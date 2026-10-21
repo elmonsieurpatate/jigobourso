@@ -1,0 +1,29 @@
+Destination vérifiée : /home/u381524662/domains/jigobourso.turnjoy.dev/public_html
+Python 3.9.25
+pip 21.3.1 from /usr/lib/python3.9/site-packages/pip (python 3.9)
+PHP 8.2.34 (cli) (built: Sep 30 2026 00:00:00) (NTS)
+Copyright (c) The PHP Group
+Zend Engine v4.2.34, Copyright (c) Zend Technologies
+    with Zend OPcache v8.2.34, Copyright (c), by Zend Technologies
+/usr/bin/rsync
+total 628
+drwxr-xr-x 5 u381524662 o1006766600   4096 Oct 21 11:16 .
+drwxr-xr-x 6 u381524662 o1006766600   4096 Oct 21 10:24 ..
+-rw-r--r-- 1 u381524662 o1006766600   5571 Oct 21 11:16 admin.html
+-rw-r--r-- 1 u381524662 o1006766600  28389 Oct 21 11:16 api.php
+-rw-r--r-- 1 u381524662 o1006766600  16494 Oct 21 11:16 auth.php
+-rw-r--r-- 1 u381524662 o1006766600   9667 Oct 21 11:16 bilan.html
+-rw-r--r-- 1 u381524662 o1006766600   1751 Oct 21 11:16 cron_scan.sh
+drwxr-xr-x 6 u381524662 o1006766600   4096 Oct 21 11:16 data
+-rw-r--r-- 1 u381524662 o1006766600  16430 Oct 21 09:31 default.php
+-rw-r--r-- 1 u381524662 o1006766600    370 Oct 21 11:16 .htaccess
+-rw-r--r-- 1 u381524662 o1006766600   5268 Oct 21 11:16 login.html
+-rw-r--r-- 1 u381524662 o1006766600 392791 Oct 21 11:16 rapport.html
+-rw-r--r-- 1 u381524662 o1006766600     60 Oct 21 11:16 requirements.txt
+-rw-r--r-- 1 u381524662 o1006766600  61370 Oct 21 11:16 scan.py
+drwxr-xr-x 2 u381524662 o1006766600   4096 Oct 21 11:16 static
+-rw-r--r-- 1 u381524662 o1006766600   6458 Oct 21 11:16 suivi.html
+drwxr-xr-x 3 u381524662 o1006766600   4096 Oct 21 10:01 .venv
+Sauvegarde du code : /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-uzqdw46s
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-uzqdw46s/lint.php
+Déploiement et contrôles HTTPS réussis.
