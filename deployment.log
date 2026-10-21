@@ -1,0 +1,32 @@
+Destination vérifiée : /home/u381524662/domains/jigobourso.turnjoy.dev/public_html
+Python 3.9.25
+pip 21.3.1 from /usr/lib/python3.9/site-packages/pip (python 3.9)
+PHP 8.2.34 (cli) (built: Sep 30 2026 00:00:00) (NTS)
+Copyright (c) The PHP Group
+Zend Engine v4.2.34, Copyright (c) Zend Technologies
+    with Zend OPcache v8.2.34, Copyright (c), by Zend Technologies
+/usr/bin/rsync
+total 684
+drwxr-xr-x 6 u381524662 o1006766600   4096 Oct 21 11:50 .
+drwxr-xr-x 6 u381524662 o1006766600   4096 Oct 21 10:24 ..
+-rw-r--r-- 1 u381524662 o1006766600   5288 Oct 21 11:48 admin.html
+-rw-r--r-- 1 u381524662 o1006766600  28727 Oct 21 11:48 api.php
+-rw-r--r-- 1 u381524662 o1006766600  18407 Oct 21 11:48 auth.php
+-rw-r--r-- 1 u381524662 o1006766600   9154 Oct 21 11:48 bilan.html
+-rw-r--r-- 1 u381524662 o1006766600   2226 Oct 21 11:48 cron_scan.sh
+drwxr-xr-x 6 u381524662 o1006766600   4096 Oct 21 11:48 data
+-rw-r--r-- 1 u381524662 o1006766600  16430 Oct 21 09:31 default.php
+-rw-r--r-- 1 u381524662 o1006766600   1912 Oct 21 11:48 etf_cli.php
+-rw-r--r-- 1 u381524662 o1006766600  35602 Oct 21 11:48 etf_profile.py
+-rw-r--r-- 1 u381524662 o1006766600    378 Oct 21 11:48 .htaccess
+-rw-r--r-- 1 u381524662 o1006766600   5268 Oct 21 11:48 login.html
+drwxr-xr-x 2 u381524662 o1006766600   4096 Oct 21 11:50 __pycache__
+-rw-r--r-- 1 u381524662 o1006766600 391896 Oct 21 11:29 rapport.html
+-rw-r--r-- 1 u381524662 o1006766600     60 Oct 21 11:48 requirements.txt
+-rw-r--r-- 1 u381524662 o1006766600  60834 Oct 21 11:48 scan.py
+drwxr-xr-x 2 u381524662 o1006766600   4096 Oct 21 11:48 static
+-rw-r--r-- 1 u381524662 o1006766600   5941 Oct 21 11:48 suivi.html
+drwxr-xr-x 3 u381524662 o1006766600   4096 Oct 21 10:01 .venv
+Sauvegarde du code : /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-41oftwds
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-41oftwds/lint.php
+Déploiement et contrôles HTTPS réussis.
