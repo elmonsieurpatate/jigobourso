@@ -1,122 +1,0 @@
-Destination vérifiée : /home/u381524662/domains/jigobourso.turnjoy.dev/public_html
-Python 3.9.25
-pip 21.3.1 from /usr/lib/python3.9/site-packages/pip (python 3.9)
-PHP 8.2.34 (cli) (built: Sep 30 2026 00:00:00) (NTS)
-Copyright (c) The PHP Group
-Zend Engine v4.2.34, Copyright (c) Zend Technologies
-    with Zend OPcache v8.2.34, Copyright (c), by Zend Technologies
-/usr/bin/rsync
-total 32
-drwxr-xr-x 2 u381524662 o1006766600  4096 Oct 21 09:31 .
-drwxr-xr-x 4 u381524662 o1006766600  4096 Oct 21 09:55 ..
--rw-r--r-- 1 u381524662 o1006766600 16430 Oct 21 09:31 default.php
-Collecting yfinance
-  Downloading yfinance-0.2.66-py2.py3-none-any.whl (123 kB)
-Collecting pandas
-  Downloading pandas-2.2.3-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (13.1 MB)
-Collecting numpy
-  Downloading numpy-2.0.2-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (19.5 MB)
-Collecting lxml
-  Downloading lxml-6.1.3-cp39-cp39-manylinux_2_26_x86_64.manylinux_2_28_x86_64.whl (5.3 MB)
-Collecting requests
-  Downloading requests-2.32.5-py3-none-any.whl (64 kB)
-Collecting beautifulsoup4
-  Downloading beautifulsoup4-4.15.0-py3-none-any.whl (109 kB)
-Collecting html5lib
-  Downloading html5lib-1.1-py2.py3-none-any.whl (112 kB)
-Collecting peewee>=3.16.2
-  Downloading peewee-3.19.0-py3-none-any.whl (411 kB)
-Collecting multitasking>=0.0.7
-  Downloading multitasking-0.0.13-py3-none-any.whl (16 kB)
-Collecting curl_cffi>=0.7
-  Downloading curl_cffi-0.13.0-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (8.3 MB)
-Collecting protobuf>=3.19.0
-  Downloading protobuf-6.33.6-cp39-abi3-manylinux2014_x86_64.whl (323 kB)
-Collecting platformdirs>=2.0.0
-  Downloading platformdirs-4.4.0-py3-none-any.whl (18 kB)
-Collecting pytz>=2022.5
-  Downloading pytz-2026.5-py2.py3-none-any.whl (506 kB)
-Collecting frozendict>=2.3.4
-  Downloading frozendict-2.4.7-cp39-cp39-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (119 kB)
-Collecting websockets>=13.0
-  Downloading websockets-15.0.1-cp39-cp39-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl (181 kB)
-Collecting python-dateutil>=2.8.2
-  Downloading python_dateutil-2.9.0.post0-py2.py3-none-any.whl (229 kB)
-Collecting tzdata>=2022.7
-  Downloading tzdata-2026.5-py2.py3-none-any.whl (347 kB)
-Collecting certifi>=2017.4.17
-  Downloading certifi-2026.10.19-py3-none-any.whl (136 kB)
-Collecting charset_normalizer<4,>=2
-  Downloading charset_normalizer-3.5.2-cp39-cp39-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (271 kB)
-Collecting urllib3<3,>=1.21.1
-  Downloading urllib3-2.6.3-py3-none-any.whl (131 kB)
-Collecting idna<4,>=2.5
-  Downloading idna-3.20-py3-none-any.whl (69 kB)
-Collecting soupsieve>=1.6.1
-  Downloading soupsieve-2.8.4-py3-none-any.whl (37 kB)
-Collecting typing-extensions>=4.0.0
-  Downloading typing_extensions-4.16.0-py3-none-any.whl (45 kB)
-Collecting webencodings
-  Downloading webencodings-0.5.1-py2.py3-none-any.whl (11 kB)
-Collecting six>=1.9
-  Downloading six-1.17.0-py2.py3-none-any.whl (11 kB)
-Collecting cffi>=1.12.0
-  Downloading cffi-2.0.0-cp39-cp39-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (216 kB)
-Collecting pycparser
-  Downloading pycparser-2.23-py3-none-any.whl (118 kB)
-Installing collected packages: six, pycparser, urllib3, tzdata, typing-extensions, soupsieve, pytz, python-dateutil, numpy, idna, charset-normalizer, cffi, certifi, websockets, webencodings, requests, protobuf, platformdirs, peewee, pandas, multitasking, frozendict, curl-cffi, beautifulsoup4, yfinance, lxml, html5lib
-ERROR: pip's dependency resolver does not currently take into account all the packages that are installed. This behaviour is the source of the following dependency conflicts.
-s3cmd 2.4.0 requires python-magic, which is not installed.
-Successfully installed beautifulsoup4-4.15.0 certifi-2026.10.19 cffi-2.0.0 charset-normalizer-3.5.2 curl-cffi-0.13.0 frozendict-2.4.7 html5lib-1.1 idna-3.20 lxml-6.1.3 multitasking-0.0.13 numpy-2.0.2 pandas-2.2.3 peewee-3.19.0 platformdirs-4.4.0 protobuf-6.33.6 pycparser-2.23 python-dateutil-2.9.0.post0 pytz-2026.5 requests-2.32.5 six-1.17.0 soupsieve-2.8.4 typing-extensions-4.16.0 tzdata-2026.5 urllib3-2.6.3 webencodings-0.5.1 websockets-15.0.1 yfinance-0.2.66
-1/4 Listes de titres…
-  Préfiltre Nasdaq : 10026 -> 7659 titres
-  US: 7659 actions
-  [Europe] France: 40 titres
-  [Europe] Allemagne: 40 titres
-  [Europe] Pays-Bas: 25 titres
-  [Europe] Espagne: 35 titres
-  [Europe] Italie: 40 titres
-  [Europe] Suède: 30 titres
-  [Europe] Suisse: 20 titres
-  [Europe] Belgique: 20 titres
-  [Europe+] France: 0 titres
-  [Europe+] Allemagne: 0 titres
-  [Europe+] Pays-Bas: 0 titres
-  [Europe+] Italie: 0 titres
-  [Europe+] Espagne: 0 titres
-  [Europe+] Suède: 0 titres
-  [Europe+] Finlande: 0 titres
-  [Europe+] Danemark: 0 titres
-  [Europe+] Norvège: 232 titres
-  [Europe+] Belgique: 57 titres
-  [Europe+] Portugal: 16 titres
-  [Europe+] Irlande: 15 titres
-  [Europe+] screener Yahoo indisponible : seuls les grands indices sont couverts
-  Univers : 3272 actions et 4807 ETF avant toute sélection
-2/4 Téléchargement des cours (quelques minutes)…
-  20/8079  40/8079  60/8079  80/8079  100/8079  120/8079  140/8079  160/8079  180/8079  200/8079  220/8079  240/8079  260/8079  280/8079  300/8079  320/8079  340/8079  360/8079  380/8079  400/8079  420/8079  440/8079  460/8079  480/8079  500/8079  520/8079  540/8079  560/8079  580/8079  600/8079  620/8079  640/8079  660/8079  680/8079  700/8079  720/8079  740/8079  760/8079  780/8079  800/8079  820/8079  840/8079  860/8079  880/8079  900/8079  920/8079  940/8079  960/8079  980/8079  1000/8079  1020/8079  1040/8079  1060/8079  1080/8079  1100/8079  1120/8079  1140/8079  1160/8079  1180/8079  1200/8079  1220/8079  1240/8079  1260/8079  1280/8079  1300/8079  1320/8079  1340/8079  1360/8079  1380/8079  1400/8079  1420/8079  1440/8079  1460/8079  1480/8079  1500/8079  1520/8079  1540/8079  1560/8079  1580/8079  1600/8079  1620/8079  1640/8079  1660/8079  1680/8079  1700/8079  1720/8079  1740/8079  1760/8079  1780/8079  1800/8079  1820/8079  1840/8079  1860/8079  1880/8079  1900/8079  1920/8079  1940/8079  1960/8079  1980/8079  2000/8079  2020/8079  2040/8079  2060/8079  2080/8079  2100/8079  2120/8079  2140/8079  2160/8079  2180/8079  2200/8079  2220/8079  2240/8079  2260/8079  2280/8079  2300/8079  2320/8079  2340/8079  2360/8079  2380/8079  2400/8079  2420/8079  2440/8079  2460/8079  2480/8079  2500/8079  2520/8079  2540/8079  2560/8079  2580/8079  2600/8079  2620/8079  2640/8079  2660/8079  2680/8079  2700/8079  2720/8079  2740/8079  2760/8079  2780/8079  2800/8079  2820/8079  2840/8079  2860/8079  2880/8079  2900/8079  2920/8079  2940/8079  2960/8079  2980/8079  3000/8079  3020/8079  3040/8079  3060/8079  3080/8079  3100/8079  3120/8079  3140/8079  3160/8079  3180/8079  3200/8079  3220/8079  3240/8079  3260/8079  3280/8079  3300/8079  3320/8079  3340/8079  3360/8079  3380/8079  3400/8079  3420/8079  3440/8079  3460/8079  3480/8079  3500/8079  3520/8079  3540/8079  3560/8079  3580/8079  3600/8079  3620/8079  3640/8079  3660/8079  3680/8079  3700/8079  3720/8079  3740/8079  3760/8079  3780/8079  3800/8079  3820/8079  3840/8079  3860/8079  3880/8079  3900/8079  3920/8079  3940/8079  3960/8079  3980/8079  4000/8079  4020/8079  4040/8079  4060/8079  4080/8079  4100/8079  4120/8079  4140/8079  4160/8079  4180/8079  4200/8079  4220/8079  4240/8079  4260/8079  4280/8079  4300/8079  4320/8079  4340/8079  4360/8079  4380/8079  4400/8079  4420/8079  4440/8079  4460/8079  4480/8079  4500/8079  4520/8079  4540/8079  4560/8079  4580/8079  4600/8079  4620/8079  4640/8079  4660/8079  4680/8079  4700/8079  4720/8079  4740/8079  4760/8079  4780/8079  4800/8079  4820/8079  4840/8079  4860/8079  4880/8079  4900/8079  4920/8079  4940/8079  4960/8079  4980/8079  5000/8079  5020/8079  5040/8079  5060/8079  5080/8079  5100/8079  5120/8079  5140/8079  5160/8079  5180/8079  5200/8079  5220/8079  5240/8079  5260/8079  5280/8079  5300/8079  5320/8079  5340/8079  5360/8079  5380/8079  5400/8079  5420/8079  5440/8079  5460/8079  5480/8079  5500/8079  5520/8079  5540/8079  5560/8079  5580/8079  5600/8079  5620/8079  5640/8079  5660/8079  5680/8079  5700/8079  5720/8079  5740/8079  5760/8079  5780/8079  5800/8079  5820/8079  5840/8079  5860/8079  5880/8079  5900/8079  5920/8079  5940/8079  5960/8079  5980/8079  6000/8079  6020/8079  6040/8079  6060/8079  6080/8079  6100/8079  6120/8079  6140/8079  6160/8079  6180/8079  6200/8079  6220/8079  6240/8079  6260/8079  6280/8079  6300/8079  6320/8079  6340/8079  6360/8079  6380/8079  6400/8079  6420/8079  6440/8079  6460/8079  6480/8079  6500/8079  6520/8079  6540/8079  6560/8079  6580/8079  6600/8079  6620/8079  6640/8079  6660/8079  6680/8079  6700/8079  6720/8079  6740/8079  6760/8079  6780/8079  6800/8079  6820/8079  6840/8079  6860/8079  6880/8079  6900/8079  6920/8079  6940/8079  6960/8079  6980/8079  7000/8079  7020/8079  7040/8079  7060/8079  7080/8079  7100/8079  7120/8079  7140/8079  7160/8079  7180/8079  7200/8079  7220/8079  7240/8079  7260/8079  7280/8079  7300/8079  7320/8079  7340/8079  7360/8079  7380/8079  7400/8079  7420/8079  7440/8079  7460/8079  7480/8079  7500/8079  7520/8079  7540/8079  7560/8079  7580/8079  7600/8079  7620/8079  7640/8079  7660/8079  7680/8079  7700/8079  7720/8079  7740/8079  7760/8079  7780/8079  7800/8079  7820/8079  7840/8079  7860/8079  7880/8079  7900/8079  7920/8079  7940/8079  7960/8079  7980/8079  8000/8079  8020/8079  8040/8079  8060/8079  8079/8079
-  7877 titres vus, 5151 à examiner de près (volumes)
-  25/5151  50/5151  75/5151  100/5151  125/5151  150/5151  175/5151  200/5151  225/5151  250/5151  275/5151  300/5151  325/5151  350/5151  375/5151  400/5151  425/5151  450/5151  475/5151  500/5151  525/5151  550/5151  575/5151  600/5151  625/5151  650/5151  675/5151  700/5151  725/5151  750/5151  775/5151  800/5151  825/5151  850/5151  875/5151  900/5151  925/5151  950/5151  975/5151  1000/5151  1025/5151  1050/5151  1075/5151  1100/5151  1125/5151  1150/5151  1175/5151  1200/5151  1225/5151  1250/5151  1275/5151  1300/5151  1325/5151  1350/5151  1375/5151  1400/5151  1425/5151  1450/5151  1475/5151  1500/5151  1525/5151  1550/5151  1575/5151  1600/5151  1625/5151  1650/5151  1675/5151  1700/5151  1725/5151  1750/5151  1775/5151  1800/5151  1825/5151  1850/5151  1875/5151  1900/5151  1925/5151  1950/5151  1975/5151  2000/5151  2025/5151  2050/5151  2075/5151  2100/5151  2125/5151  2150/5151  2175/5151  2200/5151  2225/5151  2250/5151  2275/5151  2300/5151  2325/5151  2350/5151  2375/5151  2400/5151  2425/5151  2450/5151  2475/5151  2500/5151  2525/5151  2550/5151  2575/5151  2600/5151  2625/5151  2650/5151  2675/5151  2700/5151  2725/5151  2750/5151  2775/5151  2800/5151  2825/5151  2850/5151  2875/5151  2900/5151  2925/5151  2950/5151  2975/5151  3000/5151  3025/5151  3050/5151  3075/5151  3100/5151  3125/5151  3150/5151  3175/5151  3200/5151  3225/5151  3250/5151  3275/5151  3300/5151  3325/5151  3350/5151  3375/5151  3400/5151  3425/5151  3450/5151  3475/5151  3500/5151  3525/5151  3550/5151  3575/5151  3600/5151  3625/5151  3650/5151  3675/5151  3700/5151  3725/5151  3750/5151  3775/5151  3800/5151  3825/5151  3850/5151  3875/5151  3900/5151  3925/5151  3950/5151  3975/5151  4000/5151  4025/5151  4050/5151  4075/5151  4100/5151  4125/5151  4150/5151  4175/5151  4200/5151  4225/5151  4250/5151  4275/5151  4300/5151  4325/5151  4350/5151  4375/5151  4400/5151  4425/5151  4450/5151  4475/5151  4500/5151  4525/5151  4550/5151  4575/5151  4600/5151  4625/5151  4650/5151  4675/5151  4700/5151  4725/5151  4750/5151  4775/5151  4800/5151  4825/5151  4850/5151  4875/5151  4900/5151  4925/5151  4950/5151  4975/5151  5000/5151  5025/5151  5050/5151  5075/5151  5100/5151  5125/5151  5150/5151  5151/5151
-  Historiques ETF disponibles : 4622
-  4966 titres avec historique valable
-3/4 Calcul et filtres…
-  Candidats ETF avant limite : 1153
-  1477 titres liquides · 145 candidats globaux · 40 candidats PEA
-  Vérification du pays (PEA)…
-  Codes ISIN…
-4/4 Analyse des risques (news, résultats)…
-  suivi du classement non mis à jour : KeyError 'e'
-Terminé en 258s → /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-runtime/initial-report-vnj1xm_7/rapport.html
-  WKL.AS   j   +1.1 % s   +8.4 % m  +26.6 % reg  68  
-  DB1.DE   j   -0.4 % s   +1.4 % m   +9.9 % reg  75  
-  CAP.PA   j   +1.7 % s   +6.1 % m  +17.7 % reg  55  
-  DNO.OL   j   +0.9 % s   +9.3 % m  +24.0 % reg  49  
-  KRZ.IR   j   +0.3 % s   +3.8 % m  +11.1 % reg  61  
-  SHL.DE   j   +0.1 % s   +3.5 % m  +10.8 % reg  61  
-  MUV2.DE  j   +0.5 % s   +3.0 % m   +9.4 % reg  65  
-  ENX.PA   j   +1.7 % s   +2.9 % m   +8.4 % reg  65  
-  HNR1.DE  j   +0.3 % s   +3.1 % m   +9.5 % reg  62  
-  ZAL.DE   j   +1.5 % s   +6.6 % m  +14.2 % reg  56  
-Sauvegarde du code : /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-qq08f4jp
-No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-qq08f4jp/lint.php
-Déploiement et contrôles HTTPS réussis.
