@@ -1,0 +1,145 @@
+Destination vérifiée : /home/u381524662/domains/jigobourso.turnjoy.dev/public_html
+Python 3.9.25
+pip 21.3.1 from /usr/lib/python3.9/site-packages/pip (python 3.9)
+PHP 8.2.34 (cli) (built: Sep 30 2026 00:00:00) (NTS)
+Copyright (c) The PHP Group
+Zend Engine v4.2.34, Copyright (c) Zend Technologies
+    with Zend OPcache v8.2.34, Copyright (c), by Zend Technologies
+/usr/bin/rsync
+total 32
+drwxr-xr-x 2 u381524662 o1006766600  4096 Oct 21 09:31 .
+drwxr-xr-x 3 u381524662 o1006766600  4096 Oct 21 09:31 ..
+-rw-r--r-- 1 u381524662 o1006766600 16430 Oct 21 09:31 default.php
+Collecting yfinance
+  Downloading yfinance-0.2.66-py2.py3-none-any.whl (123 kB)
+Collecting pandas
+  Downloading pandas-2.2.3-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (13.1 MB)
+Collecting numpy
+  Downloading numpy-2.0.2-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (19.5 MB)
+Collecting lxml
+  Downloading lxml-6.1.3-cp39-cp39-manylinux_2_26_x86_64.manylinux_2_28_x86_64.whl (5.3 MB)
+Collecting requests
+  Downloading requests-2.32.5-py3-none-any.whl (64 kB)
+Collecting beautifulsoup4
+  Downloading beautifulsoup4-4.15.0-py3-none-any.whl (109 kB)
+Collecting html5lib
+  Downloading html5lib-1.1-py2.py3-none-any.whl (112 kB)
+Collecting platformdirs>=2.0.0
+  Downloading platformdirs-4.4.0-py3-none-any.whl (18 kB)
+Collecting websockets>=13.0
+  Downloading websockets-15.0.1-cp39-cp39-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl (181 kB)
+Collecting protobuf>=3.19.0
+  Downloading protobuf-6.33.6-cp39-abi3-manylinux2014_x86_64.whl (323 kB)
+Collecting multitasking>=0.0.7
+  Downloading multitasking-0.0.13-py3-none-any.whl (16 kB)
+Collecting curl_cffi>=0.7
+  Downloading curl_cffi-0.13.0-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (8.3 MB)
+Collecting pytz>=2022.5
+  Downloading pytz-2026.5-py2.py3-none-any.whl (506 kB)
+Collecting peewee>=3.16.2
+  Downloading peewee-3.19.0-py3-none-any.whl (411 kB)
+Collecting frozendict>=2.3.4
+  Downloading frozendict-2.4.7-cp39-cp39-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (119 kB)
+Collecting python-dateutil>=2.8.2
+  Downloading python_dateutil-2.9.0.post0-py2.py3-none-any.whl (229 kB)
+Collecting tzdata>=2022.7
+  Downloading tzdata-2026.5-py2.py3-none-any.whl (347 kB)
+Collecting urllib3<3,>=1.21.1
+  Downloading urllib3-2.6.3-py3-none-any.whl (131 kB)
+Collecting idna<4,>=2.5
+  Downloading idna-3.20-py3-none-any.whl (69 kB)
+Collecting charset_normalizer<4,>=2
+  Downloading charset_normalizer-3.5.2-cp39-cp39-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (271 kB)
+Collecting certifi>=2017.4.17
+  Downloading certifi-2026.10.19-py3-none-any.whl (136 kB)
+Collecting soupsieve>=1.6.1
+  Downloading soupsieve-2.8.4-py3-none-any.whl (37 kB)
+Collecting typing-extensions>=4.0.0
+  Downloading typing_extensions-4.16.0-py3-none-any.whl (45 kB)
+Collecting webencodings
+  Downloading webencodings-0.5.1-py2.py3-none-any.whl (11 kB)
+Collecting six>=1.9
+  Downloading six-1.17.0-py2.py3-none-any.whl (11 kB)
+Collecting cffi>=1.12.0
+  Downloading cffi-2.0.0-cp39-cp39-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (216 kB)
+Collecting pycparser
+  Downloading pycparser-2.23-py3-none-any.whl (118 kB)
+Installing collected packages: six, pycparser, urllib3, tzdata, typing-extensions, soupsieve, pytz, python-dateutil, numpy, idna, charset-normalizer, cffi, certifi, websockets, webencodings, requests, protobuf, platformdirs, peewee, pandas, multitasking, frozendict, curl-cffi, beautifulsoup4, yfinance, lxml, html5lib
+ERROR: pip's dependency resolver does not currently take into account all the packages that are installed. This behaviour is the source of the following dependency conflicts.
+s3cmd 2.4.0 requires python-magic, which is not installed.
+Successfully installed beautifulsoup4-4.15.0 certifi-2026.10.19 cffi-2.0.0 charset-normalizer-3.5.2 curl-cffi-0.13.0 frozendict-2.4.7 html5lib-1.1 idna-3.20 lxml-6.1.3 multitasking-0.0.13 numpy-2.0.2 pandas-2.2.3 peewee-3.19.0 platformdirs-4.4.0 protobuf-6.33.6 pycparser-2.23 python-dateutil-2.9.0.post0 pytz-2026.5 requests-2.32.5 six-1.17.0 soupsieve-2.8.4 typing-extensions-4.16.0 tzdata-2026.5 urllib3-2.6.3 webencodings-0.5.1 websockets-15.0.1 yfinance-0.2.66
+OpenBLAS blas_thread_init: pthread_create failed for thread 39 of 64: Resource temporarily unavailable
+OpenBLAS blas_thread_init: RLIMIT_NPROC 2059150 current, 2059150 max
+OpenBLAS blas_thread_init: pthread_create failed for thread 40 of 64: Resource temporarily unavailable
+OpenBLAS blas_thread_init: RLIMIT_NPROC 2059150 current, 2059150 max
+OpenBLAS blas_thread_init: pthread_create failed for thread 41 of 64: Resource temporarily unavailable
+OpenBLAS blas_thread_init: RLIMIT_NPROC 2059150 current, 2059150 max
+OpenBLAS blas_thread_init: pthread_create failed for thread 42 of 64: Resource temporarily unavailable
+OpenBLAS blas_thread_init: RLIMIT_NPROC 2059150 current, 2059150 max
+OpenBLAS blas_thread_init: pthread_create failed for thread 43 of 64: Resource temporarily unavailable
+OpenBLAS blas_thread_init: RLIMIT_NPROC 2059150 current, 2059150 max
+OpenBLAS blas_thread_init: pthread_create failed for thread 44 of 64: Resource temporarily unavailable
+OpenBLAS blas_thread_init: RLIMIT_NPROC 2059150 current, 2059150 max
+OpenBLAS blas_thread_init: pthread_create failed for thread 45 of 64: Resource temporarily unavailable
+OpenBLAS blas_thread_init: RLIMIT_NPROC 2059150 current, 2059150 max
+OpenBLAS blas_thread_init: pthread_create failed for thread 46 of 64: Resource temporarily unavailable
+OpenBLAS blas_thread_init: RLIMIT_NPROC 2059150 current, 2059150 max
+OpenBLAS blas_thread_init: pthread_create failed for thread 47 of 64: Resource temporarily unavailable
+OpenBLAS blas_thread_init: RLIMIT_NPROC 2059150 current, 2059150 max
+OpenBLAS blas_thread_init: pthread_create failed for thread 48 of 64: Resource temporarily unavailable
+OpenBLAS blas_thread_init: RLIMIT_NPROC 2059150 current, 2059150 max
+OpenBLAS blas_thread_init: pthread_create failed for thread 49 of 64: Resource temporarily unavailable
+OpenBLAS blas_thread_init: RLIMIT_NPROC 2059150 current, 2059150 max
+OpenBLAS blas_thread_init: pthread_create failed for thread 50 of 64: Resource temporarily unavailable
+OpenBLAS blas_thread_init: RLIMIT_NPROC 2059150 current, 2059150 max
+OpenBLAS blas_thread_init: pthread_create failed for thread 51 of 64: Resource temporarily unavailable
+OpenBLAS blas_thread_init: RLIMIT_NPROC 2059150 current, 2059150 max
+OpenBLAS blas_thread_init: pthread_create failed for thread 52 of 64: Resource temporarily unavailable
+OpenBLAS blas_thread_init: RLIMIT_NPROC 2059150 current, 2059150 max
+OpenBLAS blas_thread_init: pthread_create failed for thread 53 of 64: Resource temporarily unavailable
+OpenBLAS blas_thread_init: RLIMIT_NPROC 2059150 current, 2059150 max
+OpenBLAS blas_thread_init: pthread_create failed for thread 54 of 64: Resource temporarily unavailable
+OpenBLAS blas_thread_init: RLIMIT_NPROC 2059150 current, 2059150 max
+OpenBLAS blas_thread_init: pthread_create failed for thread 55 of 64: Resource temporarily unavailable
+OpenBLAS blas_thread_init: RLIMIT_NPROC 2059150 current, 2059150 max
+OpenBLAS blas_thread_init: pthread_create failed for thread 56 of 64: Resource temporarily unavailable
+OpenBLAS blas_thread_init: RLIMIT_NPROC 2059150 current, 2059150 max
+OpenBLAS blas_thread_init: pthread_create failed for thread 57 of 64: Resource temporarily unavailable
+OpenBLAS blas_thread_init: RLIMIT_NPROC 2059150 current, 2059150 max
+OpenBLAS blas_thread_init: pthread_create failed for thread 58 of 64: Resource temporarily unavailable
+OpenBLAS blas_thread_init: RLIMIT_NPROC 2059150 current, 2059150 max
+OpenBLAS blas_thread_init: pthread_create failed for thread 59 of 64: Resource temporarily unavailable
+OpenBLAS blas_thread_init: RLIMIT_NPROC 2059150 current, 2059150 max
+OpenBLAS blas_thread_init: pthread_create failed for thread 60 of 64: Resource temporarily unavailable
+OpenBLAS blas_thread_init: RLIMIT_NPROC 2059150 current, 2059150 max
+OpenBLAS blas_thread_init: pthread_create failed for thread 61 of 64: Resource temporarily unavailable
+OpenBLAS blas_thread_init: RLIMIT_NPROC 2059150 current, 2059150 max
+OpenBLAS blas_thread_init: pthread_create failed for thread 62 of 64: Resource temporarily unavailable
+OpenBLAS blas_thread_init: RLIMIT_NPROC 2059150 current, 2059150 max
+OpenBLAS blas_thread_init: pthread_create failed for thread 63 of 64: Resource temporarily unavailable
+OpenBLAS blas_thread_init: RLIMIT_NPROC 2059150 current, 2059150 max
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+  File "/home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-runtime/de02fb0a5a726a40c93e/yfinance/__init__.py", line 23, in <module>
+    from .search import Search
+  File "/home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-runtime/de02fb0a5a726a40c93e/yfinance/search.py", line 25, in <module>
+    from . import utils
+  File "/home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-runtime/de02fb0a5a726a40c93e/yfinance/utils.py", line 35, in <module>
+    import numpy as _np
+  File "/home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-runtime/de02fb0a5a726a40c93e/numpy/__init__.py", line 114, in <module>
+    from numpy.__config__ import show as show_config
+  File "/home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-runtime/de02fb0a5a726a40c93e/numpy/__config__.py", line 4, in <module>
+    from numpy._core._multiarray_umath import (
+  File "/home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-runtime/de02fb0a5a726a40c93e/numpy/_core/__init__.py", line 23, in <module>
+    from . import multiarray
+  File "/home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-runtime/de02fb0a5a726a40c93e/numpy/_core/multiarray.py", line 10, in <module>
+    from . import overrides
+  File "/home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-runtime/de02fb0a5a726a40c93e/numpy/_core/overrides.py", line 8, in <module>
+    from numpy._core._multiarray_umath import (
+  File "<frozen importlib._bootstrap>", line 1002, in _find_and_load
+KeyboardInterrupt
+Traceback (most recent call last):
+  File "<string>", line 58, in <module>
+  File "/usr/lib64/python3.9/subprocess.py", line 528, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['/usr/bin/python3', '-s', '-c', 'import yfinance, pandas, numpy, requests, lxml, bs4, html5lib']' died with <Signals.SIGINT: 2>.
