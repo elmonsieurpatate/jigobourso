@@ -1,0 +1,56 @@
+Destination vérifiée : /home/u381524662/domains/jigobourso.turnjoy.dev/public_html
+Python 3.9.25
+pip 21.3.1 from /usr/lib/python3.9/site-packages/pip (python 3.9)
+PHP 8.2.34 (cli) (built: Oct 21 2026 00:00:00) (NTS)
+Copyright (c) The PHP Group
+Zend Engine v4.2.34, Copyright (c) Zend Technologies
+    with Zend OPcache v8.2.34, Copyright (c), by Zend Technologies
+/usr/bin/rsync
+total 824
+drwxr-xr-x 8 u381524662 o1006766600   4096 Oct 23 08:59 .
+drwxr-xr-x 8 u381524662 o1006766600   4096 Oct 21 16:55 ..
+-rw-r--r-- 1 u381524662 o1006766600   5291 Oct 23 08:59 admin.html
+-rw-r--r-- 1 u381524662 o1006766600  41120 Oct 23 08:59 api.php
+-rw-r--r-- 1 u381524662 o1006766600  18407 Oct 23 08:59 auth.php
+-rw-r--r-- 1 u381524662 o1006766600   9374 Oct 23 08:59 bilan.html
+-rw-r--r-- 1 u381524662 o1006766600    700 Oct 23 08:59 cron_history.sh
+-rw-r--r-- 1 u381524662 o1006766600   2226 Oct 23 08:59 cron_scan.sh
+drwxr-xr-x 6 u381524662 o1006766600   4096 Oct 23 08:59 data
+-rw-r--r-- 1 u381524662 o1006766600  16430 Oct 21 09:31 default.php
+-rw-r--r-- 1 u381524662 o1006766600   1912 Oct 23 08:59 etf_cli.php
+-rw-r--r-- 1 u381524662 o1006766600  35840 Oct 23 08:59 etf_profile.py
+-rw-r--r-- 1 u381524662 o1006766600   9627 Oct 23 08:59 fd_catalogue_api.php
+-rw-r--r-- 1 u381524662 o1006766600  12920 Oct 23 08:59 fd_source_catalogue_api.php
+-rw-r--r-- 1 u381524662 o1006766600   7968 Oct 23 08:59 finance-database-catalogue.php
+-rw-r--r-- 1 u381524662 o1006766600   2523 Oct 23 08:59 finance-database.php
+-rw-r--r-- 1 u381524662 o1006766600   4750 Oct 23 08:59 historiques.php
+-rw-r--r-- 1 u381524662 o1006766600   8811 Oct 23 08:59 history_admin_api.php
+-rw-r--r-- 1 u381524662 o1006766600    496 Oct 23 08:59 .htaccess
+-rw-r--r-- 1 u381524662 o1006766600   5268 Oct 23 08:59 login.html
+drwxr-xr-x 3 u381524662 o1006766600   4096 Oct 22 16:47 ops
+drwxr-xr-x 2 u381524662 o1006766600   4096 Oct 21 11:50 __pycache__
+-rw-r--r-- 1 u381524662 o1006766600 393086 Oct 23 08:59 rapport.html
+-rw-r--r-- 1 u381524662 o1006766600     87 Oct 23 08:59 requirements.txt
+-rw-r--r-- 1 u381524662 o1006766600  60941 Oct 23 08:59 scan.py
+drwxr-xr-x 2 u381524662 o1006766600   4096 Oct 23 08:59 static
+-rw-r--r-- 1 u381524662 o1006766600   5944 Oct 23 08:59 suivi.html
+drwxr-xr-x 3 u381524662 o1006766600   4096 Oct 23 08:59 tools
+-rw-r--r-- 1 u381524662 o1006766600   3640 Oct 23 08:59 univers-cotations.php
+-rw-r--r-- 1 u381524662 o1006766600   3935 Oct 23 08:59 universe_policy.php
+-rw-r--r-- 1 u381524662 o1006766600   4183 Oct 23 08:59 univers-investissement.php
+drwxr-xr-x 3 u381524662 o1006766600   4096 Oct 21 10:01 .venv
+Sauvegarde du code : /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-ed57f9n4
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-ed57f9n4/lint-api.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-ed57f9n4/lint-fd_catalogue_api.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-ed57f9n4/lint-fd_source_catalogue_api.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-ed57f9n4/lint-universe_policy.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-ed57f9n4/lint-univers-investissement.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-ed57f9n4/lint-univers-cotations.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-ed57f9n4/lint-finance-database-catalogue.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-ed57f9n4/lint-history_admin_api.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-ed57f9n4/lint-historiques.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-ed57f9n4/lint-tools_history_install.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-ed57f9n4/lint-tools_history_worker.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-ed57f9n4/lint-tools_history_quality.php
+{"universe_index":"ready","explain":[{"id":1,"select_type":"SIMPLE","table":"fd_listings","type":"range","possible_keys":"ix_fd_listings_status_class,ix_fd_listings_industry_group,ix_fd_listings_category_group,ix_fd_listings_category,ix_fd_listings_family,ix_fd_listings_universe_mic","key":"ix_fd_listings_universe_mic","key_len":"8","ref":null,"rows":"31547","Extra":"Using where; Using index"}]}
+Déploiement et contrôles HTTPS réussis.
