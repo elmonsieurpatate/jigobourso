@@ -1,0 +1,59 @@
+Destination vérifiée : /home/u381524662/domains/jigobourso.turnjoy.dev/public_html
+Python 3.9.25
+pip 21.3.1 from /usr/lib/python3.9/site-packages/pip (python 3.9)
+PHP 8.2.34 (cli) (built: Oct 21 2026 00:00:00) (NTS)
+Copyright (c) The PHP Group
+Zend Engine v4.2.34, Copyright (c) Zend Technologies
+    with Zend OPcache v8.2.34, Copyright (c), by Zend Technologies
+/usr/bin/rsync
+total 552
+drwxr-xr-x 9 u381524662 o1006766600  4096 Oct 24 12:16 .
+drwxr-xr-x 8 u381524662 o1006766600  4096 Oct 21 16:55 ..
+-rw-r--r-- 1 u381524662 o1006766600  5282 Oct 24 12:16 admin.html
+-rw-r--r-- 1 u381524662 o1006766600 49708 Oct 24 12:16 api.php
+-rw-r--r-- 1 u381524662 o1006766600 26078 Oct 24 12:16 auth.php
+-rw-r--r-- 1 u381524662 o1006766600  9364 Oct 24 12:16 bilan.html
+-rw-r--r-- 1 u381524662 o1006766600   181 Oct 24 12:16 constraints.txt
+-rw-r--r-- 1 u381524662 o1006766600   700 Oct 24 12:16 cron_history.sh
+-rw-r--r-- 1 u381524662 o1006766600  1838 Oct 24 12:16 cron_scan.sh
+drwxr-xr-x 6 u381524662 o1006766600  4096 Oct 24 12:16 data
+-rw-r--r-- 1 u381524662 o1006766600 16430 Oct 21 09:31 default.php
+-rw-r--r-- 1 u381524662 o1006766600   718 Oct 23 14:22 error_log
+-rw-r--r-- 1 u381524662 o1006766600  1912 Oct 24 12:16 etf_cli.php
+-rw-r--r-- 1 u381524662 o1006766600 35840 Oct 24 12:16 etf_profile.py
+-rw-r--r-- 1 u381524662 o1006766600  9627 Oct 24 12:16 fd_catalogue_api.php
+-rw-r--r-- 1 u381524662 o1006766600 12920 Oct 24 12:16 fd_source_catalogue_api.php
+-rw-r--r-- 1 u381524662 o1006766600  7961 Oct 24 12:16 finance-database-catalogue.php
+-rw-r--r-- 1 u381524662 o1006766600 11443 Oct 24 12:16 finance-database.php
+-rw-r--r-- 1 u381524662 o1006766600  8505 Oct 24 12:16 historiques.php
+-rw-r--r-- 1 u381524662 o1006766600 13880 Oct 24 12:16 history_admin_api.php
+-rw-r--r-- 1 u381524662 o1006766600  1409 Oct 24 12:16 .htaccess
+drwx------ 3 u381524662 o1006766600  4096 Oct 23 15:49 .jigobourso-runtime
+-rw-r--r-- 1 u381524662 o1006766600  5195 Oct 24 12:16 login.html
+-rw-r--r-- 1 u381524662 o1006766600  3757 Oct 24 12:16 market_rules.py
+drwxr-xr-x 5 u381524662 o1006766600  4096 Oct 23 15:37 ops
+drwxr-xr-x 2 u381524662 o1006766600  4096 Oct 24 12:18 __pycache__
+-rw-r--r-- 1 u381524662 o1006766600  7856 Oct 24 12:16 rapport.html
+-rw-r--r-- 1 u381524662 o1006766600   102 Oct 24 12:16 requirements.txt
+-rw-r--r-- 1 u381524662 o1006766600 76496 Oct 24 12:16 scan.py
+drwxr-xr-x 2 u381524662 o1006766600  4096 Oct 24 12:16 static
+-rw-r--r-- 1 u381524662 o1006766600 16689 Oct 24 12:16 strategy.py
+-rw-r--r-- 1 u381524662 o1006766600  5937 Oct 24 12:16 suivi.html
+drwxr-xr-x 5 u381524662 o1006766600  4096 Oct 24 12:16 tools
+-rw-r--r-- 1 u381524662 o1006766600  4368 Oct 24 12:16 univers-cotations.php
+-rw-r--r-- 1 u381524662 o1006766600  3935 Oct 24 12:16 universe_policy.php
+-rw-r--r-- 1 u381524662 o1006766600  4176 Oct 24 12:16 univers-investissement.php
+drwxr-xr-x 3 u381524662 o1006766600  4096 Oct 21 10:01 .venv
+STRATEGY_AUDIT {"fdp_catalogue_rows":460374,"fdp_listings":153458,"jy_bars":1495082,"selected_chain":{"id":4,"source_dedupe_run_id":4,"filter_run_id":4,"batch_id":5},"quote_prefilter_statuses":[{"prefilter_status":"admitted","n":5510},{"prefilter_status":"rejected","n":8331},{"prefilter_status":"review","n":3301}],"admitted_history_counts":{"admitted":5510,"with_two_closes":"5505","with_six_closes":"5503","with_22_closes":"5487","with_40_closes":"5469"},"published_cards":0,"published_summary":"24/10/2026 à 12:16 · Analyse des cours enregistrés"}
+STRATEGY_PROGRESS {"done": 1, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_PROGRESS {"done": 250, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_PROGRESS {"done": 500, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_PROGRESS {"done": 750, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_PROGRESS {"done": 1000, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_PROGRESS {"done": 1250, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_PROGRESS {"done": 1500, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_PROGRESS {"done": 1750, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_PROGRESS {"done": 2000, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_PROGRESS {"done": 2250, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_PROGRESS {"done": 2500, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_PROGRESS {"done": 2750, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
