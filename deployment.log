@@ -45,3 +45,13 @@ drwxr-xr-x 5 u381524662 o1006766600  4096 Oct 24 13:23 tools
 -rw-r--r-- 1 u381524662 o1006766600  4176 Oct 24 13:23 univers-investissement.php
 drwxr-xr-x 3 u381524662 o1006766600  4096 Oct 21 10:01 .venv
 STRATEGY_AUDIT {"fdp_catalogue_rows":460374,"fdp_listings":153458,"jy_bars":1495082,"selected_chain":{"id":4,"source_dedupe_run_id":4,"filter_run_id":4,"batch_id":5},"quote_prefilter_statuses":[{"prefilter_status":"admitted","n":5510},{"prefilter_status":"rejected","n":8331},{"prefilter_status":"review","n":3301}],"admitted_history_counts":{"admitted":5510,"with_two_closes":"5505","with_six_closes":"5503","with_22_closes":"5487","with_40_closes":"5469"},"published_cards":0,"published_summary":"24/10/2026 à 13:23 · Analyse des cours enregistrés"}
+STRATEGY_PROGRESS {"done": 1, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_PROGRESS {"done": 250, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_PROGRESS {"done": 500, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_PROGRESS {"done": 750, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_PROGRESS {"done": 1000, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_PROGRESS {"done": 1250, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_PROGRESS {"done": 1500, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_PROGRESS {"done": 1750, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_PROGRESS {"done": 2000, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_PROGRESS {"done": 2250, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
