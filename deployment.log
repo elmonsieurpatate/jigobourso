@@ -53,3 +53,49 @@ STRATEGY_PROGRESS {"done": 1000, "total": 5510, "stage": "Mesures des cl\u00f4tu
 STRATEGY_PROGRESS {"done": 1250, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
 STRATEGY_PROGRESS {"done": 1500, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
 STRATEGY_PROGRESS {"done": 1750, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_PROGRESS {"done": 2000, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_PROGRESS {"done": 2250, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_PROGRESS {"done": 2500, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_PROGRESS {"done": 2750, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_PROGRESS {"done": 3000, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_PROGRESS {"done": 3250, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_PROGRESS {"done": 3500, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_PROGRESS {"done": 3750, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_PROGRESS {"done": 4000, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_PROGRESS {"done": 4250, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_PROGRESS {"done": 4500, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_PROGRESS {"done": 4750, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_PROGRESS {"done": 5000, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_PROGRESS {"done": 5250, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_PROGRESS {"done": 5500, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_PROGRESS {"done": 5510, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_COUNTS {"pipeline": {"fd_rows": 153458, "fd_listings": 153458, "fd_isins": 65185, "quote_statuses": {"admitted": 5510, "rejected": 8331, "review": 3301}, "quote_admitted": 5510, "reader_candidates": 5510, "with_daily": 5505, "week_history": 5503, "month_history": 5487, "stale_last_dates": {"2026-10-22": 4611, "2026-10-20": 2, "2026-10-21": 8}, "stale_markets": {"XAMS": 2, "XASE": 58, "BATS": 170, "XLON": 1, "XNAS": 1801, "XNYS": 1869, "ARCX": 720}, "legacy_exclusive": {"no_usable_series": 116, "stale_or_invalid": 4562, "liquidity": 473, "classifiable_before_top_caps": 358, "under_40": 1}, "legacy_growth_qualified": 24, "quote_rejection_reasons": {"conversion_devise_indisponible": 3368, "cotation_perimee": 524, "liquidite_non_calculable_ou_conversion_absente": 3609, "liquidite_sous_seuil": 6568, "prix_sous_seuil": 2480, "symbole_absent_yahoo": 698, "volume_moyen_absent": 371, "date_cotation_absente": 145, "prix_absent": 145, "type_incoherent": 29}, "reader_quality": {"admitted": 5510, "joined_rows": 5510, "duplicate_same_instrument": 0, "blank_symbols": 0, "incoherent_adjustments": 111, "under_two_closes": 4, "with_daily_data": 5394, "usable_40_closes": 5358, "under_40_closes": 36, "without_daily_data": 116}, "technical_reasons": {"data:stale": 4621, "data:missing_or_incoherent": 5}}, "counts": {"evaluated": 5510, "usable_selected_periods": 884, "strategy": 49, "rejected": 5461}, "reasons": {"month:min_slope": 3494, "month:min_r2": 3437, "week:min_slope": 2782, "week:min_r2": 3736, "data:stale": 4621, "week:history": 7, "month:history": 23, "data:missing_or_incoherent": 5}, "first_reasons": {"week:min_slope": 658, "month:min_r2": 34, "week:min_r2": 119, "month:min_slope": 24, "data:stale": 4621, "data:missing_or_incoherent": 5}, "source": {"batch": 5, "quote_filter": 4}}
+Sauvegarde du code : /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-dj6se4n3
+{"password_recovery_mail_available":true}
+{"password_recovery_state":{"stored":0,"valid":0,"expired":0,"invalid_payload":0,"password_changed":0},"settings_column_limits":[{"COLUMN_NAME":"k","CHARACTER_MAXIMUM_LENGTH":40},{"COLUMN_NAME":"v","CHARACTER_MAXIMUM_LENGTH":255}]}
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-dj6se4n3/lint-api.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-dj6se4n3/lint-auth.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-dj6se4n3/lint-fd_catalogue_api.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-dj6se4n3/lint-fd_source_catalogue_api.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-dj6se4n3/lint-universe_policy.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-dj6se4n3/lint-univers-investissement.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-dj6se4n3/lint-univers-cotations.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-dj6se4n3/lint-history_admin_api.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-dj6se4n3/lint-historiques.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-dj6se4n3/lint-finance-database.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-dj6se4n3/lint-finance-database-catalogue.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-dj6se4n3/lint-etf_cli.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-dj6se4n3/lint-tools__boot.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-dj6se4n3/lint-tools_reset_password.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-dj6se4n3/lint-tools_catalogue_fd_import.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-dj6se4n3/lint-tools_catalogue_fd_run_full.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-dj6se4n3/lint-tools_history_install.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-dj6se4n3/lint-tools_history_worker.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-dj6se4n3/lint-tools_history_quality.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-dj6se4n3/lint-tools_fd_pipeline_api.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-dj6se4n3/lint-tools_fd_pipeline_worker.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-dj6se4n3/lint-tools_fd_pipeline_rules.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-dj6se4n3/lint-tools_yahoo_pipeline_api.php
+STRATEGY_PUBLISHED {"pipeline": {"fd_rows": 153458, "fd_listings": 153458, "fd_isins": 65185, "quote_statuses": {"admitted": 5510, "rejected": 8331, "review": 3301}, "quote_admitted": 5510, "reader_candidates": 5510, "with_daily": 5505, "week_history": 5503, "month_history": 5487, "stale_last_dates": {"2026-10-22": 4611, "2026-10-20": 2, "2026-10-21": 8}, "stale_markets": {"XAMS": 2, "XASE": 58, "BATS": 170, "XLON": 1, "XNAS": 1801, "XNYS": 1869, "ARCX": 720}, "legacy_exclusive": {"no_usable_series": 116, "stale_or_invalid": 4562, "liquidity": 473, "classifiable_before_top_caps": 358, "under_40": 1}, "legacy_growth_qualified": 24, "quote_rejection_reasons": {"conversion_devise_indisponible": 3368, "cotation_perimee": 524, "liquidite_non_calculable_ou_conversion_absente": 3609, "liquidite_sous_seuil": 6568, "prix_sous_seuil": 2480, "symbole_absent_yahoo": 698, "volume_moyen_absent": 371, "date_cotation_absente": 145, "prix_absent": 145, "type_incoherent": 29}, "reader_quality": {"admitted": 5510, "joined_rows": 5510, "duplicate_same_instrument": 0, "blank_symbols": 0, "incoherent_adjustments": 111, "under_two_closes": 4, "with_daily_data": 5394, "usable_40_closes": 5358, "under_40_closes": 36, "without_daily_data": 116}, "technical_reasons": {"data:stale": 4621, "data:missing_or_incoherent": 5}}, "counts": {"evaluated": 5510, "usable_selected_periods": 884, "strategy": 49, "rejected": 5461}, "reasons": {"month:min_r2": 3437, "week:min_slope": 2782, "month:min_slope": 3494, "week:min_r2": 3736, "data:stale": 4621, "month:history": 23, "week:history": 7, "data:missing_or_incoherent": 5}, "first_reasons": {"week:min_slope": 658, "month:min_r2": 34, "week:min_r2": 119, "month:min_slope": 24, "data:stale": 4621, "data:missing_or_incoherent": 5}, "source": {"batch": 5, "quote_filter": 4}}
+Récupération vérifiée: formulaires présents, jeton invalide refusé; aucun mail envoyé.
+Déploiement et contrôles HTTPS réussis.
