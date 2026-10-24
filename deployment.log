@@ -1,0 +1,73 @@
+Destination vérifiée : /home/u381524662/domains/jigobourso.turnjoy.dev/public_html
+Python 3.9.25
+pip 21.3.1 from /usr/lib/python3.9/site-packages/pip (python 3.9)
+PHP 8.2.34 (cli) (built: Oct 21 2026 00:00:00) (NTS)
+Copyright (c) The PHP Group
+Zend Engine v4.2.34, Copyright (c) Zend Technologies
+    with Zend OPcache v8.2.34, Copyright (c), by Zend Technologies
+/usr/bin/rsync
+total 964
+drwxr-xr-x 9 u381524662 o1006766600   4096 Oct 24 00:02 .
+drwxr-xr-x 8 u381524662 o1006766600   4096 Oct 21 16:55 ..
+-rw-r--r-- 1 u381524662 o1006766600   5282 Oct 24 00:02 admin.html
+-rw-r--r-- 1 u381524662 o1006766600  46843 Oct 24 00:02 api.php
+-rw-r--r-- 1 u381524662 o1006766600  24671 Oct 24 00:02 auth.php
+-rw-r--r-- 1 u381524662 o1006766600   9368 Oct 24 00:02 bilan.html
+-rw-r--r-- 1 u381524662 o1006766600    181 Oct 24 00:02 constraints.txt
+-rw-r--r-- 1 u381524662 o1006766600    700 Oct 24 00:02 cron_history.sh
+-rw-r--r-- 1 u381524662 o1006766600   2226 Oct 24 00:02 cron_scan.sh
+drwxr-xr-x 6 u381524662 o1006766600   4096 Oct 24 00:02 data
+-rw-r--r-- 1 u381524662 o1006766600  16430 Oct 21 09:31 default.php
+-rw-r--r-- 1 u381524662 o1006766600    718 Oct 23 14:22 error_log
+-rw-r--r-- 1 u381524662 o1006766600   1912 Oct 24 00:02 etf_cli.php
+-rw-r--r-- 1 u381524662 o1006766600  35840 Oct 24 00:02 etf_profile.py
+-rw-r--r-- 1 u381524662 o1006766600   9627 Oct 24 00:02 fd_catalogue_api.php
+-rw-r--r-- 1 u381524662 o1006766600  12920 Oct 24 00:02 fd_source_catalogue_api.php
+-rw-r--r-- 1 u381524662 o1006766600   7961 Oct 24 00:02 finance-database-catalogue.php
+-rw-r--r-- 1 u381524662 o1006766600  11443 Oct 24 00:02 finance-database.php
+-rw-r--r-- 1 u381524662 o1006766600   8505 Oct 24 00:02 historiques.php
+-rw-r--r-- 1 u381524662 o1006766600  13880 Oct 24 00:02 history_admin_api.php
+-rw-r--r-- 1 u381524662 o1006766600    795 Oct 24 00:02 .htaccess
+drwx------ 3 u381524662 o1006766600   4096 Oct 23 15:49 .jigobourso-runtime
+-rw-r--r-- 1 u381524662 o1006766600   9234 Oct 24 00:02 login.html
+-rw-r--r-- 1 u381524662 o1006766600   3757 Oct 24 00:02 market_rules.py
+drwxr-xr-x 5 u381524662 o1006766600   4096 Oct 23 15:37 ops
+drwxr-xr-x 2 u381524662 o1006766600   4096 Oct 24 00:05 __pycache__
+-rw-r--r-- 1 u381524662 o1006766600 448128 Oct 24 00:02 rapport.html
+-rw-r--r-- 1 u381524662 o1006766600    102 Oct 24 00:02 requirements.txt
+-rw-r--r-- 1 u381524662 o1006766600  75222 Oct 24 00:02 scan.py
+drwxr-xr-x 2 u381524662 o1006766600   4096 Oct 24 00:02 static
+-rw-r--r-- 1 u381524662 o1006766600   5937 Oct 24 00:02 suivi.html
+drwxr-xr-x 5 u381524662 o1006766600   4096 Oct 24 00:02 tools
+-rw-r--r-- 1 u381524662 o1006766600   4368 Oct 24 00:02 univers-cotations.php
+-rw-r--r-- 1 u381524662 o1006766600   3935 Oct 24 00:02 universe_policy.php
+-rw-r--r-- 1 u381524662 o1006766600   4176 Oct 24 00:02 univers-investissement.php
+drwxr-xr-x 3 u381524662 o1006766600   4096 Oct 21 10:01 .venv
+Sauvegarde du code : /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-4ltqb6p7
+{"password_recovery_mail_available":true}
+{"password_recovery_state":{"stored":1,"valid":1,"expired":0,"invalid_payload":0,"password_changed":0},"settings_column_limits":[{"COLUMN_NAME":"k","CHARACTER_MAXIMUM_LENGTH":40},{"COLUMN_NAME":"v","CHARACTER_MAXIMUM_LENGTH":255}]}
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-4ltqb6p7/lint-api.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-4ltqb6p7/lint-auth.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-4ltqb6p7/lint-fd_catalogue_api.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-4ltqb6p7/lint-fd_source_catalogue_api.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-4ltqb6p7/lint-universe_policy.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-4ltqb6p7/lint-univers-investissement.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-4ltqb6p7/lint-univers-cotations.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-4ltqb6p7/lint-history_admin_api.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-4ltqb6p7/lint-historiques.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-4ltqb6p7/lint-finance-database.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-4ltqb6p7/lint-finance-database-catalogue.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-4ltqb6p7/lint-etf_cli.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-4ltqb6p7/lint-tools__boot.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-4ltqb6p7/lint-tools_reset_password.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-4ltqb6p7/lint-tools_catalogue_fd_import.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-4ltqb6p7/lint-tools_catalogue_fd_run_full.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-4ltqb6p7/lint-tools_history_install.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-4ltqb6p7/lint-tools_history_worker.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-4ltqb6p7/lint-tools_history_quality.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-4ltqb6p7/lint-tools_fd_pipeline_api.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-4ltqb6p7/lint-tools_fd_pipeline_worker.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-4ltqb6p7/lint-tools_fd_pipeline_rules.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-4ltqb6p7/lint-tools_yahoo_pipeline_api.php
+Récupération vérifiée: formulaires présents, jeton invalide refusé; aucun mail envoyé.
+Déploiement et contrôles HTTPS réussis.
