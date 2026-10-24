@@ -1,6 +1,6 @@
 {
-  "status": "failure",
+  "status": "in_progress",
   "stage": "deployment",
-  "commit": "d048d5919035352f1597519d993967dc228b76fb",
-  "run_url": "https://github.com/elmonsieurpatate/jigobourso/actions/runs/40130314840"
+  "commit": "7c332c028736652b4ee2c7ebfff4cd47ea0f7779",
+  "run_url": "https://github.com/elmonsieurpatate/jigobourso/actions/runs/40133129532"
 }
