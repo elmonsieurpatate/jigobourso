@@ -1,5 +1,5 @@
 {
-  "status": "in_progress",
+  "status": "success",
   "stage": "deployment",
   "commit": "105fa3ffafd58f432fc2775c893deab3115bd61f",
   "run_url": "https://github.com/elmonsieurpatate/jigobourso/actions/runs/40152937012"
