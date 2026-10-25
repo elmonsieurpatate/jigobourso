@@ -1,0 +1,68 @@
+[
+  {
+    "symbol": "BRZE",
+    "width": 375,
+    "compact": false,
+    "graph_top": 2521,
+    "page_height": 7369,
+    "note": 10,
+    "risk": 5,
+    "rank": 1,
+    "history": 250
+  },
+  {
+    "symbol": "SOXS",
+    "width": 375,
+    "compact": false,
+    "graph_top": 2928,
+    "page_height": 7998,
+    "note": 8.6,
+    "risk": 6,
+    "rank": 120,
+    "history": 251
+  },
+  {
+    "symbol": "BRZE",
+    "width": 390,
+    "compact": false,
+    "graph_top": 2441,
+    "page_height": 7240,
+    "note": 10,
+    "risk": 5,
+    "rank": 1,
+    "history": 250
+  },
+  {
+    "symbol": "SOXS",
+    "width": 390,
+    "compact": false,
+    "graph_top": 2848,
+    "page_height": 7868,
+    "note": 8.6,
+    "risk": 6,
+    "rank": 120,
+    "history": 251
+  },
+  {
+    "symbol": "BRZE",
+    "width": 1280,
+    "compact": false,
+    "graph_top": 1828,
+    "page_height": 6127,
+    "note": 10,
+    "risk": 5,
+    "rank": 1,
+    "history": 250
+  },
+  {
+    "symbol": "SOXS",
+    "width": 1280,
+    "compact": false,
+    "graph_top": 1969,
+    "page_height": 6328,
+    "note": 8.6,
+    "risk": 6,
+    "rank": 120,
+    "history": 251
+  }
+]
