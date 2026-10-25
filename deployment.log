@@ -52,3 +52,50 @@ STRATEGY_PROGRESS {"done": 250, "total": 5510, "stage": "Mesures des cl\u00f4tur
 STRATEGY_PROGRESS {"done": 500, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
 STRATEGY_PROGRESS {"done": 750, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
 STRATEGY_PROGRESS {"done": 1000, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_PROGRESS {"done": 1250, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_PROGRESS {"done": 1500, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_PROGRESS {"done": 1750, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_PROGRESS {"done": 2000, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_PROGRESS {"done": 2250, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_PROGRESS {"done": 2500, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_PROGRESS {"done": 2750, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_PROGRESS {"done": 3000, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_PROGRESS {"done": 3250, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_PROGRESS {"done": 3500, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_PROGRESS {"done": 3750, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_PROGRESS {"done": 4000, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_PROGRESS {"done": 4250, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_PROGRESS {"done": 4500, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_PROGRESS {"done": 4750, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_PROGRESS {"done": 5000, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_PROGRESS {"done": 5250, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_PROGRESS {"done": 5500, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_PROGRESS {"done": 5510, "total": 5510, "stage": "Mesures des cl\u00f4tures MariaDB"}
+STRATEGY_COUNTS {"pipeline": {"fd_rows": 153458, "fd_listings": 153458, "fd_isins": 65185, "quote_statuses": {"admitted": 5510, "rejected": 8331, "review": 3301}, "quote_admitted": 5510, "reader_candidates": 5510, "with_daily": 5393, "week_history": 5393, "month_history": 5375, "stale_last_dates": {"2026-10-22": 1}, "stale_markets": {"XNYS": 1}, "legacy_exclusive": {"no_usable_series": 117, "liquidity": 1622, "classifiable_before_top_caps": 3696, "under_40": 34, "volatility": 39, "stale_or_invalid": 1, "price_or_fx": 1}, "legacy_growth_qualified": 403, "quote_rejection_reasons": {"liquidite_non_calculable_ou_conversion_absente": 3609, "cotation_perimee": 524, "conversion_devise_indisponible": 3368, "liquidite_sous_seuil": 6568, "prix_sous_seuil": 2480, "symbole_absent_yahoo": 698, "volume_moyen_absent": 371, "date_cotation_absente": 145, "prix_absent": 145, "type_incoherent": 29}, "reader_quality": {"admitted": 5510, "joined_rows": 5510, "duplicate_same_instrument": 0, "blank_symbols": 0, "incoherent_adjustments": 112, "under_two_closes": 5, "with_daily_data": 5393, "usable_40_closes": 5359, "under_40_closes": 34, "without_daily_data": 117}, "technical_reasons": {"data:missing_or_incoherent": 117, "data:stale": 1}}, "counts": {"evaluated": 5510, "usable_selected_periods": 5374, "strategy": 663, "selected": 663, "rejected": 4711, "insufficient": 136}, "reasons": {"week:history": 117, "data:missing_or_incoherent": 117, "month:history": 135, "month:min_er": 4073, "month:min_slope": 3308, "week:min_slope": 2875, "week:min_er": 4016, "data:stale": 1}, "first_reasons": {"data:missing_or_incoherent": 117, "month:min_er": 168, "month:min_slope": 523, "week:min_slope": 2861, "week:min_er": 1159, "month:history": 18, "data:stale": 1}, "source": {"batch": 5, "quote_filter": 4}}
+Sauvegarde du code : /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-sc7c_s5g
+{"password_recovery_mail_available":true}
+{"password_recovery_state":{"stored":0,"valid":0,"expired":0,"invalid_payload":0,"password_changed":0},"settings_column_limits":[{"COLUMN_NAME":"k","CHARACTER_MAXIMUM_LENGTH":40},{"COLUMN_NAME":"v","CHARACTER_MAXIMUM_LENGTH":255}]}
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-sc7c_s5g/lint-portfolio_ledger.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-sc7c_s5g/lint-api.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-sc7c_s5g/lint-auth.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-sc7c_s5g/lint-fd_catalogue_api.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-sc7c_s5g/lint-fd_source_catalogue_api.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-sc7c_s5g/lint-universe_policy.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-sc7c_s5g/lint-univers-investissement.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-sc7c_s5g/lint-univers-cotations.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-sc7c_s5g/lint-history_admin_api.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-sc7c_s5g/lint-historiques.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-sc7c_s5g/lint-finance-database.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-sc7c_s5g/lint-finance-database-catalogue.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-sc7c_s5g/lint-etf_cli.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-sc7c_s5g/lint-tools__boot.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-sc7c_s5g/lint-tools_reset_password.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-sc7c_s5g/lint-tools_catalogue_fd_import.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-sc7c_s5g/lint-tools_catalogue_fd_run_full.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-sc7c_s5g/lint-tools_history_install.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-sc7c_s5g/lint-tools_history_worker.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-sc7c_s5g/lint-tools_history_quality.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-sc7c_s5g/lint-tools_fd_pipeline_api.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-sc7c_s5g/lint-tools_fd_pipeline_worker.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-sc7c_s5g/lint-tools_fd_pipeline_rules.php
+No syntax errors detected in /home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-backups/code-sc7c_s5g/lint-tools_yahoo_pipeline_api.php
