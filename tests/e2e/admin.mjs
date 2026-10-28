@@ -28,7 +28,7 @@ try {
   await page.waitForSelector('table.funnel'); const before = await liq(); await page.locator('input[data-rule="liquidity_equity"][data-f="min_eur"]').fill('1000000000'); await page.click('#go-filter'); await finished(); const after = await liq();
   check('yahoo : modifier un seuil puis Filtrer change les compteurs (' + before + ' → ' + after + ')', after > before);
   await page.locator('table.funnel tbody tr').filter({ hasText: 'Exclus selon la liquidité' }).locator('button').click(); await page.waitForSelector('#items table tbody tr[data-id]'); check('yahoo : titres écartés consultables', true);
-  await page.click('#go-reset'); await page.click('dialog button.primary'); await page.waitForSelector('#go-filter'); await page.click('#go-filter'); await finished();
+  await page.click('#go-reset'); await page.click('dialog button.primary'); await page.waitForFunction(() => document.querySelector('input[data-rule="liquidity_equity"][data-f="min_eur"]')?.value === '1000000'); await page.click('#go-filter'); await finished();
   check('yahoo : valeurs par défaut restaurées puis refiltrées', (await liq()) === before);
   await page.fill('#ex-q', 'ETF'); await page.click('#ex-go'); await page.waitForSelector('#ex-out .reason, #ex-out .muted'); check('yahoo : « pourquoi ce titre a disparu »', true);
   // Actions / ETF
