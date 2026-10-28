@@ -72,8 +72,10 @@ else
 fi
 set -a; . ./private/env; set +a
 export MYSQL_PWD="$JIGO_DB_PASSWORD"
-mariadb -h"$JIGO_DB_HOST" -P"${JIGO_DB_PORT:-3306}" -u"$JIGO_DB_USER" "$JIGO_DB_NAME" < db/schema.sql
-echo "schéma additif appliqué (CREATE ... IF NOT EXISTS)"
+# tables : créées seulement si absentes (aucune existante n'est modifiée) ; vues : redéfinies (aucune donnée)
+sed -E 's/^CREATE TABLE ([a-z_]+)/CREATE TABLE IF NOT EXISTS \1/; s/^CREATE VIEW /CREATE OR REPLACE VIEW /' db/schema.sql \
+  | mariadb -h"$JIGO_DB_HOST" -P"${JIGO_DB_PORT:-3306}" -u"$JIGO_DB_USER" "$JIGO_DB_NAME"
+echo "schéma additif appliqué (tables manquantes créées, vues redéfinies)"
 .venv/bin/python -c "import engine.cli" && echo "moteur importable"
 find app scripts -name '*.php' -print0 | xargs -0 -n1 php -l > /dev/null && echo "PHP valide"
 printf 'commit=%s\nversion=%s\ndate=%s\n' "$SHA" "$VERSION" "$(date -u +%FT%TZ)" > .deployed
