@@ -393,7 +393,7 @@ def session_gaps(conn, mic, now, sessions=5):
     if not ids or not hours.known(mic):
         return {}
     today = hours.session_date(mic, now)
-    days, d = [], today - datetime.timedelta(days=1)
+    days, d = [], today                                              # la séance du jour compte dès que sa clôture est publiée
     while len(days) < sessions and (today - d).days <= sessions * 2 + 4:
         if d.weekday() < 5 and hours.is_settled(mic, d, now):
             days.append(d)
@@ -431,8 +431,8 @@ def session_gaps(conn, mic, now, sessions=5):
     return out
 
 
-def detect_gaps(conn, mic, now, sessions=5):
-    """Signale les séances où des données manquent vraiment (voir `session_gaps`). Renvoie le nombre de trous ajoutés."""
+def detect_gaps(conn, mic, now, sessions=2):
+    """Signale les séances où des données manquent vraiment (voir `session_gaps`) parmi les deux dernières (celles qu'on conserve). Renvoie le nombre de trous ajoutés."""
     added = 0
     with conn.cursor() as cur:
         for day, note in session_gaps(conn, mic, now, sessions).items():
@@ -443,13 +443,17 @@ def detect_gaps(conn, mic, now, sessions=5):
     return added
 
 
-def repair_gaps(conn, client, now, max_batches=30):
+def repair_gaps(conn, client, now, max_batches=200):
     """Pour chaque séance en trou : revérifie d'abord avec les données déjà présentes (réparée si ce n'est plus un trou), puis redemande 5 jours de barres
     uniquement aux places encore en trou. Irrécupérable si la séance est trop ancienne pour Yahoo (5 jours) ou reste incomplète."""
     with conn.cursor() as cur:
         cur.execute("SELECT mic, session_date FROM price_gaps WHERE state='to_repair' ORDER BY session_date DESC")
         gaps = cur.fetchall()
     used = 0
+    today = naive_utc(now).date()
+    for g in [g for g in gaps if (today - g['session_date']).days > 5]:                    # Yahoo ne remonte pas au-delà de 5 jours : inutile de redemander
+        _set_gap(conn, g['mic'], g['session_date'], 'unrecoverable')
+    gaps = [g for g in gaps if (today - g['session_date']).days <= 5]
     for mic in sorted({g['mic'] for g in gaps}):
         mine = [g for g in gaps if g['mic'] == mic]
         still = session_gaps(conn, mic, now, 8)
@@ -461,7 +465,7 @@ def repair_gaps(conn, client, now, max_batches=30):
             continue
         rows = collection_set(conn, mic)
         need = -(-len(rows) // SPARK_BATCH)
-        if used + need > max_batches:
+        if used and used + need > max_batches:                                              # une place seule peut dépasser le budget (New York : ~120 lots)
             continue
         collect_intraday(conn, client, rows, now, range_='5d')
         used += need

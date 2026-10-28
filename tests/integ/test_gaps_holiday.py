@@ -80,7 +80,7 @@ def test_thin_titles_are_not_gaps_but_an_outage_and_an_empty_session_are(conn):
     assert D(24) not in gaps and D(22) not in gaps
     assert D(26) in gaps and '6 créneaux' in gaps[D(26)]
     assert D(23) in gaps and 'clôtures' in gaps[D(23)]
-    assert collect.detect_gaps(conn, 'XETR', NOW) == 2
+    assert collect.detect_gaps(conn, 'XETR', NOW) == 1                 # seules les deux dernières séances (26 et 27) sont surveillées : le 23 est trop ancien
 
 
 def test_repair_closes_gaps_that_the_new_rule_no_longer_sees(conn):
@@ -110,3 +110,23 @@ def test_daily_close_is_fetched_after_its_publication_not_before(conn):
         cur.execute("INSERT INTO jobs(job_type,trigger_by,status,started_at,finished_at) VALUES ('daily:XNYS','cron','completed','2026-10-28 20:35:00','2026-10-28 20:35:30')")
     conn.commit()
     assert tasks._daily_done(conn, 'XNYS', D(28))
+
+
+def test_repair_handles_a_place_larger_than_the_batch_budget_and_drops_old_gaps(conn):
+    """Londres (36 lots) dépassait le budget de 30 lots et n'était jamais réparée ; un trou de plus de 5 jours n'est plus redemandé."""
+    closes(conn, D(26)); bars(conn, D(27)); closes(conn, D(27))
+    with conn.cursor() as cur:
+        cur.execute("INSERT INTO price_gaps(mic,session_date,state,detected_at,note) VALUES ('XETR',%s,'to_repair',%s,'x'),('XETR',%s,'to_repair',%s,'ancien')", (D(26), NOW.replace(tzinfo=None), D(15), NOW.replace(tzinfo=None)))
+    conn.commit()
+    calls = []
+
+    class Spy:
+        def spark(self, symbols, range_, interval):
+            calls.append((len(symbols), range_))
+            return {}
+    collect.repair_gaps(conn, Spy(), NOW, max_batches=1)                  # budget d'un seul lot, la place en demande plusieurs : elle passe quand même
+    assert calls and all(r == '5d' for _, r in calls)
+    with conn.cursor() as cur:
+        cur.execute("SELECT session_date, state FROM price_gaps ORDER BY session_date")
+        states = {r['session_date']: r['state'] for r in cur.fetchall()}
+    assert states[D(15)] == 'unrecoverable' and states[D(26)] == 'to_repair'
