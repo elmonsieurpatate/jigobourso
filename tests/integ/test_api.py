@@ -3,6 +3,7 @@ import http.cookiejar
 import json
 import os
 import socket
+import sys
 import subprocess
 import time
 import urllib.error
@@ -41,7 +42,7 @@ class Client:
 def server():
     s = socket.socket(); s.bind(('127.0.0.1', 0)); port = s.getsockname()[1]; s.close()
     proc = subprocess.Popen(['php', '-S', f'127.0.0.1:{port}', '-t', os.path.join(ROOT, 'app/public')], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                            env=dict(os.environ, JIGO_ENGINE_ROOT=ROOT, JIGO_PYTHON=os.path.join(ROOT, '.venv/bin/python')))
+                            env=dict(os.environ, JIGO_ENGINE_ROOT=ROOT, JIGO_PYTHON=sys.executable))
     for _ in range(50):
         try:
             socket.create_connection(('127.0.0.1', port), timeout=0.2).close(); break
