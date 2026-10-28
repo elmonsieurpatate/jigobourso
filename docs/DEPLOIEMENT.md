@@ -1,3 +1,13 @@
+# Déploiement automatique (GitHub Actions)
+
+Chaque push sur `main` lance `.github/workflows/deploy.yml` : syntaxe PHP/Python, `tests/fast`, `tests/integ` (base jetable du runner), puis `ops/deploy.sh` sur Hostinger.
+- Transmis : `app/ engine/ db/ docs/ scripts/ README.md requirements.txt`. Jamais touchés : `private/` (env, clé cron), `data/`, `logs/`, `.venv`, base de production, tâche cron hPanel.
+- Avant transfert : sauvegarde `tgz` du code distant (`.jigobourso-v2-code-backups/`, 5 dernières). Le schéma `db/schema.sql` n'est appliqué que s'il est purement additif (`CREATE … IF NOT EXISTS`) ; toute instruction `DROP/ALTER/DELETE…` bloque le déploiement : migration à faire à part, avec sauvegarde.
+- Après transfert : dépendances Python si `requirements.txt` a changé, import du moteur, `php -l`, puis contrôle public (accueil 200, version `?v=` servie, `api/auth/me`). Le fichier `.deployed` (hors web) note commit et date.
+- Secret requis : `HOSTINGER_SSH_PRIVATE_KEY` (environnement GitHub `production`). Clé d'hôte épinglée dans le workflow. Résultat publié sans secret sur la branche `deployment-status` (`status.json`, `deployment.log`).
+- Lancement manuel : onglet Actions › « diagnostic » (lecture seule) ou « deploy ».
+- `scripts/drop_legacy_tables.sh` n'est jamais appelé par le déploiement.
+
 # Mise en production et bascule (à exécuter seulement après accord explicite)
 
 Ce document a été exécuté le 28/10/2026 (voir « Bascule effectuée »). Avant cela, la production actuelle (jigobourso.turnjoy.dev, base Hostinger) n'a été touchée qu'en **lecture seule** (export de vos comptes, portefeuilles et transactions).
