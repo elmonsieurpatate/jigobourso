@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Explorer — Jigobourso</title><link rel="stylesheet" href="assets/app.css?v=202610281650"></head>
+<body><main class="wrap">
+<div class="page-head"><div><h1>Explorer</h1><p>Actions et ETF classés selon votre stratégie : réglez les critères, filtrez, triez, comparez, puis ouvrez la fiche d’un titre.</p></div>
+  <div class="row"><button class="btn" id="compare-btn">Comparer actions / ETF</button><button class="btn" id="export-btn">Exporter en CSV</button></div></div>
+<div class="sourcebar" id="sources" style="margin-bottom:14px"><span class="spinner"></span></div>
+
+<p class="muted small" style="margin:0 0 8px">Un profil ne fait que préremplir les critères : dès que vous les modifiez, votre configuration est appliquée telle quelle. Les filtres déterminent les titres examinés ; le classement se fait ensuite parmi eux.</p>
+<section aria-label="Stratégie"><div class="strat-cards" id="strats"></div></section>
+<section id="editor" class="card" hidden style="margin-top:14px"></section>
+<div class="row" style="margin-top:10px"><button class="btn drawer-toggle" id="edit-btn">⚙ Régler la stratégie</button><button class="btn drawer-toggle" id="filters-btn">⛃ Filtres avancés <span class="count-pill" id="filters-count" hidden></span></button><span class="muted small" id="strategy-summary"></span><span class="grow" style="flex:1"></span><span class="row gap-s" id="saved"></span></div>
+
+<section class="card" style="margin-top:12px;padding:0">
+  <div style="padding:14px 18px 0"><div class="tabs" id="status-tabs" style="margin-bottom:0"></div></div>
+  <div class="row" style="padding:14px 18px;border-bottom:1px solid var(--line)">
+    <input id="q" type="search" placeholder="Nom, symbole ou ISIN" style="flex:1;min-width:180px">
+    <select id="kind" aria-label="Type"><option value="">Actions et ETF</option><option value="equity">Actions</option><option value="etf">ETF</option></select>
+    <select id="market" aria-label="Place"><option value="">Toutes les places</option></select>
+  </div>
+  <div class="filters" id="filters" hidden>
+    <label>Pays<select id="country"><option value="">Tous</option></select></label>
+    <label>Catégorie ou secteur<input id="category" placeholder="ex. Technology"></label>
+    <label>Budget (prix d’une part ≤ €)<input id="budget" type="number" min="0" step="1" placeholder="ex. 500"></label>
+    <label>Prix min. (€)<input id="min_price" type="number" min="0" step="1"></label>
+    <label>Score min. (0–100)<input id="min_score" type="number" min="0" max="100" step="1"></label>
+    <label>Volatilité max. (%/séance)<input id="max_volatility" type="number" min="0" step=".1"></label>
+    <label>Repli max. (%)<input id="max_drawdown" type="number" min="0" step="1"></label>
+    <label>Volume moyen min. (titres/j)<input id="min_volume" type="number" min="0" step="1000"></label>
+    <label class="check"><input type="checkbox" id="pea"> PEA (probable)</label>
+    <label class="check"><input type="checkbox" id="mine"> Titres détenus</label>
+    <label class="check"><input type="checkbox" id="open_now"> Place ouverte maintenant</label>
+    <label class="check"><input type="checkbox" id="fresh_only"> Données à jour uniquement</label>
+    <div style="grid-column:1/-1;display:flex;gap:10px"><button class="btn small" id="reset-filters">Réinitialiser les filtres</button><span class="muted small" id="filters-note" style="align-self:center"></span></div>
+  </div>
+  <div id="results"><div class="empty"><span class="spinner"></span></div></div>
+  <div class="row between" style="padding:12px 18px;border-top:1px solid var(--line)" id="pager"></div>
+</section>
+<details class="card" id="why" style="margin-top:14px"><summary style="cursor:pointer;font-weight:700">Pourquoi des titres sont écartés ? <span class="muted small" style="font-weight:400">statistiques par critère</span></summary><div id="why-body" style="margin-top:12px"></div></details>
+<p class="muted small" style="margin-top:14px">Analyse descriptive des cours passés, sans conseil ni promesse de performance. Un titre « retenu » remplit vos critères ; ce n’est pas une recommandation d’achat. Catalogue : FinanceDatabase · Cours : Yahoo Finance.</p>
+</main>
+<script src="assets/app.js?v=202610281650"></script><script src="assets/explorer.js?v=202610281650"></script></body></html>

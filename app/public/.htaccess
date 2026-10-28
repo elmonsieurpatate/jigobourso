@@ -1,0 +1,17 @@
+# Jigobourso v2 — configuration Apache (Hostinger). Le dossier public ne contient que les pages et l'API.
+Options -Indexes
+DirectoryIndex index.html
+# api/xxx -> api.php?r=xxx (compatible avec les URLs des tâches cron de l'hébergeur)
+RewriteEngine On
+RewriteRule ^api/([A-Za-z0-9/_-]+)$ api.php?r=$1 [QSA,L]
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "DENY"
+  Header always set Referrer-Policy "same-origin"
+  Header always set Content-Security-Policy "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'"
+</IfModule>
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType text/css "access plus 1 hour"
+  ExpiresByType application/javascript "access plus 1 hour"
+</IfModule>
