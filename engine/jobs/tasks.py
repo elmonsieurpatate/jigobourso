@@ -243,9 +243,15 @@ def _just_closed(mic, now):
 
 
 def _daily_done(conn, mic, day):
+    """La clôture de la séance `day` a-t-elle déjà été cherchée APRÈS sa publication (fermeture + délai de règlement) ?
+    Une collecte du matin ou de l'après-midi du même jour calendaire (qui récupérait la veille) ne compte pas : sinon la clôture
+    d'une place qui ferme tard (New York : 20:00 UTC) ne serait jamais collectée le soir même."""
+    from zoneinfo import ZoneInfo
+    tz, _, closes = hours.spec(mic)                      # place sans horaires connus : clôture par défaut de la table
+    settled = (datetime.datetime.combine(day, closes, ZoneInfo(tz)).astimezone(datetime.timezone.utc).replace(tzinfo=None)
+               + datetime.timedelta(minutes=hours.SETTLE_MINUTES))
     with conn.cursor() as cur:
-        cur.execute("""SELECT COUNT(*) n FROM jobs WHERE job_type=%s AND status IN ('completed','completed_with_errors') AND started_at >= %s""",
-                    ('daily:' + mic, datetime.datetime.combine(day, datetime.time(0))))
+        cur.execute("""SELECT COUNT(*) n FROM jobs WHERE job_type=%s AND status IN ('completed','completed_with_errors') AND started_at >= %s""", ('daily:' + mic, settled))
         return cur.fetchone()['n'] > 0
 
 
@@ -275,7 +281,7 @@ def _intraday(conn, client, rows, now, log, round_id=None):
 
 
 def tick(conn, client, now=None, trigger='cron'):
-    """Passage du cron (toutes les 15 minutes en production) : décide seul quoi faire, d'après la planification enregistrée.
+    """Passage du cron (toutes les 5 minutes en production) : décide seul quoi faire, d'après la planification enregistrée.
     N'agit QUE sur le catalogue final et les titres détenus : jamais d'import, de filtre ni de reconstruction du catalogue.
     Seul un passage déclenché par le cron laisse le battement qui prouve que le cron fonctionne (un test manuel ne compte pas)."""
     now = now or hours.utcnow()

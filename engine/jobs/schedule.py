@@ -1,6 +1,6 @@
 """Cron : ce qu'il fait (uniquement l'entretien des historiques du catalogue final) et s'il fonctionne VRAIMENT.
 
-Le déclencheur est externe : une tâche cron de l'hébergeur appelle `tick` (toutes les 15 minutes en production ; la fréquence réelle est mesurée, pas supposée). Ce module distingue :
+Le déclencheur est externe : une tâche cron de l'hébergeur appelle `tick` (toutes les 5 minutes en production, mesuré ; la fréquence réelle est mesurée, pas supposée). Ce module distingue :
   - la configuration prévue (activation, intervalle) ;
   - l'observé : le dernier passage RÉEL du cron (battement écrit par `tick` quand c'est le cron qui l'appelle) et les exécutions réelles dans `jobs`.
 Il ne prétend jamais connaître une cause qu'il ne peut pas voir : si le cron ne passe pas, il le dit et indique ce qu'il ne peut pas diagnostiquer.
@@ -20,7 +20,7 @@ TASKS = (
      'params': {'interval_minutes': {'label': 'Intervalle minimal entre deux collectes d’une place (min)', 'default': 15, 'min': 5, 'max': 120}}},
 )
 BY_ID = {t['id']: t for t in TASKS}
-CRON_EXPECTED_MINUTES = 15
+CRON_EXPECTED_MINUTES = 5
 RECENT_PASSES = 12          # derniers passages du cron conservés pour mesurer la fréquence réelle
 STUCK_MINUTES = 90
 
