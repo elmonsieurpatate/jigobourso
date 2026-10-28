@@ -1,14 +1,1 @@
 == Contrôles du serveur (lecture seule)
-private/ présent (non lu)
-Python 3.9.25
-public_html/v2 -> app/public OK
-PHP 8.2.35 (cli) (built: Oct 21 2026 00:00:00) (NTS)
-rsync OK
-/dev/sda4        21T   12T  9.2T  56% /home/u381524662
-== Contrôle du schéma : additif seulement
-== Version des pages : ?v=202610281718
-== Sauvegarde du code distant (garde les 5 dernières)
-/home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-v2-code-backups/code-20261028171824-480b7549.tgz
-== Transfert du code
-== Dépendances, schéma additif, contrôles
-bash: line 5: .venv/bin/pip: No such file or directory
