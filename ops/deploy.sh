@@ -59,12 +59,16 @@ ssh "${ssh_opts[@]}" "$remote" "ROOT=$root SHA=$sha VERSION=$version bash -s" <<
 set -euo pipefail
 cd "$ROOT"
 want=$(sha256sum requirements.txt | cut -d' ' -f1)
-if [ "$(cat .requirements.sha 2>/dev/null || true)" != "$want" ]; then
-  .venv/bin/pip install --quiet -r requirements.txt
-  printf '%s\n' "$want" > .requirements.sha
-  echo "dépendances Python mises à jour"
-else
+have=$(cat .requirements.sha 2>/dev/null || true)
+if [ "$have" = "$want" ]; then
   echo "dépendances Python inchangées"
+elif [ -z "$have" ]; then
+  # première exécution : le venv a été installé à la main (sans pip) ; on vérifie seulement que le nécessaire s'importe
+  .venv/bin/python -c "import pymysql" && printf '%s\n' "$want" > .requirements.sha && echo "dépendances Python existantes validées"
+elif .venv/bin/python -m pip --version > /dev/null 2>&1; then
+  .venv/bin/python -m pip install --quiet -r requirements.txt && printf '%s\n' "$want" > .requirements.sha && echo "dépendances Python mises à jour"
+else
+  echo "requirements.txt a changé mais le venv n'a pas pip : installation manuelle nécessaire" >&2; exit 5
 fi
 set -a; . ./private/env; set +a
 export MYSQL_PWD="$JIGO_DB_PASSWORD"
