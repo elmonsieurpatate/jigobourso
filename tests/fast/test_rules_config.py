@@ -49,3 +49,13 @@ def test_categories_filter_is_optional():
     assert rules.evaluate('equity', {'mic': 'XETR', 'symbol': 'A', 'name': 'N', 'category': 'Financials'}, rules.normalize({})) == (None, None)
     cfg = rules.normalize({'categories': {'enabled': True, 'values': ['Financials']}})
     assert rules.evaluate('equity', {'mic': 'XETR', 'symbol': 'A', 'name': 'N', 'category': 'Financials'}, cfg)[0] == 'categories'
+
+
+def test_stale_quote_rule_is_optional_and_adjustable():
+    assert prefilter.decide('etf', 30.0, 100000, 1.0, None, age_days=3) == ('selected', None)
+    status, reason = prefilter.decide('etf', 30.0, 100000, 1.0, None, age_days=1800)           # titre mort : cours figé depuis 2021, il passait prix et liquidité
+    assert status == 'excluded' and prefilter.step_of(reason) == 'stale'
+    assert prefilter.decide('etf', 30.0, 100000, 1.0, {'stale': {'max_days': 3000}}, age_days=1800)[0] == 'selected'            # seuil modifiable
+    assert prefilter.decide('etf', 30.0, 100000, 1.0, {'stale': {'enabled': False}}, age_days=1800)[0] == 'selected'             # désactivable
+    assert prefilter.decide('etf', 30.0, 100000, 1.0, None, age_days=None)[0] == 'selected'                                      # âge inconnu : pas de décision sur ce critère
+    assert prefilter.default_config()['stale'] == {'enabled': True, 'max_days': 10}

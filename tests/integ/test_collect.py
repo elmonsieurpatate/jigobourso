@@ -46,7 +46,7 @@ def test_prefilter_excludes_dvdg_but_held_listing_is_still_collected(conn):
     collect.refresh_quotes(conn, client, everything, NOW)
     with conn.cursor() as cur:
         cur.execute("INSERT INTO fx_rates(currency,rate_date,to_eur) VALUES ('USD','2026-10-27',0.9)")
-    changed = collect.apply_prefilter(conn)
+    changed = collect.apply_prefilter(conn, NOW)
     assert changed == {'selected': 1, 'excluded': 2}
     with conn.cursor() as cur:
         cur.execute('SELECT id,status,excluded_reason FROM listings ORDER BY id')
@@ -63,7 +63,7 @@ def test_prefilter_excludes_dvdg_but_held_listing_is_still_collected(conn):
     got = {r['listing_id']: r['held'] for r in rows_of(conn)}
     assert got == {1: 0, 2: 1}
     # une exclusion persiste après un nouvel appel (idempotent)
-    assert collect.apply_prefilter(conn) == {'selected': 0, 'excluded': 0}
+    assert collect.apply_prefilter(conn, NOW) == {'selected': 0, 'excluded': 0}
 
 
 def test_daily_skips_unsettled_session(conn):
@@ -111,3 +111,22 @@ def test_gap_detection_ignores_holidays_and_repairs(conn):
     with conn.cursor() as cur:
         cur.execute('SELECT state FROM price_gaps WHERE session_date=%s', (day,))
         assert cur.fetchone()['state'] == 'repaired'
+
+
+def test_stale_quote_is_excluded_only_when_the_filter_is_applied(conn):
+    """Les cours figés (titre mort) sont écartés par « Filtrer », jamais en silence ; le motif et le seuil sont exacts."""
+    old = datetime.datetime(2021, 9, 30, 9, 27)
+    with conn.cursor() as cur:
+        cur.execute('SELECT id AS listing_id, mic, symbol FROM listings')
+        everything = cur.fetchall()
+    collect.refresh_quotes(conn, FakeYahoo(quotes=quotes()), everything, NOW)
+    with conn.cursor() as cur:
+        cur.execute("UPDATE latest_prices SET price_time=%s WHERE listing_id=1", (old,))
+        cur.execute("SELECT status FROM listings WHERE id=1")
+        assert cur.fetchone()['status'] == 'candidate'                       # rien n'a changé tant que le filtre n'est pas relancé
+    conn.commit()
+    collect.apply_prefilter(conn, NOW)
+    with conn.cursor() as cur:
+        cur.execute("SELECT status, excluded_reason FROM listings WHERE id=1")
+        r = cur.fetchone()
+    assert r['status'] == 'excluded' and 'dernier cours trop ancien' in r['excluded_reason']

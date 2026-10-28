@@ -63,7 +63,7 @@
         <details style="margin-left:26px"><summary class="small muted" style="cursor:pointer">Pourquoi ce filtre ?</summary><p class="small">${J.esc(r.help)}</p></details></div>`;
     };
     const groups = {}; lv.rules.forEach(r => (groups[r.group] = groups[r.group] || []).push(r));
-    const names = { ...lv.groups, liquidity: 'Prix et liquidité' };
+    const names = { ...lv.groups, liquidity: 'Prix, ancienneté du cours et liquidité' };
     return Object.entries(groups).map(([g, rs]) => `<div style="margin-bottom:14px"><h3 style="margin:0 0 6px">${J.esc(names[g] || g)}</h3>${rs.map(row).join('')}</div>`).join('');
   }
   function placePicker(r, places) {
@@ -256,7 +256,7 @@
       <div class="card"><h2>Le cron fonctionne-t-il ?</h2>
         <div class="grid cols-4"><div class="kpi"><span class="l">Cron installé et observé</span><span class="v"><span class="badge ${yes ? 'ok' : 'ko'}">${yes ? 'Oui' : 'Non'}</span></span><span class="small muted">${J.esc(c.label)}</span></div>
           <div class="kpi"><span class="l">Dernier passage réel</span><span class="v" style="font-size:18px">${c.last_at ? J.dateTime(c.last_at) : 'jamais'}</span><span class="small muted">${c.last_at ? J.esc(c.last_done || 'rien à faire') + ' · durée ' + dur(c.last_duration_s) : ''}</span></div>
-          <div class="kpi"><span class="l">Prochain passage attendu</span><span class="v" style="font-size:18px">${c.next_at ? J.dateTime(c.next_at) : '–'}</span><span class="small muted">toutes les <input id="cr-int" type="number" min="1" max="60" value="${c.expected_minutes}" style="width:56px"> min</span></div>
+          <div class="kpi"><span class="l">Prochain passage attendu</span><span class="v" style="font-size:18px">${c.next_at ? J.dateTime(c.next_at) : '–'}</span><span class="small muted">réglé : toutes les <input id="cr-int" type="number" min="1" max="60" value="${c.expected_minutes}" style="width:56px"> min<br>${c.measured_minutes ? 'observé : toutes les ' + c.measured_minutes + ' min (médiane des ' + c.passes_seen + ' derniers passages)' : 'fréquence réelle : mesure en cours (' + c.passes_seen + ' passage' + (c.passes_seen > 1 ? 's' : '') + ' vu' + (c.passes_seen > 1 ? 's' : '') + ')'}</span></div>
           <div class="kpi"><span class="l">Clé cron sur le site</span><span class="v" style="font-size:18px">${site.cron_key_present ? 'Présente' : 'Absente'}</span><span class="small muted">adresse : ${J.esc(site.cron_path)}</span></div></div>
         ${s.diagnosis.length ? `<div class="notice" style="margin-top:12px"><b>Diagnostic</b><ul style="margin:6px 0 0 18px">${s.diagnosis.map(d => `<li class="small">${J.esc(d)}</li>`).join('')}</ul></div>` : '<p class="small muted" style="margin:10px 0 0">Aucun problème détectable.</p>'}
         ${!site.cron_key_present ? '<div class="notice err" style="margin-top:10px">Le site n’a pas de clé cron : l’adresse du cron répondra « clé absente ».</div>' : ''}

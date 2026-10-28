@@ -121,19 +121,21 @@ def latest_rates(conn):
         return {r['currency']: float(r['to_eur']) for r in cur.fetchall()}
 
 
-def apply_prefilter(conn):
+def apply_prefilter(conn, now=None):
     """Décide selected / excluded pour les cotations ayant un Quote. Ne touche jamais aux exclusions par les règles du catalogue."""
     params = setting(conn, 'prefilter', {})
+    now = naive_utc(now) if now else datetime.datetime.utcnow()
     rates = latest_rates(conn)
     changed = {'selected': 0, 'excluded': 0}
     with conn.cursor() as cur:
-        cur.execute("""SELECT l.id, l.status, l.excluded_reason, i.kind, p.price, p.avg_volume_3m, p.currency
+        cur.execute("""SELECT l.id, l.status, l.excluded_reason, i.kind, p.price, p.avg_volume_3m, p.currency, p.price_time
                        FROM listings l JOIN instruments i ON i.id=l.instrument_id JOIN latest_prices p ON p.listing_id=l.id
                        WHERE p.quote_at IS NOT NULL AND (l.excluded_reason IS NULL OR l.excluded_reason LIKE %s)""", (prefilter.PREFIX + '%',))
         updates = []
         for r in cur.fetchall():
             status, reason = prefilter.decide(r['kind'], float(r['price']) if r['price'] is not None else None,
-                                              r['avg_volume_3m'], to_eur_factor(r['currency'], rates), params)
+                                              r['avg_volume_3m'], to_eur_factor(r['currency'], rates), params,
+                                              age_days=(now - r['price_time']).total_seconds() / 86400 if r['price_time'] else None)
             if status and (status != r['status'] or reason != r['excluded_reason']):
                 updates.append((status, reason, r['id']))
                 changed[status] += 1
@@ -242,6 +244,21 @@ def mark_backfill_tried(conn, rows, now):
     conn.commit()
 
 
+def is_holiday(conn, mic, group, day, settled):
+    """Jour sans séance pour la place : aucune barre de 15 min ET aucune clôture quotidienne, alors qu'une collecte quotidienne est passée après le règlement.
+    Une absence de données Yahoo (barres manquantes mais clôtures présentes) n'est JAMAIS un jour férié : la séance reste à rattraper."""
+    ids = [r['listing_id'] for r in group]
+    with conn.cursor() as cur:
+        cur.execute("SELECT 1 FROM jobs WHERE job_type IN ('history', %s) AND status IN ('completed','completed_with_errors') AND started_at > %s LIMIT 1", ('daily:' + mic, settled))
+        if not cur.fetchone():
+            return False                                    # la clôture du jour n'a pas encore été cherchée : on ne conclut pas
+        with_close = 0
+        for part in _batches(ids, CHUNK):
+            cur.execute(f"SELECT COUNT(DISTINCT listing_id) n FROM daily_prices WHERE price_date=%s AND listing_id IN ({','.join(['%s'] * len(part))})", [day] + part)
+            with_close += cur.fetchone()['n']
+    return with_close < 0.05 * len(ids)
+
+
 def intraday_plan(conn, rows, now):
     """Barres de 15 minutes des deux dernières séances de chaque place : ({'5d' | '1d': [cotations]}, résumé).
     '5d' si l'une des deux séances est incomplète ; '1d' si seule la séance en cours (ou tout juste finie) est à rafraîchir ; rien si tout est complet.
@@ -270,14 +287,13 @@ def intraday_plan(conn, rows, now):
                                 WHERE slot_start>=%s AND listing_id IN ({','.join(['%s'] * len(part))}) GROUP BY listing_id""", [s0, e0, s1, e1, s0] + part)
                 counts.update({r['listing_id']: (int(r['c0']), int(r['c1'])) for r in cur.fetchall()})
             holiday0 = holiday1 = False
-            if counts is not None:
-                for end, which in ((e0, 0), (e1, 1)):
-                    seen = sum(1 for c in counts.values() if c[which] > 0)
-                    if seen < 0.05 * len(group) and end + datetime.timedelta(minutes=hours.SETTLE_MINUTES) < naive:
-                        cur.execute("SELECT 1 FROM jobs WHERE job_type IN ('history', %s) AND status IN ('completed','completed_with_errors') AND started_at > %s LIMIT 1",
-                                    ('intraday:' + mic, end + datetime.timedelta(minutes=hours.SETTLE_MINUTES)))
-                        if cur.fetchone():
-                            holiday0, holiday1 = (True, holiday1) if which == 0 else (holiday0, True)
+            for end, which, day in ((e0, 0, prev_day), (e1, 1, cur_day)):
+                seen = sum(1 for c in counts.values() if c[which] > 0)
+                settled = end + datetime.timedelta(minutes=hours.SETTLE_MINUTES)
+                if seen >= 0.05 * len(group) or settled >= naive:
+                    continue
+                if is_holiday(conn, mic, group, day, settled):
+                    holiday0, holiday1 = (True, holiday1) if which == 0 else (holiday0, True)
         live = hours.is_open(mic, now) or s1 <= naive < e1 + datetime.timedelta(minutes=hours.SETTLE_MINUTES)
         for r in group:
             c0, c1 = counts.get(r['listing_id'], (0, 0))
@@ -354,56 +370,109 @@ def prune_intraday(conn, now, sessions=None):
 
 
 # ───────── trous ─────────
-def coverage(conn, mic, now, sessions=5):
-    """{jour local: médiane du nombre de créneaux 15 min par titre} pour les séances récentes terminées de la place."""
-    from zoneinfo import ZoneInfo
-    ids = [r['listing_id'] for r in collection_set(conn, mic)]
-    start = naive_utc(now) - datetime.timedelta(days=sessions * 2)
-    tz, counts = ZoneInfo(hours.HOURS[mic][0]), defaultdict(lambda: defaultdict(int))
+GAP_MISSING_RATIO = 0.4        # un créneau est manquant s'il compte moins de 40 % de la part de titres qu'il a d'habitude
+GAP_MIN_SLOTS = 2              # il faut au moins 2 créneaux manquants dans la séance
+GAP_EMPTY_RATIO = 0.05         # sous 5 % des titres avec une barre, la séance est « vide »
+
+
+def _quantile(values, q):
+    v = sorted(values)
+    return v[min(len(v) - 1, int(q * len(v)))] if v else 0
+
+
+def session_gaps(conn, mic, now, sessions=5):
+    """{jour local: description} des séances récentes terminées où des DONNÉES MANQUENT vraiment.
+    Un titre peu échangé n'a pas de barre sur les créneaux sans transaction : on ne regarde donc jamais « combien de barres par titre »
+    mais, pour chaque créneau, la part des titres de la place qui ont une barre, comparée à ce même créneau les autres jours.
+      - créneaux nettement sous leur niveau habituel (≥ 2) : trou ;
+      - séance sans (presque) aucune barre ALORS QUE les clôtures quotidiennes existent : trou (Yahoo n'a pas répondu, ce n'est pas un jour férié) ;
+      - séance sans barre ni clôture : jour férié, pas un trou."""
+    from engine.market import intraday as intra
+    rows = collection_set(conn, mic)
+    ids = [r['listing_id'] for r in rows]
+    if not ids or not hours.known(mic):
+        return {}
+    today = hours.session_date(mic, now)
+    days, d = [], today - datetime.timedelta(days=1)
+    while len(days) < sessions and (today - d).days <= sessions * 2 + 4:
+        if d.weekday() < 5 and hours.is_settled(mic, d, now):
+            days.append(d)
+        d -= datetime.timedelta(days=1)
+    if not days:
+        return {}
+    per_slot, closes = defaultdict(int), {}
+    first = intra.session_window(mic, min(days))[0]
     with conn.cursor() as cur:
         for part in _batches(ids, CHUNK):
-            cur.execute(f"SELECT listing_id, slot_start FROM intraday_prices WHERE slot_start>=%s AND listing_id IN ({','.join(['%s'] * len(part))})", [start] + part)
+            marks = ','.join(['%s'] * len(part))
+            cur.execute(f"SELECT slot_start, COUNT(*) n FROM intraday_prices WHERE slot_start>=%s AND listing_id IN ({marks}) GROUP BY slot_start", [first] + part)
             for r in cur.fetchall():
-                counts[r['slot_start'].replace(tzinfo=datetime.timezone.utc).astimezone(tz).date()][r['listing_id']] += 1
-    today = hours.session_date(mic, now)
-    return {d: statistics.median(per.values()) for d, per in counts.items()
-            if d < today and d.weekday() < 5 and hours.is_settled(mic, d, now)}
+                per_slot[r['slot_start']] += r['n']
+            cur.execute(f"SELECT price_date, COUNT(DISTINCT listing_id) n FROM daily_prices WHERE price_date>=%s AND listing_id IN ({marks}) GROUP BY price_date", [min(days)] + part)
+            for r in cur.fetchall():
+                closes[r['price_date']] = closes.get(r['price_date'], 0) + r['n']
+    n = len(ids)
+    ratios = {day: [per_slot.get(t, 0) / n for t in intra.expected_slot_starts(mic, day)] for day in days}
+    out, usable = {}, []
+    for day in days:
+        if max(ratios[day]) < GAP_EMPTY_RATIO:
+            if closes.get(day, 0) >= GAP_EMPTY_RATIO * n:
+                out[day] = 'aucune barre alors que les clôtures quotidiennes existent (données Yahoo absentes)'
+            continue                                                 # sans barre ni clôture : jour férié
+        usable.append(day)
+    for day in usable:
+        others = [ratios[x] for x in usable if len(ratios[x]) == len(ratios[day])]
+        flat = _quantile(ratios[day], 0.85)
+        profile = [statistics.median(r[i] for r in others) if len(others) >= 3 else flat for i in range(len(ratios[day]))]
+        slots = intra.expected_slot_starts(mic, day)
+        missing = [t for t, ratio, ref in zip(slots, ratios[day], profile) if ref >= GAP_EMPTY_RATIO and ratio < GAP_MISSING_RATIO * ref]
+        if len(missing) >= GAP_MIN_SLOTS:
+            out[day] = f'{len(missing)} créneaux sur {len(slots)} nettement sous leur niveau habituel (de {missing[0]:%H:%M} à {missing[-1]:%H:%M} UTC)'
+    return out
 
 
 def detect_gaps(conn, mic, now, sessions=5):
-    """Signale les séances dont la couverture est nettement incomplète. Une séance sans aucune barre est un jour férié, pas un trou.
-    Renvoie le nombre de trous ajoutés."""
-    expected, added = hours.expected_slots(mic), 0
+    """Signale les séances où des données manquent vraiment (voir `session_gaps`). Renvoie le nombre de trous ajoutés."""
+    added = 0
     with conn.cursor() as cur:
-        for day, median in coverage(conn, mic, now, sessions).items():
-            if median < 0.8 * expected:
-                cur.execute("INSERT INTO price_gaps(mic,session_date,state,detected_at,note) VALUES (%s,%s,'to_repair',%s,%s) ON DUPLICATE KEY UPDATE detected_at=detected_at",
-                            (mic, day, naive_utc(now), f'médiane {median:.0f}/{expected} créneaux'))
-                added += cur.rowcount == 1
+        for day, note in session_gaps(conn, mic, now, sessions).items():
+            cur.execute("INSERT INTO price_gaps(mic,session_date,state,detected_at,note) VALUES (%s,%s,'to_repair',%s,%s) ON DUPLICATE KEY UPDATE detected_at=detected_at",
+                        (mic, day, naive_utc(now), note[:200]))
+            added += cur.rowcount == 1
     conn.commit()
     return added
 
 
 def repair_gaps(conn, client, now, max_batches=30):
-    """Récupère 5 jours de barres 15 min pour les places en trou, puis revérifie la couverture :
-    réparée si elle est complète, irrécupérable si la séance est trop ancienne pour Yahoo (5 jours) ou reste incomplète."""
+    """Pour chaque séance en trou : revérifie d'abord avec les données déjà présentes (réparée si ce n'est plus un trou), puis redemande 5 jours de barres
+    uniquement aux places encore en trou. Irrécupérable si la séance est trop ancienne pour Yahoo (5 jours) ou reste incomplète."""
     with conn.cursor() as cur:
         cur.execute("SELECT mic, session_date FROM price_gaps WHERE state='to_repair' ORDER BY session_date DESC")
         gaps = cur.fetchall()
     used = 0
     for mic in sorted({g['mic'] for g in gaps}):
+        mine = [g for g in gaps if g['mic'] == mic]
+        still = session_gaps(conn, mic, now, 8)
+        todo = [g for g in mine if g['session_date'] in still]
+        for g in mine:
+            if g not in todo:
+                _set_gap(conn, mic, g['session_date'], 'repaired')
+        if not todo:
+            continue
         rows = collection_set(conn, mic)
         need = -(-len(rows) // SPARK_BATCH)
         if used + need > max_batches:
             continue
         collect_intraday(conn, client, rows, now, range_='5d')
         used += need
-        after = coverage(conn, mic, now, 8)
-        for g in [g for g in gaps if g['mic'] == mic]:
-            complete = after.get(g['session_date'], 0) >= 0.8 * hours.expected_slots(mic)
+        after = session_gaps(conn, mic, now, 8)
+        for g in todo:
             age = (naive_utc(now).date() - g['session_date']).days
-            state = 'repaired' if complete else ('unrecoverable' if age > 5 else 'to_repair')
-            with conn.cursor() as cur:
-                cur.execute('UPDATE price_gaps SET state=%s WHERE mic=%s AND session_date=%s', (state, mic, g['session_date']))
+            _set_gap(conn, mic, g['session_date'], 'repaired' if g['session_date'] not in after else ('unrecoverable' if age > 5 else 'to_repair'))
     conn.commit()
     return used
+
+
+def _set_gap(conn, mic, day, state):
+    with conn.cursor() as cur:
+        cur.execute('UPDATE price_gaps SET state=%s WHERE mic=%s AND session_date=%s', (state, mic, day))

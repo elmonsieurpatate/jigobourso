@@ -18,6 +18,7 @@ YAHOO_WHERE = {          # étape → condition SQL sur listings l (alias) : les
     'asked': "l.is_primary=1 AND (l.status IN ('candidate','selected') OR l.excluded_reason LIKE 'préfiltre%')",
     'secondary': "l.status IN ('candidate','selected') AND l.is_primary=0",
     'no_data': "l.status='candidate' AND l.is_primary=1",
+    'stale': "l.status='excluded' AND l.is_primary=1 AND l.excluded_reason LIKE 'préfiltre : dernier cours%'",
     'price': "l.status='excluded' AND l.is_primary=1 AND l.excluded_reason LIKE 'préfiltre : cours%'",
     'volume': "l.status='excluded' AND l.is_primary=1 AND l.excluded_reason LIKE 'préfiltre : volume%'",
     'liquidity': "l.status='excluded' AND l.is_primary=1 AND l.excluded_reason LIKE 'préfiltre : liquidité%'",
@@ -70,7 +71,7 @@ def yahoo_funnel(conn, cfg=None):
         held = cur.fetchone()['n']
     asked = counts['asked']
     rule = lambda rid: ('Règle désactivée : n’écarte rien' if not cfg[rid]['enabled'] else
-                        (f'Seuil : {cfg[rid]["min_eur"]:,.0f} {prefilter.BY_ID[rid]["unit"]}'.replace(',', ' ') if 'min_eur' in cfg[rid] else prefilter.BY_ID[rid]['role']))
+                        (f'Seuil : {cfg[rid][prefilter.BY_ID[rid]["key"]]:,.0f} {prefilter.BY_ID[rid]["unit"]}'.replace(',', ' ') if 'key' in prefilter.BY_ID[rid] else prefilter.BY_ID[rid]['role']))
     steps = [_step(0, 'asked', 'Titres transmis par FinanceDatabase', 'Cotation principale de chaque produit retenu par le filtrage FinanceDatabase, plus les titres détenus', asked, 0,
                    {'held': held, 'secondary': counts['secondary']})]
     kept = asked
@@ -78,13 +79,13 @@ def yahoo_funnel(conn, cfg=None):
     steps.append(_step(1, 'no_data', 'Sans information Yahoo', 'Yahoo n’a renvoyé aucun cours exploitable (ou l’import n’a pas été fait) : le titre reste « en attente », jamais retenu sans donnée',
                        kept, nodata, {'no_quote': int(nd['no_quote'] or 0), 'no_price': int(nd['no_price'] or 0)}))
     kept -= nodata
-    for seq, key, rid, label in ((2, 'price', 'price', 'Exclus selon le prix'), (3, 'volume', 'unknown_volume', 'Exclus : volume inconnu'), (4, 'liquidity', None, 'Exclus selon la liquidité')):
+    for seq, key, rid, label in ((2, 'stale', 'stale', 'Exclus : dernier cours trop ancien'), (3, 'price', 'price', 'Exclus selon le prix'), (4, 'volume', 'unknown_volume', 'Exclus : volume inconnu'), (5, 'liquidity', None, 'Exclus selon la liquidité')):
         removed = counts[key]
         text = rule(rid) if rid else f'Actions ≥ {cfg["liquidity_equity"]["min_eur"]:,.0f} €/jour · ETF ≥ {cfg["liquidity_etf"]["min_eur"]:,.0f} €/jour'.replace(',', ' ') + \
             ('' if cfg['liquidity_equity']['enabled'] and cfg['liquidity_etf']['enabled'] else ' (certaines règles désactivées)')
         steps.append(_step(seq, key, label, text, kept, removed, {'rule_ids': [rid] if rid else ['liquidity_equity', 'liquidity_etf']}))
         kept -= removed
-    steps.append(_step(5, 'final', 'Catalogue final', 'Titres retenus : leurs historiques sont importés puis entretenus automatiquement', kept, 0, {}))
+    steps.append(_step(6, 'final', 'Catalogue final', 'Titres retenus : leurs historiques sont importés puis entretenus automatiquement', kept, 0, {}))
     return steps
 
 
@@ -172,7 +173,7 @@ def items(conn, stage, step, q='', kind='', mic='', page=1, quality=''):
                 cond_all += ' AND COALESCE(s.quality,"none")=%s'; args.append(quality)
             cur.execute(f'SELECT COUNT(*) n FROM listings l JOIN instruments i ON i.id=l.instrument_id {join} WHERE {cond_all}', args)
             total = cur.fetchone()['n']
-            cur.execute(f"""SELECT l.id, l.symbol, l.mic, l.currency, l.status, l.excluded_reason, l.is_primary, i.name, i.isin, i.kind, i.country, p.price, p.currency price_currency, p.avg_volume_3m, p.quote_at,
+            cur.execute(f"""SELECT l.id, l.symbol, l.mic, l.currency, l.status, l.excluded_reason, l.is_primary, i.name, i.isin, i.kind, i.country, p.price, p.currency price_currency, p.avg_volume_3m, p.quote_at, p.price_time,
                                    {'s.quality,' if step == 'history' else ''} (SELECT COUNT(*) FROM portfolio_transactions t WHERE t.listing_id=l.id) held
                             FROM listings l JOIN instruments i ON i.id=l.instrument_id LEFT JOIN latest_prices p ON p.listing_id=l.id {join}
                             WHERE {cond_all} ORDER BY i.name, l.mic LIMIT {PAGE} OFFSET {(page - 1) * PAGE}""", args)
@@ -215,7 +216,7 @@ def explain(conn, q):
                     on = ccfg[rule['id']]['enabled'] or rule.get('locked')
                     trace.append({'key': rule['id'], 'label': rule['label'], 'result': 'passed', 'detail': 'passe' if on else 'règle désactivée', 'rule': crules.rule_text(rule['id'], ccfg)})
             item = {'raw': {k: r[k] for k in ('kind', 'mic', 'symbol', 'isin', 'name', 'country', 'category')}, 'catalogue': trace, 'listing': None, 'yahoo': []}
-            cur.execute("""SELECT l.id, l.status, l.excluded_reason, l.is_primary, l.primary_reason, l.currency, p.price, p.currency price_currency, p.avg_volume_3m, p.quote_at,
+            cur.execute("""SELECT l.id, l.status, l.excluded_reason, l.is_primary, l.primary_reason, l.currency, p.price, p.currency price_currency, p.avg_volume_3m, p.quote_at, p.price_time,
                                   (SELECT COUNT(*) FROM portfolio_transactions t WHERE t.listing_id=l.id) held
                            FROM listings l LEFT JOIN latest_prices p ON p.listing_id=l.id WHERE l.mic=%s AND l.symbol=%s""", (r['mic'], r['symbol'][:24]))
             l = cur.fetchone()
@@ -238,6 +239,10 @@ def explain(conn, q):
                         step = prefilter.step_of(l['excluded_reason'])
                         pm, vm = ycfg['price']['min_eur'], None
                         y.append({'key': 'no_data', 'label': 'Cours reçu de Yahoo', 'result': 'passed', 'detail': f'{pe:,.2f} €'.replace(',', ' ') if pe is not None else 'oui'})
+                        age = (datetime.datetime.utcnow() - l['price_time']).total_seconds() / 86400 if l['price_time'] else None
+                        mx = ycfg['stale']['max_days']
+                        y.append({'key': 'stale', 'label': 'Dernier cours récent', 'result': 'removed' if step == 'stale' else 'passed',
+                                  'detail': ('âge inconnu' if age is None else f'{age:.0f} jours ') + (f'> {mx:g} jours' if step == 'stale' else f'≤ {mx:g} jours' if ycfg['stale']['enabled'] and age is not None else '(règle désactivée)' if not ycfg['stale']['enabled'] else '')})
                         y.append({'key': 'price', 'label': 'Prix minimum', 'result': 'removed' if step == 'price' else 'passed',
                                   'detail': (f'{pe:,.2f} € ' if pe is not None else '') + (f'< {pm:g} €' if step == 'price' else f'≥ {pm:g} €' if ycfg['price']['enabled'] else 'règle désactivée')})
                         y.append({'key': 'volume', 'label': 'Volume moyen connu', 'result': 'removed' if step == 'volume' else 'passed',

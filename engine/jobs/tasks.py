@@ -129,13 +129,13 @@ def yahoo_info(conn, client, now, log):
 
 
 def yahoo_filter(conn, log, now=None):
-    """Applique les règles Yahoo (prix, liquidité, volume) aux informations déjà stockées (aucun appel à Yahoo) : le résultat est le catalogue final."""
+    """Applique les règles Yahoo (prix, ancienneté du dernier cours, liquidité, volume) aux informations déjà stockées (aucun appel à Yahoo) : le résultat est le catalogue final."""
     now = now or hours.utcnow()
     with conn.cursor() as cur:
         cur.execute('SELECT COUNT(*) n FROM latest_prices WHERE quote_at IS NOT NULL')
         if not cur.fetchone()['n']:
             raise RuntimeError('Aucune information Yahoo en base : lancez d’abord « Importer les informations Yahoo »')
-    changed = _step(log, 'Application des filtres', lambda: collect.apply_prefilter(conn), lambda r: f'{r["selected"]} retenus, {r["excluded"]} écartés (changements)')
+    changed = _step(log, 'Application des filtres', lambda: collect.apply_prefilter(conn, now), lambda r: f'{r["selected"]} retenus, {r["excluded"]} écartés (changements)')
     _step(log, 'Cotation principale de chaque produit', lambda: loader.assign_primaries(conn), lambda r: f'{r} cotations principales')
     settings.mark_applied(conn, 'prefilter', settings.prefilter_rules(conn))
     steps = _step(log, 'Résultats par étape (figés)', lambda: funnel.snapshot(conn, 'yahoo', getattr(log, 'job_id', None)))
@@ -275,7 +275,7 @@ def _intraday(conn, client, rows, now, log, round_id=None):
 
 
 def tick(conn, client, now=None, trigger='cron'):
-    """Passage du cron (toutes les ~10 minutes) : décide seul quoi faire, d'après la planification enregistrée.
+    """Passage du cron (toutes les 15 minutes en production) : décide seul quoi faire, d'après la planification enregistrée.
     N'agit QUE sur le catalogue final et les titres détenus : jamais d'import, de filtre ni de reconstruction du catalogue.
     Seul un passage déclenché par le cron laisse le battement qui prouve que le cron fonctionne (un test manuel ne compte pas)."""
     now = now or hours.utcnow()

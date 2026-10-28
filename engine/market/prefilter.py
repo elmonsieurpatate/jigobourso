@@ -1,7 +1,7 @@
 """Préfiltre de marché (niveau 2 : Yahoo Finance) : écarte les titres trop chers à échanger ou trop peu liquides, d'après Yahoo Quote.
 
 Valeurs par défaut : prix ≥ 2 € ; liquidité (prix × volume moyen 3 mois, en EUR) ≥ 1 M€/jour pour une action, ≥ 250 k€/jour pour un ETF ;
-volume inconnu = exclu. Un titre sans cotation Quote reste « candidate » (pas de décision sans donnée).
+volume inconnu = exclu ; dernier cours de plus de 10 jours = exclu (titre mort ou suspendu). Un titre sans cotation Quote reste « candidate » (pas de décision sans donnée).
 Exemple : DVDG.DE, 131 titres/jour à 42 € ≈ 5 k€/jour → exclu.
 Réglable dans l'administration (settings['prefilter']) : chaque règle s'active ou se désactive et a son seuil. Ce niveau ne connaît ni
 les règles du catalogue FinanceDatabase (niveau 1) ni les critères des stratégies (niveau 3).
@@ -9,6 +9,9 @@ les règles du catalogue FinanceDatabase (niveau 1) ni les critères des straté
 PREFIX = 'préfiltre'
 
 RULES = (
+    {'id': 'stale', 'label': 'Dernier cours trop ancien', 'kinds': ('equity', 'etf'), 'unit': 'jours', 'step': 1, 'key': 'max_days', 'default': 10, 'max': 3650,
+     'reason': 'dernier cours trop ancien', 'role': 'Écarte les titres dont le dernier cours connu date de plus de N jours.',
+     'help': 'Un titre radié, suspendu ou liquidé garde un « dernier cours » figé qui passe les seuils de prix et de liquidité. 10 jours laissent passer week-ends et jours fériés ; mettez plus pour tolérer des suspensions longues, ou désactivez la règle.'},
     {'id': 'price', 'label': 'Prix minimum', 'kinds': ('equity', 'etf'), 'unit': '€', 'step': 0.5, 'key': 'min_eur', 'default': 2.0, 'max': 1000.0,
      'reason': 'cours inférieur', 'role': 'Écarte les titres dont le cours (converti en euros) est sous le seuil.',
      'help': 'Les titres à quelques centimes ont des variations en pourcentage énormes et un écart achat/vente très coûteux : leurs pentes et leurs replis ne sont pas comparables à ceux des autres.'},
@@ -73,11 +76,13 @@ def normalize(params):
     return cfg
 
 
-def decide(kind, price, avg_volume, to_eur, params=None):
-    """Renvoie ('selected', None) ou ('excluded', motif) ou (None, None) si les données manquent."""
+def decide(kind, price, avg_volume, to_eur, params=None, age_days=None):
+    """Renvoie ('selected', None) ou ('excluded', motif) ou (None, None) si les données manquent. `age_days` : ancienneté du dernier cours (None = inconnue, la règle ne s'applique pas)."""
     c = normalize(params)
     if price is None or to_eur is None:
         return None, None
+    if c['stale']['enabled'] and age_days is not None and age_days > c['stale']['max_days']:
+        return 'excluded', f'{PREFIX} : dernier cours trop ancien ({age_days:.0f} jours > {c["stale"]["max_days"]:g})'
     if c['price']['enabled'] and price * to_eur < c['price']['min_eur']:
         return 'excluded', f'{PREFIX} : cours inférieur à {c["price"]["min_eur"]:g} €'
     if avg_volume is None:
@@ -93,9 +98,11 @@ def decide(kind, price, avg_volume, to_eur, params=None):
 
 
 def step_of(reason):
-    """Étape du préfiltre qui a produit ce motif ('price' | 'liquidity' | 'volume') ; None si ce n'est pas un motif de préfiltre."""
+    """Étape du préfiltre qui a produit ce motif ('stale' | 'price' | 'liquidity' | 'volume') ; None si ce n'est pas un motif de préfiltre."""
     if not reason or not reason.startswith(PREFIX):
         return None
+    if 'trop ancien' in reason:
+        return 'stale'
     if 'cours inférieur' in reason:
         return 'price'
     if 'volume moyen inconnu' in reason:

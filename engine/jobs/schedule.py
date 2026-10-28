@@ -1,6 +1,6 @@
 """Cron : ce qu'il fait (uniquement l'entretien des historiques du catalogue final) et s'il fonctionne VRAIMENT.
 
-Le déclencheur est externe : une tâche cron de l'hébergeur appelle `tick` toutes les ~10 minutes. Ce module distingue :
+Le déclencheur est externe : une tâche cron de l'hébergeur appelle `tick` (toutes les 15 minutes en production ; la fréquence réelle est mesurée, pas supposée). Ce module distingue :
   - la configuration prévue (activation, intervalle) ;
   - l'observé : le dernier passage RÉEL du cron (battement écrit par `tick` quand c'est le cron qui l'appelle) et les exécutions réelles dans `jobs`.
 Il ne prétend jamais connaître une cause qu'il ne peut pas voir : si le cron ne passe pas, il le dit et indique ce qu'il ne peut pas diagnostiquer.
@@ -20,7 +20,8 @@ TASKS = (
      'params': {'interval_minutes': {'label': 'Intervalle minimal entre deux collectes d’une place (min)', 'default': 15, 'min': 5, 'max': 120}}},
 )
 BY_ID = {t['id']: t for t in TASKS}
-CRON_EXPECTED_MINUTES = 10
+CRON_EXPECTED_MINUTES = 15
+RECENT_PASSES = 12          # derniers passages du cron conservés pour mesurer la fréquence réelle
 STUCK_MINUTES = 90
 
 
@@ -70,11 +71,33 @@ def _iso(v):
 
 
 def beat(conn, now, trigger='cron', done=None, duration=None):
-    """Battement. Seul un passage du CRON compte comme preuve de fonctionnement ; un test manuel est noté à part."""
+    """Battement. Seul un passage du CRON compte comme preuve de fonctionnement ; un test manuel est noté à part.
+    Le premier battement d'un passage (done=None) s'ajoute à la liste des derniers passages, qui sert à mesurer la fréquence réelle."""
     key = 'cron_heartbeat' if trigger == 'cron' else 'cron_test'
     prev = settings.get(conn, key, {})
-    data = {'at': now.replace(tzinfo=None, microsecond=0).isoformat(sep=' '), 'trigger': trigger, 'done': done if done is not None else prev.get('done'), 'duration_s': duration}
+    at = now.replace(tzinfo=None, microsecond=0).isoformat(sep=' ')
+    data = {'at': at, 'trigger': trigger, 'done': done if done is not None else prev.get('done'), 'duration_s': duration}
+    if trigger == 'cron':
+        recent = list(prev.get('recent') or [])
+        if done is None and (not recent or recent[-1] != at):
+            recent.append(at)
+        data['recent'] = recent[-RECENT_PASSES:]
     settings.put(conn, key, data)
+
+
+def measured_interval(recent):
+    """Écart médian (minutes) entre les derniers passages du cron ; None tant que moins de 3 passages sont connus."""
+    pts = []
+    for v in recent or []:
+        try:
+            pts.append(datetime.datetime.fromisoformat(v))
+        except ValueError:
+            pass
+    gaps = sorted((b - a).total_seconds() / 60 for a, b in zip(pts, pts[1:]) if b > a)
+    if len(gaps) < 2:
+        return None
+    mid = len(gaps) // 2
+    return round(gaps[mid] if len(gaps) % 2 else (gaps[mid - 1] + gaps[mid]) / 2, 1)
 
 
 def _next_settle(mic, now):
@@ -136,6 +159,9 @@ def state(conn, now=None):
         cron = {'state': 'late', 'observed': True, 'label': 'Ne répond plus'}
         diagnosis.append(f'Dernier passage il y a {age / 60:.1f} h alors qu’un passage est attendu toutes les {expected} min. Le cron ne se déclenche plus (tâche arrêtée ou supprimée chez l’hébergeur, adresse ou clé modifiée) : le système ne peut pas savoir laquelle de ces causes.' if age > 120
                          else f'Dernier passage il y a {age:.0f} min alors qu’un passage est attendu toutes les {expected} min : retard ou arrêt du cron (cause non observable).')
+    measured = measured_interval(hb.get('recent'))
+    if measured is not None and abs(measured - expected) > max(2, 0.3 * expected):
+        diagnosis.append(f'Fréquence observée : un passage toutes les {measured:g} min, alors que la planification attend {expected} min. Corrigez la valeur ici ou la tâche chez l’hébergeur.')
     for s in stuck:
         diagnosis.append(f'Verrou possible : le traitement « {s["job_type"]} » (n° {s["id"]}) est « en cours » depuis {s["mins"]} min. Un traitement du même type ne redémarre pas tant que celui-ci n’est pas terminé ; au-delà de 3 h il est marqué « interrompu » au passage suivant.')
     for t in TASKS:
@@ -175,7 +201,7 @@ def state(conn, now=None):
     with conn.cursor() as cur:
         cur.execute("SELECT id, status, started_at, finished_at, summary, TIMESTAMPDIFF(SECOND, started_at, finished_at) secs FROM jobs WHERE job_type='maintenance' ORDER BY id DESC LIMIT 1")
         maint = cur.fetchone()
-    cron.update({'last_at': hb.get('at'), 'last_done': hb.get('done'), 'last_duration_s': hb.get('duration_s'), 'expected_minutes': expected, 'age_minutes': age,
-                 'next_at': _iso(last_beat + datetime.timedelta(minutes=expected)) if last_beat else None, 'last_test': test or None})
+    cron.update({'last_at': hb.get('at'), 'last_done': hb.get('done'), 'last_duration_s': hb.get('duration_s'), 'expected_minutes': expected, 'measured_minutes': measured, 'passes_seen': len(hb.get('recent') or []), 'age_minutes': age,
+                 'next_at': _iso(last_beat + datetime.timedelta(minutes=measured or expected)) if last_beat else None, 'last_test': test or None})
     return {'cron': cron, 'diagnosis': diagnosis, 'tasks': tasks, 'errors': errors, 'config': cfg, 'now_utc': naive.isoformat(sep=' '),
             'maintenance': None if not maint else {'id': maint['id'], 'status': maint['status'], 'started_at': _iso(maint['started_at']), 'duration_s': maint['secs'], 'summary': maint['summary']}}

@@ -5,9 +5,9 @@ on:
   workflow_dispatch:
     inputs:
       operation:
-        description: diagnostic (lecture seule) ou deploy
+        description: diagnostic (lecture seule), deploy, ou rollback (restaure la dernière sauvegarde du code)
         type: choice
-        options: [diagnostic, deploy]
+        options: [diagnostic, deploy, rollback]
         default: diagnostic
 permissions:
   contents: read
@@ -41,6 +41,7 @@ jobs:
         run: |
           set -euo pipefail
           find app scripts -name '*.php' -print0 | xargs -0 -n1 php -l > /dev/null
+          python scripts/migrate.py --check
           python -m compileall -q engine scripts
       - name: Tests rapides
         run: python -m pytest tests/fast -q

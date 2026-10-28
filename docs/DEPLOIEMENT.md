@@ -1,11 +1,14 @@
 # Déploiement automatique (GitHub Actions)
 
-Chaque push sur `main` lance `.github/workflows/deploy.yml` : syntaxe PHP/Python, `tests/fast`, `tests/integ` (base jetable du runner), puis `ops/deploy.sh` sur Hostinger.
+Chaque push sur `main` lance `.github/workflows/deploy.yml` : syntaxe PHP/Python, contrôle des migrations, `tests/fast`, `tests/integ` (base jetable du runner), puis `ops/deploy.sh` sur Hostinger.
 - Transmis : `app/ engine/ db/ docs/ scripts/ README.md requirements.txt`. Jamais touchés : `private/` (env, clé cron), `data/`, `logs/`, `.venv`, base de production, tâche cron hPanel.
-- Avant transfert : sauvegarde `tgz` du code distant (`.jigobourso-v2-code-backups/`, 5 dernières). Le schéma `db/schema.sql` n'est appliqué que s'il est purement additif (`CREATE … IF NOT EXISTS`) ; toute instruction `DROP/ALTER/DELETE…` bloque le déploiement : migration à faire à part, avec sauvegarde.
-- Après transfert : dépendances Python si `requirements.txt` a changé, import du moteur, `php -l`, puis contrôle public (accueil 200, version `?v=` servie, `api/auth/me`). Le fichier `.deployed` (hors web) note commit et date.
+- **Retour arrière automatique** : avant tout transfert, sauvegarde `tgz` du code distant (`.jigobourso-v2-code-backups/`, 5 dernières). Si une étape échoue après le début du transfert (dépendances, migration, import du moteur, `php -l`, contrôle public), le code est restauré depuis cette sauvegarde (`rsync --delete` sur les seuls dossiers de code) et le site est revérifié. Les données et secrets ne sont jamais concernés.
+- **Retour arrière manuel** : Actions › « Jigobourso V2 » › Run workflow › `rollback` (dernière sauvegarde), ou `ROLLBACK_BACKUP=<fichier>`.
+- **Dépendances Python** : si `requirements.txt` change (empreinte `.requirements.sha`), le venv est sauvegardé (3 dernières copies) puis mis à jour. Le venv de production n'a pas `pip` (`ensurepip` indisponible) : le `pip` du système installe dans le venv (`--target`). Échec = retour arrière du code.
+- **Schéma SQL** : `db/schema.sql` crée seulement les tables absentes et redéfinit les vues. Toute évolution d'une table existante passe par `db/migrations/AAAAMMJJ_nom.sql` (voir son README) : appliquée une seule fois (`schema_migrations`), ajouts seulement (`ADD COLUMN`, `CREATE INDEX`, `CREATE TABLE IF NOT EXISTS`) ; `DROP`, `DELETE`, `UPDATE`, `MODIFY`… sont refusés par le CI et par `scripts/migrate.py`. Avant une migration, dump complet de la base (`.jigobourso-v2-code-backups/db-*.sql.gz`, 3 dernières). Un retour arrière du code ne défait pas une migration (colonnes ajoutées ignorées par l'ancien code).
+- Après transfert : import du moteur, `php -l`, puis contrôle public (accueil 200, version `?v=` servie, `api/auth/me`). Le fichier `.deployed` (hors web) note commit et date.
 - Secret requis : `HOSTINGER_SSH_PRIVATE_KEY` (environnement GitHub `production`). Clé d'hôte épinglée dans le workflow. Résultat publié sans secret sur la branche `deployment-status` (`status.json`, `deployment.log`).
-- Lancement manuel : onglet Actions › « diagnostic » (lecture seule) ou « deploy ».
+- Lancement manuel : onglet Actions › `diagnostic` (lecture seule), `deploy` ou `rollback`.
 - `scripts/drop_legacy_tables.sh` n'est jamais appelé par le déploiement.
 
 # Mise en production et bascule (à exécuter seulement après accord explicite)
@@ -16,7 +19,7 @@ Ce document a été exécuté le 28/10/2026 (voir « Bascule effectuée »). Ava
 - **Sauvegardes** (poste local, `migration/private/backup/`, droits 600, jamais versionnées) : dump complet de la base (229 Mo gz, 54 tables, vérifié) et copie de `public_html` (27 Mo).
 - **Installation** : `domains/jigobourso.turnjoy.dev/jigobourso-v2/` (code, venv Python 3.9 + PyMySQL, `private/env` et `private/cron.key` en 600, `logs/`). Tables V2 créées à côté des anciennes (80 tables/vues au total, anciennes tables comptées avant/après : intactes). Données : catalogue, amorçage, nightly, tick, suivi reconstitué (30 jours), comptes migrés (1 compte, 2 portefeuilles, 7/7 transactions rattachées, contrôle conforme).
 - **Mise en service** : `public_html/v2` est un lien vers `jigobourso-v2/app/public` ; le `.htaccess` racine réécrit toute la racine vers `v2/` (réécriture interne, URL inchangées). L'ancien code et les anciennes données restent sur le disque, non servis.
-- **Cron** : la tâche hPanel existante appelle `api/yahoo-history-cron?k=<clé>` toutes les 10 minutes ; V2 répond à cette même URL (même clé, copiée dans `private/cron.key`) et lance `engine.cli tick` en tâche de fond. Un garde-fou évite de refaire une collecte de 15 min si la précédente a moins de 12 minutes. Aucune modification hPanel nécessaire.
+- **Cron** : la tâche hPanel existante appelle `api/yahoo-history-cron?k=<clé>` toutes les 15 minutes (`5,20,35,50`, mesuré) ; V2 répond à cette même URL (même clé, copiée dans `private/cron.key`) et lance `engine.cli tick` en tâche de fond. Un garde-fou évite de refaire une collecte de 15 min si la précédente a moins de 12 minutes. Aucune modification hPanel nécessaire.
 - **Retour arrière immédiat** : `cd public_html && cp -p .htaccess.legacy-20261028 .htaccess` (l'ancien site revient, ses tables sont intactes). Les transactions saisies dans V2 après la bascule seraient à reporter à la main.
 - **Restent à faire** : observation 2 semaines, puis nettoyage des anciennes tables (après dump et accord) ; changer le mot de passe de test `jigo/jigo` ; retirer dans hPanel d'éventuelles anciennes tâches qui lanceraient `cron_scan.sh` ou `worker.py` (inutiles désormais).
 
