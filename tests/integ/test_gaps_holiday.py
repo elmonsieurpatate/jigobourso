@@ -99,19 +99,6 @@ def test_repair_closes_gaps_that_the_new_rule_no_longer_sees(conn):
         assert cur.fetchone()['state'] == 'repaired'
 
 
-def test_daily_close_is_fetched_after_its_publication_not_before(conn):
-    """Une collecte quotidienne de l'après-midi (qui récupérait la veille) ne dispense pas de chercher la clôture de New York le soir même."""
-    from engine.jobs import tasks
-    with conn.cursor() as cur:
-        cur.execute("INSERT INTO jobs(job_type,trigger_by,status,started_at,finished_at) VALUES ('daily:XNYS','cron','completed','2026-10-28 17:05:00','2026-10-28 17:05:30')")
-    conn.commit()
-    assert not tasks._daily_done(conn, 'XNYS', D(28))                  # fermeture 20:00 UTC + règlement : la collecte de 17:05 ne compte pas
-    with conn.cursor() as cur:
-        cur.execute("INSERT INTO jobs(job_type,trigger_by,status,started_at,finished_at) VALUES ('daily:XNYS','cron','completed','2026-10-28 20:35:00','2026-10-28 20:35:30')")
-    conn.commit()
-    assert tasks._daily_done(conn, 'XNYS', D(28))
-
-
 def test_repair_handles_a_place_larger_than_the_batch_budget_and_drops_old_gaps(conn):
     """Londres (36 lots) dépassait le budget de 30 lots et n'était jamais réparée ; un trou de plus de 5 jours n'est plus redemandé."""
     closes(conn, D(26)); bars(conn, D(27)); closes(conn, D(27))

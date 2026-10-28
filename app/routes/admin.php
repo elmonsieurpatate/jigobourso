@@ -1,4 +1,17 @@
 <?php
+// Dernières lignes d'un journal (fin du fichier seulement), éventuellement filtrées par expression régulière ; chaque ligne est tronquée.
+function log_tail(string $file, int $n, ?string $re): array {
+    if (!is_file($file) || !is_readable($file)) return [];
+    $size = filesize($file);
+    $fh = @fopen($file, 'rb');
+    if (!$fh) return [];
+    if ($size > 65536) fseek($fh, -65536, SEEK_END);
+    $lines = preg_split('/\r?\n/', (string)stream_get_contents($fh), -1, PREG_SPLIT_NO_EMPTY);
+    fclose($fh);
+    if ($re !== null) $lines = array_values(array_filter($lines, fn($l) => preg_match($re, $l)));
+    return array_map(fn($l) => mb_substr($l, 0, 300), array_slice($lines, -$n));
+}
+
 require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/engine.php';
 
@@ -87,10 +100,13 @@ return [
     },
     'admin/funnel/explain' => function () { require_admin(); return engine_call('funnel-explain', ['q' => (string)($_GET['q'] ?? '')]); },
     'admin/cron' => function () {
+        // (journaux du cron lus ci-dessous : lignes d'erreur de cron.log et appels refusés de cron-rejets.log)
         require_admin();
         $file = cfg('JIGO_CRON_KEY_FILE', '');
         $s = engine_call('schedule-get', []);
-        $s['site'] = ['cron_key_present' => $file !== '' && is_file($file) && trim((string)file_get_contents($file)) !== '', 'cron_path' => 'api/cron?k=<clé>'];
+        $dir = cfg('JIGO_LOG_DIR', engine_root() . '/logs');
+        $s['site'] = ['cron_key_present' => $file !== '' && is_file($file) && trim((string)file_get_contents($file)) !== '', 'cron_path' => 'api/cron?k=<clé>',
+                      'rejected' => log_tail($dir . '/cron-rejets.log', 10, null), 'log_errors' => log_tail($dir . '/cron.log', 15, '/Traceback|Error|Exception|No such file|not found|denied|Permission|failed|cannot|Killed/i')];
         return $s;
     },
     'admin/cron/save' => function () { need_post(); require_admin(); return engine_call('schedule-save', body()); },

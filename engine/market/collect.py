@@ -259,7 +259,7 @@ def is_holiday(conn, mic, group, day, settled):
     return with_close < 0.05 * len(ids)
 
 
-def intraday_plan(conn, rows, now):
+def intraday_plan(conn, rows, now, previous=True):
     """Barres de 15 minutes des deux dernières séances de chaque place : ({'5d' | '1d': [cotations]}, résumé).
     '5d' si l'une des deux séances est incomplète ; '1d' si seule la séance en cours (ou tout juste finie) est à rafraîchir ; rien si tout est complet.
     Une séance sans aucune barre pour toute la place (jour férié) n'est pas redemandée une fois qu'une collecte est passée après sa clôture.
@@ -297,7 +297,7 @@ def intraday_plan(conn, rows, now):
         live = hours.is_open(mic, now) or s1 <= naive < e1 + datetime.timedelta(minutes=hours.SETTLE_MINUTES)
         for r in group:
             c0, c1 = counts.get(r['listing_id'], (0, 0))
-            miss0 = not holiday0 and c0 < 0.8 * expected
+            miss0 = previous and not holiday0 and c0 < 0.8 * expected      # le passage du cron laisse la séance précédente au rattrapage (catchup.py)
             miss1 = not holiday1 and (live or c1 < 0.8 * expected)
             if miss0:
                 plan['5d'].append(r)
@@ -315,7 +315,7 @@ def slot_of(ts):
     return t.replace(minute=t.minute - t.minute % hours.SLOT_MINUTES, second=0, microsecond=0)
 
 
-def collect_intraday(conn, client, rows, now, range_='1d', progress=None):
+def collect_intraday(conn, client, rows, now, range_='1d', progress=None, failed=None):
     """Barres de 15 min. Une barre provisoire n'écrase jamais une barre définitive. Met à jour latest_prices.
     Renvoie (cotations_ok, barres, erreurs)."""
     by_symbol = {r['symbol'].upper(): r for r in rows}
@@ -328,6 +328,8 @@ def collect_intraday(conn, client, rows, now, range_='1d', progress=None):
             raise
         except Exception:
             err += len(part)
+            if failed is not None:
+                failed.extend(by_symbol[x]['listing_id'] for x in part)
             continue
         bars, latest = [], []
         for symbol, series in data.items():
@@ -353,6 +355,8 @@ def collect_intraday(conn, client, rows, now, range_='1d', progress=None):
         conn.commit()
         lines += len(bars)
         err += len(part) - len(data)
+        if failed is not None:
+            failed.extend(by_symbol[x]['listing_id'] for x in part if x not in data)
         if progress:
             progress(len(part))
     return ok, lines, err
@@ -380,24 +384,39 @@ def _quantile(values, q):
     return v[min(len(v) - 1, int(q * len(v)))] if v else 0
 
 
-def session_gaps(conn, mic, now, sessions=5):
+def settled_at(mic, day):
+    """Instant (UTC naïf) où la clôture officielle de la séance `day` est publiée (fermeture + délai de règlement)."""
+    from zoneinfo import ZoneInfo
+    tz, _, closes = hours.spec(mic)
+    return (datetime.datetime.combine(day, closes, ZoneInfo(tz)).astimezone(datetime.timezone.utc).replace(tzinfo=None)
+            + datetime.timedelta(minutes=hours.SETTLE_MINUTES))
+
+
+def recent_sessions(mic, now, n=2):
+    """Les `n` dernières séances terminées et publiées de la place (jours ouvrés, la plus récente d'abord)."""
+    today = hours.session_date(mic, now)
+    days, d = [], today
+    while len(days) < n and (today - d).days <= n * 2 + 4:
+        if d.weekday() < 5 and hours.is_settled(mic, d, now):
+            days.append(d)
+        d -= datetime.timedelta(days=1)
+    return days
+
+
+def session_gaps(conn, mic, now, sessions=5, report=None):
     """{jour local: description} des séances récentes terminées où des DONNÉES MANQUENT vraiment.
     Un titre peu échangé n'a pas de barre sur les créneaux sans transaction : on ne regarde donc jamais « combien de barres par titre »
     mais, pour chaque créneau, la part des titres de la place qui ont une barre, comparée à ce même créneau les autres jours.
       - créneaux nettement sous leur niveau habituel (≥ 2) : trou ;
       - séance sans (presque) aucune barre ALORS QUE les clôtures quotidiennes existent : trou (Yahoo n'a pas répondu, ce n'est pas un jour férié) ;
-      - séance sans barre ni clôture : jour férié, pas un trou."""
+      - séance sans barre ni clôture : jour férié, pas un trou.
+    `sessions` séances servent à établir le niveau habituel de chaque créneau ; seules les `report` plus récentes sont rapportées (toutes par défaut)."""
     from engine.market import intraday as intra
     rows = collection_set(conn, mic)
     ids = [r['listing_id'] for r in rows]
     if not ids or not hours.known(mic):
         return {}
-    today = hours.session_date(mic, now)
-    days, d = [], today                                              # la séance du jour compte dès que sa clôture est publiée
-    while len(days) < sessions and (today - d).days <= sessions * 2 + 4:
-        if d.weekday() < 5 and hours.is_settled(mic, d, now):
-            days.append(d)
-        d -= datetime.timedelta(days=1)
+    days = recent_sessions(mic, now, sessions)
     if not days:
         return {}
     per_slot, closes = defaultdict(int), {}
@@ -428,6 +447,9 @@ def session_gaps(conn, mic, now, sessions=5):
         missing = [t for t, ratio, ref in zip(slots, ratios[day], profile) if ref >= GAP_EMPTY_RATIO and ratio < GAP_MISSING_RATIO * ref]
         if len(missing) >= GAP_MIN_SLOTS:
             out[day] = f'{len(missing)} créneaux sur {len(slots)} nettement sous leur niveau habituel (de {missing[0]:%H:%M} à {missing[-1]:%H:%M} UTC)'
+    if report:
+        keep = set(days[:report])
+        out = {d: v for d, v in out.items() if d in keep}
     return out
 
 

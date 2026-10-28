@@ -14,7 +14,8 @@ import time
 
 from engine.analytics import compute, funnel, tracking
 from engine.catalogue import loader
-from engine.market import collect, hours
+from engine.market import catchup, collect, hours
+from engine.market.yahoo import RateLimited
 from engine.shared import settings
 from . import schedule
 from .runner import run_job
@@ -155,10 +156,13 @@ def _count(conn, table, ids):
     return n
 
 
-def fetch_daily(conn, client, rows, now, cb=None):
+def fetch_daily(conn, client, rows, now, cb=None, allowed=None):
     """Clôtures quotidiennes manquantes : une fenêtre adaptée par titre, rien pour un titre déjà à jour. Renvoie les chiffres."""
     ids = [r['listing_id'] for r in rows]
     plan, fresh = collect.daily_plan(conn, rows, now)
+    if allowed is not None:                       # rattrapage : seulement les titres dont le délai de nouvelle tentative est écoulé
+        plan = {rng: [r for r in group if r['listing_id'] in allowed] for rng, group in plan.items()}
+        plan = {rng: group for rng, group in plan.items() if group}
     before = _count(conn, 'daily_prices', ids)
     answered = lines = err = 0
     for rng, group in plan.items():
@@ -172,14 +176,14 @@ def fetch_daily(conn, client, rows, now, cb=None):
     return {'titles': len(rows), 'up_to_date': fresh, 'asked': sum(len(g) for g in plan.values()), 'answered': answered, 'errors': err, 'added': added, 'present': max(0, lines - added)}
 
 
-def fetch_intraday(conn, client, rows, now, cb=None):
+def fetch_intraday(conn, client, rows, now, cb=None, previous=True, failed=None):
     """Barres de 15 minutes des deux dernières séances de chaque place : uniquement celles qui manquent ou doivent être actualisées."""
     ids = [r['listing_id'] for r in rows]
-    plan, summary = collect.intraday_plan(conn, rows, now)
+    plan, summary = collect.intraday_plan(conn, rows, now, previous)
     before = _count(conn, 'intraday_prices', ids)
     answered = lines = err = 0
     for rng, group in plan.items():
-        ok, ln, er = collect.collect_intraday(conn, client, group, now, range_=rng, progress=cb)
+        ok, ln, er = collect.collect_intraday(conn, client, group, now, range_=rng, progress=cb, failed=failed)
         answered, lines, err = answered + ok, lines + ln, err + er
     done = sum(len(g) for g in plan.values())
     if cb and len(rows) > done:
@@ -217,17 +221,15 @@ def history(conn, client, now, log):
 
 # ───────── 2. entretien automatique (cron) ─────────
 def maintenance(conn, client, now, log):
-    """Après la collecte quotidienne : cours et devises du catalogue final, indicateurs, suivi, trous, rétention. Ne sélectionne rien."""
+    """Après la collecte quotidienne : cours et devises du catalogue final, indicateurs, suivi, rétention (les trous sont rattrapés à chaque passage : catchup.py). Ne sélectionne rien."""
     rows = collect.collection_set(conn)
     ok, err = _step(log, 'Cours de référence (Quote)', lambda: collect.refresh_quotes(conn, client, rows, now), lambda r: f'{r[0]} reçus sur {len(rows)}')
     _step(log, 'Taux de change', lambda: collect.refresh_fx(conn, client, now))
     n_series, n_metrics = _step(log, 'Indicateurs et classements', lambda: compute.compute_all(conn, now), lambda r: f'{r[0]} séries, {r[1]} lignes de mesures')
     snap_day, snap_rows = _step(log, 'Suivi des classements', lambda: tracking.record_snapshot(conn), lambda r: f'{r[0]} ({r[1]} titres)')
     outcomes = _step(log, 'Résultats du suivi', lambda: tracking.update_outcomes(conn), lambda r: f'{r} résultats')
-    gaps = _step(log, 'Détection des trous', lambda: sum(collect.detect_gaps(conn, mic, now) for mic in sorted({r['mic'] for r in rows}) if hours.known(mic)), lambda r: f'{r} trous')
-    _step(log, 'Réparation des trous', lambda: collect.repair_gaps(conn, client, now))
     _step(log, 'Rétention des clôtures et des barres', lambda: (collect.prune_daily(conn, now), collect.prune_intraday(conn, now)))
-    return ok, err, f'cours {ok}/{ok + err}, séries {n_series}, mesures {n_metrics}, suivi {snap_day} ({snap_rows} titres, {outcomes} résultats), trous {gaps}'
+    return ok, err, f'cours {ok}/{ok + err}, séries {n_series}, mesures {n_metrics}, suivi {snap_day} ({snap_rows} titres, {outcomes} résultats)'
 
 
 def _ran_within(conn, job_type, minutes, now):
@@ -242,19 +244,6 @@ def _just_closed(mic, now):
     return not hours.is_open(mic, now) and hours.is_open(mic, now - datetime.timedelta(minutes=30))
 
 
-def _daily_done(conn, mic, day):
-    """La clôture de la séance `day` a-t-elle déjà été cherchée APRÈS sa publication (fermeture + délai de règlement) ?
-    Une collecte du matin ou de l'après-midi du même jour calendaire (qui récupérait la veille) ne compte pas : sinon la clôture
-    d'une place qui ferme tard (New York : 20:00 UTC) ne serait jamais collectée le soir même."""
-    from zoneinfo import ZoneInfo
-    tz, _, closes = hours.spec(mic)                      # place sans horaires connus : clôture par défaut de la table
-    settled = (datetime.datetime.combine(day, closes, ZoneInfo(tz)).astimezone(datetime.timezone.utc).replace(tzinfo=None)
-               + datetime.timedelta(minutes=hours.SETTLE_MINUTES))
-    with conn.cursor() as cur:
-        cur.execute("""SELECT COUNT(*) n FROM jobs WHERE job_type=%s AND status IN ('completed','completed_with_errors') AND started_at >= %s""", ('daily:' + mic, settled))
-        return cur.fetchone()['n'] > 0
-
-
 def _maintenance_due(conn):
     """Une maintenance suit chaque collecte quotidienne réussie."""
     with conn.cursor() as cur:
@@ -264,18 +253,28 @@ def _maintenance_due(conn):
         return cur.fetchone()['n'] > 0
 
 
-def _daily(conn, client, rows, now, log, round_id=None):
-    d = fetch_daily(conn, client, rows, now, _progress(log, 'Clôtures', len(rows)))
+def _daily(conn, client, rows, now, log, round_id=None, due=None, mic=None):
+    d = fetch_daily(conn, client, rows, now, _progress(log, 'Clôtures', len(rows)), allowed=due)
+    if due is not None and mic:
+        catchup.daily_after(conn, mic, due, now)               # retient les clôtures toujours absentes pour les redemander plus tard
     if d['errors']:
-        log('warning', f'{d["errors"]} cotations sans réponse')
+        log('warning', f'{d["errors"]} cotations sans réponse : nouvelle tentative automatique plus tard')
     add_stats(conn, 'daily', now, round_id or _now_iso(now), titles=d['titles'], up_to_date=d['up_to_date'], answered=d['answered'], errors=d['errors'], added=d['added'], present=d['present'])
     return d['answered'], d['errors'], f'{d["added"]} clôtures ajoutées, {d["up_to_date"]} titres déjà à jour'
 
 
-def _intraday(conn, client, rows, now, log, round_id=None):
-    d = fetch_intraday(conn, client, rows, now, _progress(log, 'Barres 15 min', len(rows)))
+def _intraday(conn, client, rows, now, log, round_id=None, mic=None):
+    failed = []
+    try:
+        d = fetch_intraday(conn, client, rows, now, _progress(log, 'Barres 15 min', len(rows)), previous=False, failed=failed)
+    except RateLimited:
+        if mic:
+            catchup.note_failed(conn, mic, hours.session_date(mic, now), None, now)
+        raise
+    if failed and mic:
+        catchup.note_failed(conn, mic, hours.session_date(mic, now), failed, now)   # ces titres seront redemandés après la clôture
     if d['errors']:
-        log('warning', f'{d["errors"]} cotations sans réponse')
+        log('warning', f'{d["errors"]} cotations sans réponse : rattrapage automatique prévu')
     add_stats(conn, 'intraday', now, round_id or _now_iso(now), titles=d['titles'], up_to_date=d['up_to_date'], answered=d['answered'], errors=d['errors'], added=d['added'], present=d['present'])
     return d['answered'], d['errors'], f'{d["added"]} barres ajoutées, {d["up_to_date"]} titres déjà complets'
 
@@ -290,16 +289,32 @@ def tick(conn, client, now=None, trigger='cron'):
     schedule.beat(conn, now, trigger)
     round_id = _now_iso(now)
     done = []
+
+    def guarded(where, fn):
+        """Une erreur sur une place ne doit jamais empêcher les autres : elle est notée (visible dans l'administration) et le passage continue."""
+        try:
+            return fn()
+        except Exception as e:                                                   # noqa: BLE001
+            conn.rollback()
+            schedule.record_error(conn, now, where, e)
+
+    # 1. collectes normales, toujours prioritaires
     for mic in sorted({r['mic'] for r in collect.collection_set(conn)}):
         rows = collect.collection_set(conn, mic)
         if sched['intraday']['enabled'] and hours.known(mic) and (hours.is_open(mic, now) or _just_closed(mic, now)) \
                 and not _ran_within(conn, 'intraday:' + mic, max(1, sched['intraday']['interval_minutes'] - 3), now):
-            done.append(('intraday', mic, run_job(conn, 'intraday:' + mic, lambda log, rows=rows: _intraday(conn, client, rows, now, log, round_id), trigger=trigger)))
-        day = collect.latest_settled(mic, now)
-        if sched['daily']['enabled'] and not _daily_done(conn, mic, day):
-            done.append(('daily', mic, run_job(conn, 'daily:' + mic, lambda log, rows=rows: _daily(conn, client, rows, now, log, round_id), trigger=trigger)))
+            done.append(('intraday', mic, guarded(f'intraday:{mic}', lambda: run_job(conn, 'intraday:' + mic, lambda log: _intraday(conn, client, rows, now, log, round_id, mic), trigger=trigger))))
+        # clôtures : dès la publication, puis nouvelles tentatives espacées tant qu'il en manque (panne de Yahoo, passage manqué, titre en retard)
+        due = guarded(f'daily:{mic}', lambda: catchup.daily_due(conn, mic, rows, now)) if sched['daily']['enabled'] else None
+        if due:
+            done.append(('daily', mic, guarded(f'daily:{mic}', lambda: run_job(conn, 'daily:' + mic, lambda log: _daily(conn, client, rows, now, log, round_id, due, mic), trigger=trigger))))
     if sched['daily']['enabled'] and _maintenance_due(conn):
-        done.append(('maintenance', None, run_job(conn, 'maintenance', lambda log: maintenance(conn, client, now, log), trigger=trigger)))
+        done.append(('maintenance', None, guarded('maintenance', lambda: run_job(conn, 'maintenance', lambda log: maintenance(conn, client, now, log), trigger=trigger))))
+    # 2. rattrapage : séances de 15 min incomplètes ou titres sans réponse, y compris après une panne de plusieurs heures ou jours
+    if sched['intraday']['enabled']:
+        work = guarded('rattrapage', lambda: catchup.plan_intraday(conn, now))
+        if work:
+            done.append(('catchup', None, guarded('rattrapage', lambda: run_job(conn, 'catchup', lambda log: catchup.execute(conn, client, work, now, log), trigger=trigger))))
     summary = ', '.join(f'{k}{":" + m if m else ""}' for k, m, _ in done) or 'rien à faire'
     schedule.beat(conn, now, trigger, done=summary[:200], duration=round(time.monotonic() - t0, 1))
     return done

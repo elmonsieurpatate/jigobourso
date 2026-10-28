@@ -8,7 +8,7 @@ Il ne prétend jamais connaître une cause qu'il ne peut pas voir : si le cron n
 import datetime
 from zoneinfo import ZoneInfo
 
-from engine.market import collect, hours
+from engine.market import catchup, collect, hours
 from engine.shared import settings
 
 TASKS = (
@@ -100,6 +100,32 @@ def measured_interval(recent):
     return round(gaps[mid] if len(gaps) % 2 else (gaps[mid - 1] + gaps[mid]) / 2, 1)
 
 
+def record_error(conn, now, where, exc):
+    """Erreur d'un passage du cron survenue hors d'un traitement (base, planification, import) : conservée pour l'administration (50 dernières)."""
+    errs = settings.get(conn, 'cron_errors', [])
+    errs.insert(0, {'at': now.replace(tzinfo=None, microsecond=0).isoformat(sep=' '), 'where': where, 'message': f'{type(exc).__name__}: {exc}'[:300]})
+    settings.put(conn, 'cron_errors', errs[:50])
+
+
+def cron_errors(conn, naive, days=7, limit=40):
+    """Tout ce qui a mal tourné pour le cron sur `days` jours : avertissements et erreurs des traitements automatiques, traitements en échec / en pause /
+    interrompus, erreurs du passage lui-même. Liste vide = aucune erreur enregistrée (et non « inconnu »)."""
+    since = naive - datetime.timedelta(days=days)
+    out = []
+    with conn.cursor() as cur:
+        cur.execute("""SELECT l.level, l.message, l.logged_at, j.job_type, j.id job_id FROM job_logs l JOIN jobs j ON j.id=l.job_id
+                       WHERE j.trigger_by='cron' AND l.level IN ('warning','error') AND l.logged_at >= %s ORDER BY l.id DESC LIMIT %s""", (since, limit))
+        out += [{'level': r['level'], 'message': r['message'], 'at': _iso(r['logged_at']), 'source': 'traitement', 'job_type': r['job_type'], 'job_id': r['job_id']} for r in cur.fetchall()]
+        cur.execute("""SELECT id, job_type, status, started_at, summary FROM jobs WHERE trigger_by='cron' AND status IN ('failed','paused','interrupted') AND started_at >= %s
+                       ORDER BY id DESC LIMIT %s""", (since, limit))
+        out += [{'level': 'error' if r['status'] != 'paused' else 'warning', 'message': f'{ {"failed": "Échec", "paused": "En pause", "interrupted": "Interrompu"}[r["status"]] } : {r["summary"] or ""}',
+                 'at': _iso(r['started_at']), 'source': 'traitement', 'job_type': r['job_type'], 'job_id': r['id']} for r in cur.fetchall()]
+    out += [{'level': 'error', 'message': e['message'], 'at': e['at'], 'source': 'passage du cron', 'job_type': e['where'], 'job_id': None}
+            for e in settings.get(conn, 'cron_errors', []) if e['at'] >= _iso(since)]
+    out.sort(key=lambda e: e['at'], reverse=True)
+    return out[:limit]
+
+
 def _next_settle(mic, now):
     tz, _, closes = hours.spec(mic)
     day = now.astimezone(ZoneInfo(tz)).date()
@@ -144,9 +170,6 @@ def state(conn, now=None):
     with conn.cursor() as cur:
         cur.execute("SELECT id, job_type, started_at, TIMESTAMPDIFF(MINUTE, started_at, %s) mins FROM jobs WHERE status='running' AND started_at < %s", (naive, naive - datetime.timedelta(minutes=STUCK_MINUTES)))
         stuck = cur.fetchall()
-        cur.execute("""SELECT l.level, l.message, l.logged_at, j.job_type, j.id job_id FROM job_logs l JOIN jobs j ON j.id=l.job_id
-                       WHERE (j.job_type LIKE 'daily:%%' OR j.job_type LIKE 'intraday:%%' OR j.job_type='maintenance') ORDER BY l.id DESC LIMIT 8""")
-        errors = [{'level': r['level'], 'message': r['message'], 'at': _iso(r['logged_at']), 'job_type': r['job_type'], 'job_id': r['job_id']} for r in cur.fetchall()]
         cur.execute("SELECT DISTINCT mic FROM v_collect_set")
         mics = [r['mic'] for r in cur.fetchall()]
     diagnosis = []
@@ -203,5 +226,9 @@ def state(conn, now=None):
         maint = cur.fetchone()
     cron.update({'last_at': hb.get('at'), 'last_done': hb.get('done'), 'last_duration_s': hb.get('duration_s'), 'expected_minutes': expected, 'measured_minutes': measured, 'passes_seen': len(hb.get('recent') or []), 'age_minutes': age,
                  'next_at': _iso(last_beat + datetime.timedelta(minutes=measured or expected)) if last_beat else None, 'last_test': test or None})
-    return {'cron': cron, 'diagnosis': diagnosis, 'tasks': tasks, 'errors': errors, 'config': cfg, 'now_utc': naive.isoformat(sep=' '),
+    errors = cron_errors(conn, naive)
+    catch = catchup.status(conn, naive)
+    if catch['unrecoverable']:
+        diagnosis.append(f'{len(catch["unrecoverable"])} séance(s) de barres de 15 minutes n’ont pas pu être complétées : Yahoo ne les fournit pas (voir « Rattrapage automatique »).')
+    return {'cron': cron, 'catchup': catch, 'diagnosis': diagnosis, 'tasks': tasks, 'errors': errors, 'config': cfg, 'now_utc': naive.isoformat(sep=' '),
             'maintenance': None if not maint else {'id': maint['id'], 'status': maint['status'], 'started_at': _iso(maint['started_at']), 'duration_s': maint['secs'], 'summary': maint['summary']}}

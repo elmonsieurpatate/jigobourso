@@ -120,7 +120,14 @@ def main(argv=None):
         conn = connect()
         now = hours.utcnow()
         if args.cmd == 'tick':
-            print(json.dumps([(k, m, j) for k, m, j in tasks.tick(conn, YahooClient(), now, args.trigger)]))
+            try:
+                print(json.dumps([(k, m, j) for k, m, j in tasks.tick(conn, YahooClient(), now, args.trigger)]))
+            except Exception as e:                                          # noqa: BLE001 : visible dans l'administration, puis remonte vers logs/cron.log
+                if args.trigger == 'cron':
+                    from engine.jobs import schedule
+                    conn.rollback()
+                    schedule.record_error(conn, now, 'passage', e)
+                raise
         elif args.cmd == 'job':
             print(tasks.run_manual(conn, YahooClient(), args.name, now, args.trigger))
         elif args.cmd == 'suivi-backfill':

@@ -9,7 +9,7 @@
   const STATE = { completed: ['ok', 'Terminé'], completed_with_errors: ['wait', 'Terminé avec erreurs'], failed: ['ko', 'Échec'], running: ['info', 'En cours'], queued: ['info', 'En attente'], paused: ['wait', 'En pause'], interrupted: ['ko', 'Interrompu'] };
   const TSTATE = { ok: ['ok', 'Fonctionne'], late: ['wait', 'En retard'], error: ['ko', 'En erreur'], inactive: ['', 'Désactivée'], never: ['wait', 'Jamais exécutée'], running: ['info', 'En cours'] };
   const JOBNAME = { fdb_import: 'Import FinanceDatabase', fdb_filter: 'Filtrage FinanceDatabase', yahoo_info: 'Import des informations Yahoo', yahoo_filter: 'Filtrage Yahoo', history: 'Import / mise à jour des historiques',
-    maintenance: 'Entretien après collecte', intraday: 'Barres de 15 min', daily: 'Clôtures quotidiennes', catalogue: 'Import FinanceDatabase (ancien)', nightly: 'Analyse de nuit (ancienne)' };
+    maintenance: 'Entretien après collecte', catchup: 'Rattrapage des données manquantes', intraday: 'Barres de 15 min', daily: 'Clôtures quotidiennes', catalogue: 'Import FinanceDatabase (ancien)', nightly: 'Analyse de nuit (ancienne)' };
   const jobName = t => JOBNAME[t] || (t.includes(':') ? (JOBNAME[t.split(':')[0]] || t.split(':')[0]) + ' · ' + t.split(':')[1] : t);
   const nf = v => v == null ? '–' : J.num(+v, 0);
   const dur = s => s == null ? '–' : s < 90 ? Math.round(s) + ' s' : s < 5400 ? Math.round(s / 60) + ' min' : (s / 3600).toFixed(1).replace('.', ',') + ' h';
@@ -247,6 +247,21 @@
     J.$$('tr[data-id]').forEach(tr => tr.onclick = () => location.href = 'titre.html?id=' + tr.dataset.id);
   }
 
+  // ───────── rattrapage automatique (cron) ─────────
+  function catchupCard(k, c) {
+    const open = k.open || [], lost = k.unrecoverable || [], d = k.daily || {};
+    const pending = open.length + (d.waiting || 0);
+    const upToDate = !pending && !lost.length && !d.given_up;
+    const head = lost.length || d.given_up ? ['ko', 'Des données ne sont pas récupérables'] : pending ? ['wait', 'Rattrapage en cours'] : ['ok', 'Tout est à jour'];
+    return `<div class="card" style="margin-top:16px"><div class="row between"><h2 style="margin:0">Rattrapage automatique</h2><span class="badge ${head[0]}">${head[1]}</span></div>
+      <p class="small muted">À chaque passage du cron : les barres de 15 minutes manquantes des ${k.sessions_kept} dernières séances et les clôtures quotidiennes en retard sont redemandées, avec un délai croissant entre les tentatives (aucune intervention nécessaire, même après une panne de Yahoo ou du cron). Un créneau sans transaction n’est pas un manque : seuls les vrais trous sont rattrapés.</p>
+      ${k.cooldown_until ? `<div class="notice">Yahoo a refusé les requêtes (429) : rattrapage en pause jusqu’à ${J.dateTime(k.cooldown_until)} UTC.</div>` : ''}
+      <p class="small" style="margin:6px 0">Dernière vérification des trous : <b>${k.last_check ? J.dateTime(k.last_check) + ' UTC' : 'jamais'}</b>${upToDate && k.last_check ? ' · aucun retard connu' : ''}</p>
+      ${open.length ? `<h3 style="margin:10px 0 4px">Barres de 15 minutes à compléter</h3><div class="table-wrap"><table><thead><tr><th>Place</th><th>Séance</th><th>Titres</th><th>Tentatives</th><th>Depuis</th><th>Prochaine tentative</th><th>Constat</th></tr></thead><tbody>${open.map(o => `<tr><td>${J.esc(o.mic)}</td><td>${J.esc(o.session)}</td><td class="num">${o.titles == null ? 'tous' : nf(o.titles)}</td><td class="num">${o.tries}</td><td>${J.dateTime(o.since)}</td><td>${J.dateTime(o.next_try)}</td><td class="small">${J.esc(o.note)}</td></tr>`).join('')}</tbody></table></div>` : ''}
+      ${d.waiting || d.given_up ? `<h3 style="margin:10px 0 4px">Clôtures quotidiennes</h3><p class="small" style="margin:0">${nf(d.waiting)} titre(s) en attente de leur dernière clôture (nouvelle tentative automatique) · ${nf(d.given_up)} abandonné(s) après 24 h (le fournisseur ne publie pas cette clôture)${d.sample && d.sample.length ? ' · par ex. ' + J.esc(d.sample.join(', ')) : ''}</p>` : ''}
+      ${lost.length ? `<h3 style="margin:10px 0 4px">Non récupérables</h3>${lost.map(u => `<div class="reason fail" style="margin-bottom:6px"><span class="mark">✗</span><span class="small"><b>${J.esc(u.mic)} · séance du ${J.esc(u.session)}</b> · abandonnée le ${J.dateTime(u.at)} après ${u.tries} tentative(s)<br>${J.esc(u.why)}</span></div>`).join('')}` : ''}</div>`;
+  }
+
   // ───────── Cron ─────────
   async function cron() {
     const s = await J.api('admin/cron'), c = s.cron, site = s.site;
@@ -271,7 +286,11 @@
           ${k ? `<div class="table-wrap"><table><tbody><tr><td>Titres traités</td><td class="num">${nf(k.titles)}</td></tr><tr><td>Déjà à jour / complets</td><td class="num">${nf(k.up_to_date)}</td></tr><tr><td>Données ajoutées</td><td class="num">${nf(k.added)}</td></tr><tr><td>Déjà présentes</td><td class="num">${nf(k.present)}</td></tr><tr><td>Sans réponse ou en erreur</td><td class="num ${k.errors ? 'warn' : ''}">${nf(k.errors)}</td></tr></tbody></table></div><div class="small muted">Dernier passage : ${J.dateTime(k.at)}</div>` : '<p class="small muted">Aucun chiffre : pas encore de collecte.</p>'}
           ${t.last ? `<div class="small"><a href="#" data-job="${t.last.id}">Détail de la dernière exécution</a></div>` : ''}</div>`; }).join('')}</div>
         ${s.maintenance ? `<p class="small muted" style="margin:10px 0 0">Dernier entretien après collecte : ${J.dateTime(s.maintenance.started_at)} · ${dur(s.maintenance.duration_s)} · ${J.esc(s.maintenance.summary || '')} <a href="#" data-job="${s.maintenance.id}">Détail</a></p>` : ''}</div>
-      <div class="card" style="margin-top:16px"><h2>Dernières erreurs et avertissements</h2>${s.errors.map(l => `<div class="reason ${l.level === 'error' ? 'fail' : 'missing'}" style="margin-bottom:6px"><span class="mark">${l.level === 'error' ? '✗' : '!'}</span><span class="small"><b>${J.esc(jobName(l.job_type))}</b> · ${J.dateTime(l.at)}<br>${J.esc(l.message)} <a href="#" data-job="${l.job_id}">Détail</a></span></div>`).join('') || '<span class="muted">Rien à signaler.</span>'}</div>`;
+      ${catchupCard(s.catchup, c)}
+      <div class="card" style="margin-top:16px"><h2>Erreurs du cron <span class="small muted">· 7 derniers jours</span></h2>
+        ${s.errors.length ? s.errors.map(l => `<div class="reason ${l.level === 'error' ? 'fail' : 'missing'}" style="margin-bottom:6px"><span class="mark">${l.level === 'error' ? '✗' : '!'}</span><span class="small"><b>${J.esc(l.source === 'passage du cron' ? 'Passage du cron · ' + l.job_type : jobName(l.job_type))}</b> · ${J.dateTime(l.at)}<br>${J.esc(l.message)} ${l.job_id ? `<a href="#" data-job="${l.job_id}">Détail</a>` : ''}</span></div>`).join('') : '<span class="muted">Aucune erreur enregistrée sur 7 jours (traitements, passages, appels).</span>'}
+        ${site.log_errors && site.log_errors.length ? `<h3 style="margin:14px 0 6px">Journal brut du cron (logs/cron.log) — lignes d’erreur</h3><pre class="small" style="white-space:pre-wrap;margin:0;max-height:200px;overflow:auto">${J.esc(site.log_errors.join('\n'))}</pre>` : '<p class="small muted" style="margin:10px 0 0">Journal brut du cron : aucune ligne d’erreur.</p>'}
+        ${site.rejected && site.rejected.length ? `<h3 style="margin:14px 0 6px">Appels du cron refusés (mauvaise clé, clé absente…)</h3><pre class="small" style="white-space:pre-wrap;margin:0;max-height:160px;overflow:auto">${J.esc(site.rejected.join('\n'))}</pre>` : '<p class="small muted" style="margin:6px 0 0">Aucun appel refusé.</p>'}</div>`;
     bindJobLinks(); poll();
     J.$('#cr-save').onclick = async () => {
       const cfg = { cron_interval_minutes: +J.$('#cr-int').value };
