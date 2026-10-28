@@ -11,7 +11,7 @@ from collections import defaultdict
 from . import hours, prefilter
 from .yahoo import RateLimited, local_date
 
-DAILY_KEEP_DAYS = 580          # ≈ 400 séances
+DAILY_KEEP_DAYS = 610          # ≈ 420 séances US (580 jours n'en gardaient que 380-399 : jamais « complet » à 400)
 SPARK_BATCH = 20
 QUOTE_BATCH = 50
 CHUNK = 2000
@@ -215,7 +215,7 @@ def daily_plan(conn, rows, now):
             plan['2y'].append(r)
             continue
         n, first, last = st
-        if n < FULL_SESSIONS and first > today - datetime.timedelta(days=560):       # historique court : un titre récent n'a peut-être rien de plus
+        if n < FULL_SESSIONS and first > today - datetime.timedelta(days=DAILY_KEEP_DAYS - 20):       # historique court : un titre récent n'a peut-être rien de plus
             t = tried.get(str(r['listing_id']))
             if not t or (today - datetime.date.fromisoformat(t)).days > 30:
                 plan['2y'].append(r)
