@@ -1,1 +1,30 @@
 == Contrôles du serveur (lecture seule)
+private/ présent (non lu)
+Python 3.9.25
+public_html/v2 -> app/public OK
+PHP 8.2.35 (cli) (built: Oct 21 2026 00:00:00) (NTS)
+rsync OK
+/dev/sda4        21T   12T  9.2T  56% /home/u381524662
+== Contrôle du schéma : additif seulement
+== Version des pages : ?v=202610281730
+== Sauvegarde du code distant (garde les 5 dernières)
+/home/u381524662/domains/jigobourso.turnjoy.dev/.jigobourso-v2-code-backups/code-20261028173008-cd121f63.tgz
+== Transfert du code
+== Dépendances, schéma additif, contrôles
+dépendances Python existantes validées
+--------------
+CREATE TABLE instruments (
+  id        INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  group_key VARCHAR(40) CHARACTER SET ascii NOT NULL,           
+  isin      CHAR(12) CHARACTER SET ascii NULL,
+  kind      ENUM('equity','etf') NOT NULL,
+  name      VARCHAR(200) NOT NULL,
+  country   VARCHAR(40) NULL,                                  
+  category  VARCHAR(80) NULL,                                   
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_instrument_group (group_key),
+  KEY ix_instrument_isin (isin)
+) ENGINE=InnoDB ROW_FORMAT=COMPRESSED KEY_BLOCK_SIZE=8
+--------------
+
+ERROR 1050 (42S01) at line 9: Table 'instruments' already exists
