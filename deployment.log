@@ -1,1 +1,5 @@
 == Contrôles du serveur (lecture seule)
+== Contrôle des fichiers SQL : ajouts seulement
+== Version des pages : ?v=202610291605
+== Transfert du code
+== Dépendances Python, migrations de schéma, contrôles
