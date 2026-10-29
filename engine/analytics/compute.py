@@ -93,11 +93,10 @@ def _compute_one(lid, mic, rows, splits, windows, market_latest, stamp, metric_r
     expected = max(expected_close or expected_last_close(mic, stamp), market_latest.get(mic, ''))
     stale = bool(dates) and dates[-1] < expected
     year = measures.get(252) or {}
-    year_coverage = year.get('coverage')
-    quality = ('insufficient' if len(closes) < 22 else 'stale' if stale else
-               'break' if breaks and breaks[-1] > len(closes) - 253 else
-               'incomplete' if year_coverage is not None and year_coverage < 1 else
-               'calendar_unknown' if year_coverage is None else 'ok')
+    # `quality` is an existing ENUM in production. New statuses (incomplete,
+    # calendar_unknown) are derived from coverage at read time, not persisted
+    # through an unsafe enum conversion.
+    quality = 'insufficient' if len(closes) < 22 else 'stale' if stale else 'break' if breaks and breaks[-1] > len(closes) - 253 else 'ok'
     state_rows.append((lid, stamp, dates[-1] if dates else None, len(closes), t['close'], _dec(t['ma20']), _dec(t['ma50']), _dec(t['ma50_prev']),
                        _dec(t['daily_change'], 4), _dec(t['gap_to_ma20'], 4), (len(closes) - 1 - breaks[-1]) if breaks else None,
                        ','.join(dates[i] for i in breaks[-3:])[:80] or None, year.get('coverage'), year.get('observations'), year.get('expected_closes'), quality))

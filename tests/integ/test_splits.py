@@ -66,7 +66,11 @@ def test_only_the_split_declared_by_yahoo_is_corrected(conn):
         cur.execute('SELECT listing_id, kind, ratio FROM corporate_events')
         assert [(r['listing_id'], r['kind'], float(r['ratio'])) for r in cur.fetchall()] == [(1, 'split', 10.0)]
     compute.compute_all(conn, NOW)
-    assert quality(conn, 1) == 'ok'                           # la série du titre 1 est continue : anciens cours ÷ 10
+    assert quality(conn, 1) == 'ok'                           # le split est corrigé, sans rupture inexpliquée
+    with conn.cursor() as cur:
+        cur.execute('SELECT coverage_252, expected_252 FROM series_state WHERE listing_id=1')
+        coverage = cur.fetchone()
+        assert coverage['coverage_252'] < 1 and coverage['expected_252'] > 100  # couverture annuelle incomplète, affichée à la lecture
     assert quality(conn, 2) == 'break'                        # la chute du titre 2 reste une rupture, non corrigée
 
 

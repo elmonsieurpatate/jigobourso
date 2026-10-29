@@ -19,9 +19,9 @@ def data_overview(conn):
         cur.execute("SELECT COUNT(*) n FROM listings WHERE status='selected' AND is_primary=1")
         recommendable = cur.fetchone()['n']
         cur.execute("""SELECT l.mic, COUNT(*) followed, MAX(s.last_close_date) last_close,
-                              SUM(s.quality='ok') ok,
-                              SUM(s.quality='incomplete') incomplete,
-                              SUM(s.quality='calendar_unknown') calendar_unknown,
+                              SUM(s.quality='ok' AND s.coverage_252=1) ok,
+                              SUM(s.quality='ok' AND s.coverage_252<1) incomplete,
+                              SUM(s.quality='ok' AND s.coverage_252 IS NULL) calendar_unknown,
                               SUM(s.quality='stale') stale, SUM(s.quality='insufficient') insufficient,
                               SUM(s.quality='break') broken, SUM(s.coverage_252=1) full_year, MAX(p.price_time) last_price
                        FROM v_collect_set c JOIN listings l ON l.id=c.listing_id LEFT JOIN series_state s ON s.listing_id=l.id LEFT JOIN latest_prices p ON p.listing_id=l.id
