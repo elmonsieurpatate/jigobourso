@@ -67,3 +67,10 @@ def test_quote_outage_during_open_session_is_not_presented_as_current():
     now=dt.datetime(2026,10,29,11,tzinfo=dt.timezone.utc)
     assert hours.price_is_stale('XETR',now-dt.timedelta(hours=1),now)
     assert not hours.price_is_stale('XETR',now-dt.timedelta(minutes=15),now)
+
+def test_raw_close_already_split_adjusted_is_never_adjusted_a_second_time():
+    # Without an explicit provider-adjusted series, an ambiguous event is unavailable,
+    # never silently turned into a synthetic +100% performance.
+    bars=[('2026-10-01',50,None),('2026-10-02',50,None),('2026-10-05',55,None)]
+    *_,metrics,missing,tech=analyze_series(bars,[2],[('2026-10-02',2)])
+    assert metrics[2] is None and missing[2]=='break'

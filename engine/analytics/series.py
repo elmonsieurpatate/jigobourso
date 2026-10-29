@@ -47,7 +47,16 @@ def prepare_series(bars, splits=()):
             if ratio is None or ratio <= 0 or not math.isfinite(ratio):
                 unknown.append(day)
             else:
-                closes = [c / ratio if d < day else c for d, c in zip(dates, closes)]
+                boundary = next((i for i in range(1, len(dates)) if dates[i - 1] < day <= dates[i]), None)
+                if boundary is None:
+                    continue
+                observed = closes[boundary] / closes[boundary - 1]
+                # Some providers already split-adjust their nominal "close". Never
+                # apply the event a second time without evidence of a unit change.
+                if abs(math.log(observed * ratio)) >= abs(math.log(observed)) and ratio != 1:
+                    unknown.append(day)
+                else:
+                    closes = [c / ratio if d < day else c for d, c in zip(dates, closes)]
     breaks = find_breaks(dates, closes, basis, unknown)
     return dates, closes, basis, breaks
 
