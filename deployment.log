@@ -3,3 +3,7 @@
 == Version des pages : ?v=202610291851
 == Transfert du code
 == Dépendances Python, migrations de schéma, contrôles
+moteur importable
+moteur importable après restauration
+site OK : accueil 200, API répond (200)
+Code restauré ; les données et la base n'ont pas été touchées (les migrations déjà appliquées sont additives).
