@@ -76,7 +76,8 @@ jobs:
           install -d -m 700 "$JIGO_TEST_MAIL_DIR"
           php -S 127.0.0.1:18089 -t app/public > audit-results/php-server.log 2>&1 &
           php_pid=$!
-          trap 'kill "$php_pid"' EXIT
+          show() { for f in audit-results/browser.log audit-results/php-server.log; do [ -f "$f" ] && echo "::error title=$f::$(grep -v ' 200 \| Accepted\| Closing\| \[200\]' "$f" | tail -c 1400 | tr '\n' '|')"; done; true; }
+          trap 'show; kill "$php_pid"' EXIT
           node tests/e2e/financial.cjs > audit-results/browser.log 2>&1
           timeout 180s node tests/e2e/account-navigation.cjs > audit-results/account-browser.log 2>&1
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
