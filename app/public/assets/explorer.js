@@ -154,7 +154,7 @@
     try { res = await J.post('explore', { config: S.config, view: v }); } catch (e) { if (my === seq) el('results').innerHTML = `<div class="empty"><div class="notice err">${J.esc(e.message)}</div></div>`; return; }
     if (my !== seq) return;
     lastRes = res; drawTabs(res); drawWhy(res); fillFacets(res);
-    el('results').innerHTML = res.rows.length ? `<div class="table-wrap"><table class="rtable">${header(res.ref_sessions)}<tbody>${res.rows.map(row).join('')}</tbody></table></div>` : `<div class="empty">${v.q ? 'Aucun titre ne correspond à cette recherche.' : 'Aucun titre dans cette vue avec ces critères et ces filtres.'}</div>`;
+    el('results').innerHTML = res.rows.length ? JEtf.concentration(res.etf_concentration) + `<div class="table-wrap"><table class="rtable">${header(res.ref_sessions)}<tbody>${res.rows.map(row).join('')}</tbody></table></div>` : `<div class="empty">${v.q ? 'Aucun titre ne correspond à cette recherche.' : 'Aucun titre dans cette vue avec ces critères et ces filtres.'}</div>`;
     if (!window.jigoScrollRestored) { window.jigoScrollRestored = true; try { requestAnimationFrame(() => scrollTo(0, +(sessionStorage.getItem('jigo_explorer_scroll') || 0))); } catch (e) {} }
     J.$$('#results tbody tr').forEach(tr => { const a = tr.querySelector('a[data-sheet]'); a.addEventListener('click', () => { persist(); sessionStorage.setItem('jigo_explorer_scroll', String(scrollY)); }); tr.onclick = e => { if (e.target.closest('a,button,input')) return; persist(); window.open(a.href, '_blank', 'noopener'); }; });
     J.$$('#results th.sortable').forEach(th => th.onclick = () => { const k = th.dataset.k; if (S.sort === k) S.dir = S.dir === 'asc' ? 'desc' : 'asc'; else { S.sort = k; S.dir = ['name', 'price', 'volatility', 'drawdown', 'rank'].includes(k) ? 'asc' : 'desc'; } S.page = 1; load(); });
@@ -171,7 +171,7 @@
     drawTabs(eq);
     const col = (title, res) => `<div><h2 style="margin:0 0 4px">${title}</h2><div class="muted small" style="margin-bottom:8px">${J.num(res.counts[title === 'Actions' ? 'equity' : 'etf'].retained || 0, 0)} retenus sur ${J.num(res.populations[title === 'Actions' ? 'equity' : 'etf'], 0)} · 12 premiers</div>
       ${res.rows.map(r => `<a class="result" target="_blank" rel="noopener" href="${J.esc(sheetHref(r.id))}" style="grid-template-columns:34px 1fr auto"><div class="rank">${r.rank}</div><div style="min-width:0"><div class="name">${J.esc(r.name)}</div><div class="meta">${J.esc(r.symbol)} · ${J.esc(r.market)} · pente ${J.num(r.ref.slope, 3)} · R² ${J.num(r.ref.r2, 2)}</div></div><div class="num"><b>${J.num(r.score, 0)}</b><div class="meta">${J.pct(r.ref.perf, 1)}</div></div></a>`).join('') || '<div class="muted">Aucun titre retenu.</div>'}</div>`;
-    el('results').innerHTML = `<div class="grid cols-2" style="padding:16px 18px;gap:24px">${col('Actions', eq)}${col('ETF', etf)}</div>`;
+    el('results').innerHTML = `<div class="grid cols-2" style="padding:16px 18px;gap:24px">${col('Actions', eq)}<div>${JEtf.concentration(etf.etf_concentration)}${col('ETF', etf)}</div></div>`;
     el('pager').innerHTML = '<span class="muted small">Chaque groupe est classé à part : un ETF n’est jamais comparé à une action pour le rang ; ici les deux classements sont côte à côte.</span>';
   }
   function fillFacets(res) {

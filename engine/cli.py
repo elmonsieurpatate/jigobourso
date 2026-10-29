@@ -66,6 +66,9 @@ def serve(cmd):
             from engine.market import intraday
             from engine.market.yahoo import YahooClient
             result = intraday.view(connect(), int(request['listing_id']), client=YahooClient() if request.get('fetch', True) else None)
+        elif cmd == 'etf-portfolio':
+            from .analytics import etf
+            result = etf.portfolio(connect(), request.get('positions', []))
         elif cmd == 'overview':
             from .analytics import overview
             result = overview.data_overview(connect())
@@ -106,10 +109,10 @@ def main(argv=None):
         sub.add_parser(name, help='administration (JSON sur stdin)')
     for name, text in (('explore', 'Explorer : classement et recherche (JSON sur stdin)'), ('sheet', 'fiche d’un titre (JSON sur stdin)'),
                        ('validate-config', 'valider une configuration de stratégie (JSON sur stdin)'),
-                       ('presets', 'les quatre stratégies de départ'), ('suivi', 'statistiques de la page Suivi'), ('overview', 'vue d’ensemble des données (sources, fraîcheur, couverture)'), ('intraday', 'deux dernières séances en barres de 15 minutes (JSON sur stdin)')):
+                       ('etf-portfolio', 'Expositions connues et similarité du portefeuille'), ('presets', 'les quatre stratégies de départ'), ('suivi', 'statistiques de la page Suivi'), ('overview', 'vue d’ensemble des données (sources, fraîcheur, couverture)'), ('intraday', 'deux dernières séances en barres de 15 minutes (JSON sur stdin)')):
         sub.add_parser(name, help=text)
     args = ap.parse_args(argv)
-    if args.cmd in ('fdb-state', 'yahoo-state', 'titles', 'rules-save', 'rules-reset', 'funnel', 'funnel-items', 'funnel-explain', 'schedule-get', 'schedule-save', 'job-check', 'jobs-list', 'job-detail', 'explore', 'sheet', 'validate-config', 'presets', 'suivi', 'intraday', 'overview'):
+    if args.cmd in ('fdb-state', 'yahoo-state', 'titles', 'rules-save', 'rules-reset', 'funnel', 'funnel-items', 'funnel-explain', 'schedule-get', 'schedule-save', 'job-check', 'jobs-list', 'job-detail', 'explore', 'sheet', 'validate-config', 'presets', 'suivi', 'intraday', 'overview', 'etf-portfolio'):
         return serve(args.cmd)
     if args.cmd == 'catalogue':
         from engine.catalogue.loader import load

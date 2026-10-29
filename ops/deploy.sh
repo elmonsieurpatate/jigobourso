@@ -168,6 +168,7 @@ chmod 600 "$ROOT/logs/financial-integrity.json"
 find app scripts -name '*.php' -print0 | xargs -0 -n1 php -l > /dev/null && echo "PHP valide"
 REMOTE
 
+  remote_sh "cd $root && set -a && . ./private/env && set +a && .venv/bin/python scripts/verify_etf_release.py" > "$RUNNER_TEMP/etf-report.json"
   remote_sh "cd $root && set -a && . ./private/env && set +a && php scripts/check_financial_integrity.php" > "$RUNNER_TEMP/financial-after.json"
   remote_sh "cd $root && set -a && . ./private/env && set +a && JIGO_ACCOUNT_POSTCHECK=1 php scripts/verify_account_release.php" > "$RUNNER_TEMP/account-after.json"
   python3 - <<'ACCOUNTVERIFY'

@@ -137,6 +137,7 @@ jobs:
         with:
           name: financial-preservation
           path: |
+            ${{ runner.temp }}/etf-*.json
             ${{ runner.temp }}/financial-*.json
             ${{ runner.temp }}/account-*.json
           retention-days: 1

@@ -337,7 +337,10 @@ def explore(conn, request):
         markets[e['mic']] += 1
         if e['country']:
             countries[e['country']] += 1
-    return {'config': config, 'total': total, 'page': page, 'pages': max(1, -(-total // size)), 'rows': out, 'ref_sessions': ref,
+    from . import etf
+    etf_top = [e['id'] for e in rows if e.get('group') == 'etf'][:10]
+    etf_concentration = etf.concentration(conn, etf_top)
+    return {'etf_concentration': etf_concentration, 'config': config, 'total': total, 'page': page, 'pages': max(1, -(-total // size)), 'rows': out, 'ref_sessions': ref,
             'universe': len(entries), 'examined': len(base),
             'counts': {g: dict(c) for g, c in counts.items()}, 'scope_counts': scope_counts, 'populations': {g: sum(c.values()) for g, c in counts.items()},
             'reasons': dict(reasons), 'facets': {'markets': dict(markets), 'countries': dict(sorted(countries.items()))}}
@@ -447,7 +450,9 @@ def instrument_sheet(conn, request):
     else:
         sheet['verdict'] = {'status': 'unknown', 'status_label': 'Non analysé', 'note': 'Aucune cotation Yahoo exploitable pour le moment : ce titre n’est pas encore analysé.'}
     if u['kind'] == 'etf':
-        sheet['etf_profile'] = _etf_profile(conn, lid, u['symbol'], bool(request.get('fetch_profile')))
+        sheet['etf_profile'] = _etf_profile(conn, lid, u['symbol'], False)  # V1 : lecture du cache uniquement
+        from . import etf
+        sheet['etf_analysis'] = etf.load(conn, [lid]).get(lid)
     sheet['strategy'] = {'name': config.get('name'), 'ranking': config['ranking']['mode'], 'source': request.get('source') or None,
                          'technical': {k: v for k, v in config['technical'].items() if v},
                          'periods': [{'id': p['id'], 'label': strategy.LABELS[p['id']], 'sessions': p['sessions'], 'criteria': {f: p[f] for f, _, _ in strategy.CRITERIA if p[f] is not None}} for p in config['periods'] if p['enabled']]}
@@ -512,5 +517,10 @@ def _etf_profile(conn, listing_id, symbol, allow_fetch):
             conn.commit()
             return {'state': state, 'fetched_at': now.isoformat(sep=' '), 'data': data}
     if row:
-        return {'state': row['state'], 'fetched_at': row['fetched_at'].isoformat(sep=' '), 'data': json.loads(row['data_json']) or None}
+        from .etf import profile_data
+        data = profile_data(json.loads(row['data_json']) or {})
+        if row['version'] < 2:
+            data['holdings'] = [dict(h, weight=None if h['weight'] == 0 else h['weight']) for h in data['holdings']]
+            data = profile_data(data)
+        return {'state': row['state'], 'fetched_at': row['fetched_at'].isoformat(sep=' '), 'data': data}
     return {'state': 'none', 'fetched_at': None, 'data': None}

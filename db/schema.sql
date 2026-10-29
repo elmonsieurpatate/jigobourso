@@ -439,3 +439,11 @@ CREATE TABLE IF NOT EXISTS split_log (
   PRIMARY KEY (listing_id, event_date),
   CONSTRAINT fk_split_listing FOREIGN KEY (listing_id) REFERENCES listings(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
+CREATE TABLE IF NOT EXISTS etf_analysis (
+ listing_id INT UNSIGNED NOT NULL,
+ built_at DATETIME NOT NULL,
+ payload MEDIUMTEXT NOT NULL,
+ returns_json MEDIUMTEXT NOT NULL,
+ PRIMARY KEY (listing_id),
+ CONSTRAINT fk_etf_analysis_listing FOREIGN KEY (listing_id) REFERENCES listings(id)
+) ENGINE=InnoDB ROW_FORMAT=COMPRESSED KEY_BLOCK_SIZE=8;

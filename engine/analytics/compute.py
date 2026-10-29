@@ -70,6 +70,8 @@ def compute_all(conn, now, batch=400):
         cur.executemany('''INSERT INTO series_state(listing_id,computed_at,last_close_date,closes_count,close_px,ma20,ma50,ma50_prev,daily_change,gap_to_ma20,break_age,break_dates,quality)
                            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)''', state_rows)
     conn.commit()
+    from . import etf
+    etf.build(conn, now)
     return len(state_rows), len(metric_rows)
 
 

@@ -2,7 +2,7 @@
 import json
 import urllib.parse
 
-VERSION = 1
+VERSION = 2
 MODULES = 'fundProfile,topHoldings,summaryDetail'
 SECTOR_NAMES = {'realestate': 'Immobilier', 'consumer_cyclical': 'Consommation cyclique', 'basic_materials': 'Matériaux', 'consumer_defensive': 'Consommation de base',
                 'technology': 'Technologie', 'communication_services': 'Communication', 'financial_services': 'Finance', 'utilities': 'Services publics',
@@ -28,15 +28,17 @@ def parse_profile(payload):
         for key, val in item.items():
             if _raw(val) is not None:
                 sectors[SECTOR_NAMES.get(key, key)] = round(_raw(val) * 100, 2)
-    holdings = [{'symbol': h.get('symbol'), 'name': h.get('holdingName'), 'weight': round((_raw(h.get('holdingPercent')) or 0) * 100, 2)}
+    holdings = [{'symbol': h.get('symbol'), 'name': h.get('holdingName'), 'weight': None if _raw(h.get('holdingPercent')) is None else round(_raw(h.get('holdingPercent')) * 100, 4)}
                 for h in (top.get('holdings') or [])[:10]]
     out = {'family': fund.get('family'), 'category': fund.get('categoryName'), 'legal_type': fund.get('legalType'),
            'expense_ratio': None if _raw(fees.get('annualReportExpenseRatio')) is None else round(_raw(fees['annualReportExpenseRatio']) * 100, 3),
            'yield': None if _raw(summary.get('yield')) is None else round(_raw(summary['yield']) * 100, 2),
            'holdings': holdings, 'sectors': dict(sorted(sectors.items(), key=lambda kv: -kv[1])),
-           'top10_weight': round(sum(h['weight'] for h in holdings), 1) if holdings else None,
+           'top10_weight': round(sum(h['weight'] for h in holdings), 1) if len(holdings) == 10 and all(h['weight'] is not None for h in holdings) else None,
            'stock_position': None if _raw(top.get('stockPosition')) is None else round(_raw(top['stockPosition']) * 100, 1),
            'bond_position': None if _raw(top.get('bondPosition')) is None else round(_raw(top['bondPosition']) * 100, 1)}
+    from engine.analytics.etf import profile_data
+    out = profile_data(out)
     return out if any(out[k] for k in ('holdings', 'sectors', 'expense_ratio', 'family')) else None
 
 

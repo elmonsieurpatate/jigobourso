@@ -40,6 +40,7 @@ return [
         foreach ($v['positions'] as &$pos) $pos['levels'] = $pos['listing_id'] ? ($levels[$pos['listing_id']] ?? null) : null;
         unset($pos);
         $tx = q('SELECT id, listing_id, symbol, name, isin, side, quantity, unit_price, currency, fx_to_eur, fees, trade_at, note FROM portfolio_transactions WHERE portfolio_id = ? ORDER BY trade_at DESC, id DESC', [$p['id']])->fetchAll();
+        $v['etf_analysis'] = engine_call('etf-portfolio', ['positions' => array_map(function ($x) { return array_intersect_key($x, array_flip(['listing_id', 'kind', 'symbol', 'value'])); }, $v['positions'])]);
         return $v + ['portfolio' => ['id' => (int)$p['id'], 'name' => $p['name'], 'is_default' => (bool)$p['is_default'], 'strategy' => $p['strategy_config'] ? json_decode($p['strategy_config'], true) : null], 'transactions_list' => $tx];
     },
     'position/levels' => function () {

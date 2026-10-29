@@ -117,14 +117,7 @@
         <div class="card"><h2>À savoir sur ces données</h2><p class="small muted" style="margin:0">Les clôtures sont définitives une fois publiées par Yahoo Finance ; les barres de 15 minutes sont fournies pour les deux dernières séances et peuvent être différées de quelques minutes selon la place. Les actions européennes et américaines sont comptées dans la devise de leur place. Les ruptures de cours non expliquées (par exemple un regroupement d’actions) invalident les mesures de la période concernée plutôt que de les fausser.</p></div>`;
     },
     fonds() {
-      const e = s.etf_profile;
-      if (!e || !e.data) { J.$('#main').innerHTML = `<div class="card"><h2>Contenu du fonds</h2><p class="muted">${e && e.state === 'unavailable' ? 'Yahoo Finance ne fournit pas de détail pour ce fonds.' : 'Détail du fonds non chargé.'}</p></div>`; return; }
-      const d = e.data, sectors = Object.entries(d.sectors || {}).slice(0, 12);
-      J.$('#main').innerHTML = `<div class="card"><h2>Ce que contient ce fonds</h2><div class="small muted" style="margin-bottom:10px">${[d.family, d.category, d.legal_type].filter(Boolean).map(J.esc).join(' · ')}</div>
-        <div class="metric-grid"><div class="metric"><div class="l">Frais annuels</div><div class="v">${d.expense_ratio !== null ? J.num(d.expense_ratio, 2) + ' %' : '–'}</div></div><div class="metric"><div class="l">10 premières lignes</div><div class="v">${d.top10_weight !== null ? J.num(d.top10_weight, 1) + ' %' : '–'}</div></div></div></div>
-        ${(d.holdings || []).length ? `<div class="card"><h2>Principales lignes</h2><table class="dense"><tbody>${d.holdings.map(h => `<tr><td>${J.esc(h.name || h.symbol)}</td><td style="width:40%"><div class="bar"><i style="width:${Math.min(100, h.weight * 4)}%"></i></div></td><td class="num">${J.num(h.weight, 1)} %</td></tr>`).join('')}</tbody></table></div>` : ''}
-        ${sectors.length ? `<div class="card"><h2>Répartition par secteur</h2>${sectors.map(([n, w]) => `<div class="row between small" style="gap:8px"><span>${J.esc(n)}</span><span class="muted">${J.num(w, 1)} %</span></div><div class="bar" style="margin-bottom:6px"><i style="width:${Math.min(100, w * 2.5)}%"></i></div>`).join('')}</div>` : ''}
-        <p class="small muted">Un ETF réplique un indice : sa performance suit celle des titres qu’il contient, moins les frais. Source : Yahoo Finance, mis à jour le ${J.date(e.fetched_at)}.</p>`;
+      J.$('#main').innerHTML = JEtf.fund(s.etf_analysis, s.etf_profile);
     },
   };
   function open(t) {
