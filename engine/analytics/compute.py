@@ -29,7 +29,7 @@ def _dec(v, places=6):
     return None if v is None else round(v, places)
 
 
-def compute_all(conn, now, history=300, batch=400):
+def compute_all(conn, now, batch=400):
     """Recalcule les tables d'analyse pour le jeu de collecte. Renvoie (cotations, lignes de mesures).
 
     Les clôtures sont lues par lots de `batch` cotations : la mémoire reste de l'ordre de la centaine de Mo (hébergement mutualisé)."""

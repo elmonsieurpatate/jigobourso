@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/ledger.php';
+require_once __DIR__ . '/../lib/http.php';
 
 // A price is expressed in a unit, not just a currency. GBX is the canonical pence code.
 function price_unit(?string $unit): ?string {

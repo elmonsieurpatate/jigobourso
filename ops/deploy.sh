@@ -75,6 +75,23 @@ if grep -qiE '^\s*(drop|truncate|delete|alter|rename|update|insert|replace)\b' d
 fi
 python3 scripts/migrate.py --check
 
+# Preserve financial evidence before any code replacement. Never auto-rewrite legacy transactions.
+echo "== Sauvegarde et empreinte des portefeuilles"
+remote_sh "ROOT=$root BACKUPS=$backups bash -s" <<'REMOTE'
+set -euo pipefail
+cd "$ROOT"
+set -a; . ./private/env; set +a
+export MYSQL_PWD="$JIGO_DB_PASSWORD"
+install -d -m 700 "$BACKUPS"
+file="$BACKUPS/financial-$(date -u +%Y%m%d%H%M%S).sql.gz"
+mariadb-dump -h"$JIGO_DB_HOST" -P"${JIGO_DB_PORT:-3306}" -u"$JIGO_DB_USER" --single-transaction --quick "$JIGO_DB_NAME" portfolios portfolio_transactions position_levels | gzip > "$file"
+chmod 600 "$file"
+gzip -t "$file"
+echo "Sauvegarde financière vérifiée : $(basename "$file")"
+REMOTE
+# Run the new SELECT-only checker against the old deployment to establish the baseline.
+remote_sh "cd $root && set -a && . ./private/env && set +a && php" < <(sed "s@__DIR__ . '/../app/lib/db.php'@getcwd() . '/app/lib/db.php'@" scripts/check_financial_integrity.php) > "$RUNNER_TEMP/financial-before.json"
+
 echo "== Version des pages : ?v=$version"
 sed -i -E "s/(assets\/[a-z0-9_.-]+\.(js|css))\?v=[0-9]+/\1?v=$version/g" app/public/*.html
 
@@ -141,9 +158,26 @@ else
   echo "aucune migration en attente"
 fi
 .venv/bin/python -c "import engine.cli" && echo "moteur importable"
+# Derived analytics only; reuse stored prices, no collection and no transaction update.
+.venv/bin/python -m engine.cli metrics
+.venv/bin/python scripts/verify_financial_release.py
+php scripts/check_financial_integrity.php > "$ROOT/logs/financial-integrity.json"
+chmod 600 "$ROOT/logs/financial-integrity.json"
+
 find app scripts -name '*.php' -print0 | xargs -0 -n1 php -l > /dev/null && echo "PHP valide"
 REMOTE
 
+  remote_sh "cd $root && set -a && . ./private/env && set +a && php scripts/check_financial_integrity.php" > "$RUNNER_TEMP/financial-after.json"
+  python3 - <<'PYVERIFY'
+import json, os
+from pathlib import Path
+base=Path(os.environ['RUNNER_TEMP'])
+before=json.loads((base/'financial-before.json').read_text())
+after=json.loads((base/'financial-after.json').read_text())
+assert before['fingerprint']==after['fingerprint'], 'Les transactions ont changé pendant la livraison : vérification manuelle requise'
+assert before['portfolios']==after['portfolios'], 'Le nombre de portefeuilles a changé'
+print('Intégrité : portefeuilles et transactions strictement conservés ;',after['transactions'],'transactions ; anomalies historiques non réécrites :',after['issues'])
+PYVERIFY
   echo "== Vérification publique"
   public_check "$version"
 )
