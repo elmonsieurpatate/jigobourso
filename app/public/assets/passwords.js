@@ -1,5 +1,6 @@
 /* Visibility concerns only the characters currently typed in this browser. */
-window.J = window.J || {};
+(() => {
+if (J.passwordEyes) return;
 J.passwordEyes = (root = document) => {
   root.querySelectorAll('input[type="password"]').forEach(input => {
     if (input.dataset.eye) return; input.dataset.eye='1';
@@ -10,3 +11,5 @@ J.passwordEyes = (root = document) => {
 };
 J.passwordEyes();
 new MutationObserver(()=>J.passwordEyes()).observe(document.body,{childList:true,subtree:true});
+
+})();
