@@ -4,8 +4,32 @@ on:
     branches: [feat/navigation-account]
 permissions:
   contents: read
+concurrency:
+  group: account-verification
+  cancel-in-progress: true
 jobs:
+  obsolete:
+    runs-on: ubuntu-latest
+    permissions: {actions: write}
+    steps:
+      - name: Cancel obsolete runs of this feature verification only
+        env: {GH_TOKEN: '${{ github.token }}'}
+        run: |
+          python3 - <<'PY_CANCEL'
+          import os,json,urllib.request
+          base='https://api.github.com/repos/'+os.environ['GITHUB_REPOSITORY']+'/actions/'
+          headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'}
+          req=urllib.request.Request(base+'workflows/account-checks.yml/runs?branch=feat%2Fnavigation-account&per_page=50',headers=headers)
+          runs=json.load(urllib.request.urlopen(req))['workflow_runs']
+          for r in runs:
+              if str(r['id'])!=os.environ['GITHUB_RUN_ID'] and r['status'] in ('queued','in_progress','waiting','requested','pending'):
+                  try:
+                      urllib.request.urlopen(urllib.request.Request(base+'runs/'+str(r['id'])+'/cancel',headers=headers,method='POST'))
+                      print('Cancelled obsolete verification',r['id'])
+                  except Exception: print('Already ending',r['id'])
+          PY_CANCEL
   tests:
+    needs: obsolete
     runs-on: ubuntu-22.04
     timeout-minutes: 15
     services:
@@ -52,6 +76,7 @@ jobs:
         if: always()
         with: {name: financial-tests, path: audit-results/, retention-days: 3}
   remote:
+    needs: obsolete
     runs-on: ubuntu-latest
     environment: production
     timeout-minutes: 10
