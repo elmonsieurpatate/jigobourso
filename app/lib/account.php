@@ -44,15 +44,24 @@ function consume_account_link(string $raw, string $purpose, callable $change): v
     } catch (Throwable $e) { if ($db->inTransaction()) $db->rollBack(); throw $e; }
 }
 function update_account(array $u,array $b): array {
-    if (!password_verify(password_input($b,'current'),$u['pass_hash'])) throw new ApiError('Mot de passe actuel incorrect',403);
-    $name=str_in($b,'username',30);if (!preg_match('/^[A-Za-z0-9_.-]{3,30}$/D',$name)) throw new ApiError('Pseudo : 3 à 30 caractères, lettres, chiffres, point, tiret ou soulignement.',422);
-    $email=mb_strtolower(str_in($b,'email',190));if (!filter_var($email,FILTER_VALIDATE_EMAIL)) throw new ApiError('Adresse e-mail invalide',422);
-    if (q('SELECT id FROM users WHERE id<>? AND (username=? OR email=?)',[$u['id'],$name,$email])->fetch()) throw new ApiError('Ces coordonnées ne sont pas disponibles.',409);
-    $changing=mb_strtolower($u['email'] ?? '')!==$email;
-    if ($changing) {
-        account_throttle('email',$email);
-        if (!issue_account_link($u,'email',$email)) throw new ApiError('Envoi impossible pour le moment. Votre adresse actuelle est conservée.',503);
+    $db=db();$db->beginTransaction();
+    try {
+        $fresh=q('SELECT * FROM users WHERE id=? FOR UPDATE',[$u['id']])->fetch();
+        if (!$fresh || !$fresh['active'] || !password_verify(password_input($b,'current'),$fresh['pass_hash'])) throw new ApiError('Mot de passe actuel incorrect',403);
+        $name=str_in($b,'username',30);if (!preg_match('/^[A-Za-z0-9_.-]{3,30}$/D',$name)) throw new ApiError('Pseudo : 3 à 30 caractères, lettres, chiffres, point, tiret ou soulignement.',422);
+        $email=mb_strtolower(str_in($b,'email',190));if (!filter_var($email,FILTER_VALIDATE_EMAIL)) throw new ApiError('Adresse e-mail invalide',422);
+        if (q('SELECT id FROM users WHERE id<>? AND (username=? OR email=?)',[$u['id'],$name,$email])->fetch()) throw new ApiError('Ces coordonnées ne sont pas disponibles.',409);
+        $changing=mb_strtolower($fresh['email'] ?? '')!==$email;
+        if ($changing) {
+            account_throttle('email',$email);
+            if (!issue_account_link($fresh,'email',$email)) throw new ApiError('Envoi impossible pour le moment. Votre adresse actuelle est conservée.',503);
+        }
+        q('UPDATE users SET username=? WHERE id=?',[$name,$u['id']]);
+        $db->commit();
+        return ['ok'=>true,'email_pending'=>$changing,'message'=>$changing?'Pseudo enregistré. Confirmez la nouvelle adresse depuis le lien envoyé ; votre adresse actuelle reste active.':'Compte mis à jour.'];
+    } catch(Throwable $e) {
+        if($db->inTransaction())$db->rollBack();
+        if($e instanceof PDOException && $e->getCode()==='23000')throw new ApiError('Ces coordonnées ne sont pas disponibles.',409);
+        throw $e;
     }
-    q('UPDATE users SET username=? WHERE id=?',[$name,$u['id']]);
-    return ['ok'=>true,'email_pending'=>$changing,'message'=>$changing?'Pseudo enregistré. Confirmez la nouvelle adresse depuis le lien envoyé ; votre adresse actuelle reste active.':'Compte mis à jour.'];
 }

@@ -9,7 +9,7 @@ if(getenv('JIGO_ACCOUNT_POSTCHECK')==='1') {
  $result['email_aliases_resolvable']=$matched;
  require getcwd().'/app/lib/mail.php';
  $marker=getcwd().'/logs/account-mailer-confirmed.json';
- if(!is_file($marker)) {
+ if(!is_file($marker) || empty(json_decode(file_get_contents($marker),true)['accepted_by_hostinger'])) {
   $recipient=q('SELECT email FROM users WHERE active=1 AND is_admin=1 AND email IS NOT NULL ORDER BY id LIMIT 1')->fetchColumn();
   $accepted=$recipient?send_account_mail($recipient,'Jigobourso : service de récupération disponible',"La mise à jour de connexion de Jigobourso est déployée. Ce message vérifie l’envoi réel depuis le module de récupération. Votre mot de passe et vos portefeuilles n’ont pas été modifiés.\n"):false;
   file_put_contents($marker,json_encode(['at_utc'=>gmdate('c'),'accepted_by_hostinger'=>$accepted]));chmod($marker,0600);
