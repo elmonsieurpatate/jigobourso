@@ -163,8 +163,12 @@ else
 fi
 .venv/bin/python -c "import engine.cli" && echo "moteur importable"
 # Derived analytics only; reuse stored prices, no collection and no transaction update.
+echo "== Recalcul des mesures et classements depuis les historiques existants"
 .venv/bin/python -m engine.cli metrics
+echo "== Recalcul analytique terminé"
+echo "== Vérification financière de la version"
 .venv/bin/python scripts/verify_financial_release.py
+echo "== Contrôle d'intégrité financière"
 php scripts/check_financial_integrity.php > "$ROOT/logs/financial-integrity.json"
 chmod 600 "$ROOT/logs/financial-integrity.json"
 
@@ -172,7 +176,9 @@ find app scripts -name '*.php' -print0 | xargs -0 -n1 php -l > /dev/null && echo
 REMOTE
 
   phase="vérification ETF, comptes et intégrité financière"
+  echo "== Vérification ETF"
   remote_sh "cd $root && set -a && . ./private/env && set +a && .venv/bin/python scripts/verify_etf_release.py" > "$RUNNER_TEMP/etf-report.json"
+  echo "== Vérification des comptes et des transactions"
   remote_sh "cd $root && set -a && . ./private/env && set +a && php scripts/check_financial_integrity.php" > "$RUNNER_TEMP/financial-after.json"
   remote_sh "cd $root && set -a && . ./private/env && set +a && JIGO_ACCOUNT_POSTCHECK=1 php scripts/verify_account_release.php" > "$RUNNER_TEMP/account-after.json"
   python3 - <<'ACCOUNTVERIFY'
