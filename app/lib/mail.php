@@ -7,6 +7,7 @@ function mail_available(): bool {
 function send_account_mail(string $email, string $subject, string $message): bool {
     // A file transport is available ONLY for the explicitly disposable integration DB.
     $test = cfg('JIGO_TEST_DATABASE') === '1' && cfg('JIGO_DB_NAME') === 'jigobourso_it';
+    if ($test && cfg('JIGO_TEST_MAIL_FAIL') === '1') return false;
     if ($test && cfg('JIGO_TEST_MAIL_DIR')) {
         $file = rtrim(cfg('JIGO_TEST_MAIL_DIR'), '/') . '/' . bin2hex(random_bytes(12)) . '.json';
         return file_put_contents($file, json_encode(['to'=>$email,'subject'=>$subject,'body'=>$message])) !== false;

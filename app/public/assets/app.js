@@ -219,4 +219,4 @@ J.accountDialog = function () {
 };
 window.J = J;
 
-if (!document.querySelector('script[src*="passwords.js"]')) { const p=document.createElement('script'); p.src='assets/passwords.js?v=202610290001'; document.head.appendChild(p); }
+if (!document.querySelector('script[src*="passwords.js"]')) { const p=document.createElement('script'); p.src='assets/passwords.js'+new URL(document.currentScript.src).search; document.head.appendChild(p); }

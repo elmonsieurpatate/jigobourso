@@ -63,15 +63,18 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p audit-results
-          PYTHONPATH="$PWD" python tests/e2e/financial_seed.py
-          php scripts/create_user.php review_user review-local-password --admin > /dev/null
+          PYTHONPATH="$PWD" python tests/e2e/account_seed.py
+          php scripts/create_user.php review_user review-local-password --admin --email=review@example.test > /dev/null
           export JIGO_PYTHON="$(command -v python)" JIGO_ENGINE_ROOT="$PWD"
           npm install --prefix "$RUNNER_TEMP/financial-browser" --no-save playwright-core@1.56.1 > /dev/null
           export PLAYWRIGHT_MODULE="$RUNNER_TEMP/financial-browser/node_modules/playwright-core" JIGO_CHROMIUM="$(command -v google-chrome || command -v chromium)"
+          export JIGO_TEST_MAIL_DIR="$RUNNER_TEMP/account-mail"
+          install -d -m 700 "$JIGO_TEST_MAIL_DIR"
           php -S 127.0.0.1:18089 -t app/public > audit-results/php-server.log 2>&1 &
           php_pid=$!
           trap 'kill "$php_pid"' EXIT
           node tests/e2e/financial.cjs > audit-results/browser.log 2>&1
+          node tests/e2e/account-navigation.cjs > audit-results/account-browser.log 2>&1
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:

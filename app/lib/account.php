@@ -6,7 +6,7 @@ function password_input(array $b, string $key): string {
     return $b[$key];
 }
 function account_throttle(string $purpose, string $identity): void {
-    foreach ([['ip:'.client_ip(),20],['identity:'.mb_strtolower($identity),3]] as [$value,$limit]) {
+    foreach ([['ip:'.client_ip(),20],['identity:'.mb_strtolower($identity),in_array($purpose,['reset','verify'],true)?20:3]] as [$value,$limit]) {
         $hash=hash('sha256',$purpose.':'.$value);
         if ((int)q('SELECT COUNT(*) FROM account_attempts WHERE scope_hash=? AND at>?',[$hash,gmdate('Y-m-d H:i:s',time()-3600)])->fetchColumn()>=$limit)
             throw new ApiError('Trop de demandes : réessayez plus tard.',429);

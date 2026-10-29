@@ -15,7 +15,7 @@ function login_blocked(string $username): bool {
 function login(string $username, string $password, bool $remember = false): array {
     $username = trim(mb_substr($username, 0, 190));
     $ipKey='login:'.substr(hash('sha256',client_ip()),0,20);
-    if (login_blocked($ipKey)) throw new ApiError('Trop d’essais : réessayez dans quelques minutes',429);
+    if ((int)q('SELECT COUNT(*) FROM login_attempts WHERE username=? AND at>?',[$ipKey,gmdate('Y-m-d H:i:s',time()-900)])->fetchColumn() >= 20) throw new ApiError('Trop d’essais : réessayez dans quelques minutes',429);
     $column=strpos($username,'@')!==false?'email':'username';
     $u=q("SELECT * FROM users WHERE $column=? AND active=1",[$username])->fetch();
     $key=$u?$u['username']:'missing:'.substr(hash('sha256',mb_strtolower($username)),0,20);

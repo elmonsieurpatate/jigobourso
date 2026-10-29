@@ -191,3 +191,4 @@ body.side-collapsed .side .nv { justify-content: center; padding: 10px 0; } body
 .rtable .nm { max-width: 260px; }
 /* Account forms: full-size input, accessible visibility control. */
 .pw-wrap{position:relative;display:flex;align-items:center;min-width:0;width:100%}.pw-wrap input{width:100%;padding-right:86px}.pw-wrap .pw-eye{position:absolute;right:5px;min-height:36px;background:var(--card);font-size:.78rem}.auth-wrap{max-width:460px;padding-top:7vh}.auth-links{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:16px}.account-note{font-size:.88rem;color:var(--muted)}
+.pw-wrap input{padding-right:52px}.pw-wrap .pw-eye{width:42px;height:42px;min-height:42px;display:grid;place-items:center;padding:0}
