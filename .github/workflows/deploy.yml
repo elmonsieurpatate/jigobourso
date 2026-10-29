@@ -68,6 +68,7 @@ jobs:
           mkdir -p audit-results
           PYTHONPATH="$PWD" python tests/e2e/account_seed.py
           php scripts/create_user.php review_user review-local-password --admin --email=review@example.test > /dev/null
+          PYTHONPATH="$PWD" python tests/e2e/etf_seed.py
           export JIGO_PYTHON="$(command -v python)" JIGO_ENGINE_ROOT="$PWD"
           npm install --prefix "$RUNNER_TEMP/financial-browser" --no-save playwright-core@1.56.1 > /dev/null
           export PLAYWRIGHT_MODULE="$RUNNER_TEMP/financial-browser/node_modules/playwright-core" JIGO_CHROMIUM="$(command -v google-chrome || command -v chromium)"
