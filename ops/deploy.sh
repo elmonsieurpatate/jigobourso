@@ -113,11 +113,14 @@ echo "sauvegarde : $backup"
 set +e
 (
   set -euo pipefail
+  phase="transfert du code"
+  trap 'rc=$?; if [ "$rc" -ne 0 ]; then echo "Échec déploiement : étape ${phase} (code ${rc})" >&2; fi' EXIT
   echo "== Transfert du code"
   rsync -rlt --delete --exclude=__pycache__ --exclude=.venv --exclude=private --exclude=data --exclude=logs \
     -e "ssh ${ssh_opts[*]}" \
     app engine db docs scripts README.md requirements.txt "$remote:$root/"
 
+  phase="dépendances Python, migration du schéma et recalcul"
   echo "== Dépendances Python, migrations de schéma, contrôles"
   remote_sh "ROOT=$root BACKUPS=$backups SHA=$sha VERSION=$version bash -s" <<'REMOTE'
 set -euo pipefail
@@ -168,6 +171,7 @@ chmod 600 "$ROOT/logs/financial-integrity.json"
 find app scripts -name '*.php' -print0 | xargs -0 -n1 php -l > /dev/null && echo "PHP valide"
 REMOTE
 
+  phase="vérification ETF, comptes et intégrité financière"
   remote_sh "cd $root && set -a && . ./private/env && set +a && .venv/bin/python scripts/verify_etf_release.py" > "$RUNNER_TEMP/etf-report.json"
   remote_sh "cd $root && set -a && . ./private/env && set +a && php scripts/check_financial_integrity.php" > "$RUNNER_TEMP/financial-after.json"
   remote_sh "cd $root && set -a && . ./private/env && set +a && JIGO_ACCOUNT_POSTCHECK=1 php scripts/verify_account_release.php" > "$RUNNER_TEMP/account-after.json"
@@ -190,6 +194,7 @@ assert before['fingerprint']==after['fingerprint'], 'Les transactions ont chang�
 assert before['portfolios']==after['portfolios'], 'Le nombre de portefeuilles a changé'
 print('Intégrité : portefeuilles et transactions strictement conservés ;',after['transactions'],'transactions ; anomalies historiques non réécrites :',after['issues'])
 PYVERIFY
+  phase="vérification publique"
   echo "== Vérification publique"
   public_check "$version"
   for page in login.html recover.html reset.html verify-email.html; do
