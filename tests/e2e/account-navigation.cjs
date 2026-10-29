@@ -9,16 +9,18 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE),fs=require('fs');
    await page.locator('.pw-eye').click();if(await page.locator('#p').getAttribute('type')!=='text')throw Error();await page.locator('.pw-eye').click();
    await page.check('#remember');await page.click('#auth-form button.primary');await page.waitForURL('**/index.html');r.email_login=true;
    const config=await page.evaluate(async()=>{const r=await J.api('strategy/presets');const c=r.presets.regular;for(const p of c.periods){p.enabled=['week','month'].includes(p.id);p.min_slope=.01;p.min_r2=null;}c.ranking.mode='performance';return c;});
-   step='ranking-state';await page.evaluate(c=>{const s={pageKey:'/index.html',preset:'regular',config:c,status:'all',page:2,sort:'perf',dir:'desc',size:20,level:'advanced',compare:false,view:{q:'TEST',kind:'equity',budget:'1000'}};sessionStorage.setItem('jigo_explorer2',JSON.stringify(s));localStorage.setItem('jigo_explorer2',JSON.stringify(s));},config);
-   await page.reload();await page.locator('a[data-sheet]').first().waitFor();await page.evaluate(()=>scrollTo(0,400));
+   step='ranking-state';await page.addInitScript(c=>{if(location.pathname!=='/index.html'||sessionStorage.getItem('account-test-seeded'))return;const s={pageKey:'/index.html',preset:'regular',config:c,status:'all',page:2,sort:'perf',dir:'desc',size:20,level:'advanced',compare:false,view:{q:'TEST',kind:'equity',budget:'1000'}};sessionStorage.setItem('jigo_explorer2',JSON.stringify(s));localStorage.setItem('jigo_explorer2',JSON.stringify(s));sessionStorage.setItem('account-test-seeded','1');},config);
+   await page.reload();await page.locator('a[data-sheet]').first().waitFor();await page.locator('a[data-sheet]').first().evaluate(a=>a.scrollIntoView({block:'center'}));
    const before=await page.evaluate(()=>({state:JSON.parse(localStorage.getItem('jigo_explorer2')),y:scrollY,href:location.href}));
+   if(before.state.page!==2||before.state.view.q!=='TEST')throw Error('fixture not applied');
    for(let i=0;i<2;i++){
     step='open-sheet-'+i;const [sheet]=await Promise.all([ctx.waitForEvent('page'),page.locator('a[data-sheet]').nth(i).click()]);await sheet.locator('.hero').waitFor();
     const external=await sheet.locator('a[href^="https://"]').evaluateAll(links=>links.every(a=>a.target==='_blank'&&a.rel.includes('noopener')));if(!external)throw Error();await sheet.close();
    }
    const after=await page.evaluate(()=>({state:JSON.parse(localStorage.getItem('jigo_explorer2')),y:scrollY,href:location.href}));
+   if(Math.abs(before.y-after.y)>2)throw Error('scroll changed while opening sheets');
    if(before.href!==after.href||before.state.page!==after.state.page||JSON.stringify(before.state.config)!==JSON.stringify(after.state.config))throw Error('list state changed');
-   step='restore-list';await page.reload();await page.locator('a[data-sheet]').first().waitFor();const restored=await page.evaluate(()=>JSON.parse(sessionStorage.getItem('jigo_explorer2')));
+   step='restore-list';await page.reload();await page.locator('a[data-sheet]').first().waitFor();await page.waitForTimeout(150);const restored=await page.evaluate(()=>JSON.parse(sessionStorage.getItem('jigo_explorer2')));
    if(restored.page!==2||restored.view.q!=='TEST'||String(restored.view.budget)!=='1000'||restored.level!=='advanced')throw Error('restored state mismatch: '+JSON.stringify({page:restored.page,q:restored.view.q,budget:restored.view.budget,level:restored.level}));r.ranking_preserved=true;
    r.horizontal_overflow=await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth);
    await page.screenshot({path:`audit-results/navigation-${width}.png`});
