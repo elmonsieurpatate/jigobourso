@@ -20,6 +20,12 @@
   let s;
   try { s = await J.post('sheet', reqBody); } catch (e) { page.innerHTML = `<div class="notice err">${J.esc(e.message)}</div>`; return; }
   document.title = s.name + ' — Jigobourso';
+  const tvMarket = {XNAS:'NASDAQ',XNYS:'NYSE',ARCX:'AMEX',XETR:'XETR',XPAR:'EURONEXT',XLON:'LSE',XAMS:'EURONEXT',XMIL:'MIL'}[s.mic];
+  const localSymbol=s.symbol.replace(/\.(DE|PA|AS|L|MI|SW|MU)$/,'');
+  const us=['XNAS','XNYS','ARCX','BATS','XASE'].includes(s.mic);
+  const ext=[['Yahoo Finance','https://finance.yahoo.com/quote/'+encodeURIComponent(s.symbol)+'/']];
+  if(tvMarket)ext.push(['TradingView','https://www.tradingview.com/symbols/'+tvMarket+'-'+encodeURIComponent(localSymbol)+'/']);
+  if(us)ext.push(['StockAnalysis','https://stockanalysis.com/'+(s.kind==='etf'?'etf':'stocks')+'/'+encodeURIComponent(s.symbol.toLowerCase())+'/']);
   const v = s.verdict || {}, F = s.freshness || {}, SRC = s.sources || {}, st = s.state || {};
   const closes = s.daily.map(d => d[1]), last = closes[closes.length - 1];
   const perf = n => s.measures[String(n)] ? s.measures[String(n)].perf : null;
@@ -47,6 +53,7 @@
     <div style="text-align:right"><div class="px">${J.money(s.price, s.currency)}</div><div class="muted">${s.price ? J.priceLabel(s) + ' · ' + J.dateTime(s.price_time) : 'Pas de cours'}</div>${lastDay !== null ? `<div class="${J.cls(lastDay)}" style="font-weight:700">${J.pct(lastDay)} <span class="muted" style="font-weight:400">sur la dernière séance</span></div>` : ''}
     ${s.price_eur !== null && s.currency !== 'EUR' ? `<div class="muted small">≈ ${J.eur(s.price_eur)}</div>` : ''}<div style="margin-top:10px"><button class="btn small" id="add">+ Ajouter à un portefeuille</button></div></div></div>
   ${s.price_stale ? '<div class="notice warn">Cours ancien : aucune cotation récente confirmée. Le prix affiché reste daté, il ne représente pas un cours actuel.</div>' : ''}
+  <div class="row small" style="gap:14px;margin:10px 0">${ext.map(([name,url])=>`<a href="${J.esc(url)}" target="_blank" rel="noopener noreferrer">${name} ↗</a>`).join('')}</div>
   ${notice ? `<div class="grid" style="gap:10px;margin-bottom:14px">${notice}</div>` : ''}
   <div class="tabs big" id="tabs">${hasTabs.map(t => `<button data-t="${t}">${tabLabel[t]}</button>`).join('')}</div>
   <div class="grid" style="grid-template-columns:minmax(0,2.3fr) minmax(270px,1fr);align-items:start" id="layout"><div id="main"></div>

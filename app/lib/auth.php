@@ -69,7 +69,7 @@ function require_admin(): array {
 }
 function valid_password(string $p): void {
     if (mb_strlen($p) < 10) throw new ApiError('Mot de passe : 10 caractères minimum');
-    if (mb_strlen($p) > 200) throw new ApiError('Mot de passe trop long');
+    if (strlen($p) > 72) throw new ApiError('Mot de passe : 72 octets maximum (pour éviter une troncature du hachage).');
 }
 function create_user(string $username, string $password, ?string $email, bool $admin): int {
     if (!preg_match('/^[A-Za-z0-9_.-]{3,30}$/', $username)) throw new ApiError('Identifiant : 3 à 30 caractères (lettres, chiffres, _ . -)');

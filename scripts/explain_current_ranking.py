@@ -18,5 +18,5 @@ for r in rows:
  if r['symbol'] not in ('CXM','AR','DOW'):continue
  peers={n:strategy._percentiles({v['key']:v['measures'][n]['perf'] for v in kept}) for n in (5,21)}
  result.append({'symbol':r['symbol'],'name':r['row']['name'],'mic':r['row']['mic'],'status':r['status'],'rank':r['rank'],'score':r['score'],'last_close':str(r['row']['last_close_date']),'metrics':r['measures'],'percentiles':{n:peers[n].get(r['key']) for n in (5,21)}})
-print(json.dumps({'config':cfg,'retained_equities':len(kept),'at_data_max':max(str(r['row']['last_close_date']) for r in rows),'titles':result},default=str))
+print(json.dumps({'config':cfg,'retained_equities':len(kept),'at_data_max':max(str(r['row']['last_close_date']) for r in rows if r['row']['last_close_date']),'titles':result},default=str))
 c.rollback();c.close()

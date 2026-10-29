@@ -22,18 +22,23 @@ return [
             q('INSERT INTO login_attempts(username, ip, at) VALUES (?,?,?)', [$key, client_ip(), now_utc()]);
             throw new ApiError('Mot d’invitation incorrect ou inscriptions fermées', 403);
         }
-        $id = create_user(str_in($b, 'username', 30), str_in($b, 'password', 200), str_in($b, 'email', 190, false) ?: null, false);
+        $id = create_user(str_in($b, 'username', 30), password_input($b, 'password'), str_in($b, 'email', 190, false) ?: null, false);
         return ['user_id' => $id];
     },
     'auth/password' => function () {
         need_post();
         $u = require_user();
         $b = body();
-        if (!password_verify(password_input($b, 'current'), $u['pass_hash'])) throw new ApiError('Mot de passe actuel incorrect', 403);
-        $new = password_input($b, 'new');
-        valid_password($new);
-        q('UPDATE users SET pass_hash = ? WHERE id = ?', [password_hash($new, PASSWORD_DEFAULT), $u['id']]);
-        q('DELETE FROM sessions WHERE user_id = ? AND token_hash <> ?', [$u['id'], hash('sha256', $_COOKIE[COOKIE])]);
+        $db=db();$db->beginTransaction();
+        try {
+            $fresh=q('SELECT * FROM users WHERE id=? FOR UPDATE',[$u['id']])->fetch();
+            if (!password_verify(password_input($b,'current'),$fresh['pass_hash'])) throw new ApiError('Mot de passe actuel incorrect',403);
+            $new=password_input($b,'new');valid_password($new);
+            q('UPDATE users SET pass_hash=? WHERE id=?',[password_hash($new,PASSWORD_DEFAULT),$u['id']]);
+            q('UPDATE account_tokens SET used_at=? WHERE user_id=? AND used_at IS NULL',[now_utc(),$u['id']]);
+            q('DELETE FROM sessions WHERE user_id=? AND token_hash<>?',[$u['id'],hash('sha256',$_COOKIE[COOKIE])]);
+            $db->commit();
+        } catch(Throwable $e) {if($db->inTransaction())$db->rollBack();throw $e;}
         return ['ok' => true];
     },
     'auth/recover' => function () {
