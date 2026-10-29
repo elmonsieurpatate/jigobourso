@@ -28,3 +28,4 @@ Intégrité : portefeuilles et transactions strictement conservés ; 9 transacti
 == Vérification publique
 site OK : accueil 200, version 202610291231 servie, API répond (200)
 Pages de connexion, récupération et confirmation : HTTP 200
+Déploiement terminé : e2b472f9df69e4ca979c4d058a7d05dc0f018d8d
