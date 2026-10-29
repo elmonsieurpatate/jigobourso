@@ -91,6 +91,7 @@ echo "Sauvegarde financière vérifiée : $(basename "$file")"
 REMOTE
 # Run the new SELECT-only checker against the old deployment to establish the baseline.
 remote_sh "cd $root && set -a && . ./private/env && set +a && php" < <(sed "s@__DIR__ . '/../app/lib/db.php'@getcwd() . '/app/lib/db.php'@" scripts/check_financial_integrity.php) > "$RUNNER_TEMP/financial-before.json"
+remote_sh "cd $root && set -a && . ./private/env && set +a && php" < scripts/verify_account_release.php > "$RUNNER_TEMP/account-before.json"
 
 echo "== Version des pages : ?v=$version"
 sed -i -E "s/(assets\/[a-z0-9_.-]+\.(js|css))\?v=[0-9]+/\1?v=$version/g" app/public/*.html
@@ -168,6 +169,16 @@ find app scripts -name '*.php' -print0 | xargs -0 -n1 php -l > /dev/null && echo
 REMOTE
 
   remote_sh "cd $root && set -a && . ./private/env && set +a && php scripts/check_financial_integrity.php" > "$RUNNER_TEMP/financial-after.json"
+  remote_sh "cd $root && set -a && . ./private/env && set +a && JIGO_ACCOUNT_POSTCHECK=1 php scripts/verify_account_release.php" > "$RUNNER_TEMP/account-after.json"
+  python3 - <<'ACCOUNTVERIFY'
+import json,os
+from pathlib import Path
+base=Path(os.environ['RUNNER_TEMP'])
+a=json.loads((base/'account-before.json').read_text());b=json.loads((base/'account-after.json').read_text())
+assert a['users_fingerprint']==b['users_fingerprint'], 'Les comptes existants ont changé pendant la livraison'
+print('Comptes et hachages conservés ; contrôle du module de messagerie :',b['mail_transport'])
+ACCOUNTVERIFY
+
   python3 - <<'PYVERIFY'
 import json, os
 from pathlib import Path
@@ -180,6 +191,10 @@ print('Intégrité : portefeuilles et transactions strictement conservés ;',aft
 PYVERIFY
   echo "== Vérification publique"
   public_check "$version"
+  for page in login.html recover.html reset.html verify-email.html; do
+    test "$(curl -s -o /dev/null -w '%{http_code}' "$base/$page")" = 200 || exit 4
+  done
+  echo "Pages de connexion, récupération et confirmation : HTTP 200"
 )
 rc=$?
 set -e

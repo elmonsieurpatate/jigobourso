@@ -111,3 +111,19 @@ def test_session_cookie_and_absolute_expiry(world,remember,days):
  c.call('auth/me')
  with con.cursor() as q:q.execute('SELECT expires_at FROM sessions');assert q.fetchone()['expires_at']==r['absolute_expiry']
  con.close()
+
+def test_mail_failure_does_not_leave_a_usable_reset_link(world):
+ set_email()
+ code="require "+repr(ROOT+'/app/lib/account.php')+"; $u=q(\"SELECT * FROM users WHERE username='alice'\")->fetch(); echo json_encode(issue_account_link($u,'reset',$u['email']));"
+ r=subprocess.run(['php','-r',code],env=dict(os.environ,JIGO_TEST_MAIL_FAIL='1'),capture_output=True,text=True)
+ assert r.returncode==0 and json.loads(r.stdout) is False
+ c=connect()
+ with c.cursor() as q:
+  q.execute('SELECT COUNT(*) n FROM account_tokens WHERE used_at IS NULL');assert q.fetchone()['n']==0
+ c.close()
+
+def test_old_sessions_without_policy_survive_migration(world):
+ a=login(world,'alice','alice-secret-1234');c=connect()
+ with c.cursor() as q:q.execute('DELETE FROM session_policies')
+ c.commit();c.close()
+ assert a.call('auth/me')[1]['user']['username']=='alice'
