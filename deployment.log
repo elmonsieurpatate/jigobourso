@@ -4,3 +4,7 @@
 == Transfert du code
 == Dépendances Python, migrations de schéma, contrôles
 moteur importable
+PHP valide
+== Vérification publique
+site OK : accueil 200, version 202610291517 servie, API répond (200)
+Déploiement terminé : 0868231131b42981272898fbc545f0b9a72031e5
