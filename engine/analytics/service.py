@@ -14,7 +14,7 @@ from engine.market import hours
 from engine.market.collect import latest_rates, to_eur_factor
 from . import strategy
 from .measures import window_metrics
-from .series import usable_closes, find_breaks, clean_window
+from .series import usable_closes, find_breaks, clean_window, analyze_series
 
 PEA_COUNTRIES = {'France', 'Germany', 'Netherlands', 'Spain', 'Italy', 'Belgium', 'Sweden', 'Finland', 'Denmark', 'Norway', 'Ireland',
                  'Portugal', 'Austria', 'Luxembourg'}
@@ -62,14 +62,13 @@ def _live_measures(conn, ids, windows):
             bars = defaultdict(list)
             for r in cur.fetchall():
                 bars[r['listing_id']].append((r['price_date'].isoformat(), float(r['close_px']), None if r['adj_close_px'] is None else float(r['adj_close_px'])))
+            cur.execute(f"SELECT listing_id, event_date, ratio FROM corporate_events WHERE listing_id IN ({','.join(['%s'] * len(part))}) AND kind IN ('split','reverse_split')", part)
+            splits = defaultdict(list)
+            for r in cur.fetchall():
+                splits[r['listing_id']].append((r['event_date'].isoformat(), float(r['ratio']) if r['ratio'] else None))
             for lid, rows in bars.items():
-                dates, closes, basis = usable_closes(rows)
-                breaks = find_breaks(dates, closes, basis)
-                for n in windows:
-                    window, _ = clean_window(closes, n, breaks)
-                    m = window_metrics(window) if window else None
-                    if m:
-                        out[lid][n] = m
+                _, _, _, _, measured, _, _ = analyze_series(rows, windows, splits[lid])
+                out[lid].update({n: m for n, m in measured.items() if m is not None})
     return out
 
 
@@ -87,8 +86,10 @@ def judge_universe(conn, config, ids=None):
         tech = {k: (None if u[k] is None else float(u[k])) for k in ('close_px', 'ma20', 'ma50', 'ma50_prev', 'daily_change', 'gap_to_ma20')}
         tech['close'] = tech.pop('close_px')
         last = u['last_close_date'].isoformat() if u['last_close_date'] else None
-        expected = latest_by_mic.get(u['mic'])
-        v = strategy.judge(config, measures, tech, missing, last, expected.isoformat() if expected else None)
+        expected = max(hours.expected_last_close(u['mic'], hours.utcnow()), str(latest_by_mic.get(u['mic']) or ''))
+        if last and last < expected:
+            u['quality'] = 'stale'
+        v = strategy.judge(config, measures, tech, missing, last, expected or None)
         v.update(key=u['id'], group='etf' if u['kind'] == 'etf' else 'equity', symbol=u['symbol'], row=u)
         verdicts.append(v)
     return strategy.rank(config, verdicts)
@@ -107,7 +108,7 @@ def _row(v, rates):
             'quality': u['quality'], 'measures': {str(n): m for n, m in v['measures'].items()}, 'reasons': v['reasons']}
 
 
-CACHE_FORMAT = 2
+CACHE_FORMAT = 3
 ENTRY_FIELDS = ('id', 'symbol', 'name', 'isin', 'kind', 'mic', 'country', 'status', 'group', 'rank', 'score', 'category', 'fails')
 
 
@@ -123,7 +124,7 @@ def data_version(conn):
         a = cur.fetchone()
         cur.execute("SELECT COALESCE(MAX(id), 0) j FROM jobs WHERE job_type NOT LIKE 'intraday%' AND status IN ('completed', 'completed_with_errors')")
         j = cur.fetchone()['j']
-    return f"{CACHE_FORMAT}.{strategy.VERSION}|{a['t']}|{a['n']}|{j}"
+    return f"{','.join(hours.expected_last_close(m, hours.utcnow()) for m in sorted(hours.HOURS))}.{CACHE_FORMAT}.{strategy.VERSION}|{a['t']}|{a['n']}|{j}"
 
 
 def cached_verdicts(conn, config):
@@ -148,14 +149,14 @@ def cached_verdicts(conn, config):
 def _aux(conn, ref, rates):
     """Données de filtre et de tri pour tout l'univers : prix, volume, fraîcheur et mesures de la fenêtre de référence `ref`."""
     with conn.cursor() as cur:
-        cur.execute("""SELECT p.listing_id id, p.price, COALESCE(p.currency, l.currency) cur, p.avg_volume_3m volume, s.last_close_date, s.quality
+        cur.execute("""SELECT p.listing_id id, p.price, COALESCE(p.currency, l.currency) cur, p.avg_volume_3m volume, l.mic, s.last_close_date, s.quality
                        FROM latest_prices p JOIN listings l ON l.id=p.listing_id LEFT JOIN series_state s ON s.listing_id=l.id""")
         out = {}
         for r in cur.fetchall():
             price = None if r['price'] is None else float(r['price'])
             f = to_eur_factor(r['cur'], rates)
             out[r['id']] = {'price': price, 'price_eur': price * f if price is not None and f else None, 'volume': r['volume'],
-                            'last_close': r['last_close_date'], 'quality': r['quality']}
+                            'last_close': r['last_close_date'], 'quality': 'stale' if r['last_close_date'] and str(r['last_close_date']) < hours.expected_last_close(r['mic'], hours.utcnow()) else r['quality']}
         cur.execute('SELECT listing_id, slope, r2, perf, volatility, drawdown FROM strategy_metrics WHERE sessions=%s', (ref,))
         for r in cur.fetchall():
             if r['listing_id'] in out:
@@ -196,7 +197,7 @@ def scoped_entries(conn, config, view, rates=None, aux=None, now=None):
             and (not country or e['country'] == country) and (not category or category in (e['category'] or '').casefold())]
     if view.get('pea'):
         base = [e for e in base if e['kind'] == 'equity' and e['country'] in PEA_COUNTRIES]
-    if owned and view.get('owned_only'):
+    if view.get('owned_only'):
         base = [e for e in base if e['id'] in owned]
     if view.get('open_now'):
         base = [e for e in base if e['mic'] in hours.HOURS and hours.is_open(e['mic'], now)]
@@ -266,14 +267,13 @@ def explore(conn, request):
     total = len(rows) + len(excluded_hits)
     if export:
         size, page = EXPORT_LIMIT, 1
-    page_rows = (rows + [None] * len(excluded_hits))[(page - 1) * size:page * size]      # pagination : uniquement après filtrage, évaluation et classement
-    wanted = [e['id'] for e in page_rows if e]
+    page_rows = (rows + excluded_hits)[(page - 1) * size:page * size]      # pagination : uniquement après filtrage, évaluation et classement
+    wanted = [e['id'] for e in page_rows if e not in excluded_hits]
     detail = {v['key']: v for v in judge_universe(conn, config, wanted)} if wanted else {}
     out = []
-    excl_iter = iter(excluded_hits)
     for e in page_rows:
-        if e is None:
-            out.append(next(excl_iter))
+        if e in excluded_hits:
+            out.append(e)
             continue
         v = detail[e['id']]
         v['rank'], v['score'] = e['rank'], e['score']      # rang et score viennent de la sélection complète, pas de la page
@@ -312,7 +312,7 @@ def _search_excluded(conn, query, kind, market):
     if market:
         sql += ' AND l.mic=%s'; args.append(market)
     with conn.cursor() as cur:
-        cur.execute(sql + ' ORDER BY i.name LIMIT 50', args)
+        cur.execute(sql + ' ORDER BY i.name, l.id', args)
         rows = cur.fetchall()
     return [{'id': r['id'], 'symbol': r['symbol'], 'name': r['name'], 'isin': r['isin'], 'mic': r['mic'], 'market': MARKETS.get(r['mic'], r['mic']), 'kind': r['kind'],
              'category': r['category'], 'country': r['country'], 'pea': False, 'currency': r['price_currency'] or r['currency'],
@@ -348,7 +348,7 @@ def instrument_sheet(conn, request):
         u = cur.fetchone()
         if not u:
             return {'error': 'Titre introuvable'}
-        cur.execute('SELECT price_date, close_px, volume FROM daily_prices WHERE listing_id=%s ORDER BY price_date', (lid,))
+        cur.execute('SELECT price_date, close_px, adj_close_px, volume FROM daily_prices WHERE listing_id=%s ORDER BY price_date', (lid,))
         rows = cur.fetchall()
         daily = [[r['price_date'].isoformat(), float(r['close_px'])] for r in rows]
         daily_volume = [None if r['volume'] is None else int(r['volume']) for r in rows]
@@ -369,14 +369,14 @@ def instrument_sheet(conn, request):
     sheet.update(_sheet_context(conn, u, state, daily))
     # Verdict : uniquement pour une cotation recommandable ; sinon la fiche explique pourquoi elle ne l'est pas.
     all_windows = sorted({p['sessions'] for p in config['periods']})
-    bars = [(d, c, None) for d, c in daily]
-    dates, closes, basis = usable_closes(bars)
-    breaks = find_breaks(dates, closes, basis)
-    full = {}
-    for n in all_windows:
-        window, why = clean_window(closes, n, breaks)
-        full[n] = window_metrics(window) if window else None
+    bars = [(r['price_date'].isoformat(), float(r['close_px']), None if r['adj_close_px'] is None else float(r['adj_close_px'])) for r in rows]
+    with conn.cursor() as cur:
+        cur.execute("SELECT event_date, ratio FROM corporate_events WHERE listing_id=%s AND kind IN ('split','reverse_split')", (lid,))
+        splits = [(r['event_date'].isoformat(), float(r['ratio']) if r['ratio'] else None) for r in cur.fetchall()]
+    dates, closes, basis, breaks, full, missing, tech = analyze_series(bars, all_windows, splits)
     sheet['measures'] = {str(n): m for n, m in full.items()}
+    sheet['analysis_basis'] = basis
+    sheet['missing_measures'] = {str(n): why for n, why in missing.items()}
     if u['status'] == 'selected' and u['is_primary']:
         view = request.get('view') or {}
         entries, scoped, _, _ = scoped_entries(conn, config, view)      # même moteur que l'Explorer : mêmes filtres, mêmes critères, même classement
@@ -426,7 +426,7 @@ def _sheet_context(conn, u, state, daily):
             'product_warning': warn,
             'sources': {'catalogue': 'FinanceDatabase', 'catalogue_loaded_at': cat['loaded_at'].isoformat(sep=' ') if cat else None, 'catalogue_commit': (cat['source_commit'][:8] if cat else None),
                         'prices': 'Yahoo Finance', 'last_daily_collect': collects.get('daily'), 'last_intraday_collect': collects.get('intraday')},
-            'freshness': {'last_close_date': last.isoformat() if last else None, 'market_latest_close': expected.isoformat() if expected else None,
+            'freshness': {'last_close_date': last.isoformat() if last else None, 'market_latest_close': expected or None,
                           'closes_count': state.get('closes_count'), 'first_close_date': daily[0][0] if daily else None, 'stale': bool(last and expected and last < expected)}}
 
 

@@ -9,7 +9,7 @@ J.txDialog = function ({ portfolios, portfolioId, listing, tx, onDone }) {
     <div class="grid cols-2">${J.field('Quantité', `<input id="tx-qty" inputmode="decimal" value="${tx ? tx.quantity.replace(/\.?0+$/, '') : ''}">`)}${J.field('Prix unitaire (devise du titre)', `<input id="tx-price" inputmode="decimal" value="${tx ? tx.unit_price.replace(/\.?0+$/, '') : (listing && listing.price ? +listing.price : '')}">`)}
     <div class="small muted" id="tx-hint" style="grid-column:1/-1;margin-top:-6px"></div>
     ${J.field('Frais (€)', `<input id="tx-fees" inputmode="decimal" value="${tx && tx.fees ? tx.fees.replace(/\.?0+$/, '') : ''}" placeholder="0">`)}${J.field('Date', `<input id="tx-date" type="date" max="${today}" value="${tx ? tx.trade_at.slice(0, 10) : today}">`)}
-    ${listing || editing ? '' : J.field('Devise', '<input id="tx-cur" maxlength="3" value="EUR">')}${J.field('Taux vers l’euro (facultatif)', `<input id="tx-fx" inputmode="decimal" value="${tx && tx.fx_to_eur ? tx.fx_to_eur.replace(/\.?0+$/, '') : ''}" placeholder="auto">`)}</div>
+    ${J.field('Unité du prix (EUR, USD, GBP ou GBX = pence)', `<input id="tx-cur" maxlength="3" value="${J.esc(tx ? (tx.currency === 'GBp' ? 'GBX' : tx.currency || '') : listing ? (listing.currency === 'GBp' ? 'GBX' : listing.currency || '') : 'EUR')}">`)}${J.field('Taux historique : euros pour 1 unité du prix', `<input id="tx-fx" inputmode="decimal" value="${tx && tx.fx_to_eur ? tx.fx_to_eur.replace(/\.?0+$/, '') : ''}" placeholder="taux disponible à cette date">`)}</div>
     ${J.field('Note', `<input id="tx-note" maxlength="500" value="${J.esc(tx ? tx.note || '' : '')}">`)}`;
   let side = tx ? tx.side : 'buy', chosen = listing || null;
   J.dialog({
@@ -17,12 +17,12 @@ J.txDialog = function ({ portfolios, portfolioId, listing, tx, onDone }) {
     actions: [{ label: 'Annuler', run: () => { } }, {
       label: 'Enregistrer', cls: 'primary', run: async d => {
         const v = id => J.$('#' + id, d)?.value ?? '';
-        const common = { side, quantity: v('tx-qty'), unit_price: v('tx-price'), fees: v('tx-fees'), fx_to_eur: v('tx-fx'), trade_at: v('tx-date'), note: v('tx-note') };
+        const common = { side, quantity: v('tx-qty'), unit_price: v('tx-price'), fees: v('tx-fees'), fx_to_eur: v('tx-fx'), currency: v('tx-cur'), trade_at: v('tx-date'), note: v('tx-note') };
         if (editing) await J.post('tx/update', { id: tx.id, ...common });
         else {
           const pf = +v('tx-pf');
           if (chosen) await J.post('tx/add', { portfolio_id: pf, listing_id: chosen.id, ...common });
-          else { const sym = v('tx-q').trim(); if (!sym) throw new Error('Choisissez un titre'); await J.post('tx/add', { portfolio_id: pf, symbol: sym, currency: v('tx-cur'), ...common }); }
+          else { const sym = v('tx-q').trim(); if (!sym) throw new Error('Choisissez un titre'); await J.post('tx/add', { portfolio_id: pf, symbol: sym, ...common }); }
         }
         J.toast('Transaction enregistrée'); if (onDone) onDone();
       },
@@ -30,14 +30,15 @@ J.txDialog = function ({ portfolios, portfolioId, listing, tx, onDone }) {
     onopen: d => {
       J.$$('#tx-side button', d).forEach(b => { b.classList.toggle('on', b.dataset.v === side); b.onclick = () => { side = b.dataset.v; J.$$('#tx-side button', d).forEach(x => x.classList.toggle('on', x === b)); }; });
       const hint = () => { const h = J.$('#tx-hint', d), p = +J.$('#tx-price', d).value.replace(',', '.'), n = +J.$('#tx-qty', d).value.replace(',', '.'), last = chosen && chosen.price ? +chosen.price : null;
-        h.innerHTML = (last ? `Dernier cours connu : <b>${J.num(last, 2)}</b> ${J.esc(chosen.price_currency || chosen.currency || '')} <a href="#" id="tx-last">utiliser ce cours</a> · ` : 'Prix payé (ou que vous paierez) pour <b>une</b> part, dans la devise du titre. ') + (p > 0 && n > 0 ? `Total ≈ <b>${J.num(p * n, 2)}</b> ${J.esc((chosen && chosen.currency) || '')} hors frais` : 'Saisissez la quantité pour voir le total.');
+        h.innerHTML = (last ? `Dernier cours connu : <b>${J.num(last, 2)}</b> ${J.esc(chosen.price_currency || chosen.currency || '')} <a href="#" id="tx-last">utiliser ce cours</a> · ` : 'Prix payé (ou que vous paierez) pour <b>une</b> part, dans la devise du titre. ') + (p > 0 && n > 0 ? `Total ≈ <b>${J.num(p * n, 2)}</b> ${J.esc(J.$('#tx-cur', d).value || '')} hors frais` : 'Saisissez la quantité pour voir le total.');
         const a = J.$('#tx-last', d); if (a) a.onclick = e => { e.preventDefault(); J.$('#tx-price', d).value = +chosen.price; hint(); }; };
+      ['tx-date', 'tx-cur'].forEach(i => J.$('#' + i, d).addEventListener('input', () => { J.$('#tx-fx', d).value = ''; }));
       ['tx-qty', 'tx-price'].forEach(i => J.$('#' + i, d).addEventListener('input', hint)); hint();
       const q = J.$('#tx-q', d); if (!q) return; let t;
       q.oninput = () => { clearTimeout(t); chosen = null; t = setTimeout(async () => {
         const r = await J.api('listings/search', { params: { q: q.value } });
         J.$('#tx-hits', d).innerHTML = r.results.map(x => `<div><a href="#" data-id="${x.id}">${J.esc(x.name)} — ${J.esc(x.symbol)} (${J.esc(x.mic)})</a> ${x.status === 'excluded' ? '<span class="badge ko">exclu</span>' : ''}</div>`).join('') || '<span class="muted">Aucun résultat : le symbole saisi sera enregistré tel quel.</span>';
-        J.$$('#tx-hits a', d).forEach(a => a.onclick = e => { e.preventDefault(); chosen = r.results.find(x => x.id == a.dataset.id); q.value = chosen.name + ' — ' + chosen.symbol; J.$('#tx-hits', d).textContent = ''; if (chosen.price) J.$('#tx-price', d).value = +chosen.price; hint(); });
+        J.$$('#tx-hits a', d).forEach(a => a.onclick = e => { e.preventDefault(); chosen = r.results.find(x => x.id == a.dataset.id); q.value = chosen.name + ' — ' + chosen.symbol; J.$('#tx-hits', d).textContent = ''; if (chosen.price) J.$('#tx-price', d).value = +chosen.price; J.$('#tx-cur', d).value = chosen.price_currency === 'GBp' ? 'GBX' : chosen.price_currency || chosen.currency || ''; J.$('#tx-fx', d).value = ''; hint(); });
       }, 250); };
     },
   });

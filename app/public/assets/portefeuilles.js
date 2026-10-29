@@ -22,7 +22,7 @@
     if (!list.find(p => p.id === current)) current = list[0].id;
     const d = await J.api('portfolio', { params: { id: current } }), t = d.totals;
     history.replaceState(null, '', '?id=' + current);
-    page.innerHTML = `<div class="row between"><h1>Portefeuilles</h1><div class="row"><button class="btn" id="new-pf">Nouveau portefeuille</button></div></div>
+    page.innerHTML = `${d.integrity && !d.integrity.ok ? `<div class="notice err">${d.integrity.issues.map(x => J.esc(x.message)).join('<br>')}</div>` : ''}<div class="row between"><h1>Portefeuilles</h1><div class="row"><button class="btn" id="new-pf">Nouveau portefeuille</button></div></div>
     <div class="tabs" id="pf-tabs">${list.map(p => `<button data-id="${p.id}" class="${p.id === current ? 'on' : ''}">${J.esc(p.name)}${p.is_default ? ' ★' : ''}</button>`).join('')}</div>
     <div class="grid cols-4">
       <div class="card kpi"><span class="l">Valeur actuelle</span><span class="v">${J.eur(t.value, 0)}</span></div>

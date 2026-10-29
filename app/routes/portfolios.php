@@ -1,7 +1,7 @@
 <?php
 require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/engine.php';
-require_once __DIR__ . '/../services/ledger.php';
+require_once __DIR__ . '/../services/transactions.php';
 
 function own_portfolio(int $id, array $user): array {
     $p = q('SELECT * FROM portfolios WHERE id = ? AND user_id = ?', [$id, $user['id']])->fetch();
@@ -110,32 +110,47 @@ return [
         }
         $symbol = $listing ? $listing['symbol'] : strtoupper(str_in($b, 'symbol', 32));
         $currency = $listing ? $listing['currency'] : (strtoupper(str_in($b, 'currency', 3, false)) ?: null);
-        if ($side === 'sell') {
-            $held = portfolio_valuation((int)$p['id']);
-            $have = 0.0;
-            foreach ($held['positions'] as $pos) if (($listing && $pos['listing_id'] === (int)$listing['id']) || (!$listing && $pos['symbol'] === $symbol)) $have = $pos['qty'];
-            if ($qty > $have + 1e-9) throw new ApiError('Vente supérieure à la quantité détenue (' . rtrim(rtrim(number_format($have, 8, '.', ''), '0'), '.') . ')', 422);
+        $currency = price_unit($b['currency'] ?? ($listing['currency'] ?? $currency));
+        if ($listing && empty($b['currency'])) {
+            $quote = q('SELECT currency FROM latest_prices WHERE listing_id = ?', [$listing['id']])->fetch();
+            $currency = price_unit($quote['currency'] ?? $currency);
         }
+        $fx = historical_fx($currency, $when, $fx);
+        return write_transaction((int)$u['id'], (int)$p['id'], function ($rows) use ($p, $listing, $symbol, $b, $side, $qty, $price, $currency, $fx, $fees, $when) {
         q('INSERT INTO portfolio_transactions(portfolio_id, listing_id, symbol, name, isin, side, quantity, unit_price, currency, fx_to_eur, fees, trade_at, note, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
           [$p['id'], $listing ? $listing['id'] : null, $symbol, $listing ? $listing['name'] : (str_in($b, 'name', 120, false) ?: null), $listing ? $listing['isin'] : null, $side, $qty, $price,
            $currency, $fx, $fees, $when, str_in($b, 'note', 500, false) ?: null, now_utc()]);
         return ['id' => (int)db()->lastInsertId()];
+        });
     },
     'tx/delete' => function () {
         need_post(); $u = require_user();
         $t = q('SELECT t.id, t.portfolio_id FROM portfolio_transactions t JOIN portfolios p ON p.id = t.portfolio_id WHERE t.id = ? AND p.user_id = ?', [(int)(body()['id'] ?? 0), $u['id']])->fetch();
         if (!$t) throw new ApiError('Transaction introuvable', 404);
-        q('DELETE FROM portfolio_transactions WHERE id = ?', [$t['id']]);
-        return ['ok' => true];
+        return write_transaction((int)$u['id'], (int)$t['portfolio_id'], function ($rows) use ($t) {
+            if (!array_filter($rows, function ($r) use ($t) { return $r['id'] == $t['id']; })) throw new ApiError('Transaction introuvable', 404);
+            q('DELETE FROM portfolio_transactions WHERE id = ?', [$t['id']]);
+            return ['ok' => true];
+        });
     },
     'tx/update' => function () {
         need_post(); $u = require_user(); $b = body();
-        $t = q('SELECT t.* FROM portfolio_transactions t JOIN portfolios p ON p.id = t.portfolio_id WHERE t.id = ? AND p.user_id = ?', [(int)($b['id'] ?? 0), $u['id']])->fetch();
+        $t = q('SELECT t.id, t.portfolio_id FROM portfolio_transactions t JOIN portfolios p ON p.id = t.portfolio_id WHERE t.id = ? AND p.user_id = ?', [(int)($b['id'] ?? 0), $u['id']])->fetch();
         if (!$t) throw new ApiError('Transaction introuvable', 404);
-        list($side, $qty, $price, $fees, $fx, $when) = tx_fields($b);
-        q('UPDATE portfolio_transactions SET side = ?, quantity = ?, unit_price = ?, fees = ?, fx_to_eur = ?, trade_at = ?, note = ? WHERE id = ?',
-          [$side, $qty, $price, $fees, $fx, $when, str_in($b, 'note', 500, false) ?: null, $t['id']]);
-        return ['ok' => true];
+        return write_transaction((int)$u['id'], (int)$t['portfolio_id'], function ($rows) use ($b, $t) {
+            $found = array_values(array_filter($rows, function ($r) use ($t) { return $r['id'] == $t['id']; }));
+            if (!$found) throw new ApiError('Transaction introuvable', 404);
+            $old = $found[0];
+            list($side, $qty, $price, $fees, $fx, $when) = tx_fields($b);
+            $currency = price_unit($b['currency'] ?? $old['currency']);
+            // Unchanged date/unit retains the immutable historical rate when the client leaves it blank.
+            if ($fx === null && substr($when, 0, 10) === substr($old['trade_at'], 0, 10) && $currency === price_unit($old['currency']))
+                $fx = $old['fx_to_eur'] === null ? null : (float)$old['fx_to_eur'];
+            $fx = historical_fx($currency, $when, $fx);
+            q('UPDATE portfolio_transactions SET side = ?, quantity = ?, unit_price = ?, currency = ?, fees = ?, fx_to_eur = ?, trade_at = ?, note = ? WHERE id = ?',
+              [$side, $qty, $price, $currency, $fees, $fx, $when, str_in($b, 'note', 500, false) ?: null, $old['id']]);
+            return ['ok' => true];
+        });
     },
     'bilan' => function () {
         $u = require_user();

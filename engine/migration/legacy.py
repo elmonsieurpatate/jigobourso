@@ -99,7 +99,9 @@ def migrate(conn, data):
             cur.execute("""INSERT INTO portfolio_transactions(id,portfolio_id,listing_id,symbol,name,isin,side,quantity,unit_price,currency,fx_to_eur,fees,trade_at,note,created_at)
                            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
                         (t['id'], t['portfolio_id'], listing_id, t['symbol'], t.get('name') or None, (t.get('isin') or None), t['side'], t['quantity'], t['unit_price'],
-                         t.get('currency_code') or None, t.get('fx_to_eur'), t.get('fees') or 0, t.get('trade_at') or (t['trade_date'] + ' 12:00:00'), t.get('note'), t['created_at']))
+                         ('GBX' if t.get('currency_code') in ('GBp','GBX') else t.get('currency_code')) or None, t.get('fx_to_eur'), t.get('fees') or 0, t.get('trade_at') or (t['trade_date'] + ' 12:00:00'), t.get('note'), t['created_at']))
+            if not t.get('fx_to_eur') and t.get('currency_code') != 'EUR':
+                report['warnings'].append(f"transaction {t['id']} : taux historique manquant, à confirmer explicitement")
             report['transactions'] += 1
     conn.commit()
     return report

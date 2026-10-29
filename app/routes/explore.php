@@ -4,7 +4,7 @@ require_once __DIR__ . '/../lib/engine.php';
 require_once __DIR__ . '/../services/ledger.php';
 
 function held_listing_ids(int $userId): array {
-    return array_map('intval', q('SELECT DISTINCT t.listing_id FROM portfolio_transactions t JOIN portfolios p ON p.id = t.portfolio_id WHERE p.user_id = ? AND t.listing_id IS NOT NULL', [$userId])->fetchAll(PDO::FETCH_COLUMN));
+    return array_map('intval', q("SELECT t.listing_id FROM portfolio_transactions t JOIN portfolios p ON p.id = t.portfolio_id WHERE p.user_id = ? AND t.listing_id IS NOT NULL GROUP BY t.listing_id HAVING SUM(CASE WHEN t.side='buy' THEN t.quantity ELSE -t.quantity END) > 0.000000001", [$userId])->fetchAll(PDO::FETCH_COLUMN));
 }
 
 return [

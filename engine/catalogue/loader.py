@@ -178,11 +178,11 @@ def assign_primaries(conn):
     """Recalcule listings.is_primary / primary_reason pour tous les produits (règle R1). Renvoie le nombre de principales."""
     with conn.cursor() as cur:
         cur.execute("""SELECT l.id, l.instrument_id, l.mic, l.symbol, l.currency, i.country,
-                              COALESCE(p.price * p.avg_volume_3m * COALESCE(f.to_eur, IF(l.currency='EUR',1,NULL)), 0) AS liquidity
+                              COALESCE(p.price * p.avg_volume_3m * COALESCE(f.to_eur, IF(COALESCE(p.currency,l.currency)='EUR',1,NULL)) / IF(BINARY COALESCE(p.currency,l.currency)='GBp' OR UPPER(COALESCE(p.currency,l.currency))='GBX',100,1), 0) AS liquidity
                        FROM listings l JOIN instruments i ON i.id = l.instrument_id
                        LEFT JOIN latest_prices p ON p.listing_id = l.id
                        LEFT JOIN (SELECT currency, SUBSTRING_INDEX(GROUP_CONCAT(to_eur ORDER BY rate_date DESC), ',', 1) AS to_eur
-                                  FROM fx_rates GROUP BY currency) f ON f.currency = l.currency
+                                  FROM fx_rates GROUP BY currency) f ON f.currency = CASE WHEN BINARY COALESCE(p.currency,l.currency)='GBp' OR UPPER(COALESCE(p.currency,l.currency))='GBX' THEN 'GBP' ELSE UPPER(COALESCE(p.currency,l.currency)) END
                        WHERE l.status <> 'excluded' OR l.excluded_reason LIKE 'préfiltre%'""")
         by_instrument = defaultdict(list)
         for r in cur.fetchall():

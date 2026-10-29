@@ -13,7 +13,7 @@ function fx_rates(): array {
 }
 function eur_factor(?string $currency, array $rates): ?float {
     if (!$currency) return null;
-    if ($currency === 'GBp') return isset($rates['GBP']) ? $rates['GBP'] / 100 : null;
+    if ($currency === 'GBp' || strtoupper($currency) === 'GBX') return isset($rates['GBP']) ? $rates['GBP'] / 100 : null;
     return $rates[strtoupper($currency)] ?? null;
 }
 
@@ -22,19 +22,27 @@ function portfolio_valuation(int $portfolioId): array {
     $tx = q('SELECT * FROM portfolio_transactions WHERE portfolio_id = ? ORDER BY trade_at, id', [$portfolioId])->fetchAll();
     $pos = [];
     $realizedTotal = 0.0; $feesTotal = 0.0; $investedTotal = 0.0; $proceedsTotal = 0.0;
-    $byYear = [];
+    $byYear = []; $issues = []; $uncertain = [];
     foreach ($tx as $t) {
         $key = $t['listing_id'] ? 'L' . $t['listing_id'] : 'S' . strtoupper($t['symbol']);
         if (!isset($pos[$key])) $pos[$key] = ['key' => $key, 'listing_id' => $t['listing_id'] ? (int)$t['listing_id'] : null, 'symbol' => $t['symbol'], 'name' => $t['name'],
                                                  'isin' => $t['isin'], 'currency' => $t['currency'], 'qty' => 0.0, 'cost' => 0.0, 'realized' => 0.0, 'first_buy' => null, 'last_trade' => null, 'fees' => 0.0];
         $p = &$pos[$key];
-        $fx = $t['fx_to_eur'] !== null ? (float)$t['fx_to_eur'] : (eur_factor($t['currency'], $rates) ?? 1.0);
+        $fx = $t['fx_to_eur'] !== null ? (float)$t['fx_to_eur'] : (strtoupper($t['currency'] ?? '') === 'EUR' ? 1.0 : null);
+        if ($fx === null || $fx <= 0) {
+            $issues[] = ['transaction_id' => (int)$t['id'], 'code' => 'historical_fx_missing', 'message' => 'Taux historique non enregistré : prix de revient et plus-value non calculables. Corrigez explicitement cette transaction.'];
+            $uncertain[$key] = true; $fx = 0.0; // internal placeholder; all affected monetary outputs are suppressed below
+        }
         $qty = (float)$t['quantity']; $gross = $qty * (float)$t['unit_price'] * $fx; $fees = (float)($t['fees'] ?? 0);
         $feesTotal += $fees; $p['fees'] += $fees; $p['last_trade'] = $t['trade_at'];
         if ($t['side'] === 'buy') {
             $p['qty'] += $qty; $p['cost'] += $gross + $fees; $investedTotal += $gross + $fees;
             if (!$p['first_buy']) $p['first_buy'] = $t['trade_at'];
         } else {
+            if ($qty > $p['qty'] + 1e-9) {
+                $issues[] = ['transaction_id' => (int)$t['id'], 'code' => 'oversold', 'message' => 'Vente sans quantité suffisante à sa date : registre à corriger explicitement.'];
+                $uncertain[$key] = true;
+            }
             $sold = min($qty, $p['qty']);
             $avg = $p['qty'] > 0 ? $p['cost'] / $p['qty'] : 0.0;
             $out = $avg * $sold; $net = $gross - $fees;
@@ -59,13 +67,14 @@ function portfolio_valuation(int $portfolioId): array {
         $row = $p + ['name_catalogue' => $i['name'] ?? null, 'kind' => $i['kind'] ?? null, 'mic' => $i['mic'] ?? null, 'catalogue_status' => $i['status'] ?? null,
                      'excluded_reason' => $i['excluded_reason'] ?? null, 'price' => null, 'price_eur' => null, 'price_time' => null, 'price_source' => null,
                      'value' => null, 'unrealized' => null, 'unrealized_pct' => null, 'avg_cost' => null, 'linked' => $i !== null, 'price_currency' => $i ? ($i['price_currency'] ?: $i['currency']) : null];
+        if (isset($uncertain[$p['key']])) { $row['cost'] = null; $row['realized'] = null; $row['financial_incomplete'] = true; }
         if ($row['qty'] > 0) {
-            $row['avg_cost'] = $row['cost'] / $row['qty'];
+            $row['avg_cost'] = $row['cost'] === null ? null : $row['cost'] / $row['qty'];
             if ($i && $i['price'] !== null) {
                 $f = eur_factor($i['price_currency'] ?: $i['currency'], $rates);
                 if ($f !== null) {
                     $row['price'] = (float)$i['price']; $row['price_eur'] = $row['price'] * $f; $row['price_time'] = $i['price_time']; $row['price_source'] = $i['source'];
-                    $row['value'] = $row['qty'] * $row['price_eur']; $row['unrealized'] = $row['value'] - $row['cost'];
+                    $row['value'] = $row['qty'] * $row['price_eur']; $row['unrealized'] = $row['cost'] === null ? null : $row['value'] - $row['cost'];
                     $row['unrealized_pct'] = $row['cost'] > 0 ? 100 * $row['unrealized'] / $row['cost'] : null;
                     $value += $row['value']; $costOpen += $row['cost'];
                 }
@@ -79,9 +88,9 @@ function portfolio_valuation(int $portfolioId): array {
     unset($o);
     usort($open, function ($a, $b) { return ($b['value'] ?? -1) <=> ($a['value'] ?? -1); });
     $unrealized = $value - $costOpen;
-    return ['positions' => $open, 'closed' => $closed,
-            'totals' => ['value' => $value, 'cost' => $costOpen, 'unrealized' => $unrealized, 'unrealized_pct' => $costOpen > 0 ? 100 * $unrealized / $costOpen : null,
-                         'realized' => $realizedTotal, 'fees' => $feesTotal, 'invested_total' => $investedTotal, 'proceeds_total' => $proceedsTotal,
-                         'total_gain' => $unrealized + $realizedTotal, 'unpriced' => count(array_filter($open, function ($o) { return $o['value'] === null; }))],
-            'realized_by_year' => $byYear, 'transactions' => count($tx)];
+    return ['integrity' => ['ok' => !$issues, 'issues' => $issues], 'positions' => $open, 'closed' => $closed,
+            'totals' => ['value' => $value, 'cost' => $issues ? null : $costOpen, 'unrealized' => $issues ? null : $unrealized, 'unrealized_pct' => !$issues && $costOpen > 0 ? 100 * $unrealized / $costOpen : null,
+                         'realized' => $issues ? null : $realizedTotal, 'fees' => $feesTotal, 'invested_total' => $issues ? null : $investedTotal, 'proceeds_total' => $issues ? null : $proceedsTotal,
+                         'total_gain' => $issues ? null : $unrealized + $realizedTotal, 'unpriced' => count(array_filter($open, function ($o) { return $o['value'] === null; }))],
+            'realized_by_year' => $issues ? [] : $byYear, 'transactions' => count($tx)];
 }

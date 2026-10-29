@@ -3,8 +3,9 @@ import datetime
 import json
 
 from .measures import window_metrics, technical_state
-from .series import usable_closes, find_breaks, clean_window
+from .series import usable_closes, find_breaks, clean_window, analyze_series
 from . import strategy
+from ..market.hours import expected_last_close
 
 BASE_WINDOWS = (1, 5, 21, 63, 126, 252)
 
@@ -36,10 +37,10 @@ def compute_all(conn, now, history=300, batch=400):
     with conn.cursor() as cur:
         cur.execute('SELECT listing_id, mic FROM v_collect_set')
         mics = {r['listing_id']: r['mic'] for r in cur.fetchall()}
-        cur.execute('SELECT listing_id, event_date FROM corporate_events WHERE kind IN (%s,%s)', ('split', 'reverse_split'))
+        cur.execute('SELECT listing_id, event_date, ratio FROM corporate_events WHERE kind IN (%s,%s)', ('split', 'reverse_split'))
         splits = {}
         for r in cur.fetchall():
-            splits.setdefault(r['listing_id'], []).append(r['event_date'].isoformat())
+            splits.setdefault(r['listing_id'], []).append((r['event_date'].isoformat(), float(r['ratio']) if r['ratio'] else None))
         cur.execute("""SELECT d.listing_id, MAX(d.price_date) last_date FROM daily_prices d
                        JOIN v_collect_set c ON c.listing_id=d.listing_id GROUP BY d.listing_id""")
         market_latest = {}
@@ -71,16 +72,13 @@ def compute_all(conn, now, history=300, batch=400):
 
 
 def _compute_one(lid, mic, rows, splits, windows, market_latest, stamp, metric_rows, state_rows):
-    dates, closes, basis = usable_closes(rows)
-    breaks = find_breaks(dates, closes, basis, splits)
-    for n in windows:
-        window, _ = clean_window(closes, n, breaks)
-        m = window_metrics(window) if window else None
+    dates, closes, basis, breaks, measures, missing, t = analyze_series(rows, windows, splits)
+    for n, m in measures.items():
         if m:
             metric_rows.append((lid, n, _dec(m['slope']), _dec(m['slope_log'], 10), _dec(m['r2']), _dec(m['perf'], 4),
                                 _dec(m['volatility']), _dec(m['drawdown'], 4), _dec(m['er']), None))
-    t = technical_state(closes)
-    stale = bool(dates) and dates[-1] < market_latest.get(mic, '')
+    expected = max(expected_last_close(mic, stamp), market_latest.get(mic, ''))
+    stale = bool(dates) and dates[-1] < expected
     quality = 'insufficient' if len(closes) < 22 else 'stale' if stale else 'break' if breaks and breaks[-1] > len(closes) - 253 else 'ok'
     state_rows.append((lid, stamp, dates[-1] if dates else None, len(closes), t['close'], _dec(t['ma20']), _dec(t['ma50']), _dec(t['ma50_prev']),
                        _dec(t['daily_change'], 4), _dec(t['gap_to_ma20'], 4), (len(closes) - 1 - breaks[-1]) if breaks else None,

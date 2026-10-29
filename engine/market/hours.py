@@ -81,3 +81,21 @@ def expected_slots(mic):
 
 def utcnow():
     return datetime.now(timezone.utc)
+
+
+def expected_last_close(mic, now):
+    """Dernière clôture due selon l'horloge, indépendante des réponses du fournisseur.
+
+    Référence prudente jours ouvrés + délai de publication. Sans calendrier certifié,
+    un jour férié peut être signalé à vérifier ; une panne générale ne devient jamais
+    une preuve de fermeture de marché.
+    """
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
+    local = _local(mic, now)
+    day = local.date()
+    if day.weekday() >= 5 or not is_settled(mic, day, now):
+        day -= timedelta(days=1)
+    while day.weekday() >= 5:
+        day -= timedelta(days=1)
+    return day.isoformat()

@@ -16,7 +16,7 @@ import math
 from collections import defaultdict
 
 from .measures import window_metrics, technical_state
-from .series import usable_closes, find_breaks, clean_window
+from .series import usable_closes, find_breaks, clean_window, analyze_series
 
 VERSION = 3
 PERIOD_IDS = ('day', 'week', 'month', 'quarter', 'half', 'year')
@@ -146,16 +146,9 @@ def _check(period, criterion, metric, value, threshold, op):
 def evaluate_one(config, candidate):
     """Évalue un titre depuis ses clôtures. candidate : {'bars': [(date, close, adj)], 'split_dates', 'expected_last_date'}.
     Renvoie {'status', 'reasons', 'measures' {séances: mesures|None}, 'technical', 'basis', 'breaks'}."""
-    dates, closes, basis = usable_closes(candidate.get('bars') or [])
-    breaks = find_breaks(dates, closes, basis, candidate.get('split_dates') or ())
-    measures, missing = {}, {}
-    for p in config['periods']:
-        if p['enabled']:
-            window, why = clean_window(closes, p['sessions'], breaks)
-            measures[p['sessions']] = window_metrics(window) if window else None
-            if measures[p['sessions']] is None:
-                missing[p['sessions']] = why or 'invalid'
-    verdict = judge(config, measures, technical_state(closes), missing, dates[-1] if dates else None, candidate.get('expected_last_date'))
+    windows = [p['sessions'] for p in config['periods'] if p['enabled']]
+    dates, closes, basis, breaks, measures, missing, tech = analyze_series(candidate.get('bars') or [], windows, candidate.get('split_dates') or ())
+    verdict = judge(config, measures, tech, missing, dates[-1] if dates else None, candidate.get('expected_last_date'))
     verdict.update(basis=basis, breaks=[dates[i] for i in breaks])
     return verdict
 

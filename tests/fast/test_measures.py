@@ -69,7 +69,7 @@ def test_break_detection_and_split_explanation():
     dates = [f'd{i}' for i in range(6)]
     closes = [100, 101, 50, 50.5, 51, 52]
     assert find_breaks(dates, closes, 'raw') == [2]
-    assert find_breaks(dates, closes, 'raw', split_dates=['d2']) == []
+    assert find_breaks(dates, closes, 'raw', split_dates=['d2']) == [2]  # known split without adjustment is not a real return
     assert find_breaks(dates, closes, 'adjusted', split_dates=['d2']) == [2]
 
 

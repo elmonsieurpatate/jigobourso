@@ -90,7 +90,7 @@ def refresh_quotes(conn, client, rows, now, progress=None, stats=None):
 def refresh_fx(conn, client, now):
     """Taux de change vers l'euro pour les devises présentes dans le catalogue."""
     with conn.cursor() as cur:
-        cur.execute("SELECT DISTINCT UPPER(currency) c FROM latest_prices WHERE currency IS NOT NULL")
+        cur.execute("SELECT DISTINCT CASE WHEN BINARY currency='GBp' OR UPPER(currency)='GBX' THEN 'GBP' ELSE UPPER(currency) END c FROM latest_prices WHERE currency IS NOT NULL")
         currencies = sorted({r['c'] for r in cur.fetchall()} - {'EUR'})
     pairs = {c: f'{c}EUR=X' for c in currencies}
     if not pairs:
@@ -108,7 +108,7 @@ def to_eur_factor(currency, rates):
     """Facteur de conversion vers l'euro ; 'GBp' (pence) = GBP / 100 ; None si inconnu."""
     if not currency:
         return None
-    if currency == 'GBp':
+    if currency == 'GBp' or currency.upper() == 'GBX':
         r = rates.get('GBP')
         return r / 100 if r else None
     if currency.upper() == 'EUR':

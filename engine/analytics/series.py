@@ -16,17 +16,14 @@ def usable_closes(bars):
 
 
 def find_breaks(dates, closes, basis, split_dates=()):
-    """Sauts de cours non expliqués. Sur cours bruts, un split connu (±1 jour) explique le saut ; sur cours ajustés
+    """Sauts de cours non expliqués. Sur cours bruts, un split non ajusté invalide la fenêtre ; sur cours ajustés
     il aurait déjà été absorbé, donc tout saut restant est suspect. Renvoie la liste des index i (saut entre i-1 et i)."""
-    explained = set(split_dates) if basis == 'raw' else set()
-    found = []
-    for i in range(1, len(closes)):
-        r = closes[i] / closes[i - 1]
-        if r > BREAK_RATIO or r < 1 / BREAK_RATIO:
-            near = {dates[i], dates[i - 1]}
-            if not near & explained:
-                found.append(i)
-    return found
+    # A declared split without trustworthy adjusted prices is NOT an economic return.
+    # It invalidates a crossing window, even if its ratio is below the jump heuristic.
+    unexplained_splits = set(split_dates) if basis == 'raw' else set()
+    return [i for i in range(1, len(closes))
+            if closes[i] / closes[i - 1] > BREAK_RATIO or closes[i] / closes[i - 1] < 1 / BREAK_RATIO
+            or (basis == 'raw' and any(dates[i - 1] < d <= dates[i] for d in unexplained_splits))]
 
 
 def clean_window(closes, sessions, break_indexes):
@@ -38,3 +35,31 @@ def clean_window(closes, sessions, break_indexes):
     if any(i > start for i in break_indexes):
         return None, 'break'
     return closes[start:], None
+
+
+def analyze_series(bars, windows, splits=()):
+    """Shared financial preparation: adjusted closes, or split-adjusted raw closes.
+
+    Split ratio = new shares / old shares. Before a 2:1 split, 100 becomes 50.
+    Unknown ratios invalidate crossing windows, never simulate a gain/loss.
+    No mixture of vendor-adjusted and unadjusted prices. Analysis uses 300 bars.
+    """
+    from .measures import window_metrics, technical_state
+    rows = list(bars)[-300:]
+    dates, closes, basis = usable_closes(rows)
+    events = [(s, None) if isinstance(s, str) else (s[0], s[1]) for s in splits]
+    unknown = []
+    if basis == 'raw':
+        for day, ratio in events:
+            if ratio is None or ratio <= 0 or not math.isfinite(ratio):
+                unknown.append(day)
+            else:
+                closes = [c / ratio if d < day else c for d, c in zip(dates, closes)]
+    breaks = find_breaks(dates, closes, basis, unknown)
+    measures, missing = {}, {}
+    for n in windows:
+        window, why = clean_window(closes, n, breaks)
+        measures[n] = window_metrics(window) if window else None
+        if window is None:
+            missing[n] = why
+    return dates, closes, basis, breaks, measures, missing, technical_state(closes)
