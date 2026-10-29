@@ -74,7 +74,7 @@ jobs:
           php_pid=$!
           trap 'kill "$php_pid"' EXIT
           node tests/e2e/financial.cjs > audit-results/browser.log 2>&1
-          node tests/e2e/account-navigation.cjs > audit-results/account-browser.log 2>&1
+          timeout 180s node tests/e2e/account-navigation.cjs > audit-results/account-browser.log 2>&1
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
