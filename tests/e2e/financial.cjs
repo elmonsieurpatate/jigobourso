@@ -23,5 +23,5 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE),fs=require('fs');
   }catch(e){r.error=e.message;await page.screenshot({path:`audit-results/error-${width}.png`}).catch(()=>{});r.errors=errors;}
   report.push(r);await ctx.close();
  }
- await browser.close();fs.writeFileSync('audit-results/browser.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report));if(report.some(r=>!r.completed || r.errors.length || r.explorer_overflow || r.sheet_overflow || r.etf_overflow || !r.etf_content || !r.etf_portfolio || !r.portfolio_picker))process.exit(1);
+ await browser.close();fs.writeFileSync('audit-results/browser.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report));if(report.some(r=>!r.completed || r.errors.length || r.explorer_overflow || r.sheet_overflow || r.etf_overflow || !r.etf_content || !r.etf_portfolio || !r.portfolio_picker))console.log('::error title=Résultat navigateur::'+JSON.stringify(report).slice(0,1500));if(report.some(r=>!r.completed || r.errors.length || r.explorer_overflow || r.sheet_overflow || r.etf_overflow || !r.etf_content || !r.etf_portfolio || !r.portfolio_picker))process.exit(1);
 })().catch(e=>{console.error(e);process.exit(1)});
