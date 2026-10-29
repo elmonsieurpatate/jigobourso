@@ -173,7 +173,10 @@ rm -f "$metrics_exit" "$metrics_exit.tmp" "$metrics_pid"
 # channel closes. nohup alone ignores SIGHUP but keeps the SSH session/process
 # group; setsid gives this bounded maintenance job its own session as well.
 if command -v setsid >/dev/null 2>&1; then
-  nohup setsid bash -c 'set +e; cd "$1"; .venv/bin/python -m engine.cli metrics; rc=$?; printf "%s\n" "$rc" > "$2.tmp"; mv "$2.tmp" "$2"; exit 0' _ "$ROOT" "$metrics_exit" > "$metrics_log" 2>&1 < /dev/null &
+  # --wait keeps the PID we record alive until the detached child exits;
+  # without it setsid may fork and the poller mistakes the parent exit for a
+  # lost worker before the child has written its status file.
+  nohup setsid --wait bash -c 'set +e; cd "$1"; .venv/bin/python -m engine.cli metrics; rc=$?; printf "%s\n" "$rc" > "$2.tmp"; mv "$2.tmp" "$2"; exit 0' _ "$ROOT" "$metrics_exit" > "$metrics_log" 2>&1 < /dev/null &
 else
   nohup bash -c 'set +e; cd "$1"; .venv/bin/python -m engine.cli metrics; rc=$?; printf "%s\n" "$rc" > "$2.tmp"; mv "$2.tmp" "$2"; exit 0' _ "$ROOT" "$metrics_exit" > "$metrics_log" 2>&1 < /dev/null &
 fi
