@@ -18,7 +18,7 @@ from engine.market import catchup, collect, hours
 from engine.market.yahoo import RateLimited
 from engine.shared import settings
 from . import schedule
-from .runner import run_job
+from .runner import recover_interrupted, run_job
 
 FDB_URL = 'https://github.com/JerBouma/FinanceDatabase.git'
 
@@ -222,6 +222,7 @@ def history(conn, client, now, log):
 # ───────── 2. entretien automatique (cron) ─────────
 def maintenance(conn, client, now, log):
     """Après la collecte quotidienne : cours et devises du catalogue final, indicateurs, suivi, rétention (les trous sont rattrapés à chaque passage : catchup.py). Ne sélectionne rien."""
+    settings.put(conn, 'maintenance_pending', False)           # une clôture ajoutée pendant la maintenance la redéclenchera
     rows = collect.collection_set(conn)
     ok, err = _step(log, 'Cours de référence (Quote)', lambda: collect.refresh_quotes(conn, client, rows, now), lambda r: f'{r[0]} reçus sur {len(rows)}')
     _step(log, 'Taux de change', lambda: collect.refresh_fx(conn, client, now))
@@ -244,13 +245,10 @@ def _just_closed(mic, now):
     return not hours.is_open(mic, now) and hours.is_open(mic, now - datetime.timedelta(minutes=30))
 
 
-def _maintenance_due(conn):
-    """Une maintenance suit chaque collecte quotidienne réussie."""
-    with conn.cursor() as cur:
-        cur.execute("SELECT MAX(started_at) t FROM jobs WHERE job_type='maintenance'")
-        last = cur.fetchone()['t']
-        cur.execute("SELECT COUNT(*) n FROM jobs WHERE job_type LIKE 'daily:%%' AND status IN ('completed','completed_with_errors') AND started_at > %s", (last or datetime.datetime(2000, 1, 1),))
-        return cur.fetchone()['n'] > 0
+def _maintenance_due(conn, now):
+    """La maintenance (indicateurs, suivi, rétention : ~2 minutes) suit une collecte quotidienne qui a AJOUTÉ des clôtures, pas chaque nouvelle tentative qui n'apporte rien.
+    Après un échec, elle attend 30 minutes avant de se représenter."""
+    return bool(settings.get(conn, 'maintenance_pending', False)) and not _ran_within(conn, 'maintenance', 30, now)
 
 
 def _daily(conn, client, rows, now, log, round_id=None, due=None, mic=None):
@@ -259,6 +257,8 @@ def _daily(conn, client, rows, now, log, round_id=None, due=None, mic=None):
         catchup.daily_after(conn, mic, due, now)               # retient les clôtures toujours absentes pour les redemander plus tard
     if d['errors']:
         log('warning', f'{d["errors"]} cotations sans réponse : nouvelle tentative automatique plus tard')
+    if d['added']:
+        settings.put(conn, 'maintenance_pending', True)
     add_stats(conn, 'daily', now, round_id or _now_iso(now), titles=d['titles'], up_to_date=d['up_to_date'], answered=d['answered'], errors=d['errors'], added=d['added'], present=d['present'])
     return d['answered'], d['errors'], f'{d["added"]} clôtures ajoutées, {d["up_to_date"]} titres déjà à jour'
 
@@ -285,6 +285,7 @@ def tick(conn, client, now=None, trigger='cron'):
     Seul un passage déclenché par le cron laisse le battement qui prouve que le cron fonctionne (un test manuel ne compte pas)."""
     now = now or hours.utcnow()
     t0 = time.monotonic()
+    recover_interrupted(conn)                                                    # un traitement tué (hébergeur, panne) ne garde pas son verrou
     sched = schedule.get(conn)
     schedule.beat(conn, now, trigger)
     round_id = _now_iso(now)
@@ -308,7 +309,7 @@ def tick(conn, client, now=None, trigger='cron'):
         due = guarded(f'daily:{mic}', lambda: catchup.daily_due(conn, mic, rows, now)) if sched['daily']['enabled'] else None
         if due:
             done.append(('daily', mic, guarded(f'daily:{mic}', lambda: run_job(conn, 'daily:' + mic, lambda log: _daily(conn, client, rows, now, log, round_id, due, mic), trigger=trigger))))
-    if sched['daily']['enabled'] and _maintenance_due(conn):
+    if sched['daily']['enabled'] and _maintenance_due(conn, now):
         done.append(('maintenance', None, guarded('maintenance', lambda: run_job(conn, 'maintenance', lambda log: maintenance(conn, client, now, log), trigger=trigger))))
     # 2. rattrapage : séances de 15 min incomplètes ou titres sans réponse, y compris après une panne de plusieurs heures ou jours
     if sched['intraday']['enabled']:

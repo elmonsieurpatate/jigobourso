@@ -16,7 +16,7 @@ TASKS = (
      'help': 'Après la clôture officielle de chaque place : récupère les séances manquantes (jamais ce qui est déjà en base, 400 séances conservées), complète les trous, puis recalcule les indicateurs.',
      'params': {}},
     {'id': 'intraday', 'label': 'Barres de 15 minutes', 'prefix': 'intraday:', 'stats': 'intraday',
-     'help': 'Pendant la séance de chaque place (+ 30 min après la clôture) : ne télécharge que les barres manquantes ou à actualiser des deux dernières séances.',
+     'help': 'Pendant la séance de chaque place (+ 30 min après la clôture) : ne télécharge que les barres manquantes ou à actualiser des deux dernières séances (les séances plus anciennes, jusqu’à la rétention, sont rattrapées automatiquement).',
      'params': {'interval_minutes': {'label': 'Intervalle minimal entre deux collectes d’une place (min)', 'default': 15, 'min': 5, 'max': 120}}},
 )
 BY_ID = {t['id']: t for t in TASKS}

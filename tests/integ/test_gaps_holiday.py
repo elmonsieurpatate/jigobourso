@@ -80,40 +80,31 @@ def test_thin_titles_are_not_gaps_but_an_outage_and_an_empty_session_are(conn):
     assert D(24) not in gaps and D(22) not in gaps
     assert D(26) in gaps and '6 créneaux' in gaps[D(26)]
     assert D(23) in gaps and 'clôtures' in gaps[D(23)]
-    assert collect.detect_gaps(conn, 'XETR', NOW) == 1                 # seules les deux dernières séances (26 et 27) sont surveillées : le 23 est trop ancien
+    assert set(gaps) == {D(23), D(26)}                                 # toute la rétention est surveillée (20 séances), pas seulement les deux dernières
 
 
-def test_repair_closes_gaps_that_the_new_rule_no_longer_sees(conn):
+def test_stale_gap_rows_follow_the_data_without_asking_yahoo(conn):
+    from engine.market import catchup
     thin = lambda i, j: (i + j) % 3 != 0
-    bars(conn, D(24), thin); bars(conn, D(26), thin)
+    bars(conn, D(23), thin); bars(conn, D(26), thin)
     with conn.cursor() as cur:
-        cur.execute("INSERT INTO price_gaps(mic,session_date,state,detected_at,note) VALUES ('XETR',%s,'to_repair',%s,'ancienne médiane 20/34 créneaux')", (D(26), NOW.replace(tzinfo=None)))
+        cur.execute("INSERT INTO price_gaps(mic,session_date,state,detected_at,note) VALUES ('XETR',%s,'to_repair',%s,'ancienne médiane 20/34 créneaux'),('XETR',%s,'unrecoverable',%s,'conclu à tort')",
+                    (D(26), NOW.replace(tzinfo=None), D(23), NOW.replace(tzinfo=None)))
     conn.commit()
-
-    class NoCall:
-        def spark(self, *a, **k):
-            raise AssertionError('aucune redemande à Yahoo pour une fausse alerte')
-    assert collect.repair_gaps(conn, NoCall(), NOW) == 0
+    assert catchup.plan_intraday(conn, NOW) == []                      # aucune redemande à Yahoo pour une fausse alerte
     with conn.cursor() as cur:
-        cur.execute("SELECT state FROM price_gaps WHERE session_date=%s", (D(26),))
-        assert cur.fetchone()['state'] == 'repaired'
+        cur.execute("SELECT session_date, state FROM price_gaps")
+        assert {r['session_date']: r['state'] for r in cur.fetchall()} == {D(26): 'repaired', D(23): 'repaired'}      # « non récupérable » aussi est revérifié
 
 
-def test_repair_handles_a_place_larger_than_the_batch_budget_and_drops_old_gaps(conn):
-    """Londres (36 lots) dépassait le budget de 30 lots et n'était jamais réparée ; un trou de plus de 5 jours n'est plus redemandé."""
-    closes(conn, D(26)); bars(conn, D(27)); closes(conn, D(27))
-    with conn.cursor() as cur:
-        cur.execute("INSERT INTO price_gaps(mic,session_date,state,detected_at,note) VALUES ('XETR',%s,'to_repair',%s,'x'),('XETR',%s,'to_repair',%s,'ancien')", (D(26), NOW.replace(tzinfo=None), D(15), NOW.replace(tzinfo=None)))
-    conn.commit()
-    calls = []
+def test_partial_collection_is_a_gap_even_when_every_slot_is_still_covered(conn):
+    """Une collecte interrompue qui a rempli la moitié des titres sur tous les créneaux est détectée par le nombre de titres couverts."""
+    for d in (22, 23, 24, 26):
+        bars(conn, D(d))
+    bars(conn, D(27), lambda i, j: i <= N // 2)
+    gaps = collect.session_gaps(conn, 'XETR', NOW)
+    assert set(gaps) == {D(27)} and 'titres' in gaps[D(27)]
 
-    class Spy:
-        def spark(self, symbols, range_, interval):
-            calls.append((len(symbols), range_))
-            return {}
-    collect.repair_gaps(conn, Spy(), NOW, max_batches=1)                  # budget d'un seul lot, la place en demande plusieurs : elle passe quand même
-    assert calls and all(r == '5d' for _, r in calls)
-    with conn.cursor() as cur:
-        cur.execute("SELECT session_date, state FROM price_gaps ORDER BY session_date")
-        states = {r['session_date']: r['state'] for r in cur.fetchall()}
-    assert states[D(15)] == 'unrecoverable' and states[D(26)] == 'to_repair'
+
+def test_yahoo_range_matches_its_real_depth_and_retention():
+    assert [collect.intraday_range(n) for n in (1, 5, 6, 22, 23, 60, 64, 65)] == ['5d', '5d', '1mo', '1mo', '60d', '60d', '60d', None]

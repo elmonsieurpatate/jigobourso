@@ -96,21 +96,21 @@ def test_intraday_final_never_overwritten_by_provisional_and_latest_follows(conn
 
 
 def test_gap_detection_ignores_holidays_and_repairs(conn):
+    from engine.market import catchup
     with conn.cursor() as cur:
         cur.execute("UPDATE listings SET status='selected' WHERE id=1")
     conn.commit()
     rows = [{'listing_id': 1, 'mic': 'XETR', 'symbol': 'LIQ.DE'}]
     day = datetime.date(2026, 10, 26)                                  # lundi
     full = [(datetime.datetime(2026, 10, 26, 8, 0) + datetime.timedelta(minutes=15 * i), 100.0 + i) for i in range(34)]
-    partial = full[:10]
-    collect.collect_intraday(conn, FakeYahoo(intraday={'LIQ.DE': ('UTC', partial)}), rows, NOW, range_='5d')
-    assert collect.detect_gaps(conn, 'XETR', NOW) == 1
-    # le jour sans aucune barre (mardi 20 : jour férié simulé) n'est pas un trou
-    assert collect.detect_gaps(conn, 'XETR', NOW) == 0
-    collect.repair_gaps(conn, FakeYahoo(intraday={'LIQ.DE': ('UTC', full)}), NOW)
+    collect.collect_intraday(conn, FakeYahoo(intraday={'LIQ.DE': ('UTC', full[:10])}), rows, NOW, range_='5d')
+    assert day in collect.session_gaps(conn, 'XETR', NOW)               # séance incomplète : trou ; les autres jours (sans barre ni clôture) sont fériés, pas des trous
+    assert [t['sessions'] for t in catchup.plan_intraday(conn, NOW)] == [[day]]
+    catchup.execute(conn, FakeYahoo(intraday={'LIQ.DE': ('UTC', full)}), catchup.plan_intraday(conn, NOW), NOW, lambda *a: None)
     with conn.cursor() as cur:
         cur.execute('SELECT state FROM price_gaps WHERE session_date=%s', (day,))
         assert cur.fetchone()['state'] == 'repaired'
+    assert day not in collect.session_gaps(conn, 'XETR', NOW)
 
 
 def test_stale_quote_is_excluded_only_when_the_filter_is_applied(conn):

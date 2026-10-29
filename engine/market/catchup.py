@@ -1,13 +1,17 @@
-"""Rattrapage autonome : à chaque passage du cron, ce qui manque est cherché et redemandé, sans intervention, jusqu'à ce que ce soit comblé.
+"""Rattrapage autonome : à chaque passage du cron, ce qui manque est cherché et redemandé, sans intervention, jusqu'à ce que ce soit comblé
+ou que Yahoo ait prouvé qu'il ne le fournit pas.
 
 Deux sources de retard, toutes deux retrouvées à partir des DONNÉES (un redémarrage après une panne n'a besoin d'aucune mémoire) :
   - clôtures quotidiennes : titres dont la dernière clôture est antérieure à la dernière séance publiée (`collect.daily_plan`) ;
-  - barres de 15 min : séances (parmi les deux conservées) où des créneaux manquent VRAIMENT (`collect.session_gaps`, qui ne confond pas un créneau
-    sans transaction avec une donnée absente), plus les titres qui n'ont pas répondu pendant une collecte (`note_failed`).
-Le registre `settings['catchup']` ne sert qu'à espacer les nouvelles tentatives (délai croissant) et à afficher l'état dans l'administration :
-  intraday : {"MIC|AAAA-MM-JJ": {ids|null, tries, first, last, note}}   daily : {id_cotation: {mic, day, n, last}}
-  unrecoverable : séances abandonnées (hors des deux séances conservées, ou plus anciennes que ce que Yahoo fournit en 15 min : 5 jours)
-Les collectes normales passent avant (voir `tasks.tick`) ; le rattrapage a un budget de temps par passage et reprend au passage suivant.
+  - barres de 15 min : séances, parmi TOUTES celles conservées (`collect.retention_sessions`, jamais plus que Yahoo ne fournit), où des données manquent
+    vraiment (`collect.session_gaps`), plus les titres qui n'ont pas répondu pendant une collecte (`note_failed`).
+`price_gaps` reflète la réalité des données à chaque vérification : une séance n'y est « réparée » que si ses données sont là, et une séance « non récupérable »
+est revérifiée (si les données arrivent un jour, elle redevient réparée). Une séance n'est déclarée non récupérable que lorsque Yahoo a répondu à tous les
+titres, plusieurs fois, plus de 24 h après la clôture, sans fournir les barres — avec les chiffres de sa réponse — ou lorsqu'elle est au-delà de sa profondeur.
+Le registre `settings['catchup']` ne sert qu'à espacer les nouvelles tentatives (délai croissant) et à garder les titres encore à demander :
+  intraday : {"MIC|AAAA-MM-JJ": {ids|null (null = toute la place), tries, first, last, note}}   daily : {id_cotation: {mic, day, n, last}}
+Les collectes normales passent avant (voir `tasks.tick`) ; le rattrapage a un budget de temps par passage, s'interrompt entre deux lots de Yahoo et reprend
+exactement où il s'est arrêté au passage suivant.
 """
 import datetime
 import time
@@ -22,9 +26,9 @@ RETRY = (5, 120)                # délai entre deux tentatives sur une séance :
 DAILY_RETRY = (10, 360)         # idem pour une clôture quotidienne introuvable
 DAILY_GIVE_UP = datetime.timedelta(hours=24)
 COOLDOWN = datetime.timedelta(minutes=15)       # après un refus de Yahoo (429)
-MAX_AGE_DAYS = 5                # Yahoo ne fournit des barres de 15 min que sur les 5 derniers jours
 BUDGET_SECONDS = 150            # temps maximal de rattrapage par passage
-SESSIONS = 2                    # séances de barres de 15 min conservées et surveillées
+CONFIRM_TRIES = 3               # réponses complètes de Yahoo, sans les barres, avant de conclure qu'il ne les fournit pas
+CONFIRM_AFTER = datetime.timedelta(hours=24)    # et jamais avant 24 h après la clôture de la séance (Yahoo peut publier avec retard)
 EPOCH = '2000-01-01 00:00:00'
 
 
@@ -59,8 +63,24 @@ def save(conn, led):
 def _gap_row(conn, mic, day, state, note, now):
     with conn.cursor() as cur:
         cur.execute("""INSERT INTO price_gaps(mic,session_date,state,detected_at,note) VALUES (%s,%s,%s,%s,%s)
-                       ON DUPLICATE KEY UPDATE state=VALUES(state), note=VALUES(note)""", (mic, day, state, collect.naive_utc(now), note[:200]))
+                       ON DUPLICATE KEY UPDATE state=VALUES(state), note=VALUES(note)""", (mic, day, state, collect.naive_utc(now), note[:160]))
     conn.commit()
+
+
+def _rows(conn, mic):
+    with conn.cursor() as cur:
+        cur.execute('SELECT session_date, state FROM price_gaps WHERE mic=%s', (mic,))
+        return {r['session_date']: r['state'] for r in cur.fetchall()}
+
+
+def _depth(mic, day, aware):
+    """Nombre de séances (jour courant compris, avec une séance de marge) entre `day` et maintenant : de quoi choisir la plage Yahoo."""
+    today = hours._local(mic, aware).date()
+    n, d = 0, day
+    while d <= today:
+        n += d.weekday() < 5
+        d += datetime.timedelta(days=1)
+    return n + 1
 
 
 # ───────── barres de 15 minutes ─────────
@@ -73,12 +93,8 @@ def note_failed(conn, mic, session, ids, now):
     if e:
         e['ids'] = None if (e['ids'] is None or ids is None) else sorted(set(e['ids']) | set(ids))
     else:
-        e = led['intraday'][key] = {'ids': None if ids is None else sorted(set(ids)), 'tries': 0, 'first': _iso(now), 'last': _iso(now), 'note': 'titres sans réponse de Yahoo'}
+        e = led['intraday'][key] = {'ids': None if ids is None else sorted(set(ids)), 'tries': 0, 'first': _iso(now), 'last': EPOCH, 'note': 'titres sans réponse de Yahoo', 'src': 'failed'}
     save(conn, led)
-
-
-def _lost(led, mic, day):
-    return any(u['mic'] == mic and u['session'] == day.isoformat() for u in led['unrecoverable'])
 
 
 def _give_up(conn, led, mic, day, entry, why, now):
@@ -86,108 +102,154 @@ def _give_up(conn, led, mic, day, entry, why, now):
     _gap_row(conn, mic, day, 'unrecoverable', why, now)
 
 
+def _plan_mic(conn, led, mic, aware, now, horizon, rows_state):
+    """Réconcilie `price_gaps` avec les données de la place et renvoie la tâche de rattrapage due maintenant (ou None)."""
+    examined = collect.recent_sessions(mic, aware, horizon)
+    entries = {k.split('|')[1]: (k, e) for k, e in led['intraday'].items() if k.startswith(mic + '|')}
+    oldest = min(examined) if examined else None
+    for iso, (key, e) in list(entries.items()):                           # séance sortie de la rétention : la donnée n'est plus voulue, l'abandon est signalé
+        day = datetime.date.fromisoformat(iso)
+        if oldest and day < oldest:
+            _give_up(conn, led, mic, day, e, f'séance sortie des {horizon} séances conservées sans avoir pu être complétée', now)
+            del led['intraday'][key]
+            del entries[iso]
+    gaps = None
+    if entries or now - _at(led['checked'].get(mic)) >= datetime.timedelta(minutes=CHECK_MINUTES):
+        gaps = collect.session_gaps(conn, mic, aware, horizon)
+        led['checked'][mic] = _iso(now)
+    wanted = {}
+    if gaps is not None:
+        partial = {datetime.date.fromisoformat(iso) for iso, (_, e) in entries.items() if e['ids'] is not None}      # titres restant à demander : seule une réponse de Yahoo les résout
+        for day, state in rows_state.items():                              # la table reflète les données : plus de trou = réparé, même si elle disait « non récupérable »
+            if day not in gaps and state != 'repaired' and day in examined and day not in partial:
+                _gap_row(conn, mic, day, 'repaired', 'données présentes', now)
+        for iso, (key, e) in list(entries.items()):
+            day = datetime.date.fromisoformat(iso)
+            if day in examined and day not in gaps and e.get('src') == 'gap' and e['ids'] is None:
+                del led['intraday'][key]
+                del entries[iso]
+        for day, note in gaps.items():
+            if rows_state.get(day) == 'unrecoverable':
+                continue                                                   # conclusion déjà établie par la réponse de Yahoo (revérifiée ci-dessus)
+            depth = _depth(mic, day, aware)
+            if collect.intraday_range(depth) is None:
+                _give_up(conn, led, mic, day, {}, f'à {depth} séances en arrière : Yahoo ne fournit pas les barres de 15 minutes aussi loin ({collect.YAHOO_DEPTH_SESSIONS} séances)', now)
+                continue
+            key = f'{mic}|{day.isoformat()}'
+            e = led['intraday'].setdefault(key, {'ids': None, 'tries': 0, 'first': _iso(now), 'last': EPOCH, 'note': note, 'src': 'gap'})
+            e['note'] = note
+            _gap_row(conn, mic, day, 'to_repair', note, now)
+            wanted[day] = e
+    for iso, (key, e) in entries.items():
+        day = datetime.date.fromisoformat(iso)
+        if day in examined:                                                # une séance pas encore publiée attend sa clôture
+            wanted.setdefault(day, e)
+    due = [d for d, e in wanted.items() if now >= _at(e['last']) + _backoff(e['tries'], RETRY)]
+    if not due:
+        return None
+    ids = None if any(wanted[d]['ids'] is None for d in due) else sorted({i for d in due for i in wanted[d]['ids']})
+    return {'mic': mic, 'sessions': sorted(due), 'ids': ids, 'last_try': min(_at(wanted[d]['last']) for d in due)}
+
+
 def plan_intraday(conn, now):
-    """Rattrapages de barres à lancer maintenant : [{'mic', 'sessions', 'ids' (None = toute la place)}]. Vide si tout va bien ou si Yahoo est en pause."""
+    """Rattrapages de barres à lancer maintenant : [{'mic', 'sessions', 'ids' (None = toute la place)}], les moins récemment essayés d'abord
+    (aucune place ne peut en affamer une autre). Vide si tout va bien ou si Yahoo est en pause. Une place en erreur n'empêche pas les autres."""
     aware, now = _aware(now), collect.naive_utc(now)
     led = load(conn)
     if led['cooldown_until'] and _at(led['cooldown_until']) > now:
         return []
+    horizon = collect.retention_sessions(conn)
     tasks = []
     for mic in sorted({r['mic'] for r in collect.collection_set(conn)}):
         if not hours.known(mic):
             continue
-        recent = collect.recent_sessions(mic, aware, SESSIONS)
-        current = hours.session_date(mic, aware)
-        entries = {k.split('|')[1]: (k, e) for k, e in led['intraday'].items() if k.startswith(mic + '|')}
-        for iso, (key, e) in list(entries.items()):                       # séances sorties des deux conservées (ou trop anciennes pour Yahoo) : abandon signalé
-            day = datetime.date.fromisoformat(iso)
-            if _lost(led, mic, day):
-                del led['intraday'][key]
-                del entries[iso]
-            elif day not in recent and day != current:
-                _give_up(conn, led, mic, day, e, 'séance sortie des deux séances conservées sans avoir pu être complétée (Yahoo n’a pas fourni ces barres)', now)
-                del led['intraday'][key]
-                del entries[iso]
-            elif (now.date() - day).days > MAX_AGE_DAYS:
-                _give_up(conn, led, mic, day, e, f'plus de {MAX_AGE_DAYS} jours : Yahoo ne fournit plus ces barres de 15 minutes', now)
-                del led['intraday'][key]
-                del entries[iso]
-        gaps = {}
-        if entries or now - _at(led['checked'].get(mic)) >= datetime.timedelta(minutes=CHECK_MINUTES):
-            gaps = collect.session_gaps(conn, mic, aware, 6, report=SESSIONS)
-            led['checked'][mic] = _iso(now)
-        wanted = {}
-        for day, note in gaps.items():
-            if _lost(led, mic, day):
-                continue
-            if (now.date() - day).days > MAX_AGE_DAYS:
-                _give_up(conn, led, mic, day, {}, f'plus de {MAX_AGE_DAYS} jours : Yahoo ne fournit plus ces barres de 15 minutes', now)
-                continue
-            key = f'{mic}|{day.isoformat()}'
-            e = led['intraday'].setdefault(key, {'ids': None, 'tries': 0, 'first': _iso(now), 'last': EPOCH, 'note': note})
-            e['ids'], e['note'] = None, note                              # un trou de la place : tous ses titres
-            _gap_row(conn, mic, day, 'to_repair', note, now)
-            wanted[day] = e
-        for iso, (key, e) in entries.items():
-            day = datetime.date.fromisoformat(iso)
-            if day in recent:                                              # une séance pas encore publiée attend sa clôture
-                wanted.setdefault(day, led['intraday'][key])
-        due = [d for d, e in wanted.items() if now >= _at(e['last']) + _backoff(e['tries'], RETRY)]
-        if due:
-            ids = None if any(wanted[d]['ids'] is None for d in due) else sorted({i for d in due for i in wanted[d]['ids']})
-            tasks.append({'mic': mic, 'sessions': sorted(due), 'ids': ids})
+        try:
+            t = _plan_mic(conn, led, mic, aware, now, horizon, _rows(conn, mic))
+        except Exception as e:                                             # noqa: BLE001
+            conn.rollback()
+            from engine.jobs import schedule                                # import tardif : schedule importe ce module
+            schedule.record_error(conn, aware, f'rattrapage:{mic}', e)
+            continue
+        if t:
+            tasks.append(t)
     save(conn, led)
+    tasks.sort(key=lambda t: (t['last_try'], t['mic']))
     return tasks
 
 
 def execute(conn, client, tasks, now, log):
-    """Redemande 5 jours de barres aux titres concernés, revérifie, et conserve ce qui reste manquant. Renvoie (ok, erreurs, résumé)."""
+    """Redemande aux titres concernés la plage Yahoo qui remonte jusqu'à la séance manquante, revérifie, et conserve ce qui reste à faire. Renvoie (ok, erreurs, résumé)."""
     aware, now = _aware(now), collect.naive_utc(now)
-    t0, fixed, still, skipped, lines_total = time.monotonic(), [], [], 0, 0
+    t0 = time.monotonic()
+    deadline = t0 + BUDGET_SECONDS
+    fixed, still, given_up, errors, lines_total, postponed = [], [], [], 0, 0, 0
     for t in tasks:
-        if time.monotonic() - t0 > BUDGET_SECONDS:
-            skipped += 1                                                    # repris au passage suivant (rien n'est perdu : les données manquantes sont retrouvées)
+        if time.monotonic() > deadline:
+            postponed += 1                                                  # repris au prochain passage : rien n'est perdu, les données manquantes sont retrouvées
             continue
         mic = t['mic']
         rows = collect.collection_set(conn, mic)
+        total = len(rows)
         if t['ids'] is not None:
             keep = set(t['ids'])
             rows = [r for r in rows if r['listing_id'] in keep]
-        failed = []
+        rng = collect.intraday_range(max(_depth(mic, d, aware) for d in t['sessions']))
+        failed, unfetched, limited = [], [], False
         try:
-            _, lines, _ = collect.collect_intraday(conn, client, rows, aware, range_='5d', failed=failed)
+            _, lines, _ = collect.collect_intraday(conn, client, rows, aware, range_=rng, failed=failed, deadline=deadline, unfetched=unfetched)
+            lines_total += lines
         except RateLimited:
-            led = load(conn)
-            led['cooldown_until'] = _iso(now + COOLDOWN)
-            save(conn, led)
-            raise
-        lines_total += lines
-        gaps = collect.session_gaps(conn, mic, aware, 6, report=SESSIONS)
+            limited = True
+        except Exception as e:                                              # noqa: BLE001 — une place en erreur ne bloque pas les autres
+            conn.rollback()
+            errors += 1
+            failed = [r['listing_id'] for r in rows]
+            log('error', f'{mic} : {type(e).__name__}: {e}')
+        gaps = collect.session_gaps(conn, mic, aware)
         led = load(conn)
+        pending = sorted(set(failed) | set(unfetched))
         for day in t['sessions']:
             key = f'{mic}|{day.isoformat()}'
             e = led['intraday'].get(key)
             if e is None:
                 continue
-            if day in gaps:
-                e['ids'], e['note'] = None, gaps[day]
-            elif failed:
-                e['ids'] = sorted(set(failed))
-            else:
+            if day not in gaps and not pending:
                 del led['intraday'][key]
-                _gap_row(conn, mic, day, 'repaired', 'comblé automatiquement', now)
+                _gap_row(conn, mic, day, 'repaired', f'comblé automatiquement ({collect.session_titles(conn, mic, day, [r["listing_id"] for r in collect.collection_set(conn, mic)])} titres avec barres)', now)
                 fixed.append(f'{mic} {day}')
                 continue
-            e['tries'] += 1
-            e['last'] = _iso(now)
+            if day not in gaps:                                             # comblée pour ce qui a été demandé ; le reste (titres sans réponse, lots non faits) suit
+                e['ids'], e['note'] = pending, 'titres restant à demander'
+            elif pending:
+                e['ids'], e['note'] = pending, gaps[day]
+            else:
+                e['ids'], e['note'] = None, gaps[day]
+            if not (unfetched or limited) or failed:                       # un arrêt faute de temps (ou 429) n'est pas une tentative échouée
+                e['tries'] += 1
+                e['last'] = _iso(now)
+            complete_answer = not pending and day in gaps
+            if complete_answer and e['tries'] >= CONFIRM_TRIES and now >= collect.settled_at(mic, day) + CONFIRM_AFTER:
+                have = collect.session_titles(conn, mic, day, [r['listing_id'] for r in collect.collection_set(conn, mic)])
+                _give_up(conn, led, mic, day, e, f'Yahoo a répondu pour les {total} titres, {e["tries"]} fois, sans fournir ces barres ({have} titres en ont) : {gaps[day]}', now)
+                del led['intraday'][key]
+                given_up.append(f'{mic} {day}')
+                continue
             _gap_row(conn, mic, day, 'to_repair', e['note'], now)
             still.append(f'{mic} {day}')
-            log('warning', f'{mic} {day} : toujours incomplète après {e["tries"]} tentative(s) ({e["note"]}) ; nouvelle tentative automatique plus tard')
+            if not (unfetched or limited):
+                log('warning', f'{mic} {day} : toujours incomplète après {e["tries"]} tentative(s) ({e["note"]}) ; nouvelle tentative automatique plus tard')
         save(conn, led)
+        if limited:
+            led = load(conn)
+            led['cooldown_until'] = _iso(now + COOLDOWN)
+            save(conn, led)
+            raise RateLimited()
     summary = f'{len(fixed)} séance(s) comblée(s)' + (f' ({", ".join(fixed)})' if fixed else '') + f', {len(still)} encore à compléter, {lines_total} barres reçues'
-    if skipped:
-        summary += f', {skipped} place(s) reportée(s) au prochain passage'
-    return len(fixed), len(still), summary
+    if given_up:
+        summary += f', {len(given_up)} non récupérable(s) confirmée(s) par Yahoo ({", ".join(given_up)})'
+    if postponed:
+        summary += f', {postponed} place(s) reportée(s) au prochain passage'
+    return len(fixed), errors, summary
 
 
 # ───────── clôtures quotidiennes ─────────
@@ -262,4 +324,4 @@ def status(conn, now):
     checked = [_at(v) for v in led['checked'].values()]
     return {'open': open_, 'daily': {'waiting': waiting, 'given_up': given_up, 'sample': symbols}, 'unrecoverable': led['unrecoverable'][:10],
             'cooldown_until': led['cooldown_until'] if led['cooldown_until'] and _at(led['cooldown_until']) > now else None,
-            'last_check': _iso(max(checked)) if checked else None, 'sessions_kept': SESSIONS}
+            'last_check': _iso(max(checked)) if checked else None, 'sessions_kept': collect.retention_sessions(conn)}

@@ -6,6 +6,7 @@ Le jeu de collecte vient de v_collect_set : sélectionnées principales + cotati
 import datetime
 import json
 import statistics
+import time
 from collections import defaultdict
 
 from . import hours, prefilter
@@ -315,16 +316,24 @@ def slot_of(ts):
     return t.replace(minute=t.minute - t.minute % hours.SLOT_MINUTES, second=0, microsecond=0)
 
 
-def collect_intraday(conn, client, rows, now, range_='1d', progress=None, failed=None):
+def collect_intraday(conn, client, rows, now, range_='1d', progress=None, failed=None, deadline=None, unfetched=None):
     """Barres de 15 min. Une barre provisoire n'écrase jamais une barre définitive. Met à jour latest_prices.
-    Renvoie (cotations_ok, barres, erreurs)."""
+    `failed` reçoit les cotations que Yahoo n'a pas renvoyées ; `deadline` (temps monotonic) interrompt entre deux lots et `unfetched` reçoit alors les cotations
+    pas encore demandées (également sur un 429 : l'appelant sait exactement ce qui reste à faire). Renvoie (cotations_ok, barres, erreurs)."""
     by_symbol = {r['symbol'].upper(): r for r in rows}
     cutoff = naive_utc(now)
     ok = lines = err = 0
-    for part in _batches(sorted(by_symbol), SPARK_BATCH):
+    batches = list(_batches(sorted(by_symbol), SPARK_BATCH))
+    for i, part in enumerate(batches):
+        if deadline is not None and time.monotonic() > deadline:
+            if unfetched is not None:
+                unfetched.extend(by_symbol[x]['listing_id'] for rest in batches[i:] for x in rest)
+            break
         try:
             data = client.spark(part, range_, '15m')
         except RateLimited:
+            if unfetched is not None:
+                unfetched.extend(by_symbol[x]['listing_id'] for rest in batches[i:] for x in rest)
             raise
         except Exception:
             err += len(part)
@@ -362,8 +371,24 @@ def collect_intraday(conn, client, rows, now, range_='1d', progress=None, failed
     return ok, lines, err
 
 
+# Profondeur réelle de Yahoo en 15 minutes (mesurée le 2026-10-28) : 5d → 5 séances, 1mo → 22, 60d → 60 (du 5 août au 28 octobre) ; 3mo est refusé (HTTP 422).
+# Le nombre de séances comptées ici est celui des jours ouvrés (fériés compris) : on demande 60d jusqu'à 64 pour laisser Yahoo répondre lui-même sur la limite.
+INTRADAY_RANGES = ((5, '5d'), (22, '1mo'), (64, '60d'))
+YAHOO_DEPTH_SESSIONS = 60
+
+
+def intraday_range(sessions_back):
+    """Plus petite plage Yahoo qui remonte à `sessions_back` séances (jour courant compris) ; None si c'est au-delà de ce que Yahoo peut fournir."""
+    return next((rg for n, rg in INTRADAY_RANGES if sessions_back <= n), None)
+
+
+def retention_sessions(conn):
+    """Séances de barres de 15 minutes conservées ET surveillées : la même limite pour la rétention, la détection et la réparation (jamais plus que Yahoo ne fournit)."""
+    return max(1, min(int(setting(conn, 'intraday_retention_sessions', 20)), YAHOO_DEPTH_SESSIONS))
+
+
 def prune_intraday(conn, now, sessions=None):
-    sessions = sessions or setting(conn, 'intraday_retention_sessions', 20)
+    sessions = sessions or retention_sessions(conn)
     limit = naive_utc(now) - datetime.timedelta(days=int(sessions * 7 / 5) + 2)
     with conn.cursor() as cur:
         cur.execute('DELETE FROM intraday_prices WHERE slot_start < %s', (limit,))
@@ -377,6 +402,7 @@ def prune_intraday(conn, now, sessions=None):
 GAP_MISSING_RATIO = 0.4        # un créneau est manquant s'il compte moins de 40 % de la part de titres qu'il a d'habitude
 GAP_MIN_SLOTS = 2              # il faut au moins 2 créneaux manquants dans la séance
 GAP_EMPTY_RATIO = 0.05         # sous 5 % des titres avec une barre, la séance est « vide »
+GAP_COVERAGE_RATIO = 0.85      # une séance couvre au moins 85 % du nombre de titres habituel
 
 
 def _quantile(values, q):
@@ -403,20 +429,33 @@ def recent_sessions(mic, now, n=2):
     return days
 
 
-def session_gaps(conn, mic, now, sessions=5, report=None):
-    """{jour local: description} des séances récentes terminées où des DONNÉES MANQUENT vraiment.
+def session_titles(conn, mic, day, ids):
+    """Nombre de titres de la place qui ont au moins une barre de 15 minutes pendant la séance `day`."""
+    from engine.market import intraday as intra
+    start, end = intra.session_window(mic, day)
+    n = 0
+    with conn.cursor() as cur:
+        for part in _batches(ids, CHUNK):
+            cur.execute(f"SELECT COUNT(DISTINCT listing_id) n FROM intraday_prices WHERE slot_start>=%s AND slot_start<%s AND listing_id IN ({','.join(['%s'] * len(part))})", [start, end] + part)
+            n += cur.fetchone()['n']
+    return n
+
+
+def session_gaps(conn, mic, now, sessions=None):
+    """{jour local: description} des séances terminées et publiées, parmi les `sessions` dernières (par défaut la rétention), où des DONNÉES MANQUENT vraiment.
     Un titre peu échangé n'a pas de barre sur les créneaux sans transaction : on ne regarde donc jamais « combien de barres par titre »
-    mais, pour chaque créneau, la part des titres de la place qui ont une barre, comparée à ce même créneau les autres jours.
+    mais, pour chaque créneau, la part des titres de la place qui ont une barre, comparée à ce même créneau les autres jours, et le nombre de titres couverts.
+      - séance sans (presque) aucune barre ALORS QUE les clôtures quotidiennes existent : trou (Yahoo n'a pas répondu, ce n'est pas un jour férié) — même si
+        la place n'a JAMAIS eu de barre ;
       - créneaux nettement sous leur niveau habituel (≥ 2) : trou ;
-      - séance sans (presque) aucune barre ALORS QUE les clôtures quotidiennes existent : trou (Yahoo n'a pas répondu, ce n'est pas un jour férié) ;
-      - séance sans barre ni clôture : jour férié, pas un trou.
-    `sessions` séances servent à établir le niveau habituel de chaque créneau ; seules les `report` plus récentes sont rapportées (toutes par défaut)."""
+      - titres couverts nettement sous le niveau habituel (collecte interrompue en cours de route) : trou ;
+      - séance sans barre ni clôture : jour férié (ou clôtures pas encore collectées : revu dès qu'elles arrivent), pas un trou."""
     from engine.market import intraday as intra
     rows = collection_set(conn, mic)
     ids = [r['listing_id'] for r in rows]
     if not ids or not hours.known(mic):
         return {}
-    days = recent_sessions(mic, now, sessions)
+    days = recent_sessions(mic, now, sessions or retention_sessions(conn))
     if not days:
         return {}
     per_slot, closes = defaultdict(int), {}
@@ -439,6 +478,7 @@ def session_gaps(conn, mic, now, sessions=5, report=None):
                 out[day] = 'aucune barre alors que les clôtures quotidiennes existent (données Yahoo absentes)'
             continue                                                 # sans barre ni clôture : jour férié
         usable.append(day)
+    titles = {day: session_titles(conn, mic, day, ids) for day in usable}
     for day in usable:
         others = [ratios[x] for x in usable if len(ratios[x]) == len(ratios[day])]
         flat = _quantile(ratios[day], 0.85)
@@ -447,58 +487,9 @@ def session_gaps(conn, mic, now, sessions=5, report=None):
         missing = [t for t, ratio, ref in zip(slots, ratios[day], profile) if ref >= GAP_EMPTY_RATIO and ratio < GAP_MISSING_RATIO * ref]
         if len(missing) >= GAP_MIN_SLOTS:
             out[day] = f'{len(missing)} créneaux sur {len(slots)} nettement sous leur niveau habituel (de {missing[0]:%H:%M} à {missing[-1]:%H:%M} UTC)'
-    if report:
-        keep = set(days[:report])
-        out = {d: v for d, v in out.items() if d in keep}
+            continue
+        rest = [titles[x] for x in usable if x != day]
+        usual = statistics.median(rest) if len(rest) >= 3 else 0
+        if usual and titles[day] < GAP_COVERAGE_RATIO * usual:
+            out[day] = f'{titles[day]} titres avec des barres sur {int(usual)} habituellement'
     return out
-
-
-def detect_gaps(conn, mic, now, sessions=2):
-    """Signale les séances où des données manquent vraiment (voir `session_gaps`) parmi les deux dernières (celles qu'on conserve). Renvoie le nombre de trous ajoutés."""
-    added = 0
-    with conn.cursor() as cur:
-        for day, note in session_gaps(conn, mic, now, sessions).items():
-            cur.execute("INSERT INTO price_gaps(mic,session_date,state,detected_at,note) VALUES (%s,%s,'to_repair',%s,%s) ON DUPLICATE KEY UPDATE detected_at=detected_at",
-                        (mic, day, naive_utc(now), note[:200]))
-            added += cur.rowcount == 1
-    conn.commit()
-    return added
-
-
-def repair_gaps(conn, client, now, max_batches=200):
-    """Pour chaque séance en trou : revérifie d'abord avec les données déjà présentes (réparée si ce n'est plus un trou), puis redemande 5 jours de barres
-    uniquement aux places encore en trou. Irrécupérable si la séance est trop ancienne pour Yahoo (5 jours) ou reste incomplète."""
-    with conn.cursor() as cur:
-        cur.execute("SELECT mic, session_date FROM price_gaps WHERE state='to_repair' ORDER BY session_date DESC")
-        gaps = cur.fetchall()
-    used = 0
-    today = naive_utc(now).date()
-    for g in [g for g in gaps if (today - g['session_date']).days > 5]:                    # Yahoo ne remonte pas au-delà de 5 jours : inutile de redemander
-        _set_gap(conn, g['mic'], g['session_date'], 'unrecoverable')
-    gaps = [g for g in gaps if (today - g['session_date']).days <= 5]
-    for mic in sorted({g['mic'] for g in gaps}):
-        mine = [g for g in gaps if g['mic'] == mic]
-        still = session_gaps(conn, mic, now, 8)
-        todo = [g for g in mine if g['session_date'] in still]
-        for g in mine:
-            if g not in todo:
-                _set_gap(conn, mic, g['session_date'], 'repaired')
-        if not todo:
-            continue
-        rows = collection_set(conn, mic)
-        need = -(-len(rows) // SPARK_BATCH)
-        if used and used + need > max_batches:                                              # une place seule peut dépasser le budget (New York : ~120 lots)
-            continue
-        collect_intraday(conn, client, rows, now, range_='5d')
-        used += need
-        after = session_gaps(conn, mic, now, 8)
-        for g in todo:
-            age = (naive_utc(now).date() - g['session_date']).days
-            _set_gap(conn, mic, g['session_date'], 'repaired' if g['session_date'] not in after else ('unrecoverable' if age > 5 else 'to_repair'))
-    conn.commit()
-    return used
-
-
-def _set_gap(conn, mic, day, state):
-    with conn.cursor() as cur:
-        cur.execute('UPDATE price_gaps SET state=%s WHERE mic=%s AND session_date=%s', (state, mic, day))

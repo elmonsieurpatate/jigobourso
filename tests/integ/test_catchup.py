@@ -47,11 +47,20 @@ class Ranged(Yahoo):
         return out
 
 
+class Empty(Yahoo):
+    """Yahoo répond bien, pour chaque titre, mais n'a aucune barre de 15 minutes à fournir (réponse valide et vide)."""
+
+    def spark(self, symbols, range_, interval):
+        if interval == '15m':
+            return {x: {'currency': 'EUR', 'timezone': 'UTC', 'bars': []} for x in symbols}
+        return super().spark(symbols, range_, interval)
+
+
 def full_day(day):
     return [(t, 10.0 + (t.minute % 7)) for t in intraday.expected_slot_starts('XETR', datetime.date(2026, 10, day))]
 
 
-def yahoo(days=(26, 27), **kw):
+def yahoo(days=(23, 26, 27), **kw):
     y = Yahoo(intraday={s: ('UTC', [b for d in days for b in full_day(d)]) for s in SYMS},
               daily={s: ('UTC', [(datetime.date(2026, 10, d), 10.0) for d in (23, 26, 27, 28)]) for s in SYMS})
     for k, v in kw.items():
@@ -149,20 +158,23 @@ def test_normal_collection_stays_first_and_catchup_never_touches_catalogue_or_po
     assert all(t.split(':')[0] in ('intraday', 'daily', 'maintenance', 'catchup') for t in order)
 
 
-def test_data_yahoo_never_provides_is_reported_not_hidden(conn):
+def test_data_yahoo_never_provides_is_reported_with_its_own_answer(conn):
     seed(conn, 26, bars=False); seed(conn, 27, bars=False)                     # clôtures présentes, barres jamais fournies par Yahoo
-    empty = Yahoo(daily=yahoo().daily)                                         # répond, mais sans aucune barre de 15 min
+    empty = Empty(daily={s: ('UTC', [(datetime.date(2026, 10, d), 10.0) for d in (26, 27, 28)]) for s in SYMS})
     for hh, mm in ((18, 0), (18, 10), (18, 30), (19, 10), (20, 30), (22, 0)):
         tasks.tick(conn, empty, at(27, hh, mm), 'cron')
     st = catchup.status(conn, at(27, 22, 0))
-    assert len(st['open']) == 2 and all(o['tries'] >= 2 for o in st['open'])
-    assert all(o['next_try'] for o in st['open'])                              # les nouvelles tentatives continuent, espacées
-    tasks.tick(conn, empty, at(29, 18, 0), 'cron')                             # deux jours plus tard : ces séances ne sont plus conservées
-    st = catchup.status(conn, at(29, 18, 0))
-    lost = {(u['mic'], u['session']) for u in st['unrecoverable']}
-    assert ('XETR', '2026-10-26') in lost and ('XETR', '2026-10-27') in lost
-    assert all('Yahoo' in u['why'] for u in st['unrecoverable'])
-    assert count(conn, "SELECT COUNT(*) FROM price_gaps WHERE state='unrecoverable'") >= 2
+    assert [o['session'] for o in st['open']] == ['2026-10-27']                # le 27 : moins de 24 h après sa clôture, on continue, espacé
+    assert st['open'][0]['tries'] >= 3 and st['open'][0]['next_try']
+    lost = {(u['mic'], u['session']): u['why'] for u in st['unrecoverable']}
+    assert set(lost) == {('XETR', '2026-10-26')}                               # le 26 : trois réponses complètes de Yahoo, plus de 24 h après la clôture, sans barre
+    assert f'Yahoo a répondu pour les {N} titres' in lost[('XETR', '2026-10-26')] and '0 titres en ont' in lost[('XETR', '2026-10-26')]
+    tasks.tick(conn, empty, at(28, 20, 0), 'cron')                             # le lendemain soir : le 27 aussi est conclu
+    assert {u['session'] for u in catchup.status(conn, at(28, 20, 0))['unrecoverable']} == {'2026-10-26', '2026-10-27'}
+    assert count(conn, "SELECT COUNT(*) FROM price_gaps WHERE state='unrecoverable'") == 2 and count(conn, "SELECT GROUP_CONCAT(session_date) FROM price_gaps WHERE state='to_repair'") == '2026-10-28'      # le 28, tout juste publié, est suivi à son tour
+    seed(conn, 26, closes=False)                                               # si les barres finissent par exister, la séance redevient réparée (la table suit les données)
+    tasks.tick(conn, empty, at(28, 20, 15), 'cron')
+    assert count(conn, "SELECT state FROM price_gaps WHERE session_date='2026-10-26'") == 'repaired'
 
 
 def test_thin_titles_without_trades_do_not_trigger_any_catchup(conn):

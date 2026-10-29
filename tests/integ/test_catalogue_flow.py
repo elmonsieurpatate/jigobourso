@@ -122,11 +122,11 @@ def test_full_parcours_then_cron_only_maintains(env):
         raw = cur.fetchone()['n']
     later = NOW + datetime.timedelta(days=1, hours=1)                      # mercredi : clôture de la veille déjà collectée → maintenance + rien d'autre
     done = tasks.tick(conn, client, later, 'cron')
-    assert {k for k, _, _ in done} <= {'daily', 'intraday', 'maintenance'}
+    assert {k for k, _, _ in done} <= {'daily', 'intraday', 'maintenance', 'catchup'}
     assert statuses(conn) == before
     with conn.cursor() as cur:
         cur.execute('SELECT DISTINCT job_type FROM jobs WHERE trigger_by=%s', ('cron',))
-        assert all(r['job_type'].split(':')[0] in ('daily', 'intraday', 'maintenance') for r in cur.fetchall())
+        assert all(r['job_type'].split(':')[0] in ('daily', 'intraday', 'maintenance', 'catchup') for r in cur.fetchall())
         cur.execute('SELECT COUNT(*) n FROM catalogue_raw')
         assert cur.fetchone()['n'] == raw
     assert schedule.state(conn, later.replace(tzinfo=None))['cron']['observed'] is True

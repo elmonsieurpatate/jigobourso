@@ -11,10 +11,27 @@ def _now():
     return datetime.datetime.utcnow().replace(microsecond=0)
 
 
-def recover_interrupted(conn, stale_minutes=180):
+# Durée au-delà de laquelle un traitement « en cours » est considéré mort (processus tué, hébergeur, panne) et libère son verrou.
+# Les traitements du cron ont une durée bornée : un verrou resté posé ne doit jamais bloquer le rattrapage pendant des heures.
+STALE_MINUTES = {'catchup': 8, 'maintenance': 15}
+STALE_PREFIX = (('intraday:', 20), ('daily:', 45))
+STALE_DEFAULT = 180            # traitements manuels de l'administration (import, filtres, historiques)
+
+
+def stale_minutes(job_type):
+    if job_type in STALE_MINUTES:
+        return STALE_MINUTES[job_type]
+    return next((m for prefix, m in STALE_PREFIX if job_type.startswith(prefix)), STALE_DEFAULT)
+
+
+def recover_interrupted(conn):
+    """Marque « interrupted » les traitements restés « running » trop longtemps pour leur type (libère le verrou)."""
     with conn.cursor() as cur:
-        cur.execute("UPDATE jobs SET status='interrupted', finished_at=%s WHERE status='running' AND started_at < %s",
-                    (_now(), _now() - datetime.timedelta(minutes=stale_minutes)))
+        cur.execute("SELECT id, job_type, started_at FROM jobs WHERE status='running'")
+        running = cur.fetchall()
+        for j in running:
+            if j['started_at'] < _now() - datetime.timedelta(minutes=stale_minutes(j['job_type'])):
+                cur.execute("UPDATE jobs SET status='interrupted', finished_at=%s, summary=LEFT(CONCAT('interrompu (processus arrêté) · ', COALESCE(summary, '')), 500) WHERE id=%s", (_now(), j['id']))
     conn.commit()
 
 
