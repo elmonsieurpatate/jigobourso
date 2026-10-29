@@ -14,7 +14,7 @@ from engine.market import hours
 from engine.market.collect import latest_rates, to_eur_factor
 from . import strategy
 from .measures import window_metrics
-from .series import usable_closes, find_breaks, clean_window, analyze_series
+from .series import usable_closes, find_breaks, clean_window, analyze_series, prepare_series
 
 PEA_COUNTRIES = {'France', 'Germany', 'Netherlands', 'Spain', 'Italy', 'Belgium', 'Sweden', 'Finland', 'Denmark', 'Norway', 'Ireland',
                  'Portugal', 'Austria', 'Luxembourg'}
@@ -105,7 +105,7 @@ def _row(v, rates):
             'currency': cur, 'price': price, 'price_eur': price * factor if price is not None and factor else None,
             'price_time': u['price_time'].isoformat(sep=' ') if u['price_time'] else None, 'price_source': u['price_source'],
             'status': v['status'], 'status_label': STATUS_LABELS[v['status']], 'score': v['score'], 'rank': v['rank'],
-            'quality': u['quality'], 'measures': {str(n): m for n, m in v['measures'].items()}, 'reasons': v['reasons']}
+            'quality': u['quality'], 'price_stale': hours.price_is_stale(u['mic'], u['price_time'], hours.utcnow()), 'measures': {str(n): m for n, m in v['measures'].items()}, 'reasons': v['reasons']}
 
 
 CACHE_FORMAT = 3
@@ -377,6 +377,16 @@ def instrument_sheet(conn, request):
     dates, closes, basis, breaks, full, missing, tech = analyze_series(bars, all_windows, splits)
     sheet['measures'] = {str(n): m for n, m in full.items()}
     sheet['analysis_basis'] = basis
+    chart_dates, chart_closes, _, chart_breaks = prepare_series(bars, splits)
+    volumes = dict(zip((d for d, _ in daily), daily_volume))
+    sheet['daily_raw'] = sheet['daily']
+    sheet['daily'] = [[d, c] for d, c in zip(chart_dates, chart_closes)][-400:]
+    sheet['daily_volume'] = [volumes.get(d) for d, _ in sheet['daily']]
+    sheet['chart_break_dates'] = [chart_dates[i] for i in chart_breaks]
+    sheet['price_stale'] = hours.price_is_stale(u['mic'], u['price_time'], hours.utcnow())
+    if sheet['freshness']['stale']:
+        sheet['state']['quality'] = 'stale'
+
     sheet['missing_measures'] = {str(n): why for n, why in missing.items()}
     if u['status'] == 'selected' and u['is_primary']:
         view = request.get('view') or {}

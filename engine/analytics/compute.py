@@ -59,7 +59,7 @@ def compute_all(conn, now, history=300, batch=400):
             for r in cur.fetchall():
                 bars.setdefault(r['listing_id'], []).append((r['price_date'].isoformat(), float(r['close_px']), None if r['adj_close_px'] is None else float(r['adj_close_px'])))
         for lid in part:
-            _compute_one(lid, mics[lid], bars.get(lid, [])[-history:], splits.get(lid, ()), windows, market_latest, stamp, metric_rows, state_rows)
+            _compute_one(lid, mics[lid], bars.get(lid, []), splits.get(lid, ()), windows, market_latest, stamp, metric_rows, state_rows)
     with conn.cursor() as cur:
         cur.execute('DELETE FROM strategy_metrics')
         cur.execute('DELETE FROM series_state')

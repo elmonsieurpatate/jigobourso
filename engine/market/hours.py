@@ -99,3 +99,16 @@ def expected_last_close(mic, now):
     while day.weekday() >= 5:
         day -= timedelta(days=1)
     return day.isoformat()
+
+
+def price_is_stale(mic, stamp, now):
+    if stamp is None:
+        return True
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
+    if stamp.tzinfo is None:
+        stamp = stamp.replace(tzinfo=timezone.utc)
+    if _local(mic, stamp).date().isoformat() < expected_last_close(mic, now):
+        return True
+    # During trading, a quote older than two intraday slots is explicitly old.
+    return is_open(mic, now) and (now - stamp).total_seconds() > 30 * 60

@@ -22,7 +22,7 @@
   document.title = s.name + ' — Jigobourso';
   const v = s.verdict || {}, F = s.freshness || {}, SRC = s.sources || {}, st = s.state || {};
   const closes = s.daily.map(d => d[1]), last = closes[closes.length - 1];
-  const perf = n => closes.length > n ? 100 * (last / closes[closes.length - 1 - n] - 1) : null;
+  const perf = n => s.measures[String(n)] ? s.measures[String(n)].perf : null;
   const lastDay = perf(1);
   const periodRows = Object.entries(s.measures).filter(([, m]) => m).map(([n, m]) => ({ n: +n, m }));
   const labelFor = n => (s.config_periods.find(p => p.sessions === n) || { label: n + ' séances' }).label;
@@ -37,7 +37,7 @@
   const notice = [
     s.catalogue_status === 'excluded' ? `<div class="notice warn"><b>Ce titre est exclu des recommandations.</b> ${J.esc(s.excluded_reason || '')} Il n’est ni classé ni proposé dans l’Explorer${held ? ' ; il reste suivi et actualisé parce que vous le détenez' : ''}.</div>` : '',
     s.product_warning ? `<div class="notice warn"><b>Produit à surveiller.</b> ${J.esc(s.product_warning)}</div>` : '',
-    F.stale ? `<div class="notice warn">Les clôtures de ce titre sont en retard par rapport à sa place (dernière : ${J.date(F.last_close_date)}, place : ${J.date(F.market_latest_close)}). Les mesures peuvent être décalées.</div>` : '',
+    F.stale ? `<div class="notice warn">Les clôtures de ce titre sont anciennes par rapport à la dernière séance attendue (dernière : ${J.date(F.last_close_date)}, attendue : ${J.date(F.market_latest_close)}). Les mesures peuvent être décalées.</div>` : '',
   ].filter(Boolean).join('');
   page.innerHTML = `
   <p class="small" style="margin:0 0 8px"><a href="index.html">← Explorer</a></p>
@@ -46,6 +46,7 @@
     <div style="margin-top:10px">${v.status ? J.statusBadge(v.status, v.status_label) : ''}${v.rank ? ` <span class="muted">n° ${v.rank} sur ${v.of} ${s.kind === 'etf' ? 'ETF' : 'actions'} retenus${v.scope_filtered ? ' (sélection)' : ''} · selon ${J.esc((s.strategy || {}).source || 'réglage par défaut')} · score ${J.num(v.score, 0)}/100</span>` : ''}</div></div>
     <div style="text-align:right"><div class="px">${J.money(s.price, s.currency)}</div><div class="muted">${s.price ? J.priceLabel(s) + ' · ' + J.dateTime(s.price_time) : 'Pas de cours'}</div>${lastDay !== null ? `<div class="${J.cls(lastDay)}" style="font-weight:700">${J.pct(lastDay)} <span class="muted" style="font-weight:400">sur la dernière séance</span></div>` : ''}
     ${s.price_eur !== null && s.currency !== 'EUR' ? `<div class="muted small">≈ ${J.eur(s.price_eur)}</div>` : ''}<div style="margin-top:10px"><button class="btn small" id="add">+ Ajouter à un portefeuille</button></div></div></div>
+  ${s.price_stale ? '<div class="notice warn">Cours ancien : aucune cotation récente confirmée. Le prix affiché reste daté, il ne représente pas un cours actuel.</div>' : ''}
   ${notice ? `<div class="grid" style="gap:10px;margin-bottom:14px">${notice}</div>` : ''}
   <div class="tabs big" id="tabs">${hasTabs.map(t => `<button data-t="${t}">${tabLabel[t]}</button>`).join('')}</div>
   <div class="grid" style="grid-template-columns:minmax(0,2.3fr) minmax(270px,1fr);align-items:start" id="layout"><div id="main"></div>
@@ -59,13 +60,13 @@
 
   const panes = {
     cours() {
-      const R = [['1 S', 5], ['1 M', 22], ['3 M', 66], ['6 M', 132], ['1 A', 260], ['Max', 0]];
-      let sessions = 260, ma20 = true, ma50 = false, vol = true;
+      const R = [['1 S', 5], ['1 M', 21], ['3 M', 63], ['6 M', 126], ['1 A', 252], ['Max', 0]];
+      let sessions = 252, ma20 = true, ma50 = false, vol = true;
       J.$('#main').innerHTML = `<div class="card"><div class="row between wrap-s"><h2 style="margin:0">Évolution du cours</h2><div class="row gap-s"><span class="seg" id="range">${R.map(([l, n]) => `<button data-n="${n}" class="${n === sessions ? 'on' : ''}">${l}</button>`).join('')}</span>
         <button class="chip on" data-o="ma20">Moy. 20 j</button><button class="chip" data-o="ma50">Moy. 50 j</button><button class="chip on" data-o="vol">Volumes</button></div></div>
         <div id="chart" style="margin-top:8px"></div><div class="row between small muted" id="chart-sum" style="margin-top:6px"></div></div>
-        <div class="card"><h2>Performances</h2><div class="metric-grid">${[['1 jour', perf(1)], ['1 semaine', perf(5)], ['1 mois', perf(22)], ['3 mois', perf(66)], ['6 mois', perf(132)], ['1 an', perf(260)]].map(([l, p]) => `<div class="metric"><div class="l">${l}</div><div class="v ${J.cls(p)}">${J.pct(p, 1)}</div></div>`).join('')}</div>
-        <p class="small muted" style="margin:10px 0 0">Performances calculées sur les clôtures quotidiennes de la place de cotation, dans sa devise (${J.esc(s.currency || '')}). Elles décrivent le passé et ne garantissent rien pour la suite.</p></div>`;
+        <div class="card"><h2>Performances</h2><div class="metric-grid">${[['1 jour', perf(1)], ['1 semaine', perf(5)], ['1 mois', perf(21)], ['3 mois', perf(63)], ['6 mois', perf(126)], ['1 an', perf(252)]].map(([l, p]) => `<div class="metric"><div class="l">${l}</div><div class="v ${J.cls(p)}">${J.pct(p, 1)}</div></div>`).join('')}</div>
+        <p class="small muted" style="margin:10px 0 0">Performances calculées sur la même série que la stratégie (${J.esc(s.analysis_basis === 'adjusted' ? 'clôtures ajustées du fournisseur' : 'clôtures brutes, splits connus corrigés si leur ratio est disponible')}), dans sa devise (${J.esc(s.currency || '')}). Elles décrivent le passé et ne garantissent rien pour la suite.</p></div>`;
       const draw = () => { const r = J.priceChart(J.$('#chart'), s.daily.map((d, i) => [d[0], d[1], s.daily_volume[i]]), { sessions, ma20, ma50, volume: vol, unit: s.currency });
         J.$('#chart-sum').innerHTML = r ? `<span>${J.date(r.from)} → ${J.date(r.to)} · ${r.sessions} séances</span><span class="${J.cls(r.perf)}"><b>${J.pct(r.perf, 1)}</b> sur la période · plus haut ${J.num(r.high, 2)} · plus bas ${J.num(r.low, 2)}</span>` : ''; };
       J.$$('#range button').forEach(b => b.onclick = () => { sessions = +b.dataset.n; J.$$('#range button').forEach(x => x.classList.toggle('on', x === b)); draw(); });

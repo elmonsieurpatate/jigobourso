@@ -16,11 +16,11 @@ def recommendable_candidates(conn, history=300, ids=None):
         for row in cur.fetchall():
             bars[row['listing_id']].append((row['price_date'].isoformat(), float(row['close_px']),
                                             None if row['adj_close_px'] is None else float(row['adj_close_px'])))
-        cur.execute("""SELECT e.listing_id, e.event_date FROM corporate_events e JOIN v_recommendable r ON r.listing_id = e.listing_id
+        cur.execute("""SELECT e.listing_id, e.event_date, e.ratio FROM corporate_events e JOIN v_recommendable r ON r.listing_id = e.listing_id
                        WHERE e.kind IN ('split','reverse_split')""" + only.replace('l.id', 'e.listing_id'), list(ids or []))
         splits = defaultdict(list)
         for row in cur.fetchall():
-            splits[row['listing_id']].append(row['event_date'].isoformat())
+            splits[row['listing_id']].append((row['event_date'].isoformat(), float(row['ratio']) if row['ratio'] else None))
     return [{'key': l['id'], 'symbol': l['symbol'], 'name': l['name'], 'isin': l['isin'], 'mic': l['mic'],
              'group': 'etf' if l['kind'] == 'etf' else 'equity', 'bars': bars[l['id']][-history:],
              'split_dates': splits[l['id']]} for l in listings]

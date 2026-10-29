@@ -12,7 +12,7 @@ function price_unit(?string $unit): ?string {
 function historical_fx(?string $unit, string $when, ?float $explicit): float {
     $unit = price_unit($unit);
     if ($explicit !== null) {
-        if (!is_finite($explicit) || $explicit <= 0) throw new ApiError('Le taux de change doit être strictement positif', 422);
+        if (!is_finite($explicit) || round($explicit, 10) <= 0 || $explicit >= 1e10) throw new ApiError('Le taux de change doit être strictement positif', 422);
         if ($unit === 'EUR' && abs($explicit - 1) > 1e-10) throw new ApiError('Le taux EUR doit être égal à 1', 422);
         return $explicit;
     }

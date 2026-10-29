@@ -31,7 +31,7 @@ J.cls = v => (v > 0 ? 'up' : v < 0 ? 'down' : '');
 J.date = s => { if (!s) return '–'; const d = new Date(s.replace(' ', 'T') + (s.length > 10 ? 'Z' : '')); return isNaN(d) ? s : d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' }); };
 J.dateTime = s => { if (!s) return '–'; const d = new Date(s.replace(' ', 'T') + 'Z'); return isNaN(d) ? s : d.toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }); };
 J.ago = s => { if (!s) return '–'; const m = (Date.now() - new Date(s.replace(' ', 'T') + 'Z')) / 60000; return m < 1 ? 'à l’instant' : m < 60 ? Math.round(m) + ' min' : m < 1440 ? Math.round(m / 60) + ' h' : Math.round(m / 1440) + ' j'; };
-J.priceLabel = r => ({ intraday: 'Cours différé', daily: 'Clôture', quote: 'Dernier cours' }[r.price_source || r.source] || 'Cours');
+J.priceLabel = r => r.price_stale ? 'Cours ancien' : ({ intraday: 'Cours différé', daily: 'Clôture', quote: 'Dernier cours' }[r.price_source || r.source] || 'Cours');
 
 /* ───── statuts et explications ───── */
 J.statusBadge = (status, label) => `<span class="badge ${{ retained: 'ok', rejected: 'ko', unknown: 'wait', excluded: 'ko' }[status] || ''}">${J.esc(label || status)}</span>`;

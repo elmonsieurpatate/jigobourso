@@ -16,6 +16,9 @@ function tx_fields(array $b): array {
     $fees = num_in($b, 'fees', false, 0) ?? 0.0;
     $fx = num_in($b, 'fx_to_eur', false, 0);
     $when = str_in($b, 'trade_at', 25);
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2}(?::\d{2})?)?$/', $when)) throw new ApiError('Date invalide', 422);
+    $date = DateTimeImmutable::createFromFormat('!Y-m-d', substr($when, 0, 10), new DateTimeZone('UTC'));
+    if (!$date || $date->format('Y-m-d') !== substr($when, 0, 10)) throw new ApiError('Date invalide', 422);
     $ts = strtotime($when . (strlen($when) <= 10 ? ' 12:00:00' : '') . ' UTC');
     if ($ts === false || $ts > time() + 86400) throw new ApiError('Date invalide');
     return [$side, $qty, $price, $fees, $fx, gmdate('Y-m-d H:i:s', $ts)];

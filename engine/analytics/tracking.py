@@ -11,25 +11,24 @@ from collections import defaultdict
 
 from . import service, strategy
 from .repository import recommendable_candidates
-from .series import usable_closes, find_breaks
+from .series import usable_closes, find_breaks, prepare_series
 
 HORIZONS = (1, 3, 5)
 TOP_N = 20              # titres gardés par groupe (actions / ETF) et par stratégie
 MAX_STALE_DAYS = 5      # base de calcul trop ancienne : le titre n'est pas évalué ce jour-là
 
 
-def forward_returns(bars, snap_date, horizons=HORIZONS):
+def forward_returns(bars, snap_date, horizons=HORIZONS, splits=()):
     """Rendement (%) N séances après `snap_date`, par horizon disponible. bars = [(date, close, adj_close|None)] triées.
 
     Base = dernière clôture ≤ snap_date. Un saut de cours non expliqué entre la base et la cible invalide l'horizon."""
-    dates, closes, basis = usable_closes(bars)
+    dates, closes, basis, breaks = prepare_series(bars, splits)
     base = bisect.bisect_right(dates, snap_date) - 1
     if base < 0:
         return {}
     gap = datetime.date.fromisoformat(snap_date) - datetime.date.fromisoformat(dates[base])
     if gap.days > MAX_STALE_DAYS:
         return {}
-    breaks = find_breaks(dates, closes, basis)
     out = {}
     for k in horizons:
         j = base + k
@@ -161,7 +160,12 @@ def update_outcomes(conn):
                                 WHERE listing_id IN ({','.join(['%s'] * len(part))}) AND price_date BETWEEN %s AND %s ORDER BY listing_id, price_date""", part + [start, stop])
                 for r in cur.fetchall():
                     bars[r['listing_id']].append((r['price_date'].isoformat(), float(r['close_px']), None if r['adj_close_px'] is None else float(r['adj_close_px'])))
-        fwd = {lid: forward_returns(rows, day, todo) for lid, rows in bars.items()}
+        splits = defaultdict(list)
+        with conn.cursor() as cur:
+            cur.execute("SELECT listing_id,event_date,ratio FROM corporate_events WHERE kind IN ('split','reverse_split')")
+            for r in cur.fetchall():
+                splits[r['listing_id']].append((r['event_date'].isoformat(),float(r['ratio']) if r['ratio'] else None))
+        fwd = {lid: forward_returns(rows, day, todo, splits[lid]) for lid, rows in bars.items()}
         outcome_rows = [(day, preset, lid, h, round(fwd[lid][h], 4)) for preset, lid in picks for h in todo if h in fwd.get(lid, {})]
         universe_rows = []
         for h in todo:

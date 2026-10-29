@@ -50,3 +50,20 @@ def test_log_slope_compounding_known_case():
  ('XETR','2026-10-25T18:00:00+00:00','2026-10-23')])
 def test_independent_freshness_clock(mic,stamp,expected):
     assert hours.expected_last_close(mic,dt.datetime.fromisoformat(stamp))==expected
+
+def test_unknown_split_also_invalidates_crossing_moving_average():
+    bars=[(str(i).zfill(3),100 if i<55 else 50,None) for i in range(60)]
+    *_,m,missing,tech=analyze_series(bars,[21],['055'])
+    assert tech['ma20'] is None and tech['ma50'] is None
+    assert m[21] is None
+
+def test_tracking_forward_return_uses_the_same_split_basis():
+    from engine.analytics.tracking import forward_returns
+    bars=[('2026-10-01',100,None),('2026-10-02',50,None),('2026-10-05',55,None)]
+    result=forward_returns(bars,'2026-10-01',[1,2],[('2026-10-02',2)])
+    assert result[1]==pytest.approx(0) and result[2]==pytest.approx(10)
+
+def test_quote_outage_during_open_session_is_not_presented_as_current():
+    now=dt.datetime(2026,10,29,11,tzinfo=dt.timezone.utc)
+    assert hours.price_is_stale('XETR',now-dt.timedelta(hours=1),now)
+    assert not hours.price_is_stale('XETR',now-dt.timedelta(minutes=15),now)

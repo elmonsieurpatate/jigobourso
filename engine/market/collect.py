@@ -77,7 +77,7 @@ def refresh_quotes(conn, client, rows, now, progress=None, stats=None):
                                ON DUPLICATE KEY UPDATE price=IF(source='intraday' AND price_time>VALUES(price_time),price,VALUES(price)),
                                  price_time=IF(source='intraday' AND price_time>VALUES(price_time),price_time,VALUES(price_time)),
                                  source=IF(source='intraday' AND price_time>VALUES(price_time),source,'quote'),
-                                 currency=VALUES(currency), avg_volume_3m=VALUES(avg_volume_3m), market_cap=VALUES(market_cap), quote_at=VALUES(quote_at)""",
+                                 currency=IF(source='intraday' AND price_time>VALUES(price_time),currency,VALUES(currency)), avg_volume_3m=VALUES(avg_volume_3m), market_cap=VALUES(market_cap), quote_at=VALUES(quote_at)""",
                             [(d[0], d[1], d[2], d[3], d[4], d[5], d[6]) for d in data])
         conn.commit()
         ok += len(data)

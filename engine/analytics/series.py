@@ -37,16 +37,9 @@ def clean_window(closes, sessions, break_indexes):
     return closes[start:], None
 
 
-def analyze_series(bars, windows, splits=()):
-    """Shared financial preparation: adjusted closes, or split-adjusted raw closes.
-
-    Split ratio = new shares / old shares. Before a 2:1 split, 100 becomes 50.
-    Unknown ratios invalidate crossing windows, never simulate a gain/loss.
-    No mixture of vendor-adjusted and unadjusted prices. Analysis uses 300 bars.
-    """
-    from .measures import window_metrics, technical_state
-    rows = list(bars)[-300:]
-    dates, closes, basis = usable_closes(rows)
+def prepare_series(bars, splits=()):
+    """One financial basis for charts, metrics and strategies, without truncation."""
+    dates, closes, basis = usable_closes(bars)
     events = [(s, None) if isinstance(s, str) else (s[0], s[1]) for s in splits]
     unknown = []
     if basis == 'raw':
@@ -56,10 +49,22 @@ def analyze_series(bars, windows, splits=()):
             else:
                 closes = [c / ratio if d < day else c for d, c in zip(dates, closes)]
     breaks = find_breaks(dates, closes, basis, unknown)
+    return dates, closes, basis, breaks
+
+
+def analyze_series(bars, windows, splits=()):
+    """Use the same adjusted or raw series for every consumer.
+
+    Ratio = new shares / old shares. Vendor adjustments take precedence;
+    otherwise known ratios adjust all earlier raw closes. Unknown ratios
+    invalidate crossing windows. No arbitrary cut-off changes the price basis.
+    """
+    from .measures import window_metrics, technical_state
+    dates, closes, basis, breaks = prepare_series(bars, splits)
     measures, missing = {}, {}
     for n in windows:
         window, why = clean_window(closes, n, breaks)
         measures[n] = window_metrics(window) if window else None
         if window is None:
             missing[n] = why
-    return dates, closes, basis, breaks, measures, missing, technical_state(closes)
+    return dates, closes, basis, breaks, measures, missing, technical_state(closes[breaks[-1]:] if breaks else closes)

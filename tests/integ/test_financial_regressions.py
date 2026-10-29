@@ -138,3 +138,38 @@ def test_legacy_missing_fx_is_visible_not_silently_revalued(world):
 def fixed_market_clock(monkeypatch):
     from engine.market import hours
     monkeypatch.setattr(hours, 'utcnow', lambda: dt.datetime(2026,10,29,12,tzinfo=dt.timezone.utc))
+
+
+def test_concurrent_sales_serialize_and_only_one_can_spend_same_share(world):
+    import subprocess
+    from tests.integ.test_api import ROOT
+    a,pf=account(world)
+    assert add(a,pf,'buy',1,100)[0]==200
+    con=connect()
+    with con.cursor() as c:
+        c.execute('SELECT user_id FROM portfolios WHERE id=%s',(pf,)); uid=c.fetchone()['user_id']
+    con.close()
+    code = "require " + repr(ROOT+'/app/services/transactions.php') + "; try { write_transaction("+str(uid)+","+str(pf)+", function($rows) { usleep(150000); q(\"INSERT INTO portfolio_transactions(portfolio_id,listing_id,symbol,side,quantity,unit_price,currency,fx_to_eur,trade_at,created_at) VALUES (?,1,'A.DE','sell',1,120,'EUR',1,'2026-10-02',NOW())\", ["+str(pf)+"]); return []; }); exit(0); } catch (ApiError $e) { exit($e->status === 422 ? 42 : 43); }"
+    # Separate PHP processes/connections; the built-in HTTP server itself is single-threaded.
+    procs=[subprocess.Popen(['php','-r',code],stdout=subprocess.PIPE,stderr=subprocess.PIPE) for _ in range(2)]
+    results=[p.communicate(timeout=15) for p in procs]
+    assert sorted(p.returncode for p in procs)==[0,42],results
+    v=portfolio(a,pf)
+    assert v['transactions']==2 and not v['positions']
+    assert v['totals']['realized']==pytest.approx(20)
+
+@pytest.mark.parametrize('when',['2026-02-30','not-a-date'])
+def test_invalid_trade_dates_are_not_silently_normalized(world,when):
+    a,pf=account(world)
+    assert add(a,pf,'buy',1,100,when)[0]==422
+
+def test_full_disposal_net_cash_identity_includes_all_fees(world):
+    a,pf=account(world)
+    assert add(a,pf,'buy',3,100,fees=2)[0]==200
+    assert add(a,pf,'sell',1,110,'2026-10-02',fees=1)[0]==200
+    assert add(a,pf,'sell',2,120,'2026-10-03',fees=3)[0]==200
+    v=portfolio(a,pf)
+    assert not v['positions']
+    assert v['totals']['realized']==pytest.approx(44) #109+237-302
+    assert v['totals']['proceeds_total']-v['totals']['invested_total']==pytest.approx(44)
+    assert v['totals']['fees']==pytest.approx(6)
