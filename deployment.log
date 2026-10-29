@@ -1,1 +1,11 @@
 == Contrôles du serveur (lecture seule)
+== Contrôle des fichiers SQL : ajouts seulement
+== Version des pages : ?v=202610291900
+== Transfert du code
+== Dépendances Python, migrations de schéma, contrôles
+moteur importable
+== Recalcul des mesures et classements depuis les historiques existants
+Échec déploiement : étape dépendances Python, migration du schéma et recalcul (code 130)
+moteur importable après restauration
+site OK : accueil 200, API répond (200)
+Code restauré ; les données et la base n'ont pas été touchées (les migrations déjà appliquées sont additives).
