@@ -3,7 +3,7 @@
   const user = await J.init('explorer'); if (!user) return;
   const params = new URLSearchParams(location.search), id = +params.get('id'), page = J.$('#page');
   /* Le verdict suit exactement la configuration choisie : celle de l'Explorer (par défaut si on vient de là), d'un profil ou d'un portefeuille. */
-  const saved = (() => { try { return JSON.parse(localStorage.getItem('jigo_explorer2')) || null; } catch (e) { return null; } })();
+  const saved = (() => { try { return JSON.parse(new URLSearchParams(location.hash.slice(1)).get('explore')) || JSON.parse(localStorage.getItem('jigo_explorer2')) || null; } catch (e) { return null; } })();
   const pfList = (await J.api('portfolios').catch(() => ({ portfolios: [] }))).portfolios.filter(p => p.has_strategy);
   const P = await J.api('strategy/presets').catch(() => ({ presets: {} }));
   const PN = { regular: 'Croissance régulière', fast: 'Croissance rapide', recovery: 'Rebond', low_volatility: 'Hausse calme' };
@@ -12,7 +12,7 @@
   const reqBody = { id };
   if (src === 'explorer') {
     const sv = saved.view || {}, keep = {};
-    ['kind', 'market', 'country', 'category', 'budget', 'min_price', 'max_price', 'max_volatility', 'max_drawdown', 'min_volume', 'pea', 'owned_only', 'open_now', 'fresh_only'].forEach(k => { if (sv[k] !== '' && sv[k] !== false && sv[k] !== undefined) keep[k] = sv[k]; });
+    ['kind', 'market', 'country', 'category', 'budget', 'min_price', 'max_price', 'min_score', 'max_volatility', 'max_drawdown', 'min_volume', 'pea', 'owned_only', 'open_now', 'fresh_only'].forEach(k => { if (sv[k] !== '' && sv[k] !== false && sv[k] !== undefined) keep[k] = sv[k]; });
     reqBody.config = saved.config; reqBody.view = keep;
     reqBody.source = 'Réglages de l’Explorer' + (saved.label ? ' · ' + saved.label : saved.preset && PN[saved.preset] ? ' · ' + PN[saved.preset] : ' (personnalisés)');
   } else if (src.startsWith('preset:') && P.presets[src.slice(7)]) { reqBody.config = P.presets[src.slice(7)]; reqBody.source = 'Profil « ' + PN[src.slice(7)] + ' »'; }

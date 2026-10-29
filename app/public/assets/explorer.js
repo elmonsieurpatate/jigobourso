@@ -124,12 +124,13 @@
     const tip = { slope: '%/séance', r2: 'régularité', perf: 'performance', volatility: '%/séance', drawdown: 'repli maximal' };
     return '<thead><tr>' + COLS.map(([k, l, c]) => k ? `<th class="sortable ${c || ''} ${S.sort === k ? 'sorted' : ''}" data-k="${k}" title="${tip[k] ? tip[k] + ' sur ' + ref + ' séances' : 'Trier'}">${l}${S.sort === k ? (S.dir === 'asc' ? ' ▲' : ' ▼') : ''}</th>` : `<th class="${c || ''}">${l}</th>`).join('') + '</tr></thead>';
   }
+  function sheetHref(id) { return 'titre.html?src=explorer&id=' + encodeURIComponent(id) + '#explore=' + encodeURIComponent(JSON.stringify({config:S.config,view:view(),preset:S.preset,label:S.label})); }
   function row(r) {
     const m = r.ref || {};
     const badge = r.status === 'excluded' ? `<span class="badge ko help" title="${J.esc(r.excluded_reason || '')}">Exclu</span>` : J.statusBadge(r.status, r.status_label);
     const fresh = r.last_close ? J.date(r.last_close) : '–';
     return `<tr data-id="${r.id}"><td class="rk">${r.rank || '·'}</td>
-      <td class="name"><span class="nm">${`<a data-sheet href="titre.html?src=explorer&id=${r.id}" target="_blank" rel="noopener" aria-label="Ouvrir ${J.esc(r.symbol)} dans un nouvel onglet">${J.esc(r.name)}</a>`}</span><span class="sub">${J.esc(r.symbol)} · ${J.esc(r.market)} <span class="tag ${r.kind === 'etf' ? 'etf' : ''}">${r.kind === 'etf' ? 'ETF' : 'ACTION'}</span>${r.pea ? ' <span class="tag pea">PEA</span>' : ''}${r.held ? ' <span class="tag held">DÉTENU</span>' : ''}${r.open ? ' <span class="tag open">OUVERT</span>' : ''}</span>${r.status === 'excluded' ? `<span class="sub warn">${J.esc(r.excluded_reason || '')}</span>` : ''}</td>
+      <td class="name"><span class="nm">${`<a data-sheet href="${J.esc(sheetHref(r.id))}" target="_blank" rel="noopener" aria-label="Ouvrir ${J.esc(r.symbol)} dans un nouvel onglet">${J.esc(r.name)}</a>`}</span><span class="sub">${J.esc(r.symbol)} · ${J.esc(r.market)} <span class="tag ${r.kind === 'etf' ? 'etf' : ''}">${r.kind === 'etf' ? 'ETF' : 'ACTION'}</span>${r.pea ? ' <span class="tag pea">PEA</span>' : ''}${r.held ? ' <span class="tag held">DÉTENU</span>' : ''}${r.open ? ' <span class="tag open">OUVERT</span>' : ''}</span>${r.status === 'excluded' ? `<span class="sub warn">${J.esc(r.excluded_reason || '')}</span>` : ''}</td>
       <td class="num">${r.price_eur !== null && r.price_eur !== undefined ? J.eur(r.price_eur) : J.money(r.price, r.currency)}<span class="sub" style="display:block">${r.currency !== 'EUR' && r.price !== null ? J.money(r.price, r.currency) : (r.price ? J.priceLabel(r) : '')}</span>${r.price_stale ? '<span class="sub warn">Cours ancien</span>' : ''}</td>
       <td class="hide-s">${J.spark(r.curve)}</td>
       <td class="num ${J.cls(m.slope)}">${m.slope !== null && m.slope !== undefined ? J.num(m.slope, 3) : '–'}</td><td class="num">${J.num(m.r2, 2)}</td><td class="num ${J.cls(m.perf)}">${J.pct(m.perf, 1)}</td>
@@ -169,7 +170,7 @@
     if (my !== seq) return;
     drawTabs(eq);
     const col = (title, res) => `<div><h2 style="margin:0 0 4px">${title}</h2><div class="muted small" style="margin-bottom:8px">${J.num(res.counts[title === 'Actions' ? 'equity' : 'etf'].retained || 0, 0)} retenus sur ${J.num(res.populations[title === 'Actions' ? 'equity' : 'etf'], 0)} · 12 premiers</div>
-      ${res.rows.map(r => `<a class="result" href="titre.html?src=explorer&id=${r.id}" style="grid-template-columns:34px 1fr auto"><div class="rank">${r.rank}</div><div style="min-width:0"><div class="name">${J.esc(r.name)}</div><div class="meta">${J.esc(r.symbol)} · ${J.esc(r.market)} · pente ${J.num(r.ref.slope, 3)} · R² ${J.num(r.ref.r2, 2)}</div></div><div class="num"><b>${J.num(r.score, 0)}</b><div class="meta">${J.pct(r.ref.perf, 1)}</div></div></a>`).join('') || '<div class="muted">Aucun titre retenu.</div>'}</div>`;
+      ${res.rows.map(r => `<a class="result" target="_blank" rel="noopener" href="${J.esc(sheetHref(r.id))}" style="grid-template-columns:34px 1fr auto"><div class="rank">${r.rank}</div><div style="min-width:0"><div class="name">${J.esc(r.name)}</div><div class="meta">${J.esc(r.symbol)} · ${J.esc(r.market)} · pente ${J.num(r.ref.slope, 3)} · R² ${J.num(r.ref.r2, 2)}</div></div><div class="num"><b>${J.num(r.score, 0)}</b><div class="meta">${J.pct(r.ref.perf, 1)}</div></div></a>`).join('') || '<div class="muted">Aucun titre retenu.</div>'}</div>`;
     el('results').innerHTML = `<div class="grid cols-2" style="padding:16px 18px;gap:24px">${col('Actions', eq)}${col('ETF', etf)}</div>`;
     el('pager').innerHTML = '<span class="muted small">Chaque groupe est classé à part : un ETF n’est jamais comparé à une action pour le rang ; ici les deux classements sont côte à côte.</span>';
   }
