@@ -14,7 +14,7 @@ from engine.market import hours
 from engine.market.collect import effective_expected_close, latest_rates, to_eur_factor
 from . import strategy
 from .measures import window_metrics
-from .series import usable_closes, find_breaks, clean_window, analyze_series, prepare_series
+from .series import usable_closes, find_breaks, clean_window, analyze_series, prepare_series, data_corrections
 
 # PEA : actions d'une société dont le siège est dans l'UE ou l'EEE (Islande, Liechtenstein et Norvège compris ; pas le Royaume-Uni ni la Suisse),
 # achetées sur une place européenne (c'est ce que les courtiers acceptent dans un PEA). Une action américaine d'une société irlandaise n'est donc
@@ -31,6 +31,18 @@ def pea_status(kind, country, mic):
     if kind == 'etf':
         return 'a_verifier'
     return 'probable' if country in PEA_COUNTRIES and mic in PEA_MICS else 'non'
+
+
+def last_collection(conn, mic):
+    """Fin de la dernière collecte de 15 minutes réussie de la place (UTC naïf), ou None : c'est elle qui dit si NOS données sont à jour pendant la séance."""
+    now = hours.utcnow()
+    memo = conn.__dict__.setdefault('_jigo_collected', {})
+    key = (mic, now.replace(second=0, microsecond=0))
+    if key not in memo:
+        with conn.cursor() as cur:
+            cur.execute("SELECT MAX(finished_at) f FROM jobs WHERE job_type=%s AND status IN ('completed','completed_with_errors')", ('intraday:' + mic,))
+            memo[key] = cur.fetchone()['f']
+    return memo[key]
 
 
 def expected_close(conn, mic):
@@ -130,7 +142,7 @@ def _row(v, rates, conn=None):
             'currency': cur, 'price': price, 'price_eur': price * factor if price is not None and factor else None,
             'price_time': u['price_time'].isoformat(sep=' ') if u['price_time'] else None, 'price_source': u['price_source'],
             'status': v['status'], 'status_label': STATUS_LABELS[v['status']], 'score': v['score'], 'rank': v['rank'],
-            'quality': u['quality'], 'price_stale': hours.price_is_stale(u['mic'], u['price_time'], hours.utcnow(), expected_close(conn, u['mic']) if conn is not None else None), 'measures': {str(n): m for n, m in v['measures'].items()}, 'reasons': v['reasons']}
+            'quality': u['quality'], 'price_stale': hours.price_is_stale(u['mic'], u['price_time'], hours.utcnow(), expected_close(conn, u['mic']) if conn is not None else None, last_collection(conn, u['mic']) if conn is not None else None), 'measures': {str(n): m for n, m in v['measures'].items()}, 'reasons': v['reasons']}
 
 
 CACHE_FORMAT = 3
@@ -413,7 +425,8 @@ def instrument_sheet(conn, request):
     sheet['daily'] = [[d, c] for d, c in zip(chart_dates, chart_closes)][-400:]
     sheet['daily_volume'] = [volumes.get(d) for d, _ in sheet['daily']]
     sheet['chart_break_dates'] = [chart_dates[i] for i in chart_breaks]
-    sheet['price_stale'] = hours.price_is_stale(u['mic'], u['price_time'], hours.utcnow(), expected_close(conn, u['mic']))
+    sheet['data_corrections'] = data_corrections(bars, splits)
+    sheet['price_stale'] = hours.price_is_stale(u['mic'], u['price_time'], hours.utcnow(), expected_close(conn, u['mic']), last_collection(conn, u['mic']))
     if sheet['freshness']['stale']:
         sheet['state']['quality'] = 'stale'
 

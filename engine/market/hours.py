@@ -108,8 +108,13 @@ def expected_last_close(mic, now):
     return day.isoformat()
 
 
-def price_is_stale(mic, stamp, now, expected=None):
-    """`expected` : dernière clôture due (ISO) si l'appelant la connaît mieux que l'horloge (jours fériés déduits des données)."""
+def price_is_stale(mic, stamp, now, expected=None, checked=None):
+    """Le cours affiché est-il « ancien » ?
+
+    1. Son dernier échange date d'avant la dernière clôture due (`expected`, jours fériés déduits des données) : oui.
+    2. Pendant la séance : un titre peu échangé (ETF de niche) peut ne pas avoir de transaction depuis 30 minutes, ce qui n'a rien d'anormal : le cours est alors
+       le dernier échange, toujours d'actualité. Il n'est « ancien » que si NOTRE donnée est ancienne, c'est-à-dire si ni le dernier échange (`stamp`) ni la dernière
+       vérification de la place par la collecte de 15 minutes (`checked`) ne datent de moins de 30 minutes. Sans `checked` (inconnu), on retombe sur le dernier échange seul."""
     if stamp is None:
         return True
     if now.tzinfo is None:
@@ -118,5 +123,9 @@ def price_is_stale(mic, stamp, now, expected=None):
         stamp = stamp.replace(tzinfo=timezone.utc)
     if _local(mic, stamp).date().isoformat() < (expected or expected_last_close(mic, now)):
         return True
-    # During trading, a quote older than two intraday slots is explicitly old.
-    return is_open(mic, now) and (now - stamp).total_seconds() > 30 * 60
+    if not is_open(mic, now):
+        return False
+    latest = stamp
+    if checked is not None:
+        latest = max(stamp, checked if checked.tzinfo else checked.replace(tzinfo=timezone.utc))
+    return (now - latest).total_seconds() > 30 * 60

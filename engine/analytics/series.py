@@ -1,4 +1,5 @@
 """Préparation d'une série de clôtures : choix cours bruts / ajustés et détection des ruptures de cours."""
+import datetime
 import math
 
 BREAK_RATIO = 1.6   # variation d'une séance à l'autre au-delà de laquelle un saut est suspect (×1,6 ou ÷1,6)
@@ -37,9 +38,64 @@ def clean_window(closes, sessions, break_indexes):
     return closes[start:], None
 
 
+# ── Erreurs de données identifiables (sans inventer de prix ni effacer un vrai mouvement) ──
+UNIT_FACTOR = 100.0        # livres / pence (Londres), rands / cents, shekels / agorot : Yahoo bascule parfois d'une unité à l'autre
+UNIT_TOLERANCE = 0.06      # un vrai mouvement n'est jamais de ×100 en une séance : un saut de ×100 ou ÷100 (± 6 %) est un changement d'unité
+SPIKE_FACTOR = 4.0         # un cours isolé à plus de ×4 (ou ÷4) de ses DEUX voisines, qui se ressemblent, est une erreur de donnée ponctuelle
+
+
+def _near_day(day, others, tolerance=5):
+    d = datetime.date.fromisoformat(day)
+    return any(abs((d - datetime.date.fromisoformat(o)).days) <= tolerance for o in others)
+
+
+def normalize_units(dates, closes, protected=()):
+    """Ramène tous les cours à l'unité de la DERNIÈRE séance. Un saut de ×100 ou ÷100 est un changement d'unité, pas un rendement : l'historique antérieur est
+    mis à l'échelle de ×100 (ou ÷100) et le vrai mouvement restant (par ex. +0,14 %) est conservé. Les dates proches d'un split déclaré sont laissées de côté.
+    Renvoie (cours corrigés, notes)."""
+    n = len(closes)
+    out, notes, scale = list(closes), [], 1.0
+    for i in range(n - 1, 0, -1):
+        r = closes[i] / closes[i - 1]
+        if (abs(r / UNIT_FACTOR - 1) <= UNIT_TOLERANCE or abs(r * UNIT_FACTOR - 1) <= UNIT_TOLERANCE) and not _near_day(dates[i], protected):
+            factor = UNIT_FACTOR if r > 1 else 1 / UNIT_FACTOR
+            scale *= factor
+            notes.append({'kind': 'unit', 'date': dates[i], 'factor': factor})
+        out[i - 1] = closes[i - 1] * scale
+    return out, sorted(notes, key=lambda x: x['date'])
+
+
+def drop_isolated_spikes(dates, closes):
+    """Retire (sans rien remplacer) un cours isolé à plus de ×4 / ÷4 de ses deux voisins quand ceux-ci se ressemblent (à ×1,6 près) : erreur de donnée ponctuelle.
+    Une vraie rupture ou un vrai mouvement persistant n'est jamais concerné (le cours suivant ne revient pas au niveau d'avant). Renvoie (dates, cours, notes)."""
+    keep, notes = [], []
+    for i in range(len(closes)):
+        if 0 < i < len(closes) - 1:
+            a, b, c = closes[i - 1], closes[i], closes[i + 1]
+            if a > 0 and c > 0 and b > 0 and 1 / BREAK_RATIO < a / c < BREAK_RATIO and ((b / a <= 1 / SPIKE_FACTOR and b / c <= 1 / SPIKE_FACTOR) or (b / a >= SPIKE_FACTOR and b / c >= SPIKE_FACTOR)):
+                notes.append({'kind': 'spike', 'date': dates[i], 'close': b, 'neighbours': [a, c]})
+                continue
+        keep.append(i)
+    return [dates[i] for i in keep], [closes[i] for i in keep], notes
+
+
+def _clean(bars, splits=()):
+    """Séries utilisables + corrections de données appliquées (changements d'unité, cours aberrants isolés)."""
+    dates, closes, basis = usable_closes(bars)
+    protected = [s if isinstance(s, str) else s[0] for s in splits]
+    closes, unit_notes = normalize_units(dates, closes, protected)
+    dates, closes, spike_notes = drop_isolated_spikes(dates, closes)
+    return dates, closes, basis, unit_notes + spike_notes
+
+
+def data_corrections(bars, splits=()):
+    """Corrections de données appliquées à cette série (pour l'afficher : rien n'est corrigé en silence)."""
+    return _clean(bars, splits)[3]
+
+
 def prepare_series(bars, splits=()):
     """One financial basis for charts, metrics and strategies, without truncation."""
-    dates, closes, basis = usable_closes(bars)
+    dates, closes, basis, _ = _clean(bars, splits)
     events = [(s, None) if isinstance(s, str) else (s[0], s[1]) for s in splits]
     unknown = []
     if basis == 'raw':

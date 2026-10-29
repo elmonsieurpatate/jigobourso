@@ -37,3 +37,29 @@ def test_parse_quotes():
     q = yahoo.parse_quotes({'quoteResponse': {'result': [{'symbol': 'DVDG.DE', 'regularMarketPrice': 42.1, 'averageDailyVolume3Month': 131, 'currency': 'EUR'},
                                                          {'symbol': 'X', 'regularMarketPrice': None}]}})
     assert list(q) == ['DVDG.DE'] and q['DVDG.DE']['avg_volume_3m'] == 131
+
+
+# ── « Cours ancien » : absence d'échange récent ≠ donnée ancienne ──
+import datetime as _dt  # noqa: E402
+from engine.market import hours as _hours  # noqa: E402
+
+_UTC = _dt.timezone.utc
+
+
+def test_quiet_etf_is_not_stale_when_our_collection_is_recent():
+    now = _dt.datetime(2026, 10, 29, 15, 30, tzinfo=_UTC)                      # Xetra ouverte (9 h - 17 h 30 à Berlin)
+    last_trade = _dt.datetime(2026, 10, 29, 14, 45, 44)                         # dernier échange il y a 45 min (cas réel BUG.DE)
+    assert _hours.is_open('XETR', now)
+    assert _hours.price_is_stale('XETR', last_trade, now, '2026-10-28') is True                                   # sans information sur la collecte : comportement d'avant
+    assert _hours.price_is_stale('XETR', last_trade, now, '2026-10-28', _dt.datetime(2026, 10, 29, 15, 25)) is False      # collecte il y a 5 min : cours d'actualité
+    assert _hours.price_is_stale('XETR', last_trade, now, '2026-10-28', _dt.datetime(2026, 10, 29, 14, 40)) is True       # collecte arrêtée depuis 50 min : donnée ancienne
+
+
+def test_price_older_than_the_last_expected_close_is_always_stale():
+    now = _dt.datetime(2026, 10, 29, 15, 30, tzinfo=_UTC)
+    assert _hours.price_is_stale('XETR', _dt.datetime(2026, 10, 27, 15, 0), now, '2026-10-28', _dt.datetime(2026, 10, 29, 15, 29)) is True
+
+
+def test_closed_market_is_not_stale_on_time_alone():
+    now = _dt.datetime(2026, 10, 29, 21, 0, tzinfo=_UTC)
+    assert _hours.price_is_stale('XETR', _dt.datetime(2026, 10, 29, 15, 29), now, '2026-10-29') is False
