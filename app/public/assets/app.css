@@ -204,3 +204,4 @@ tr.in-family td.name { box-shadow: inset 3px 0 0 var(--warn); }
 ul.reading { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 8px; } ul.reading li { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
 ul.reading .sig { font-size: .85rem; } details.why summary { display: inline; cursor: pointer; font-size: .72rem; color: var(--muted); } details.why { display: inline; }
 table.cmp th, table.cmp td { text-align: left; vertical-align: top; } table.cmp td:first-child { white-space: nowrap; }
+.card { min-width: 0; } table.cmp { min-width: 100%; } .table-wrap { max-width: 100%; }
