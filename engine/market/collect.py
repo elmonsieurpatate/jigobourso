@@ -9,7 +9,7 @@ import statistics
 import time
 from collections import defaultdict
 
-from . import hours, prefilter
+from . import hours, prefilter, splits
 from .yahoo import RateLimited, local_date
 
 DAILY_KEEP_DAYS = 610          # ≈ 420 séances US (580 jours n'en gardaient que 380-399 : jamais « complet » à 400)
@@ -90,7 +90,9 @@ def refresh_quotes(conn, client, rows, now, progress=None, stats=None):
 def refresh_fx(conn, client, now):
     """Taux de change vers l'euro pour les devises présentes dans le catalogue."""
     with conn.cursor() as cur:
-        cur.execute("SELECT DISTINCT CASE WHEN BINARY currency='GBp' OR UPPER(currency)='GBX' THEN 'GBP' ELSE UPPER(currency) END c FROM latest_prices WHERE currency IS NOT NULL")
+        cur.execute("""SELECT DISTINCT CASE WHEN BINARY currency IN ('GBp','ZAc') OR UPPER(currency) IN ('GBX','ILA') THEN
+                                          CASE WHEN UPPER(currency) IN ('GBP','GBX') THEN 'GBP' WHEN UPPER(currency)='ZAC' THEN 'ZAR' ELSE 'ILS' END
+                                        ELSE UPPER(currency) END c FROM latest_prices WHERE currency IS NOT NULL""")
         currencies = sorted({r['c'] for r in cur.fetchall()} - {'EUR'})
     pairs = {c: f'{c}EUR=X' for c in currencies}
     if not pairs:
@@ -104,13 +106,53 @@ def refresh_fx(conn, client, now):
     return len(rows)
 
 
+# Devises cotées dans une sous-unité : code Yahoo (sensible à la casse quand il l'est) -> (devise principale, diviseur).
+SUBUNITS = {'GBp': ('GBP', 100), 'GBX': ('GBP', 100), 'ZAc': ('ZAR', 100), 'ZAC': ('ZAR', 100), 'ILA': ('ILS', 100)}
+
+
+FX_HISTORY_DAYS = 300        # profondeur d'historique de change visée (les transactions plus anciennes exigent un taux saisi à la main)
+
+
+def backfill_fx(conn, client, now):
+    """Complète l'historique de change (clôtures quotidiennes Yahoo) des devises dont le premier taux connu est récent. Sans cela, une opération antérieure au
+    début de la collecte exige un taux saisi à la main. N'écrase jamais un taux existant ; une devise sans réponse n'est redemandée qu'une fois par semaine.
+    Renvoie le nombre de taux ajoutés."""
+    today = naive_utc(now).date()
+    with conn.cursor() as cur:
+        cur.execute('SELECT currency, MIN(rate_date) first FROM fx_rates GROUP BY currency')
+        first = {r['currency']: r['first'] for r in cur.fetchall()}
+    tried = setting(conn, 'fx_backfill_tried', {})
+    wanted = sorted(c for c, d in first.items() if d > today - datetime.timedelta(days=FX_HISTORY_DAYS)
+                    and (not tried.get(c) or (today - datetime.date.fromisoformat(tried[c])).days >= 7))
+    added = 0
+    for part in _batches(wanted, SPARK_BATCH):
+        pairs = {f'{c}EUR=X': c for c in part}
+        data = client.spark(list(pairs), '2y', '1d')
+        rows = []
+        for symbol, series in data.items():
+            c = pairs.get(symbol.upper())
+            if c:
+                rows += [(c, local_date(ts, series['timezone']), close) for ts, close in series['bars'] if close and close > 0]
+        with conn.cursor() as cur:
+            cur.executemany('INSERT IGNORE INTO fx_rates(currency,rate_date,to_eur) VALUES (%s,%s,%s)', rows)
+            added += max(0, cur.rowcount or 0)
+        for c in part:
+            tried[c] = today.isoformat()
+        with conn.cursor() as cur:
+            cur.execute('INSERT INTO settings(name, value_json, updated_at) VALUES (%s,%s,%s) ON DUPLICATE KEY UPDATE value_json=VALUES(value_json), updated_at=VALUES(updated_at)',
+                        ('fx_backfill_tried', json.dumps(tried), naive_utc(now)))
+        conn.commit()
+    return added
+
+
 def to_eur_factor(currency, rates):
-    """Facteur de conversion vers l'euro ; 'GBp' (pence) = GBP / 100 ; None si inconnu."""
+    """Facteur de conversion vers l'euro ; 'GBp' (pence), 'ZAc' (cents du rand) et 'ILA' (agorot) sont des sous-unités ; None si inconnu."""
     if not currency:
         return None
-    if currency == 'GBp' or currency.upper() == 'GBX':
-        r = rates.get('GBP')
-        return r / 100 if r else None
+    sub = SUBUNITS.get(currency) or SUBUNITS.get(currency.upper())
+    if sub:
+        r = rates.get(sub[0])
+        return r / sub[1] if r else None
     if currency.upper() == 'EUR':
         return 1.0
     return rates.get(currency.upper())
@@ -137,16 +179,19 @@ def apply_prefilter(conn, now=None):
             status, reason = prefilter.decide(r['kind'], float(r['price']) if r['price'] is not None else None,
                                               r['avg_volume_3m'], to_eur_factor(r['currency'], rates), params,
                                               age_days=(now - r['price_time']).total_seconds() / 86400 if r['price_time'] else None)
+            if status is None and r['price'] is not None and to_eur_factor(r['currency'], rates) is None:
+                # Aucun taux de change : on ne décide pas, mais on le dit (sinon le titre reste « candidat » sans explication).
+                status, reason = 'candidate', f'{prefilter.PREFIX} : devise {r["currency"] or "inconnue"} non convertible en euros (taux indisponible)'
             if status and (status != r['status'] or reason != r['excluded_reason']):
                 updates.append((status, reason, r['id']))
-                changed[status] += 1
+                changed[status] = changed.get(status, 0) + 1
         cur.executemany('UPDATE listings SET status=%s, excluded_reason=%s WHERE id=%s', updates)
     conn.commit()
     return changed
 
 
 # ───────── clôtures quotidiennes ─────────
-def collect_daily(conn, client, rows, now, range_='2y', progress=None):
+def collect_daily(conn, client, rows, now, range_='2y', progress=None, answered=None):
     """Clôtures définitives (séance terminée et publiée). Renvoie (cotations_ok, lignes, erreurs)."""
     by_symbol = {r['symbol'].upper(): r for r in rows}
     ok = lines = err = 0
@@ -168,6 +213,8 @@ def collect_daily(conn, client, rows, now, range_='2y', progress=None):
                     seen[day] = close
             out += [(row['listing_id'], d, c) for d, c in seen.items()]
             ok += bool(seen)
+            if seen and answered is not None:
+                answered.add(row['listing_id'])
         with conn.cursor() as cur:
             cur.executemany('INSERT INTO daily_prices(listing_id,price_date,close_px) VALUES (%s,%s,%s) ON DUPLICATE KEY UPDATE close_px=VALUES(close_px)', out)
         conn.commit()
@@ -211,8 +258,12 @@ def daily_plan(conn, rows, now):
             stats.update({r['listing_id']: (r['n'], r['a'], r['b']) for r in cur.fetchall()})
     tried = setting(conn, 'daily_backfill_tried', {})
     today = naive_utc(now).date()
+    forced = set(splits.due_ids(conn, ids, today))              # saut ressemblant à un split : historique complet redemandé pour que Yahoo l'ajuste
     plan, fresh = defaultdict(list), 0
     for r in rows:
+        if r['listing_id'] in forced:
+            plan['2y'].append(r)
+            continue
         st = stats.get(r['listing_id'])
         if not st:
             plan['2y'].append(r)
@@ -243,6 +294,36 @@ def mark_backfill_tried(conn, rows, now):
         cur.execute('INSERT INTO settings(name, value_json, updated_at) VALUES (%s,%s,%s) ON DUPLICATE KEY UPDATE value_json=VALUES(value_json), updated_at=VALUES(updated_at)',
                     ('daily_backfill_tried', json.dumps(keep), naive_utc(now)))
     conn.commit()
+
+
+def observed_holiday(conn, mic, day):
+    """Jour férié déduit des données : la collecte quotidienne de la place est passée après le règlement SANS erreur notable, et pourtant moins de 5 % des
+    titres suivis ont une clôture ce jour-là. Une panne du fournisseur (beaucoup d'erreurs, ou collecte pas encore passée) n'est jamais prise pour un férié."""
+    settled = hours.settle_utc(mic, day)
+    with conn.cursor() as cur:
+        cur.execute("""SELECT 1 FROM jobs WHERE job_type IN ('history', %s) AND status IN ('completed','completed_with_errors') AND COALESCE(items_ok, 0) > 0
+                       AND items_error <= 0.05 * (COALESCE(items_ok, 0) + items_error) AND started_at > %s LIMIT 1""", ('daily:' + mic, settled))
+        if not cur.fetchone():
+            return False
+        cur.execute("""SELECT COUNT(*) total, COUNT(d.listing_id) closed
+                       FROM v_collect_set c JOIN listings l ON l.id=c.listing_id
+                       LEFT JOIN daily_prices d ON d.listing_id=c.listing_id AND d.price_date=%s WHERE l.mic=%s""", (day, mic))
+        r = cur.fetchone()
+    total = int(r['total'] or 0)
+    return total > 0 and int(r['closed'] or 0) < 0.05 * total
+
+
+def effective_expected_close(conn, mic, now, lookback=5):
+    """Dernière clôture due (ISO) : celle de l'horloge (jours ouvrés + délai de publication) en reculant sur les jours fériés observés dans les données.
+    Sans cela, un jour férié rendrait toute la place « périmée » (donc « non évaluable ») jusqu'à la collecte du lendemain."""
+    day = datetime.date.fromisoformat(hours.expected_last_close(mic, now))
+    for _ in range(lookback):
+        if not observed_holiday(conn, mic, day):
+            break
+        day -= datetime.timedelta(days=1)
+        while day.weekday() >= 5:
+            day -= datetime.timedelta(days=1)
+    return day.isoformat()
 
 
 def is_holiday(conn, mic, group, day, settled):

@@ -10,7 +10,8 @@ function db(): PDO {
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         PDO::ATTR_EMULATE_PREPARES => false,
     ]);
-    $pdo->exec("SET time_zone = '+00:00'");
+    // Mode strict : une valeur hors limites ou trop longue est refusée au lieu d'être tronquée en silence (montants, quantités).
+    $pdo->exec("SET time_zone = '+00:00', SESSION sql_mode = CONCAT_WS(',', @@sql_mode, 'STRICT_TRANS_TABLES', 'ERROR_FOR_DIVISION_BY_ZERO')");
     return $pdo;
 }
 function q(string $sql, array $args = []): PDOStatement {

@@ -80,8 +80,12 @@ def serve(cmd):
             result = service.explore(conn, request) if cmd == 'explore' else service.instrument_sheet(conn, request)
         print(json.dumps(result, default=plain, ensure_ascii=False, allow_nan=False))
         return 0
-    except (ValueError, KeyError, TypeError) as e:
+    except ValueError as e:                                 # demande invalide : message écrit pour l'utilisateur
         print(json.dumps({'error': str(e)}, ensure_ascii=False))
+        return 2
+    except (KeyError, TypeError) as e:                      # forme de requête inattendue : le détail va dans le journal, pas vers le client
+        print(f'{type(e).__name__}: {e}', file=sys.stderr)
+        print(json.dumps({'error': f'Champ manquant : {e.args[0]}' if isinstance(e, KeyError) and e.args and isinstance(e.args[0], str) else 'Requête invalide'}, ensure_ascii=False))
         return 2
 
 

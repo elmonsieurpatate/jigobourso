@@ -14,10 +14,14 @@ function account_throttle(string $purpose, string $identity): void {
     }
 }
 function account_stamp(array $u): string { return hash('sha256',$u['pass_hash']."\0".($u['email'] ?? '')); }
-function issue_account_link(array $u, string $purpose, string $email): bool {
+// Étape 1 : enregistre le jeton (haché). Étape 2 : envoie le lien. Séparées pour ne pas tenir de verrou SQL pendant l'envoi.
+function stage_account_link(array $u, string $purpose, string $email): array {
     $raw=bin2hex(random_bytes(32));$hash=hash('sha256',$raw);
     q('INSERT INTO account_tokens(token_hash,user_id,purpose,target_email,auth_stamp,created_at,expires_at) VALUES (?,?,?,?,?,?,?)',
       [$hash,$u['id'],$purpose,$email,account_stamp($u),now_utc(),gmdate('Y-m-d H:i:s',time()+1800)]);
+    return [$hash,$raw];
+}
+function deliver_account_link(string $hash, string $raw, string $purpose, string $email): bool {
     // Fragments never travel in HTTP request URLs, proxy logs or Referer headers.
     $url='https://jigobourso.turnjoy.dev/'.($purpose==='reset'?'reset.html':'verify-email.html').'#token='.$raw;
     $message=($purpose==='reset'?'Vous avez demandé à réinitialiser votre mot de passe.':'Confirmez votre nouvelle adresse e-mail.')."\n\n".$url."\n\nCe lien expire dans 30 minutes et ne fonctionne qu’une fois. Si vous n’êtes pas à l’origine de cette demande, ignorez ce message.\nJigobourso";
@@ -27,7 +31,20 @@ function issue_account_link(array $u, string $purpose, string $email): bool {
     }
     return true;
 }
-function consume_account_link(string $raw, string $purpose, callable $change): void {
+function issue_account_link(array $u, string $purpose, string $email): bool {
+    [$hash,$raw]=stage_account_link($u,$purpose,$email);
+    return deliver_account_link($hash,$raw,$purpose,$email);
+}
+// Prévient l'adresse enregistrée d'un changement sensible (mot de passe, adresse). Ne lève jamais : l'échec d'un avis ne doit pas annuler l'opération.
+function notify_account_change(array $u, string $what, ?string $detail = null): void {
+    $to=(string)($u['email'] ?? '');
+    if ($to==='') return;
+    $subject=$what==='password'?'Votre mot de passe Jigobourso a été modifié':'L’adresse e-mail de votre compte Jigobourso a été remplacée';
+    $body=($what==='password'?'Le mot de passe de votre compte Jigobourso vient d’être modifié.':'L’adresse e-mail de votre compte Jigobourso vient d’être remplacée'.($detail?' par '.$detail:'').'.')
+         ."\n\nSi vous n’êtes pas à l’origine de ce changement, utilisez « Mot de passe oublié » sans attendre, avec une adresse que vous contrôlez, et prévenez l’administrateur.\nJigobourso";
+    try { send_account_mail($to,$subject,$body); } catch (Throwable $e) { error_log('account_notice: transport failure'); }
+}
+function consume_account_link(string $raw, string $purpose, callable $change): array {
     if (!preg_match('/^[a-f0-9]{64}$/D',$raw)) throw new ApiError('Lien invalide ou expiré. Demandez un nouveau lien.',422);
     $hash=hash('sha256',$raw);$db=db();$db->beginTransaction();
     try {
@@ -41,6 +58,7 @@ function consume_account_link(string $raw, string $purpose, callable $change): v
         $change($u,$t);
         q('UPDATE account_tokens SET used_at=? WHERE user_id=? AND used_at IS NULL',[now_utc(),$u['id']]);
         $db->commit();
+        return [$u,$t];
     } catch (Throwable $e) { if ($db->inTransaction()) $db->rollBack(); throw $e; }
 }
 function update_account(array $u,array $b): array {
@@ -52,12 +70,16 @@ function update_account(array $u,array $b): array {
         $email=mb_strtolower(str_in($b,'email',190));if (!filter_var($email,FILTER_VALIDATE_EMAIL)) throw new ApiError('Adresse e-mail invalide',422);
         if (q('SELECT id FROM users WHERE id<>? AND (username=? OR email=?)',[$u['id'],$name,$email])->fetch()) throw new ApiError('Ces coordonnées ne sont pas disponibles.',409);
         $changing=mb_strtolower($fresh['email'] ?? '')!==$email;
+        $staged=null;
         if ($changing) {
             account_throttle('email',$email);
-            if (!issue_account_link($fresh,'email',$email)) throw new ApiError('Envoi impossible pour le moment. Votre adresse actuelle est conservée.',503);
+            $staged=stage_account_link($fresh,'email',$email);
         }
         q('UPDATE users SET username=? WHERE id=?',[$name,$u['id']]);
         $db->commit();
+        // Envoi hors transaction : le verrou sur la ligne utilisateur n'est pas tenu pendant que le transport mail répond.
+        if ($staged && !deliver_account_link($staged[0],$staged[1],'email',$email))
+            throw new ApiError('Pseudo enregistré, mais l’envoi du lien de confirmation est impossible pour le moment. Votre adresse actuelle est conservée ; réessayez plus tard.',503);
         return ['ok'=>true,'email_pending'=>$changing,'message'=>$changing?'Pseudo enregistré. Confirmez la nouvelle adresse depuis le lien envoyé ; votre adresse actuelle reste active.':'Compte mis à jour.'];
     } catch(Throwable $e) {
         if($db->inTransaction())$db->rollBack();

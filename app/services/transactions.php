@@ -3,7 +3,8 @@ require_once __DIR__ . '/ledger.php';
 require_once __DIR__ . '/../lib/http.php';
 
 // A price is expressed in a unit, not just a currency. GBX is the canonical pence code.
-function price_unit(?string $unit): ?string {
+function price_unit($unit): ?string {
+    if ($unit !== null && !is_string($unit)) throw new ApiError('Devise invalide', 422);
     if ($unit === null || trim($unit) === '') return null;
     if ($unit === 'GBp' || strtoupper($unit) === 'GBX') return 'GBX';
     $unit = strtoupper(trim($unit));

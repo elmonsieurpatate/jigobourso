@@ -7,6 +7,9 @@
   const NAMES = { regular: 'Croissance régulière', fast: 'Croissance rapide', recovery: 'Rebond', low_volatility: 'Hausse calme' };
 
   const px = (v, c) => v === null || v === undefined ? '–' : J.money(v, c || 'EUR');
+  const splitNotice = positions => positions.filter(p => p.split_alerts && p.split_alerts.length).map(p => p.split_alerts.map(a => `<div class="notice warn" style="margin-top:14px"><b>${J.esc(p.name_catalogue || p.name || p.symbol)}</b> : ${a.ratio >= 1
+    ? `un split ${J.num(a.ratio, 2)} pour 1 a eu lieu le ${J.date(a.date)} (Yahoo a ajusté ses cours) mais votre quantité n’a pas été ajustée : la valeur affichée est sous-estimée. Ajoutez une transaction d’achat à <b>prix 0</b> de ${J.num(a.shares_to_add, 4)} titre(s) à la date du split : la quantité sera corrigée sans fausser le prix de revient.`
+    : `un regroupement ${J.num(1 / a.ratio, 2)} pour 1 a eu lieu le ${J.date(a.date)} (Yahoo a ajusté ses cours) mais votre quantité n’a pas été ajustée : la valeur affichée est surestimée. Modifiez vos achats d’avant cette date : divisez chaque quantité par ${J.num(1 / a.ratio, 2)} et multipliez chaque prix unitaire par ${J.num(1 / a.ratio, 2)}.`}</div>`).join('')).join('');
   function levelCell(p) {
     if (!p.linked) return '<span class="muted small">–</span>';
     const cur = p.price_currency || p.currency, L = p.levels || {}, price = p.price;
@@ -30,6 +33,7 @@
       <div class="card kpi"><span class="l">Plus-value réalisée</span><span class="v ${J.cls(t.realized)}">${J.eur(t.realized, 0)}</span></div>
       <div class="card kpi"><span class="l">Investi (positions ouvertes)</span><span class="v">${J.eur(t.cost, 0)}</span><span class="small muted">frais cumulés ${J.eur(t.fees)}</span></div></div>
     ${t.unpriced ? `<div class="notice warn" style="margin-top:14px">${t.unpriced} position${t.unpriced > 1 ? 's' : ''} sans cours disponible : la valeur totale est sous-estimée.</div>` : ''}
+    ${splitNotice(d.positions)}
     <div class="card" style="margin-top:16px"><div class="row between"><h2 style="margin:0">Positions</h2><div class="row"><button class="btn primary small" id="add-tx">Ajouter une transaction</button></div></div>
       <div class="table-wrap"><table><thead><tr><th>Titre</th><th class="num">Quantité</th><th class="num">Prix de revient</th><th class="num">Cours</th><th class="num">Valeur</th><th class="num">+/− value</th><th class="num">Poids</th><th>Garde-fous</th></tr></thead><tbody>
       ${d.positions.map(p => `<tr><td>${p.linked ? `<a href="titre.html?id=${p.listing_id}"><b>${J.esc(p.name_catalogue || p.name || p.symbol)}</b></a>` : `<b>${J.esc(p.name || p.symbol)}</b>`}<div class="small muted">${J.esc(p.symbol)} ${p.catalogue_status === 'excluded' ? `<span class="badge ko help" title="${J.esc(p.excluded_reason || '')}">Hors sélection</span>` : ''}${!p.linked ? '<span class="badge wait help" title="Titre saisi à la main, sans cours">Sans cours</span>' : ''}</div></td>

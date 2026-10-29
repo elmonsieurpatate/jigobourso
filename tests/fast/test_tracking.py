@@ -35,3 +35,15 @@ def test_summarize_edge_against_benchmark():
     assert abs(s['win_pct'] - 200 / 3) < 1e-9
     assert abs(s['edge'] - ((1.5 - 1.5 + 2.0) / 3)) < 1e-9 and abs(s['beat_pct'] - 200 / 3) < 1e-9
     assert summarize([], {}) is None
+
+
+def test_edge_compares_mean_with_mean_when_the_universe_mean_is_known():
+    # rendements asymétriques : la moyenne du groupe dépasse sa médiane sans aucun talent de sélection
+    returns = [('2026-10-01', 10.0), ('2026-10-02', 0.0), ('2026-10-03', 0.0)]
+    medians = {'2026-10-01': 0.0, '2026-10-02': 0.0, '2026-10-03': 0.0}
+    means = {'2026-10-01': 10.0, '2026-10-02': 0.0, '2026-10-03': 0.0}
+    old = summarize(returns, medians)
+    new = summarize(returns, medians, means)
+    assert old['edge'] > 3 and old['edge_basis'] == 'median'          # l'ancien calcul flatte
+    assert new['edge'] == 0 and new['edge_basis'] == 'mean' and new['edge_median'] == 0
+    assert new['days'] == 3

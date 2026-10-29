@@ -24,9 +24,18 @@ MARKETS = MARKET_NAMES       # compatibilité d'affichage (noms) : ne limite plu
 US_MICS = ('XNAS', 'XNYS', 'XASE', 'ARCX', 'BATS')
 MIC_FORMAT = re.compile(r'^[A-Z0-9]{3,6}$')
 
-_WARRANT = re.compile(r'\b(warrants?|rights?|units?|subscription receipts?)\b', re.I)
+# Bons de souscription, droits, unités : détectés par le nom ou le suffixe du symbole. « units » et « rights » seuls ne suffisent pas :
+# « Multi Units Luxembourg - Lyxor … » (toute une gamme d'ETF) ou « Human Rights » ne sont pas des dérivés. Pour une action, ces mots ne comptent
+# qu'en fin de nom (« Foo Acquisition Corp Units », « Foo Corp Rights ») ; pour un ETF, seuls « warrant(s) » et « subscription receipt(s) » comptent.
+_WARRANT = re.compile(r'\b(warrants?|subscription receipts?)\b', re.I)
+_EQUITY_DERIVATIVE_END = re.compile(r'\b(rights?|units?)\s*$', re.I)
 _SYMBOL_DERIVATIVE = re.compile(r'[-.](W|WS|WT|WTS|R|RT|U|UN)$')
-_LEVERAGED = re.compile(r'(\b[2-9]x\b|\bx[2-9]\b|\bleverag|\bultra(short|pro)?\b|\bdaily (short|inverse)|\binverse\b|\bshort\b|\bbear\b|\blevered\b|\b-[1-9]x\b)', re.I)
+# ETF à effet de levier ou inverses. Marqueurs forts : toujours exclus. Marqueurs faibles (« short », « ultra ») : exclus sauf si le nom décrit un fonds
+# obligataire / monétaire à courte durée (« Short Duration », « Ultra Short Income », « Short Treasury Bond »…), ou à une stratégie sans levier
+# (« Ultra Buffer », « Long/Short Equity », « Short-Term REIT »), qui n'a rien de spéculatif.
+_LEVERAGED_STRONG = re.compile(r'(\b[2-9]x\b|\bx[2-9]\b|\bleverag|\bultra[- ]?(short|pro)\b(?![- ]*(term|duration|bond|income|municipal|muni|treasur|credit|maturity|dated))|\bdaily (short|inverse)|\binverse\b|\bshort\s+\d|\bbear\b|\blevered\b|\b-[1-9]x\b)', re.I)
+_LEVERAGED_WEAK = re.compile(r'\b(short|ultra)\b', re.I)
+_FIXED_INCOME = re.compile(r'\b(bonds?|income|treasur\w*|municipal|muni|duration|dur|maturity|dated|credit|money market|cash|government|govt|corporate|clean energy|buffer|box|reit)\b|\bultra[- ]small\b|\blong/short\b|\bshort[- ]term\s+(fund|etf)\b', re.I)
 _SPAC = re.compile(r'\b(acquisition (corp|corporation|co)|blank check|spac)\b', re.I)
 
 # Ordre réel d'application. 'perimeter' : la ligne écartée n'est pas enregistrée comme cotation (hors périmètre) ;
@@ -119,6 +128,13 @@ def normalize(config):
     return cfg
 
 
+def is_leveraged_name(name):
+    """ETF à levier ou inverse d'après son nom (voir _LEVERAGED_STRONG / _LEVERAGED_WEAK)."""
+    if _LEVERAGED_STRONG.search(name):
+        return True
+    return bool(_LEVERAGED_WEAK.search(name)) and not _FIXED_INCOME.search(name)
+
+
 def evaluate(kind, row, config=None):
     """Premier motif d'exclusion rencontré, dans l'ordre réel des règles : (id de règle, motif) ou (None, None).
     `row` : dict avec symbol, name, mic, delisted. Les doublons sont traités par l'appelant (ils dépendent des autres lignes)."""
@@ -137,11 +153,11 @@ def evaluate(kind, row, config=None):
         return 'delisted', BY_ID['delisted']['reason']
     if cfg['nameless']['enabled'] and not name:
         return 'nameless', BY_ID['nameless']['reason']
-    if cfg['warrants']['enabled'] and (_WARRANT.search(name) or _SYMBOL_DERIVATIVE.search(symbol)):
+    if cfg['warrants']['enabled'] and (_WARRANT.search(name) or (kind == 'equity' and _EQUITY_DERIVATIVE_END.search(name)) or _SYMBOL_DERIVATIVE.search(symbol)):
         return 'warrants', BY_ID['warrants']['reason']
     if cfg['spac']['enabled'] and kind == 'equity' and _SPAC.search(name):
         return 'spac', BY_ID['spac']['reason']
-    if cfg['leveraged']['enabled'] and kind == 'etf' and _LEVERAGED.search(name):
+    if cfg['leveraged']['enabled'] and kind == 'etf' and is_leveraged_name(name):
         return 'leveraged', BY_ID['leveraged']['reason']
     return None, None
 

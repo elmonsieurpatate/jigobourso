@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 # Compte rendu minimal (statut, commit, lien du run, fin du journal) sur la branche existante deployment-status.
-# Aucun secret, aucune donnée de portefeuille : le journal ne contient que les messages de ops/deploy.sh.
+# Aucun secret, aucune donnée de portefeuille : le journal est filtré par ops/public-log.sh (titres d'étapes et verdicts seulement) car la branche est publique.
+repo_root=$(cd "$(dirname "$0")/.." && pwd)
 report_dir=$(mktemp -d)
 git init -q "$report_dir"
 cd "$report_dir"
@@ -28,7 +29,7 @@ Path('status.json').write_text(json.dumps({
 PY
 git add status.json
 if [ -f "$RUNNER_TEMP/jigobourso-deploy.log" ]; then
-  tail -n 200 "$RUNNER_TEMP/jigobourso-deploy.log" > deployment.log
+  bash "$repo_root/ops/public-log.sh" < "$RUNNER_TEMP/jigobourso-deploy.log" > deployment.log
   git add deployment.log
 fi
 git commit -qm "Statut du déploiement Jigobourso V2 : $STATUS" --allow-empty

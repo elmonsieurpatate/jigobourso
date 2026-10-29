@@ -16,7 +16,7 @@ return [
         need_post();
         $b = body();
         $code = (string)setting_value('invite_code', '');
-        $key = 'register:' . client_ip();
+        $key = attempt_key('register', client_ip());
         if (login_blocked($key)) throw new ApiError('Trop d’essais : réessayez plus tard', 429);
         if ($code === '' || !hash_equals(mb_strtolower($code), mb_strtolower(str_in($b, 'code', 60)))) {
             q('INSERT INTO login_attempts(username, ip, at) VALUES (?,?,?)', [$key, client_ip(), now_utc()]);
@@ -39,30 +39,36 @@ return [
             q('DELETE FROM sessions WHERE user_id=? AND token_hash<>?',[$u['id'],hash('sha256',$_COOKIE[COOKIE])]);
             $db->commit();
         } catch(Throwable $e) {if($db->inTransaction())$db->rollBack();throw $e;}
+        notify_account_change($fresh,'password');
         return ['ok' => true];
     },
     'auth/recover' => function () {
         need_post();$b=body();$email=mb_strtolower(str_in($b,'email',190));
         account_throttle('recover',$email);
         $u=q('SELECT * FROM users WHERE email=? AND active=1',[$email])->fetch();
-        if ($u && !issue_account_link($u,'reset',$email)) throw new ApiError('Le service d’envoi est temporairement indisponible. Réessayez plus tard.',503);
-        return ['ok'=>true,'message'=>'Si cette adresse correspond à un compte actif, un lien a été envoyé. Vérifiez aussi les courriers indésirables.'];
+        // Réponse identique et immédiate que l'adresse existe ou non (ni message d'échec d'envoi, ni écart de durée) ; l'envoi se fait après la réponse.
+        out_then(['ok'=>true,'message'=>'Si cette adresse correspond à un compte actif, un lien a été envoyé. Vérifiez aussi les courriers indésirables.'], function () use ($u,$email) {
+            if ($u && !issue_account_link($u,'reset',$email)) error_log('account_mail: recovery link not delivered');
+        });
     },
     'auth/reset' => function () {
         need_post();$b=body();account_throttle('reset',client_ip());$new=password_input($b,'new');valid_password($new);
-        consume_account_link(str_in($b,'token',64),'reset',function($u,$t) use($new) {
+        [$user]=consume_account_link(str_in($b,'token',64),'reset',function($u,$t) use($new) {
             q('UPDATE users SET pass_hash=? WHERE id=?',[password_hash($new,PASSWORD_DEFAULT),$u['id']]);
             q('DELETE FROM sessions WHERE user_id=?',[$u['id']]);
         });
+        notify_account_change($user,'password');
         return ['ok'=>true];
     },
     'auth/account' => function () { need_post();return update_account(require_user(),body()); },
     'auth/verify-email' => function () {
         need_post();$b=body();account_throttle('verify',client_ip());
-        consume_account_link(str_in($b,'token',64),'email',function($u,$t) {
+        [$user,$token]=consume_account_link(str_in($b,'token',64),'email',function($u,$t) {
             if (q('SELECT id FROM users WHERE email=? AND id<>?',[$t['target_email'],$u['id']])->fetch()) throw new ApiError('Cette adresse n’est plus disponible.',409);
             q('UPDATE users SET email=? WHERE id=?',[$t['target_email'],$u['id']]);
-        });return ['ok'=>true];
+        });
+        notify_account_change($user,'email',$token['target_email']); // l'ancienne adresse est prévenue du remplacement
+        return ['ok'=>true];
     },
     'auth/prefs' => function () {
         need_post();

@@ -71,7 +71,7 @@
     return `<div style="margin:6px 0 0 26px"><div class="row gap-s" style="flex-wrap:wrap"><input id="pl-q" type="search" placeholder="Chercher une place (nom ou code)" style="width:240px"><span class="small muted" id="pl-n"></span>
       <button class="btn small" type="button" id="pl-all">Cocher les places affichées</button><button class="btn small" type="button" id="pl-none">Décocher les places affichées</button><button class="btn small" type="button" id="pl-def">Places par défaut</button></div>
       <div id="pl-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:2px 12px;max-height:240px;overflow:auto;margin-top:6px;border:1px solid var(--line,#ddd);border-radius:8px;padding:8px">
-      ${places.map(p => `<label class="small" data-search="${J.esc((p.mic + ' ' + p.name).toLowerCase())}"><input type="checkbox" data-mic="${p.mic}" data-def="${p.default ? 1 : 0}" ${sel.has(p.mic) ? 'checked' : ''}> <b>${p.mic}</b> ${J.esc(p.name)} <span class="muted">${nf(p.equity)} act. · ${nf(p.etf)} ETF${p.hours_known ? '' : ' · pas de barres 15 min'}</span></label>`).join('') || '<span class="muted small">Importez FinanceDatabase pour voir toutes les places disponibles.</span>'}</div>
+      ${places.map(p => `<label class="small" data-search="${J.esc((p.mic + ' ' + p.name).toLowerCase())}"><input type="checkbox" data-mic="${J.esc(p.mic)}" data-def="${p.default ? 1 : 0}" ${sel.has(p.mic) ? 'checked' : ''}> <b>${J.esc(p.mic)}</b> ${J.esc(p.name)} <span class="muted">${nf(p.equity)} act. · ${nf(p.etf)} ETF${p.hours_known ? '' : ' · pas de barres 15 min'}</span></label>`).join('') || '<span class="muted small">Importez FinanceDatabase pour voir toutes les places disponibles.</span>'}</div>
       <p class="small muted" style="margin:4px 0 0">Toutes les places présentes dans FinanceDatabase sont proposées. Les places sans horaires connus n’ont que les clôtures quotidiennes.</p></div>`;
   }
   function catPicker(r, cats) {
@@ -225,7 +225,7 @@
     const th = (key, label) => `<th ${key ? `data-sort="${key}" style="cursor:pointer"` : ''}>${label}${tf.sort === key ? (tf.dir === 'asc' ? ' ▲' : ' ▼') : ''}</th>`;
     page.innerHTML = `${runBar()}<div class="card" style="padding:0"><div class="row" style="padding:14px 18px;gap:10px;flex-wrap:wrap"><input id="tq" type="search" placeholder="Nom, symbole ou ISIN" value="${J.esc(tf.q)}" style="flex:1;min-width:180px">
         <select id="tk">${opt(tf.kind, [['', 'Actions et ETF'], ['equity', 'Actions'], ['etf', 'ETF']])}</select>
-        <select id="tm"><option value="">Toutes les places</option>${r.places.map(m => `<option ${tf.mic === m ? 'selected' : ''}>${m}</option>`).join('')}</select>
+        <select id="tm"><option value="">Toutes les places</option>${r.places.map(m => `<option ${tf.mic === m ? 'selected' : ''}>${J.esc(m)}</option>`).join('')}</select>
         <select id="tfdb">${opt(tf.fdb, [['', 'Filtre FinanceDatabase : tous'], ['kept', 'Conservés'], ['removed', 'Écartés']])}</select>
         <select id="ty">${opt(tf.yahoo, [['', 'Filtre Yahoo : tous'], ['kept', 'Retenus'], ['removed', 'Écartés'], ['pending', 'En attente'], ['secondary', 'Cotations secondaires']])}</select>
         <select id="tfin">${opt(tf.final, [['', 'Catalogue : tous'], ['1', 'Dans mon catalogue'], ['0', 'Hors catalogue']])}</select>

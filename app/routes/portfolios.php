@@ -13,7 +13,7 @@ function tx_fields(array $b): array {
     if (!in_array($side, ['buy', 'sell'], true)) throw new ApiError('Sens invalide (buy ou sell)');
     $qty = num_in($b, 'quantity', true, 0.00000001);
     $price = num_in($b, 'unit_price', true, 0);
-    $fees = num_in($b, 'fees', false, 0) ?? 0.0;
+    $fees = num_in($b, 'fees', false, 0, 1e11) ?? 0.0;   // colonne DECIMAL(20,8) : 12 chiffres avant la virgule
     $fx = num_in($b, 'fx_to_eur', false, 0);
     $when = str_in($b, 'trade_at', 25);
     if (!preg_match('/^\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2}(?::\d{2})?)?$/', $when)) throw new ApiError('Date invalide', 422);
@@ -78,10 +78,12 @@ return [
     'portfolio/default' => function () {
         need_post(); $u = require_user();
         $p = own_portfolio((int)(body()['id'] ?? 0), $u);
-        db()->beginTransaction();
-        q('UPDATE portfolios SET is_default = 0 WHERE user_id = ?', [$u['id']]);
-        q('UPDATE portfolios SET is_default = 1 WHERE id = ?', [$p['id']]);
-        db()->commit();
+        $db = db(); $db->beginTransaction();
+        try {
+            q('UPDATE portfolios SET is_default = 0 WHERE user_id = ?', [$u['id']]);
+            q('UPDATE portfolios SET is_default = 1 WHERE id = ?', [$p['id']]);
+            $db->commit();
+        } catch (Throwable $e) { if ($db->inTransaction()) $db->rollBack(); throw $e; }
         return ['ok' => true];
     },
     'portfolio/delete' => function () {
@@ -112,8 +114,7 @@ return [
             if (!$listing) throw new ApiError('Titre introuvable', 404);
         }
         $symbol = $listing ? $listing['symbol'] : strtoupper(str_in($b, 'symbol', 32));
-        $currency = $listing ? $listing['currency'] : (strtoupper(str_in($b, 'currency', 3, false)) ?: null);
-        $currency = price_unit($b['currency'] ?? ($listing['currency'] ?? $currency));
+        $currency = price_unit($b['currency'] ?? ($listing['currency'] ?? null));
         if ($listing && empty($b['currency'])) {
             $quote = q('SELECT currency FROM latest_prices WHERE listing_id = ?', [$listing['id']])->fetch();
             $currency = price_unit($quote['currency'] ?? $currency);
@@ -182,9 +183,11 @@ return [
         header('Content-Type: text/csv; charset=utf-8');
         header('Content-Disposition: attachment; filename="transactions-' . preg_replace('/[^A-Za-z0-9_-]+/', '_', $p['name']) . '.csv"');
         $f = fopen('php://output', 'w');
+        // Un texte qui commence par = + - @ (ou tabulation / retour) serait interprété comme une formule par un tableur : on le préfixe d'une apostrophe.
+        $cell = function ($v) { return is_string($v) && $v !== '' && strpbrk($v[0], "=+-@\t\r") !== false ? "'" . $v : $v; };
         fputcsv($f, ['date', 'sens', 'symbole', 'nom', 'isin', 'quantite', 'prix_unitaire', 'devise', 'change_eur', 'frais', 'note']);
         foreach (q('SELECT * FROM portfolio_transactions WHERE portfolio_id = ? ORDER BY trade_at, id', [$p['id']])->fetchAll() as $t)
-            fputcsv($f, [$t['trade_at'], $t['side'], $t['symbol'], $t['name'], $t['isin'], $t['quantity'], $t['unit_price'], $t['currency'], $t['fx_to_eur'], $t['fees'], $t['note']]);
+            fputcsv($f, [$t['trade_at'], $t['side'], $cell($t['symbol']), $cell($t['name']), $cell($t['isin']), $t['quantity'], $t['unit_price'], $t['currency'], $t['fx_to_eur'], $t['fees'], $cell($t['note'])]);
         exit;
     },
 ];

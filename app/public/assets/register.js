@@ -1,0 +1,1 @@
+J.$('#register').onsubmit=async e=>{e.preventDefault();try{await J.post('auth/register',{username:J.$('#name').value,email:J.$('#email').value,password:J.$('#p').value,code:J.$('#code').value});location.href='login.html';}catch(x){J.$('#msg').textContent=x.message;}};

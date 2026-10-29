@@ -14,6 +14,8 @@ function fx_rates(): array {
 function eur_factor(?string $currency, array $rates): ?float {
     if (!$currency) return null;
     if ($currency === 'GBp' || strtoupper($currency) === 'GBX') return isset($rates['GBP']) ? $rates['GBP'] / 100 : null;
+    if ($currency === 'ZAc' || strtoupper($currency) === 'ZAC') return isset($rates['ZAR']) ? $rates['ZAR'] / 100 : null;        // cents du rand (Johannesburg)
+    if (strtoupper($currency) === 'ILA') return isset($rates['ILS']) ? $rates['ILS'] / 100 : null;                              // agorot (Tel-Aviv)
     return $rates[strtoupper($currency)] ?? null;
 }
 
@@ -26,7 +28,8 @@ function portfolio_valuation(int $portfolioId): array {
     foreach ($tx as $t) {
         $key = $t['listing_id'] ? 'L' . $t['listing_id'] : 'S' . strtoupper($t['symbol']);
         if (!isset($pos[$key])) $pos[$key] = ['key' => $key, 'listing_id' => $t['listing_id'] ? (int)$t['listing_id'] : null, 'symbol' => $t['symbol'], 'name' => $t['name'],
-                                                 'isin' => $t['isin'], 'currency' => $t['currency'], 'qty' => 0.0, 'cost' => 0.0, 'realized' => 0.0, 'first_buy' => null, 'last_trade' => null, 'fees' => 0.0];
+                                                 'isin' => $t['isin'], 'currency' => $t['currency'], 'qty' => 0.0, 'cost' => 0.0, 'realized' => 0.0, 'first_buy' => null, 'last_trade' => null, 'fees' => 0.0,
+                                                 'hist' => [], 'free_dates' => []];
         $p = &$pos[$key];
         $fx = $t['fx_to_eur'] !== null ? (float)$t['fx_to_eur'] : (strtoupper($t['currency'] ?? '') === 'EUR' ? 1.0 : null);
         if ($fx === null || $fx <= 0) {
@@ -52,6 +55,8 @@ function portfolio_valuation(int $portfolioId): array {
             $byYear[$year] = ($byYear[$year] ?? 0.0) + $gain;
             if ($p['qty'] < 1e-9) { $p['qty'] = 0.0; $p['cost'] = 0.0; }
         }
+        $p['hist'][] = [substr($t['trade_at'], 0, 10), $p['qty']];                         // quantité détenue après chaque opération
+        if ($t['side'] === 'buy' && (float)$t['unit_price'] == 0.0) $p['free_dates'][] = substr($t['trade_at'], 0, 10);       // titres reçus gratuitement (ajustement de split saisi par l'utilisateur)
         unset($p);
     }
     $ids = array_values(array_filter(array_map(function ($p) { return $p['listing_id']; }, $pos)));
@@ -61,12 +66,29 @@ function portfolio_valuation(int $portfolioId): array {
         foreach (q("SELECT l.id, l.symbol, l.mic, l.status, l.excluded_reason, l.is_primary, i.name, i.kind, p.price, p.price_time, p.source, p.currency AS price_currency, l.currency
                     FROM listings l JOIN instruments i ON i.id = l.instrument_id LEFT JOIN latest_prices p ON p.listing_id = l.id WHERE l.id IN ($in)", $ids)->fetchAll() as $r) $info[(int)$r['id']] = $r;
     }
+    // Splits confirmés par le fournisseur (Yahoo a ajusté ses cours) après l'achat : la quantité du registre n'est pas ajustée automatiquement.
+    $splitsOf = [];
+    if ($ids) {
+        try {
+            $in2 = implode(',', array_fill(0, count($ids), '?'));
+            foreach (q("SELECT listing_id, event_date, ratio FROM split_log WHERE status = 'confirmed' AND listing_id IN ($in2) ORDER BY event_date", $ids)->fetchAll() as $sp) $splitsOf[(int)$sp['listing_id']][] = $sp;
+        } catch (Throwable $e) { /* table absente tant que la migration n'est pas passée */ }
+    }
     $open = []; $closed = []; $value = 0.0; $costOpen = 0.0;
     foreach ($pos as $p) {
         $i = $p['listing_id'] ? ($info[$p['listing_id']] ?? null) : null;
         $row = $p + ['name_catalogue' => $i['name'] ?? null, 'kind' => $i['kind'] ?? null, 'mic' => $i['mic'] ?? null, 'catalogue_status' => $i['status'] ?? null,
                      'excluded_reason' => $i['excluded_reason'] ?? null, 'price' => null, 'price_eur' => null, 'price_time' => null, 'price_source' => null,
                      'value' => null, 'unrealized' => null, 'unrealized_pct' => null, 'avg_cost' => null, 'linked' => $i !== null, 'price_currency' => $i ? ($i['price_currency'] ?: $i['currency']) : null];
+        $row['split_alerts'] = [];
+        foreach ($splitsOf[(int)($p['listing_id'] ?? 0)] ?? [] as $sp) {
+            $before = 0.0;
+            foreach ($p['hist'] as [$d, $q]) if ($d < $sp['event_date']) $before = $q;                      // quantité détenue la veille du split
+            $handled = false;
+            foreach ($p['free_dates'] as $d) if ($d >= $sp['event_date']) $handled = true;                  // l'utilisateur a déjà saisi des titres à prix 0 à partir de cette date
+            if ($before > 1e-9 && !$handled) $row['split_alerts'][] = ['date' => $sp['event_date'], 'ratio' => (float)$sp['ratio'], 'shares_to_add' => $before * ((float)$sp['ratio'] - 1)];
+        }
+        unset($row['hist'], $row['free_dates']);
         if (isset($uncertain[$p['key']])) { $row['cost'] = null; $row['realized'] = null; $row['financial_incomplete'] = true; }
         if ($row['qty'] > 0) {
             $row['avg_cost'] = $row['cost'] === null ? null : $row['cost'] / $row['qty'];

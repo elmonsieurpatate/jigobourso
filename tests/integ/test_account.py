@@ -127,3 +127,21 @@ def test_old_sessions_without_policy_survive_migration(world):
  with c.cursor() as q:q.execute('DELETE FROM session_policies')
  c.commit();c.close()
  assert a.call('auth/me')[1]['user']['username']=='alice'
+
+def messages_to(address):
+ return [json.loads(p.read_text()) for p in MAILDIR.glob('*.json') if json.loads(p.read_text())['to']==address]
+
+def test_password_change_and_reset_warn_the_registered_address(world):
+ set_email();a=login(world,'alice','alice-secret-1234')
+ assert a.call('auth/password',{'current':'alice-secret-1234','new':'changed-secret-1234'})[0]==200
+ sent=messages_to('alice@example.test');assert len(sent)==1 and 'modifié' in sent[0]['subject'] and 'http' not in sent[0]['body']
+ for p in MAILDIR.glob('*.json'):p.unlink()
+ anon=Client(world);assert anon.call('auth/recover',{'email':'alice@example.test'})[0]==200
+ raw,_=link();assert anon.call('auth/reset',{'token':raw,'new':'reset-secret-123456'})[0]==200
+ assert len(messages_to('alice@example.test'))==2     # le lien, puis l'avis de changement
+
+def test_email_replacement_warns_the_old_address(world):
+ set_email();a=login(world,'alice','alice-secret-1234')
+ assert a.call('auth/account',{'username':'alice','email':'new@example.test','current':'alice-secret-1234'})[0]==200
+ raw,_=link();assert Client(world).call('auth/verify-email',{'token':raw})[0]==200
+ old=messages_to('alice@example.test');assert len(old)==1 and 'new@example.test' in old[0]['body']

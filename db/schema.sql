@@ -29,7 +29,7 @@ CREATE TABLE listings (
   excluded_reason  VARCHAR(120) NULL,                           -- motif principal (obligatoire si excluded)
   is_primary       TINYINT(1) NOT NULL DEFAULT 0,               -- cotation principale de l'instrument (règle R1)
   primary_reason   VARCHAR(20) NULL,                            -- 'home_market' | 'liquidity' | 'single'
-  next_daily_check DATE NULL,
+  next_daily_check DATE NULL,                                   -- redemande de l'historique complet à partir de cette date (saut ressemblant à un split : voir market/splits.py)
   PRIMARY KEY (id),
   UNIQUE KEY uq_listing_venue_symbol (mic, symbol),
   KEY ix_listing_instrument (instrument_id),
@@ -56,7 +56,7 @@ CREATE TABLE daily_prices (                                     -- clôtures DÉ
   listing_id   INT UNSIGNED NOT NULL,
   price_date   DATE NOT NULL,
   close_px     DECIMAL(16,6) NOT NULL,
-  adj_close_px DECIMAL(16,6) NULL,                              -- jamais mélangée à close_px dans un calcul
+  adj_close_px DECIMAL(16,6) NULL,                              -- RÉSERVÉ : non renseignée (Spark ne fournit pas de cours ajustés des dividendes) ; jamais mélangée à close_px
   volume       BIGINT UNSIGNED NULL,
   PRIMARY KEY (listing_id, price_date),
   CONSTRAINT fk_daily_listing FOREIGN KEY (listing_id) REFERENCES listings(id)
@@ -126,7 +126,7 @@ CREATE TABLE strategy_metrics (
   volatility   DECIMAL(12,6) NULL,                              -- % par séance
   drawdown     DECIMAL(10,4) NULL,
   er           DECIMAL(8,6) NULL,                               -- efficiency ratio
-  acceleration DECIMAL(12,6) NULL,
+  acceleration DECIMAL(12,6) NULL,                              -- RÉSERVÉ : jamais calculé (toujours NULL)
   PRIMARY KEY (listing_id, sessions),
   CONSTRAINT fk_metrics_listing FOREIGN KEY (listing_id) REFERENCES listings(id)
 ) ENGINE=InnoDB;
@@ -145,7 +145,7 @@ CREATE TABLE series_state (                                     -- état de la s
   gap_to_ma20     DECIMAL(10,4) NULL,                           -- % écart au MA20
   break_age       SMALLINT UNSIGNED NULL,                       -- séances écoulées depuis la dernière rupture de cours inexpliquée
   break_dates     VARCHAR(80) NULL,
-  risk_score      TINYINT UNSIGNED NULL,                        -- /10
+  risk_score      TINYINT UNSIGNED NULL,                        -- RÉSERVÉ : jamais calculé (toujours NULL)
   quality         ENUM('ok','insufficient','inconsistent_adjustments','stale','break') NOT NULL DEFAULT 'ok',
   PRIMARY KEY (listing_id),
   CONSTRAINT fk_state_listing FOREIGN KEY (listing_id) REFERENCES listings(id)
@@ -427,4 +427,15 @@ CREATE TABLE IF NOT EXISTS session_policies (
  persistent TINYINT(1) NOT NULL,
  absolute_expiry DATETIME NOT NULL,
  CONSTRAINT fk_session_policy FOREIGN KEY (token_hash) REFERENCES sessions(token_hash) ON DELETE CASCADE
+) ENGINE=InnoDB;
+CREATE TABLE IF NOT EXISTS split_log (
+  listing_id  INT UNSIGNED NOT NULL,
+  event_date  DATE NOT NULL,                                    -- séance qui suit le saut
+  price_ratio DECIMAL(18,8) NOT NULL,                           -- cours après / cours avant, observé à la détection
+  ratio       DECIMAL(18,8) NOT NULL,                           -- parts nouvelles / anciennes (2 = deux pour un ; 0,1 = regroupement 1 pour 10)
+  status      ENUM('detected','confirmed','real_move') NOT NULL DEFAULT 'detected',   -- confirmed : Yahoo a ajusté l'historique ; real_move : le saut persiste
+  detected_at DATETIME NOT NULL,
+  checked_at  DATETIME NULL,
+  PRIMARY KEY (listing_id, event_date),
+  CONSTRAINT fk_split_listing FOREIGN KEY (listing_id) REFERENCES listings(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;

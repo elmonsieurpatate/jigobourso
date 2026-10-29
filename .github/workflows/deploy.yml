@@ -83,7 +83,7 @@ jobs:
         with:
           name: financial-browser
           path: audit-results/
-          retention-days: 14
+          retention-days: 1
       - name: Publish verification result before deployment
         if: always()
         env:
@@ -129,7 +129,8 @@ jobs:
           done
           result=0
           wait "$pid" || result=$?
-          tail -n 120 "$RUNNER_TEMP/jigobourso-deploy.log"
+          # Le journal d'Actions est public avec le dépôt : seules les lignes d'étapes et de verdict sont affichées (ops/public-log.sh).
+          bash ops/public-log.sh < "$RUNNER_TEMP/jigobourso-deploy.log"
           exit "$result"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
@@ -138,7 +139,7 @@ jobs:
           path: |
             ${{ runner.temp }}/financial-*.json
             ${{ runner.temp }}/account-*.json
-          retention-days: 14
+          retention-days: 1
       - name: Publier le résultat
         if: always()
         env:

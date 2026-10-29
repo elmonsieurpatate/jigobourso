@@ -43,3 +43,39 @@ def test_no_liquidity_fallback_is_deterministic_and_single():
     ls = [{'id': 1, 'mic': 'XETR', 'symbol': 'A', 'currency': 'EUR'}, {'id': 2, 'mic': 'XNAS', 'symbol': 'A', 'currency': 'USD'}]
     assert choose_primary(ls)[1] == 'default'
     assert choose_primary([ls[0]]) == (1, 'single')
+
+
+# ── Faux positifs constatés sur le catalogue réel (audit du 29/10/2026) ──
+import pytest as _pytest  # noqa: E402
+from engine.catalogue import rules as _rules  # noqa: E402
+
+
+@_pytest.mark.parametrize('name', [
+    'AB Short Duration High Yield ETF', 'AB Ultra Short Income ETF', 'Allspring Short-Term High Income Fund ETF', 'iShares Short Treasury Bond ETF',
+    'Vanguard Short-Term Bond ETF', 'iShares € Ultrashort Bond UCITS ETF EUR (Dist)', 'JPM USD Ultra-Short Income ETF USD Acc', 'JH US Short Dur HY ETF',
+    'Innovator S&P 500 Ultra Buffer ETF - April New', 'Convergence Long/Short Equity ETF', 'Nuveen Short-Term REIT ETF', 'EA Bridgeway Ultra-Small Company Market ETF',
+    'Multi Units Luxembourg - Lyxor DAX (DR) UCITS ETF'])
+def test_funds_without_leverage_are_not_excluded_as_leveraged(name):
+    assert not _rules.is_leveraged_name(name)
+    assert _rules.evaluate('etf', {'mic': 'XPAR', 'symbol': 'ABCD.PA', 'name': name}, _rules.default_config()) == (None, None)
+
+
+@_pytest.mark.parametrize('name', [
+    'ProShares UltraShort QQQ', 'ProShares Ultra QQQ', 'ProShares UltraPro Short QQQ', 'Direxion Daily S&P 500 Bull 3X Shares', 'ProShares Short S&P500',
+    'ProShares Short 20+ Year Treasury', 'ProShares Short High Yield', 'Leverage Shares 3x Tesla', 'GraniteShares 2x Long NVDA', 'Ultra Short Dax',
+    'Xtrackers FTSE 100 Short Daily Swap UCITS ETF 1C', 'ComStage EURO STOXX 50 Daily Short UCITS ETF', 'Xtrackers S&P 500 Inverse Daily', 'ProShares Short VIX Short-Term Futures ETF'])
+def test_real_leveraged_and_inverse_funds_stay_excluded(name):
+    assert _rules.is_leveraged_name(name)
+
+
+@_pytest.mark.parametrize('kind,name,expected', [
+    ('etf', 'Multi Units Luxembourg - Lyxor MSCI ACWI Gold UCITS ETF', None),
+    ('etf', 'Global X Human Rights ETF', None),
+    ('equity', 'Smith Unit Holdings', None),
+    ('equity', 'Launch Two Acquisition Corp. Unit', 'warrants'),
+    ('equity', 'Range Capital Acquisition Corp. Units', 'warrants'),
+    ('equity', 'Foo Corp Rights', 'warrants'),
+    ('equity', 'Foo Corp Warrants', 'warrants'),
+    ('etf', 'Foo Warrants ETF', 'warrants')])
+def test_derivative_detection_does_not_hit_etf_names_with_units(kind, name, expected):
+    assert _rules.evaluate(kind, {'mic': 'XNAS', 'symbol': 'ABCD', 'name': name}, _rules.default_config())[0] == expected

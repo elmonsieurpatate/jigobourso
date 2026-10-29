@@ -8,28 +8,32 @@ const COOKIE = 'jigo_s';
 function client_ip(): string { return substr($_SERVER['REMOTE_ADDR'] ?? '', 0, 45); }
 function https(): bool { return (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https'; }
 
-function login_blocked(string $username): bool {
+function login_blocked(string $username, int $limit = 5): bool {
     $n = q('SELECT COUNT(*) FROM login_attempts WHERE username = ? AND at > ?', [$username, gmdate('Y-m-d H:i:s', time() - 900)])->fetchColumn();
-    return (int)$n >= 5;
+    return (int)$n >= $limit;
 }
+// Clé de limitation hachée : tient dans login_attempts.username (30 caractères), y compris pour une adresse IPv6.
+function attempt_key(string $kind, string $value): string { return $kind . ':' . substr(hash('sha256', $value), 0, 20); }
 function login(string $username, string $password, bool $remember = false): array {
     $username = trim(mb_substr($username, 0, 190));
-    $ipKey='login:'.substr(hash('sha256',client_ip()),0,20);
+    $ipKey=attempt_key('login',client_ip());
     if ((int)q('SELECT COUNT(*) FROM login_attempts WHERE username=? AND at>?',[$ipKey,gmdate('Y-m-d H:i:s',time()-900)])->fetchColumn() >= 20) throw new ApiError('Trop d’essais : réessayez dans quelques minutes',429);
     $column=strpos($username,'@')!==false?'email':'username';
     $db=db();$db->beginTransaction();
     try {
     $u=q("SELECT * FROM users WHERE $column=? AND active=1 FOR UPDATE",[$username])->fetch();
     $key=$u?$u['username']:'missing:'.substr(hash('sha256',mb_strtolower($username)),0,20);
-    if (login_blocked($key)) throw new ApiError('Trop d’essais : réessayez dans quelques minutes',429);
+    // Un compte n'est verrouillé pour tous qu'au-delà de ce qu'une seule IP peut produire (20) ; 5 échecs depuis la même IP le verrouillent pour cette IP.
+    $pair=attempt_key('pair',$key.'|'.client_ip());
+    if (login_blocked($key,30) || login_blocked($pair,5)) throw new ApiError('Trop d’essais : réessayez dans quelques minutes',429);
     $hash=$u?$u['pass_hash']:'$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2uheWG/igi';
     $verified=password_verify($password,$hash);
     if (!$u || !$verified) {
-        foreach ([$key,$ipKey] as $k) q('INSERT INTO login_attempts(username,ip,at) VALUES (?,?,?)',[$k,client_ip(),now_utc()]);
+        foreach ([$key,$pair,$ipKey] as $k) q('INSERT INTO login_attempts(username,ip,at) VALUES (?,?,?)',[$k,client_ip(),now_utc()]);
         $db->commit();
         throw new ApiError('E-mail, pseudo ou mot de passe incorrect',401);
     }
-    q('DELETE FROM login_attempts WHERE username=?',[$key]);
+    q('DELETE FROM login_attempts WHERE username IN (?,?)',[$key,$pair]);
     $expiry=time()+($remember?SESSION_DAYS*86400:86400);
     $token = bin2hex(random_bytes(32));
     $now = now_utc();

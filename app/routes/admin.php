@@ -37,11 +37,15 @@ return [
         $id = (int)($b['id'] ?? 0);
         $u = q('SELECT * FROM users WHERE id = ?', [$id])->fetch();
         if (!$u) throw new ApiError('Utilisateur introuvable', 404);
-        if ($id === (int)$me['id'] && (isset($b['active']) && !$b['active'] || isset($b['is_admin']) && !$b['is_admin'])) throw new ApiError('Vous ne pouvez pas retirer vos propres droits', 422);
-        if (isset($b['active'])) q('UPDATE users SET active = ? WHERE id = ?', [$b['active'] ? 1 : 0, $id]);
-        if (isset($b['is_admin'])) q('UPDATE users SET is_admin = ? WHERE id = ?', [$b['is_admin'] ? 1 : 0, $id]);
+        $flag = function ($v) { return filter_var($v, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE); };   // "false" / "0" / false → faux (et non vrai)
+        $active = isset($b['active']) ? $flag($b['active']) : null;
+        $isAdmin = isset($b['is_admin']) ? $flag($b['is_admin']) : null;
+        if ((isset($b['active']) && $active === null) || (isset($b['is_admin']) && $isAdmin === null)) throw new ApiError('Valeur booléenne attendue', 422);
+        if ($id === (int)$me['id'] && ($active === false || $isAdmin === false)) throw new ApiError('Vous ne pouvez pas retirer vos propres droits', 422);
+        if ($active !== null) q('UPDATE users SET active = ? WHERE id = ?', [$active ? 1 : 0, $id]);
+        if ($isAdmin !== null) q('UPDATE users SET is_admin = ? WHERE id = ?', [$isAdmin ? 1 : 0, $id]);
         if (!empty($b['password'])) { valid_password((string)$b['password']); q('UPDATE users SET pass_hash = ? WHERE id = ?', [password_hash((string)$b['password'], PASSWORD_DEFAULT), $id]); q('DELETE FROM sessions WHERE user_id = ?', [$id]); }
-        if (isset($b['active']) && !$b['active']) q('DELETE FROM sessions WHERE user_id = ?', [$id]);
+        if ($active === false) q('DELETE FROM sessions WHERE user_id = ?', [$id]);
         return ['ok' => true];
     },
     'admin/system' => function () {

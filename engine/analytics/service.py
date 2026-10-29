@@ -9,15 +9,40 @@ import json
 import re
 from collections import defaultdict
 
-from engine.catalogue.rules import MARKETS
+from engine.catalogue.rules import MARKETS, is_leveraged_name
 from engine.market import hours
-from engine.market.collect import latest_rates, to_eur_factor
+from engine.market.collect import effective_expected_close, latest_rates, to_eur_factor
 from . import strategy
 from .measures import window_metrics
 from .series import usable_closes, find_breaks, clean_window, analyze_series, prepare_series
 
-PEA_COUNTRIES = {'France', 'Germany', 'Netherlands', 'Spain', 'Italy', 'Belgium', 'Sweden', 'Finland', 'Denmark', 'Norway', 'Ireland',
-                 'Portugal', 'Austria', 'Luxembourg'}
+# PEA : actions d'une société dont le siège est dans l'UE ou l'EEE (Islande, Liechtenstein et Norvège compris ; pas le Royaume-Uni ni la Suisse),
+# achetées sur une place européenne (c'est ce que les courtiers acceptent dans un PEA). Une action américaine d'une société irlandaise n'est donc
+# pas « PEA probable ». Les ETF dépendent de leur indice et de leur domicile : toujours « à vérifier ».
+PEA_COUNTRIES = {'Austria', 'Belgium', 'Bulgaria', 'Croatia', 'Cyprus', 'Czech Republic', 'Denmark', 'Estonia', 'Finland', 'France', 'Germany', 'Greece',
+                 'Hungary', 'Iceland', 'Ireland', 'Italy', 'Latvia', 'Liechtenstein', 'Lithuania', 'Luxembourg', 'Malta', 'Netherlands', 'Norway', 'Poland',
+                 'Portugal', 'Romania', 'Slovakia', 'Slovenia', 'Spain', 'Sweden'}
+PEA_MICS = {'XPAR', 'XAMS', 'XBRU', 'XLIS', 'XETR', 'XFRA', 'XSTU', 'XBER', 'XDUS', 'XHAM', 'XMUN', 'XHAN', 'XMIL', 'XMAD', 'XSTO', 'XOSL', 'XHEL', 'XCSE',
+            'XWBO', 'XDUB', 'XATH', 'XWAR', 'XPRA', 'XBUD', 'XBSE', 'XICE', 'XLUX'}
+
+
+def pea_status(kind, country, mic):
+    """'probable' (action d'un pays éligible cotée en Europe) | 'a_verifier' (ETF) | 'non'."""
+    if kind == 'etf':
+        return 'a_verifier'
+    return 'probable' if country in PEA_COUNTRIES and mic in PEA_MICS else 'non'
+
+
+def expected_close(conn, mic):
+    """Dernière clôture due pour la place, jours fériés déduits des données (mémorisée par connexion et par minute)."""
+    now = hours.utcnow()
+    memo = conn.__dict__.setdefault('_jigo_expected', {})
+    key = (mic, now.replace(second=0, microsecond=0))
+    if key not in memo:
+        memo[key] = effective_expected_close(conn, mic, now)
+    return memo[key]
+
+
 STATUS_LABELS = {'retained': 'Retenu', 'rejected': 'Écarté', 'unknown': 'Non évaluable', 'excluded': 'Exclu'}
 REF_FIELDS = ('slope', 'r2', 'perf', 'volatility', 'drawdown')
 EXPORT_LIMIT = 20000
@@ -86,7 +111,7 @@ def judge_universe(conn, config, ids=None):
         tech = {k: (None if u[k] is None else float(u[k])) for k in ('close_px', 'ma20', 'ma50', 'ma50_prev', 'daily_change', 'gap_to_ma20')}
         tech['close'] = tech.pop('close_px')
         last = u['last_close_date'].isoformat() if u['last_close_date'] else None
-        expected = max(hours.expected_last_close(u['mic'], hours.utcnow()), str(latest_by_mic.get(u['mic']) or ''))
+        expected = max(expected_close(conn, u['mic']), str(latest_by_mic.get(u['mic']) or ''))
         if last and last < expected:
             u['quality'] = 'stale'
         v = strategy.judge(config, measures, tech, missing, last, expected or None)
@@ -95,20 +120,21 @@ def judge_universe(conn, config, ids=None):
     return strategy.rank(config, verdicts)
 
 
-def _row(v, rates):
+def _row(v, rates, conn=None):
     u = v['row']
     cur = u['price_currency'] or u['currency']
     factor = to_eur_factor(cur, rates)
     price = float(u['price']) if u['price'] is not None else None
     return {'id': u['id'], 'symbol': u['symbol'], 'name': u['name'], 'isin': u['isin'], 'mic': u['mic'], 'market': MARKETS.get(u['mic'], u['mic']),
-            'kind': u['kind'], 'category': u['category'], 'country': u['country'], 'pea': u['kind'] == 'equity' and u['country'] in PEA_COUNTRIES,
+            'kind': u['kind'], 'category': u['category'], 'country': u['country'], 'pea': pea_status(u['kind'], u['country'], u['mic']) == 'probable',
             'currency': cur, 'price': price, 'price_eur': price * factor if price is not None and factor else None,
             'price_time': u['price_time'].isoformat(sep=' ') if u['price_time'] else None, 'price_source': u['price_source'],
             'status': v['status'], 'status_label': STATUS_LABELS[v['status']], 'score': v['score'], 'rank': v['rank'],
-            'quality': u['quality'], 'price_stale': hours.price_is_stale(u['mic'], u['price_time'], hours.utcnow()), 'measures': {str(n): m for n, m in v['measures'].items()}, 'reasons': v['reasons']}
+            'quality': u['quality'], 'price_stale': hours.price_is_stale(u['mic'], u['price_time'], hours.utcnow(), expected_close(conn, u['mic']) if conn is not None else None), 'measures': {str(n): m for n, m in v['measures'].items()}, 'reasons': v['reasons']}
 
 
 CACHE_FORMAT = 3
+MAX_NEW_CONFIGS_PER_HOUR = 60       # calculs d'univers complets (réglages jamais vus ou données changées) acceptés par heure, tous utilisateurs confondus
 ENTRY_FIELDS = ('id', 'symbol', 'name', 'isin', 'kind', 'mic', 'country', 'status', 'group', 'rank', 'score', 'category', 'fails')
 
 
@@ -137,6 +163,10 @@ def cached_verdicts(conn, config):
         hit = cur.fetchone()
     if hit and hit['data_version'] == version:
         return [dict(zip(ENTRY_FIELDS, e)) for e in json.loads(hit['payload'])]
+    with conn.cursor() as cur:        # garde-fou : chaque configuration inédite évalue tout l'univers ; on borne le nombre de calculs par heure pour protéger la base partagée
+        cur.execute("SELECT COUNT(*) n FROM result_cache WHERE built_at > %s AND data_version <> 'intraday-fetch'", (datetime.datetime.utcnow() - datetime.timedelta(hours=1),))
+        if cur.fetchone()['n'] >= MAX_NEW_CONFIGS_PER_HOUR:
+            raise ValueError('Trop de réglages différents ont été calculés depuis une heure : réessayez un peu plus tard, ou utilisez un des quatre profils de départ.')
     entries = [[v['key'], v['symbol'], v['row']['name'], v['row']['isin'], v['row']['kind'], v['row']['mic'], v['row']['country'], v['status'], v['group'], v['rank'],
                 None if v['score'] is None else round(v['score'], 4), v['row']['category'], _fails(v)] for v in judge_universe(conn, config)]
     with conn.cursor() as cur:
@@ -157,7 +187,7 @@ def _aux(conn, ref, rates):
             price = None if r['price'] is None else float(r['price'])
             f = to_eur_factor(r['cur'], rates)
             out[r['id']] = {'price': price, 'price_eur': price * f if price is not None and f else None, 'volume': r['volume'],
-                            'last_close': r['last_close_date'], 'quality': 'stale' if r['last_close_date'] and str(r['last_close_date']) < hours.expected_last_close(r['mic'], hours.utcnow()) else r['quality']}
+                            'last_close': r['last_close_date'], 'quality': 'stale' if r['last_close_date'] and str(r['last_close_date']) < expected_close(conn, r['mic']) else r['quality']}
         cur.execute('SELECT listing_id, slope, r2, perf, volatility, drawdown FROM strategy_metrics WHERE sessions=%s', (ref,))
         for r in cur.fetchall():
             if r['listing_id'] in out:
@@ -197,7 +227,7 @@ def scoped_entries(conn, config, view, rates=None, aux=None, now=None):
     base = [e for e in entries if (not kind or e['kind'] == kind) and (not market or e['mic'] == market)
             and (not country or e['country'] == country) and (not category or category in (e['category'] or '').casefold())]
     if view.get('pea'):
-        base = [e for e in base if e['kind'] == 'equity' and e['country'] in PEA_COUNTRIES]
+        base = [e for e in base if pea_status(e['kind'], e['country'], e['mic']) == 'probable']
     if view.get('owned_only'):
         base = [e for e in base if e['id'] in owned]
     if view.get('open_now'):
@@ -278,7 +308,7 @@ def explore(conn, request):
             continue
         v = detail[e['id']]
         v['rank'], v['score'] = e['rank'], e['score']      # rang et score viennent de la sélection complète, pas de la page
-        r = _row(v, rates)
+        r = _row(v, rates, conn)
         a = aux.get(e['id'], {})
         r.update({'volume': a.get('volume'), 'last_close': a['last_close'].isoformat() if a.get('last_close') else None,
                   'ref': {k: a.get(k) for k in REF_FIELDS}, 'open': e['mic'] in hours.HOURS and hours.is_open(e['mic'], now)})
@@ -383,7 +413,7 @@ def instrument_sheet(conn, request):
     sheet['daily'] = [[d, c] for d, c in zip(chart_dates, chart_closes)][-400:]
     sheet['daily_volume'] = [volumes.get(d) for d, _ in sheet['daily']]
     sheet['chart_break_dates'] = [chart_dates[i] for i in chart_breaks]
-    sheet['price_stale'] = hours.price_is_stale(u['mic'], u['price_time'], hours.utcnow())
+    sheet['price_stale'] = hours.price_is_stale(u['mic'], u['price_time'], hours.utcnow(), expected_close(conn, u['mic']))
     if sheet['freshness']['stale']:
         sheet['state']['quality'] = 'stale'
 
@@ -412,7 +442,7 @@ def instrument_sheet(conn, request):
     return sheet
 
 
-LEVERAGE = re.compile(r'\b(leverag\w*|ultra\w*|short|inverse|bear|bull|[235]x|x[235]|-[123]x|daily)\b|levier|effet de levier', re.I)
+LEVERAGE = re.compile(r'\b(bull|[235]x|x[235]|-[123]x)\b|levier|effet de levier', re.I)       # compléments de rules.is_leveraged_name pour l'avertissement de la fiche
 
 
 def _sheet_context(conn, u, state, daily):
@@ -425,16 +455,16 @@ def _sheet_context(conn, u, state, daily):
         collects = {r['job_type'].split(':')[0]: (r['finished_at'] or r['started_at']).isoformat(sep=' ') for r in cur.fetchall()}
         cur.execute('SELECT MAX(last_close_date) d FROM series_state s JOIN listings l ON l.id=s.listing_id WHERE l.mic=%s', (u['mic'],))
         peer_date = cur.fetchone()['d']
-        expected = max(hours.expected_last_close(u['mic'], hours.utcnow()), str(peer_date or ''))
-    pea = u['kind'] == 'equity' and u['country'] in PEA_COUNTRIES
+        expected = max(expected_close(conn, u['mic']), str(peer_date or ''))
+    pea = pea_status(u['kind'], u['country'], u['mic']) == 'probable'
     warn = None
     text = ' '.join(filter(None, [u['name'], u['category']]))
-    if u['kind'] == 'etf' and LEVERAGE.search(text):
+    if u['kind'] == 'etf' and (is_leveraged_name(text) or LEVERAGE.search(text)):
         warn = 'Ce produit semble à effet de levier ou inversé (d’après son nom). Les effets cumulés quotidiens peuvent différer fortement de l’indice : vérifiez son document d’information.'
     last = state.get('last_close_date')
     return {'pea': {'status': 'probable' if pea else ('a_verifier' if u['kind'] == 'etf' else 'non'),
-                    'note': 'Action d’un pays de l’Espace économique européen : éligibilité PEA probable, à confirmer chez le courtier.' if pea else
-                            ('Éligibilité PEA d’un ETF : dépend de son indice et de son domicile, à vérifier dans son document d’information.' if u['kind'] == 'etf' else 'Émetteur hors pays éligibles au PEA.')},
+                    'note': 'Action d’une société de l’Espace économique européen, cotée sur une place européenne : éligibilité PEA probable, à confirmer chez le courtier.' if pea else
+                            ('Éligibilité PEA d’un ETF : dépend de son indice et de son domicile, à vérifier dans son document d’information.' if u['kind'] == 'etf' else 'Émetteur hors des pays éligibles, ou action cotée hors d’Europe : pas éligible au PEA par défaut.')},
             'product_warning': warn,
             'sources': {'catalogue': 'FinanceDatabase', 'catalogue_loaded_at': cat['loaded_at'].isoformat(sep=' ') if cat else None, 'catalogue_commit': (cat['source_commit'][:8] if cat else None),
                         'prices': 'Yahoo Finance', 'last_daily_collect': collects.get('daily'), 'last_intraday_collect': collects.get('intraday')},

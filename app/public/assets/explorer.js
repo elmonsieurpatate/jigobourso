@@ -176,7 +176,7 @@
   }
   function fillFacets(res) {
     if (el('country').options.length === 1) Object.entries(res.facets.countries).forEach(([c, n]) => el('country').insertAdjacentHTML('beforeend', `<option value="${J.esc(c)}">${J.esc(c)} (${n})</option>`));
-    if (el('market').options.length === 1) Object.entries(res.facets.markets).sort((a, b) => b[1] - a[1]).forEach(([m, n]) => el('market').insertAdjacentHTML('beforeend', `<option value="${m}">${MARKETS[m] || m} (${n})</option>`));
+    if (el('market').options.length === 1) Object.entries(res.facets.markets).sort((a, b) => b[1] - a[1]).forEach(([m, n]) => el('market').insertAdjacentHTML('beforeend', `<option value="${J.esc(m)}">${J.esc(MARKETS[m] || m)} (${n})</option>`));
     ['country', 'market'].forEach(k => { const v = (saved.view || {})[k]; if (v && !el(k).dataset.restored) { el(k).value = v; el(k).dataset.restored = 1; } });
     el('filters-note').textContent = 'Les filtres numériques utilisent les mesures sur ' + res.ref_sessions + ' séances (la plus longue période active).';
   }

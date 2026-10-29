@@ -19,7 +19,7 @@
     const p = s.presets[preset], g = p.groups[group];
     J.$('#table').innerHTML = `<div class="table-wrap"><table><thead><tr><th>Horizon</th><th class="num">Cas</th><th class="num">Moyenne</th><th class="num">Médiane</th><th class="num">En hausse</th><th class="num">Écart vs univers</th><th class="num">Battent l’univers</th></tr></thead><tbody>
       ${s.horizons.map(h => `<tr><td>${HZ[h]}</td>${stat(g[h])}</tr>`).join('')}</tbody></table></div>
-      <p class="small muted">« Écart vs univers » : rendement du titre moins rendement médian de tous les ${GROUPS[group].toLowerCase()} analysés le même jour, sur le même horizon, en points de pourcentage.</p>`;
+      <p class="small muted">« Écart vs univers » : rendement moyen des titres classés moins rendement moyen de tous les ${GROUPS[group].toLowerCase()} analysés le même jour, sur le même horizon, en points de pourcentage. Les classements de jours voisins se chevauchent : « Cas » ne compte donc pas autant d’observations indépendantes. Les jours « reconstitués » utilisent l’univers actuel (biais de survie).</p>`;
     J.$$('#presets button').forEach(b => b.classList.toggle('on', b.dataset.p === preset));
     J.$$('#groups button').forEach(b => b.classList.toggle('on', b.dataset.g === group));
     drawRecent();

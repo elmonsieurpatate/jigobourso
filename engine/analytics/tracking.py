@@ -40,15 +40,21 @@ def forward_returns(bars, snap_date, horizons=HORIZONS, splits=()):
     return out
 
 
-def summarize(returns, benchmarks):
-    """returns : [(snap_date, rendement)], benchmarks : {snap_date: médiane de l'univers}. Statistiques descriptives ou None."""
+def summarize(returns, benchmarks, benchmarks_mean=None):
+    """returns : [(snap_date, rendement)], benchmarks : {snap_date: médiane de l'univers}, benchmarks_mean : {snap_date: moyenne de l'univers}. Statistiques descriptives ou None.
+
+    `edge` compare des choses comparables : la MOYENNE des titres choisis à la MOYENNE de l'univers (si fournie ; sinon, comme avant, à sa médiane, ce qui flatte
+    quand les rendements sont asymétriques). `edge_median` = écart médian à la médiane de l'univers ; `beat_pct` = part des titres qui battent la médiane.
+    `days` = nombre de jours de classement distincts : les observations d'un même jour et de jours voisins se chevauchent, `n` ne compte donc pas autant de cas indépendants."""
     if not returns:
         return None
     rets = [r for _, r in returns]
     diffs = [r - benchmarks[d] for d, r in returns if d in benchmarks]
-    return {'n': len(rets), 'mean': statistics.fmean(rets), 'median': statistics.median(rets),
+    mean_diffs = [r - benchmarks_mean[d] for d, r in returns if benchmarks_mean and d in benchmarks_mean]
+    edge = statistics.fmean(mean_diffs) if mean_diffs else (statistics.fmean(diffs) if diffs else None)
+    return {'n': len(rets), 'days': len({d for d, _ in returns}), 'mean': statistics.fmean(rets), 'median': statistics.median(rets),
             'win_pct': 100 * sum(1 for r in rets if r > 0) / len(rets),
-            'edge': statistics.fmean(diffs) if diffs else None,
+            'edge': edge, 'edge_basis': 'mean' if mean_diffs else 'median', 'edge_median': statistics.median(diffs) if diffs else None,
             'beat_pct': 100 * sum(1 for x in diffs if x > 0) / len(diffs) if diffs else None}
 
 
@@ -188,10 +194,11 @@ def summary(conn, recent_days=8):
     with conn.cursor() as cur:
         cur.execute('SELECT snap_date, origin, COUNT(*) n FROM ranking_snapshots GROUP BY snap_date, origin ORDER BY snap_date')
         snaps = cur.fetchall()
-        cur.execute('SELECT snap_date, grp, horizon, median_ret FROM universe_outcomes')
-        bench = defaultdict(dict)
+        cur.execute('SELECT snap_date, grp, horizon, median_ret, mean_ret FROM universe_outcomes')
+        bench, bench_mean = defaultdict(dict), defaultdict(dict)
         for r in cur.fetchall():
             bench[(r['grp'], r['horizon'])][r['snap_date'].isoformat()] = float(r['median_ret'])
+            bench_mean[(r['grp'], r['horizon'])][r['snap_date'].isoformat()] = float(r['mean_ret'])
         cur.execute("""SELECT o.snap_date, o.preset, o.horizon, o.ret, s.grp FROM ranking_outcomes o
                        JOIN ranking_snapshots s ON s.snap_date = o.snap_date AND s.preset = o.preset AND s.listing_id = o.listing_id""")
         outcomes = cur.fetchall()
@@ -205,7 +212,7 @@ def summary(conn, recent_days=8):
     presets = {}
     for name in ('*',) + strategy.PRESETS:
         presets[name] = {'label': name,
-                         'groups': {g: {str(h): summarize(grouped.get((name, g, h), []), bench.get((g, h), {})) for h in HORIZONS} for g in ('equity', 'etf')}}
+                         'groups': {g: {str(h): summarize(grouped.get((name, g, h), []), bench.get((g, h), {}), bench_mean.get((g, h), {})) for h in HORIZONS} for g in ('equity', 'etf')}}
     resolved = {str(h): len({d for (g, hh), m in bench.items() if hh == h for d in m}) for h in HORIZONS}
     recent = _recent(conn, [s['snap_date'].isoformat() for s in snaps][-recent_days:])
     return {'horizons': list(HORIZONS), 'days': len(snaps), 'first': snaps[0]['snap_date'].isoformat(), 'last': snaps[-1]['snap_date'].isoformat(),

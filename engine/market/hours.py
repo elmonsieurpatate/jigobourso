@@ -71,6 +71,13 @@ def is_settled(mic, day, now):
     return now >= end
 
 
+def settle_utc(mic, day):
+    """Instant (UTC naïf, comme la base) à partir duquel la clôture officielle de la séance `day` est publiée."""
+    tz, _, closes = spec(mic)
+    end = datetime.combine(day, closes, ZoneInfo(tz)) + timedelta(minutes=SETTLE_MINUTES)
+    return end.astimezone(timezone.utc).replace(tzinfo=None)
+
+
 def expected_slots(mic):
     """Nombre de créneaux de 15 minutes d'une séance complète."""
     if not known(mic):
@@ -101,14 +108,15 @@ def expected_last_close(mic, now):
     return day.isoformat()
 
 
-def price_is_stale(mic, stamp, now):
+def price_is_stale(mic, stamp, now, expected=None):
+    """`expected` : dernière clôture due (ISO) si l'appelant la connaît mieux que l'horloge (jours fériés déduits des données)."""
     if stamp is None:
         return True
     if now.tzinfo is None:
         now = now.replace(tzinfo=timezone.utc)
     if stamp.tzinfo is None:
         stamp = stamp.replace(tzinfo=timezone.utc)
-    if _local(mic, stamp).date().isoformat() < expected_last_close(mic, now):
+    if _local(mic, stamp).date().isoformat() < (expected or expected_last_close(mic, now)):
         return True
     # During trading, a quote older than two intraday slots is explicitly old.
     return is_open(mic, now) and (now - stamp).total_seconds() > 30 * 60

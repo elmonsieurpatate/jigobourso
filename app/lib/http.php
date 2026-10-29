@@ -11,6 +11,23 @@ function out($data, int $status = 200): void {
     echo json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PARTIAL_OUTPUT_ON_ERROR);
     exit;
 }
+// Envoie la réponse, puis exécute $after sans faire attendre le client (travail lent : e-mail). Sans fin de requête anticipée
+// (serveur de développement, tests), $after s'exécute avant la réponse pour que le comportement reste déterministe.
+function out_then($data, callable $after, int $status = 200): void {
+    ignore_user_abort(true);
+    $finish = function_exists('fastcgi_finish_request') ? 'fastcgi_finish_request' : (function_exists('litespeed_finish_request') ? 'litespeed_finish_request' : null);
+    $run = function () use ($after) { try { $after(); } catch (Throwable $e) { error_log('after-response: ' . $e->getMessage() . ' @' . basename($e->getFile()) . ':' . $e->getLine()); } };
+    if (!$finish) { $run(); out($data, $status); }
+    $json = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PARTIAL_OUTPUT_ON_ERROR);
+    http_response_code($status);
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
+    header('Content-Length: ' . strlen((string)$json));
+    echo $json;
+    $finish();
+    $run();
+    exit;
+}
 function body(): array {
     static $b = null;
     if ($b !== null) return $b;
@@ -35,7 +52,9 @@ function str_in(array $a, string $k, int $max = 200, bool $required = true): str
     if (mb_strlen($v) > $max) throw new ApiError("Champ « $k » trop long");
     return $v;
 }
-function num_in(array $a, string $k, bool $required = true, ?float $min = null) {
+// Montants et quantités : borne haute commune, très en dessous de la capacité des colonnes DECIMAL(24,8).
+const NUM_MAX = 1e12;
+function num_in(array $a, string $k, bool $required = true, ?float $min = null, float $max = NUM_MAX) {
     if (!isset($a[$k]) || $a[$k] === '' || $a[$k] === null) {
         if ($required) throw new ApiError("Champ « $k » requis");
         return null;
@@ -43,5 +62,6 @@ function num_in(array $a, string $k, bool $required = true, ?float $min = null) 
     $v = is_string($a[$k]) ? str_replace(',', '.', $a[$k]) : $a[$k];
     if (!is_numeric($v) || !is_finite((float)$v)) throw new ApiError("Champ « $k » numérique attendu");
     if ($min !== null && (float)$v < $min) throw new ApiError("Champ « $k » trop petit");
+    if ((float)$v > $max) throw new ApiError("Champ « $k » trop grand");
     return (float)$v;
 }

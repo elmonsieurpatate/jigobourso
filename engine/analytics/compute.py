@@ -5,7 +5,8 @@ import json
 from .measures import window_metrics, technical_state
 from .series import usable_closes, find_breaks, clean_window, analyze_series
 from . import strategy
-from ..market.hours import expected_last_close
+from ..market import collect
+from ..market.hours import expected_last_close  # noqa: F401 (conservé pour compatibilité)
 
 BASE_WINDOWS = (1, 5, 21, 63, 126, 252)
 
@@ -49,6 +50,7 @@ def compute_all(conn, now, batch=400):
             market_latest[m] = max(market_latest.get(m, ''), r['last_date'].isoformat())
     metric_rows, state_rows = [], []
     stamp = now.astimezone(datetime.timezone.utc).replace(tzinfo=None, microsecond=0)
+    expected_by_mic = {m: collect.effective_expected_close(conn, m, now) for m in sorted(set(mics.values()))}      # jours fériés déduits des données
     ids = sorted(mics)
     for start in range(0, len(ids), batch):
         part = ids[start:start + batch]
@@ -59,7 +61,7 @@ def compute_all(conn, now, batch=400):
             for r in cur.fetchall():
                 bars.setdefault(r['listing_id'], []).append((r['price_date'].isoformat(), float(r['close_px']), None if r['adj_close_px'] is None else float(r['adj_close_px'])))
         for lid in part:
-            _compute_one(lid, mics[lid], bars.get(lid, []), splits.get(lid, ()), windows, market_latest, stamp, metric_rows, state_rows)
+            _compute_one(lid, mics[lid], bars.get(lid, []), splits.get(lid, ()), windows, market_latest, stamp, metric_rows, state_rows, expected_by_mic.get(mics[lid]))
     with conn.cursor() as cur:
         cur.execute('DELETE FROM strategy_metrics')
         cur.execute('DELETE FROM series_state')
@@ -71,13 +73,13 @@ def compute_all(conn, now, batch=400):
     return len(state_rows), len(metric_rows)
 
 
-def _compute_one(lid, mic, rows, splits, windows, market_latest, stamp, metric_rows, state_rows):
+def _compute_one(lid, mic, rows, splits, windows, market_latest, stamp, metric_rows, state_rows, expected_close=None):
     dates, closes, basis, breaks, measures, missing, t = analyze_series(rows, windows, splits)
     for n, m in measures.items():
         if m:
             metric_rows.append((lid, n, _dec(m['slope']), _dec(m['slope_log'], 10), _dec(m['r2']), _dec(m['perf'], 4),
                                 _dec(m['volatility']), _dec(m['drawdown'], 4), _dec(m['er']), None))
-    expected = max(expected_last_close(mic, stamp), market_latest.get(mic, ''))
+    expected = max(expected_close or expected_last_close(mic, stamp), market_latest.get(mic, ''))
     stale = bool(dates) and dates[-1] < expected
     quality = 'insufficient' if len(closes) < 22 else 'stale' if stale else 'break' if breaks and breaks[-1] > len(closes) - 253 else 'ok'
     state_rows.append((lid, stamp, dates[-1] if dates else None, len(closes), t['close'], _dec(t['ma20']), _dec(t['ma50']), _dec(t['ma50_prev']),

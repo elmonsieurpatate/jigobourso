@@ -7,14 +7,17 @@
    Le cron n'importe jamais FinanceDatabase, ne filtre jamais, ne change jamais le catalogue.
 """
 import datetime
+import glob
+import gzip
 import os
 import shutil
 import subprocess
+import tempfile
 import time
 
 from engine.analytics import compute, funnel, tracking
 from engine.catalogue import loader
-from engine.market import catchup, collect, hours
+from engine.market import catchup, collect, hours, splits
 from engine.market.yahoo import RateLimited
 from engine.shared import settings
 from . import schedule
@@ -63,20 +66,32 @@ def add_stats(conn, key, now, round_id, **numbers):
 # ───────── 1. construction du catalogue (manuelle) ─────────
 def fdb_import(conn, log, now=None):
     """Télécharge FinanceDatabase et stocke les données brutes (rien n'est filtré ni supprimé : on pourra re-filtrer sans retélécharger).
-    JIGO_FDB_SOURCE : dossier local déjà téléchargé (tests, hors ligne) ; sinon clone git superficiel."""
+    JIGO_FDB_SOURCE : dossier local déjà téléchargé (tests, hors ligne) ; sinon clone git superficiel. JIGO_FDB_REF : commit ou étiquette à utiliser (catalogue reproductible)."""
     now = now or hours.utcnow()
     local = os.environ.get('JIGO_FDB_SOURCE')
     root = local or os.path.join(os.environ.get('JIGO_DATA_DIR', 'data'), 'financedatabase')
 
+    ref = os.environ.get('JIGO_FDB_REF', '').strip()          # version épinglée (commit complet ou étiquette) ; vide = dernière version, notée dans catalogue_loads
+
+    def head(path):
+        return subprocess.run(['git', '-C', path, 'rev-parse', 'HEAD'], capture_output=True, text=True).stdout.strip() or '0' * 40
+
     def download():
         if local:
-            return subprocess.run(['git', '-C', local, 'rev-parse', 'HEAD'], capture_output=True, text=True).stdout.strip() or '0' * 40
+            return head(local)
         shutil.rmtree(root, ignore_errors=True)
         os.makedirs(os.path.dirname(root), exist_ok=True)
-        done = subprocess.run(['git', 'clone', '--depth', '1', FDB_URL, root], capture_output=True, text=True, timeout=900)
-        if done.returncode != 0:
-            raise RuntimeError('Téléchargement de FinanceDatabase impossible : ' + done.stderr.strip()[-200:])
-        return subprocess.run(['git', '-C', root, 'rev-parse', 'HEAD'], capture_output=True, text=True).stdout.strip() or '0' * 40
+        if ref:
+            if not all(c.isalnum() or c in '._-/' for c in ref) or ref.startswith('-'):
+                raise RuntimeError('JIGO_FDB_REF invalide')
+            steps = (['git', 'init', '-q', root], ['git', '-C', root, 'fetch', '-q', '--depth', '1', FDB_URL, ref], ['git', '-C', root, 'checkout', '-q', 'FETCH_HEAD'])
+        else:
+            steps = (['git', 'clone', '--depth', '1', FDB_URL, root],)
+        for cmd in steps:
+            done = subprocess.run(cmd, capture_output=True, text=True, timeout=900)
+            if done.returncode != 0:
+                raise RuntimeError('Téléchargement de FinanceDatabase impossible : ' + done.stderr.strip()[-200:])
+        return head(root)
     commit = _step(log, 'Téléchargement de FinanceDatabase', download, lambda r: f'version {r[:8]}')
     try:
         read = _step(log, 'Stockage des données brutes', lambda: loader.store_raw(conn, root), lambda r: f'{r} lignes')
@@ -160,20 +175,28 @@ def fetch_daily(conn, client, rows, now, cb=None, allowed=None):
     """Clôtures quotidiennes manquantes : une fenêtre adaptée par titre, rien pour un titre déjà à jour. Renvoie les chiffres."""
     ids = [r['listing_id'] for r in rows]
     plan, fresh = collect.daily_plan(conn, rows, now)
+    forced = set(splits.due_ids(conn, ids, collect.naive_utc(now).date()))
     if allowed is not None:                       # rattrapage : seulement les titres dont le délai de nouvelle tentative est écoulé
         plan = {rng: [r for r in group if r['listing_id'] in allowed] for rng, group in plan.items()}
         plan = {rng: group for rng, group in plan.items() if group}
     before = _count(conn, 'daily_prices', ids)
     answered = lines = err = 0
+    replied = set()
     for rng, group in plan.items():
-        ok, ln, er = collect.collect_daily(conn, client, group, now, range_=rng, progress=cb)
+        ok, ln, er = collect.collect_daily(conn, client, group, now, range_=rng, progress=cb, answered=replied)
         answered, lines, err = answered + ok, lines + ln, err + er
         if rng == '2y':
             collect.mark_backfill_tried(conn, group, now)
     if cb and fresh:
         cb(fresh)
     added = max(0, _count(conn, 'daily_prices', ids) - before)
-    return {'titles': len(rows), 'up_to_date': fresh, 'asked': sum(len(g) for g in plan.values()), 'answered': answered, 'errors': err, 'added': added, 'present': max(0, lines - added)}
+    asked = forced & {r['listing_id'] for g in plan.values() for r in g}
+    refetched = sorted(asked & replied)
+    outcome = splits.resolve(conn, refetched, now) if refetched else {'confirmed': 0, 'real_move': 0}
+    if asked - replied:                                         # Yahoo n'a rien répondu pour ces titres : on ne conclut pas, nouvel essai demain
+        splits.postpone(conn, sorted(asked - replied), collect.naive_utc(now).date() + datetime.timedelta(days=1))
+    return {'titles': len(rows), 'up_to_date': fresh, 'asked': sum(len(g) for g in plan.values()), 'answered': answered, 'errors': err, 'added': added, 'present': max(0, lines - added),
+            'splits_confirmed': outcome['confirmed'], 'splits_real_move': outcome['real_move']}
 
 
 def fetch_intraday(conn, client, rows, now, cb=None, previous=True, failed=None):
@@ -213,10 +236,71 @@ def history(conn, client, now, log):
     i = _step(log, 'Barres de 15 minutes (deux dernières séances)', lambda: fetch_intraday(conn, client, rows, now, _progress(log, 'Barres de 15 minutes', total)),
               lambda r: f'{r["asked"]} titres interrogés, {r["up_to_date"]} déjà complets, {r["added"]} barres ajoutées, {r["errors"]} sans réponse' + (f', {r["unknown_hours"]} sans horaires connus' if r['unknown_hours'] else ''))
     _step(log, 'Indicateurs et classements', lambda: compute.compute_all(conn, now), lambda r: f'{r[0]} séries, {r[1]} lignes de mesures')
+    _step(log, 'Détection des splits', lambda: splits.detect(conn, now), lambda r: f'{r} nouveaux sauts à vérifier auprès de Yahoo')
     cov = history_coverage(conn)
     save_stats(conn, 'history', now, daily=d, intraday=i, coverage=cov, titles=total)
     errors = d['errors'] + i['errors']
     return total - min(total, errors), errors, f'{total} titres · quotidien +{d["added"]} · 15 min +{i["added"]} · {errors} sans réponse'
+
+
+# ───────── entretien : purges et sauvegarde ─────────
+BACKUP_TABLES = ('users', 'portfolios', 'portfolio_transactions', 'position_levels', 'saved_searches', 'settings')     # ce qui n'est pas reconstructible depuis Yahoo
+BACKUP_KEEP = 14
+
+
+def housekeeping(conn, now):
+    """Purge les tables d'exploitation qui grossiraient sans fin (tentatives, sessions et jetons périmés, anciens traitements). Renvoie le nombre de lignes par table."""
+    naive = collect.naive_utc(now)
+    day, week, quarter = (naive - datetime.timedelta(days=d) for d in (1, 7, 90))
+    plan = (('login_attempts', 'at < %s', day), ('account_attempts', 'at < %s', day), ('sessions', 'expires_at < %s', naive),
+            ('account_tokens', 'expires_at < %s', week), ('job_steps', 'started_at < %s', quarter),
+            ('jobs', "started_at < %s AND status NOT IN ('queued','running')", quarter))
+    out = {}
+    for table, cond, arg in plan:
+        try:
+            with conn.cursor() as cur:
+                cur.execute(f'DELETE FROM {table} WHERE {cond}', (arg,))
+                out[table] = cur.rowcount
+            conn.commit()
+        except Exception:                                                        # noqa: BLE001 : table absente (base pas encore migrée) ou verrou : on passe à la suivante
+            conn.rollback()
+            out[table] = None
+    return out
+
+
+def backup_user_data(now, directory=None):
+    """Une sauvegarde par jour (UTC) des tables irremplaçables (comptes, portefeuilles, transactions, réglages), hors racine web, droits 600,
+    14 exemplaires conservés. Renvoie le chemin créé, ou None si celle du jour existe déjà. Lève RuntimeError si l'outil ou le dump échoue."""
+    directory = directory or os.environ.get('JIGO_BACKUP_DIR') or os.path.join(os.environ.get('JIGO_DATA_DIR', 'data'), 'backups')
+    target = os.path.join(directory, f'userdata-{now.strftime("%Y%m%d")}.sql.gz')
+    if os.path.exists(target):
+        return None
+    dump = shutil.which('mariadb-dump') or shutil.which('mysqldump')
+    if not dump:
+        raise RuntimeError('mariadb-dump introuvable')
+    os.makedirs(directory, mode=0o700, exist_ok=True)
+    env = dict(os.environ, MYSQL_PWD=os.environ.get('JIGO_DB_PASSWORD', ''))
+    cmd = [dump, f'-h{os.environ["JIGO_DB_HOST"]}', f'-P{os.environ.get("JIGO_DB_PORT", "3306")}', f'-u{os.environ["JIGO_DB_USER"]}',
+           '--single-transaction', '--quick', os.environ['JIGO_DB_NAME'], *BACKUP_TABLES]
+    part = target + '.part'
+    try:
+        with open(part, 'wb') as out, tempfile.TemporaryFile() as err:
+            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=err, env=env)
+            with gzip.GzipFile(fileobj=out, mode='wb') as gz:
+                shutil.copyfileobj(proc.stdout, gz)
+            code = proc.wait(timeout=600)
+            err.seek(0)
+            detail = err.read()[-200:].decode('utf-8', 'replace')
+        if code != 0:
+            raise RuntimeError(f'mariadb-dump a échoué ({code}) : {detail}')
+        os.chmod(part, 0o600)
+        os.replace(part, target)
+    finally:
+        if os.path.exists(part):
+            os.remove(part)
+    for old in sorted(glob.glob(os.path.join(directory, 'userdata-*.sql.gz')))[:-BACKUP_KEEP]:
+        os.remove(old)
+    return target
 
 
 # ───────── 2. entretien automatique (cron) ─────────
@@ -226,10 +310,31 @@ def maintenance(conn, client, now, log):
     rows = collect.collection_set(conn)
     ok, err = _step(log, 'Cours de référence (Quote)', lambda: collect.refresh_quotes(conn, client, rows, now), lambda r: f'{r[0]} reçus sur {len(rows)}')
     _step(log, 'Taux de change', lambda: collect.refresh_fx(conn, client, now))
+
+    def fx_history():
+        try:
+            return collect.backfill_fx(conn, client, now)
+        except RateLimited:
+            raise
+        except Exception as e:                                                   # noqa: BLE001 : l'historique de change ne doit jamais empêcher le recalcul
+            conn.rollback()
+            log('warning', f'historique de change impossible : {e}')
+            return 0
+    _step(log, 'Historique des taux de change', fx_history, lambda r: f'{r} taux ajoutés')
     n_series, n_metrics = _step(log, 'Indicateurs et classements', lambda: compute.compute_all(conn, now), lambda r: f'{r[0]} séries, {r[1]} lignes de mesures')
+    _step(log, 'Détection des splits', lambda: splits.detect(conn, now), lambda r: f'{r} nouveaux sauts à vérifier auprès de Yahoo')
     snap_day, snap_rows = _step(log, 'Suivi des classements', lambda: tracking.record_snapshot(conn), lambda r: f'{r[0]} ({r[1]} titres)')
     outcomes = _step(log, 'Résultats du suivi', lambda: tracking.update_outcomes(conn), lambda r: f'{r} résultats')
     _step(log, 'Rétention des clôtures et des barres', lambda: (collect.prune_daily(conn, now), collect.prune_intraday(conn, now)))
+    _step(log, 'Purge des tables d’exploitation', lambda: housekeeping(conn, now))
+
+    def backup():
+        try:
+            return backup_user_data(now)
+        except Exception as e:                                                   # noqa: BLE001 : ne fait jamais échouer la maintenance, mais reste visible dans les journaux
+            log('warning', f'sauvegarde des données utilisateur impossible : {e}')
+            return '(échec : voir les avertissements)'
+    _step(log, 'Sauvegarde des données utilisateur', backup, lambda r: 'déjà faite aujourd’hui' if r is None else os.path.basename(r))
     return ok, err, f'cours {ok}/{ok + err}, séries {n_series}, mesures {n_metrics}, suivi {snap_day} ({snap_rows} titres, {outcomes} résultats)'
 
 
@@ -257,8 +362,8 @@ def _daily(conn, client, rows, now, log, round_id=None, due=None, mic=None):
         catchup.daily_after(conn, mic, due, now)               # retient les clôtures toujours absentes pour les redemander plus tard
     if d['errors']:
         log('warning', f'{d["errors"]} cotations sans réponse : nouvelle tentative automatique plus tard')
-    if d['added']:
-        settings.put(conn, 'maintenance_pending', True)
+    if d['added'] or d.get('splits_confirmed') or d.get('splits_real_move'):
+        settings.put(conn, 'maintenance_pending', True)             # l'historique d'un titre a été réécrit ou de nouvelles clôtures sont arrivées : recalcul
     add_stats(conn, 'daily', now, round_id or _now_iso(now), titles=d['titles'], up_to_date=d['up_to_date'], answered=d['answered'], errors=d['errors'], added=d['added'], present=d['present'])
     return d['answered'], d['errors'], f'{d["added"]} clôtures ajoutées, {d["up_to_date"]} titres déjà à jour'
 

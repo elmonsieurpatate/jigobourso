@@ -21,4 +21,4 @@ php -S 127.0.0.1:8090 -t app/public  # site (variables JIGO_DB_* et JIGO_PYTHON)
 BASE=http://127.0.0.1:8090 USER_NAME=… PASS=… node tests/e2e/smoke.mjs   # parcours navigateur
 ```
 Variables : `JIGO_DB_HOST/PORT/NAME/USER/PASSWORD`, `JIGO_PYTHON` (interpréteur du moteur), `JIGO_ENGINE_ROOT`, `JIGO_DATA_DIR`.
-Planification : une seule tâche cron, toutes les 15 minutes : `python -m engine.cli tick`.
+Planification : une seule tâche cron hPanel, toutes les 5 minutes, qui appelle `api/cron` (clé dans l'en-tête `X-Cron-Key` ou `?k=`) ; elle lance `python -m engine.cli tick` (la collecte d'une place reste espacée de 15 minutes).

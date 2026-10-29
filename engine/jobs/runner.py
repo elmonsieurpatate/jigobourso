@@ -38,19 +38,29 @@ def recover_interrupted(conn):
 def run_job(conn, job_type, fn, trigger='cron'):
     """Exécute fn(log) -> (items_ok, items_error, résumé). Refuse de démarrer si le même type est déjà en cours."""
     recover_interrupted(conn)
+    # Verrou nommé le temps de « vérifier puis créer » : deux processus simultanés (cron + test depuis l'administration) ne démarrent pas le même type.
+    lock = 'jigo:job:' + job_type
     with conn.cursor() as cur:
-        cur.execute("SELECT id FROM jobs WHERE job_type=%s AND status='running'", (job_type,))
-        if cur.fetchone():
+        cur.execute('SELECT GET_LOCK(%s, 0) AS got', (lock,))
+        if not cur.fetchone()['got']:
             return None
-        cur.execute("SELECT id FROM jobs WHERE job_type=%s AND status='queued' ORDER BY id LIMIT 1", (job_type,))
-        queued = cur.fetchone()
-        if queued:      # demande faite depuis l'administration : on reprend la ligne
-            cur.execute("UPDATE jobs SET status='running', started_at=%s WHERE id=%s", (_now(), queued['id']))
-            job_id = queued['id']
-        else:
-            cur.execute("INSERT INTO jobs(job_type,trigger_by,status,started_at) VALUES (%s,%s,'running',%s)", (job_type, trigger, _now()))
-            job_id = cur.lastrowid
-    conn.commit()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id FROM jobs WHERE job_type=%s AND status='running'", (job_type,))
+            if cur.fetchone():
+                return None
+            cur.execute("SELECT id FROM jobs WHERE job_type=%s AND status='queued' ORDER BY id LIMIT 1", (job_type,))
+            queued = cur.fetchone()
+            if queued:      # demande faite depuis l'administration : on reprend la ligne
+                cur.execute("UPDATE jobs SET status='running', started_at=%s WHERE id=%s", (_now(), queued['id']))
+                job_id = queued['id']
+            else:
+                cur.execute("INSERT INTO jobs(job_type,trigger_by,status,started_at) VALUES (%s,%s,'running',%s)", (job_type, trigger, _now()))
+                job_id = cur.lastrowid
+        conn.commit()
+    finally:
+        with conn.cursor() as cur:
+            cur.execute('SELECT RELEASE_LOCK(%s)', (lock,))
 
     def log(level, message):
         with conn.cursor() as cur:
