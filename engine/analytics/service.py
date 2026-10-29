@@ -10,6 +10,7 @@ import re
 from collections import defaultdict
 
 from engine.catalogue.rules import MARKETS, is_leveraged_name
+from engine.shared import settings as settings_mod
 from engine.market import hours
 from engine.market.collect import effective_expected_close, latest_rates, to_eur_factor
 from . import strategy
@@ -314,6 +315,11 @@ def explore(conn, request):
     wanted = [e['id'] for e in page_rows if e not in excluded_hits]
     detail = {v['key']: v for v in judge_universe(conn, config, wanted)} if wanted else {}
     out = []
+    prefilter_cfg = settings_mod.prefilter_rules(conn)
+    from . import etf, signals
+    etf_top = [e['id'] for e in rows if e.get('group') == 'etf'][:10]          # dix premiers ETF de la vue, avant pagination, dans l'ordre déjà déterminé
+    etf_concentration = etf.concentration(conn, etf_top)
+    group_of = {i: g['id'] for g in etf_concentration['groups'] for i in g['members']}
     for e in page_rows:
         if e in excluded_hits:
             out.append(e)
@@ -323,7 +329,8 @@ def explore(conn, request):
         r = _row(v, rates, conn)
         a = aux.get(e['id'], {})
         r.update({'volume': a.get('volume'), 'last_close': a['last_close'].isoformat() if a.get('last_close') else None,
-                  'ref': {k: a.get(k) for k in REF_FIELDS}, 'open': e['mic'] in hours.HOURS and hours.is_open(e['mic'], now)})
+                  'ref': {k: a.get(k) for k in REF_FIELDS}, 'open': e['mic'] in hours.HOURS and hours.is_open(e['mic'], now),
+                  'signals': signals.row_signals(a, e['kind'], ref, prefilter_cfg), 'etf_group': group_of.get(e['id'])})
         out.append(r)
     if not export:
         _attach_curves(conn, out)
@@ -337,9 +344,6 @@ def explore(conn, request):
         markets[e['mic']] += 1
         if e['country']:
             countries[e['country']] += 1
-    from . import etf
-    etf_top = [e['id'] for e in rows if e.get('group') == 'etf'][:10]
-    etf_concentration = etf.concentration(conn, etf_top)
     return {'etf_concentration': etf_concentration, 'config': config, 'total': total, 'page': page, 'pages': max(1, -(-total // size)), 'rows': out, 'ref_sessions': ref,
             'universe': len(entries), 'examined': len(base),
             'counts': {g: dict(c) for g, c in counts.items()}, 'scope_counts': scope_counts, 'populations': {g: sum(c.values()) for g, c in counts.items()},
@@ -434,6 +438,7 @@ def instrument_sheet(conn, request):
         sheet['state']['quality'] = 'stale'
 
     sheet['missing_measures'] = {str(n): why for n, why in missing.items()}
+    sheet['signals'] = _sheet_signals(conn, sheet, u, config, chart_closes, state)
     if u['status'] == 'selected' and u['is_primary']:
         view = request.get('view') or {}
         entries, scoped, _, _ = scoped_entries(conn, config, view)      # même moteur que l'Explorer : mêmes filtres, mêmes critères, même classement
@@ -450,9 +455,10 @@ def instrument_sheet(conn, request):
     else:
         sheet['verdict'] = {'status': 'unknown', 'status_label': 'Non analysé', 'note': 'Aucune cotation Yahoo exploitable pour le moment : ce titre n’est pas encore analysé.'}
     if u['kind'] == 'etf':
-        sheet['etf_profile'] = _etf_profile(conn, lid, u['symbol'], False)  # V1 : lecture du cache uniquement
+        sheet['etf_profile'] = _etf_profile(conn, lid, u['symbol'], bool(request.get('fetch_profile')))     # une seule requête Yahoo, pour l'ETF ouvert, profil de plus de 30 jours ou d'ancienne version
         from . import etf
         sheet['etf_analysis'] = etf.load(conn, [lid]).get(lid)
+        sheet['etf_compare'] = etf.compare(conn, lid)
     sheet['strategy'] = {'name': config.get('name'), 'ranking': config['ranking']['mode'], 'source': request.get('source') or None,
                          'technical': {k: v for k, v in config['technical'].items() if v},
                          'periods': [{'id': p['id'], 'label': strategy.LABELS[p['id']], 'sessions': p['sessions'], 'criteria': {f: p[f] for f, _, _ in strategy.CRITERIA if p[f] is not None}} for p in config['periods'] if p['enabled']]}
@@ -461,6 +467,25 @@ def instrument_sheet(conn, request):
 
 
 LEVERAGE = re.compile(r'\b(bull|[235]x|x[235]|-[123]x)\b|levier|effet de levier', re.I)       # compléments de rules.is_leveraged_name pour l'avertissement de la fiche
+
+
+def _sheet_signals(conn, sheet, u, config, closes, state):
+    """« Lecture rapide » de la fiche : mêmes seuils que les pastilles du classement, avec les détails pédagogiques de la V1 (séances en hausse, poids du meilleur jour)."""
+    from . import signals
+    ref = _reference_window(config)
+    m = (sheet.get('measures') or {}).get(str(ref)) or {}
+    facts = signals.history_facts(closes, ref)
+    price_eur, vol = sheet.get('price_eur'), u.get('avg_volume_3m')
+    out = [signals.regularity(m.get('r2'), ref, signals.regularity_extra(facts)), signals.risk(m.get('volatility'), m.get('drawdown'), ref),
+           signals.liquidity(price_eur * vol if price_eur is not None and vol else None, u['kind'], settings_mod.prefilter_rules(conn)),
+           signals.data_quality(state.get('quality'), sheet.get('data_corrections'), sheet.get('price_stale'), state.get('break_dates'))]
+    if u['kind'] == 'etf':
+        from . import etf
+        analysis = etf.load(conn, [u['id']]).get(u['id'])
+        prof = (sheet.get('etf_profile') or {}).get('data') or {}
+        out += [signals.similarity(analysis), signals.composition(prof),
+                signals.specific_risks(u['name'], u['category'], is_leveraged_name(' '.join(filter(None, [u['name'], u['category']]))))]
+    return out
 
 
 def _sheet_context(conn, u, state, daily):

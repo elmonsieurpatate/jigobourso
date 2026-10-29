@@ -21,7 +21,7 @@ def conn():
         for lid in range(1, 5):
             cur.execute("INSERT INTO instruments(id,group_key,kind,name,category) VALUES (%s,%s,'etf',%s,%s)", (lid, 'etf:' + str(lid), 'ETF ' + str(lid), 'Energy' if lid < 4 else 'Commodities'))
             cur.execute("INSERT INTO listings(id,instrument_id,mic,symbol,currency,status,is_primary) VALUES (%s,%s,'XETR',%s,'EUR','selected',1)", (lid, lid, str(lid) + '.DE'))
-        day = dt.date(2026, 4, 20)
+        day = dt.date(2025, 10, 6)
         i = 0
         while day <= dt.date(2026, 10, 29):
             if day.weekday() < 5:
@@ -51,14 +51,14 @@ def test_precomputed_similarity_metadata_and_portfolio(conn, monkeypatch):
     assert result['etfs'] == result['with_minimum_history'] == 4
     p = etf.load(conn, [1, 2])
     assert p[1]['similar'][0]['coefficient'] == 1
-    assert p[1]['similar'][0]['sessions'] >= 100
+    assert p[1]['similar'][0]['weeks'] >= etf.MIN_WEEKS and p[1]['similar'][0]['partitions'] == 5
     assert p[1]['profile']['holdings'][0]['weight'] is None
     r = etf.portfolio(conn, [{'listing_id': 1, 'kind': 'etf', 'symbol': 'A', 'value': 100},
                              {'listing_id': 2, 'kind': 'etf', 'symbol': 'B', 'value': 300}])
     assert r['known_eur'] == 100 and r['unknown_eur'] == 300 and r['unknown_percent'] == 75
     assert len(r['similar_pairs']) == 1 and r['similar_pairs'][0]['coefficient'] == 1
     alert = etf.concentration(conn, [1, 2, 3, 4])
-    assert alert['alerts'][0]['count'] == 3 and alert['sample'] == 4
+    assert alert['sample'] == 4 and len(alert['groups']) == 1 and alert['groups'][0]['size'] == 4 and alert['groups'][0]['min_coefficient'] >= .9
     with conn.cursor() as cur:
         cur.execute('SELECT COUNT(*) n FROM portfolio_transactions')
         assert cur.fetchone()['n'] == 0

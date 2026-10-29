@@ -316,6 +316,18 @@ def maintenance(conn, client, now, log):
     _step(log, 'Historique des taux de change', fx_history, lambda r: f'{r} taux ajoutés')
     _step(log, 'Détection des sauts de cours', lambda: splits.detect(conn, now), lambda r: f'{r} nouveaux sauts ressemblant à un split')
     _step(log, 'Splits déclarés par Yahoo', lambda: splits.verify(conn, client, now), lambda r: f'{r["confirmed"]} confirmés (cours corrigés), {r["real_move"]} vrais mouvements, {r["unanswered"]} sans réponse')
+
+    def etf_profiles():
+        from engine.analytics import etf
+        try:
+            return etf.warm_profiles(conn, client, now)
+        except RateLimited:
+            raise
+        except Exception as e:                                                   # noqa: BLE001 : les profils ETF ne doivent jamais empêcher le recalcul
+            conn.rollback()
+            log('warning', f'profils ETF impossibles : {e}')
+            return {'wanted': 0, 'to_refresh': 0, 'fetched': 0, 'unavailable': 0, 'limit': 0}
+    _step(log, 'Profils des ETF suivis', etf_profiles, lambda r: f'{r["fetched"]} récupérés, {r["unavailable"]} indisponibles, {r["to_refresh"]} à rafraîchir sur {r["wanted"]} suivis (au plus {r["limit"]} par passage)')
     n_series, n_metrics = _step(log, 'Indicateurs et classements', lambda: compute.compute_all(conn, now), lambda r: f'{r[0]} séries, {r[1]} lignes de mesures')
     snap_day, snap_rows = _step(log, 'Suivi des classements', lambda: tracking.record_snapshot(conn), lambda r: f'{r[0]} ({r[1]} titres)')
     outcomes = _step(log, 'Résultats du suivi', lambda: tracking.update_outcomes(conn), lambda r: f'{r} résultats')

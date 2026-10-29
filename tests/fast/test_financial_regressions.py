@@ -6,7 +6,7 @@ from engine.analytics.compute import _compute_one
 
 def test_excluded_search_page_two_must_not_repeat_page_one():
     excluded=[{'id':i,'symbol':f'EX{i}','status':'excluded'} for i in range(1,51)]
-    with patch.object(S,'scoped_entries',return_value=([],[],21,{})),patch.object(S,'latest_rates',return_value={}),patch.object(S,'_search_excluded',return_value=excluded),patch.object(S,'_attach_curves'):
+    with patch.object(S,'scoped_entries',return_value=([],[],21,{})),patch.object(S,'latest_rates',return_value={}),patch.object(S,'_search_excluded',return_value=excluded),patch.object(S,'_attach_curves'),patch.object(S.settings_mod,'prefilter_rules',return_value={}):
         a=S.explore(None,{'view':{'q':'EX','page':1,'page_size':24}})
         b=S.explore(None,{'view':{'q':'EX','page':2,'page_size':24}})
     assert {r['id'] for r in a['rows']}.isdisjoint({r['id'] for r in b['rows']}), 'Page 2 repeats excluded listings from page 1'
