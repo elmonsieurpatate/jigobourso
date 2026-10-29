@@ -26,7 +26,7 @@ def statements(sql):
 def check(sql, name='?'):
     """ValueError si le fichier contient autre chose que des ajouts."""
     for st in statements(sql):
-        if FORBIDDEN.search(st) or not ALLOWED_START.match(st):
+        if FORBIDDEN.search(re.sub(r'ON\s+DELETE\s+CASCADE', '', st, flags=re.I)) or not ALLOWED_START.match(st):
             raise ValueError(f'{name} : instruction non admise ({st[:60]!r}…). Seuls les ajouts sont autorisés.')
 
 

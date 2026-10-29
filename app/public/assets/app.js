@@ -206,8 +206,9 @@ J.accountDialog = function () {
   J.dialog({
     title: 'Mon compte', body: `<div class="row between"><span>Affichage</span><span class="seg" id="mode"><button type="button" data-v="simple">Simple</button><button type="button" data-v="advanced">Avancé</button></span></div>
     <div class="row between"><span>Thème</span><span class="seg" id="theme"><button type="button" data-v="auto">Auto</button><button type="button" data-v="light">Clair</button><button type="button" data-v="dark">Sombre</button></span></div>
-    <hr style="border:0;border-top:1px solid var(--line);width:100%"><h3>Changer le mot de passe</h3>${J.field('Mot de passe actuel', '<input type="password" id="pw0" autocomplete="current-password">')}${J.field('Nouveau (10 caractères minimum)', '<input type="password" id="pw1" autocomplete="new-password">')}`,
+    <hr style="border:0;border-top:1px solid var(--line);width:100%"><h3>Mes coordonnées</h3>${J.field('Pseudo', `<input id="account-name" autocomplete="username" value="${J.esc(J.user.username)}" maxlength="30">`)}${J.field('E-mail', `<input id="account-email" type="email" autocomplete="email" value="${J.esc(J.user.email || '')}" maxlength="190">`)}<p class="account-note">Une nouvelle adresse doit être confirmée par e-mail. L’adresse actuelle reste utilisable jusque-là.</p><h3>Confirmer mes modifications</h3>${J.field('Mot de passe actuel', '<input type="password" id="pw0" autocomplete="current-password">')}${J.field('Nouveau (10 caractères minimum)', '<input type="password" id="pw1" autocomplete="new-password">')}`,
     actions: [{ label: 'Se déconnecter', cls: 'danger', run: async () => { await J.post('auth/logout'); location.href = 'login.html'; return true; }, },
+    { label: 'Enregistrer mes coordonnées', run: async d => { const r = await J.post('auth/account', { username: J.$('#account-name', d).value, email: J.$('#account-email', d).value, current: J.$('#pw0', d).value }); J.toast(r.message); J.user = (await J.api('auth/me')).user; } },
     { label: 'Changer le mot de passe', run: async d => { await J.post('auth/password', { current: J.$('#pw0', d).value, new: J.$('#pw1', d).value }); J.toast('Mot de passe modifié'); } }],
     onopen: d => {
       for (const [id, key, cur] of [['mode', 'mode', prefs.mode || 'simple'], ['theme', 'theme', prefs.theme || localStorage.getItem('jigo_theme') || 'auto']]) {
@@ -217,3 +218,5 @@ J.accountDialog = function () {
   });
 };
 window.J = J;
+
+if (!document.querySelector('script[src*="passwords.js"]')) { const p=document.createElement('script'); p.src='assets/passwords.js?v=202610290001'; document.head.appendChild(p); }

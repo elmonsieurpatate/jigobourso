@@ -6,7 +6,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE),fs=require('fs');
   page.setDefaultTimeout(20000);page.on('pageerror',e=>errors.push(e.message));
   const r={width,synthetic_local_database:true};
   try{
-   await page.goto('http://127.0.0.1:18089/login.html');await page.fill('#u','review_user');await page.fill('#p','review-local-password');await page.click('#in button.primary');await page.waitForURL('**/index.html');
+   await page.goto('http://127.0.0.1:18089/login.html');await page.fill('#u','review_user');await page.fill('#p','review-local-password');await page.click('#auth-form button.primary');await page.waitForURL('**/index.html');
    await page.locator('.rtable tbody tr').first().waitFor();r.login=true;r.explorer_rows=await page.locator('.rtable tbody tr').count();r.explorer_overflow=await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth);
    await page.screenshot({path:`audit-results/explorer-${width}.png`});
    await page.goto('http://127.0.0.1:18089/titre.html?id=1');await page.locator('.hero').waitFor();await page.locator('svg.price-svg').waitFor();r.sheet_chart=true;r.sheet_overflow=await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth);

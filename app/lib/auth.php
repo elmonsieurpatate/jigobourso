@@ -12,23 +12,29 @@ function login_blocked(string $username): bool {
     $n = q('SELECT COUNT(*) FROM login_attempts WHERE username = ? AND at > ?', [$username, gmdate('Y-m-d H:i:s', time() - 900)])->fetchColumn();
     return (int)$n >= 5;
 }
-function login(string $username, string $password): array {
-    $username = mb_substr($username, 0, 30);
-    if (login_blocked($username)) throw new ApiError('Trop d’essais : réessayez dans quelques minutes', 429);
-    $u = q('SELECT * FROM users WHERE username = ? AND active = 1', [$username])->fetch();
-    // Même coût de vérification que l'utilisateur existe ou non.
-    $hash = $u ? $u['pass_hash'] : '$2y$10$usesomesillystringforsalt$';
-    if (!$u || !password_verify($password, $hash)) {
-        q('INSERT INTO login_attempts(username, ip, at) VALUES (?, ?, ?)', [$username, client_ip(), now_utc()]);
-        throw new ApiError('Identifiant ou mot de passe incorrect', 401);
+function login(string $username, string $password, bool $remember = false): array {
+    $username = trim(mb_substr($username, 0, 190));
+    $ipKey='login:'.substr(hash('sha256',client_ip()),0,20);
+    if (login_blocked($ipKey)) throw new ApiError('Trop d’essais : réessayez dans quelques minutes',429);
+    $column=strpos($username,'@')!==false?'email':'username';
+    $u=q("SELECT * FROM users WHERE $column=? AND active=1",[$username])->fetch();
+    $key=$u?$u['username']:'missing:'.substr(hash('sha256',mb_strtolower($username)),0,20);
+    if (login_blocked($key)) throw new ApiError('Trop d’essais : réessayez dans quelques minutes',429);
+    $hash=$u?$u['pass_hash']:'$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2uheWG/igi';
+    $verified=password_verify($password,$hash);
+    if (!$u || !$verified) {
+        foreach ([$key,$ipKey] as $k) q('INSERT INTO login_attempts(username,ip,at) VALUES (?,?,?)',[$k,client_ip(),now_utc()]);
+        throw new ApiError('E-mail, pseudo ou mot de passe incorrect',401);
     }
-    q('DELETE FROM login_attempts WHERE username = ?', [$username]);
+    q('DELETE FROM login_attempts WHERE username=?',[$key]);
+    $expiry=time()+($remember?SESSION_DAYS*86400:86400);
     $token = bin2hex(random_bytes(32));
     $now = now_utc();
     q('INSERT INTO sessions(token_hash, user_id, created_at, last_seen, expires_at, ip, ua) VALUES (?,?,?,?,?,?,?)',
-      [hash('sha256', $token), $u['id'], $now, $now, gmdate('Y-m-d H:i:s', time() + SESSION_DAYS * 86400), client_ip(), substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 190)]);
+      [hash('sha256', $token), $u['id'], $now, $now, gmdate('Y-m-d H:i:s', $expiry), client_ip(), substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 190)]);
+    q('INSERT INTO session_policies(token_hash,persistent,absolute_expiry) VALUES (?,?,?)',[hash('sha256',$token),$remember?1:0,gmdate('Y-m-d H:i:s',$expiry)]);
     q('UPDATE users SET last_login = ? WHERE id = ?', [$now, $u['id']]);
-    setcookie(COOKIE, $token, ['expires' => time() + SESSION_DAYS * 86400, 'path' => '/', 'secure' => https(), 'httponly' => true, 'samesite' => 'Lax']);
+    setcookie(COOKIE, $token, ['expires' => $remember ? $expiry : 0, 'path' => '/', 'secure' => https(), 'httponly' => true, 'samesite' => 'Lax']);
     return public_user($u);
 }
 function logout(): void {
@@ -46,7 +52,9 @@ function current_user(): ?array {
     $row = q('SELECT u.* FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ? AND s.expires_at > ? AND u.active = 1',
              [hash('sha256', $_COOKIE[COOKIE]), now_utc()])->fetch();
     if (!$row) return null;
-    q('UPDATE sessions SET last_seen = ?, expires_at = ? WHERE token_hash = ?', [now_utc(), gmdate('Y-m-d H:i:s', time() + SESSION_DAYS * 86400), hash('sha256', $_COOKIE[COOKIE])]);
+    $policy=q('SELECT absolute_expiry FROM session_policies WHERE token_hash=?',[hash('sha256',$_COOKIE[COOKIE])])->fetch();
+    if ($policy) q('UPDATE sessions SET last_seen=? WHERE token_hash=?',[now_utc(),hash('sha256',$_COOKIE[COOKIE])]);
+    else q('UPDATE sessions SET last_seen=?,expires_at=? WHERE token_hash=?',[now_utc(),gmdate('Y-m-d H:i:s',time()+SESSION_DAYS*86400),hash('sha256',$_COOKIE[COOKIE])]);
     return $cache = $row;
 }
 function require_user(): array {

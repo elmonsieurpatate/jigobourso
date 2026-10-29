@@ -12,10 +12,10 @@
   const MARKETS = { XETR: 'Xetra', XPAR: 'Paris', XAMS: 'Amsterdam', XLON: 'Londres', XMIL: 'Milan', XMAD: 'Madrid', XSTO: 'Stockholm', XOSL: 'Oslo', XSWX: 'Zurich', XNAS: 'Nasdaq', XNYS: 'NYSE', XASE: 'NYSE American', ARCX: 'NYSE Arca', BATS: 'Cboe' };
   const url = new URLSearchParams(location.search);
   const saved = (() => { try { return JSON.parse(localStorage.getItem('jigo_explorer2')) || {}; } catch (e) { return {}; } })();
-  const S = { preset: saved.preset || 'regular', label: saved.label || null, config: saved.config || P.presets[saved.preset || 'regular'], status: 'retained', page: 1, sort: saved.sort || 'rank', dir: saved.dir || 'asc', size: saved.size || 20, level: 'guided', compare: false };
+  const S = { preset: saved.preset || 'regular', label: saved.label || null, config: saved.config || P.presets[saved.preset || 'regular'], status: saved.status || 'retained', page: saved.page || 1, sort: saved.sort || 'rank', dir: saved.dir || 'asc', size: saved.size || 20, level: saved.level || 'guided', compare: !!saved.compare };
   const el = id => J.$('#' + id);
   const text = ['q', 'kind', 'market', ...FILTERS];
-  text.forEach(k => { const v = k === 'q' ? url.get('q') : (saved.view || {})[k]; if (v !== undefined && v !== null && el(k)) el(k).value = v; });
+  text.forEach(k => { const v = k === 'q' ? (url.has('q') ? url.get('q') : (saved.view || {}).q) : (saved.view || {})[k]; if (v !== undefined && v !== null && el(k)) el(k).value = v; });
   CHECKS.forEach(k => { if (el(k) && (saved.view || {})[k]) el(k).checked = true; });
   let timer, seq = 0, lastRes = null;
 
@@ -42,7 +42,8 @@
     CHECKS.forEach(k => { v[k === 'mine' ? 'owned_only' : k] = el(k).checked; });
     return v;
   }
-  function persist() { try { localStorage.setItem('jigo_explorer2', JSON.stringify({ preset: S.preset, config: S.config, sort: S.sort, dir: S.dir, size: S.size, view: { ...view(), mine: el('mine').checked }, label: S.label || null })); } catch (e) { } }
+  addEventListener('pagehide', () => { persist(); try { sessionStorage.setItem('jigo_explorer_scroll', String(scrollY)); } catch (e) {} });
+  function persist() { try { localStorage.setItem('jigo_explorer2', JSON.stringify({ preset: S.preset, config: S.config, status: S.status, page: S.page, level: S.level, compare: S.compare, sort: S.sort, dir: S.dir, size: S.size, view: { ...view(), mine: el('mine').checked }, label: S.label || null })); } catch (e) { } }
 
   /* éditeur : réglages guidés + détaillé */
   const levelOpts = (obj, labels, cur) => Object.entries(labels).map(([k, l]) => `<option value="${k}" ${k === cur ? 'selected' : ''}>${l}</option>`).join('');
@@ -128,7 +129,7 @@
     const badge = r.status === 'excluded' ? `<span class="badge ko help" title="${J.esc(r.excluded_reason || '')}">Exclu</span>` : J.statusBadge(r.status, r.status_label);
     const fresh = r.last_close ? J.date(r.last_close) : '–';
     return `<tr data-id="${r.id}"><td class="rk">${r.rank || '·'}</td>
-      <td class="name"><span class="nm">${J.esc(r.name)}</span><span class="sub">${J.esc(r.symbol)} · ${J.esc(r.market)} <span class="tag ${r.kind === 'etf' ? 'etf' : ''}">${r.kind === 'etf' ? 'ETF' : 'ACTION'}</span>${r.pea ? ' <span class="tag pea">PEA</span>' : ''}${r.held ? ' <span class="tag held">DÉTENU</span>' : ''}${r.open ? ' <span class="tag open">OUVERT</span>' : ''}</span>${r.status === 'excluded' ? `<span class="sub warn">${J.esc(r.excluded_reason || '')}</span>` : ''}</td>
+      <td class="name"><span class="nm">${`<a data-sheet href="titre.html?src=explorer&id=${r.id}" target="_blank" rel="noopener" aria-label="Ouvrir ${J.esc(r.symbol)} dans un nouvel onglet">${J.esc(r.name)}</a>`}</span><span class="sub">${J.esc(r.symbol)} · ${J.esc(r.market)} <span class="tag ${r.kind === 'etf' ? 'etf' : ''}">${r.kind === 'etf' ? 'ETF' : 'ACTION'}</span>${r.pea ? ' <span class="tag pea">PEA</span>' : ''}${r.held ? ' <span class="tag held">DÉTENU</span>' : ''}${r.open ? ' <span class="tag open">OUVERT</span>' : ''}</span>${r.status === 'excluded' ? `<span class="sub warn">${J.esc(r.excluded_reason || '')}</span>` : ''}</td>
       <td class="num">${r.price_eur !== null && r.price_eur !== undefined ? J.eur(r.price_eur) : J.money(r.price, r.currency)}<span class="sub" style="display:block">${r.currency !== 'EUR' && r.price !== null ? J.money(r.price, r.currency) : (r.price ? J.priceLabel(r) : '')}</span>${r.price_stale ? '<span class="sub warn">Cours ancien</span>' : ''}</td>
       <td class="hide-s">${J.spark(r.curve)}</td>
       <td class="num ${J.cls(m.slope)}">${m.slope !== null && m.slope !== undefined ? J.num(m.slope, 3) : '–'}</td><td class="num">${J.num(m.r2, 2)}</td><td class="num ${J.cls(m.perf)}">${J.pct(m.perf, 1)}</td>
@@ -153,7 +154,8 @@
     if (my !== seq) return;
     lastRes = res; drawTabs(res); drawWhy(res); fillFacets(res);
     el('results').innerHTML = res.rows.length ? `<div class="table-wrap"><table class="rtable">${header(res.ref_sessions)}<tbody>${res.rows.map(row).join('')}</tbody></table></div>` : `<div class="empty">${v.q ? 'Aucun titre ne correspond à cette recherche.' : 'Aucun titre dans cette vue avec ces critères et ces filtres.'}</div>`;
-    J.$$('#results tbody tr').forEach(tr => tr.onclick = () => location.href = 'titre.html?src=explorer&id=' + tr.dataset.id);
+    if (!window.jigoScrollRestored) { window.jigoScrollRestored = true; try { requestAnimationFrame(() => scrollTo(0, +(sessionStorage.getItem('jigo_explorer_scroll') || 0))); } catch (e) {} }
+    J.$$('#results tbody tr').forEach(tr => { const a = tr.querySelector('a[data-sheet]'); tr.onclick = e => { if (e.target.closest('a,button,input')) return; persist(); window.open(a.href, '_blank', 'noopener'); }; });
     J.$$('#results th.sortable').forEach(th => th.onclick = () => { const k = th.dataset.k; if (S.sort === k) S.dir = S.dir === 'asc' ? 'desc' : 'asc'; else { S.sort = k; S.dir = ['name', 'price', 'volatility', 'drawdown', 'rank'].includes(k) ? 'asc' : 'desc'; } S.page = 1; load(); });
     el('pager').innerHTML = `<span class="muted small">${J.num(res.examined, 0)} titres examinés sur ${J.num(res.universe, 0)} · ${J.num(res.total, 0)} résultat${res.total > 1 ? 's' : ''}${res.populations.etf && res.populations.equity ? ' · actions et ETF sont classés séparément' : ''} · mesures sur ${res.ref_sessions} séances</span>
       <span class="row gap-s"><select id="size" aria-label="Lignes par page">${[20, 50, 100].map(n => `<option value="${n}" ${n === S.size ? 'selected' : ''}>${n} par page</option>`).join('')}</select><button class="btn small" id="prev" ${res.page <= 1 ? 'disabled' : ''}>←</button><span class="small">Page ${res.page} / ${res.pages}</span><button class="btn small" id="next" ${res.page >= res.pages ? 'disabled' : ''}>→</button></span>`;
