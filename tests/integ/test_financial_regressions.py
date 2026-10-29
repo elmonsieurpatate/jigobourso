@@ -131,7 +131,8 @@ def test_legacy_missing_fx_is_visible_not_silently_revalued(world):
     con.commit();con.close()
     v=portfolio(a,pf)
     assert not v['integrity']['ok']
-    assert v['totals']['cost'] is None and v['positions'][0]['cost'] is None
+    assert v['totals']['cost'] is None and v['positions'][0]['cost'] is None      # le seul titre est incomplet : rien de calculable
+    assert v['totals']['partial'] and v['totals']['excluded'] == ['OLD']
     assert v['transactions_list'][0]['fx_to_eur'] is None
 
 @pytest.fixture(autouse=True)

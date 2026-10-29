@@ -114,15 +114,77 @@ def test_housekeeping_purges_only_what_is_old_or_expired(world):
     c.close()
 
 
-def test_confirmed_split_after_purchase_raises_an_alert_until_free_shares_are_entered(world):
+def confirmed_split(c, listing, day, ratio):
+    with c.cursor() as q:
+        q.execute("INSERT INTO split_log(listing_id,event_date,price_ratio,ratio,status,detected_at) VALUES (%s,%s,%s,%s,'confirmed',NOW())", (listing, day, 1 / ratio, ratio))
+    c.commit()
+
+
+def position(a, pf):
+    return a.call('portfolio', params=f'&id={pf}')[1]['positions'][0]
+
+
+def test_confirmed_split_is_applied_automatically_and_keeps_the_total_cost(world):
     a = login(world, 'alice', 'alice-secret-1234'); pf = new_portfolio(a)
     assert tx(a, pf, quantity=10, trade_at='2026-10-01')[0] == 200
+    c = connect(); confirmed_split(c, 1, '2026-10-10', 2.0); c.close()
+    pos = position(a, pf)
+    assert pos['qty'] == 20 and abs(pos['cost'] - 1000.0) < 1e-6 and abs(pos['avg_cost'] - 50.0) < 1e-6
+    assert pos['splits_applied'][0]['ratio'] == 2.0
+    assert tx(a, pf, side='sell', quantity=20, trade_at='2026-10-20')[0] == 200        # vendre toute la quantité d'après-split est permis
+
+
+def test_reverse_split_reduces_the_quantity_and_blocks_selling_more_than_held(world):
+    a = login(world, 'alice', 'alice-secret-1234'); pf = new_portfolio(a)
+    assert tx(a, pf, quantity=100, unit_price=1, trade_at='2026-10-01')[0] == 200
+    c = connect(); confirmed_split(c, 1, '2026-10-10', 0.1); c.close()
+    pos = position(a, pf)
+    assert abs(pos['qty'] - 10) < 1e-9 and abs(pos['cost'] - 100.0) < 1e-6
+    status, data = tx(a, pf, side='sell', quantity=50, trade_at='2026-10-20')
+    assert status == 422 and 'supérieure' in data['error']
+
+
+def test_manual_correction_made_before_automation_is_not_counted_twice(world):
+    a = login(world, 'alice', 'alice-secret-1234'); pf = new_portfolio(a)
+    assert tx(a, pf, quantity=10, trade_at='2026-10-01')[0] == 200
+    assert tx(a, pf, quantity=10, unit_price=0, trade_at='2026-10-10')[0] == 200        # titres gratuits saisis à la main à la date du split
+    c = connect(); confirmed_split(c, 1, '2026-10-10', 2.0); c.close()
+    assert position(a, pf)['qty'] == 20
+
+
+def test_held_flag_follows_split_adjusted_quantity(world):
+    a = login(world, 'alice', 'alice-secret-1234'); pf = new_portfolio(a)
+    assert tx(a, pf, quantity=10, trade_at='2026-10-01')[0] == 200
+    c = connect(); confirmed_split(c, 1, '2026-10-10', 2.0); c.close()
+    assert tx(a, pf, side='sell', quantity=19, trade_at='2026-10-20')[0] == 200
+    held = a.call('explore', {'preset': 'regular', 'view': {'owned_only': True, 'status': 'all'}})[1]
+    assert [r['id'] for r in held['rows']] == [1]                                       # 1 titre restant après la vente de 19 sur 20
+
+
+def legacy_usd_transaction_without_rate(pf):
     c = connect()
     with c.cursor() as q:
-        q.execute("INSERT INTO split_log(listing_id,event_date,price_ratio,ratio,status,detected_at) VALUES (1,'2026-10-10',0.5,2,'confirmed',NOW())")
+        q.execute("INSERT INTO portfolio_transactions(portfolio_id,symbol,side,quantity,unit_price,currency,trade_at,created_at) VALUES (%s,'OLD','buy',1,100,'USD','2026-10-01',NOW())", (pf,))
     c.commit(); c.close()
-    pos = a.call('portfolio', params=f'&id={pf}')[1]['positions'][0]
-    assert pos['split_alerts'] == [{'date': '2026-10-10', 'ratio': 2.0, 'shares_to_add': 10.0}]
-    assert tx(a, pf, quantity=10, unit_price=0, trade_at='2026-10-10')[0] == 200        # titres gratuits à la date du split : quantité corrigée, coût inchangé
-    pos = a.call('portfolio', params=f'&id={pf}')[1]['positions'][0]
-    assert pos['split_alerts'] == [] and pos['qty'] == 20 and abs(pos['cost'] - 1000.0) < 1e-6      # coût d'origine conservé (10 × 100)
+
+
+def test_an_incomplete_transaction_only_excludes_its_own_position(world):
+    a = login(world, 'alice', 'alice-secret-1234'); pf = new_portfolio(a)
+    assert tx(a, pf, quantity=2, unit_price=100, trade_at='2026-10-01')[0] == 200      # titre complet : coût 200 €
+    legacy_usd_transaction_without_rate(pf)
+    v = a.call('portfolio', params=f'&id={pf}')[1]
+    t = v['totals']
+    assert not v['integrity']['ok'] and t['partial'] and t['excluded'] == ['OLD']
+    assert abs(t['cost'] - 200.0) < 1e-6 and t['invested_total'] == 200.0               # le titre complet reste calculé
+    assert next(p for p in v['positions'] if p['symbol'] == 'OLD')['cost'] is None
+
+
+def test_bilan_keeps_other_portfolios_results_when_one_transaction_is_incomplete(world):
+    a = login(world, 'alice', 'alice-secret-1234'); good = new_portfolio(a)
+    bad = a.call('portfolio/create', {'name': 'Ancien'})[1]['id']
+    assert tx(a, good, quantity=1, unit_price=100, trade_at='2026-10-01')[0] == 200
+    assert tx(a, good, side='sell', quantity=1, unit_price=150, trade_at='2026-10-05')[0] == 200      # +50 € réalisés
+    legacy_usd_transaction_without_rate(bad)
+    b = a.call('bilan')[1]
+    assert not b['integrity']['ok'] and b['totals']['partial'] and len(b['totals']['excluded']) == 1
+    assert abs(b['totals']['realized'] - 50.0) < 1e-6 and b['realized_by_year'] == {'2026': 50.0}

@@ -160,21 +160,22 @@ return [
         $u = require_user();
         $list = q('SELECT id, name, is_default FROM portfolios WHERE user_id = ? ORDER BY is_default DESC, name', [$u['id']])->fetchAll();
         $all = ['value' => 0.0, 'cost' => 0.0, 'unrealized' => 0.0, 'realized' => 0.0, 'fees' => 0.0, 'invested_total' => 0.0, 'unpriced' => 0];
-        $years = []; $rows = []; $issues = [];
+        $years = []; $rows = []; $issues = []; $excluded = [];
         foreach ($list as $p) {
             $v = portfolio_valuation((int)$p['id']);
             $issues = array_merge($issues, $v['integrity']['issues']);
             $rows[] = ['id' => (int)$p['id'], 'name' => $p['name'], 'totals' => $v['totals'], 'positions' => count($v['positions'])];
-            foreach (['value', 'cost', 'unrealized', 'realized', 'fees', 'invested_total', 'unpriced'] as $k) $all[$k] += $v['totals'][$k];
+            // Les résultats calculables de chaque portefeuille comptent toujours ; seules les positions incomplètes en sont exclues (et signalées).
+            foreach (['value', 'fees', 'unpriced'] as $k) $all[$k] += $v['totals'][$k];
+            foreach (['cost', 'unrealized', 'realized', 'invested_total'] as $k) $all[$k] += $v['totals'][$k] ?? 0.0;
             foreach ($v['realized_by_year'] as $y => $g) $years[$y] = ($years[$y] ?? 0.0) + $g;
+            foreach ($v['totals']['excluded'] as $name) $excluded[] = $p['name'] . ' · ' . $name;
         }
         ksort($years);
         $all['total_gain'] = $all['unrealized'] + $all['realized'];
         $all['unrealized_pct'] = $all['cost'] > 0 ? 100 * $all['unrealized'] / $all['cost'] : null;
-        if ($issues) {
-            foreach (['cost','unrealized','realized','invested_total','total_gain','unrealized_pct'] as $k) $all[$k] = null;
-            $years = [];
-        }
+        $all['partial'] = (bool)$excluded;
+        $all['excluded'] = $excluded;
         return ['integrity' => ['ok' => !$issues, 'issues' => $issues], 'portfolios' => $rows, 'totals' => $all, 'realized_by_year' => $years];
     },
     'export' => function () {

@@ -33,10 +33,18 @@ function transaction_key(array $t): string {
 }
 function validate_transaction_history(array $rows): void {
     usort($rows, function ($a, $b) { return [$a['trade_at'], (int)$a['id']] <=> [$b['trade_at'], (int)$b['id']]; });
-    $held = [];
+    $events = split_events(array_map(function ($t) { return $t['listing_id'] ?? null; }, $rows));      // les quantités suivent les splits confirmés, comme la valorisation
+    $freeBuys = free_buy_dates($rows);
+    $held = []; $cursor = [];
     foreach ($rows as $t) {
         $k = transaction_key($t); $qty = (float)$t['quantity'];
         $have = $held[$k] ?? 0.0;
+        $lid = !empty($t['listing_id']) ? (int)$t['listing_id'] : 0;
+        if ($lid && isset($events[$lid])) {
+            $c = $cursor[$k] ?? '';
+            $have *= pending_split_ratio($events[$lid], $freeBuys[$lid] ?? [], $c, substr($t['trade_at'], 0, 10));
+            $cursor[$k] = $c;
+        }
         if ($t['side'] === 'sell' && $qty > $have + 1e-9)
             throw new ApiError('Vente supérieure à la quantité détenue à la date du ' . $t['trade_at'] . ' (' . $t['symbol'] . ')', 422);
         $held[$k] = $have + ($t['side'] === 'buy' ? $qty : -$qty);

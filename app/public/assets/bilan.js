@@ -1,7 +1,7 @@
 (async () => {
   if (!await J.init('bilan')) return;
   const b = await J.api('bilan'), t = b.totals, page = J.$('#page');
-  page.innerHTML = `${b.integrity && !b.integrity.ok ? `<div class="notice err">Prix de revient et plus-values indisponibles : des transactions ont un taux historique non confirmé ou un registre incohérent. Consultez le portefeuille concerné.</div>` : ''}<div class="grid cols-4">
+  page.innerHTML = `${t.partial ? `<div class="notice warn">Coût, gains et plus-values calculés <b>sans</b> ${t.excluded.length} position${t.excluded.length > 1 ? 's' : ''} incomplète${t.excluded.length > 1 ? 's' : ''} (taux de change historique manquant ou registre incohérent) : ${t.excluded.map(J.esc).join(', ')}. Corrigez ces transactions dans le portefeuille concerné pour les inclure ; la valeur totale, elle, les compte.</div>` : ''}<div class="grid cols-4">
     <div class="card kpi"><span class="l">Valeur totale</span><span class="v">${J.eur(t.value, 0)}</span></div>
     <div class="card kpi"><span class="l">Gain total (latent + réalisé)</span><span class="v ${J.cls(t.total_gain)}">${J.eur(t.total_gain, 0)}</span></div>
     <div class="card kpi"><span class="l">Latent</span><span class="v ${J.cls(t.unrealized)}">${J.eur(t.unrealized, 0)}</span><span class="small ${J.cls(t.unrealized)}">${J.pct(t.unrealized_pct)}</span></div>

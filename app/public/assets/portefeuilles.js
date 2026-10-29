@@ -7,9 +7,7 @@
   const NAMES = { regular: 'Croissance régulière', fast: 'Croissance rapide', recovery: 'Rebond', low_volatility: 'Hausse calme' };
 
   const px = (v, c) => v === null || v === undefined ? '–' : J.money(v, c || 'EUR');
-  const splitNotice = positions => positions.filter(p => p.split_alerts && p.split_alerts.length).map(p => p.split_alerts.map(a => `<div class="notice warn" style="margin-top:14px"><b>${J.esc(p.name_catalogue || p.name || p.symbol)}</b> : ${a.ratio >= 1
-    ? `un split ${J.num(a.ratio, 2)} pour 1 a eu lieu le ${J.date(a.date)} (Yahoo a ajusté ses cours) mais votre quantité n’a pas été ajustée : la valeur affichée est sous-estimée. Ajoutez une transaction d’achat à <b>prix 0</b> de ${J.num(a.shares_to_add, 4)} titre(s) à la date du split : la quantité sera corrigée sans fausser le prix de revient.`
-    : `un regroupement ${J.num(1 / a.ratio, 2)} pour 1 a eu lieu le ${J.date(a.date)} (Yahoo a ajusté ses cours) mais votre quantité n’a pas été ajustée : la valeur affichée est surestimée. Modifiez vos achats d’avant cette date : divisez chaque quantité par ${J.num(1 / a.ratio, 2)} et multipliez chaque prix unitaire par ${J.num(1 / a.ratio, 2)}.`}</div>`).join('')).join('');
+  const splitNotice = positions => positions.filter(p => p.splits_applied && p.splits_applied.length).map(p => `<div class="notice" style="margin-top:14px"><b>${J.esc(p.name_catalogue || p.name || p.symbol)}</b> : ${p.splits_applied.map(a => a.ratio >= 1 ? `split ${J.num(a.ratio, 2)} pour 1` : `regroupement ${J.num(1 / a.ratio, 2)} pour 1`).join(', ')} pris en compte automatiquement (Yahoo a ajusté ses cours) : la quantité affichée est celle d’aujourd’hui, le prix de revient total est inchangé.</div>`).join('');
   function levelCell(p) {
     if (!p.linked) return '<span class="muted small">–</span>';
     const cur = p.price_currency || p.currency, L = p.levels || {}, price = p.price;

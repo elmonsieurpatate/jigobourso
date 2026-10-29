@@ -4,7 +4,22 @@ require_once __DIR__ . '/../lib/engine.php';
 require_once __DIR__ . '/../services/ledger.php';
 
 function held_listing_ids(int $userId): array {
-    return array_map('intval', q("SELECT t.listing_id FROM portfolio_transactions t JOIN portfolios p ON p.id = t.portfolio_id WHERE p.user_id = ? AND t.listing_id IS NOT NULL GROUP BY t.listing_id HAVING SUM(CASE WHEN t.side='buy' THEN t.quantity ELSE -t.quantity END) > 0.000000001", [$userId])->fetchAll(PDO::FETCH_COLUMN));
+    // Quantité nette > 0, splits confirmés compris (même règle que la valorisation des portefeuilles).
+    $rows = q("SELECT t.listing_id, t.side, t.quantity, t.unit_price, t.trade_at, t.id FROM portfolio_transactions t JOIN portfolios p ON p.id = t.portfolio_id
+               WHERE p.user_id = ? AND t.listing_id IS NOT NULL ORDER BY t.trade_at, t.id", [$userId])->fetchAll();
+    $events = split_events(array_map(function ($t) { return $t['listing_id']; }, $rows));
+    $freeBuys = free_buy_dates($rows);
+    $qty = []; $cursor = [];
+    foreach ($rows as $t) {
+        $lid = (int)$t['listing_id'];
+        $c = $cursor[$lid] ?? '';
+        $qty[$lid] = ($qty[$lid] ?? 0.0) * (isset($events[$lid]) ? pending_split_ratio($events[$lid], $freeBuys[$lid] ?? [], $c, substr($t['trade_at'], 0, 10)) : 1.0);
+        $cursor[$lid] = $c;
+        $qty[$lid] += $t['side'] === 'buy' ? (float)$t['quantity'] : -(float)$t['quantity'];
+    }
+    $today = gmdate('Y-m-d');
+    foreach ($qty as $lid => $q) if ($q > 0 && isset($events[$lid])) { $c = $cursor[$lid]; $qty[$lid] = $q * pending_split_ratio($events[$lid], $freeBuys[$lid] ?? [], $c, $today); }
+    return array_values(array_map('intval', array_keys(array_filter($qty, function ($q) { return $q > 0.000000001; }))));
 }
 
 return [
