@@ -3,10 +3,11 @@ import datetime
 
 
 class FakeYahoo:
-    def __init__(self, quotes=None, daily=None, intraday=None):
+    def __init__(self, quotes=None, daily=None, intraday=None, declared_splits=None):
         self.quote_data = quotes or {}      # symbole -> dict Quote
         self.daily = daily or {}            # symbole -> (tz, [(date, close)])
         self.intraday = intraday or {}      # symbole -> (tz, [(datetime_utc, close)])
+        self.declared_splits = declared_splits or {}   # symbole -> [(date ISO, parts nouvelles, parts anciennes)]
         self.calls = []
 
     def quotes(self, symbols):
@@ -24,3 +25,7 @@ class FakeYahoo:
                 tz, bars = self.intraday[s]
                 out[s] = {'currency': 'EUR', 'timezone': tz, 'bars': [(int(t.replace(tzinfo=datetime.timezone.utc).timestamp()), c) for t, c in bars]}
         return out
+
+    def splits(self, symbol, range_='2y'):
+        self.calls.append(('splits', symbol))
+        return list(self.declared_splits.get(symbol.upper(), []))

@@ -81,10 +81,31 @@ class YahooClient:
         text = self.transport.get('/v7/finance/spark', {'symbols': ','.join(symbols), 'range': range_, 'interval': interval})
         return parse_spark(json.loads(text), symbols)
 
+    def splits(self, symbol, range_='2y'):
+        """Splits et regroupements que Yahoo déclare pour ce titre sur la période : voir parse_splits."""
+        text = self.transport.get('/v8/finance/chart/' + urllib.parse.quote(symbol, safe=''), {'range': range_, 'interval': '1d', 'events': 'split', 'includePrePost': 'false'})
+        return parse_splits(json.loads(text))
+
     def chart(self, symbol, range_='5d', interval='15m'):
         """Bougies OHLCV d'un seul symbole (utilisé à la consultation d'une fiche) : voir parse_chart."""
         text = self.transport.get('/v8/finance/chart/' + urllib.parse.quote(symbol, safe=''), {'range': range_, 'interval': interval, 'includePrePost': 'false'})
         return parse_chart(json.loads(text))
+
+
+def parse_splits(payload):
+    """Splits déclarés par Yahoo dans la réponse /v8/finance/chart?events=split : [(date ISO de la séance, parts nouvelles, parts anciennes)].
+    Ex. un regroupement « 1:10 » donne (date, 1.0, 10.0) : ratio parts nouvelles / anciennes = 0,1. Liste vide si rien de déclaré ou réponse inexploitable."""
+    result = (((payload or {}).get('chart') or {}).get('result') or [None])[0]
+    if not isinstance(result, dict):
+        return []
+    meta = result.get('meta') or {}
+    tz = meta.get('exchangeTimezoneName') or meta.get('timezone')
+    out = []
+    for ev in ((result.get('events') or {}).get('splits') or {}).values():
+        num, den, ts = _num(ev.get('numerator')), _num(ev.get('denominator')), ev.get('date')
+        if num and den and num > 0 and den > 0 and isinstance(ts, int):
+            out.append((local_date(ts, tz).isoformat(), num, den))
+    return sorted(out)
 
 
 def parse_chart(payload):

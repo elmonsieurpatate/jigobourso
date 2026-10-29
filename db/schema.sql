@@ -29,7 +29,7 @@ CREATE TABLE listings (
   excluded_reason  VARCHAR(120) NULL,                           -- motif principal (obligatoire si excluded)
   is_primary       TINYINT(1) NOT NULL DEFAULT 0,               -- cotation principale de l'instrument (règle R1)
   primary_reason   VARCHAR(20) NULL,                            -- 'home_market' | 'liquidity' | 'single'
-  next_daily_check DATE NULL,                                   -- redemande de l'historique complet à partir de cette date (saut ressemblant à un split : voir market/splits.py)
+  next_daily_check DATE NULL,                                   -- RÉSERVÉ : non utilisé (les splits sont corrigés par corporate_events, voir market/splits.py)
   PRIMARY KEY (id),
   UNIQUE KEY uq_listing_venue_symbol (mic, symbol),
   KEY ix_listing_instrument (instrument_id),

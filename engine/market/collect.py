@@ -9,7 +9,7 @@ import statistics
 import time
 from collections import defaultdict
 
-from . import hours, prefilter, splits
+from . import hours, prefilter
 from .yahoo import RateLimited, local_date
 
 DAILY_KEEP_DAYS = 610          # ≈ 420 séances US (580 jours n'en gardaient que 380-399 : jamais « complet » à 400)
@@ -191,7 +191,7 @@ def apply_prefilter(conn, now=None):
 
 
 # ───────── clôtures quotidiennes ─────────
-def collect_daily(conn, client, rows, now, range_='2y', progress=None, answered=None):
+def collect_daily(conn, client, rows, now, range_='2y', progress=None):
     """Clôtures définitives (séance terminée et publiée). Renvoie (cotations_ok, lignes, erreurs)."""
     by_symbol = {r['symbol'].upper(): r for r in rows}
     ok = lines = err = 0
@@ -213,8 +213,6 @@ def collect_daily(conn, client, rows, now, range_='2y', progress=None, answered=
                     seen[day] = close
             out += [(row['listing_id'], d, c) for d, c in seen.items()]
             ok += bool(seen)
-            if seen and answered is not None:
-                answered.add(row['listing_id'])
         with conn.cursor() as cur:
             cur.executemany('INSERT INTO daily_prices(listing_id,price_date,close_px) VALUES (%s,%s,%s) ON DUPLICATE KEY UPDATE close_px=VALUES(close_px)', out)
         conn.commit()
@@ -258,12 +256,8 @@ def daily_plan(conn, rows, now):
             stats.update({r['listing_id']: (r['n'], r['a'], r['b']) for r in cur.fetchall()})
     tried = setting(conn, 'daily_backfill_tried', {})
     today = naive_utc(now).date()
-    forced = set(splits.due_ids(conn, ids, today))              # saut ressemblant à un split : historique complet redemandé pour que Yahoo l'ajuste
     plan, fresh = defaultdict(list), 0
     for r in rows:
-        if r['listing_id'] in forced:
-            plan['2y'].append(r)
-            continue
         st = stats.get(r['listing_id'])
         if not st:
             plan['2y'].append(r)

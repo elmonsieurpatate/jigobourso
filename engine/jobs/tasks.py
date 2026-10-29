@@ -175,28 +175,20 @@ def fetch_daily(conn, client, rows, now, cb=None, allowed=None):
     """Clôtures quotidiennes manquantes : une fenêtre adaptée par titre, rien pour un titre déjà à jour. Renvoie les chiffres."""
     ids = [r['listing_id'] for r in rows]
     plan, fresh = collect.daily_plan(conn, rows, now)
-    forced = set(splits.due_ids(conn, ids, collect.naive_utc(now).date()))
     if allowed is not None:                       # rattrapage : seulement les titres dont le délai de nouvelle tentative est écoulé
         plan = {rng: [r for r in group if r['listing_id'] in allowed] for rng, group in plan.items()}
         plan = {rng: group for rng, group in plan.items() if group}
     before = _count(conn, 'daily_prices', ids)
     answered = lines = err = 0
-    replied = set()
     for rng, group in plan.items():
-        ok, ln, er = collect.collect_daily(conn, client, group, now, range_=rng, progress=cb, answered=replied)
+        ok, ln, er = collect.collect_daily(conn, client, group, now, range_=rng, progress=cb)
         answered, lines, err = answered + ok, lines + ln, err + er
         if rng == '2y':
             collect.mark_backfill_tried(conn, group, now)
     if cb and fresh:
         cb(fresh)
     added = max(0, _count(conn, 'daily_prices', ids) - before)
-    asked = forced & {r['listing_id'] for g in plan.values() for r in g}
-    refetched = sorted(asked & replied)
-    outcome = splits.resolve(conn, refetched, now) if refetched else {'confirmed': 0, 'real_move': 0}
-    if asked - replied:                                         # Yahoo n'a rien répondu pour ces titres : on ne conclut pas, nouvel essai demain
-        splits.postpone(conn, sorted(asked - replied), collect.naive_utc(now).date() + datetime.timedelta(days=1))
-    return {'titles': len(rows), 'up_to_date': fresh, 'asked': sum(len(g) for g in plan.values()), 'answered': answered, 'errors': err, 'added': added, 'present': max(0, lines - added),
-            'splits_confirmed': outcome['confirmed'], 'splits_real_move': outcome['real_move']}
+    return {'titles': len(rows), 'up_to_date': fresh, 'asked': sum(len(g) for g in plan.values()), 'answered': answered, 'errors': err, 'added': added, 'present': max(0, lines - added)}
 
 
 def fetch_intraday(conn, client, rows, now, cb=None, previous=True, failed=None):
@@ -235,8 +227,9 @@ def history(conn, client, now, log):
               lambda r: f'{r["asked"]} titres interrogés, {r["up_to_date"]} déjà à jour, {r["added"]} clôtures ajoutées, {r["errors"]} sans réponse')
     i = _step(log, 'Barres de 15 minutes (deux dernières séances)', lambda: fetch_intraday(conn, client, rows, now, _progress(log, 'Barres de 15 minutes', total)),
               lambda r: f'{r["asked"]} titres interrogés, {r["up_to_date"]} déjà complets, {r["added"]} barres ajoutées, {r["errors"]} sans réponse' + (f', {r["unknown_hours"]} sans horaires connus' if r['unknown_hours'] else ''))
+    _step(log, 'Détection des sauts de cours', lambda: splits.detect(conn, now), lambda r: f'{r} nouveaux sauts ressemblant à un split')
+    _step(log, 'Splits déclarés par Yahoo', lambda: splits.verify(conn, client, now), lambda r: f'{r["confirmed"]} confirmés (cours corrigés), {r["real_move"]} vrais mouvements, {r["unanswered"]} sans réponse')
     _step(log, 'Indicateurs et classements', lambda: compute.compute_all(conn, now), lambda r: f'{r[0]} séries, {r[1]} lignes de mesures')
-    _step(log, 'Détection des splits', lambda: splits.detect(conn, now), lambda r: f'{r} nouveaux sauts à vérifier auprès de Yahoo')
     cov = history_coverage(conn)
     save_stats(conn, 'history', now, daily=d, intraday=i, coverage=cov, titles=total)
     errors = d['errors'] + i['errors']
@@ -321,8 +314,9 @@ def maintenance(conn, client, now, log):
             log('warning', f'historique de change impossible : {e}')
             return 0
     _step(log, 'Historique des taux de change', fx_history, lambda r: f'{r} taux ajoutés')
+    _step(log, 'Détection des sauts de cours', lambda: splits.detect(conn, now), lambda r: f'{r} nouveaux sauts ressemblant à un split')
+    _step(log, 'Splits déclarés par Yahoo', lambda: splits.verify(conn, client, now), lambda r: f'{r["confirmed"]} confirmés (cours corrigés), {r["real_move"]} vrais mouvements, {r["unanswered"]} sans réponse')
     n_series, n_metrics = _step(log, 'Indicateurs et classements', lambda: compute.compute_all(conn, now), lambda r: f'{r[0]} séries, {r[1]} lignes de mesures')
-    _step(log, 'Détection des splits', lambda: splits.detect(conn, now), lambda r: f'{r} nouveaux sauts à vérifier auprès de Yahoo')
     snap_day, snap_rows = _step(log, 'Suivi des classements', lambda: tracking.record_snapshot(conn), lambda r: f'{r[0]} ({r[1]} titres)')
     outcomes = _step(log, 'Résultats du suivi', lambda: tracking.update_outcomes(conn), lambda r: f'{r} résultats')
     _step(log, 'Rétention des clôtures et des barres', lambda: (collect.prune_daily(conn, now), collect.prune_intraday(conn, now)))
@@ -362,8 +356,8 @@ def _daily(conn, client, rows, now, log, round_id=None, due=None, mic=None):
         catchup.daily_after(conn, mic, due, now)               # retient les clôtures toujours absentes pour les redemander plus tard
     if d['errors']:
         log('warning', f'{d["errors"]} cotations sans réponse : nouvelle tentative automatique plus tard')
-    if d['added'] or d.get('splits_confirmed') or d.get('splits_real_move'):
-        settings.put(conn, 'maintenance_pending', True)             # l'historique d'un titre a été réécrit ou de nouvelles clôtures sont arrivées : recalcul
+    if d['added']:
+        settings.put(conn, 'maintenance_pending', True)
     add_stats(conn, 'daily', now, round_id or _now_iso(now), titles=d['titles'], up_to_date=d['up_to_date'], answered=d['answered'], errors=d['errors'], added=d['added'], present=d['present'])
     return d['answered'], d['errors'], f'{d["added"]} clôtures ajoutées, {d["up_to_date"]} titres déjà à jour'
 

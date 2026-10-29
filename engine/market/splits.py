@@ -1,21 +1,22 @@
 """Splits et regroupements non ajustés dans l'historique.
 
-Yahoo corrige rétroactivement ses historiques d'un split, mais nous ne redemandons jamais ce que nous avons déjà : après un split, nos anciennes clôtures
-restent à l'ancienne échelle et la série montre un faux saut. On ne peut pas décider seul si un saut est un split (à corriger) ou un vrai mouvement (à garder) :
-le fournisseur tranche.
+Les cours de clôture de Yahoo (Spark et Chart) ne sont PAS toujours ajustés des splits : pour certains titres l'historique garde le saut (constaté sur
+DHY, TACK, GOSS : le saut est dans les données et le split est déclaré à part, dans `events.splits` de l'API Chart). Un saut de cours seul ne prouve rien :
+ce peut être un vrai mouvement (à garder tel quel) ou un split non ajusté (à corriger). Seul un split DÉCLARÉ par Yahoo, de ratio cohérent avec le saut observé,
+est donc corrigé.
 
-1. `detect` repère les sauts de cours qui ressemblent à un ratio usuel (×2, ÷2, ÷10, ×3/2…) et les note dans `split_log` (statut « detected ») ;
-   chaque nouveau saut programme UNE redemande de l'historique complet du titre (`listings.next_daily_check`).
-2. La collecte quotidienne redemande cet historique (`due_ids`, utilisé par `collect.daily_plan`) : Yahoo renvoie les cours ajustés, qui écrasent les nôtres.
-3. `resolve` regarde ensuite le même saut : disparu = split confirmé (« confirmed », l'historique est maintenant à l'échelle actuelle) ;
-   toujours là = vrai mouvement de cours (« real_move », rien n'est corrigé et le titre reste « non évaluable » sur les fenêtres qui le traversent).
-Une chute réelle de 50 % n'est donc jamais « corrigée » : seul le fournisseur peut ajuster. Sans redemande, rien n'est modifié.
+1. `detect` repère les sauts de cours qui ressemblent à un ratio usuel (×2, ÷2, ÷10, ×3/2…) et les note dans `split_log` (statut « detected »).
+2. `verify` interroge Yahoo (`events.splits`) : un split déclaré à la même date (± 5 jours) dont le ratio explique le saut (± 15 %) devient « confirmed » et est écrit
+   dans `corporate_events` (ratio = parts nouvelles / anciennes) ; le calcul des séries (`analytics/series.prepare_series`) ajuste alors les clôtures antérieures.
+   Sinon le saut est « real_move » : rien n'est corrigé et le titre reste « non évaluable » sur les fenêtres qui le traversent.
+Une chute réelle de 50 % n'est donc jamais « corrigée » : il faut une déclaration du fournisseur.
 """
 import datetime
 
 import pymysql.err
 
 from engine.analytics.series import BREAK_RATIO
+from engine.market.yahoo import RateLimited
 
 # Ratios usuels parts nouvelles / anciennes (2 = deux pour un) ; leur inverse est le regroupement correspondant.
 COMMON_RATIOS = (1.5, 2, 2.5, 3, 4, 5, 6, 7, 8, 10, 15, 20, 25, 30, 40, 50, 100)
@@ -48,12 +49,26 @@ def _pair(conn, listing_id, day):
     return float(rows[0]['close_px']), float(rows[1]['close_px'])
 
 
+def available(conn):
+    """La table split_log existe-t-elle (entre le transfert du code et la migration, elle peut manquer) ?"""
+    try:
+        with conn.cursor() as cur:
+            cur.execute('SELECT 1 FROM split_log LIMIT 1')
+        return True
+    except pymysql.err.ProgrammingError:
+        conn.rollback()
+        return False
+
+
+def _stamp(now):
+    return now.replace(microsecond=0, tzinfo=None) if isinstance(now, datetime.datetime) else datetime.datetime.combine(now, datetime.time())
+
+
 def detect(conn, now):
-    """Note les nouveaux sauts qui ressemblent à un split et programme la redemande de l'historique. Renvoie le nombre de nouveaux sauts."""
+    """Note les nouveaux sauts qui ressemblent à un split (statut « detected »). Renvoie leur nombre."""
     if not available(conn):
         return 0
-    today = now.date() if isinstance(now, datetime.datetime) else now
-    stamp = now.replace(microsecond=0, tzinfo=None) if isinstance(now, datetime.datetime) else datetime.datetime.combine(now, datetime.time())
+    stamp = _stamp(now)
     with conn.cursor() as cur:
         cur.execute("""SELECT s.listing_id, s.break_dates FROM series_state s JOIN v_collect_set c ON c.listing_id=s.listing_id
                        WHERE s.break_dates IS NOT NULL AND s.break_dates<>''""")
@@ -72,64 +87,66 @@ def detect(conn, now):
             with conn.cursor() as cur:
                 cur.execute("INSERT IGNORE INTO split_log(listing_id,event_date,price_ratio,ratio,status,detected_at) VALUES (%s,%s,%s,%s,'detected',%s)",
                             (r['listing_id'], day, round(pair[0] / pair[1], 8), round(ratio, 8), stamp))
-                cur.execute('UPDATE listings SET next_daily_check=%s WHERE id=%s AND next_daily_check IS NULL', (today, r['listing_id']))
             new += 1
     conn.commit()
     return new
 
 
-def due_ids(conn, ids, today):
-    """Parmi `ids`, les cotations dont l'historique complet doit être redemandé (saut à vérifier auprès du fournisseur)."""
-    due = []
-    with conn.cursor() as cur:
-        for i in range(0, len(ids), 2000):
-            part = ids[i:i + 2000]
-            cur.execute(f"SELECT id FROM listings WHERE next_daily_check IS NOT NULL AND next_daily_check<=%s AND id IN ({','.join(['%s'] * len(part))})", [today] + part)
-            due += [r['id'] for r in cur.fetchall()]
-    return due
+DATE_TOLERANCE_DAYS = 5      # écart toléré entre la date du saut dans nos données et la date déclarée par Yahoo
+RATIO_TOLERANCE = 0.15       # le ratio déclaré doit expliquer le saut observé à 15 % près (le cours bouge aussi le jour du split)
 
 
-def available(conn):
-    """La table split_log existe-t-elle (entre le transfert du code et la migration, elle peut manquer) ?"""
-    try:
-        with conn.cursor() as cur:
-            cur.execute('SELECT 1 FROM split_log LIMIT 1')
-        return True
-    except pymysql.err.ProgrammingError:
-        conn.rollback()
-        return False
+def match_declared(declared, event_date, price_ratio):
+    """Split déclaré (date, num, den) qui explique le saut observé à `event_date`, ou None. Renvoie (ratio parts nouvelles / anciennes, date déclarée).
+
+    Le sens de la notation de Yahoo (1:10) n'est pas fiable d'un titre à l'autre (constaté : TACK, dont le cours est divisé par 10, est déclaré « 1:10 ») :
+    on retient le sens, direct ou inverse, que le saut OBSERVÉ confirme, avec l'ordre de grandeur déclaré."""
+    best = None
+    for day, num, den in declared:
+        gap = abs((datetime.date.fromisoformat(day) - event_date).days)
+        if gap > DATE_TOLERANCE_DAYS:
+            continue
+        for ratio in (num / den, den / num):
+            err = abs(price_ratio * ratio - 1)
+            if err <= RATIO_TOLERANCE and (best is None or (err, gap) < best[:2]):
+                best = (err, gap, ratio, day)
+    return None if best is None else (best[2], best[3])
 
 
-def resolve(conn, ids, now):
-    """Après la redemande : chaque saut « detected » de ces cotations devient « confirmed » (disparu) ou « real_move » (toujours là). Efface la programmation."""
+def verify(conn, client, now, limit=150):
+    """Interroge Yahoo pour les sauts « detected » (au plus `limit` titres par passage) : split déclaré cohérent = « confirmed » (écrit dans corporate_events),
+    sinon « real_move ». Un titre dont Yahoo ne répond pas reste « detected » pour le passage suivant. Renvoie {'confirmed': n, 'real_move': n, 'unanswered': n}."""
+    out = {'confirmed': 0, 'real_move': 0, 'unanswered': 0}
     if not available(conn):
-        return {'confirmed': 0, 'real_move': 0}
-    stamp = now.replace(microsecond=0, tzinfo=None) if isinstance(now, datetime.datetime) else datetime.datetime.combine(now, datetime.time())
-    counts = {'confirmed': 0, 'real_move': 0}
-    for lid in ids:
-        with conn.cursor() as cur:
-            cur.execute("SELECT event_date FROM split_log WHERE listing_id=%s AND status='detected'", (lid,))
-            events = [r['event_date'] for r in cur.fetchall()]
-        for day in events:
-            pair = _pair(conn, lid, day)
-            if pair is None:
-                continue                                                       # séance disparue de l'historique : on reverra plus tard
-            status = 'real_move' if is_break(pair[0] / pair[1]) else 'confirmed'
+        return out
+    stamp = _stamp(now)
+    with conn.cursor() as cur:
+        cur.execute("""SELECT s.listing_id, s.event_date, s.price_ratio, l.symbol FROM split_log s JOIN listings l ON l.id=s.listing_id
+                       WHERE s.status='detected' ORDER BY s.listing_id, s.event_date""")
+        rows = cur.fetchall()
+    by_listing = {}
+    for r in rows:
+        by_listing.setdefault(r['listing_id'], []).append(r)
+    for lid in list(by_listing)[:limit]:
+        events = by_listing[lid]
+        try:
+            declared = client.splits(events[0]['symbol'])
+        except RateLimited:
+            raise
+        except Exception:                                                      # noqa: BLE001 : réponse absente ou illisible : on réessaiera au prochain passage
+            out['unanswered'] += len(events)
+            continue
+        for r in events:
+            hit = match_declared(declared, r['event_date'], float(r['price_ratio']))
             with conn.cursor() as cur:
-                cur.execute('UPDATE split_log SET status=%s, checked_at=%s WHERE listing_id=%s AND event_date=%s', (status, stamp, lid, day))
-            counts[status] += 1
-    with conn.cursor() as cur:
-        for i in range(0, len(ids), 2000):
-            part = list(ids)[i:i + 2000]
-            cur.execute(f"UPDATE listings SET next_daily_check=NULL WHERE id IN ({','.join(['%s'] * len(part))})", part)
-    conn.commit()
-    return counts
-
-
-def postpone(conn, ids, day):
-    """Reporte la redemande de ces cotations au jour `day` (le fournisseur n'a pas répondu)."""
-    with conn.cursor() as cur:
-        for i in range(0, len(ids), 2000):
-            part = list(ids)[i:i + 2000]
-            cur.execute(f"UPDATE listings SET next_daily_check=%s WHERE id IN ({','.join(['%s'] * len(part))})", [day] + part)
-    conn.commit()
+                if hit:
+                    ratio, _ = hit
+                    cur.execute('INSERT INTO corporate_events(listing_id,event_date,kind,ratio) VALUES (%s,%s,%s,%s) ON DUPLICATE KEY UPDATE ratio=VALUES(ratio)',
+                                (lid, r['event_date'], 'split' if ratio > 1 else 'reverse_split', round(ratio, 8)))
+                    cur.execute("UPDATE split_log SET status='confirmed', ratio=%s, checked_at=%s WHERE listing_id=%s AND event_date=%s", (round(ratio, 8), stamp, lid, r['event_date']))
+                    out['confirmed'] += 1
+                else:
+                    cur.execute("UPDATE split_log SET status='real_move', checked_at=%s WHERE listing_id=%s AND event_date=%s", (stamp, lid, r['event_date']))
+                    out['real_move'] += 1
+        conn.commit()
+    return out
