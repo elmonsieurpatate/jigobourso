@@ -169,7 +169,14 @@ metrics_log="$ROOT/logs/deploy-metrics-$token.log"
 metrics_exit="$ROOT/logs/deploy-metrics-$token.exit"
 metrics_pid="$ROOT/logs/deploy-metrics-$token.pid"
 rm -f "$metrics_exit" "$metrics_exit.tmp" "$metrics_pid"
-nohup bash -c 'set +e; cd "$1"; .venv/bin/python -m engine.cli metrics; rc=$?; printf "%s\n" "$rc" > "$2.tmp"; mv "$2.tmp" "$2"; exit 0' _ "$ROOT" "$metrics_exit" > "$metrics_log" 2>&1 < /dev/null &
+# Shared-host SSH servers may terminate every child in the session once the
+# channel closes. nohup alone ignores SIGHUP but keeps the SSH session/process
+# group; setsid gives this bounded maintenance job its own session as well.
+if command -v setsid >/dev/null 2>&1; then
+  nohup setsid bash -c 'set +e; cd "$1"; .venv/bin/python -m engine.cli metrics; rc=$?; printf "%s\n" "$rc" > "$2.tmp"; mv "$2.tmp" "$2"; exit 0' _ "$ROOT" "$metrics_exit" > "$metrics_log" 2>&1 < /dev/null &
+else
+  nohup bash -c 'set +e; cd "$1"; .venv/bin/python -m engine.cli metrics; rc=$?; printf "%s\n" "$rc" > "$2.tmp"; mv "$2.tmp" "$2"; exit 0' _ "$ROOT" "$metrics_exit" > "$metrics_log" 2>&1 < /dev/null &
+fi
 printf '%s\n' "$!" > "$metrics_pid"
 echo "Recalcul analytique lancé en tâche détachée"
 echo "== Contrôle d'intégrité financière"
