@@ -136,7 +136,7 @@
       <td class="num ${J.cls(m.slope)}">${m.slope !== null && m.slope !== undefined ? J.num(m.slope, 3) : '–'}</td><td class="num">${J.num(m.r2, 2)}</td><td class="num ${J.cls(m.perf)}">${J.pct(m.perf, 1)}</td>
       <td class="num">${m.volatility !== null && m.volatility !== undefined ? J.num(m.volatility, 2) : '–'}</td><td class="num">${m.drawdown !== null && m.drawdown !== undefined ? J.num(m.drawdown, 1) + ' %' : '–'}</td>
       <td class="num">${r.volume ? J.num(r.volume, 0) : '–'}</td><td class="num">${r.score !== null && r.score !== undefined ? `<b>${J.num(r.score, 0)}</b><div class="score-bar"><i style="width:${r.score}%"></i></div>` : '–'}</td>
-      <td class="num small ${r.quality && r.quality !== 'ok' ? 'warn' : ''}" title="${{ ok: 'À jour', stale: 'Clôture en retard', insufficient: 'Historique court', break: 'Rupture de cours' }[r.quality] || ''}">${fresh}${r.quality && r.quality !== 'ok' ? ' ⚠' : ''}</td><td>${badge}</td></tr>`;
+      <td class="num small ${r.quality && r.quality !== 'ok' ? 'warn' : ''}" title="${{ ok: 'À jour', stale: 'Clôture en retard', insufficient: 'Historique court', incomplete: 'Historique incomplet : des séances de marché sont absentes', calendar_unknown: 'Calendrier de séances indisponible pour cette place', break: 'Rupture de cours' }[r.quality] || ''}">${fresh}${r.quality && r.quality !== 'ok' ? ' ⚠' : ''}</td><td>${badge}</td></tr>`;
   }
   function drawWhy(res) {
     const total = (res.scope_counts.rejected || 0) + (res.scope_counts.unknown || 0), groups = {};

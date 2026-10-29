@@ -1,3 +1,9 @@
 PyMySQL>=1.1,<2
 
 numpy>=1.24,<2
+
+# Calendriers de séances officiels pour dater les fenêtres de cotation.
+# 4.3 reste compatible avec Python 3.9 (Hostinger); pandas 3.x a retiré
+# une API utilisée par cette version, d'où la borne supérieure.
+exchange_calendars==4.3
+pandas>=1.5,<3

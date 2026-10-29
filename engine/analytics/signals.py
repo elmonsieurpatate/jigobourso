@@ -116,7 +116,7 @@ def regularity_extra(facts):
     return (' ' + ', '.join(bits).capitalize() + '.') if bits else ''
 
 
-def data_quality(quality, corrections, price_stale, break_dates=None):
+def data_quality(quality, corrections, price_stale, break_dates=None, coverage=None, observed=None, expected=None):
     tip = 'Fraîcheur et continuité des cours. Ce n\'est pas un jugement sur le titre ni sur la régularité de sa courbe.'
     if quality == 'insufficient':
         return sig('data', 'unknown', 'Historique court', 'Moins de 22 clôtures : les mesures sont peu fiables ou absentes.', tip)
@@ -124,6 +124,14 @@ def data_quality(quality, corrections, price_stale, break_dates=None):
         return sig('data', 'bad', 'Rupture de cours', 'Un saut de cours inexpliqué dans l\'année rend certaines périodes non évaluables' + (f' (dates : {break_dates}).' if break_dates else '.'), tip)
     if quality == 'stale' or price_stale:
         return sig('data', 'warn', 'Cours ancien', 'La dernière clôture ou le dernier cours est plus ancien que prévu pour cette place.', tip)
+    if quality == 'incomplete':
+        if observed is not None and expected:
+            text = f'Historique incomplet : {int(observed)} clôtures disponibles sur {int(expected)} séances attendues. Les indicateurs qui nécessitent chaque clôture ne sont pas calculés.'
+        elif coverage is not None:
+            text = f'Historique incomplet : {round(100 * coverage)} % des clôtures attendues sont présentes. Les indicateurs qui nécessitent chaque clôture ne sont pas calculés.'
+        else:
+            text = 'Historique incomplet : des séances attendues sont absentes. Les indicateurs concernés ne sont pas calculés.'
+        return sig('data', 'warn', 'Historique incomplet', text, tip)
     if corrections:
         return sig('data', 'warn', 'Données corrigées', f'{len(corrections)} correction(s) d\'unité ou de cours aberrant appliquée(s) : voir le détail.', tip)
     return sig('data', 'ok', 'Données à jour', 'Cours à jour et série continue sur l\'année.', tip)

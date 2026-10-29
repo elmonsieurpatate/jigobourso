@@ -117,19 +117,42 @@ def prepare_series(bars, splits=()):
     return dates, closes, basis, breaks
 
 
-def analyze_series(bars, windows, splits=()):
+def analyze_series(bars, windows, splits=(), session_windows=None, technical_sessions=None):
     """Use the same adjusted or raw series for every consumer.
 
     Ratio = new shares / old shares. Vendor adjustments take precedence;
     otherwise known ratios adjust all earlier raw closes. Unknown ratios
     invalidate crossing windows. No arbitrary cut-off changes the price basis.
     """
-    from .measures import window_metrics, technical_state
+    from .measures import window_metrics, technical_state, dated_window_metrics, dated_technical_state
     dates, closes, basis, breaks = prepare_series(bars, splits)
+    observations = dict(zip(dates, closes))
     measures, missing = {}, {}
     for n in windows:
-        window, why = clean_window(closes, n, breaks)
-        measures[n] = window_metrics(window) if window else None
-        if window is None:
-            missing[n] = why
-    return dates, closes, basis, breaks, measures, missing, technical_state(closes[breaks[-1]:] if breaks else closes)
+        expected = (session_windows or {}).get(n)
+        if session_windows is not None:
+            if not expected:
+                measures[n] = None
+                missing[n] = 'calendar'
+                continue
+            measured, info = dated_window_metrics(expected, observations)
+            if measured is not None:
+                measured.update(info)
+            start, end = expected[0], expected[-1]
+            crossed_break = any(start < dates[i] <= end for i in breaks)
+            if crossed_break:
+                measured = None
+                missing[n] = 'break'
+            elif measured is None or (measured.get('slope') is None and n > 1):
+                missing[n] = 'coverage'
+            measures[n] = measured
+        else:
+            window, why = clean_window(closes, n, breaks)
+            measures[n] = window_metrics(window) if window else None
+            if window is None:
+                missing[n] = why
+    if technical_sessions is not None:
+        tech = dated_technical_state(technical_sessions, observations)
+    else:
+        tech = technical_state(closes[breaks[-1]:] if breaks else closes)
+    return dates, closes, basis, breaks, measures, missing, tech

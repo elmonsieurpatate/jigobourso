@@ -18,8 +18,12 @@ def data_overview(conn):
             listings.setdefault(r['kind'], {})[r['status']] = r['n']
         cur.execute("SELECT COUNT(*) n FROM listings WHERE status='selected' AND is_primary=1")
         recommendable = cur.fetchone()['n']
-        cur.execute("""SELECT l.mic, COUNT(*) followed, MAX(s.last_close_date) last_close, SUM(s.quality='ok') ok, SUM(s.quality='stale') stale,
-                              SUM(s.quality='insufficient') insufficient, SUM(s.quality='break') broken, SUM(s.closes_count>=253) full_year, MAX(p.price_time) last_price
+        cur.execute("""SELECT l.mic, COUNT(*) followed, MAX(s.last_close_date) last_close,
+                              SUM(s.quality='ok') ok,
+                              SUM(s.quality='incomplete') incomplete,
+                              SUM(s.quality='calendar_unknown') calendar_unknown,
+                              SUM(s.quality='stale') stale, SUM(s.quality='insufficient') insufficient,
+                              SUM(s.quality='break') broken, SUM(s.coverage_252=1) full_year, MAX(p.price_time) last_price
                        FROM v_collect_set c JOIN listings l ON l.id=c.listing_id LEFT JOIN series_state s ON s.listing_id=l.id LEFT JOIN latest_prices p ON p.listing_id=l.id
                        GROUP BY l.mic ORDER BY followed DESC""")
         places = cur.fetchall()
@@ -42,7 +46,8 @@ def data_overview(conn):
     for p in places:
         mic = p['mic']
         out.append({'mic': mic, 'market': MARKETS.get(mic, mic), 'followed': p['followed'], 'last_close': p['last_close'].isoformat() if p['last_close'] else None,
-                    'ok': int(p['ok'] or 0), 'stale': int(p['stale'] or 0), 'insufficient': int(p['insufficient'] or 0), 'broken': int(p['broken'] or 0), 'full_year': int(p['full_year'] or 0),
+                    'ok': int(p['ok'] or 0), 'incomplete': int(p['incomplete'] or 0), 'calendar_unknown': int(p['calendar_unknown'] or 0),
+                    'stale': int(p['stale'] or 0), 'insufficient': int(p['insufficient'] or 0), 'broken': int(p['broken'] or 0), 'full_year': int(p['full_year'] or 0),
                     'last_price': _iso(p['last_price']), 'last_daily_collect': (last.get(mic) or {}).get('daily'), 'last_intraday_collect': (last.get(mic) or {}).get('intraday'),
                     'open': mic in hours.HOURS and hours.is_open(mic, now), 'tz': hours.HOURS[mic][0] if mic in hours.HOURS else None})
     return {'catalogue': {'source': 'FinanceDatabase', 'url': 'https://github.com/JerBouma/FinanceDatabase', 'commit': cat['source_commit'][:8] if cat else None,

@@ -55,6 +55,68 @@ def window_metrics(closes):
     return out
 
 
+def dated_window_metrics(session_dates, observations):
+    """Mesures d'une fenêtre indexée par ses vraies séances, sans compléter les trous.
+
+    `session_dates` contient n+1 dates de clôture attendues; observations est
+    {date_iso: close}. Sur une fenêtre complète, délègue au calcul historique,
+    donc les résultats restent identiques. Sur une fenêtre trouée, pente/R²
+    utilisent les indices de séance réellement observés. Les mesures de chemin
+    (volatilité, drawdown, ER) restent indisponibles dès qu'une clôture manque.
+
+    Le seuil de support du modèle de tendance est 80 % des clôtures attendues,
+    arrondi au supérieur, avec les deux bornes et au moins 3 points. Cela permet
+    une séance isolée manquante sur une semaine (5/6) ou plus long, mais pas une
+    longue interruption; il s'agit d'un minimum d'échantillon, pas d'un seuil
+    de sélection stratégique.
+    """
+    expected = list(session_dates or ())
+    if len(expected) < 2:
+        return None, {'observations': 0, 'expected_closes': len(expected), 'coverage': 0.0}
+    points = [(i, float(observations[d])) for i, d in enumerate(expected)
+              if d in observations and observations[d] is not None
+              and float(observations[d]) > 0 and math.isfinite(float(observations[d]))]
+    n_expected = len(expected) - 1
+    coverage = len(points) / len(expected)
+    info = {'observations': len(points), 'expected_closes': len(expected), 'coverage': coverage,
+            'missing_sessions': len(expected) - len(points)}
+    full = len(points) == len(expected)
+    if full:
+        return dict(window_metrics([v for _, v in points]), **{'coverage': 1.0, 'observations': len(points),
+                                                              'expected_closes': len(expected), 'missing_sessions': 0}), info
+
+    out = {'sessions': n_expected, 'perf': None, 'slope': None, 'slope_log': None, 'r2': None,
+           'volatility': None, 'drawdown': None, 'er': None}
+    minimum = max(3, math.ceil(0.80 * len(expected)))
+    if len(points) < minimum:
+        return out, info
+    logs = [math.log(v) for _, v in points]
+    xs = [x for x, _ in points]
+    endpoints = points[0][0] == 0 and points[-1][0] == len(expected) - 1
+    if endpoints:
+        out['perf'] = 100 * math.expm1(logs[-1] - logs[0])
+    if n_expected == 1:
+        if not endpoints:
+            return out, info
+        step = logs[-1] - logs[0]
+        out['slope_log'] = step
+        out['slope'] = 100 * math.expm1(step)
+        return out, info
+    mean_x, mean_y = sum(xs) / len(xs), sum(logs) / len(logs)
+    sxx = sum((x - mean_x) ** 2 for x in xs)
+    syy = sum((y - mean_y) ** 2 for y in logs)
+    sxy = sum((x - mean_x) * (y - mean_y) for x, y in zip(xs, logs))
+    if sxx <= 0:
+        return out, info
+    b = sxy / sxx
+    out['slope_log'] = b
+    out['slope'] = 100 * math.expm1(b)
+    out['r2'] = 1.0 if syy == 0 else min(1.0, (sxy * sxy) / (sxx * syy))
+    # A path metric needs every session; deriving a daily path across a missing
+    # close would fabricate the unknown movement inside that interval.
+    return out, info
+
+
 def moving_average(closes, length):
     """Moyenne simple des `length` dernières clôtures ; None si historique trop court."""
     return sum(closes[-length:]) / length if len(closes) >= length else None
@@ -69,3 +131,23 @@ def technical_state(closes):
             'ma50_prev': moving_average(closes[:-5], 50) if len(closes) > 5 else None,
             'daily_change': 100 * (closes[-1] / closes[-2] - 1) if len(closes) >= 2 else None,
             'gap_to_ma20': 100 * (closes[-1] / ma20 - 1) if ma20 else None}
+
+
+def dated_technical_state(expected_dates, observations):
+    """Indicateurs de contexte calculés sur des séances calendaires sans sauter les trous."""
+    dates = list(expected_dates or ())
+    def values(days):
+        if len(days) != len(set(days)) or not days or any(d not in observations for d in days):
+            return None
+        return [float(observations[d]) for d in days]
+    close = observations.get(dates[-1]) if dates else None
+    last20, last50 = values(dates[-20:]), values(dates[-50:])
+    prev50 = values(dates[-55:-5]) if len(dates) >= 55 else None
+    last2 = values(dates[-2:])
+    ma20 = sum(last20) / 20 if last20 else None
+    ma50 = sum(last50) / 50 if last50 else None
+    ma50_prev = sum(prev50) / 50 if prev50 else None
+    daily = 100 * (last2[-1] / last2[0] - 1) if last2 else None
+    return {'close': float(close) if close is not None else None, 'ma20': ma20, 'ma50': ma50,
+            'ma50_prev': ma50_prev, 'daily_change': daily,
+            'gap_to_ma20': 100 * (float(close) / ma20 - 1) if close is not None and ma20 else None}

@@ -17,6 +17,13 @@ Abandonné par rapport à l'ancien moteur : **accélération** (définition ambi
 ## Données douteuses
 Un saut de cours d'une séance à l'autre de plus de ×1,6 (ou ÷1,6), sans split connu, est une **rupture** : aucune fenêtre qui la traverse n'est évaluée, le titre est « non évaluable » sur ces périodes. Série trop courte, dernière clôture plus ancienne que celle de la place : « non évaluable » (jamais « écarté »).
 
+### Fenêtres et séances absentes
+Une fenêtre de `n` séances est désormais formée des `n+1` dates de clôture attendues par le calendrier de la place, et non des `n+1` dernières lignes présentes en base. Les calendriers Xetra, Euronext, Londres, les places américaines et les autres places prises en charge excluent week-ends et jours fériés propres au marché. Une place sans calendrier pris en charge est déclarée non évaluable : le moteur ne suppose pas qu'elle ouvre du lundi au vendredi.
+
+La pente et le R² régressent sur l'indice réel de chaque séance attendue. Ils restent calculables si au moins `ceil(80 % × clôtures attendues)` sont présentes et si au moins trois points sont disponibles. Ce minimum laisse passer une séance manquante isolée sur une courte fenêtre (5/6) sans compresser le temps; il n'accepte pas les fenêtres extrêmement creuses. Il ne modifie aucun seuil de stratégie. La performance entre bornes exige les deux clôtures de bord. Le cas WHCA.AS atteint tout juste ce plancher sur les 64 dernières clôtures (52/64); son R² sur ces dates est 0,469, sous le seuil existant de 0,556 : le titre échoue donc au critère de régularité au lieu d'être artificiellement retenu.
+
+La performance reste calculable entre les deux bornes si elles existent. En revanche, volatilité quotidienne, repli maximal et ER décrivent un chemin : ils sont indisponibles dès qu'une séance attendue manque, car le mouvement à l'intérieur de l'intervalle absent est inconnu. Aucune clôture n'est recopiée et aucune interpolation n'est faite. Les moyennes mobiles et la variation du jour exigent elles aussi les clôtures précises de leurs séances calendaires.
+
 ## Verdicts
 - **Retenu** : tous les critères actifs de toutes les périodes actives sont satisfaits.
 - **Écarté** : au moins un critère mesuré échoue (même si une autre mesure manque).

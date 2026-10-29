@@ -147,7 +147,9 @@ def evaluate_one(config, candidate):
     """Évalue un titre depuis ses clôtures. candidate : {'bars': [(date, close, adj)], 'split_dates', 'expected_last_date'}.
     Renvoie {'status', 'reasons', 'measures' {séances: mesures|None}, 'technical', 'basis', 'breaks'}."""
     windows = [p['sessions'] for p in config['periods'] if p['enabled']]
-    dates, closes, basis, breaks, measures, missing, tech = analyze_series(candidate.get('bars') or [], windows, candidate.get('split_dates') or ())
+    dates, closes, basis, breaks, measures, missing, tech = analyze_series(
+        candidate.get('bars') or [], windows, candidate.get('split_dates') or (),
+        candidate.get('session_windows'), candidate.get('technical_sessions'))
     verdict = judge(config, measures, tech, missing, dates[-1] if dates else None, candidate.get('expected_last_date'))
     verdict.update(basis=basis, breaks=[dates[i] for i in breaks])
     return verdict
@@ -164,8 +166,13 @@ def judge(config, measures, tech, missing, last_close_date=None, expected_last_d
             continue
         m = measures.get(p['sessions'])
         if m is None:
-            reasons.append({'period': p['id'], 'criterion': 'data', 'metric': missing.get(p['sessions'], 'history'), 'value': None, 'threshold': p['sessions'] + 1, 'result': 'missing'})
+            reasons.append({'period': p['id'], 'criterion': 'data', 'metric': missing.get(p['sessions'], 'history'), 'value': None,
+                            'threshold': p['sessions'] + 1, 'result': 'missing'})
             continue
+        if m.get('coverage') is not None and m['coverage'] < 1:
+            reasons.append({'period': p['id'], 'criterion': 'coverage', 'metric': 'observed_closes',
+                            'value': m.get('observations'), 'threshold': m.get('expected_closes'),
+                            'missing': m.get('missing_sessions'), 'coverage': m.get('coverage'), 'result': 'warning'})
         for field, metric, op in CRITERIA:
             chk = _check(p['id'], field, metric, m.get(metric), p[field], op)
             if chk:

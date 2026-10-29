@@ -13,6 +13,7 @@ from engine.catalogue.rules import MARKETS, is_leveraged_name
 from engine.shared import settings as settings_mod
 from engine.market import hours
 from engine.market.collect import effective_expected_close, latest_rates, to_eur_factor
+from engine.market.calendar import window_calendars, session_dates
 from . import strategy
 from .measures import window_metrics
 from .series import usable_closes, find_breaks, clean_window, analyze_series, prepare_series, data_corrections
@@ -73,13 +74,14 @@ def _load_universe(conn, windows, ids=None):
     with conn.cursor() as cur:
         cur.execute("""SELECT l.id, l.symbol, l.mic, l.currency, i.name, i.isin, i.kind, i.country, i.category,
                               p.price, p.price_time, p.source AS price_source, p.currency AS price_currency, p.avg_volume_3m,
-                              s.last_close_date, s.closes_count, s.close_px, s.ma20, s.ma50, s.ma50_prev, s.daily_change, s.gap_to_ma20, s.quality, s.break_dates
+                       s.last_close_date, s.closes_count, s.close_px, s.ma20, s.ma50, s.ma50_prev, s.daily_change, s.gap_to_ma20, s.quality, s.break_dates,
+                       s.coverage_252, s.expected_252
                        FROM v_recommendable r JOIN listings l ON l.id=r.listing_id JOIN instruments i ON i.id=l.instrument_id
                        LEFT JOIN latest_prices p ON p.listing_id=l.id LEFT JOIN series_state s ON s.listing_id=l.id""" + only, list(ids or []))
         universe = cur.fetchall()
         marks = ','.join(['%s'] * len(windows))
         scope = f' AND listing_id IN ({",".join(["%s"] * len(ids))})' if ids else ''
-        cur.execute(f'SELECT listing_id, sessions, slope, slope_log, r2, perf, volatility, drawdown, er FROM strategy_metrics WHERE sessions IN ({marks})' + scope, list(windows) + list(ids or []))
+        cur.execute(f'SELECT listing_id, sessions, slope, slope_log, r2, perf, volatility, drawdown, er, observations, expected_closes, coverage FROM strategy_metrics WHERE sessions IN ({marks})' + scope, list(windows) + list(ids or []))
         stored = defaultdict(dict)
         for r in cur.fetchall():
             stored[r['listing_id']][r['sessions']] = {k: (None if v is None else float(v)) for k, v in r.items() if k not in ('listing_id',)}
@@ -93,7 +95,12 @@ def _live_measures(conn, ids, windows):
     out = defaultdict(dict)
     if not ids or not windows:
         return out
+    mic_by_id = {}
     with conn.cursor() as cur:
+        for i in range(0, len(ids), 2000):
+            part = ids[i:i + 2000]
+            cur.execute(f"SELECT id, mic FROM listings WHERE id IN ({','.join(['%s'] * len(part))})", part)
+            mic_by_id.update({r['id']: r['mic'] for r in cur.fetchall()})
         for i in range(0, len(ids), 2000):
             part = ids[i:i + 2000]
             cur.execute(f"SELECT listing_id, price_date, close_px, adj_close_px FROM daily_prices WHERE listing_id IN ({','.join(['%s'] * len(part))}) ORDER BY listing_id, price_date", part)
@@ -105,7 +112,11 @@ def _live_measures(conn, ids, windows):
             for r in cur.fetchall():
                 splits[r['listing_id']].append((r['event_date'].isoformat(), float(r['ratio']) if r['ratio'] else None))
             for lid, rows in bars.items():
-                _, _, _, _, measured, _, _ = analyze_series(rows, windows, splits[lid])
+                mic = mic_by_id.get(lid)
+                cutoff = expected_close(conn, mic) if mic else None
+                calendars = window_calendars(mic, cutoff, windows) if cutoff else {}
+                tech_dates = session_dates(mic, cutoff, 55) if cutoff else None
+                _, _, _, _, measured, _, _ = analyze_series(rows, windows, splits[lid], calendars, tech_dates)
                 out[lid].update({n: m for n, m in measured.items() if m is not None})
     return out
 
@@ -114,20 +125,35 @@ def judge_universe(conn, config, ids=None):
     """Verdicts de l'univers recommandable (ou d'un sous-ensemble `ids` : rang et score n'y ont alors pas de sens)."""
     windows = strategy.required_sessions(config)
     universe, stored, latest_by_mic = _load_universe(conn, windows, ids)
-    absent = sorted({n for n in windows for u in universe if n not in stored.get(u['id'], {})})
-    live = _live_measures(conn, [u['id'] for u in universe if any(n not in stored.get(u['id'], {}) for n in windows)], absent) if absent else {}
+    needs_live = [u['id'] for u in universe if any(n not in stored.get(u['id'], {}) or stored[u['id']][n].get('coverage') is None for n in windows)]
+    absent = sorted({n for n in windows if any(n not in stored.get(lid, {}) or stored[lid][n].get('coverage') is None for lid in needs_live)})
+    live = _live_measures(conn, needs_live, absent) if needs_live and absent else {}
     verdicts = []
     for u in universe:
-        measures = {n: stored.get(u['id'], {}).get(n) or live.get(u['id'], {}).get(n) for n in windows}
+        measures = {n: (live.get(u['id'], {}).get(n) if stored.get(u['id'], {}).get(n, {}).get('coverage') is None
+                        else stored.get(u['id'], {}).get(n)) or live.get(u['id'], {}).get(n)
+                    for n in windows}
         count = u['closes_count'] or 0
-        missing = {n: ('history' if count < n + 1 else 'break') for n, m in measures.items() if m is None}
+        missing = {n: ('history' if count < n + 1 else 'calendar' if m is None else 'coverage') for n, m in measures.items() if m is None}
+        for n in windows:
+            stored_metric = stored.get(u['id'], {}).get(n)
+            if stored_metric and stored_metric.get('coverage') is None and n not in live.get(u['id'], {}):
+                missing[n] = 'calendar'
         tech = {k: (None if u[k] is None else float(u[k])) for k in ('close_px', 'ma20', 'ma50', 'ma50_prev', 'daily_change', 'gap_to_ma20')}
         tech['close'] = tech.pop('close_px')
         last = u['last_close_date'].isoformat() if u['last_close_date'] else None
         expected = max(expected_close(conn, u['mic']), str(latest_by_mic.get(u['mic']) or ''))
         if last and last < expected:
             u['quality'] = 'stale'
+        elif u['quality'] not in ('break', 'insufficient') and (
+                any(n in missing and missing[n] in ('coverage', 'calendar') for n in windows) or
+                any((m or {}).get('coverage') is not None and (m or {}).get('coverage') < 1 for m in measures.values())):
+            u['quality'] = 'incomplete'
+        elif u['quality'] not in ('break', 'insufficient') and any(n in missing and missing[n] == 'calendar' for n in windows):
+            u['quality'] = 'calendar_unknown'
         v = strategy.judge(config, measures, tech, missing, last, expected or None)
+        if u['quality'] == 'incomplete' and v['status'] == 'unknown':
+            v['status_label'] = 'Historique incomplet'
         v.update(key=u['id'], group='etf' if u['kind'] == 'etf' else 'equity', symbol=u['symbol'], row=u)
         verdicts.append(v)
     return strategy.rank(config, verdicts)
@@ -146,7 +172,7 @@ def _row(v, rates, conn=None):
             'quality': u['quality'], 'price_stale': hours.price_is_stale(u['mic'], u['price_time'], hours.utcnow(), expected_close(conn, u['mic']) if conn is not None else None, last_collection(conn, u['mic']) if conn is not None else None), 'measures': {str(n): m for n, m in v['measures'].items()}, 'reasons': v['reasons']}
 
 
-CACHE_FORMAT = 3
+CACHE_FORMAT = 4
 MAX_NEW_CONFIGS_PER_HOUR = 60       # calculs d'univers complets (réglages jamais vus ou données changées) acceptés par heure, tous utilisateurs confondus
 ENTRY_FIELDS = ('id', 'symbol', 'name', 'isin', 'kind', 'mic', 'country', 'status', 'group', 'rank', 'score', 'category', 'fails')
 
@@ -404,7 +430,7 @@ def instrument_sheet(conn, request):
         daily_volume = [None if r['volume'] is None else int(r['volume']) for r in rows]
         cur.execute("""SELECT l.id, l.mic, l.symbol, l.currency, l.status, l.is_primary FROM listings l WHERE l.instrument_id=%s AND l.id<>%s ORDER BY l.is_primary DESC, l.mic""", (u['instrument_id'], lid))
         siblings = cur.fetchall()
-        cur.execute('SELECT quality, closes_count, last_close_date, ma20, ma50, ma50_prev, daily_change, gap_to_ma20, break_dates FROM series_state WHERE listing_id=%s', (lid,))
+        cur.execute('SELECT quality, closes_count, last_close_date, ma20, ma50, ma50_prev, daily_change, gap_to_ma20, break_dates, coverage_252, observed_252, expected_252 FROM series_state WHERE listing_id=%s', (lid,))
         state = cur.fetchone() or {}
     price = float(u['price']) if u['price'] is not None else None
     factor = to_eur_factor(u['price_currency'] or u['currency'], rates)
@@ -423,8 +449,13 @@ def instrument_sheet(conn, request):
     with conn.cursor() as cur:
         cur.execute("SELECT event_date, ratio FROM corporate_events WHERE listing_id=%s AND kind IN ('split','reverse_split')", (lid,))
         splits = [(r['event_date'].isoformat(), float(r['ratio']) if r['ratio'] else None) for r in cur.fetchall()]
-    dates, closes, basis, breaks, full, missing, tech = analyze_series(bars, all_windows, splits)
+    cutoff = expected_close(conn, u['mic'])
+    calendars = window_calendars(u['mic'], cutoff, all_windows) if cutoff else {}
+    tech_dates = session_dates(u['mic'], cutoff, 55) if cutoff else None
+    dates, closes, basis, breaks, full, missing, tech = analyze_series(bars, all_windows, splits, calendars, tech_dates)
     sheet['measures'] = {str(n): m for n, m in full.items()}
+    sheet['window_coverage'] = {str(n): {k: m.get(k) for k in ('observations', 'expected_closes', 'missing_sessions', 'coverage')}
+                                for n, m in full.items() if m and m.get('coverage') is not None}
     sheet['analysis_basis'] = basis
     chart_dates, chart_closes, _, chart_breaks = prepare_series(bars, splits)
     volumes = dict(zip((d for d, _ in daily), daily_volume))
@@ -436,6 +467,8 @@ def instrument_sheet(conn, request):
     sheet['price_stale'] = hours.price_is_stale(u['mic'], u['price_time'], hours.utcnow(), expected_close(conn, u['mic']), last_collection(conn, u['mic']))
     if sheet['freshness']['stale']:
         sheet['state']['quality'] = 'stale'
+    elif state.get('quality') not in ('break', 'insufficient') and (missing or any((m or {}).get('coverage') is not None and (m or {}).get('coverage') < 1 for m in full.values())):
+        sheet['state']['quality'] = 'incomplete' if any((m or {}).get('coverage') is not None and (m or {}).get('coverage') < 1 for m in full.values()) else 'calendar_unknown'
 
     sheet['missing_measures'] = {str(n): why for n, why in missing.items()}
     sheet['signals'] = _sheet_signals(conn, sheet, u, config, chart_closes, state)
@@ -474,11 +507,14 @@ def _sheet_signals(conn, sheet, u, config, closes, state):
     from . import signals
     ref = _reference_window(config)
     m = (sheet.get('measures') or {}).get(str(ref)) or {}
-    facts = signals.history_facts(closes, ref)
+    facts = signals.history_facts(closes, ref) if m.get('coverage') in (None, 1.0) else {}
+    quality = 'incomplete' if m.get('coverage') is not None and m.get('coverage') < 1 else state.get('quality')
     price_eur, vol = sheet.get('price_eur'), u.get('avg_volume_3m')
     out = [signals.regularity(m.get('r2'), ref, signals.regularity_extra(facts)), signals.risk(m.get('volatility'), m.get('drawdown'), ref),
            signals.liquidity(price_eur * vol if price_eur is not None and vol else None, u['kind'], settings_mod.prefilter_rules(conn)),
-           signals.data_quality(state.get('quality'), sheet.get('data_corrections'), sheet.get('price_stale'), state.get('break_dates'))]
+           signals.data_quality(quality, sheet.get('data_corrections'), sheet.get('price_stale'), state.get('break_dates'),
+                                m.get('coverage', state.get('coverage_252')), m.get('observations', state.get('observed_252')),
+                                m.get('expected_closes', state.get('expected_252')))]
     if u['kind'] == 'etf':
         from . import etf
         analysis = etf.load(conn, [u['id']]).get(u['id'])

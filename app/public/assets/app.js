@@ -46,7 +46,8 @@ J.explain = function (r) {
   const ok = r.result === 'pass' ? 'pass' : r.result === 'fail' ? 'fail' : 'missing';
   let text;
   if (r.criterion === 'freshness') text = `Données non à jour : dernière clôture ${J.date(r.value)} (attendue ${J.date(r.threshold)}).`;
-  else if (r.criterion === 'data') text = `${per} : ${{ history: 'historique trop court', break: 'rupture de cours dans la période', invalid: 'données inexploitables' }[r.metric] || 'donnée absente'} (${r.threshold} clôtures nécessaires).`;
+  else if (r.criterion === 'coverage') text = `${per} : historique incomplet, ${J.num(r.value, 0)} clôtures disponibles sur ${J.num(r.threshold, 0)} séances attendues. Les indicateurs de chemin (volatilité, repli, ER) ne sont pas reconstruits à travers les séances absentes.`;
+  else if (r.criterion === 'data') text = `${per} : ${{ history: 'historique trop court', break: 'rupture de cours dans la période', invalid: 'données inexploitables', coverage: 'historique insuffisant ou incomplet', calendar: 'calendrier de séances indisponible pour cette place' }[r.metric] || 'donnée absente'}${r.metric === 'calendar' ? '.' : ` (${r.threshold} clôtures nécessaires).`}`;
   else if (r.period === 'technical') text = `${J.TECH[r.criterion] || r.criterion} : ${r.result === 'missing' ? 'non évaluable' : r.result === 'pass' ? 'respecté' : 'non respecté'}.`;
   else {
     const [label, unit] = J.CRITERIA[r.criterion] || [r.criterion, ''];

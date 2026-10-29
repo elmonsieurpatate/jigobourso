@@ -22,8 +22,9 @@ def test_manual_selection_then_maintenance_with_fake_yahoo():
     with conn.cursor() as cur:
         cur.execute("INSERT INTO instruments(id,group_key,kind,name,country) VALUES (1,'sym:XETR:UP.DE','equity','Monte SE','Germany'),(2,'sym:XETR:ILLIQ.DE','etf','Illiquide ETF',NULL)")
         cur.execute("INSERT INTO listings(id,instrument_id,mic,symbol,currency,status,is_primary) VALUES (1,1,'XETR','UP.DE','EUR','candidate',1),(2,2,'XETR','ILLIQ.DE','EUR','candidate',1)")
-        start = datetime.date(2026, 1, 5)
-        days = [start + datetime.timedelta(days=i) for i in range(400) if (start + datetime.timedelta(days=i)).weekday() < 5][:260]
+        import exchange_calendars as xc
+        calendar = xc.get_calendar('XETR', start='2026-01-05', end='2027-01-31')
+        days = [d.date() for d in calendar.sessions if d.date() >= datetime.date(2026, 1, 5)][:260]
         cur.executemany('INSERT INTO daily_prices(listing_id,price_date,close_px) VALUES (%s,%s,%s)', [(1, d, round(100 * 1.003 ** i, 6)) for i, d in enumerate(days)])
     conn.commit()
     q = lambda p, v: {'price': p, 'price_time': datetime.datetime(2026, 10, 27, 16, 30), 'avg_volume_3m': v, 'currency': 'EUR', 'market_cap': None, 'quote_type': 'EQUITY'}

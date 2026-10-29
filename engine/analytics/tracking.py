@@ -12,13 +12,14 @@ from collections import defaultdict
 from . import service, strategy
 from .repository import recommendable_candidates
 from .series import usable_closes, find_breaks, prepare_series
+from engine.market.calendar import window_calendars, session_dates, next_session_dates
 
 HORIZONS = (1, 3, 5)
 TOP_N = 20              # titres gardés par groupe (actions / ETF) et par stratégie
 MAX_STALE_DAYS = 5      # base de calcul trop ancienne : le titre n'est pas évalué ce jour-là
 
 
-def forward_returns(bars, snap_date, horizons=HORIZONS, splits=()):
+def forward_returns(bars, snap_date, horizons=HORIZONS, splits=(), mic=None):
     """Rendement (%) N séances après `snap_date`, par horizon disponible. bars = [(date, close, adj_close|None)] triées.
 
     Base = dernière clôture ≤ snap_date. Un saut de cours non expliqué entre la base et la cible invalide l'horizon."""
@@ -30,6 +31,20 @@ def forward_returns(bars, snap_date, horizons=HORIZONS, splits=()):
     if gap.days > MAX_STALE_DAYS:
         return {}
     out = {}
+    if mic:
+        target_dates = next_session_dates(mic, dates[base], max(horizons))
+        if not target_dates:
+            return {}
+        by_date = dict(zip(dates, closes))
+        for k in horizons:
+            target_date = target_dates[k - 1]
+            if target_date not in by_date:
+                continue
+            target = bisect.bisect_right(dates, target_date) - 1
+            if target < 0 or dates[target] != target_date or any(base < b <= target for b in breaks):
+                continue
+            out[k] = 100 * (by_date[target_date] / closes[base] - 1)
+        return out
     for k in horizons:
         j = base + k
         if j >= len(closes):
@@ -124,6 +139,11 @@ def backfill(conn, sessions=30, log=lambda *_: None, batch=300):
                 if not n or (datetime.date.fromisoformat(day) - datetime.date.fromisoformat(ds[n - 1])).days > MAX_STALE_DAYS:
                     continue
                 cut = dict(c, bars=c['bars'][:n])
+                windows = sorted({p['sessions'] for cfg in configs.values() for p in cfg['periods'] if p['enabled']})
+                cut['session_windows'] = window_calendars(c.get('mic'), day, windows)
+                cut['technical_sessions'] = session_dates(c.get('mic'), day, 55)
+                full_cal = session_dates(c.get('mic'), day, 1)
+                cut['expected_last_date'] = full_cal[-1] if full_cal else None
                 for name, cfg in configs.items():
                     v = dict(strategy.evaluate_one(cfg, cut), key=c['key'], group=c['group'], symbol=c['symbol'])
                     if v['status'] == 'retained':
@@ -144,8 +164,10 @@ def update_outcomes(conn):
         days = [r['snap_date'].isoformat() for r in cur.fetchall()]
         cur.execute('SELECT DISTINCT snap_date, horizon FROM universe_outcomes')
         done = {(r['snap_date'].isoformat(), r['horizon']) for r in cur.fetchall()}
-        cur.execute('SELECT l.id, i.kind FROM v_recommendable r JOIN listings l ON l.id = r.listing_id JOIN instruments i ON i.id = l.instrument_id')
-        universe = {r['id']: ('etf' if r['kind'] == 'etf' else 'equity') for r in cur.fetchall()}
+        cur.execute('SELECT l.id, l.mic, i.kind FROM v_recommendable r JOIN listings l ON l.id = r.listing_id JOIN instruments i ON i.id = l.instrument_id')
+        universe_rows = cur.fetchall()
+        universe = {r['id']: ('etf' if r['kind'] == 'etf' else 'equity') for r in universe_rows}
+        mic_by_id = {r['id']: r['mic'] for r in universe_rows}
     written = 0
     for day in days:
         later = len(calendar) - bisect.bisect_right(calendar, day)
@@ -156,6 +178,11 @@ def update_outcomes(conn):
             cur.execute('SELECT preset, listing_id FROM ranking_snapshots WHERE snap_date=%s', (day,))
             picks = [(r['preset'], r['listing_id']) for r in cur.fetchall()]
         ids = sorted(set(universe) | {lid for _, lid in picks})
+        with conn.cursor() as cur:
+            for i in range(0, len(ids), 3000):
+                part = ids[i:i + 3000]
+                cur.execute(f"SELECT id, mic FROM listings WHERE id IN ({','.join(['%s'] * len(part))})", part)
+                mic_by_id.update({r['id']: r['mic'] for r in cur.fetchall()})
         start = datetime.date.fromisoformat(day) - datetime.timedelta(days=10)
         stop = datetime.date.fromisoformat(day) + datetime.timedelta(days=21)
         bars = defaultdict(list)
@@ -171,7 +198,7 @@ def update_outcomes(conn):
             cur.execute("SELECT listing_id,event_date,ratio FROM corporate_events WHERE kind IN ('split','reverse_split')")
             for r in cur.fetchall():
                 splits[r['listing_id']].append((r['event_date'].isoformat(),float(r['ratio']) if r['ratio'] else None))
-        fwd = {lid: forward_returns(rows, day, todo, splits[lid]) for lid, rows in bars.items()}
+        fwd = {lid: forward_returns(rows, day, todo, splits[lid], mic_by_id.get(lid)) for lid, rows in bars.items()}
         outcome_rows = [(day, preset, lid, h, round(fwd[lid][h], 4)) for preset, lid in picks for h in todo if h in fwd.get(lid, {})]
         universe_rows = []
         for h in todo:

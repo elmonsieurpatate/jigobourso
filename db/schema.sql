@@ -127,10 +127,13 @@ CREATE TABLE strategy_metrics (
   drawdown     DECIMAL(10,4) NULL,
   er           DECIMAL(8,6) NULL,                               -- efficiency ratio
   acceleration DECIMAL(12,6) NULL,                              -- RÉSERVÉ : jamais calculé (toujours NULL)
+  observations SMALLINT UNSIGNED NULL,                          -- clôtures observées dans la fenêtre calendaire
+  expected_closes SMALLINT UNSIGNED NULL,                       -- clôtures attendues selon le calendrier de la place
+  coverage DECIMAL(8,6) NULL,                                   -- observations / expected_closes
   PRIMARY KEY (listing_id, sessions),
   CONSTRAINT fk_metrics_listing FOREIGN KEY (listing_id) REFERENCES listings(id)
 ) ENGINE=InnoDB;
--- NULL sur toute la ligne = fenêtre non évaluable ; la raison est dans series_state.
+-- Les mesures peuvent être NULL alors que coverage et le nombre de clôtures expliquent la fenêtre non évaluable.
 
 CREATE TABLE series_state (                                     -- état de la série et indicateurs techniques, 1 ligne / cotation
   listing_id      INT UNSIGNED NOT NULL,
@@ -145,8 +148,11 @@ CREATE TABLE series_state (                                     -- état de la s
   gap_to_ma20     DECIMAL(10,4) NULL,                           -- % écart au MA20
   break_age       SMALLINT UNSIGNED NULL,                       -- séances écoulées depuis la dernière rupture de cours inexpliquée
   break_dates     VARCHAR(80) NULL,
+  coverage_252    DECIMAL(8,6) NULL,                            -- couverture de la fenêtre annuelle calendaire
+  observed_252    SMALLINT UNSIGNED NULL,
+  expected_252    SMALLINT UNSIGNED NULL,
   risk_score      TINYINT UNSIGNED NULL,                        -- RÉSERVÉ : jamais calculé (toujours NULL)
-  quality         ENUM('ok','insufficient','inconsistent_adjustments','stale','break') NOT NULL DEFAULT 'ok',
+  quality         ENUM('ok','insufficient','inconsistent_adjustments','stale','break','incomplete','calendar_unknown') NOT NULL DEFAULT 'ok',
   PRIMARY KEY (listing_id),
   CONSTRAINT fk_state_listing FOREIGN KEY (listing_id) REFERENCES listings(id)
 ) ENGINE=InnoDB;
