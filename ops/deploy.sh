@@ -162,10 +162,16 @@ else
   echo "aucune migration en attente"
 fi
 .venv/bin/python -c "import engine.cli" && echo "moteur importable"
-# Derived analytics only; reuse stored prices, no collection and no transaction update.
-echo "== Recalcul des mesures et classements depuis les historiques existants"
-.venv/bin/python -m engine.cli metrics
-echo "== Recalcul analytique terminé"
+# Détacher le recalcul des données dérivées : certaines commandes SSH mutualisées
+# interrompent les traitements longs. Le runner attend le code de sortie avant la suite.
+token="$SHA-$VERSION"
+metrics_log="$ROOT/logs/deploy-metrics-$token.log"
+metrics_exit="$ROOT/logs/deploy-metrics-$token.exit"
+metrics_pid="$ROOT/logs/deploy-metrics-$token.pid"
+rm -f "$metrics_exit" "$metrics_exit.tmp" "$metrics_pid"
+nohup bash -c 'set +e; cd "$1"; .venv/bin/python -m engine.cli metrics; rc=$?; printf "%s\n" "$rc" > "$2.tmp"; mv "$2.tmp" "$2"; exit 0' _ "$ROOT" "$metrics_exit" > "$metrics_log" 2>&1 < /dev/null &
+printf '%s\n' "$!" > "$metrics_pid"
+echo "Recalcul analytique lancé en tâche détachée"
 echo "== Vérification financière de la version"
 .venv/bin/python scripts/verify_financial_release.py
 echo "== Contrôle d'intégrité financière"
@@ -174,6 +180,38 @@ chmod 600 "$ROOT/logs/financial-integrity.json"
 
 find app scripts -name '*.php' -print0 | xargs -0 -n1 php -l > /dev/null && echo "PHP valide"
 REMOTE
+
+  phase="recalcul analytique sur les historiques existants"
+  echo "== Attente du recalcul des mesures et classements"
+  metrics_state=""
+  for attempt in $(seq 1 120); do
+    metrics_state=$(remote_sh "ROOT=$root TOKEN=$sha-$version bash -s" <<'REMOTE'
+set -euo pipefail
+status="$ROOT/logs/deploy-metrics-$TOKEN.exit"
+pidfile="$ROOT/logs/deploy-metrics-$TOKEN.pid"
+if [ -f "$status" ]; then
+  rc=$(cat "$status")
+  if [ "$rc" = 0 ]; then
+    rm -f "$status" "$pidfile" "$ROOT/logs/deploy-metrics-$TOKEN.log"
+    echo done
+  else
+    echo "failed:$rc"
+  fi
+elif [ -f "$pidfile" ] && kill -0 "$(cat "$pidfile")" 2>/dev/null; then
+  echo running
+else
+  echo missing
+fi
+REMOTE
+)
+    case "$metrics_state" in
+      done) echo "== Recalcul analytique terminé"; break ;;
+      running) sleep 10 ;;
+      failed:*) echo "Échec du recalcul analytique (code de retour $metrics_state)" >&2; exit 1 ;;
+      *) echo "Échec du recalcul analytique (processus terminé sans code de sortie)" >&2; exit 1 ;;
+    esac
+  done
+  if [ "$metrics_state" != done ]; then echo "Échec du recalcul analytique (délai dépassé)" >&2; exit 1; fi
 
   phase="vérification ETF, comptes et intégrité financière"
   echo "== Vérification ETF"
