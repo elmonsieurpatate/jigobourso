@@ -1,27 +1,33 @@
-== Contrôles du serveur (lecture seule)
-private/ présent (non lu)
-Python 3.9.25
-public_html/v2 -> app/public OK
-PHP 8.2.35 (cli) (built: Oct 21 2026 00:00:00) (NTS)
-rsync et mariadb-dump OK
-/dev/sda4        21T   12T  9.2T  56% /home/u381524662
-== Contrôle des fichiers SQL : ajouts seulement
-0 migration(s) admissible(s)
-== Sauvegarde et empreinte des portefeuilles
-Sauvegarde financière vérifiée : financial-20261029095057.sql.gz
-== Version des pages : ?v=202610290950
-== Sauvegarde du code distant (garde les 5 dernières)
-sauvegarde : code-20261029095100-8b54810c.tgz
-== Transfert du code
-== Dépendances Python, migrations de schéma, contrôles
-dépendances Python inchangées
-schéma de base appliqué (tables manquantes créées, vues redéfinies)
-aucune migration en attente
-moteur importable
-(9460, 55096)
-{"ok": true, "at_utc": "2026-10-29T09:51:34.445353+00:00", "actual_series_checks": [{"symbol": "BBSI", "daily_closes": 419, "last_close": "2026-10-28", "basis": "raw", "windows_verified": 6, "expected_close": "2026-10-28"}, {"symbol": "BOX", "daily_closes": 420, "last_close": "2026-10-28", "basis": "raw", "windows_verified": 6, "expected_close": "2026-10-28"}, {"symbol": "UBU5.DE", "daily_closes": 402, "last_close": "2026-10-28", "basis": "raw", "windows_verified": 6, "expected_close": "2026-10-28"}, {"symbol": "VOO", "daily_closes": 421, "last_close": "2026-10-28", "basis": "raw", "windows_verified": 6, "expected_close": "2026-10-28"}]}
-PHP valide
-Intégrité : portefeuilles et transactions strictement conservés ; 9 transactions ; anomalies historiques non réécrites : [{'id': 14, 'code': 'historical_fx_unconfirmed'}, {'id': 14, 'code': 'confirm_historical_price_unit_GBP_vs_pence'}]
-== Vérification publique
-site OK : accueil 200, version 202610290950 servie, API répond (200)
-Déploiement terminé : 8b54810cd868f9e04f85e0a3eba2f93bd492968e
+........................................................................ [ 92%]
+......                                                                   [100%]
+78 passed in 0.22s
+........................................................................ [ 81%]
+................                                                         [100%]
+88 passed in 20.97s
+[
+  {
+    "width": 375,
+    "email_login": true,
+    "ranking_preserved": true,
+    "horizontal_overflow": false,
+    "ok": true
+  },
+  {
+    "width": 390,
+    "email_login": true,
+    "ranking_preserved": true,
+    "horizontal_overflow": false,
+    "ok": true
+  },
+  {
+    "width": 1280,
+    "email_login": true,
+    "ranking_preserved": true,
+    "horizontal_overflow": false,
+    "ok": true
+  },
+  {
+    "account_round_trip": true,
+    "ok": true
+  }
+]
