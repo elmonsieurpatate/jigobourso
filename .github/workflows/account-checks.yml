@@ -105,4 +105,11 @@ jobs:
           printf '{"commit":"%s","run_url":"https://github.com/%s/actions/runs/%s","tests":"%s","remote":"%s"}\n' "$GITHUB_SHA" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" '${{ needs.tests.result }}' '${{ needs.remote.result }}' > status.json
           git add .
           git commit -qm 'Account verification results'
-          git push -q origin HEAD:account-status
+          for attempt in 1 2 3; do
+            if git push -q origin HEAD:account-status; then exit 0; fi
+            git fetch -q origin account-status
+            git reset --soft FETCH_HEAD
+            git add .
+            git commit -qm 'Account verification results'
+          done
+          exit 1

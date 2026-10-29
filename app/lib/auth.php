@@ -17,13 +17,16 @@ function login(string $username, string $password, bool $remember = false): arra
     $ipKey='login:'.substr(hash('sha256',client_ip()),0,20);
     if ((int)q('SELECT COUNT(*) FROM login_attempts WHERE username=? AND at>?',[$ipKey,gmdate('Y-m-d H:i:s',time()-900)])->fetchColumn() >= 20) throw new ApiError('Trop d’essais : réessayez dans quelques minutes',429);
     $column=strpos($username,'@')!==false?'email':'username';
-    $u=q("SELECT * FROM users WHERE $column=? AND active=1",[$username])->fetch();
+    $db=db();$db->beginTransaction();
+    try {
+    $u=q("SELECT * FROM users WHERE $column=? AND active=1 FOR UPDATE",[$username])->fetch();
     $key=$u?$u['username']:'missing:'.substr(hash('sha256',mb_strtolower($username)),0,20);
     if (login_blocked($key)) throw new ApiError('Trop d’essais : réessayez dans quelques minutes',429);
     $hash=$u?$u['pass_hash']:'$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2uheWG/igi';
     $verified=password_verify($password,$hash);
     if (!$u || !$verified) {
         foreach ([$key,$ipKey] as $k) q('INSERT INTO login_attempts(username,ip,at) VALUES (?,?,?)',[$k,client_ip(),now_utc()]);
+        $db->commit();
         throw new ApiError('E-mail, pseudo ou mot de passe incorrect',401);
     }
     q('DELETE FROM login_attempts WHERE username=?',[$key]);
@@ -34,8 +37,11 @@ function login(string $username, string $password, bool $remember = false): arra
       [hash('sha256', $token), $u['id'], $now, $now, gmdate('Y-m-d H:i:s', $expiry), client_ip(), substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 190)]);
     q('INSERT INTO session_policies(token_hash,persistent,absolute_expiry) VALUES (?,?,?)',[hash('sha256',$token),$remember?1:0,gmdate('Y-m-d H:i:s',$expiry)]);
     q('UPDATE users SET last_login = ? WHERE id = ?', [$now, $u['id']]);
+    $db->commit();
     setcookie(COOKIE, $token, ['expires' => $remember ? $expiry : 0, 'path' => '/', 'secure' => https(), 'httponly' => true, 'samesite' => 'Lax']);
     return public_user($u);
+    } catch(Throwable $e) {if($db->inTransaction())$db->rollBack();throw $e;}
+
 }
 function logout(): void {
     if (!empty($_COOKIE[COOKIE])) q('DELETE FROM sessions WHERE token_hash = ?', [hash('sha256', $_COOKIE[COOKIE])]);
