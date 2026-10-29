@@ -1,1 +1,11 @@
 == Contrôles du serveur (lecture seule)
+== Contrôle des fichiers SQL : ajouts seulement
+== Version des pages : ?v=202610291905
+== Transfert du code
+== Dépendances Python, migrations de schéma, contrôles
+moteur importable
+== Vérification financière de la version
+== Contrôle d'intégrité financière
+PHP valide
+== Attente du recalcul des mesures et classements
+Échec déploiement : étape recalcul analytique sur les historiques existants (code 255)
