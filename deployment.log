@@ -20,3 +20,11 @@ migrations en attente : 20261029_account_tokens.sql
 sauvegarde de la base : db-20261029123208.sql.gz (57M)
 1 migration(s) appliquée(s) : 20261029_account_tokens.sql
 moteur importable
+(9460, 55096)
+{"ok": true, "at_utc": "2026-10-29T12:32:52.808455+00:00", "actual_series_checks": [{"symbol": "BBSI", "daily_closes": 419, "last_close": "2026-10-28", "basis": "raw", "windows_verified": 6, "expected_close": "2026-10-28"}, {"symbol": "BOX", "daily_closes": 420, "last_close": "2026-10-28", "basis": "raw", "windows_verified": 6, "expected_close": "2026-10-28"}, {"symbol": "UBU5.DE", "daily_closes": 402, "last_close": "2026-10-28", "basis": "raw", "windows_verified": 6, "expected_close": "2026-10-28"}, {"symbol": "VOO", "daily_closes": 421, "last_close": "2026-10-28", "basis": "raw", "windows_verified": 6, "expected_close": "2026-10-28"}]}
+PHP valide
+Comptes et hachages conservés ; contrôle du module de messagerie : {'at_utc': '2026-10-29T12:32:56+00:00', 'accepted_by_hostinger': True}
+Intégrité : portefeuilles et transactions strictement conservés ; 9 transactions ; anomalies historiques non réécrites : [{'id': 14, 'code': 'historical_fx_unconfirmed'}, {'id': 14, 'code': 'confirm_historical_price_unit_GBP_vs_pence'}]
+== Vérification publique
+site OK : accueil 200, version 202610291231 servie, API répond (200)
+Pages de connexion, récupération et confirmation : HTTP 200
