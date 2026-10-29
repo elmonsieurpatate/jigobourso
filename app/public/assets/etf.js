@@ -34,7 +34,7 @@ window.JEtf = {
     };
     const head = c.rows.map((r, i) => `<th>${i ? `<a href="titre.html?id=${r.id}" target="_blank" rel="noopener">${J.esc(r.symbol)}</a>` : J.esc(r.symbol)}${i ? `<div class="small muted">corr. ${J.num(r.coefficient, 2)}</div>` : '<div class="small muted">cet ETF</div>'}</th>`).join('');
     const line = (label, f) => `<tr><td class="muted">${label}</td>${c.rows.map(r => `<td>${J.esc(f(r))}</td>`).join('')}</tr>`;
-    return `<h3 style="margin:14px 0 6px">Ce qui les différencie</h3><div class="table-wrap"><table class="dense cmp"><thead><tr><th></th>${head}</tr></thead><tbody>
+    return `<h3 style="margin:14px 0 6px">Ce qui les différencie</h3><div class="table-wrap cmp-wrap"><table class="dense cmp"><thead><tr><th></th>${head}</tr></thead><tbody>
       ${line('Frais annuels', fmt.fee)}${line('Liquidité', fmt.liq)}${line('Place · devise', r => (r.mic || '?') + ' · ' + (r.currency || '?'))}${line('Émetteur', r => r.family || 'inconnu')}${line('Actifs sous gestion', fmt.aum)}${line('Distribution', fmt.yld)}${line('Écart de performance 1 an (EUR)', fmt.gap)}${line('Lignes communes (10 premières)', fmt.ov)}</tbody></table></div>
       <p class="small muted">${J.esc(c.note)} Valeurs inconnues = non fournies, jamais complétées. Le « rendement de distribution » explique souvent un écart de cours entre un ETF qui distribue et son jumeau qui capitalise. Aucune recommandation.</p>`;
   },
