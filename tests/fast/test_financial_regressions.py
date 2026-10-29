@@ -1,4 +1,4 @@
-"""Audit-only regression expectations, no production access or application changes."""
+"""Permanent regression tests for pagination, holdings, freshness and splits."""
 import datetime as dt
 from unittest.mock import patch
 from engine.analytics import service as S, strategy as T

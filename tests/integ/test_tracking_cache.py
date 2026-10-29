@@ -11,6 +11,11 @@ if not os.environ.get('JIGO_TEST_DATABASE'):
 
 NOW = datetime.datetime(2026, 10, 28, 2, 10, tzinfo=datetime.timezone.utc)
 
+@pytest.fixture(autouse=True)
+def fixed_market_clock(monkeypatch):
+    monkeypatch.setattr(service.hours, 'utcnow', lambda: NOW)
+
+
 
 def seed(conn):
     reset_data(conn)

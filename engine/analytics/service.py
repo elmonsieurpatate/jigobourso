@@ -124,7 +124,8 @@ def data_version(conn):
         a = cur.fetchone()
         cur.execute("SELECT COALESCE(MAX(id), 0) j FROM jobs WHERE job_type NOT LIKE 'intraday%' AND status IN ('completed', 'completed_with_errors')")
         j = cur.fetchone()['j']
-    return f"{','.join(hours.expected_last_close(m, hours.utcnow()) for m in sorted(hours.HOURS))}.{CACHE_FORMAT}.{strategy.VERSION}|{a['t']}|{a['n']}|{j}"
+    clock = hashlib.sha1(','.join(hours.expected_last_close(m, hours.utcnow()) for m in sorted(hours.HOURS)).encode()).hexdigest()[:12]
+    return f"{clock}.{CACHE_FORMAT}.{strategy.VERSION}|{a['t']}|{a['n']}|{j}"
 
 
 def cached_verdicts(conn, config):
@@ -368,7 +369,7 @@ def instrument_sheet(conn, request):
              'break_dates': state.get('break_dates')}
     sheet.update(_sheet_context(conn, u, state, daily))
     # Verdict : uniquement pour une cotation recommandable ; sinon la fiche explique pourquoi elle ne l'est pas.
-    all_windows = sorted({p['sessions'] for p in config['periods']})
+    all_windows = sorted({1, 5, 21, 63, 126, 252} | {p['sessions'] for p in config['periods']})
     bars = [(r['price_date'].isoformat(), float(r['close_px']), None if r['adj_close_px'] is None else float(r['adj_close_px'])) for r in rows]
     with conn.cursor() as cur:
         cur.execute("SELECT event_date, ratio FROM corporate_events WHERE listing_id=%s AND kind IN ('split','reverse_split')", (lid,))
@@ -413,7 +414,8 @@ def _sheet_context(conn, u, state, daily):
                     ('daily:' + u['mic'], 'intraday:' + u['mic']))
         collects = {r['job_type'].split(':')[0]: (r['finished_at'] or r['started_at']).isoformat(sep=' ') for r in cur.fetchall()}
         cur.execute('SELECT MAX(last_close_date) d FROM series_state s JOIN listings l ON l.id=s.listing_id WHERE l.mic=%s', (u['mic'],))
-        expected = cur.fetchone()['d']
+        peer_date = cur.fetchone()['d']
+        expected = max(hours.expected_last_close(u['mic'], hours.utcnow()), str(peer_date or ''))
     pea = u['kind'] == 'equity' and u['country'] in PEA_COUNTRIES
     warn = None
     text = ' '.join(filter(None, [u['name'], u['category']]))
@@ -427,7 +429,7 @@ def _sheet_context(conn, u, state, daily):
             'sources': {'catalogue': 'FinanceDatabase', 'catalogue_loaded_at': cat['loaded_at'].isoformat(sep=' ') if cat else None, 'catalogue_commit': (cat['source_commit'][:8] if cat else None),
                         'prices': 'Yahoo Finance', 'last_daily_collect': collects.get('daily'), 'last_intraday_collect': collects.get('intraday')},
             'freshness': {'last_close_date': last.isoformat() if last else None, 'market_latest_close': expected or None,
-                          'closes_count': state.get('closes_count'), 'first_close_date': daily[0][0] if daily else None, 'stale': bool(last and expected and last < expected)}}
+                          'closes_count': state.get('closes_count'), 'first_close_date': daily[0][0] if daily else None, 'stale': bool(last and expected and str(last) < expected)}}
 
 
 PROFILE_MAX_AGE_DAYS = 30
