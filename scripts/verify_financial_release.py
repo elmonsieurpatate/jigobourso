@@ -4,14 +4,20 @@ import json
 from engine.shared.db import connect
 from engine.analytics.series import analyze_series
 from engine.market import hours
-from engine.market.collect import to_eur_factor
+from engine.market.calendar import session_dates, window_calendars
+from engine.market.collect import effective_expected_close, to_eur_factor
 
 
 def run():
     conn = connect()
+    now = hours.utcnow()
     with conn.cursor() as c:
         c.execute('SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ')
         c.execute('START TRANSACTION READ ONLY')
+        c.execute("""SELECT l.mic, MAX(d.price_date) last_date
+                     FROM daily_prices d JOIN v_collect_set s ON s.listing_id=d.listing_id
+                     JOIN listings l ON l.id=d.listing_id GROUP BY l.mic""")
+        latest_by_mic = {r['mic']: r['last_date'].isoformat() for r in c.fetchall() if r['last_date']}
     with conn.cursor() as c:
         c.execute("SELECT l.id,l.symbol,l.mic FROM listings l WHERE l.symbol IN ('BOX','BBSI','VOO','UBU5.DE') AND l.is_primary=1")
         listings=c.fetchall()
@@ -25,7 +31,10 @@ def run():
             c.execute('SELECT * FROM strategy_metrics WHERE listing_id=%s',(listing['id'],))
             stored={r['sessions']:r for r in c.fetchall()}
         windows=[1,5,21,63,126,252]
-        dates,closes,basis,breaks,metrics,missing,tech=analyze_series(bars,windows,splits)
+        cutoff=max(effective_expected_close(conn, listing['mic'], now) or '', latest_by_mic.get(listing['mic'], ''))
+        calendars=window_calendars(listing['mic'], cutoff, windows)
+        tech_dates=session_dates(listing['mic'], cutoff, 55)
+        dates,closes,basis,breaks,metrics,missing,tech=analyze_series(bars,windows,splits,calendars,tech_dates)
         compared=0
         for n,m in metrics.items():
             if m is None:

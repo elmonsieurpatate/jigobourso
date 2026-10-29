@@ -172,8 +172,6 @@ rm -f "$metrics_exit" "$metrics_exit.tmp" "$metrics_pid"
 nohup bash -c 'set +e; cd "$1"; .venv/bin/python -m engine.cli metrics; rc=$?; printf "%s\n" "$rc" > "$2.tmp"; mv "$2.tmp" "$2"; exit 0' _ "$ROOT" "$metrics_exit" > "$metrics_log" 2>&1 < /dev/null &
 printf '%s\n' "$!" > "$metrics_pid"
 echo "Recalcul analytique lancé en tâche détachée"
-echo "== Vérification financière de la version"
-.venv/bin/python scripts/verify_financial_release.py
 echo "== Contrôle d'intégrité financière"
 php scripts/check_financial_integrity.php > "$ROOT/logs/financial-integrity.json"
 chmod 600 "$ROOT/logs/financial-integrity.json"
@@ -212,6 +210,9 @@ REMOTE
     esac
   done
   if [ "$metrics_state" != done ]; then echo "Échec du recalcul analytique (délai dépassé)" >&2; exit 1; fi
+
+  echo "== Vérification des calculs financiers avec les calendriers de séance"
+  remote_sh "cd $root && set -a && . ./private/env && set +a && .venv/bin/python scripts/verify_financial_release.py"
 
   phase="vérification ETF, comptes et intégrité financière"
   echo "== Vérification ETF"
