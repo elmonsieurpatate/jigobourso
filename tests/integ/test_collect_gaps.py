@@ -93,8 +93,10 @@ def test_manual_force_ignores_the_retry_delay_but_automatic_runs_do_not(conn):
     with conn.cursor() as cur:
         cur.execute('DELETE FROM daily_prices WHERE listing_id=1 AND price_date=%s', (DAYS[1],))
     conn.commit()
-    assert collect.fill_gaps_batch(conn, ChartClient(), rows, NOW)['examined'] == 0                       # automatique : délai de 30 jours
-    assert collect.fill_gaps_batch(conn, ChartClient(), rows, NOW, force=True)['examined'] == 1           # manuel : repasse sur tout
+    later = NOW + datetime.timedelta(days=2)
+    assert collect.fill_gaps_batch(conn, ChartClient(), rows, later)['examined'] == 0                     # automatique : délai de 30 jours
+    assert collect.fill_gaps_batch(conn, ChartClient(), rows, NOW, force=True)['examined'] == 0           # manuel, même jour : reprend là où il s'est arrêté
+    assert collect.fill_gaps_batch(conn, ChartClient(), rows, later, force=True)['examined'] == 1         # manuel, un autre jour : repasse
 
 
 def test_progress_reports_done_over_total_after_each_title(conn):

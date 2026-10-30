@@ -222,7 +222,7 @@ GAP_RETRY_DAYS = 30        # un titre déjà examiné n'est pas redemandé avant
 
 def fill_gaps_batch(conn, client, rows, now, limit=GAP_LIMIT, budget_s=GAP_BUDGET_S, force=False, progress=None):
     """Un lot de titres dont l'historique d'un an est incomplet, les moins troués d'abord. Arrêt au premier 429 (le titre en cours n'est pas marqué : il sera repris).
-    `force` (demande manuelle) ignore le délai de 30 jours entre deux essais sur un même titre. `progress(faits, total)` est appelé après chaque titre."""
+    `force` (demande manuelle) ignore le délai de 30 jours, mais pas les titres déjà traités aujourd'hui : une relance reprend où la précédente s'est arrêtée. `progress(faits, total)` est appelé après chaque titre."""
     tried = setting(conn, 'gap_fill_tried', {})
     today = naive_utc(now).date()
     by_id = {r['listing_id']: r for r in rows}
@@ -231,7 +231,13 @@ def fill_gaps_batch(conn, client, rows, now, limit=GAP_LIMIT, budget_s=GAP_BUDGE
         for part in _batches(list(by_id), CHUNK):
             cur.execute(f"SELECT listing_id, expected_252 - observed_252 m FROM series_state WHERE coverage_252 < 1 AND expected_252 IS NOT NULL AND listing_id IN ({','.join(['%s'] * len(part))})", part)
             missing.update({r['listing_id']: int(r['m']) for r in cur.fetchall()})
-    todo = [i for i in sorted(missing, key=lambda i: (missing[i], i)) if force or not tried.get(str(i)) or (today - datetime.date.fromisoformat(tried[str(i)])).days >= GAP_RETRY_DAYS]
+    todo = [i for i in sorted(missing, key=lambda i: (missing[i], i)) if not tried.get(str(i)) or (today - datetime.date.fromisoformat(tried[str(i)])).days >= (1 if force else GAP_RETRY_DAYS)]
+    def save_tried():
+        keep = {k: v for k, v in tried.items() if (today - datetime.date.fromisoformat(v)).days < GAP_RETRY_DAYS}
+        with conn.cursor() as cur:
+            cur.execute('INSERT INTO settings(name, value_json, updated_at) VALUES (%s,%s,%s) ON DUPLICATE KEY UPDATE value_json=VALUES(value_json), updated_at=VALUES(updated_at)',
+                        ('gap_fill_tried', json.dumps(keep), naive_utc(now)))
+        conn.commit()
     started, done, added, limited = time.monotonic(), 0, 0, False
     for i in todo[:limit]:
         if time.monotonic() - started > budget_s:
@@ -245,13 +251,11 @@ def fill_gaps_batch(conn, client, rows, now, limit=GAP_LIMIT, budget_s=GAP_BUDGE
             continue
         tried[str(i)] = today.isoformat()
         done, added = done + 1, added + n
+        if done % 50 == 0:
+            save_tried()                                                               # un arrêt en cours de route ne perd pas ce qui est fait
         if progress:
             progress(done, min(len(todo), limit))
-    keep = {k: v for k, v in tried.items() if (today - datetime.date.fromisoformat(v)).days < GAP_RETRY_DAYS}
-    with conn.cursor() as cur:
-        cur.execute('INSERT INTO settings(name, value_json, updated_at) VALUES (%s,%s,%s) ON DUPLICATE KEY UPDATE value_json=VALUES(value_json), updated_at=VALUES(updated_at)',
-                    ('gap_fill_tried', json.dumps(keep), naive_utc(now)))
-    conn.commit()
+    save_tried()
     return {'candidates': len(todo), 'examined': done, 'added': added, 'remaining': len(todo) - done, 'rate_limited': limited}
 
 
