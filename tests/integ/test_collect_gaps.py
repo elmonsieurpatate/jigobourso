@@ -104,3 +104,15 @@ def test_progress_reports_done_over_total_after_each_title(conn):
     seen = []
     collect.fill_gaps_batch(conn, ChartClient(), rows, NOW, progress=lambda d, t: seen.append((d, t)))
     assert seen == [(1, 2), (2, 2)]
+
+
+def test_parallel_fetch_gives_the_same_result_and_a_rate_limit_leaves_that_title_for_later(conn):
+    rows = [{'listing_id': 1, 'symbol': 'AAA', 'mic': 'XNAS'}, {'listing_id': 2, 'symbol': 'BBB', 'mic': 'XNAS'}]
+    r = collect.fill_gaps_batch(conn, ChartClient(), rows, NOW, workers=3, client_factory=ChartClient)
+    assert r['examined'] == 2 and r['added'] == 2 and closes(conn, 1)[DAYS[1]] == 11.0 and closes(conn, 2)[DAYS[1]] == 11.0
+    with conn.cursor() as cur:
+        cur.execute('DELETE FROM daily_prices WHERE price_date=%s', (DAYS[1],))
+        cur.execute("DELETE FROM settings WHERE name='gap_fill_tried'")
+    conn.commit()
+    limited = collect.fill_gaps_batch(conn, ChartClient(), rows, NOW, workers=3, client_factory=lambda: ChartClient(fail_on='BBB'))
+    assert limited['rate_limited'] and limited['examined'] == 1 and closes(conn, 1).get(DAYS[1]) == 11.0 and DAYS[1] not in closes(conn, 2)

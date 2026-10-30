@@ -6,8 +6,10 @@ Le jeu de collecte vient de v_collect_set : sélectionnées principales + cotati
 import datetime
 import json
 import statistics
+import threading
 import time
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
 
 from . import hours, prefilter
 from .yahoo import RateLimited, local_date
@@ -192,26 +194,31 @@ def apply_prefilter(conn, now=None):
 
 
 # ───────── clôtures quotidiennes ─────────
+def store_gap_bars(conn, r, data, now):
+    """Écrit les seuls jours absents et réglés d'une réponse « chart » pour un titre (jamais de modification d'une clôture existante). Renvoie le nombre de clôtures ajoutées."""
+    if not data or not data.get('bars'):
+        return 0
+    with conn.cursor() as cur:
+        cur.execute('SELECT price_date FROM daily_prices WHERE listing_id=%s', (r['listing_id'],))
+        have = {x['price_date'] for x in cur.fetchall()}
+        out = {}
+        for ts, _o, _h, _l, close, _v in data['bars']:
+            day = local_date(ts, data['timezone'])
+            if day not in have and hours.is_settled(r['mic'], day, now):
+                out[day] = close
+        if out:
+            cur.executemany('INSERT IGNORE INTO daily_prices(listing_id,price_date,close_px) VALUES (%s,%s,%s)', [(r['listing_id'], d, c) for d, c in out.items()])
+    conn.commit()
+    return len(out)
+
+
 def fill_daily_gaps(conn, client, rows, now, range_='1y'):
     """Comble les clôtures absentes de l'historique avec le point d'accès « chart » (un symbole par appel) : le point d'accès groupé « spark » omet certains jours que « chart » fournit.
     N'ajoute que les jours manquants (jamais de modification d'une clôture déjà en base) et seulement des séances terminées. Renvoie (titres examinés, clôtures ajoutées)."""
     added = 0
     for r in rows:
         data = client.chart(r['symbol'], range_, '1d')                       # RateLimited remonte : le passage s'arrête, la suite reprend plus tard
-        if not data or not data.get('bars'):
-            continue
-        with conn.cursor() as cur:
-            cur.execute('SELECT price_date FROM daily_prices WHERE listing_id=%s', (r['listing_id'],))
-            have = {x['price_date'] for x in cur.fetchall()}
-            out = {}
-            for ts, _o, _h, _l, close, _v in data['bars']:
-                day = local_date(ts, data['timezone'])
-                if day not in have and hours.is_settled(r['mic'], day, now):
-                    out[day] = close
-            if out:
-                cur.executemany('INSERT IGNORE INTO daily_prices(listing_id,price_date,close_px) VALUES (%s,%s,%s)', [(r['listing_id'], d, c) for d, c in out.items()])
-                added += len(out)
-        conn.commit()
+        added += store_gap_bars(conn, r, data, now)
     return len(rows), added
 
 
@@ -220,9 +227,9 @@ GAP_BUDGET_S = 60          # ...et au plus ce temps (secondes) : un appel Yahoo 
 GAP_RETRY_DAYS = 30        # un titre déjà examiné n'est pas redemandé avant ce délai (les jours que Yahoo n'a vraiment pas restent absents)
 
 
-def fill_gaps_batch(conn, client, rows, now, limit=GAP_LIMIT, budget_s=GAP_BUDGET_S, force=False, progress=None):
+def fill_gaps_batch(conn, client, rows, now, limit=GAP_LIMIT, budget_s=GAP_BUDGET_S, force=False, progress=None, workers=1, client_factory=None):
     """Un lot de titres dont l'historique d'un an est incomplet, les moins troués d'abord. Arrêt au premier 429 (le titre en cours n'est pas marqué : il sera repris).
-    `force` (demande manuelle) ignore le délai de 30 jours, mais pas les titres déjà traités aujourd'hui : une relance reprend où la précédente s'est arrêtée. `progress(faits, total)` est appelé après chaque titre."""
+    `force` (demande manuelle) ignore le délai de 30 jours, mais pas les titres déjà traités aujourd'hui : une relance reprend où la précédente s'est arrêtée. `progress(faits, total)` est appelé après chaque titre. `workers` > 1 (action manuelle) : plusieurs sessions Yahoo en parallèle, créées par `client_factory`."""
     tried = setting(conn, 'gap_fill_tried', {})
     today = naive_utc(now).date()
     by_id = {r['listing_id']: r for r in rows}
@@ -238,23 +245,48 @@ def fill_gaps_batch(conn, client, rows, now, limit=GAP_LIMIT, budget_s=GAP_BUDGE
             cur.execute('INSERT INTO settings(name, value_json, updated_at) VALUES (%s,%s,%s) ON DUPLICATE KEY UPDATE value_json=VALUES(value_json), updated_at=VALUES(updated_at)',
                         ('gap_fill_tried', json.dumps(keep), naive_utc(now)))
         conn.commit()
-    started, done, added, limited = time.monotonic(), 0, 0, False
-    for i in todo[:limit]:
-        if time.monotonic() - started > budget_s:
-            break
+    started, done, added, limited, saved = time.monotonic(), 0, 0, False, 0
+    local = threading.local()
+
+    def fetch(i):
+        """Appel Yahoo seul (dans un fil de travail) : l'écriture en base reste dans le fil principal. Chaque fil a sa propre session Yahoo, donc sa propre pause entre appels."""
+        c = client
+        if workers > 1:
+            if not hasattr(local, 'client'):
+                local.client = client_factory()
+            c = local.client
         try:
-            _, n = fill_daily_gaps(conn, client, [by_id[i]], now)
-        except RateLimited:
-            limited = True
-            break
-        except Exception:                                                              # noqa: BLE001 : réponse absente ou illisible : réessai au prochain passage
-            continue
-        tried[str(i)] = today.isoformat()
-        done, added = done + 1, added + n
-        if done % 50 == 0:
-            save_tried()                                                               # un arrêt en cours de route ne perd pas ce qui est fait
-        if progress:
-            progress(done, min(len(todo), limit))
+            return i, c.chart(by_id[i]['symbol'], '1y', '1d'), None
+        except Exception as e:                                                         # noqa: BLE001
+            return i, None, e
+    chunk = workers * 4 if workers > 1 else 1
+    pool = ThreadPoolExecutor(max_workers=workers) if workers > 1 else None
+    try:
+        for start in range(0, len(todo[:limit]), chunk):
+            if time.monotonic() - started > budget_s:
+                break
+            ids = todo[:limit][start:start + chunk]
+            results = list(pool.map(fetch, ids)) if pool else [fetch(i) for i in ids]
+            stop = False
+            for i, data, err in results:
+                if isinstance(err, RateLimited):
+                    limited = stop = True                                              # le titre n'est pas marqué : il sera repris
+                    continue
+                if err is not None:
+                    continue                                                           # réponse absente ou illisible : réessai au prochain passage
+                added += store_gap_bars(conn, by_id[i], data, now)
+                tried[str(i)] = today.isoformat()
+                done += 1
+                if progress:
+                    progress(done, min(len(todo), limit))
+            if done - saved >= 50:
+                save_tried()                                                           # un arrêt en cours de route ne perd pas ce qui est fait
+                saved = done
+            if stop:
+                break
+    finally:
+        if pool:
+            pool.shutdown()
     save_tried()
     return {'candidates': len(todo), 'examined': done, 'added': added, 'remaining': len(todo) - done, 'rate_limited': limited}
 

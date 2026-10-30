@@ -474,10 +474,13 @@ def _recompute(conn, now, log, which):
     return r['etfs'], 0, f'{r["etfs"]} ETF, {r["with_minimum_history"]} avec un historique suffisant'
 
 
+GAP_WORKERS = 4                                              # sessions Yahoo parallèles pour l'action manuelle (chacune garde sa pause de 0,3 s)
+
+
 def gaps_all(conn, client, now, log):
     """« Combler les clôtures manquantes » sur tout le catalogue : un appel Yahoo par titre incomplet, sans le plafond ni le délai de la maintenance ; reprise possible si Yahoo limite."""
     rows = collect.collection_set(conn)
-    r = _step(log, 'Clôtures manquantes', lambda: collect.fill_gaps_batch(conn, client, rows, now, limit=len(rows), budget_s=6 * 3600, force=True,
+    r = _step(log, 'Clôtures manquantes', lambda: collect.fill_gaps_batch(conn, client, rows, now, limit=len(rows), budget_s=6 * 3600, force=True, workers=GAP_WORKERS, client_factory=type(client),
                                                               progress=lambda d, t: log.progress(f'Clôtures manquantes : {d} / {t} titres') if hasattr(log, 'progress') else None),
               lambda r: f'{r["added"]} clôtures ajoutées sur {r["examined"]} titres examinés, {r["remaining"]} restent à examiner' + (' (limitation Yahoo : relancez plus tard)' if r['rate_limited'] else ''))
     if r['added']:
