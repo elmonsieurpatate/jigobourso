@@ -237,14 +237,14 @@ def _daily_eur(a):
 def _aux(conn, ref, rates):
     """Données de filtre et de tri pour tout l'univers : prix, volume, fraîcheur et mesures de la fenêtre de référence `ref`."""
     with conn.cursor() as cur:
-        cur.execute("""SELECT p.listing_id id, p.price, COALESCE(p.currency, l.currency) cur, p.avg_volume_3m volume, p.quote_at, l.mic, s.last_close_date, s.quality
+        cur.execute("""SELECT p.listing_id id, p.price, COALESCE(p.currency, l.currency) cur, p.avg_volume_3m volume, p.avg_volume_10d volume_10d, p.analyst_rating analyst, p.quote_at, l.mic, s.last_close_date, s.quality
                        FROM latest_prices p JOIN listings l ON l.id=p.listing_id LEFT JOIN series_state s ON s.listing_id=l.id""")
         out = {}
         for r in cur.fetchall():
             price = None if r['price'] is None else float(r['price'])
             f = to_eur_factor(r['cur'], rates)
             age = None if r['quote_at'] is None else max(0.0, (hours.utcnow().replace(tzinfo=None) - r['quote_at']).total_seconds() / 86400)
-            out[r['id']] = {'price': price, 'price_eur': price * f if price is not None and f else None, 'volume': r['volume'], 'quote_age_days': age,
+            out[r['id']] = {'price': price, 'price_eur': price * f if price is not None and f else None, 'volume': r['volume'], 'volume_10d': r['volume_10d'], 'analyst': r['analyst'], 'quote_age_days': age,
                             'last_close': r['last_close_date'], 'quality': 'stale' if r['last_close_date'] and str(r['last_close_date']) < expected_close(conn, r['mic']) else r['quality']}
         cur.execute('SELECT listing_id, slope, r2, perf, volatility, drawdown FROM strategy_metrics WHERE sessions=%s', (ref,))
         for r in cur.fetchall():
@@ -370,7 +370,23 @@ def explore(conn, request):
     from . import etf
     etf_top = [e['id'] for e in rows if e.get('group') == 'etf'][:10]          # dix premiers ETF de la vue, avant pagination, dans l'ordre déjà déterminé
     etf_concentration = etf.concentration(conn, etf_top)
-    group_of = {i: g['id'] for g in etf_concentration['groups'] for i in g['members']}
+    page_etf = [e['id'] for e in page_rows if e not in excluded_hits and e.get('group') == 'etf']
+    cache = etf.load(conn, set(page_etf) | set(etf_top))
+    pgroups = etf.page_groups(cache, page_etf) if len(page_etf) > 1 else []          # toute la page, depuis les liens précalculés : aucune corrélation recalculée ici
+    group_of, group_info = {}, {}
+    for g in pgroups:
+        group_of[g['leader']] = g['id']
+        group_info[g['leader']] = {'leader': True, 'size': len(g['members']) + 1, 'index': g['index']}
+        for r in g['rows']:
+            group_of[r['id']] = g['id']
+            group_info[r['id']] = {'leader': False, 'why': r['why'], 'diff': r['diff'], 'coefficient': r['coefficient']}
+    banner = []                                          # le bandeau reprend la même méthode (lien direct avec le chef, même couverture), appliquée aux dix premiers ETF de la vue
+    for g in etf.page_groups(cache, etf_top):
+        m = [g['leader']] + g['members']
+        if len(m) >= 3:
+            banner.append({'id': g['id'], 'size': len(m), 'members': m, 'symbols': [cache[i]['meta']['symbol'] for i in m], 'label': g['index'], 'min_coefficient': g['min_coefficient'],
+                           'unstable': False, 'basis': 'Corrélation des rendements hebdomadaires en EUR >= %s (52 semaines), lien direct avec le chef du groupe' % etf.NEAR_IDENTICAL})
+    etf_concentration['groups'] = banner
     for position, e in enumerate(page_rows, (page - 1) * size + 1):
         if e in excluded_hits:
             out.append(e)
@@ -380,8 +396,8 @@ def explore(conn, request):
         r = _row(v, rates, conn)
         a = aux.get(e['id'], {})
         r.update({'position': position, 'volume': a.get('volume'), 'last_close': a['last_close'].isoformat() if a.get('last_close') else None,
-                  'ref': {k: a.get(k) for k in REF_FIELDS}, 'open': e['mic'] in hours.HOURS and hours.is_open(e['mic'], now),
-                  'signals': signals.row_signals(a, e['kind'], ref, prefilter_cfg, a.get('quote_age_days')), 'etf_group': group_of.get(e['id'])})
+                  'analyst': analyst_view(a.get('analyst')) if e['kind'] == 'equity' else None, 'ref': {k: a.get(k) for k in REF_FIELDS}, 'open': e['mic'] in hours.HOURS and hours.is_open(e['mic'], now),
+                  'signals': signals.row_signals(a, e['kind'], ref, prefilter_cfg, a.get('quote_age_days')), 'etf_group': group_of.get(e['id']), 'etf_group_info': group_info.get(e['id'])})
         out.append(r)
     if not export:
         _attach_curves(conn, out)
@@ -452,7 +468,7 @@ def instrument_sheet(conn, request):
     rates = latest_rates(conn)
     with conn.cursor() as cur:
         cur.execute("""SELECT l.id, l.symbol, l.mic, l.currency, l.status, l.excluded_reason, l.is_primary, l.primary_reason, i.id AS instrument_id, i.name, i.isin, i.kind, i.country, i.category,
-                              p.price, p.price_time, p.quote_at, p.source AS price_source, p.currency AS price_currency, p.avg_volume_3m, p.market_cap
+                              p.price, p.price_time, p.quote_at, p.source AS price_source, p.currency AS price_currency, p.avg_volume_3m, p.avg_volume_10d, p.market_cap, p.analyst_rating
                        FROM listings l JOIN instruments i ON i.id=l.instrument_id LEFT JOIN latest_prices p ON p.listing_id=l.id WHERE l.id=%s""", (lid,))
         u = cur.fetchone()
         if not u:
@@ -471,6 +487,8 @@ def instrument_sheet(conn, request):
              'mic': u['mic'], 'market': MARKETS.get(u['mic'], u['mic']), 'currency': u['price_currency'] or u['currency'], 'price': price,
              'price_eur': price * factor if price is not None and factor else None, 'price_time': u['price_time'].isoformat(sep=' ') if u['price_time'] else None,
              'price_source': u['price_source'], 'avg_volume_3m': u['avg_volume_3m'], 'market_cap': u['market_cap'],
+             'market_cap_class': None if u['kind'] != 'equity' else _size_class(u['market_cap'], u['price_currency'] or u['currency'], rates),
+             'analyst': analyst_view(u['analyst_rating']) if u['kind'] == 'equity' else None,
              'catalogue_status': u['status'], 'excluded_reason': u['excluded_reason'], 'is_primary': bool(u['is_primary']),
              'other_listings': [{'id': s['id'], 'mic': s['mic'], 'symbol': s['symbol'], 'currency': s['currency'], 'status': s['status'], 'is_primary': bool(s['is_primary'])} for s in siblings],
              'daily': daily[-400:], 'daily_volume': daily_volume[-400:], 'state': {k: (float(v) if hasattr(v, 'as_integer_ratio') and not isinstance(v, int) else v) for k, v in state.items() if k != 'break_dates'},
@@ -562,6 +580,54 @@ def _bar_coverage(conn, lid, mic, sessions=5):
     return {'sessions': len(days), 'share': round(have / expected, 2) if expected else None}
 
 
+_ANALYST_FR = {'strong buy': 'Achat fort', 'buy': 'Achat', 'hold': 'Conserver', 'underperform': 'Sous-performance', 'sell': 'Vente', 'strong sell': 'Vente forte'}
+
+
+def analyst_view(raw):
+    """Consensus des analystes tel que Yahoo le donne (« 1.8 - Buy »), mis en français pour l'affichage. Information externe : ni score, ni filtre, ni critère de Jigobourso.
+    Une absence n'est jamais un défaut du titre ; un libellé inconnu n'est pas traduit (la note seule est affichée)."""
+    if not raw or ' - ' not in raw:
+        return None
+    note, _, label = raw.partition(' - ')
+    try:
+        score = float(note)
+    except ValueError:
+        return None
+    fr = _ANALYST_FR.get(label.strip().casefold())
+    return {'score': score, 'label': fr, 'raw': raw, 'text': ('%s (%s)' % (fr, ('%.1f' % score).replace('.', ','))) if fr else 'Note ' + ('%.1f' % score).replace('.', ',')}
+
+
+_SIZE_CLASSES = ((300e6, 'micro-capitalisation'), (2e9, 'petite capitalisation'), (10e9, 'capitalisation moyenne'), (200e9, 'grande capitalisation'), (float('inf'), 'très grande capitalisation'))
+
+
+def _size_class(market_cap, currency, rates):
+    """Catégorie de taille d'une action, en euros ; inconnue si la devise n'est pas une devise ordinaire (par exemple les pence)."""
+    if not market_cap or currency in (None, 'GBp', 'ZAc', 'ILA'):
+        return None
+    f = to_eur_factor(currency, rates)
+    if not f:
+        return None
+    eur = float(market_cap) * f
+    return next(label for limit, label in _SIZE_CLASSES if eur < limit)
+
+
+def _activity_note(u):
+    """Compare le volume moyen des 10 derniers jours à celui de 3 mois. Information pédagogique : ne modifie ni le filtre ni ses seuils."""
+    v3, v10 = u.get('avg_volume_3m'), u.get('avg_volume_10d')
+    if not v3 or v10 is None:
+        return []
+    ratio = v10 / v3
+    if 0.67 <= ratio <= 1.5:
+        return []
+    word = ('plus actif' if ratio > 1 else 'moins actif')
+    return ['Activité récente : volume moyen sur 10 jours de %s titres par jour contre %s sur 3 mois (×%s). Le titre est %s que d’habitude. '
+            'Plus de volume ne veut pas dire meilleure liquidité durable, ni moindre volatilité.' % (_n(v10), _n(v3), ('%.1f' % ratio).replace('.', ','), word)]
+
+
+def _n(x):
+    return f'{int(x):,}'.replace(',', ' ')
+
+
 def _sheet_tradability(conn, u, rates):
     """Explique le statut de négociabilité d'un titre, avec le MÊME calcul que le filtre « Titres facilement négociables » et la pastille du classement."""
     f = to_eur_factor(u['price_currency'] or u['currency'], rates)
@@ -589,8 +655,9 @@ def _sheet_tradability(conn, u, rates):
                      'Les créneaux sans bougie ne prouvent pas à eux seuls une mauvaise liquidité : le fournisseur peut renvoyer des données incomplètes.')
     if u['kind'] == 'etf' and u['mic'] in EUROPEAN_MICS and US_NAME.search(u['name'] or ''):
         notes.append('D’après son nom, cet ETF suit des actions américaines : ses échanges peuvent être moins fréquents avant l’ouverture de Wall Street. Cela ne signifie pas à lui seul une mauvaise liquidité.')
+    notes.extend(_activity_note(u))
     return {'level': level, 'label': sig['label'], 'text': text, 'notes': notes, 'hidden_by_filter': level == 'bad', 'reason': sig.get('reason'),
-            'values': {'daily_eur': None if daily is None else round(daily), 'avg_volume_3m': u['avg_volume_3m'], 'floor_eur': v['floor_eur'], 'comfort_eur': v['comfort_eur'],
+            'values': {'daily_eur': None if daily is None else round(daily), 'avg_volume_3m': u['avg_volume_3m'], 'avg_volume_10d': u.get('avg_volume_10d'), 'floor_eur': v['floor_eur'], 'comfort_eur': v['comfort_eur'],
                        'volume_at': u['quote_at'].isoformat(sep=' ') if u['quote_at'] else None},
             'source': 'Volume moyen sur 3 mois × cours (estimation Yahoo, pas du volume exécuté).'}
 

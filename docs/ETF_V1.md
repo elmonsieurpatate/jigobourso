@@ -20,7 +20,7 @@ Quatre états : vert, orange, rouge, gris (inconnu). Chaque pastille porte un mo
 
 ## Profils et préchauffage
 
-Ouverture d'une fiche ETF : une requête Yahoo pour cet ETF (profil version 3 : actifs, rendement de distribution). La maintenance prépare au plus 40 profils par passage (ETF détenus puis dix premiers ETF de la veille), jamais redemandés avant 30 jours : pas de collecte massive, aucune API payante.
+Ouverture d'une fiche ETF : une requête Yahoo pour cet ETF (profil version 3 : actifs, rendement de distribution). La maintenance récupère progressivement les profils manquants, par passage : au plus 120 profils et 60 secondes, dans cet ordre : ETF détenus et dix premiers de chaque classement, 300 premiers du dernier classement, puis le reste des ETF sélectionnés. Un profil récent n'est jamais redemandé avant 30 jours ; un profil indisponible est réessayé après 1 jour (groupes prioritaires) ou 30 jours (le reste). Arrêt au premier HTTP 429, reprise au passage suivant : aucune API payante, aucun impact sur les cours et devises.
 
 Prétraitement au recalcul existant des mesures / maintenance, matrice par blocs de 32 ETF, pas de matrice N×N permanente. Explorer ne lit que les résumés nécessaires. Portefeuille : petits vecteurs prétraités, aucune lecture des historiques. Cache de plus de trois jours exclu des calculs d'exposition et de similarité des portefeuilles.
 
@@ -39,3 +39,10 @@ Portefeuille : pondération par valeur actuelle en EUR, pas par nombre de parts 
 `scripts/verify_etf_release.py` ouvre une transaction READ ONLY et mesure deux périmètres : toutes les cotations ETF, puis les ETF sélectionnés et principaux. Compte séparément instruments, cotations, profils, lignes, poids, secteurs, frais ; les motifs sont indépendants et non additionnables. Ne fixe pas 4 676 comme dénominateur : compte la base réelle. Le rapport est un artefact privé de la livraison, conservé un jour, jamais publié sur la branche de statut.
 
 Aucune table utilisateur modifiée. Seule table ajoutée : `etf_analysis`, données dérivées remplaçables. Pas de fournisseur payant.
+
+
+## Frais, actifs et regroupement (30/10/2026)
+
+- **Frais courants et actifs sous gestion** : lus dans la réponse de cotation Yahoo déjà demandée (`netExpenseRatio`, `netAssets`), sans requête de plus. Ils servent de repli quand le profil détaillé du fonds n'est pas en cache ; une valeur absente reste « inconnue ». Les cotations multiples d'un même fonds donnent le même actif sous gestion.
+- **Regroupement des ETF quasi identiques** (toute la page affichée, calculé à la maintenance, aucun calcul de corrélation à l'affichage) : le premier ETF de la page en est le chef ; un membre doit lui être lié DIRECTEMENT (jamais en chaîne), avec une corrélation hebdomadaire en EUR de 0,97 au moins ET le même indice d'après le nom, ou de 0,99 au moins sans nom d'indice commun. Même couverture de change et mêmes marqueurs de stratégie (buffer, levier, ESG, mines, revenus renforcés…) sont exigés. Chaque membre affiche ce qui le rapproche et ce qui le distingue (distribution, devise de cotation, frais). Aucun ETF n'est masqué ; rangs, scores et ordre ne changent pas.
+- Une corrélation ne prouve ni la même composition ni les mêmes risques ; le nom d'un indice proche ne rend pas deux fonds interchangeables.

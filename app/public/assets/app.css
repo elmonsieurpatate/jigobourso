@@ -282,3 +282,4 @@ tr[data-child-of] td { background: color-mix(in srgb, var(--surface-2) 55%, tran
 tr[hidden] { display: none; }
 .ms-acts { display: flex; gap: 6px; flex-wrap: wrap; }
 .ms-foot { align-items: center; flex-wrap: wrap; }
+.fam-why { display: block; margin-top: 4px; max-width: 420px; white-space: normal; font-size: .76rem; line-height: 1.35; color: var(--muted); font-weight: 400; } .fam-why b { color: var(--text); font-weight: 600; }

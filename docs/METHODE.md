@@ -82,3 +82,11 @@ Recherches enregistrées : critères + filtres + tri (`saved_searches`).
 - **Le filtre masque seulement, après le classement.** Rang et score restent ceux du catalogue (aucun recalcul) ; les suivants remontent dans la liste (colonne « # » = position dans la liste filtrée). Désactivé, l'ordre et les scores sont identiques à avant. La pagination s'applique après le filtre. Un titre détenu n'est jamais masqué ; un titre trouvé par son symbole ou son ISIN exact reste affiché avec sa mention. Le Suivi des classements n'est pas filtré.
 - **Indicateurs complémentaires, jamais des critères** : part des créneaux de 15 min avec une bougie (note de fiche sous 70 %), et, pour un ETF européen dont le nom indique des actions américaines, rappel que les échanges peuvent être moins fréquents avant l'ouverture de Wall Street. Une bougie manquante n'est pas une absence d'échange.
 - **Limites** : un seul chiffre de volume par titre (moyenne 3 mois) ; pas de spread ; pas de volume par créneau horaire ; l'exposition américaine d'un ETF n'est déduite que de son nom.
+
+
+## Avis des analystes, taille et activité récente (30/10/2026)
+
+- **Analystes** : consensus relevé par Yahoo pour les ACTIONS seulement (« 1.8 - Buy » devient « Achat (1,8) » ; 1 = achat fort, 5 = vente forte). Information externe : ce n'est pas une recommandation de Jigobourso et il n'entre dans aucun score, filtre ou classement. Absent = « — », jamais un défaut du titre. Jamais affiché pour un ETF.
+- **Catégorie de taille** (fiche action) : d'après la capitalisation convertie en euros (micro < 300 M€, petite < 2 Md€, moyenne < 10 Md€, grande < 200 Md€, très grande au-delà) ; non indiquée quand la devise est en pence.
+- **Activité récente** : le volume moyen sur 10 jours est comparé à celui sur 3 mois ; au-delà de ×1,5 ou en dessous de ×0,67, la fiche l'explique. C'est un signal d'activité, pas de liquidité durable ni de volatilité. Les seuils du filtre « Titres facilement négociables » ne changent pas.
+- Non retenus faute de fiabilité (inventaire du 30/10/2026) : bid/ask (valeurs à 0, ask inférieur au bid), rendement de distribution et ratio cours/valeur comptable des ETF, indice suivi (absent de la réponse).

@@ -7,6 +7,7 @@ moitiés de la période servent à signaler un résultat instable. Aucune clôtu
 Pourquoi pas le quotidien : deux ETF du même indice cotés à Xetra et à New York ne clôturent pas à la même heure (VOO / SXR8.DE : 0,64 en quotidien, 0,89 en hebdomadaire).
 """
 import datetime as dt
+import re
 import json
 import math
 from collections import defaultdict
@@ -22,6 +23,8 @@ NEAR_IDENTICAL = 0.97      # « quasi identiques »
 SPREAD_LIMIT = 0.15        # écart maximal entre les cinq corrélations avant de déclarer le résultat instable
 HALF_LIMIT = 0.20          # écart maximal entre la première et la seconde moitié de la période
 VERSION = 2
+IDENTICAL = 0.99           # sans nom d'indice commun, seule une corrélation >= 0,99 rapproche deux ETF (une corrélation plus basse peut venir de produits à stratégie différente)
+NEAR_LIMIT = 40            # liens « quasi identiques » conservés par ETF
 MAX_PROFILE_DAYS = 90
 
 
@@ -136,6 +139,73 @@ def correlate(a, b):
             'start': start, 'end': keys[-1], 'method': 'weekly-eur'}
 
 
+_HEDGE = re.compile(r'\b(hedged|hdg)\b')
+_HEDGE_CUR = re.compile(r'\b(eur|usd|gbp|chf|jpy|cad|aud|sek|nok|dkk)\s*(hedged|hdg)\b|\b(hedged|hdg)\s*(?:to\s*)?(eur|usd|gbp|chf|jpy|cad|aud)\b')
+_DIST = re.compile(r'\((dist|distributing|dis|inc|income)\)|\b(dist|distributing)\b')
+_ACC = re.compile(r'\((acc|accumulating|cap|capitalisation)\)|\b(acc|accumulating|capitalisation)\b')
+_ISSUERS = re.compile(r'^(ishares( vi| iii| iv| v| ii)?|vanguard|xtrackers|amundi|lyxor|spdr|invesco|wisdomtree|ubs|hsbc|sg|bnp paribas|multi units luxembourg|state street|vaneck|global x|first trust|franklin|jpmorgan|l&g|legal & general|source|db x-trackers|comstage|deka|ossiam|goldman sachs|fidelity)\b[\s\-]*')
+_STRATEGY = re.compile(r'\b(buffer|leveraged|leverage|2x|3x|-1x|-2x|-3x|inverse|short|covered call|enhanced income|weeklypay|yieldmax|put write|daily|autocall\w*|defined outcome|ultra|esg|sri|screened|paris aligned|climate|equal weight|minimum volatility|min vol|momentum|quality|dividend|mining|miners|small cap|mid cap)\b')
+_ISSUERS_ANY = re.compile(r'\b(ishares|vanguard|xtrackers|amundi|lyxor|spdr|invesco|wisdomtree|ubs|hsbc|sg|bnp paribas|multi units luxembourg|state street|vaneck|vectors|global x|first trust|franklin|jpmorgan|l&g|legal & general|source|db x-trackers|comstage|deka|ossiam|goldman sachs|fidelity|innovator|pgim|roundhill)\b')
+_NOISE = re.compile(r'\b(core|index|solutions|edge|tr|c|ii|iii|iv|ch|ucits|ucit|etf|acc|accumulating|dist|distributing|dis|capitalisation|income|usd|eur|gbp|chf|hedged|hdg|1c|2c|3c|4c|1d|2d|fund|trust|plc|ireland|public limited company)\b')
+
+
+def variant(name):
+    """Caractéristiques d'une variante déduites du NOM seul (aucune donnée fournisseur) : couverture de change, distribution, et clé d'indice. Une valeur non reconnue reste None."""
+    low = (name or '').lower()
+    cur = _HEDGE_CUR.search(low)
+    hedge = (cur.group(1) or cur.group(4)).upper() if cur else ('?' if _HEDGE.search(low) else None)
+    dist = 'Dist' if _DIST.search(low) else 'Acc' if _ACC.search(low) else None
+    key = re.sub(r'\(.*?\)', ' ', low)
+    key = _NOISE.sub(' ', key)
+    key = _ISSUERS_ANY.sub(' ', key)
+    key = ' '.join(re.sub(r'[^a-z0-9& ]', ' ', key).split())
+    return {'hedge': hedge, 'dist': dist, 'index': key or None, 'flags': frozenset(_STRATEGY.findall(low))}
+
+
+def _letters(n):
+    return chr(65 + n) if n < 26 else chr(65 + n // 26 - 1) + chr(65 + n % 26)
+
+
+def page_groups(cached, ordered):
+    """ETF quasi identiques (corrélation hebdomadaire >= 0,97, stable) parmi les ETF de la page, dans l'ordre d'affichage. Le premier de chaque groupe en est le chef ; chaque membre doit être
+    lié DIRECTEMENT au chef (jamais par chaînage), avoir la même couverture de change, et aucun ETF n'est masqué. Pour chaque membre : ce qui le rapproche et ce qui le distingue."""
+    meta = {i: variant((cached[i].get('meta') or {}).get('name')) for i in ordered if i in cached}
+    assigned, groups = set(), []
+    for lead in ordered:
+        if lead in assigned or lead not in cached:
+            continue
+        near = {n['id']: n for n in cached[lead].get('near', [])}
+        members = [o for o in ordered if o != lead and o not in assigned and o in near and o in cached and meta[o]['hedge'] == meta[lead]['hedge'] and meta[o]['flags'] == meta[lead]['flags']
+                   and near[o].get('stable', True) and (near[o]['coefficient'] >= IDENTICAL or (meta[o]['index'] and meta[o]['index'] == meta[lead]['index']))]
+        if not members:
+            continue
+        gid = _letters(len(groups))
+        lead_fee = number(((cached[lead].get('profile') or {}).get('expense_ratio')))
+        rows = []
+        for o in members:
+            n = near[o]
+            why = ['corrélation hebdomadaire %s sur 52 semaines' % ('%.2f' % n['coefficient']).replace('.', ',')]
+            if meta[o]['index'] and meta[o]['index'] == meta[lead]['index']:
+                why.append('même indice d’après le nom : ' + meta[o]['index'])
+            diff = []
+            if meta[o]['dist'] and meta[lead]['dist'] and meta[o]['dist'] != meta[lead]['dist']:
+                diff.append('%s au lieu de %s' % ('distribue ses revenus' if meta[o]['dist'] == 'Dist' else 'capitalise ses revenus', 'distribue' if meta[lead]['dist'] == 'Dist' else 'capitalise'))
+            cl, co = (cached[lead].get('meta') or {}).get('currency'), (cached[o].get('meta') or {}).get('currency')
+            if cl and co and cl != co:
+                diff.append('coté en %s (chef : %s)' % (co, cl))
+            fee = number(((cached[o].get('profile') or {}).get('expense_ratio')))
+            if fee is not None and lead_fee is not None and abs(fee - lead_fee) >= 0.005:
+                diff.append('frais %s %% contre %s %%' % (('%.2f' % fee).replace('.', ','), ('%.2f' % lead_fee).replace('.', ',')))
+            rows.append({'id': o, 'coefficient': n['coefficient'], 'why': why, 'diff': diff})
+            assigned.add(o)
+        assigned.add(lead)
+        same = sum(1 for o in members if meta[o]['index'] and meta[o]['index'] == meta[lead]['index'])
+        label = meta[lead]['index'] if same * 2 >= len(members) else None
+        groups.append({'id': gid, 'leader': lead, 'members': members, 'rows': rows, 'index': label,
+                       'hedge': meta[lead]['hedge'], 'min_coefficient': min(r['coefficient'] for r in rows)})
+    return groups
+
+
 def tier(coefficient):
     """Libellé d'une corrélation (seuils fixes, voir docs/ETF_V1.md)."""
     return 'quasi identiques' if coefficient >= NEAR_IDENTICAL else 'très proches' if coefficient >= STRONG else 'proches' if coefficient >= 0.75 else 'distincts'
@@ -220,8 +290,10 @@ def build(conn, now):
             splits[r['listing_id']].append((r['event_date'].isoformat(), number(r['ratio'])))
     profiles = read_profiles(conn)
     with conn.cursor() as c:
-        c.execute('SELECT listing_id,expense_ratio FROM latest_prices WHERE expense_ratio IS NOT NULL')
-        quote_fee = {r['listing_id']: float(r['expense_ratio']) for r in c.fetchall()}        # frais de la réponse de cotation : repli quand le profil du fonds n'est pas en cache
+        c.execute('SELECT listing_id,expense_ratio,net_assets FROM latest_prices WHERE expense_ratio IS NOT NULL OR net_assets IS NOT NULL')
+        quote_row = c.fetchall()
+        quote_fee = {r['listing_id']: float(r['expense_ratio']) for r in quote_row if r['expense_ratio'] is not None}
+        quote_assets = {r['listing_id']: float(r['net_assets']) for r in quote_row if r['net_assets']}        # frais de la réponse de cotation : repli quand le profil du fonds n'est pas en cache
     vectors, payloads = [], []
     for offset in range(0, len(meta), 200):
         part = meta[offset:offset + 200]
@@ -240,6 +312,8 @@ def build(conn, now):
                 data = profile_data(data)
             if data.get('expense_ratio') is None and m['id'] in quote_fee:
                 data['expense_ratio'] = quote_fee[m['id']]
+            if data.get('total_assets') is None and m['id'] in quote_assets:
+                data['total_assets'] = quote_assets[m['id']]
             fetched = p['fetched_at'].isoformat(sep=' ') if p else None
             fresh = bool(p and p['state'] == 'ok' and (now.replace(tzinfo=None) - p['fetched_at']).days <= MAX_PROFILE_DAYS)
             e = exposure(m, data if fresh else {})
@@ -248,7 +322,7 @@ def build(conn, now):
             payloads.append(dict(meta=m, exposure=e, profile=data, profile_fetched_at=fetched,
                                  profile_state=p['state'] if p else 'none', profile_usable=fresh,
                                  composition_date=None, source='Yahoo Finance (profil mis en cache)',
-                                 similar=[], observations=len(v), reason=None if len(v) >= MIN_WEEKS * MIN_PARTITIONS else f'Moins de {MIN_WEEKS * MIN_PARTITIONS} rendements hebdomadaires en EUR exploitables : historique, fraîcheur ou change insuffisant.',
+                                 similar=[], near=[], observations=len(v), reason=None if len(v) >= MIN_WEEKS * MIN_PARTITIONS else f'Moins de {MIN_WEEKS * MIN_PARTITIONS} rendements hebdomadaires en EUR exploitables : historique, fraîcheur ou change insuffisant.',
                                  start=start.isoformat(), end=day.isoformat(), currency='EUR', min_weeks=MIN_WEEKS, method='weekly-eur', method_version=VERSION))
     keys = sorted({k for v in vectors for k in v})
     index = {k: i for i, k in enumerate(keys)}
@@ -282,6 +356,11 @@ def build(conn, now):
                     if kept == 5:
                         break
             payloads[i]['similar'].sort(key=lambda x: -x['coefficient'])
+            # Liens « quasi identiques » seuls, en forme compacte : ils servent à regrouper une page entière sans recalculer de corrélation à l'affichage.
+            for j in [j for j in np.argsort(-cor[local], kind='stable') if j != i and cor[local, j] >= NEAR_IDENTICAL - 0.02 and meta[j]['instrument_id'] != meta[i]['instrument_id']][:NEAR_LIMIT]:
+                c = correlate(vectors[i], vectors[j])
+                if c and c['coefficient'] >= NEAR_IDENTICAL:
+                    payloads[i]['near'].append({'id': meta[j]['id'], 'coefficient': c['coefficient'], 'stable': c['stable']})
     stamp = now.replace(tzinfo=None, microsecond=0)
     ensure(conn)                               # le calcul ci-dessus n'interroge pas la base ; rien n'est encore écrit
     with conn.cursor() as c:
@@ -308,22 +387,32 @@ def load(conn, ids, with_returns=False):
     return out
 
 
-WARM_LIMIT = 40            # profils Yahoo récupérés au plus par passage de maintenance (jamais de collecte massive)
+WARM_LIMIT = 120           # profils Yahoo récupérés au plus par passage de maintenance
+WARM_BUDGET_S = 60        # ...et au plus ce temps (secondes) : les petits lots restent compatibles avec l'hébergement mutualisé ; un 429 de Yahoo arrête le passage
 PROFILE_FRESH_DAYS = 30
+RANKED_DEPTH = 300        # les ETF des 300 premières places du dernier classement passent avant le reste du catalogue
 
 
-def warm_profiles(conn, client, now, limit=WARM_LIMIT):
-    """Rafraîchit, par petits lots, le profil Yahoo des ETF dont l'utilisateur a besoin : ceux qu'il détient et ceux du haut des classements de la veille (dix premiers de
-    chaque profil). Un profil récent (30 jours, dernière version du lecteur) n'est jamais redemandé ; un profil indisponible n'est réessayé qu'après un jour."""
+def warm_profiles(conn, client, now, limit=WARM_LIMIT, budget_s=WARM_BUDGET_S):
+    """Récupère progressivement le profil Yahoo (frais, compositions) des ETF, par ordre d'utilité : 1) ceux que l'utilisateur détient et les dix premiers de chaque classement,
+    2) ceux du haut du dernier classement, 3) le reste des ETF sélectionnés, jamais encore demandés. Un profil récent (30 jours, dernière version du lecteur) n'est jamais redemandé ;
+    un profil indisponible est réessayé après un jour pour les deux premiers groupes, après 30 jours pour le reste. Arrêt au premier 429 ou à la fin du temps imparti : la suite reprend au passage suivant."""
+    import time
     from engine.market import etf_profile
     from engine.market.yahoo import RateLimited
     with conn.cursor() as c:
         c.execute("""SELECT l.id,l.symbol FROM listings l JOIN instruments i ON i.id=l.instrument_id
                      WHERE i.kind='etf' AND l.id IN (SELECT listing_id FROM portfolio_transactions WHERE listing_id IS NOT NULL)""")
-        wanted = c.fetchall()
+        wanted = [dict(r, tier=1) for r in c.fetchall()]
         c.execute("""SELECT DISTINCT l.id,l.symbol FROM ranking_snapshots s JOIN listings l ON l.id=s.listing_id
                      WHERE s.grp='etf' AND s.rank_pos<=10 AND s.snap_date=(SELECT MAX(snap_date) FROM ranking_snapshots)""")
-        wanted += c.fetchall()
+        wanted += [dict(r, tier=1) for r in c.fetchall()]
+        c.execute("""SELECT l.id,l.symbol FROM ranking_snapshots s JOIN listings l ON l.id=s.listing_id
+                     WHERE s.grp='etf' AND s.rank_pos<=%s AND s.snap_date=(SELECT MAX(snap_date) FROM ranking_snapshots) ORDER BY s.rank_pos""", (RANKED_DEPTH,))
+        wanted += [dict(r, tier=2) for r in c.fetchall()]
+        c.execute("""SELECT l.id,l.symbol FROM listings l JOIN instruments i ON i.id=l.instrument_id
+                     WHERE i.kind='etf' AND l.status='selected' AND l.is_primary=1 ORDER BY l.id""")
+        wanted += [dict(r, tier=3) for r in c.fetchall()]
     seen, todo = set(), []
     profiles = read_profiles(conn)
     stamp = now.replace(tzinfo=None, microsecond=0)
@@ -333,10 +422,14 @@ def warm_profiles(conn, client, now, limit=WARM_LIMIT):
         seen.add(r['id'])
         p = profiles.get(r['id'])
         age = (stamp - p['fetched_at']).days if p else None
-        if p is None or p['version'] < etf_profile.VERSION or (p['state'] == 'ok' and age >= PROFILE_FRESH_DAYS) or (p['state'] != 'ok' and age >= 1):
+        retry = 1 if r['tier'] < 3 else PROFILE_FRESH_DAYS
+        if p is None or p['version'] < etf_profile.VERSION or (p['state'] == 'ok' and age >= PROFILE_FRESH_DAYS) or (p['state'] != 'ok' and age >= retry):
             todo.append(r)
     done = unavailable = 0
+    started = time.monotonic()
     for r in todo[:limit]:
+        if time.monotonic() - started > budget_s:
+            break
         try:
             data, state = etf_profile.fetch_profile(client.transport, r['symbol']), 'ok'
             if data is None:
@@ -353,7 +446,7 @@ def warm_profiles(conn, client, now, limit=WARM_LIMIT):
             conn.commit()
         done += state == 'ok'
         unavailable += state != 'ok'
-    return {'wanted': len(seen), 'to_refresh': len(todo), 'fetched': done, 'unavailable': unavailable, 'limit': limit}
+    return {'wanted': len(seen), 'to_refresh': len(todo), 'fetched': done, 'unavailable': unavailable, 'limit': limit, 'remaining': max(0, len(todo) - done - unavailable)}
 
 
 def families(items, cached, threshold=STRONG):

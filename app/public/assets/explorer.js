@@ -123,7 +123,7 @@
     const n = FILTERS.filter(k => el(k).value.trim()).length + CHECKS.filter(k => el(k).checked).length;
     el('filters-count').hidden = !n; el('filters-count').textContent = n;
   }
-  const COLS = [['rank', '#', 'rk'], ['name', 'Titre'], ['price', 'Prix (€)', 'num'], [null, 'Tendance', 'hide-s'], ['slope', 'Pente', 'num'], ['r2', 'R²', 'num'], ['perf', 'Perf.', 'num'], ['volatility', 'Volat.', 'num'], ['drawdown', 'Repli', 'num'], ['volume', 'Volume moy.', 'num'], ['score', 'Score', 'num'], ['fresh', 'Données', 'num'], [null, 'Verdict', '']];
+  const COLS = [['rank', '#', 'rk'], ['name', 'Titre'], ['price', 'Prix (€)', 'num'], [null, 'Tendance', 'hide-s'], ['slope', 'Pente', 'num'], ['r2', 'R²', 'num'], ['perf', 'Perf.', 'num'], ['volatility', 'Volat.', 'num'], ['drawdown', 'Repli', 'num'], ['volume', 'Volume moy.', 'num'], ['score', 'Score', 'num'], [null, 'Analystes', 'hide-s'], ['fresh', 'Données', 'num'], [null, 'Verdict', '']];
   function header(ref) {
     const tip = { slope: '%/séance', r2: 'régularité', perf: 'performance', volatility: '%/séance', drawdown: 'repli maximal' };
     return '<thead><tr>' + COLS.map(([k, l, c]) => k ? `<th class="sortable ${c || ''} ${S.sort === k ? 'sorted' : ''}" data-k="${k}" title="${tip[k] ? tip[k] + ' sur ' + ref + ' séances' : 'Trier'}">${l}${S.sort === k ? (S.dir === 'asc' ? ' ▲' : ' ▼') : ''}</th>` : `<th class="${c || ''}">${l}</th>`).join('') + '</tr></thead>';
@@ -136,6 +136,7 @@
   }
   /* ETF « presque identiques » (Groupe A, B…) : le mieux classé reste visible, les autres se déplient sous lui avec « + ». Rangs, scores et ordre ne changent pas. */
   const openGroups = new Set();
+  const famWhy = i => i && !i.leader ? `<span class="fam-why"><b>Rapproche :</b> ${(i.why || []).map(J.esc).join(' · ')}.${(i.diff || []).length ? ` <b>Diffère :</b> ${i.diff.map(J.esc).join(' · ')}.` : ' <b>Aucune différence relevée</b> dans le nom, la devise et les frais connus.'}</span>` : '';
   function groupedRows(rows) {
     const members = {};
     rows.forEach(r => { if (r.etf_group) (members[r.etf_group] = members[r.etf_group] || []).push(r); });
@@ -144,11 +145,13 @@
       const g = r.etf_group, list = g ? members[g] : null;
       if (!list || list.length < 2) return row(r);
       if (list[0] !== r) return null;
-      const btn = `<button type="button" class="fam-toggle" data-g="${J.esc(g)}" aria-expanded="${open(g)}" title="Afficher ou masquer les ETF presque identiques"><span class="fam-sign">${open(g) ? '−' : '+'}</span> ${list.length - 1} similaire${list.length > 2 ? 's' : ''} · Groupe ${J.esc(g)}</button>`;
+      const btn = `<button type="button" class="fam-toggle" data-g="${J.esc(g)}" aria-expanded="${open(g)}" title="Afficher ou masquer les ETF presque identiques"><span class="fam-sign">${open(g) ? '−' : '+'}</span> ${list.length - 1} similaire${list.length > 2 ? 's' : ''} · ${r.etf_group_info && r.etf_group_info.index ? J.esc(r.etf_group_info.index) + ' · ' : ''}Groupe ${J.esc(g)}</button>`;
       const lead = row(r).replace(/(<td class="name">[\s\S]*?)<\/td>/, (m, a) => a + btn + '</td>');
-      return lead + list.slice(1).map(c => row(c).replace('<tr ', `<tr data-child-of="${J.esc(g)}" ${open(g) ? '' : 'hidden '}`)).join('');
+      return lead + list.slice(1).map(c => row(c).replace('<tr ', `<tr data-child-of="${J.esc(g)}" ${open(g) ? '' : 'hidden '}`).replace(/(<td class="name">[\s\S]*?)<\/td>/, (m, a) => a + famWhy(c.etf_group_info) + '</td>')).join('');
     }).filter(x => x !== null).join('');
   }
+  const ANALYST_TIP = 'Consensus des analystes financiers relevé par Yahoo (1 = achat fort, 5 = vente forte). Ce n’est pas une recommandation de Jigobourso et n’entre dans aucun score, filtre ou classement.';
+  const analystCell = a => a ? `<span class="help" title="${J.esc(ANALYST_TIP)}">${J.esc(a.text)}</span>` : '<span class="muted" title="Information indisponible pour ce titre">—</span>';
   function row(r) {
     const m = r.ref || {};
     const badge = r.status === 'excluded' ? `<span class="badge ko help" title="${J.esc(r.excluded_reason || '')}">Exclu</span>` : J.statusBadge(r.status, r.status_label);
@@ -160,6 +163,7 @@
       <td class="num ${J.cls(m.slope)}">${m.slope !== null && m.slope !== undefined ? J.num(m.slope, 3) : '–'}</td><td class="num">${J.num(m.r2, 2)}</td><td class="num ${J.cls(m.perf)}">${J.pct(m.perf, 1)}</td>
       <td class="num">${m.volatility !== null && m.volatility !== undefined ? J.num(m.volatility, 2) : '–'}</td><td class="num">${m.drawdown !== null && m.drawdown !== undefined ? J.num(m.drawdown, 1) + ' %' : '–'}</td>
       <td class="num">${r.volume ? J.num(r.volume, 0) : '–'}</td><td class="num">${r.score !== null && r.score !== undefined ? `<b>${J.num(r.score, 0)}</b><div class="score-bar"><i style="width:${r.score}%"></i></div>` : '–'}</td>
+      <td class="hide-s small">${analystCell(r.analyst)}</td>
       <td class="num small ${r.quality && r.quality !== 'ok' ? 'warn' : ''}" title="${{ ok: 'À jour', stale: 'Clôture en retard', insufficient: 'Historique court', incomplete: 'Historique incomplet : des séances de marché sont absentes', calendar_unknown: 'Calendrier de séances indisponible pour cette place', break: 'Rupture de cours' }[r.quality] || ''}">${fresh}${r.quality && r.quality !== 'ok' ? ' ⚠' : ''}</td><td>${badge}</td></tr>`;
   }
   function drawWhy(res) {
