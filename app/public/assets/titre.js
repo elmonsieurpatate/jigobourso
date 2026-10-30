@@ -3,6 +3,14 @@
   const user = await J.init('explorer'); if (!user) return;
   const params = new URLSearchParams(location.search), id = +params.get('id'), page = J.$('#page');
   /* Le verdict suit exactement la configuration choisie : celle de l'Explorer (par défaut si on vient de là), d'un profil ou d'un portefeuille. */
+  /* Négociabilité : même calcul que le filtre « Titres facilement négociables ». Discret quand tout va bien, explicite quand le titre est masqué ou non évalué. */
+  const tradability = t => {
+    if (!t) return '';
+    const meta = `<span class="small muted">${J.esc(t.source)}${t.values.volume_at ? ' · données du ' + J.dateTime(t.values.volume_at) : ''}</span>`;
+    const notes = t.notes.map(n => `<br><span class="small">${J.esc(n)}</span>`).join('');
+    if (t.level === 'bad' || t.level === 'unknown') return `<div class="notice" style="margin-bottom:12px"><b>${J.esc(t.label)}</b><br>${J.esc(t.text)}${notes}<br>${meta}</div>`;
+    return `<p class="small" style="margin:0 0 12px"><b>${J.esc(t.label)}.</b> ${J.esc(t.text)}${notes} ${meta}</p>`;
+  };
   const saved = (() => { try { return JSON.parse(new URLSearchParams(location.hash.slice(1)).get('explore')) || JSON.parse(localStorage.getItem('jigo_explorer2')) || null; } catch (e) { return null; } })();
   const pfList = (await J.api('portfolios').catch(() => ({ portfolios: [] }))).portfolios.filter(p => p.has_strategy);
   const P = await J.api('strategy/presets').catch(() => ({ presets: {} }));
@@ -69,7 +77,7 @@
     cours() {
       const R = [['1 S', 5], ['1 M', 21], ['3 M', 63], ['6 M', 126], ['1 A', 252], ['Max', 0]];
       let sessions = 252, ma20 = true, ma50 = false, vol = true;
-      J.$('#main').innerHTML = JEtf.reading(s.signals) + `<div class="card"><div class="row between wrap-s"><h2 style="margin:0">Évolution du cours</h2><div class="row gap-s"><span class="seg" id="range">${R.map(([l, n]) => `<button data-n="${n}" class="${n === sessions ? 'on' : ''}">${l}</button>`).join('')}</span>
+      J.$('#main').innerHTML = JEtf.reading(s.signals) + tradability(s.tradability) + `<div class="card"><div class="row between wrap-s"><h2 style="margin:0">Évolution du cours</h2><div class="row gap-s"><span class="seg" id="range">${R.map(([l, n]) => `<button data-n="${n}" class="${n === sessions ? 'on' : ''}">${l}</button>`).join('')}</span>
         <button class="chip on" data-o="ma20">Moy. 20 j</button><button class="chip" data-o="ma50">Moy. 50 j</button><button class="chip on" data-o="vol">Volumes</button></div></div>
         <div id="chart" style="margin-top:8px"></div><div class="row between small muted" id="chart-sum" style="margin-top:6px"></div></div>
         <div class="card"><h2>Performances</h2><div class="metric-grid">${[['1 jour', perf(1)], ['1 semaine', perf(5)], ['1 mois', perf(21)], ['3 mois', perf(63)], ['6 mois', perf(126)], ['1 an', perf(252)]].map(([l, p]) => `<div class="metric"><div class="l">${l}</div><div class="v ${J.cls(p)}">${J.pct(p, 1)}</div></div>`).join('')}</div>

@@ -14,7 +14,7 @@ from engine.shared import settings as settings_mod
 from engine.market import hours
 from engine.market.collect import effective_expected_close, latest_rates, to_eur_factor
 from engine.market.calendar import window_calendars, session_dates
-from . import strategy
+from . import signals, strategy
 from .measures import window_metrics
 from .series import usable_closes, find_breaks, clean_window, analyze_series, prepare_series, data_corrections
 
@@ -216,16 +216,29 @@ def cached_verdicts(conn, config):
     return [dict(zip(ENTRY_FIELDS, e)) for e in entries]
 
 
+def masked_by_tradability(entry, aux_row, prefilter_cfg, query=''):
+    """Vrai si le filtre « Titres facilement négociables » masque ce titre : seulement une négociabilité LIMITÉE (donnée présente, récente et basse). Une donnée absente ou périmée ne masque jamais.
+    Un titre retrouvé par son symbole ou son ISIN exact n'est jamais masqué."""
+    level = signals.liquidity(_daily_eur(aux_row), entry['kind'], prefilter_cfg, aux_row.get('quote_age_days'))['level']
+    return level == 'bad' and not (query and query in (entry['symbol'].casefold(), (entry['isin'] or '').casefold()))
+
+
+def _daily_eur(a):
+    """Valeur échangée par jour (€) : volume moyen 3 mois × cours converti ; None si l'une des deux données manque."""
+    return a['price_eur'] * a['volume'] if a.get('price_eur') is not None and a.get('volume') is not None else None
+
+
 def _aux(conn, ref, rates):
     """Données de filtre et de tri pour tout l'univers : prix, volume, fraîcheur et mesures de la fenêtre de référence `ref`."""
     with conn.cursor() as cur:
-        cur.execute("""SELECT p.listing_id id, p.price, COALESCE(p.currency, l.currency) cur, p.avg_volume_3m volume, l.mic, s.last_close_date, s.quality
+        cur.execute("""SELECT p.listing_id id, p.price, COALESCE(p.currency, l.currency) cur, p.avg_volume_3m volume, p.quote_at, l.mic, s.last_close_date, s.quality
                        FROM latest_prices p JOIN listings l ON l.id=p.listing_id LEFT JOIN series_state s ON s.listing_id=l.id""")
         out = {}
         for r in cur.fetchall():
             price = None if r['price'] is None else float(r['price'])
             f = to_eur_factor(r['cur'], rates)
-            out[r['id']] = {'price': price, 'price_eur': price * f if price is not None and f else None, 'volume': r['volume'],
+            age = None if r['quote_at'] is None else max(0.0, (hours.utcnow().replace(tzinfo=None) - r['quote_at']).total_seconds() / 86400)
+            out[r['id']] = {'price': price, 'price_eur': price * f if price is not None and f else None, 'volume': r['volume'], 'quote_age_days': age,
                             'last_close': r['last_close_date'], 'quality': 'stale' if r['last_close_date'] and str(r['last_close_date']) < expected_close(conn, r['mic']) else r['quality']}
         cur.execute('SELECT listing_id, slope, r2, perf, volatility, drawdown FROM strategy_metrics WHERE sessions=%s', (ref,))
         for r in cur.fetchall():
@@ -324,6 +337,14 @@ def explore(conn, request):
         excluded_hits = _search_excluded(conn, query, kind, market)
     elif status != 'all':
         rows = [e for e in rows if e['status'] == status]
+    prefilter_cfg = settings_mod.prefilter_rules(conn)
+    masked = 0
+    if view.get('tradable', True):
+        # Titres facilement négociables : MASQUE seulement, après le classement. Rang et score restent ceux du catalogue (aucun recalcul) ; les suivants remontent dans la liste.
+        # Un titre retrouvé par son symbole ou son ISIN exact reste affiché (avec sa mention), pour qu'une recherche précise n'échoue jamais en silence.
+        owned = set(view.get('owned_ids') or [])            # un titre détenu n'est jamais masqué
+        kept = [e for e in rows if e['id'] in owned or not masked_by_tradability(e, aux.get(e['id'], {}), prefilter_cfg, query)]
+        masked, rows = len(rows) - len(kept), kept
     sort, desc = view.get('sort', 'rank'), view.get('dir') == 'desc'
     if sort in SORT_KEYS:
         key = SORT_KEYS[sort]
@@ -341,12 +362,11 @@ def explore(conn, request):
     wanted = [e['id'] for e in page_rows if e not in excluded_hits]
     detail = {v['key']: v for v in judge_universe(conn, config, wanted)} if wanted else {}
     out = []
-    prefilter_cfg = settings_mod.prefilter_rules(conn)
-    from . import etf, signals
+    from . import etf
     etf_top = [e['id'] for e in rows if e.get('group') == 'etf'][:10]          # dix premiers ETF de la vue, avant pagination, dans l'ordre déjà déterminé
     etf_concentration = etf.concentration(conn, etf_top)
     group_of = {i: g['id'] for g in etf_concentration['groups'] for i in g['members']}
-    for e in page_rows:
+    for position, e in enumerate(page_rows, (page - 1) * size + 1):
         if e in excluded_hits:
             out.append(e)
             continue
@@ -354,9 +374,9 @@ def explore(conn, request):
         v['rank'], v['score'] = e['rank'], e['score']      # rang et score viennent de la sélection complète, pas de la page
         r = _row(v, rates, conn)
         a = aux.get(e['id'], {})
-        r.update({'volume': a.get('volume'), 'last_close': a['last_close'].isoformat() if a.get('last_close') else None,
+        r.update({'position': position, 'volume': a.get('volume'), 'last_close': a['last_close'].isoformat() if a.get('last_close') else None,
                   'ref': {k: a.get(k) for k in REF_FIELDS}, 'open': e['mic'] in hours.HOURS and hours.is_open(e['mic'], now),
-                  'signals': signals.row_signals(a, e['kind'], ref, prefilter_cfg), 'etf_group': group_of.get(e['id'])})
+                  'signals': signals.row_signals(a, e['kind'], ref, prefilter_cfg, a.get('quote_age_days')), 'etf_group': group_of.get(e['id'])})
         out.append(r)
     if not export:
         _attach_curves(conn, out)
@@ -371,7 +391,7 @@ def explore(conn, request):
         if e['country']:
             countries[e['country']] += 1
     return {'etf_concentration': etf_concentration, 'config': config, 'total': total, 'page': page, 'pages': max(1, -(-total // size)), 'rows': out, 'ref_sessions': ref,
-            'universe': len(entries), 'examined': len(base),
+            'universe': len(entries), 'examined': len(base), 'tradable': {'on': bool(view.get('tradable', True)), 'masked': masked},
             'counts': {g: dict(c) for g, c in counts.items()}, 'scope_counts': scope_counts, 'populations': {g: sum(c.values()) for g, c in counts.items()},
             'reasons': dict(reasons), 'facets': {'markets': dict(markets), 'countries': dict(sorted(countries.items()))}}
 
@@ -419,7 +439,7 @@ def instrument_sheet(conn, request):
     rates = latest_rates(conn)
     with conn.cursor() as cur:
         cur.execute("""SELECT l.id, l.symbol, l.mic, l.currency, l.status, l.excluded_reason, l.is_primary, l.primary_reason, i.id AS instrument_id, i.name, i.isin, i.kind, i.country, i.category,
-                              p.price, p.price_time, p.source AS price_source, p.currency AS price_currency, p.avg_volume_3m, p.market_cap
+                              p.price, p.price_time, p.quote_at, p.source AS price_source, p.currency AS price_currency, p.avg_volume_3m, p.market_cap
                        FROM listings l JOIN instruments i ON i.id=l.instrument_id LEFT JOIN latest_prices p ON p.listing_id=l.id WHERE l.id=%s""", (lid,))
         u = cur.fetchone()
         if not u:
@@ -472,6 +492,7 @@ def instrument_sheet(conn, request):
 
     sheet['missing_measures'] = {str(n): why for n, why in missing.items()}
     sheet['signals'] = _sheet_signals(conn, sheet, u, config, chart_closes, state)
+    sheet['tradability'] = _sheet_tradability(conn, u, rates)
     if u['status'] == 'selected' and u['is_primary']:
         view = request.get('view') or {}
         entries, scoped, _, _ = scoped_entries(conn, config, view)      # même moteur que l'Explorer : mêmes filtres, mêmes critères, même classement
@@ -502,6 +523,65 @@ def instrument_sheet(conn, request):
 LEVERAGE = re.compile(r'\b(bull|[235]x|x[235]|-[123]x)\b|levier|effet de levier', re.I)       # compléments de rules.is_leveraged_name pour l'avertissement de la fiche
 
 
+US_NAME = re.compile(r'\b(s&p ?500|nasdaq|russell|dow jones|u\.?s\.?a?\b|united states|america)', re.I)
+EUROPEAN_MICS = {'XETR', 'XPAR', 'XAMS', 'XLON', 'XMIL', 'XMAD', 'XSTO', 'XOSL', 'XSWX', 'XBRU', 'XLIS', 'XHEL', 'XCSE', 'XWBO', 'XDUB'}
+
+
+def _bar_coverage(conn, lid, mic, sessions=5):
+    """Part des créneaux de 15 min qui ont une bougie, sur les dernières séances qui en ont au moins une. Indicateur complémentaire : une bougie manquante n'est PAS une absence d'échange
+    (le fournisseur renvoie des données incomplètes). None si les horaires ou les barres manquent."""
+    from engine.market import intraday
+    if not hours.known(mic):
+        return None
+    tz = hours.spec(mic)[0]
+    since = hours.utcnow().replace(tzinfo=None) - datetime.timedelta(days=14)
+    with conn.cursor() as cur:
+        cur.execute('SELECT slot_start FROM intraday_prices WHERE listing_id=%s AND slot_start>=%s', (lid, since))
+        slots = [r['slot_start'] for r in cur.fetchall()]
+    by_day = defaultdict(set)
+    for t in slots:
+        by_day[intraday.local_day(t, tz)].add(t)
+    days = sorted(by_day)[-sessions:]
+    if len(days) < 2:
+        return None
+    expected = sum(len(intraday.expected_slot_starts(mic, d)) for d in days)
+    have = sum(len(by_day[d] & set(intraday.expected_slot_starts(mic, d))) for d in days)
+    return {'sessions': len(days), 'share': round(have / expected, 2) if expected else None}
+
+
+def _sheet_tradability(conn, u, rates):
+    """Explique le statut de négociabilité d'un titre, avec le MÊME calcul que le filtre « Titres facilement négociables » et la pastille du classement."""
+    f = to_eur_factor(u['price_currency'] or u['currency'], rates)
+    price_eur = None if u['price'] is None or not f else float(u['price']) * f
+    daily = price_eur * u['avg_volume_3m'] if price_eur is not None and u['avg_volume_3m'] else None
+    age = None if u['quote_at'] is None else max(0.0, (hours.utcnow().replace(tzinfo=None) - u['quote_at']).total_seconds() / 86400)
+    sig = signals.liquidity(daily, u['kind'], settings_mod.prefilter_rules(conn), age)
+    v, level = sig['values'], sig['level']
+    where = 'Pour le retrouver dans les classements, décochez « Titres facilement négociables ».'
+    if level == 'bad':
+        text = (f'Ce titre n’apparaît pas dans les classements quand le filtre « Titres facilement négociables » est activé : sa valeur quotidienne échangée estimée est de '
+                f'{signals._eur(daily)} (seuil : {signals._eur(v["floor_eur"])}). {where}')
+    elif level == 'warn':
+        text = f'Valeur quotidienne échangée estimée : {signals._eur(daily)}, entre {signals._eur(v["floor_eur"])} et {signals._eur(v["comfort_eur"])}. Le titre reste dans les classements, avec une pastille de vigilance : un ordre important peut être exécuté à un prix moins favorable.'
+    elif level == 'ok':
+        text = f'Valeur quotidienne échangée estimée : {signals._eur(daily)}. Cela n’assure pas qu’un ordre précis sera facile à revendre.'
+    else:
+        text = ('Nous ne disposons pas de données suffisamment fiables pour évaluer la facilité d’achat ou de revente de ce titre. Son absence éventuelle des résultats filtrés ne signifie pas qu’il est peu liquide.'
+                if sig['reason'] == 'missing' else
+                f'Les données de volume de ce titre datent de {age:.0f} jours : nous ne pouvons pas évaluer sa négociabilité. Son absence éventuelle des résultats filtrés ne signifie pas qu’il est peu liquide.')
+    notes = []
+    cov = _bar_coverage(conn, u['id'], u['mic'])
+    if cov and cov['share'] is not None and cov['share'] < 0.7:
+        notes.append(f'Cotations intrajournalières espacées : {round(100 * cov["share"])} % des créneaux de 15 minutes ont une bougie sur les {cov["sessions"]} dernières séances. '
+                     'Les créneaux sans bougie ne prouvent pas à eux seuls une mauvaise liquidité : le fournisseur peut renvoyer des données incomplètes.')
+    if u['kind'] == 'etf' and u['mic'] in EUROPEAN_MICS and US_NAME.search(u['name'] or ''):
+        notes.append('D’après son nom, cet ETF suit des actions américaines : ses échanges peuvent être moins fréquents avant l’ouverture de Wall Street. Cela ne signifie pas à lui seul une mauvaise liquidité.')
+    return {'level': level, 'label': sig['label'], 'text': text, 'notes': notes, 'hidden_by_filter': level == 'bad', 'reason': sig.get('reason'),
+            'values': {'daily_eur': None if daily is None else round(daily), 'avg_volume_3m': u['avg_volume_3m'], 'floor_eur': v['floor_eur'], 'comfort_eur': v['comfort_eur'],
+                       'volume_at': u['quote_at'].isoformat(sep=' ') if u['quote_at'] else None},
+            'source': 'Volume moyen sur 3 mois × cours (estimation Yahoo, pas du volume exécuté).'}
+
+
 def _sheet_signals(conn, sheet, u, config, closes, state):
     """« Lecture rapide » de la fiche : mêmes seuils que les pastilles du classement, avec les détails pédagogiques de la V1 (séances en hausse, poids du meilleur jour)."""
     from . import signals
@@ -511,7 +591,7 @@ def _sheet_signals(conn, sheet, u, config, closes, state):
     quality = 'incomplete' if m.get('coverage') is not None and m.get('coverage') < 1 else state.get('quality')
     price_eur, vol = sheet.get('price_eur'), u.get('avg_volume_3m')
     out = [signals.regularity(m.get('r2'), ref, signals.regularity_extra(facts)), signals.risk(m.get('volatility'), m.get('drawdown'), ref),
-           signals.liquidity(price_eur * vol if price_eur is not None and vol else None, u['kind'], settings_mod.prefilter_rules(conn)),
+           signals.liquidity(price_eur * vol if price_eur is not None and vol else None, u['kind'], settings_mod.prefilter_rules(conn), None if not u.get('quote_at') else max(0.0, (hours.utcnow().replace(tzinfo=None) - u['quote_at']).total_seconds() / 86400)),
            signals.data_quality(quality, sheet.get('data_corrections'), sheet.get('price_stale'), state.get('break_dates'),
                                 m.get('coverage', state.get('coverage_252')), m.get('observations', state.get('observed_252')),
                                 m.get('expected_closes', state.get('expected_252')))]

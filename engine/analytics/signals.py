@@ -20,8 +20,8 @@ TOP10_WARN, TOP10_BAD = 40.0, 70.0            # poids des dix premières lignes 
 FAMILY_WARN, FAMILY_BAD = 30.0, 50.0          # part de la valeur d'un portefeuille dans une même famille d'ETF
 
 
-def sig(key, level, label, text, tip=None):
-    return {'key': key, 'level': level, 'label': label, 'text': text, 'tip': tip}
+def sig(key, level, label, text, tip=None, **extra):
+    return {'key': key, 'level': level, 'label': label, 'text': text, 'tip': tip, **extra}
 
 
 def _num(v):
@@ -70,28 +70,42 @@ def risk(vol, dd, sessions=None):
     return sig('risk', 'bad', 'Volatilité forte', text, tip)
 
 
-def liquidity(daily_eur, kind, prefilter=None):
-    minimum = DEFAULT_MIN_LIQUIDITY['etf' if kind == 'etf' else 'equity']
+STALE_QUOTE_DAYS = 10                          # un volume moyen plus ancien n'est plus une preuve : « non déterminée », jamais « peu négociable »
+FLOOR_FACTOR = 2.0                             # sous 2 fois le minimum du préfiltre (ordre de 10 000 € ≤ 0,5 % de la valeur d'un jour pour une action, ≤ 2 % pour un ETF) : négociabilité limitée
+
+
+def liquidity_levels(kind, prefilter=None):
+    """(plancher, confort) en €/jour : sous le plancher « limitée » (masquée par le filtre), jusqu'au confort « à surveiller », au-delà « facilement négociable »."""
     rule = (prefilter or {}).get('liquidity_etf' if kind == 'etf' else 'liquidity_equity') or {}
-    minimum = _num(rule.get('min_eur')) or minimum
+    minimum = _num(rule.get('min_eur')) or DEFAULT_MIN_LIQUIDITY['etf' if kind == 'etf' else 'equity']
+    return minimum * FLOOR_FACTOR, minimum * LIQ_FACTOR
+
+
+def liquidity(daily_eur, kind, prefilter=None, quote_age_days=None):
+    """Statut de négociabilité d'un titre : une seule source pour la pastille, le filtre « Titres facilement négociables » et la fiche. Mesure : volume moyen 3 mois × cours
+    (estimation Yahoo, pas du volume exécuté). Une donnée absente ou périmée donne « non déterminée », jamais « limitée »."""
+    floor, comfort = liquidity_levels(kind, prefilter)
     daily_eur = _num(daily_eur)
-    tip = f'Vert : ≥ {_eur(minimum * LIQ_FACTOR)}/jour (4 fois le minimum du préfiltre) · orange : ≥ {_eur(minimum)} · rouge : en dessous. Volume moyen 3 mois × cours.'
+    tip = f'Facilement négociable : ≥ {_eur(comfort)}/jour · à surveiller : ≥ {_eur(floor)} · limitée : en dessous. Volume moyen 3 mois × cours (estimation Yahoo).'
+    values = {'daily_eur': daily_eur, 'floor_eur': floor, 'comfort_eur': comfort, 'quote_age_days': quote_age_days}
     if daily_eur is None:
-        return sig('liquidity', 'unknown', 'Liquidité inconnue', 'Volume ou cours non disponible.', tip)
+        return sig('liquidity', 'unknown', 'Négociabilité non déterminée', 'Volume ou cours non disponible.', tip, values=values, reason='missing')
+    if quote_age_days is not None and quote_age_days > STALE_QUOTE_DAYS:
+        return sig('liquidity', 'unknown', 'Négociabilité non déterminée', f'Les données de volume datent de {quote_age_days:.0f} jours.', tip, values=values, reason='stale')
     text = f'{_eur(daily_eur)} échangés par jour en moyenne.'
-    if daily_eur >= minimum * LIQ_FACTOR:
-        return sig('liquidity', 'ok', 'Très liquide', text, tip)
-    if daily_eur >= minimum:
-        return sig('liquidity', 'warn', 'Liquidité correcte', text + ' Peut coûter plus cher à revendre.', tip)
-    return sig('liquidity', 'bad', 'Peu liquide', text + ' Sous le minimum retenu pour la sélection.', tip)
+    if daily_eur >= comfort:
+        return sig('liquidity', 'ok', 'Facilement négociable', text, tip, values=values)
+    if daily_eur >= floor:
+        return sig('liquidity', 'warn', 'Négociabilité à surveiller', text + ' Peut coûter plus cher à revendre.', tip, values=values)
+    return sig('liquidity', 'bad', 'Négociabilité limitée', text + f' Sous {_eur(floor)} par jour.', tip, values=values)
 
 
-def row_signals(aux, kind, ref_sessions, prefilter=None):
+def row_signals(aux, kind, ref_sessions, prefilter=None, quote_age_days=None):
     """Les trois pastilles d'une ligne de classement, depuis les mesures de la fenêtre de référence (les mêmes que les colonnes du tableau)."""
     aux = aux or {}
     price, volume = _num(aux.get('price_eur')), _num(aux.get('volume'))
     return [regularity(aux.get('r2'), ref_sessions), risk(aux.get('volatility'), aux.get('drawdown'), ref_sessions),
-            liquidity(price * volume if price is not None and volume is not None else None, kind, prefilter)]
+            liquidity(price * volume if price is not None and volume is not None else None, kind, prefilter, quote_age_days)]
 
 
 def history_facts(closes, sessions):

@@ -17,6 +17,7 @@
   const text = ['q', 'kind', 'market', ...FILTERS];
   text.forEach(k => { const v = k === 'q' ? (url.has('q') && saved.pageKey !== location.pathname + location.search ? url.get('q') : (saved.view || {}).q) : (saved.view || {})[k]; if (v !== undefined && v !== null && el(k)) el(k).value = v; });
   CHECKS.forEach(k => { if (el(k) && (saved.view || {})[k]) el(k).checked = true; });
+  if ((saved.view || {}).tradable === false) el('tradable').checked = false;         // activé par défaut ; seul un choix explicite de le désactiver est conservé
   let timer, seq = 0, lastRes = null;
 
   /* bandeau de sources */
@@ -40,6 +41,7 @@
     const v = { q: el('q').value.trim(), kind: el('kind').value, market: el('market').value };
     FILTERS.forEach(k => { v[k] = el(k).value.trim(); });
     CHECKS.forEach(k => { v[k === 'mine' ? 'owned_only' : k] = el(k).checked; });
+    v.tradable = el('tradable').checked;
     return v;
   }
   addEventListener('pagehide', () => { persist(); try { sessionStorage.setItem('jigo_explorer_scroll', String(scrollY)); } catch (e) {} });
@@ -105,7 +107,7 @@
   }
   function applySearch(x) {
     S.config = x.config; S.preset = 'custom'; S.label = x.name; S.page = 1; const v = x.view || {};
-    [...FILTERS, 'kind', 'market'].forEach(k => { el(k).value = v[k] ?? ''; }); el('pea').checked = !!v.pea; el('mine').checked = !!v.owned_only; el('open_now').checked = !!v.open_now; el('fresh_only').checked = !!v.fresh_only;
+    [...FILTERS, 'kind', 'market'].forEach(k => { el(k).value = v[k] ?? ''; }); el('pea').checked = !!v.pea; el('mine').checked = !!v.owned_only; el('open_now').checked = !!v.open_now; el('fresh_only').checked = !!v.fresh_only; el('tradable').checked = v.tradable !== false;
     S.sort = v.sort || 'rank'; S.dir = v.dir || 'asc'; el('filters').hidden = !(FILTERS.some(k => el(k).value) || CHECKS.some(k => el(k).checked));
     persist(); drawStrategies(); if (!el('editor').hidden) drawEditor(); load();
   }
@@ -129,7 +131,7 @@
     const m = r.ref || {};
     const badge = r.status === 'excluded' ? `<span class="badge ko help" title="${J.esc(r.excluded_reason || '')}">Exclu</span>` : J.statusBadge(r.status, r.status_label);
     const fresh = r.last_close ? J.date(r.last_close) : '–';
-    return `<tr data-id="${r.id}"${r.etf_group ? ` class="in-family" data-group="${J.esc(r.etf_group)}"` : ''}><td class="rk">${r.rank || '·'}</td>
+    return `<tr data-id="${r.id}"${r.etf_group ? ` class="in-family" data-group="${J.esc(r.etf_group)}"` : ''}><td class="rk">${((lastRes && lastRes.tradable && lastRes.tradable.on && S.sort === 'rank' ? r.position : r.rank) || '·')}</td>
       <td class="name"><span class="nm">${`<a data-sheet href="${J.esc(sheetHref(r.id))}" target="_blank" rel="noopener" aria-label="Ouvrir ${J.esc(r.symbol)} dans un nouvel onglet">${J.esc(r.name)}</a>`}</span><span class="sub">${J.esc(r.symbol)} · ${J.esc(r.market)} <span class="tag ${r.kind === 'etf' ? 'etf' : ''}">${r.kind === 'etf' ? 'ETF' : 'ACTION'}</span>${r.pea ? ' <span class="tag pea">PEA</span>' : ''}${r.held ? ' <span class="tag held">DÉTENU</span>' : ''}${r.open ? ' <span class="tag open">OUVERT</span>' : ''}${r.etf_group ? ` <span class="tag grp" title="Cet ETF évolue presque comme les autres ETF du groupe ${J.esc(r.etf_group)} (voir le bandeau au-dessus du tableau). Information seulement : son rang n’est pas modifié.">Groupe ${J.esc(r.etf_group)}</span>` : ''}</span>${(r.signals || []).length ? `<span class="sigs">${JEtf.rowSignals(r.signals)}</span>` : ''}${r.status === 'excluded' ? `<span class="sub warn">${J.esc(r.excluded_reason || '')}</span>` : ''}</td>
       <td class="num">${r.price_eur !== null && r.price_eur !== undefined ? J.eur(r.price_eur) : J.money(r.price, r.currency)}<span class="sub" style="display:block">${r.currency !== 'EUR' && r.price !== null ? J.money(r.price, r.currency) : (r.price ? J.priceLabel(r) : '')}</span>${r.price_stale ? '<span class="sub warn">Cours ancien</span>' : ''}</td>
       <td class="hide-s">${J.spark(r.curve)}</td>
@@ -153,7 +155,8 @@
     let res;
     try { res = await J.post('explore', { config: S.config, view: v }); } catch (e) { if (my === seq) el('results').innerHTML = `<div class="empty"><div class="notice err">${J.esc(e.message)}</div></div>`; return; }
     if (my !== seq) return;
-    lastRes = res; drawTabs(res); drawWhy(res); fillFacets(res);
+    lastRes = res; el('tradable-note').textContent = res.tradable.on ? (res.tradable.masked ? `${J.num(res.tradable.masked, 0)} titre${res.tradable.masked > 1 ? 's' : ''} masqué${res.tradable.masked > 1 ? 's' : ''} : valeur échangée estimée trop faible. Décochez pour tout voir.` : 'Aucun titre masqué dans cette vue.') : 'Tous les titres du catalogue sont affichés.';
+    drawTabs(res); drawWhy(res); fillFacets(res);
     el('results').innerHTML = res.rows.length ? JEtf.concentration(res.etf_concentration) + `<p class="small muted" style="margin:0 0 8px">${JEtf.LEGEND}</p><div class="table-wrap"><table class="rtable">${header(res.ref_sessions)}<tbody>${res.rows.map(row).join('')}</tbody></table></div>` : `<div class="empty">${v.q ? 'Aucun titre ne correspond à cette recherche.' : 'Aucun titre dans cette vue avec ces critères et ces filtres.'}</div>`;
     if (!window.jigoScrollRestored) { window.jigoScrollRestored = true; try { requestAnimationFrame(() => scrollTo(0, +(sessionStorage.getItem('jigo_explorer_scroll') || 0))); } catch (e) {} }
     J.$$('#results tbody tr').forEach(tr => { const a = tr.querySelector('a[data-sheet]'); a.addEventListener('click', () => { persist(); sessionStorage.setItem('jigo_explorer_scroll', String(scrollY)); }); tr.onclick = e => { if (e.target.closest('a,button,input')) return; persist(); window.open(a.href, '_blank', 'noopener'); }; });
@@ -189,7 +192,8 @@
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + [head.join(';'), ...lines].join('\r\n')], { type: 'text/csv;charset=utf-8' })); a.download = 'jigobourso-explorer-' + new Date().toISOString().slice(0, 10) + '.csv'; a.click();
     J.toast(res.rows.length + ' lignes exportées' + (res.total > res.rows.length ? ' (limite de 3 000)' : ''));
   };
-  el('reset-filters').onclick = () => { FILTERS.forEach(k => el(k).value = ''); CHECKS.forEach(k => el(k).checked = false); el('kind').value = ''; el('market').value = ''; S.page = 1; load(); };
+  el('reset-filters').onclick = () => { FILTERS.forEach(k => el(k).value = ''); CHECKS.forEach(k => el(k).checked = false); el('kind').value = ''; el('market').value = ''; el('tradable').checked = true; S.page = 1; load(); };
+  el('tradable').onchange = () => { S.page = 1; load(); };
   [...text, ...CHECKS].forEach(k => el(k).addEventListener(el(k).type === 'search' || el(k).type === 'number' || el(k).placeholder ? 'input' : 'change', () => { clearTimeout(timer); timer = setTimeout(() => { S.page = 1; if (el('q').value.trim()) S.status = 'all'; load(); }, 350); }));
   /* liens du menu latéral : ?kind=, ?compare=1, ?preset= */
   if (url.get('kind')) el('kind').value = url.get('kind');
