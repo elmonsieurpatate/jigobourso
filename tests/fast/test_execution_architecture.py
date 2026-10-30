@@ -161,3 +161,9 @@ def test_explicit_actions_start_now_and_deploy_starts_the_recalculation_detached
     assert set(tasks.COMPUTE) <= set(tasks.MANUAL_LABELS)
     deploy = (ROOT / 'ops/deploy.sh').read_text()
     assert '--name maintenance --trigger system' in deploy and deploy.index('.deployed') < deploy.index('--name maintenance')
+
+
+def test_deploy_recalculates_only_when_engine_or_schema_changed():
+    deploy = (ROOT / 'ops/deploy.sh').read_text()
+    assert 'engine_hash=' in deploy and 'find engine db' in deploy and 'aucun recalcul' in deploy
+    assert deploy.index("--name maintenance") > deploy.index('"$hash" = "$before"')

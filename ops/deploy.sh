@@ -179,9 +179,6 @@ else
   echo "aucune migration en attente"
 fi
 .venv/bin/python -c "import engine.cli" && echo "moteur importable"
-# Le déploiement ne recalcule rien : il pose seulement la demande de recalcul (lancé à la toute fin, détaché ; à défaut le cron la reprend) pour recalculer les données dérivées avec le nouveau code.
-.venv/bin/python -c "from engine.shared import settings; from engine.shared.db import connect; c = connect(); settings.put(c, 'maintenance_pending', 'deploy'); c.commit()"
-echo "recalcul des données dérivées demandé à la maintenance (aucun calcul pendant le déploiement)"
 echo "== Contrôle d'intégrité financière"
 php scripts/check_financial_integrity.php > "$ROOT/logs/financial-integrity.json"
 chmod 600 "$ROOT/logs/financial-integrity.json"
@@ -240,8 +237,18 @@ if [ "$rc" -ne 0 ]; then
 fi
 
 remote_sh "ROOT=$root SHA=$sha VERSION=$version bash -s" <<'REMOTE'
-printf 'commit=%s\nversion=%s\ndate=%s\n' "$SHA" "$VERSION" "$(date -u +%FT%TZ)" > "$ROOT/.deployed"
-# Le recalcul demandé démarre tout de suite, détaché (le déploiement ne l'attend pas) ; s'il ne part pas, la demande reste posée et le cron la reprend.
-cd "$ROOT" && set -a && . ./private/env && set +a && PYTHONPATH=$ROOT nohup .venv/bin/python -m engine.cli job --name maintenance --trigger system >> logs/admin.log 2>&1 < /dev/null &
+cd "$ROOT"
+hash=$(find engine db -type f ! -name '*.pyc' | LC_ALL=C sort | xargs sha256sum | sha256sum | cut -c1-16)
+before=$(sed -n 's/^engine_hash=//p' .deployed 2>/dev/null)
+printf 'commit=%s\nversion=%s\ndate=%s\nengine_hash=%s\n' "$SHA" "$VERSION" "$(date -u +%FT%TZ)" "$hash" > .deployed
+if [ "$hash" = "$before" ]; then
+  echo "moteur et schéma inchangés : aucun recalcul"
+else
+  # Recalcul des données dérivées avec le nouveau code : demandé (le cron le reprend si le lancement échoue), puis démarré tout de suite, détaché ; le déploiement ne l'attend pas.
+  set -a && . ./private/env && set +a
+  PYTHONPATH=$ROOT .venv/bin/python -c "from engine.shared import settings; from engine.shared.db import connect; c = connect(); settings.put(c, 'maintenance_pending', 'deploy'); c.commit()"
+  PYTHONPATH=$ROOT nohup .venv/bin/python -m engine.cli job --name maintenance --trigger system >> logs/admin.log 2>&1 < /dev/null &
+  echo "moteur ou schéma modifié : recalcul démarré en arrière-plan"
+fi
 REMOTE
 echo "Déploiement terminé : $sha"
