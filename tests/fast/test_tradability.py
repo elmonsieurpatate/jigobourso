@@ -38,3 +38,10 @@ def test_mask_only_hides_limited_titles_and_never_an_exact_search_hit():
     assert service.masked_by_tradability(entry(), {'price_eur': 100.0, 'volume': None}, CFG) is False        # inconnu : visible
     assert service.masked_by_tradability(entry(), {'price_eur': 100.0, 'volume': 5_000, 'quote_age_days': 40}, CFG) is False
     assert service.masked_by_tradability(entry(), {'price_eur': 100.0, 'volume': 60_000, 'quote_age_days': 0.1}, CFG) is False
+
+
+def test_a_held_title_is_masked_like_any_other_except_in_the_held_view():
+    rows = [{'id': 1, 'symbol': 'UBU5.DE', 'isin': None, 'kind': 'etf'}, {'id': 2, 'symbol': 'GOOD', 'isin': None, 'kind': 'etf'}]
+    aux = {1: {'price_eur': 100.0, 'volume': 4_500, 'quote_age_days': 0.1}, 2: {'price_eur': 100.0, 'volume': 50_000, 'quote_age_days': 0.1}}      # 450 k€ et 5 M€ par jour
+    assert [e['id'] for e in service.tradable_rows(rows, aux, CFG)] == [2]                       # détenu ou non : masqué
+    assert [e['id'] for e in service.tradable_rows(rows, aux, CFG, '', {1})] == [1, 2]           # vue « Titres détenus » : complète

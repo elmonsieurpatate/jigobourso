@@ -125,6 +125,8 @@ echo "$name"
 REMOTE
 )
 echo "sauvegarde : $backup"
+# Le recalcul n'est demandé que si le code qui produit les données dérivées (engine/, db/) change. service.py et signals.py ne font qu'afficher (lecture seule) : les exclure évite un recalcul pour une retouche d'affichage.
+engine_before=$(remote_sh "cd $root && find engine db -type f ! -name '*.pyc' ! -path engine/analytics/service.py ! -path engine/analytics/signals.py | LC_ALL=C sort | xargs sha256sum | sha256sum | cut -c1-16" 2>/dev/null || true)
 
 set +e
 (
@@ -236,12 +238,11 @@ if [ "$rc" -ne 0 ]; then
   exit "$rc"
 fi
 
-remote_sh "ROOT=$root SHA=$sha VERSION=$version bash -s" <<'REMOTE'
+remote_sh "ROOT=$root SHA=$sha VERSION=$version BEFORE=$engine_before bash -s" <<'REMOTE'
 cd "$ROOT"
-hash=$(find engine db -type f ! -name '*.pyc' | LC_ALL=C sort | xargs sha256sum | sha256sum | cut -c1-16)
-before=$(sed -n 's/^engine_hash=//p' .deployed 2>/dev/null)
+hash=$(find engine db -type f ! -name '*.pyc' ! -path engine/analytics/service.py ! -path engine/analytics/signals.py | LC_ALL=C sort | xargs sha256sum | sha256sum | cut -c1-16)
 printf 'commit=%s\nversion=%s\ndate=%s\nengine_hash=%s\n' "$SHA" "$VERSION" "$(date -u +%FT%TZ)" "$hash" > .deployed
-if [ "$hash" = "$before" ]; then
+if [ "$hash" = "$BEFORE" ]; then
   echo "moteur et schéma inchangés : aucun recalcul"
 else
   # Recalcul des données dérivées avec le nouveau code : demandé (le cron le reprend si le lancement échoue), puis démarré tout de suite, détaché ; le déploiement ne l'attend pas.

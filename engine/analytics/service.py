@@ -223,6 +223,12 @@ def masked_by_tradability(entry, aux_row, prefilter_cfg, query=''):
     return level == 'bad' and not (query and query in (entry['symbol'].casefold(), (entry['isin'] or '').casefold()))
 
 
+def tradable_rows(rows, aux, prefilter_cfg, query='', always_shown=()):
+    """Les lignes que le filtre « Titres facilement négociables » laisse passer. `always_shown` : uniquement la vue « Titres détenus », pour qu'elle reste complète ;
+    partout ailleurs un titre détenu est masqué comme les autres (ses portefeuilles, eux, ne sont jamais filtrés)."""
+    return [e for e in rows if e['id'] in always_shown or not masked_by_tradability(e, aux.get(e['id'], {}), prefilter_cfg, query)]
+
+
 def _daily_eur(a):
     """Valeur échangée par jour (€) : volume moyen 3 mois × cours converti ; None si l'une des deux données manque."""
     return a['price_eur'] * a['volume'] if a.get('price_eur') is not None and a.get('volume') is not None else None
@@ -342,8 +348,7 @@ def explore(conn, request):
     if view.get('tradable', True):
         # Titres facilement négociables : MASQUE seulement, après le classement. Rang et score restent ceux du catalogue (aucun recalcul) ; les suivants remontent dans la liste.
         # Un titre retrouvé par son symbole ou son ISIN exact reste affiché (avec sa mention), pour qu'une recherche précise n'échoue jamais en silence.
-        owned = set(view.get('owned_ids') or [])            # un titre détenu n'est jamais masqué
-        kept = [e for e in rows if e['id'] in owned or not masked_by_tradability(e, aux.get(e['id'], {}), prefilter_cfg, query)]
+        kept = tradable_rows(rows, aux, prefilter_cfg, query, set(view.get('owned_ids') or []) if view.get('owned_only') else set())
         masked, rows = len(rows) - len(kept), kept
     sort, desc = view.get('sort', 'rank'), view.get('dir') == 'desc'
     if sort in SORT_KEYS:

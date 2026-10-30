@@ -19,13 +19,14 @@ const BASE='http://127.0.0.1:18089';
   const on=await symbols();
   const limited=['TEST03.PA','TEST04.PA','TEST05.PA','TEST06.PA','TEST07.PA','TEST08.PA'];
   ok('limitees_masquees',limited.every(s=>!on.includes(s)),on.slice(0,10));
+  ok('detenu_limite_masque',!on.includes('ETF1001.PA'),on.slice(0,10));      // ETF 1001 : détenu par review_user, volume faible -> masqué comme les autres
   ok('visibles_presentes',['TEST09.PA','TEST13.PA'].every(x=>on.includes(x)),on.length);
   const note=await page.locator('#tradable-note').innerText();
   ok('note_masques',/masqué/.test(note),note);
   ok('rang_original_affiche',await page.locator('.rtable tbody tr .rk .sub').first().innerText().then(t=>/^rang \d+/.test(t),()=>false));
   // un clic : tout le catalogue
   await page.locator('#tradable').uncheck();
-  ok('tout_affiche',await retry(async()=>{const all=await symbols();return limited.every(s=>all.includes(s))}));
+  ok('tout_affiche',await retry(async()=>{const all=await symbols();return limited.every(s=>all.includes(s))&&all.includes('ETF1001.PA')}));
   const off=await symbols();
   const masked=Number((note.match(/(\d+)\s+titres?\s+masqu/)||[])[1]);
   ok('compte_coherent',masked>=6&&off.length-on.length===masked,{note,masked,on:on.length,off:off.length});

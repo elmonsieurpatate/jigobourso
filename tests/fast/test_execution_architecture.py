@@ -165,5 +165,9 @@ def test_explicit_actions_start_now_and_deploy_starts_the_recalculation_detached
 
 def test_deploy_recalculates_only_when_engine_or_schema_changed():
     deploy = (ROOT / 'ops/deploy.sh').read_text()
-    assert 'engine_hash=' in deploy and 'find engine db' in deploy and 'aucun recalcul' in deploy
-    assert deploy.index("--name maintenance") > deploy.index('"$hash" = "$before"')
+    assert 'engine_hash=' in deploy and 'aucun recalcul' in deploy
+    commands = [l for l in deploy.splitlines() if 'find engine db' in l]
+    assert len(commands) == 2 and 'service.py' in commands[0] and 'signals.py' in commands[0]
+    core = lambda l: l[l.index('find engine db'):l.index('cut -c1-16') + len('cut -c1-16')]
+    assert core(commands[0]) == core(commands[1])                # même empreinte avant et après le transfert
+    assert deploy.index("--name maintenance") > deploy.index('"$hash" = "$BEFORE"')
