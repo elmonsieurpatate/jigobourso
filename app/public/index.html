@@ -17,10 +17,13 @@
     <select id="kind" aria-label="Type"><option value="">Actions et ETF</option><option value="equity">Actions</option><option value="etf">ETF</option></select>
     <select id="market" aria-label="Place"><option value="">Toutes les places</option></select>
   </div>
-  <div class="tradable-row"><label class="switch-label"><input type="checkbox" class="switch" id="tradable" checked role="switch"> Titres facilement négociables</label><span class="small muted" id="tradable-note"></span></div>
+  <div class="tradable-row"><label class="switch-label"><input type="checkbox" class="switch" id="tradable" checked role="switch"> Titres facilement négociables</label><span class="small muted" id="tradable-note"></span></div><div class="small muted" id="level-note" style="margin:2px 0 6px"></div>
   <div class="filters" id="filters" hidden>
     <div class="fld"><span>Pays</span><input type="hidden" id="country"></div>
     <div class="fld"><span>Catégorie ou secteur</span><input type="hidden" id="category"></div>
+    <div class="fld"><span>Régularité <span class="muted small">(période de la stratégie)</span></span><input type="hidden" id="regularity"></div>
+    <div class="fld"><span>Volatilité <span class="muted small">(période de la stratégie)</span></span><input type="hidden" id="risk"></div>
+    <div class="fld"><span>Négociabilité <span class="muted small">(volume moyen 3 mois)</span></span><input type="hidden" id="liquidity"></div>
     <label>Budget (prix d’une part ≤ €)<input id="budget" type="number" min="0" step="1" placeholder="ex. 500"></label>
     <label>Prix min. (€)<input id="min_price" type="number" min="0" step="1"></label>
     <label>Score min. (0–100)<input id="min_score" type="number" min="0" max="100" step="1"></label>

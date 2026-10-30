@@ -77,7 +77,7 @@
     cours() {
       const R = [['1 S', 5], ['1 M', 21], ['3 M', 63], ['6 M', 126], ['1 A', 252], ['Max', 0]];
       let sessions = 252, ma20 = true, ma50 = false, vol = true;
-      J.$('#main').innerHTML = JEtf.reading(s.signals) + tradability(s.tradability) + `<div class="card"><div class="row between wrap-s"><h2 style="margin:0">Évolution du cours</h2><div class="row gap-s"><span class="seg" id="range">${R.map(([l, n]) => `<button data-n="${n}" class="${n === sessions ? 'on' : ''}">${l}</button>`).join('')}</span>
+      J.$('#main').innerHTML = JEtf.assessment(s.assessment) + JEtf.reading(s.signals) + tradability(s.tradability) + `<div class="card"><div class="row between wrap-s"><h2 style="margin:0">Évolution du cours</h2><div class="row gap-s"><span class="seg" id="range">${R.map(([l, n]) => `<button data-n="${n}" class="${n === sessions ? 'on' : ''}">${l}</button>`).join('')}</span>
         <button class="chip on" data-o="ma20">Moy. 20 j</button><button class="chip" data-o="ma50">Moy. 50 j</button><button class="chip on" data-o="vol">Volumes</button></div></div>
         <div id="chart" style="margin-top:8px"></div><div class="row between small muted" id="chart-sum" style="margin-top:6px"></div></div>
         <div class="card"><h2>Performances</h2><div class="metric-grid">${[['1 jour', perf(1)], ['1 semaine', perf(5)], ['1 mois', perf(21)], ['3 mois', perf(63)], ['6 mois', perf(126)], ['1 an', perf(252)]].map(([l, p]) => `<div class="metric"><div class="l">${l}</div><div class="v ${J.cls(p)}">${J.pct(p, 1)}</div></div>`).join('')}</div>

@@ -223,6 +223,30 @@ def masked_by_tradability(entry, aux_row, prefilter_cfg, query=''):
     return level == 'bad' and not (query and query in (entry['symbol'].casefold(), (entry['isin'] or '').casefold()))
 
 
+LEVEL_FILTERS = ('regularity', 'risk', 'liquidity')          # clés de vue = clés des pastilles ; valeurs : ok, warn, bad, unknown
+
+
+def row_levels(entry, aux_row, ref, prefilter_cfg):
+    """Niveau de chaque pastille d'une ligne (même calcul que les pastilles affichées) : {'regularity': 'ok', 'risk': 'warn', 'liquidity': 'unknown'}."""
+    return {s['key']: s['level'] for s in signals.row_signals(aux_row, entry['kind'], ref, prefilter_cfg, aux_row.get('quote_age_days'))}
+
+
+def level_filtered_rows(rows, aux, ref, prefilter_cfg, wanted, query='', always_shown=()):
+    """Filtres Régularité / Volatilité / Négociabilité : MASQUENT seulement, après le classement (rang et score restent ceux du catalogue, l'ordre relatif ne change pas).
+    `wanted` : {clé: ensemble de niveaux} ; une clé absente ou vide ne filtre rien. Un titre retrouvé par son symbole ou son ISIN exact n'est jamais masqué.
+    Renvoie (lignes gardées, effectifs par niveau avant filtre {clé: {niveau: n}})."""
+    counts = {k: defaultdict(int) for k in LEVEL_FILTERS}
+    kept = []
+    for e in rows:
+        levels = row_levels(e, aux.get(e['id'], {}), ref, prefilter_cfg)
+        for k in LEVEL_FILTERS:
+            counts[k][levels.get(k, 'unknown')] += 1
+        exact = query and query in (e['symbol'].casefold(), (e['isin'] or '').casefold())
+        if e['id'] in always_shown or exact or all(not wanted.get(k) or levels.get(k, 'unknown') in wanted[k] for k in LEVEL_FILTERS):
+            kept.append(e)
+    return kept, {k: dict(v) for k, v in counts.items()}
+
+
 def tradable_rows(rows, aux, prefilter_cfg, query='', always_shown=()):
     """Les lignes que le filtre « Titres facilement négociables » laisse passer. `always_shown` : uniquement la vue « Titres détenus », pour qu'elle reste complète ;
     partout ailleurs un titre détenu est masqué comme les autres (ses portefeuilles, eux, ne sont jamais filtrés)."""
@@ -350,6 +374,9 @@ def explore(conn, request):
         # Un titre retrouvé par son symbole ou son ISIN exact reste affiché (avec sa mention), pour qu'une recherche précise n'échoue jamais en silence.
         kept = tradable_rows(rows, aux, prefilter_cfg, query, set(view.get('owned_ids') or []) if view.get('owned_only') else set())
         masked, rows = len(rows) - len(kept), kept
+    wanted = {k: _choices(view.get(k)) & {'ok', 'warn', 'bad', 'unknown'} for k in LEVEL_FILTERS}
+    rows, level_counts = level_filtered_rows(rows, aux, ref, prefilter_cfg, wanted, query, set(view.get('owned_ids') or []) if view.get('owned_only') else set())
+    level_masked = sum(level_counts['regularity'].values()) - len(rows)
     sort, desc = view.get('sort', 'rank'), view.get('dir') == 'desc'
     if sort in SORT_KEYS:
         key = SORT_KEYS[sort]
@@ -414,7 +441,7 @@ def explore(conn, request):
         if e['category']:
             categories[e['category']] += 1
     return {'etf_concentration': etf_concentration, 'config': config, 'total': total, 'page': page, 'pages': max(1, -(-total // size)), 'rows': out, 'ref_sessions': ref,
-            'universe': len(entries), 'examined': len(base), 'tradable': {'on': bool(view.get('tradable', True)), 'masked': masked},
+            'universe': len(entries), 'examined': len(base), 'tradable': {'on': bool(view.get('tradable', True)), 'masked': masked}, 'level_filters': {'masked': level_masked, 'counts': level_counts},
             'counts': {g: dict(c) for g, c in counts.items()}, 'scope_counts': scope_counts, 'populations': {g: sum(c.values()) for g, c in counts.items()},
             'reasons': dict(reasons), 'facets': {'markets': dict(markets), 'countries': dict(sorted(countries.items())), 'categories': dict(sorted(categories.items()))}}
 
@@ -523,6 +550,7 @@ def instrument_sheet(conn, request):
 
     sheet['missing_measures'] = {str(n): why for n, why in missing.items()}
     sheet['signals'] = _sheet_signals(conn, sheet, u, config, chart_closes, state)
+    sheet['assessment'] = signals.assessment(sheet['measures'], _reference_window(config), sheet['signals'])         # descriptive : aucun effet sur le score, le filtre ni le classement
     sheet['tradability'] = _sheet_tradability(conn, u, rates)
     if u['status'] == 'selected' and u['is_primary']:
         view = request.get('view') or {}

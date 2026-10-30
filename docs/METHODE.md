@@ -43,6 +43,19 @@ Niveaux de pente = temps pour doubler à ce rythme : doux 8 ans (0,034 %/séance
 
 Calibrage du 28/10/2026 sur 9 700 titres réels. Avec les seuils initiaux, « régulière » ne retenait que 52 actions (R² 0,75 sur deux périodes) et « calme » 4 : trop peu pour offrir un choix. Variantes testées : voir l'historique du calibrage dans ce paragraphe ; les réglages restent modifiables par l'utilisateur.
 
+## Pastilles, filtres de niveau et résumé du profil
+Information seulement : rien de ce qui suit n'entre dans un score, un classement, un critère ou un filtre de stratégie.
+- **Période des pastilles.** Régularité (R²) et volatilité/repli se mesurent sur la période de la stratégie active (la plus longue période cochée, ramenée à 1 semaine, 1 mois, 3 mois, 6 mois ou 1 an) : la pastille l'indique (« Régulière · 1 mois »). La négociabilité se mesure sur une autre durée, indépendante de la stratégie : volume moyen 3 mois × cours (« Facilement négociable · 3 mois »).
+- **Filtres Régularité / Volatilité / Négociabilité** (Explorer, filtres avancés). Listes à choix multiple comme Pays et Catégorie : rien de coché = tout (même chose que tout cocher). Niveaux = ceux des pastilles (vert, orange, rouge, inconnu), avec leurs effectifs. Ils **masquent seulement**, après le classement, comme le filtre « Titres facilement négociables » : rang et score du catalogue inchangés, ordre relatif inchangé ; un titre retrouvé par son symbole ou son ISIN exact n'est jamais masqué. Ils se cumulent entre eux et avec les autres filtres. Coût : ≈ 90 ms pour les 9 600 titres.
+- **Résumé du profil** (fiche d'un titre). « Points forts », « Points de vigilance » et une appréciation descriptive : **Très favorable, Favorable, Mitigé, Défavorable, Indéterminé**. Ce n'est ni une note chiffrée, ni une consigne d'achat ou de vente. Règles, dans l'ordre :
+  1. *Indéterminé* : tendance non mesurée sur la période, historique court, ou au moins deux des trois pastilles inconnues (l'inconnu reste inconnu).
+  2. *Défavorable* : courbe en baisse sur la période, ou trois risques importants (rouges) ou plus.
+  3. *Mitigé* : pas de tendance nette, ou un à deux risques importants, ou une tendance récente qui contredit celle de fond, ou au moins deux points de vigilance (oranges).
+  4. *Très favorable* : hausse forte (pente ≥ « fort », temps pour doubler ≤ 2 ans) et régularité, volatilité, négociabilité toutes vertes, aucun autre point de vigilance, aucune pastille inconnue.
+  5. *Favorable* : le reste des cas en hausse, avec au plus un point de vigilance.
+  Un risque important (rouge) interdit donc « Favorable » et « Très favorable », même pour une très forte hausse. Une hausse ≥ 100 % sur la période est signalée comme point de vigilance (un mouvement aussi rapide peut se retourner vite). La rupture de cours est un risque important ; un historique incomplet ou un cours ancien un point de vigilance.
+  *Tendance récente contre tendance de fond* : d'après les performances déjà mesurées sur 1 semaine, 1 mois, 3 mois, 6 mois et 1 an, on signale un repli récent (≤ −5 % sur 1 mois ou 1 semaine) dans une hausse de fond (≥ +10 % sur une période plus longue), ou un rebond récent (≥ +10 %) dans une baisse de fond (≤ −10 %). Sans mesure de fond, rien n'est affirmé. Les avis des analystes n'entrent pas dans l'appréciation.
+
 ## Préfiltre de liquidité (réglable en Administration)
 Cours ≥ 2 € ; liquidité (cours × volume moyen 3 mois, en euros) ≥ 1 M€/jour pour une action, ≥ 250 k€/jour pour un ETF. Sans cotation Yahoo : pas de décision (le titre n'est ni collecté ni recommandé). Exemple : DVDG.DE, 131 titres/jour à 42 € ≈ 5 520 €/jour → exclu.
 

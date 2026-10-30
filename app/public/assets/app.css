@@ -198,6 +198,7 @@ body.side-collapsed .side .nv { justify-content: center; padding: 10px 0; } body
 .sigs { display: flex; flex-wrap: wrap; gap: 2px 0; margin-top: 3px; }
 .tag.grp { background: var(--warn-soft); color: var(--warn); }
 tr.in-family td.name { box-shadow: inset 3px 0 0 var(--warn); }
+/* résumé du profil */ .card.assess p { margin: 8px 0 0; } .card.assess .reason { font-weight: 600; } .sig.big { font-size: 1rem; } .sig.big i { width: 11px; height: 11px; } .card.assess ul { margin: 6px 0 0 18px; }
 ul.reading { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 8px; } ul.reading li { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
 ul.reading .sig { font-size: .85rem; } details.why summary { display: inline; cursor: pointer; font-size: .72rem; color: var(--muted); } details.why { display: inline; }
 table.cmp th, table.cmp td { text-align: left; vertical-align: top; } table.cmp td:first-child { white-space: nowrap; }

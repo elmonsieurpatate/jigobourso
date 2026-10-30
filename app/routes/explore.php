@@ -79,7 +79,7 @@ return [
         $name = str_in($b, 'name', 80);
         $config = engine_call('validate-config', is_array($b['config'] ?? null) ? $b['config'] : []);
         $view = [];
-        foreach (['kind', 'market', 'country', 'category', 'budget', 'min_price', 'max_price', 'min_score', 'max_volatility', 'max_drawdown', 'min_volume', 'pea', 'owned_only', 'open_now', 'fresh_only', 'sort', 'dir'] as $k)
+        foreach (['kind', 'market', 'country', 'category', 'budget', 'min_price', 'max_price', 'min_score', 'max_volatility', 'max_drawdown', 'min_volume', 'regularity', 'risk', 'liquidity', 'pea', 'owned_only', 'open_now', 'fresh_only', 'sort', 'dir'] as $k)
             if (isset($b['view'][$k]) && is_scalar($b['view'][$k]) && $b['view'][$k] !== '' && $b['view'][$k] !== false) $view[$k] = $b['view'][$k];
         if (!q('SELECT 1 FROM saved_searches WHERE user_id = ? AND name = ?', [$u['id'], $name])->fetch() && (int)q('SELECT COUNT(*) FROM saved_searches WHERE user_id = ?', [$u['id']])->fetchColumn() >= 50) throw new ApiError('50 recherches enregistrées au maximum', 422);
         q('INSERT INTO saved_searches(user_id, name, config, view, created_at, updated_at) VALUES (?,?,?,?,?,?) ON DUPLICATE KEY UPDATE config = VALUES(config), view = VALUES(view), updated_at = VALUES(updated_at)',

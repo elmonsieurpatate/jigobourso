@@ -1,17 +1,31 @@
 /* ETF et pastilles : informations distinctes de tout score de stratégie ; aucune requête fournisseur depuis cette page.
    Une pastille = un point de couleur + un mot + une explication. La couleur n'est jamais la seule information. */
 window.JEtf = {
-  LEGEND: '<span class="sig ok"><i></i>favorable selon nos critères</span> <span class="sig warn"><i></i>vigilance</span> <span class="sig bad"><i></i>risque important ou anomalie</span> <span class="sig unknown"><i></i>inconnu, insuffisant ou « rien détecté » (jamais « sans risque »)</span>',
+  LEGEND: '<span class="sig ok"><i></i>favorable selon nos critères</span> <span class="sig warn"><i></i>vigilance</span> <span class="sig bad"><i></i>risque important ou anomalie</span> <span class="sig unknown"><i></i>inconnu, insuffisant ou « rien détecté » (jamais « sans risque »)</span> <span class="muted">· la durée indiquée est celle de la mesure</span>',
   dot(s, withText) {
     const tip = J.esc(s.text + (s.tip ? ' — ' + s.tip : ''));
-    return `<span class="sig ${J.esc(s.level)}" title="${tip}"><i aria-hidden="true"></i>${J.esc(s.label)}</span>`;
+    return `<span class="sig ${J.esc(s.level)}" title="${tip}"><i aria-hidden="true"></i>${J.esc(s.label)}${s.period ? ' · ' + J.esc(s.period) : ''}</span>`;
   },
   rowSignals(list) {
     return (list || []).slice(0, 3).map(s => this.dot(s)).join('');
   },
+  assessment(a) {
+    if (!a) return '';
+    const up = t => t.charAt(0).toUpperCase() + t.slice(1), pc = v => (v > 0 ? '+' : v < 0 ? '−' : '') + J.num(Math.abs(v), 0) + ' %';
+    const strengths = a.strengths.length ? up(a.strengths.join(', ')) + '.' : 'Aucun point fort net repéré.';
+    const cautions = a.cautions.length ? up(a.cautions.join(' ; ')) + '.' : 'Rien de gênant repéré par nos indicateurs (ce n’est pas une garantie).';
+    return `<div class="card assess"><div class="row between wrap-s"><h2 style="margin:0">Résumé du profil</h2><span class="sig ${J.esc(a.level)} big" title="Appréciation descriptive, construite à partir des indicateurs ci-dessous. Aucun effet sur le score ni le classement."><i aria-hidden="true"></i><b>${J.esc(a.label)}</b></span></div>
+      <p class="reason">${J.esc(a.reason)}</p>
+      <p><b>Points forts :</b> ${J.esc(strengths)}</p><p><b>Points de vigilance :</b> ${J.esc(cautions)}</p>
+      ${a.unknowns.length ? `<p class="muted"><b>Non évalué :</b> ${J.esc(a.unknowns.join(', '))} (l’inconnu reste inconnu : il n’est ni favorable ni défavorable).</p>` : ''}
+      ${a.horizons.length ? `<p class="small muted">Performance par période : ${a.horizons.map(h => `${J.esc(h.period)} <b class="${J.cls(h.perf)}">${pc(h.perf)}</b>`).join(' · ')}. Période de la stratégie : <b>${J.esc(a.period || '')}</b>.</p>` : ''}
+      <details class="why"><summary>Comment cette appréciation est construite</summary><div class="small muted"><p>Aucune note chiffrée ni nouvelle formule : des règles lisibles appliquées aux indicateurs existants (pente et performance de la période de la stratégie, pastilles de régularité, volatilité et négociabilité, qualité des données). ${J.esc((a.facts || []).join(' '))}</p>
+        <ul>${a.rules.map(r => `<li><b>${J.esc(r.label)}</b> : ${J.esc(r.rule)}</li>`).join('')}</ul><p>Les avis des analystes n’y entrent pas. Un titre n’est jamais « favorable » s’il présente un risque important, même s’il monte fortement.</p></div></details>
+      <p class="small muted" style="margin:8px 0 0">${J.esc(a.closing)}</p></div>`;
+  },
   reading(list) {
     if (!list || !list.length) return '';
-    return `<div class="card"><h2>Lecture rapide</h2><ul class="reading">${list.map(s => `<li><span class="sig ${J.esc(s.level)}"><i aria-hidden="true"></i><b>${J.esc(s.label)}</b></span> <span>${J.esc(s.text)}</span>${s.tip ? `<details class="why"><summary>Seuil</summary><span class="small muted">${J.esc(s.tip)}</span></details>` : ''}</li>`).join('')}</ul>
+    return `<div class="card"><h2>Lecture rapide</h2><ul class="reading">${list.map(s => `<li><span class="sig ${J.esc(s.level)}"><i aria-hidden="true"></i><b>${J.esc(s.label)}${s.period ? ' · ' + J.esc(s.period) : ''}</b></span> <span>${J.esc(s.text)}</span>${s.tip ? `<details class="why"><summary>Seuil</summary><span class="small muted">${J.esc(s.tip)}</span></details>` : ''}</li>`).join('')}</ul>
       <p class="small muted" style="margin:8px 0 0">${this.LEGEND} Information pédagogique, distincte du score : une bonne tendance ne dit rien du risque ni de la diversification.</p></div>`;
   },
   similar(a, cmp) {

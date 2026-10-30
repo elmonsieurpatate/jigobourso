@@ -7,7 +7,10 @@
   const CRIT = { min_slope: 'pente insuffisante', min_r2: 'régularité insuffisante', min_er: 'efficacité insuffisante', min_return: 'performance trop faible', max_return: 'performance trop forte',
     max_volatility: 'volatilité trop forte', max_drawdown: 'repli trop fort', data: 'historique insuffisant ou rupture de cours', freshness: 'cours non à jour',
     above_ma50: 'cours sous la moyenne 50 j', ma50_rising: 'moyenne 50 j orientée à la baisse', max_daily_change: 'variation du jour trop forte', max_gap_ma20: 'écart à la moyenne 20 j trop grand' };
-  const FILTERS = ['country', 'category', 'budget', 'min_price', 'min_score', 'max_volatility', 'max_drawdown', 'min_volume'];
+  const LEVELS = { regularity: [['ok', 'Régulière'], ['warn', 'Moyennement régulière'], ['bad', 'Irrégulière'], ['unknown', 'Inconnue']],
+    risk: [['ok', 'Volatilité faible'], ['warn', 'Volatilité modérée'], ['bad', 'Volatilité forte'], ['unknown', 'Inconnue']],
+    liquidity: [['ok', 'Facilement négociable'], ['warn', 'À surveiller'], ['bad', 'Limitée'], ['unknown', 'Non déterminée']] };
+  const FILTERS = ['country', 'category', 'regularity', 'risk', 'liquidity', 'budget', 'min_price', 'min_score', 'max_volatility', 'max_drawdown', 'min_volume'];
   const CHECKS = ['pea', 'mine', 'open_now', 'fresh_only'];
   const MARKETS = { XETR: 'Xetra', XPAR: 'Paris', XAMS: 'Amsterdam', XLON: 'Londres', XMIL: 'Milan', XMAD: 'Madrid', XSTO: 'Stockholm', XOSL: 'Oslo', XSWX: 'Zurich', XNAS: 'Nasdaq', XNYS: 'NYSE', XASE: 'NYSE American', ARCX: 'NYSE Arca', BATS: 'Cboe' };
   const url = new URLSearchParams(location.search);
@@ -18,8 +21,9 @@
   text.forEach(k => { const v = k === 'q' ? (url.has('q') && saved.pageKey !== location.pathname + location.search ? url.get('q') : (saved.view || {}).q) : (saved.view || {})[k]; if (v !== undefined && v !== null && el(k)) el(k).value = v; });
   CHECKS.forEach(k => { if (el(k) && (saved.view || {})[k]) el(k).checked = true; });
   if ((saved.view || {}).tradable === false) el('tradable').checked = false;         // activé par défaut ; seul un choix explicite de le désactiver est conservé
-  const MS = { country: JMulti(el('country')), category: JMulti(el('category')) };
-  ['country', 'category'].forEach(k => { const v = (saved.view || {})[k]; if (v) el(k).value = v; });
+  const MS = { country: JMulti(el('country')), category: JMulti(el('category')), regularity: JMulti(el('regularity')), risk: JMulti(el('risk')), liquidity: JMulti(el('liquidity')) };
+  Object.keys(LEVELS).forEach(k => MS[k].set(LEVELS[k].map(([v, l]) => [v, l, ''])));
+  ['country', 'category', ...Object.keys(LEVELS)].forEach(k => { const v = (saved.view || {})[k]; if (v) el(k).value = v; });
   let timer, seq = 0, lastRes = null;
 
   /* bandeau de sources */
@@ -181,7 +185,8 @@
     let res;
     try { res = await J.post('explore', { config: S.config, view: v }); } catch (e) { if (my === seq) el('results').innerHTML = `<div class="empty"><div class="notice err">${J.esc(e.message)}</div></div>`; return; }
     if (my !== seq) return;
-    lastRes = res; el('tradable-note').textContent = res.tradable.on ? (res.tradable.masked ? `${J.num(res.tradable.masked, 0)} titre${res.tradable.masked > 1 ? 's' : ''} masqué${res.tradable.masked > 1 ? 's' : ''} : valeur échangée estimée trop faible. Décochez pour tout voir.` : 'Aucun titre masqué dans cette vue.') : 'Tous les titres du catalogue sont affichés.';
+    lastRes = res; const lm = (res.level_filters || {}).masked || 0; el('level-note').textContent = lm ? `${J.num(lm, 0)} titre${lm > 1 ? 's' : ''} masqué${lm > 1 ? 's' : ''} par vos filtres de régularité, volatilité ou négociabilité (rang et score inchangés).` : '';
+    el('tradable-note').textContent = res.tradable.on ? (res.tradable.masked ? `${J.num(res.tradable.masked, 0)} titre${res.tradable.masked > 1 ? 's' : ''} masqué${res.tradable.masked > 1 ? 's' : ''} : valeur échangée estimée trop faible. Décochez pour tout voir.` : 'Aucun titre masqué dans cette vue.') : 'Tous les titres du catalogue sont affichés.';
     drawTabs(res); drawWhy(res); fillFacets(res);
     el('results').innerHTML = res.rows.length ? JEtf.concentration(res.etf_concentration) + `<p class="small muted" style="margin:0 0 8px">${JEtf.LEGEND}</p><div class="table-wrap"><table class="rtable">${header(res.ref_sessions)}<tbody>${groupedRows(res.rows)}</tbody></table></div>` : `<div class="empty">${v.q ? 'Aucun titre ne correspond à cette recherche.' : 'Aucun titre dans cette vue avec ces critères et ces filtres.'}</div>`;
     if (!window.jigoScrollRestored) { window.jigoScrollRestored = true; try { requestAnimationFrame(() => scrollTo(0, +(sessionStorage.getItem('jigo_explorer_scroll') || 0))); } catch (e) {} }
@@ -205,6 +210,7 @@
     el('pager').innerHTML = '<span class="muted small">Chaque groupe est classé à part : un ETF n’est jamais comparé à une action pour le rang ; ici les deux classements sont côte à côte.</span>';
   }
   function fillFacets(res) {
+    Object.keys(LEVELS).forEach(k => MS[k].set(LEVELS[k].map(([v, l]) => [v, l, (((res.level_filters || {}).counts || {})[k] || {})[v] || 0])));
     if (!MS.country.loaded) { MS.country.loaded = 1; MS.country.set(Object.entries(res.facets.countries).map(([c, n]) => [c, c, n])); }
     if (!MS.category.loaded) { MS.category.loaded = 1; MS.category.set(Object.entries(res.facets.categories || {}).sort((a, b) => a[0].localeCompare(b[0], 'fr')).map(([c, n]) => [c, c, n])); }
     if (el('market').options.length === 1) Object.entries(res.facets.markets).sort((a, b) => b[1] - a[1]).forEach(([m, n]) => el('market').insertAdjacentHTML('beforeend', `<option value="${J.esc(m)}">${J.esc(MARKETS[m] || m)} (${n})</option>`));
