@@ -70,15 +70,16 @@ def refresh_quotes(conn, client, rows, now, progress=None, stats=None):
         data = []
         for symbol, q in quotes.items():
             if symbol in by_symbol:
-                data.append((by_symbol[symbol], q['price'], q['price_time'] or naive_utc(now), q['currency'], q['avg_volume_3m'], q['market_cap'], naive_utc(now)))
+                data.append((by_symbol[symbol], q['price'], q['price_time'] or naive_utc(now), q['currency'], q['avg_volume_3m'], q['market_cap'], naive_utc(now), q.get('expense_ratio'), q.get('avg_volume_10d')))
         with conn.cursor() as cur:
-            cur.executemany("""INSERT INTO latest_prices(listing_id,price,price_time,source,currency,avg_volume_3m,market_cap,quote_at)
-                               VALUES (%s,%s,%s,'quote',%s,%s,%s,%s)
+            cur.executemany("""INSERT INTO latest_prices(listing_id,price,price_time,source,currency,avg_volume_3m,market_cap,quote_at,expense_ratio,avg_volume_10d)
+                               VALUES (%s,%s,%s,'quote',%s,%s,%s,%s,%s,%s)
                                ON DUPLICATE KEY UPDATE price=IF(source='intraday' AND price_time>VALUES(price_time),price,VALUES(price)),
                                  price_time=IF(source='intraday' AND price_time>VALUES(price_time),price_time,VALUES(price_time)),
                                  source=IF(source='intraday' AND price_time>VALUES(price_time),source,'quote'),
-                                 currency=IF(source='intraday' AND price_time>VALUES(price_time),currency,VALUES(currency)), avg_volume_3m=VALUES(avg_volume_3m), market_cap=VALUES(market_cap), quote_at=VALUES(quote_at)""",
-                            [(d[0], d[1], d[2], d[3], d[4], d[5], d[6]) for d in data])
+                                 currency=IF(source='intraday' AND price_time>VALUES(price_time),currency,VALUES(currency)), avg_volume_3m=VALUES(avg_volume_3m), market_cap=VALUES(market_cap), quote_at=VALUES(quote_at),
+                                 expense_ratio=VALUES(expense_ratio), avg_volume_10d=VALUES(avg_volume_10d)""",
+                            data)
         conn.commit()
         ok += len(data)
         err += len(part) - len(data)

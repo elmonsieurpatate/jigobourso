@@ -219,6 +219,9 @@ def build(conn, now):
         for r in c.fetchall():
             splits[r['listing_id']].append((r['event_date'].isoformat(), number(r['ratio'])))
     profiles = read_profiles(conn)
+    with conn.cursor() as c:
+        c.execute('SELECT listing_id,expense_ratio FROM latest_prices WHERE expense_ratio IS NOT NULL')
+        quote_fee = {r['listing_id']: float(r['expense_ratio']) for r in c.fetchall()}        # frais de la réponse de cotation : repli quand le profil du fonds n'est pas en cache
     vectors, payloads = [], []
     for offset in range(0, len(meta), 200):
         part = meta[offset:offset + 200]
@@ -235,6 +238,8 @@ def build(conn, now):
                 # Anciens zéros non prouvés : inconnus, jamais des absences d'exposition.
                 data['holdings'] = [dict(h, weight=None if h['weight'] == 0 else h['weight']) for h in data.get('holdings', [])]
                 data = profile_data(data)
+            if data.get('expense_ratio') is None and m['id'] in quote_fee:
+                data['expense_ratio'] = quote_fee[m['id']]
             fetched = p['fetched_at'].isoformat(sep=' ') if p else None
             fresh = bool(p and p['state'] == 'ok' and (now.replace(tzinfo=None) - p['fetched_at']).days <= MAX_PROFILE_DAYS)
             e = exposure(m, data if fresh else {})

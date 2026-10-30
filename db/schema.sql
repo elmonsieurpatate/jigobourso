@@ -84,6 +84,8 @@ CREATE TABLE latest_prices (                                    -- une ligne par
   avg_volume_3m BIGINT UNSIGNED NULL,
   market_cap    BIGINT UNSIGNED NULL,
   quote_at      DATETIME NULL,
+  expense_ratio DECIMAL(6,3) NULL,                                -- frais courants d'un ETF, en % (réponse de cotation Yahoo)
+  avg_volume_10d BIGINT UNSIGNED NULL,
   PRIMARY KEY (listing_id),
   CONSTRAINT fk_latest_listing FOREIGN KEY (listing_id) REFERENCES listings(id)
 ) ENGINE=InnoDB;

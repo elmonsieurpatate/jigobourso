@@ -15,7 +15,7 @@ from zoneinfo import ZoneInfo
 
 BASE = 'https://query1.finance.yahoo.com'
 UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36'
-QUOTE_FIELDS = 'symbol,regularMarketPrice,regularMarketTime,averageDailyVolume3Month,currency,marketCap,quoteType'
+QUOTE_FIELDS = 'symbol,regularMarketPrice,regularMarketTime,averageDailyVolume3Month,currency,marketCap,quoteType,netExpenseRatio,averageDailyVolume10Day'
 
 
 class RateLimited(Exception):
@@ -138,6 +138,12 @@ def _num(v):
     return float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) else None
 
 
+def _fee(v):
+    """Frais courants en % ; une valeur absente ou hors de 0-100 reste inconnue."""
+    v = _num(v)
+    return v if v is not None and 0 <= v <= 100 else None
+
+
 def parse_quotes(payload):
     out = {}
     for r in (((payload or {}).get('quoteResponse') or {}).get('result') or []):
@@ -149,7 +155,9 @@ def parse_quotes(payload):
         out[symbol] = {'price': price, 'price_time': datetime.fromtimestamp(t, timezone.utc).replace(tzinfo=None) if isinstance(t, (int, float)) else None,
                        'avg_volume_3m': int(r['averageDailyVolume3Month']) if _num(r.get('averageDailyVolume3Month')) is not None else None,
                        'currency': (r.get('currency') or '')[:3] or None,
-                       'market_cap': int(r['marketCap']) if _num(r.get('marketCap')) else None, 'quote_type': r.get('quoteType')}
+                       'market_cap': int(r['marketCap']) if _num(r.get('marketCap')) else None, 'quote_type': r.get('quoteType'),
+                       'expense_ratio': _fee(r.get('netExpenseRatio')),
+                       'avg_volume_10d': int(r['averageDailyVolume10Day']) if _num(r.get('averageDailyVolume10Day')) is not None else None}
     return out
 
 
