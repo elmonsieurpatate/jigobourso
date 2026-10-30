@@ -127,11 +127,16 @@
     return '<thead><tr>' + COLS.map(([k, l, c]) => k ? `<th class="sortable ${c || ''} ${S.sort === k ? 'sorted' : ''}" data-k="${k}" title="${tip[k] ? tip[k] + ' sur ' + ref + ' séances' : 'Trier'}">${l}${S.sort === k ? (S.dir === 'asc' ? ' ▲' : ' ▼') : ''}</th>` : `<th class="${c || ''}">${l}</th>`).join('') + '</tr></thead>';
   }
   function sheetHref(id) { return 'titre.html?src=explorer&id=' + encodeURIComponent(id) + '#explore=' + encodeURIComponent(JSON.stringify({config:S.config,view:view(),preset:S.preset,label:S.label})); }
+  /* Filtre actif : « # » = position dans la liste affichée, et le rang d'origine du catalogue complet reste visible dessous (jamais recalculé). */
+  function rankCell(r) {
+    const filtered = lastRes && lastRes.tradable && lastRes.tradable.on && S.sort === 'rank' && r.position;
+    return filtered ? `${r.position}<span class="sub" style="display:block" title="Rang dans le catalogue complet, sans filtre">rang ${r.rank || '·'}</span>` : (r.rank || '·');
+  }
   function row(r) {
     const m = r.ref || {};
     const badge = r.status === 'excluded' ? `<span class="badge ko help" title="${J.esc(r.excluded_reason || '')}">Exclu</span>` : J.statusBadge(r.status, r.status_label);
     const fresh = r.last_close ? J.date(r.last_close) : '–';
-    return `<tr data-id="${r.id}"${r.etf_group ? ` class="in-family" data-group="${J.esc(r.etf_group)}"` : ''}><td class="rk">${((lastRes && lastRes.tradable && lastRes.tradable.on && S.sort === 'rank' ? r.position : r.rank) || '·')}</td>
+    return `<tr data-id="${r.id}"${r.etf_group ? ` class="in-family" data-group="${J.esc(r.etf_group)}"` : ''}><td class="rk">${rankCell(r)}</td>
       <td class="name"><span class="nm">${`<a data-sheet href="${J.esc(sheetHref(r.id))}" target="_blank" rel="noopener" aria-label="Ouvrir ${J.esc(r.symbol)} dans un nouvel onglet">${J.esc(r.name)}</a>`}</span><span class="sub">${J.esc(r.symbol)} · ${J.esc(r.market)} <span class="tag ${r.kind === 'etf' ? 'etf' : ''}">${r.kind === 'etf' ? 'ETF' : 'ACTION'}</span>${r.pea ? ' <span class="tag pea">PEA</span>' : ''}${r.held ? ' <span class="tag held">DÉTENU</span>' : ''}${r.open ? ' <span class="tag open">OUVERT</span>' : ''}${r.etf_group ? ` <span class="tag grp" title="Cet ETF évolue presque comme les autres ETF du groupe ${J.esc(r.etf_group)} (voir le bandeau au-dessus du tableau). Information seulement : son rang n’est pas modifié.">Groupe ${J.esc(r.etf_group)}</span>` : ''}</span>${(r.signals || []).length ? `<span class="sigs">${JEtf.rowSignals(r.signals)}</span>` : ''}${r.status === 'excluded' ? `<span class="sub warn">${J.esc(r.excluded_reason || '')}</span>` : ''}</td>
       <td class="num">${r.price_eur !== null && r.price_eur !== undefined ? J.eur(r.price_eur) : J.money(r.price, r.currency)}<span class="sub" style="display:block">${r.currency !== 'EUR' && r.price !== null ? J.money(r.price, r.currency) : (r.price ? J.priceLabel(r) : '')}</span>${r.price_stale ? '<span class="sub warn">Cours ancien</span>' : ''}</td>
       <td class="hide-s">${J.spark(r.curve)}</td>
