@@ -60,7 +60,7 @@ def test_database_socket_replaces_host_for_isolated_tests(monkeypatch):
         db.connect()
 
 
-STEPS = ('backup', 'quotes', 'fx', 'fx_history', 'detect', 'verify', 'compute', 'warm', 'etf', 'snapshot', 'outcomes', 'prune', 'housekeeping')
+STEPS = ('backup', 'quotes', 'fx', 'fx_history', 'gaps', 'detect', 'verify', 'compute', 'warm', 'etf', 'snapshot', 'outcomes', 'prune', 'housekeeping')
 
 
 @pytest.fixture
@@ -80,6 +80,7 @@ def plan(monkeypatch):
     monkeypatch.setattr(tasks.collect, 'refresh_quotes', step('quotes', (1, 0)))
     monkeypatch.setattr(tasks.collect, 'refresh_fx', step('fx'))
     monkeypatch.setattr(tasks.collect, 'backfill_fx', step('fx_history', 0))
+    monkeypatch.setattr(tasks.collect, 'fill_gaps_batch', step('gaps', {'added': 2, 'examined': 1, 'remaining': 0, 'rate_limited': False}))
     monkeypatch.setattr(tasks.splits, 'detect', step('detect', 0))
     monkeypatch.setattr(tasks.splits, 'verify', step('verify', {'confirmed': 0, 'real_move': 0, 'unanswered': 0}))
     monkeypatch.setattr(tasks.compute, 'compute_all', step('compute', (9612, 57672)))
@@ -98,7 +99,7 @@ def plan(monkeypatch):
 def test_maintenance_runs_everything_and_the_backup_comes_first(plan):
     calls, fail, pending, logs, log = plan
     ok, errors, summary = tasks.maintenance(Conn(), object(), None, log)
-    assert calls[0] == 'backup' and calls == ['backup', 'quotes', 'fx', 'fx_history', 'detect', 'verify', 'compute', 'warm', 'etf', 'snapshot', 'outcomes', 'prune', 'housekeeping']
+    assert calls[0] == 'backup' and calls == ['backup', 'quotes', 'fx', 'fx_history', 'gaps', 'detect', 'verify', 'compute', 'warm', 'etf', 'snapshot', 'outcomes', 'prune', 'housekeeping']
     assert errors == 0 and pending['maintenance_pending'] is False and 'séries 9612' in summary and 'en échec' not in summary
 
 
@@ -171,3 +172,15 @@ def test_deploy_recalculates_only_when_engine_or_schema_changed():
     core = lambda l: l[l.index('find engine db'):l.index('cut -c1-16') + len('cut -c1-16')]
     assert core(commands[0]) == core(commands[1])                # même empreinte avant et après le transfert
     assert deploy.index("--name maintenance") > deploy.index('"$hash" = "$BEFORE"')
+
+
+def test_manual_gap_fill_is_a_registered_job_on_the_whole_catalogue(monkeypatch):
+    assert 'gaps' in tasks.JOBS and 'gaps' in tasks.MANUAL_LABELS and 'gaps' not in tasks.COMPUTE
+    assert "'gaps' =>" in (ROOT / 'app/routes/admin.php').read_text() and "'gaps'" in (ROOT / 'app/public/assets/admin.js').read_text()
+    seen = {}
+    monkeypatch.setattr(tasks.collect, 'collection_set', lambda conn: [{'listing_id': 1}, {'listing_id': 2}])
+    monkeypatch.setattr(tasks.collect, 'fill_gaps_batch', lambda *a, **k: seen.update(k) or {'added': 3, 'examined': 2, 'candidates': 2, 'remaining': 0, 'rate_limited': False})
+    monkeypatch.setattr(tasks.splits, 'detect', lambda *a: 0)
+    monkeypatch.setattr(tasks.compute, 'compute_all', lambda *a: (2, 10))
+    assert tasks.gaps_all(None, object(), None, object())[0] == 2
+    assert seen['force'] is True and seen['limit'] == 2

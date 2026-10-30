@@ -192,6 +192,67 @@ def apply_prefilter(conn, now=None):
 
 
 # ───────── clôtures quotidiennes ─────────
+def fill_daily_gaps(conn, client, rows, now, range_='1y'):
+    """Comble les clôtures absentes de l'historique avec le point d'accès « chart » (un symbole par appel) : le point d'accès groupé « spark » omet certains jours que « chart » fournit.
+    N'ajoute que les jours manquants (jamais de modification d'une clôture déjà en base) et seulement des séances terminées. Renvoie (titres examinés, clôtures ajoutées)."""
+    added = 0
+    for r in rows:
+        data = client.chart(r['symbol'], range_, '1d')                       # RateLimited remonte : le passage s'arrête, la suite reprend plus tard
+        if not data or not data.get('bars'):
+            continue
+        with conn.cursor() as cur:
+            cur.execute('SELECT price_date FROM daily_prices WHERE listing_id=%s', (r['listing_id'],))
+            have = {x['price_date'] for x in cur.fetchall()}
+            out = {}
+            for ts, _o, _h, _l, close, _v in data['bars']:
+                day = local_date(ts, data['timezone'])
+                if day not in have and hours.is_settled(r['mic'], day, now):
+                    out[day] = close
+            if out:
+                cur.executemany('INSERT IGNORE INTO daily_prices(listing_id,price_date,close_px) VALUES (%s,%s,%s)', [(r['listing_id'], d, c) for d, c in out.items()])
+                added += len(out)
+        conn.commit()
+    return len(rows), added
+
+
+GAP_LIMIT = 150            # titres examinés au plus par passage de maintenance
+GAP_BUDGET_S = 60          # ...et au plus ce temps (secondes) : un appel Yahoo par titre
+GAP_RETRY_DAYS = 30        # un titre déjà examiné n'est pas redemandé avant ce délai (les jours que Yahoo n'a vraiment pas restent absents)
+
+
+def fill_gaps_batch(conn, client, rows, now, limit=GAP_LIMIT, budget_s=GAP_BUDGET_S, force=False):
+    """Un lot de titres dont l'historique d'un an est incomplet, les moins troués d'abord. Arrêt au premier 429 (le titre en cours n'est pas marqué : il sera repris).
+    `force` (demande manuelle) ignore le délai de 30 jours entre deux essais sur un même titre."""
+    tried = setting(conn, 'gap_fill_tried', {})
+    today = naive_utc(now).date()
+    by_id = {r['listing_id']: r for r in rows}
+    missing = {}
+    with conn.cursor() as cur:
+        for part in _batches(list(by_id), CHUNK):
+            cur.execute(f"SELECT listing_id, expected_252 - observed_252 m FROM series_state WHERE coverage_252 < 1 AND expected_252 IS NOT NULL AND listing_id IN ({','.join(['%s'] * len(part))})", part)
+            missing.update({r['listing_id']: int(r['m']) for r in cur.fetchall()})
+    todo = [i for i in sorted(missing, key=lambda i: (missing[i], i)) if force or not tried.get(str(i)) or (today - datetime.date.fromisoformat(tried[str(i)])).days >= GAP_RETRY_DAYS]
+    started, done, added, limited = time.monotonic(), 0, 0, False
+    for i in todo[:limit]:
+        if time.monotonic() - started > budget_s:
+            break
+        try:
+            _, n = fill_daily_gaps(conn, client, [by_id[i]], now)
+        except RateLimited:
+            limited = True
+            break
+        except Exception:                                                              # noqa: BLE001 : réponse absente ou illisible : réessai au prochain passage
+            continue
+        tried[str(i)] = today.isoformat()
+        done, added = done + 1, added + n
+    keep = {k: v for k, v in tried.items() if (today - datetime.date.fromisoformat(v)).days < GAP_RETRY_DAYS}
+    with conn.cursor() as cur:
+        cur.execute('INSERT INTO settings(name, value_json, updated_at) VALUES (%s,%s,%s) ON DUPLICATE KEY UPDATE value_json=VALUES(value_json), updated_at=VALUES(updated_at)',
+                    ('gap_fill_tried', json.dumps(keep), naive_utc(now)))
+    conn.commit()
+    return {'candidates': len(todo), 'examined': done, 'added': added, 'remaining': len(todo) - done, 'rate_limited': limited}
+
+
 def collect_daily(conn, client, rows, now, range_='2y', progress=None):
     """Clôtures définitives (séance terminée et publiée). Renvoie (cotations_ok, lignes, erreurs)."""
     by_symbol = {r['symbol'].upper(): r for r in rows}

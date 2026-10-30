@@ -142,7 +142,7 @@ return [
         need_post(); require_admin();
         $job = str_in(body(), 'job', 24);
         $labels = ['fdb_import' => 'Import FinanceDatabase', 'fdb_filter' => 'Filtrage FinanceDatabase', 'yahoo_info' => 'Import des informations Yahoo', 'yahoo_filter' => 'Filtrage Yahoo',
-                   'history' => 'Import / mise à jour des historiques', 'maintenance' => 'Entretien après collecte', 'metrics' => 'Indicateurs et classements', 'etf' => 'Similarité des ETF'];
+                   'history' => 'Import / mise à jour des historiques', 'gaps' => 'Clôtures manquantes (tout le catalogue)', 'maintenance' => 'Entretien après collecte', 'metrics' => 'Indicateurs et classements', 'etf' => 'Similarité des ETF'];
         if (!isset($labels[$job])) throw new ApiError('Traitement inconnu');
         engine_call('job-check', ['name' => $job]);          // 422 avec un message clair si l'étape précédente manque ou si un traitement est en cours
         $log = cfg('JIGO_LOG_DIR', engine_root() . '/logs') . '/admin.log';

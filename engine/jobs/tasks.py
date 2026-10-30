@@ -323,6 +323,8 @@ def maintenance(conn, client, now, log):
     ok, err = attempt('Cours de référence (Quote)', lambda: collect.refresh_quotes(conn, client, rows, now), lambda r: f'{r[0]} reçus sur {len(rows)}', (0, 0))
     attempt('Taux de change', lambda: collect.refresh_fx(conn, client, now))
     attempt('Historique des taux de change', lambda: collect.backfill_fx(conn, client, now), lambda r: f'{r} taux ajoutés')
+    attempt('Clôtures manquantes', lambda: collect.fill_gaps_batch(conn, client, rows, now),
+            lambda r: f'{r["added"]} clôtures ajoutées sur {r["examined"]} titres examinés, {r["remaining"]} restent à examiner' + (' (limitation Yahoo : reprise au prochain passage)' if r['rate_limited'] else ''))
     attempt('Détection des sauts de cours', lambda: splits.detect(conn, now), lambda r: f'{r} nouveaux sauts ressemblant à un split')
     attempt('Splits déclarés par Yahoo', lambda: splits.verify(conn, client, now), lambda r: f'{r["confirmed"]} confirmés (cours corrigés), {r["real_move"]} vrais mouvements, {r["unanswered"]} sans réponse')
     # 3. Calculs dérivés : les indicateurs, puis les ETF (indépendants l'un de l'autre).
@@ -433,9 +435,9 @@ def tick(conn, client, now=None, trigger='cron'):
     return done
 
 
-JOBS = ('fdb_import', 'fdb_filter', 'yahoo_info', 'yahoo_filter', 'history')
+JOBS = ('fdb_import', 'fdb_filter', 'yahoo_info', 'yahoo_filter', 'history', 'gaps')
 MANUAL_LABELS = {'maintenance': 'Entretien après collecte', 'metrics': 'Indicateurs et classements', 'etf': 'Similarité des ETF', 'fdb_import': 'Import FinanceDatabase', 'fdb_filter': 'Filtrage FinanceDatabase', 'yahoo_info': 'Import des informations Yahoo',
-                 'yahoo_filter': 'Filtrage Yahoo', 'history': 'Import / mise à jour des historiques'}
+                 'yahoo_filter': 'Filtrage Yahoo', 'history': 'Import / mise à jour des historiques', 'gaps': 'Clôtures manquantes (tout le catalogue)'}
 
 
 def precheck(conn, name):
@@ -457,6 +459,8 @@ def precheck(conn, name):
         raise ValueError('Aucun titre à interroger : filtrez d’abord FinanceDatabase (étape 2).')
     if name == 'history' and not collect.collection_set(conn):
         raise ValueError('Le catalogue final est vide : filtrez d’abord Yahoo Finance (étape 4).')
+    if name == 'gaps' and not collect.collection_set(conn):
+        raise ValueError('Le catalogue final est vide : filtrez d’abord Yahoo Finance (étape 4).')
     if busy:
         raise ValueError(f'« {MANUAL_LABELS[busy["job_type"]]} » est déjà en cours : attendez sa fin.')
 
@@ -470,10 +474,21 @@ def _recompute(conn, now, log, which):
     return r['etfs'], 0, f'{r["etfs"]} ETF, {r["with_minimum_history"]} avec un historique suffisant'
 
 
+def gaps_all(conn, client, now, log):
+    """« Combler les clôtures manquantes » sur tout le catalogue : un appel Yahoo par titre incomplet, sans le plafond ni le délai de la maintenance ; reprise possible si Yahoo limite."""
+    rows = collect.collection_set(conn)
+    r = _step(log, 'Clôtures manquantes', lambda: collect.fill_gaps_batch(conn, client, rows, now, limit=len(rows), budget_s=6 * 3600, force=True),
+              lambda r: f'{r["added"]} clôtures ajoutées sur {r["examined"]} titres examinés, {r["remaining"]} restent à examiner' + (' (limitation Yahoo : relancez plus tard)' if r['rate_limited'] else ''))
+    if r['added']:
+        _step(log, 'Détection des sauts de cours', lambda: splits.detect(conn, now), lambda n: f'{n} nouveaux sauts ressemblant à un split')
+        _step(log, 'Indicateurs et classements', lambda: compute.compute_all(conn, now), lambda c: f'{c[0]} séries, {c[1]} lignes de mesures')
+    return r['examined'], int(r['rate_limited']), f'{r["added"]} clôtures ajoutées sur {r["examined"]} titres examinés sur {r["candidates"]} incomplets' + (' · limitation Yahoo, à relancer' if r['rate_limited'] else '')
+
+
 def run_manual(conn, client, name, now=None, trigger='admin'):
     """Lance un traitement de construction du catalogue (ou la collecte manuelle). Renvoie l'identifiant du traitement."""
     now = now or hours.utcnow()
     fns = {'fdb_import': lambda log: fdb_import(conn, log, now), 'fdb_filter': lambda log: fdb_filter(conn, log, now), 'yahoo_info': lambda log: yahoo_info(conn, client, now, log),
-           'yahoo_filter': lambda log: yahoo_filter(conn, log, now), 'history': lambda log: history(conn, client, now, log),
+           'yahoo_filter': lambda log: yahoo_filter(conn, log, now), 'history': lambda log: history(conn, client, now, log), 'gaps': lambda log: gaps_all(conn, client, now, log),
            'maintenance': lambda log: maintenance(conn, client, now, log), 'metrics': lambda log: _recompute(conn, now, log, 'metrics'), 'etf': lambda log: _recompute(conn, now, log, 'etf')}
     return run_job(conn, name, fns[name], trigger=trigger)
