@@ -1,1 +1,13 @@
 == Contrôles du serveur (lecture seule)
+== Contrôle des fichiers SQL : ajouts seulement
+== Version des pages : ?v=202610301534
+== Transfert du code
+== Dépendances Python, migrations de schéma, contrôles
+moteur importable
+== Contrôle d'intégrité financière
+PHP valide
+== Vérification des calculs financiers avec les calendriers de séance
+== Vérification ETF
+== Vérification publique
+site OK : accueil 200, version 202610301534 servie, API répond (200)
+Déploiement terminé : 2bad1b03c18705f60a77bd96a1f0eb5eb03fa708
