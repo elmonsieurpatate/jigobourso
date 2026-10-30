@@ -232,7 +232,10 @@ REMOTE
         error_type=$(remote_sh "ROOT=$root TOKEN=$sha-$version bash -s" <<'REMOTE'
 set -euo pipefail
 log="$ROOT/logs/deploy-metrics-$TOKEN.log"
-sed -nE 's/^([A-Za-z_][A-Za-z0-9_.]*(Error|Exception))(:.*)?$/\1/p' "$log" 2>/dev/null | tail -1
+line=$(grep -E '^[A-Za-z_][A-Za-z0-9_.]*(Error|Exception)(:|$)' "$log" 2>/dev/null | tail -1 || true)
+error=$(sed -nE 's/^([A-Za-z_][A-Za-z0-9_.]*(Error|Exception))(:.*)?$/\1/p' <<< "$line")
+db_code=$(sed -nE 's/^[A-Za-z_][A-Za-z0-9_.]*(Error|Exception): \(([0-9]+),.*/\2/p' <<< "$line")
+printf '%s%s' "$error" "${db_code:+ errno=$db_code}"
 REMOTE
 )
         echo "Échec du recalcul analytique (code de retour $metrics_state${error_type:+, erreur $error_type})" >&2
