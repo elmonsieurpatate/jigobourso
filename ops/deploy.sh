@@ -14,13 +14,17 @@ version=$(date -u +%Y%m%d%H%M)
 ssh_opts=(-F /dev/null -p 65002 -i "$RUNNER_TEMP/jigobourso-ssh/key"
   -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes
   -o UserKnownHostsFile="$RUNNER_TEMP/jigobourso-ssh/known_hosts"
-  -o ConnectTimeout=20 -o ConnectionAttempts=3 -o HostKeyAlgorithms=ssh-ed25519)
+  -o ConnectTimeout=20 -o ConnectionAttempts=3 -o HostKeyAlgorithms=ssh-ed25519
+  -o ServerAliveInterval=15 -o ServerAliveCountMax=8
+  # Une seule connexion SSH réutilisée par tous les appels (et rsync) : l'hébergement mutualisé refuse ou coupe les connexions répétées (code 255).
+  -o ControlMaster=auto -o ControlPath="$RUNNER_TEMP/jcm-%C" -o ControlPersist=900)
 remote=u381524662@147.79.103.168
 domain=/home/u381524662/domains/jigobourso.turnjoy.dev
 root=$domain/jigobourso-v2
 backups=$domain/.jigobourso-v2-code-backups
 base=https://jigobourso.turnjoy.dev
 remote_sh() { ssh "${ssh_opts[@]}" "$remote" "$@"; }
+trap 'ssh "${ssh_opts[@]}" -O exit "$remote" > /dev/null 2>&1 || true' EXIT
 
 public_check() {                                  # accueil servi avec la bonne version (si fournie), API qui répond
   local expect=${1:-} code me
@@ -204,9 +208,9 @@ REMOTE
 
   phase="recalcul analytique sur les historiques existants"
   echo "== Attente du recalcul des mesures et classements"
-  metrics_state=""
+  metrics_state=""; ssh_errors=0
   for attempt in $(seq 1 120); do
-    metrics_state=$(remote_sh "ROOT=$root TOKEN=$sha-$version bash -s" <<'REMOTE'
+    metrics_state=$(remote_sh "ROOT=$root TOKEN=$sha-$version bash -s" <<'REMOTE' || echo ssh_error
 set -euo pipefail
 status="$ROOT/logs/deploy-metrics-$TOKEN.exit"
 pidfile="$ROOT/logs/deploy-metrics-$TOKEN.pid"
@@ -228,6 +232,7 @@ REMOTE
     case "$metrics_state" in
       done) echo "== Recalcul analytique terminé"; break ;;
       running) sleep 10 ;;
+      ssh_error) ssh_errors=$((ssh_errors + 1)); [ "$ssh_errors" -le 10 ] || { echo "Échec de la liaison SSH pendant l'attente du recalcul" >&2; exit 1; }; sleep 15 ;;
       failed:*)
         error_type=$(remote_sh "ROOT=$root TOKEN=$sha-$version bash -s" <<'REMOTE'
 set -euo pipefail
@@ -246,11 +251,11 @@ REMOTE
   if [ "$metrics_state" != done ]; then echo "Échec du recalcul analytique (délai dépassé)" >&2; exit 1; fi
 
   echo "== Vérification des calculs financiers avec les calendriers de séance"
-  remote_sh "cd $root && set -a && . ./private/env && set +a && .venv/bin/python scripts/verify_financial_release.py"
+  remote_sh "cd $root && set -a && . ./private/env && set +a && PYTHONPATH=$root .venv/bin/python scripts/verify_financial_release.py"
 
   phase="vérification ETF, comptes et intégrité financière"
   echo "== Vérification ETF"
-  remote_sh "cd $root && set -a && . ./private/env && set +a && .venv/bin/python scripts/verify_etf_release.py" > "$RUNNER_TEMP/etf-report.json"
+  remote_sh "cd $root && set -a && . ./private/env && set +a && PYTHONPATH=$root .venv/bin/python scripts/verify_etf_release.py" > "$RUNNER_TEMP/etf-report.json"
   echo "== Vérification des comptes et des transactions"
   remote_sh "cd $root && set -a && . ./private/env && set +a && php scripts/check_financial_integrity.php" > "$RUNNER_TEMP/financial-after.json"
   remote_sh "cd $root && set -a && . ./private/env && set +a && JIGO_ACCOUNT_POSTCHECK=1 php scripts/verify_account_release.php" > "$RUNNER_TEMP/account-after.json"
