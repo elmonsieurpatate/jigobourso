@@ -215,7 +215,11 @@ def history_coverage(conn):
                        (SELECT c.listing_id, COUNT(d.price_date) n, MAX(d.price_date) last_day FROM v_collect_set c LEFT JOIN daily_prices d ON d.listing_id=c.listing_id GROUP BY c.listing_id) t""",
                     (collect.FULL_SESSIONS - 1, collect.FULL_SESSIONS))
         r = cur.fetchone()
-    return {'absent': int(r['absent']), 'partial': int(r['partial']), 'complete': int(r['complete']), 'last_day': r['last_day'].isoformat() if r['last_day'] else None}
+        cur.execute("""SELECT COUNT(*) titles, COALESCE(SUM(s.expected_252-s.observed_252),0) days, COALESCE(SUM(s.expected_252-s.observed_252<=2),0) small
+                       FROM series_state s JOIN v_collect_set c ON c.listing_id=s.listing_id WHERE s.coverage_252<1 AND s.expected_252 IS NOT NULL""")
+        g = cur.fetchone()
+    return {'absent': int(r['absent']), 'partial': int(r['partial']), 'complete': int(r['complete']), 'last_day': r['last_day'].isoformat() if r['last_day'] else None,
+            'gap_titles': int(g['titles']), 'gap_days': int(g['days']), 'gap_small': int(g['small'])}
 
 
 def history(conn, client, now, log):
@@ -486,6 +490,8 @@ def gaps_all(conn, client, now, log):
     if r['added']:
         _step(log, 'Détection des sauts de cours', lambda: splits.detect(conn, now), lambda n: f'{n} nouveaux sauts ressemblant à un split')
         _step(log, 'Indicateurs et classements', lambda: compute.compute_all(conn, now), lambda c: f'{c[0]} séries, {c[1]} lignes de mesures')
+    if not r['candidates']:
+        return 0, 0, 'rien à faire : les titres encore incomplets ont déjà tous été essayés aujourd’hui (Yahoo n’a pas leurs jours manquants)'
     return r['examined'], int(r['rate_limited']), f'{r["added"]} clôtures ajoutées sur {r["examined"]} titres examinés sur {r["candidates"]} incomplets' + (' · limitation Yahoo, à relancer' if r['rate_limited'] else '')
 
 

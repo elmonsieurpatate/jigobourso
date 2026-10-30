@@ -152,7 +152,7 @@ def yahoo_state(conn):
         pending.append('Des informations Yahoo plus récentes n’ont pas encore été filtrées : cliquez sur « Filtrer ».')
     level = _level(conn, 'prefilter')
     final = kinds.get('equity', 0) + kinds.get('etf', 0)
-    coverage = tasks.history_coverage(conn) if final else {'absent': 0, 'partial': 0, 'complete': 0, 'last_day': None}
+    coverage = tasks.history_coverage(conn) if final else {'absent': 0, 'partial': 0, 'complete': 0, 'last_day': None, 'gap_titles': 0, 'gap_days': 0, 'gap_small': 0}
     return {'info': {'last': info, 'stats': stats.get('yahoo_info'), 'quotes': q['n'], 'quote_at': _iso(q['t']), 'asked_now': len(tasks.info_set(conn))},
             'filters': level, 'funnel': funnel.last_run(conn, 'yahoo'), 'last_filter': filt, 'pending': pending,
             'final': {'equity': kinds.get('equity', 0), 'etf': kinds.get('etf', 0), 'total': final, 'held_extra': held_extra, 'coverage': coverage,
