@@ -85,9 +85,6 @@ table.dense td { padding: 7px 10px; } .table-scroll { max-height: 70vh; overflow
 button.chip { cursor: pointer; font: inherit; font-size: .8rem; } button.chip.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 700; } button.chip:hover { border-color: var(--accent); }
 .sourcebar { display: flex; flex-wrap: wrap; gap: 8px 22px; align-items: center; padding: 10px 16px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); font-size: .82rem; color: var(--muted); }
 .sourcebar b { color: var(--text); } .sourcebar .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--up); margin-right: 6px; } .sourcebar .dot.stale { background: var(--warn); } .sourcebar .dot.old { background: var(--down); }
-.filters { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px 16px; padding: 14px 18px; border-bottom: 1px solid var(--line); background: var(--surface-2); }
-.filters label { display: grid; gap: 4px; font-size: .78rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; } .filters label input, .filters label select { text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--text); width: 100%; }
-.filters .check { display: flex; align-items: center; gap: 8px; text-transform: none; letter-spacing: 0; font-weight: 600; color: var(--text); font-size: .86rem; padding-top: 18px; } .filters .check input { width: auto; }
 .rtable td, .rtable th { white-space: nowrap; } .rtable td.name { white-space: normal; min-width: 220px; } .rtable tbody tr { cursor: pointer; }
 .rtable .nm { font-weight: 700; color: var(--text); display: block; max-width: 340px; overflow: hidden; text-overflow: ellipsis; } .rtable .sub { color: var(--muted); font-size: .78rem; }
 .rtable .rk { font-weight: 800; color: var(--muted); text-align: center; width: 44px; }
@@ -206,3 +203,51 @@ ul.reading .sig { font-size: .85rem; } details.why summary { display: inline; cu
 table.cmp th, table.cmp td { text-align: left; vertical-align: top; } table.cmp td:first-child { white-space: nowrap; }
 .card { min-width: 0; } table.cmp { min-width: 100%; } .table-wrap { max-width: 100%; }
 .cmp-wrap { width: 0; min-width: 100%; }
+
+/* ───── Contrôles de formulaire des filtres et du réglage de stratégie ───── */
+:is(.filters, #editor, .tool-row) :is(input:not([type=checkbox]), select) { height: 42px; border-radius: 12px; padding: 0 14px; background-color: var(--surface); border: 1px solid var(--line); font-size: .95rem; }
+:is(.filters, #editor, .tool-row) :is(input:not([type=checkbox]), select):hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+:is(.filters, #editor, .tool-row) :is(input, select):focus-visible { outline: 0; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent); }
+:is(.filters, #editor, .tool-row) input[type=number] { -moz-appearance: textfield; appearance: textfield; }
+:is(.filters, #editor, .tool-row) input[type=number]::-webkit-inner-spin-button, :is(.filters, #editor, .tool-row) input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+:is(.filters, #editor, .tool-row) select { -webkit-appearance: none; appearance: none; padding-right: 38px; cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%2354657c' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 14px center; background-size: 12px 8px; }
+:root[data-theme="dark"] :is(.filters, #editor, .tool-row) select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%2392a4bb' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); }
+:is(.filters, #editor, .tool-row) input[type=checkbox] { -webkit-appearance: none; appearance: none; flex: none; display: inline-grid; place-content: center; width: 20px; height: 20px; margin: 0; padding: 0; border: 1.5px solid var(--muted); border-radius: 6px; background: var(--surface); cursor: pointer; transition: background .12s, border-color .12s; }
+:is(.filters, #editor, .tool-row) input[type=checkbox]:checked { background: var(--accent); border-color: var(--accent); }
+:is(.filters, #editor, .tool-row) input[type=checkbox]:checked::after { content: ""; width: 10px; height: 5px; margin-top: -2px; border-left: 2px solid var(--accent-ink); border-bottom: 2px solid var(--accent-ink); transform: rotate(-45deg); }
+:is(.filters, #editor, .tool-row) input[type=checkbox]:focus-visible { outline: 0; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent); }
+:is(.filters, #editor, .tool-row) :is(input, select):disabled { opacity: .45; cursor: not-allowed; }
+
+.filters { display: grid; grid-template-columns: repeat(auto-fill, minmax(215px, 1fr)); gap: 18px 16px; padding: 20px 18px 18px; border-bottom: 1px solid var(--line); background: var(--surface-2); }
+.filters > label { display: grid; grid-template-rows: auto auto; align-content: end; gap: 7px; font-size: .82rem; font-weight: 600; color: var(--muted); line-height: 1.25; }
+.filters > label :is(input, select) { width: 100%; color: var(--text); font-weight: 400; }
+.filters .toggles, .filters .filters-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.filters .toggles { padding-top: 4px; border-top: 1px dashed var(--line); padding-top: 16px; }
+.filters .check { display: inline-flex; align-items: center; gap: 10px; padding: 9px 16px 9px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--text); font-size: .9rem; font-weight: 600; cursor: pointer; }
+.filters .check:hover { border-color: var(--accent); } .filters .check:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.filters .btn.small { padding: 8px 14px; border-radius: 999px; }
+
+/* un guidé « Régler la stratégie » : périodes en pastilles */
+#editor label.row.small { gap: 10px; padding: 7px 12px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px; font-size: .9rem; font-weight: 600; color: var(--text); flex-wrap: nowrap; }
+#editor label.row.small:has(input[type=checkbox]:checked) { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); background: var(--accent-soft); }
+#editor label.row.small input[type=number] { height: 34px; width: 66px !important; padding: 0 6px; text-align: center; border-radius: 10px; font-weight: 600; }
+#editor label.row.small .muted { font-weight: 500; }
+#editor .filters { padding: 0; border: 0; background: none; }
+#editor table input[type=number] { height: 36px; width: 96px !important; text-align: right; }
+#editor .btn { height: 42px; border-radius: 12px; padding: 0 18px; }
+
+/* barre de recherche, interrupteur « négociables » et boutons d'outils */
+.tool-row { padding: 16px 18px 12px; border-bottom: 0; }
+.tool-row #q { height: 44px; border-radius: 14px; padding-left: 16px; }
+.tradable-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 0 18px 14px; border-bottom: 1px solid var(--line); }
+.switch-label { display: inline-flex; align-items: center; gap: 12px; cursor: pointer; font-weight: 700; font-size: .92rem; color: var(--text); }
+.switch-label input.switch { -webkit-appearance: none; appearance: none; position: relative; flex: none; width: 44px; height: 26px; margin: 0; border-radius: 999px; background: var(--line); border: 0; cursor: pointer; transition: background .15s; }
+.switch-label input.switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .35); transition: transform .15s; }
+.switch-label input.switch:checked { background: var(--accent); } .switch-label input.switch:checked::after { transform: translateX(18px); }
+.switch-label input.switch:focus-visible { outline: 0; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent); }
+.drawer-toggle { height: 42px; padding: 0 16px; border-radius: 12px; } .drawer-toggle svg { width: 17px; height: 17px; flex: none; }
+.tabs .count { background: var(--surface-2); border-radius: 999px; padding: 1px 9px; font-size: .78rem; font-weight: 600; margin-left: 4px; }
+.tabs button.on .count { background: var(--accent-soft); color: var(--accent); }
+:is(.filters, #editor, .tool-row) select:not([type=checkbox]) { padding-right: 38px; }
