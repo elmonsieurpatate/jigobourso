@@ -8,6 +8,7 @@ from . import strategy
 from ..market import collect
 from ..market.calendar import session_dates, window_calendars
 from ..market.hours import expected_last_close  # noqa: F401 (conservé pour compatibilité)
+from ..shared.db import ensure
 
 BASE_WINDOWS = (1, 5, 21, 63, 126, 252)
 
@@ -67,6 +68,7 @@ def compute_all(conn, now, batch=400):
         for lid in part:
             _compute_one(lid, mics[lid], bars.get(lid, []), splits.get(lid, ()), windows, market_latest, stamp, metric_rows, state_rows,
                          expected_by_mic.get(mics[lid]), calendars_by_mic.get(mics[lid]), technical_by_mic.get(mics[lid]))
+    ensure(conn)                               # le calcul ci-dessus n'interroge pas la base : la connexion a pu être fermée ; rien n'est encore écrit
     with conn.cursor() as cur:
         cur.execute('DELETE FROM strategy_metrics')
         cur.execute('DELETE FROM series_state')
@@ -76,8 +78,6 @@ def compute_all(conn, now, batch=400):
         cur.executemany('''INSERT INTO series_state(listing_id,computed_at,last_close_date,closes_count,close_px,ma20,ma50,ma50_prev,daily_change,gap_to_ma20,break_age,break_dates,coverage_252,observed_252,expected_252,quality)
                            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)''', state_rows)
     conn.commit()
-    from . import etf
-    etf.build(conn, now)
     return len(state_rows), len(metric_rows)
 
 

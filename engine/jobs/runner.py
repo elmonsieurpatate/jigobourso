@@ -5,6 +5,7 @@ import time
 import traceback
 
 from engine.market.yahoo import RateLimited
+from engine.shared.db import ensure
 
 
 def _now():
@@ -13,7 +14,7 @@ def _now():
 
 # Durée au-delà de laquelle un traitement « en cours » est considéré mort (processus tué, hébergeur, panne) et libère son verrou.
 # Les traitements du cron ont une durée bornée : un verrou resté posé ne doit jamais bloquer le rattrapage pendant des heures.
-STALE_MINUTES = {'catchup': 8, 'maintenance': 15}
+STALE_MINUTES = {'catchup': 8, 'maintenance': 45}
 STALE_PREFIX = (('intraday:', 20), ('daily:', 45))
 STALE_DEFAULT = 180            # traitements manuels de l'administration (import, filtres, historiques)
 
@@ -63,6 +64,7 @@ def run_job(conn, job_type, fn, trigger='cron'):
             cur.execute('SELECT RELEASE_LOCK(%s)', (lock,))
 
     def log(level, message):
+        ensure(conn)
         with conn.cursor() as cur:
             cur.execute('INSERT INTO job_logs(job_id,level,message,logged_at) VALUES (%s,%s,%s,%s)', (job_id, level, str(message)[:400], _now()))
         conn.commit()
@@ -71,10 +73,12 @@ def run_job(conn, job_type, fn, trigger='cron'):
 
     def step(name, fn, detail=None):
         """Exécute une étape du traitement en la chronométrant (table job_steps) ; `detail` peut être une fonction du résultat."""
+        ensure(conn)
         t0, started = time.monotonic(), _now()
         result = fn()
         d = detail(result) if callable(detail) else detail
         steps.append(name)
+        ensure(conn)
         with conn.cursor() as cur:
             cur.execute('INSERT INTO job_steps(job_id,seq,name,started_at,duration_ms,detail) VALUES (%s,%s,%s,%s,%s,%s)',
                         (job_id, len(steps), name[:80], started, int((time.monotonic() - t0) * 1000), None if d is None else str(d)[:300]))
@@ -96,8 +100,11 @@ def run_job(conn, job_type, fn, trigger='cron'):
         log('warning', summary)
     except Exception as e:
         status, summary = 'failed', f'{type(e).__name__}: {e}'
-        log('error', traceback.format_exc()[-380:])
+        trace = traceback.format_exc()[-380:]
+        ensure(conn)                               # le statut final s'écrit toujours : jamais sur une connexion que l'erreur a fermée
         conn.rollback()
+        log('error', trace)
+    ensure(conn)
     with conn.cursor() as cur:
         cur.execute('UPDATE jobs SET status=%s, finished_at=%s, items_ok=%s, items_error=%s, summary=%s WHERE id=%s',
                     (status, _now(), ok, errors, (summary or '')[:500], job_id))

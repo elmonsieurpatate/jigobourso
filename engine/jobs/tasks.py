@@ -15,11 +15,12 @@ import subprocess
 import tempfile
 import time
 
-from engine.analytics import compute, funnel, tracking
+from engine.analytics import compute, etf, funnel, tracking
 from engine.catalogue import loader
 from engine.market import catchup, collect, hours, splits
 from engine.market.yahoo import RateLimited
 from engine.shared import settings
+from engine.shared.db import ensure
 from . import schedule
 from .runner import recover_interrupted, run_job
 
@@ -273,8 +274,9 @@ def backup_user_data(now, directory=None):
         raise RuntimeError('mariadb-dump introuvable')
     os.makedirs(directory, mode=0o700, exist_ok=True)
     env = dict(os.environ, MYSQL_PWD=os.environ.get('JIGO_DB_PASSWORD', ''))
-    cmd = [dump, f'-h{os.environ["JIGO_DB_HOST"]}', f'-P{os.environ.get("JIGO_DB_PORT", "3306")}', f'-u{os.environ["JIGO_DB_USER"]}',
-           '--single-transaction', '--quick', os.environ['JIGO_DB_NAME'], *BACKUP_TABLES]
+    socket = os.environ.get('JIGO_DB_SOCKET')                  # base de test locale uniquement
+    where = ['--protocol=socket', f'--socket={socket}'] if socket else [f'-h{os.environ["JIGO_DB_HOST"]}', f'-P{os.environ.get("JIGO_DB_PORT", "3306")}']
+    cmd = [dump, *where, f'-u{os.environ["JIGO_DB_USER"]}', '--single-transaction', '--quick', os.environ['JIGO_DB_NAME'], *BACKUP_TABLES]
     part = target + '.part'
     try:
         with open(part, 'wb') as out, tempfile.TemporaryFile() as err:
@@ -298,50 +300,48 @@ def backup_user_data(now, directory=None):
 
 # ───────── 2. entretien automatique (cron) ─────────
 def maintenance(conn, client, now, log):
-    """Après la collecte quotidienne : cours et devises du catalogue final, indicateurs, suivi, rétention (les trous sont rattrapés à chaque passage : catchup.py). Ne sélectionne rien."""
+    """Après la collecte quotidienne. Chaque étape est indépendante : l'échec de l'une est noté (journal, administration) et n'arrête NI les suivantes NI la sauvegarde,
+    qui passe en premier. Seul le suivi des classements dépend des indicateurs (il ne photographie jamais des classements périmés). Un échec relance la maintenance
+    dans 30 minutes. Ne sélectionne rien."""
     settings.put(conn, 'maintenance_pending', False)           # une clôture ajoutée pendant la maintenance la redéclenchera
+    failed = []
+
+    def attempt(name, fn, detail=None, default=None):
+        try:
+            return _step(log, name, fn, detail)
+        except Exception as e:                                                   # noqa: BLE001 : isolée ; la cause reste visible dans l'administration
+            ensure(conn)
+            conn.rollback()
+            failed.append(name)
+            log('warning' if isinstance(e, RateLimited) else 'error', f'{name} : {type(e).__name__}: {e}')
+            return default
+
+    # 1. L'irremplaçable d'abord : comptes, portefeuilles, transactions.
+    attempt('Sauvegarde des données utilisateur', lambda: backup_user_data(now), lambda r: 'déjà faite aujourd’hui' if r is None else os.path.basename(r))
+    # 2. Données de marché (réseau).
     rows = collect.collection_set(conn)
-    ok, err = _step(log, 'Cours de référence (Quote)', lambda: collect.refresh_quotes(conn, client, rows, now), lambda r: f'{r[0]} reçus sur {len(rows)}')
-    _step(log, 'Taux de change', lambda: collect.refresh_fx(conn, client, now))
-
-    def fx_history():
-        try:
-            return collect.backfill_fx(conn, client, now)
-        except RateLimited:
-            raise
-        except Exception as e:                                                   # noqa: BLE001 : l'historique de change ne doit jamais empêcher le recalcul
-            conn.rollback()
-            log('warning', f'historique de change impossible : {e}')
-            return 0
-    _step(log, 'Historique des taux de change', fx_history, lambda r: f'{r} taux ajoutés')
-    _step(log, 'Détection des sauts de cours', lambda: splits.detect(conn, now), lambda r: f'{r} nouveaux sauts ressemblant à un split')
-    _step(log, 'Splits déclarés par Yahoo', lambda: splits.verify(conn, client, now), lambda r: f'{r["confirmed"]} confirmés (cours corrigés), {r["real_move"]} vrais mouvements, {r["unanswered"]} sans réponse')
-
-    def etf_profiles():
-        from engine.analytics import etf
-        try:
-            return etf.warm_profiles(conn, client, now)
-        except RateLimited:
-            raise
-        except Exception as e:                                                   # noqa: BLE001 : les profils ETF ne doivent jamais empêcher le recalcul
-            conn.rollback()
-            log('warning', f'profils ETF impossibles : {e}')
-            return {'wanted': 0, 'to_refresh': 0, 'fetched': 0, 'unavailable': 0, 'limit': 0}
-    _step(log, 'Profils des ETF suivis', etf_profiles, lambda r: f'{r["fetched"]} récupérés, {r["unavailable"]} indisponibles, {r["to_refresh"]} à rafraîchir sur {r["wanted"]} suivis (au plus {r["limit"]} par passage)')
-    n_series, n_metrics = _step(log, 'Indicateurs et classements', lambda: compute.compute_all(conn, now), lambda r: f'{r[0]} séries, {r[1]} lignes de mesures')
-    snap_day, snap_rows = _step(log, 'Suivi des classements', lambda: tracking.record_snapshot(conn), lambda r: f'{r[0]} ({r[1]} titres)')
-    outcomes = _step(log, 'Résultats du suivi', lambda: tracking.update_outcomes(conn), lambda r: f'{r} résultats')
-    _step(log, 'Rétention des clôtures et des barres', lambda: (collect.prune_daily(conn, now), collect.prune_intraday(conn, now)))
-    _step(log, 'Purge des tables d’exploitation', lambda: housekeeping(conn, now))
-
-    def backup():
-        try:
-            return backup_user_data(now)
-        except Exception as e:                                                   # noqa: BLE001 : ne fait jamais échouer la maintenance, mais reste visible dans les journaux
-            log('warning', f'sauvegarde des données utilisateur impossible : {e}')
-            return '(échec : voir les avertissements)'
-    _step(log, 'Sauvegarde des données utilisateur', backup, lambda r: 'déjà faite aujourd’hui' if r is None else os.path.basename(r))
-    return ok, err, f'cours {ok}/{ok + err}, séries {n_series}, mesures {n_metrics}, suivi {snap_day} ({snap_rows} titres, {outcomes} résultats)'
+    ok, err = attempt('Cours de référence (Quote)', lambda: collect.refresh_quotes(conn, client, rows, now), lambda r: f'{r[0]} reçus sur {len(rows)}', (0, 0))
+    attempt('Taux de change', lambda: collect.refresh_fx(conn, client, now))
+    attempt('Historique des taux de change', lambda: collect.backfill_fx(conn, client, now), lambda r: f'{r} taux ajoutés')
+    attempt('Détection des sauts de cours', lambda: splits.detect(conn, now), lambda r: f'{r} nouveaux sauts ressemblant à un split')
+    attempt('Splits déclarés par Yahoo', lambda: splits.verify(conn, client, now), lambda r: f'{r["confirmed"]} confirmés (cours corrigés), {r["real_move"]} vrais mouvements, {r["unanswered"]} sans réponse')
+    # 3. Calculs dérivés : les indicateurs, puis les ETF (indépendants l'un de l'autre).
+    computed = attempt('Indicateurs et classements', lambda: compute.compute_all(conn, now), lambda r: f'{r[0]} séries, {r[1]} lignes de mesures')
+    attempt('Profils des ETF suivis', lambda: etf.warm_profiles(conn, client, now),
+            lambda r: f'{r["fetched"]} récupérés, {r["unavailable"]} indisponibles, {r["to_refresh"]} à rafraîchir sur {r["wanted"]} suivis (au plus {r["limit"]} par passage)')
+    attempt('Similarité des ETF', lambda: etf.build(conn, now), lambda r: f'{r["etfs"]} ETF, {r["with_minimum_history"]} avec un historique suffisant')
+    # 4. Suivi et entretien.
+    snap = attempt('Suivi des classements', lambda: tracking.record_snapshot(conn), lambda r: f'{r[0]} ({r[1]} titres)') if computed else None
+    if not computed:
+        log('warning', 'Suivi des classements ignoré : les indicateurs n’ont pas été recalculés (aucune photographie d’un classement périmé).')
+    outcomes = attempt('Résultats du suivi', lambda: tracking.update_outcomes(conn), lambda r: f'{r} résultats')
+    attempt('Rétention des clôtures et des barres', lambda: (collect.prune_daily(conn, now), collect.prune_intraday(conn, now)))
+    attempt('Purge des tables d’exploitation', lambda: housekeeping(conn, now))
+    if failed:
+        settings.put(conn, 'maintenance_pending', True)        # nouvelle tentative au prochain passage autorisé (30 minutes)
+    n_series, n_metrics = computed or (0, 0)
+    return ok, err + len(failed), (f'{len(failed)} étape(s) en échec : {", ".join(failed)} · ' if failed else '') + \
+        f'cours {ok}/{ok + err}, séries {n_series}, mesures {n_metrics}' + (f', suivi {snap[0]} ({snap[1]} titres, {outcomes} résultats)' if snap else '')
 
 
 def _ran_within(conn, job_type, minutes, now):
@@ -358,8 +358,9 @@ def _just_closed(mic, now):
 
 def _maintenance_due(conn, now):
     """La maintenance (indicateurs, suivi, rétention : ~2 minutes) suit une collecte quotidienne qui a AJOUTÉ des clôtures, pas chaque nouvelle tentative qui n'apporte rien.
-    Après un échec, elle attend 30 minutes avant de se représenter."""
-    return bool(settings.get(conn, 'maintenance_pending', False)) and not _ran_within(conn, 'maintenance', 30, now)
+    Après un échec, elle attend 30 minutes avant de se représenter ; un déploiement la demande sans délai."""
+    pending = settings.get(conn, 'maintenance_pending', False)
+    return bool(pending) and (pending == 'deploy' or not _ran_within(conn, 'maintenance', 30, now))      # un déploiement demande un recalcul tout de suite ; un échec attend 30 minutes
 
 
 def _daily(conn, client, rows, now, log, round_id=None, due=None, mic=None):

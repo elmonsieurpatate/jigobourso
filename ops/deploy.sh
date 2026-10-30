@@ -19,15 +19,21 @@ ssh_opts=(-F /dev/null -p 65002 -i "$RUNNER_TEMP/jigobourso-ssh/key"
   # Une seule connexion SSH réutilisée par tous les appels (et rsync) : l'hébergement mutualisé refuse ou coupe les connexions répétées (code 255).
   -o ControlMaster=auto -o ControlPath="$RUNNER_TEMP/jcm-%C" -o ControlPersist=900)
 remote=u381524662@147.79.103.168
-domain=/home/u381524662/domains/jigobourso.turnjoy.dev
+# Paramètres de la production ; JIGO_DEPLOY_DOMAIN / JIGO_DEPLOY_BASE / JIGO_DEPLOY_SANDBOX ne servent qu'aux essais sur une copie isolée (sans site public).
+domain=${JIGO_DEPLOY_DOMAIN:-/home/u381524662/domains/jigobourso.turnjoy.dev}
 root=$domain/jigobourso-v2
 backups=$domain/.jigobourso-v2-code-backups
-base=https://jigobourso.turnjoy.dev
+base=${JIGO_DEPLOY_BASE:-https://jigobourso.turnjoy.dev}
+sandbox=${JIGO_DEPLOY_SANDBOX:-}
 remote_sh() { ssh "${ssh_opts[@]}" "$remote" "$@"; }
 trap 'ssh "${ssh_opts[@]}" -O exit "$remote" > /dev/null 2>&1 || true' EXIT
 
 public_check() {                                  # accueil servi avec la bonne version (si fournie), API qui répond
   local expect=${1:-} code me
+  if [ -n "$sandbox" ]; then                      # essai isolé : pas de HTTP, la version est lue dans la page du dossier de test
+    remote_sh "grep -q '?v=$expect' $root/app/public/index.html" || { echo "la page n'a pas la version attendue ($expect)" >&2; return 4; }
+    echo "essai isolé : version ${expect:-?} présente dans la page"; return 0
+  fi
   code=$(curl -s -o "$RUNNER_TEMP/index.html" -w '%{http_code}' "$base/")
   test "$code" = 200 || { echo "page d'accueil : HTTP $code" >&2; return 4; }
   if [ -n "$expect" ]; then grep -q "?v=$expect" "$RUNNER_TEMP/index.html" || { echo "la page servie n'a pas la version attendue ($expect)" >&2; return 4; }; fi
@@ -60,18 +66,9 @@ test "$(readlink "$DOMAIN/public_html/v2")" = "../jigobourso-v2/app/public" && e
 php --version | head -1
 command -v rsync mariadb-dump > /dev/null && echo "rsync et mariadb-dump OK"
 df -h "$DOMAIN" | tail -1
-# Read only: expose a release identifier and only the exception class from a
-# failed detached metrics job. Never print the private job log (it can contain
-# identifiers and query details).
+# Lecture seule : identifiant de la version en place.
 if [ -f "$ROOT/.deployed" ]; then
   sed -nE 's/^commit=([0-9a-f]{40})$/release commit=\1/p' "$ROOT/.deployed"
-fi
-log=$(ls -1t "$ROOT"/logs/deploy-metrics-*.log 2>/dev/null | head -1 || true)
-if [ -n "$log" ]; then
-  error_line=$(grep -E '^[A-Za-z_][A-Za-z0-9_.]*(Error|Exception)(:|$)' "$log" | tail -1 || true)
-  error=$(sed -nE 's/^([A-Za-z_][A-Za-z0-9_.]*(Error|Exception))(:.*)?$/\1/p' <<< "$error_line")
-  db_code=$(sed -nE 's/^[A-Za-z_][A-Za-z0-9_.]*(Error|Exception): \(([0-9]+),.*/\2/p' <<< "$error_line")
-  [ -z "$error" ] || echo "dernier recalcul en échec : type $error${db_code:+, code MariaDB $db_code}"
 fi
 REMOTE
 
@@ -99,9 +96,10 @@ set -euo pipefail
 cd "$ROOT"
 set -a; . ./private/env; set +a
 export MYSQL_PWD="$JIGO_DB_PASSWORD"
+dbconn=(-u"$JIGO_DB_USER"); if [ -n "${JIGO_DB_SOCKET:-}" ]; then dbconn+=(--protocol=socket --socket="$JIGO_DB_SOCKET"); else dbconn+=(-h"$JIGO_DB_HOST" -P"${JIGO_DB_PORT:-3306}"); fi   # JIGO_DB_SOCKET : essais isolés uniquement
 install -d -m 700 "$BACKUPS"
 file="$BACKUPS/financial-$(date -u +%Y%m%d%H%M%S).sql.gz"
-mariadb-dump -h"$JIGO_DB_HOST" -P"${JIGO_DB_PORT:-3306}" -u"$JIGO_DB_USER" --single-transaction --quick "$JIGO_DB_NAME" portfolios portfolio_transactions position_levels | gzip > "$file"
+mariadb-dump "${dbconn[@]}" --single-transaction --quick "$JIGO_DB_NAME" portfolios portfolio_transactions position_levels | gzip > "$file"
 chmod 600 "$file"
 gzip -t "$file"
 echo "Sauvegarde financière vérifiée : $(basename "$file")"
@@ -137,7 +135,7 @@ set +e
     -e "ssh ${ssh_opts[*]}" \
     app engine db docs scripts README.md requirements.txt "$remote:$root/"
 
-  phase="dépendances Python, migration du schéma et recalcul"
+  phase="dépendances Python et migration du schéma"
   echo "== Dépendances Python, migrations de schéma, contrôles"
   remote_sh "ROOT=$root BACKUPS=$backups SHA=$sha VERSION=$version bash -s" <<'REMOTE'
 set -euo pipefail
@@ -162,15 +160,16 @@ else
 fi
 set -a; . ./private/env; set +a
 export MYSQL_PWD="$JIGO_DB_PASSWORD" PYTHONPATH="$ROOT"
+dbconn=(-u"$JIGO_DB_USER"); if [ -n "${JIGO_DB_SOCKET:-}" ]; then dbconn+=(--protocol=socket --socket="$JIGO_DB_SOCKET"); else dbconn+=(-h"$JIGO_DB_HOST" -P"${JIGO_DB_PORT:-3306}"); fi   # JIGO_DB_SOCKET : essais isolés uniquement
 # tables : créées seulement si absentes (aucune existante n'est modifiée) ; vues : redéfinies (aucune donnée)
 sed -E 's/^CREATE TABLE ([a-z_]+)/CREATE TABLE IF NOT EXISTS \1/; s/^CREATE VIEW /CREATE OR REPLACE VIEW /' db/schema.sql \
-  | mariadb -h"$JIGO_DB_HOST" -P"${JIGO_DB_PORT:-3306}" -u"$JIGO_DB_USER" "$JIGO_DB_NAME"
+  | mariadb "${dbconn[@]}" "$JIGO_DB_NAME"
 echo "schéma de base appliqué (tables manquantes créées, vues redéfinies)"
 todo=$(.venv/bin/python scripts/migrate.py --pending)
 if [ -n "$todo" ]; then
   echo "migrations en attente : $(echo "$todo" | tr '\n' ' ')"
   dump="$BACKUPS/db-$(date -u +%Y%m%d%H%M%S).sql.gz"
-  mariadb-dump -h"$JIGO_DB_HOST" -P"${JIGO_DB_PORT:-3306}" -u"$JIGO_DB_USER" --single-transaction --quick "$JIGO_DB_NAME" | gzip > "$dump"
+  mariadb-dump "${dbconn[@]}" --single-transaction --quick "$JIGO_DB_NAME" | gzip > "$dump"
   gzip -t "$dump" && echo "sauvegarde de la base : $(basename "$dump") ($(du -h "$dump" | cut -f1))"
   chmod 600 "$dump"
   ls -1t "$BACKUPS"/db-*.sql.gz | tail -n +4 | xargs -r rm -f
@@ -179,26 +178,9 @@ else
   echo "aucune migration en attente"
 fi
 .venv/bin/python -c "import engine.cli" && echo "moteur importable"
-# Détacher le recalcul des données dérivées : certaines commandes SSH mutualisées
-# interrompent les traitements longs. Le runner attend le code de sortie avant la suite.
-token="$SHA-$VERSION"
-metrics_log="$ROOT/logs/deploy-metrics-$token.log"
-metrics_exit="$ROOT/logs/deploy-metrics-$token.exit"
-metrics_pid="$ROOT/logs/deploy-metrics-$token.pid"
-rm -f "$metrics_exit" "$metrics_exit.tmp" "$metrics_pid"
-# Shared-host SSH servers may terminate every child in the session once the
-# channel closes. nohup alone ignores SIGHUP but keeps the SSH session/process
-# group; setsid gives this bounded maintenance job its own session as well.
-if command -v setsid >/dev/null 2>&1; then
-  # --wait keeps the PID we record alive until the detached child exits;
-  # without it setsid may fork and the poller mistakes the parent exit for a
-  # lost worker before the child has written its status file.
-  nohup setsid --wait bash -c 'set +e; cd "$1"; .venv/bin/python -m engine.cli metrics; rc=$?; printf "%s\n" "$rc" > "$2.tmp"; mv "$2.tmp" "$2"; exit 0' _ "$ROOT" "$metrics_exit" > "$metrics_log" 2>&1 < /dev/null &
-else
-  nohup bash -c 'set +e; cd "$1"; .venv/bin/python -m engine.cli metrics; rc=$?; printf "%s\n" "$rc" > "$2.tmp"; mv "$2.tmp" "$2"; exit 0' _ "$ROOT" "$metrics_exit" > "$metrics_log" 2>&1 < /dev/null &
-fi
-printf '%s\n' "$!" > "$metrics_pid"
-echo "Recalcul analytique lancé en tâche détachée"
+# Le déploiement ne recalcule rien : il demande seulement à la maintenance (cron, moins de 5 minutes) de recalculer les données dérivées avec le nouveau code.
+.venv/bin/python -c "from engine.shared import settings; from engine.shared.db import connect; c = connect(); settings.put(c, 'maintenance_pending', 'deploy'); c.commit()"
+echo "recalcul des données dérivées demandé à la maintenance (aucun calcul pendant le déploiement)"
 echo "== Contrôle d'intégrité financière"
 php scripts/check_financial_integrity.php > "$ROOT/logs/financial-integrity.json"
 chmod 600 "$ROOT/logs/financial-integrity.json"
@@ -206,50 +188,7 @@ chmod 600 "$ROOT/logs/financial-integrity.json"
 find app scripts -name '*.php' -print0 | xargs -0 -n1 php -l > /dev/null && echo "PHP valide"
 REMOTE
 
-  phase="recalcul analytique sur les historiques existants"
-  echo "== Attente du recalcul des mesures et classements"
-  metrics_state=""; ssh_errors=0
-  for attempt in $(seq 1 120); do
-    metrics_state=$(remote_sh "ROOT=$root TOKEN=$sha-$version bash -s" <<'REMOTE' || echo ssh_error
-set -euo pipefail
-status="$ROOT/logs/deploy-metrics-$TOKEN.exit"
-pidfile="$ROOT/logs/deploy-metrics-$TOKEN.pid"
-if [ -f "$status" ]; then
-  rc=$(cat "$status")
-  if [ "$rc" = 0 ]; then
-    rm -f "$status" "$pidfile" "$ROOT/logs/deploy-metrics-$TOKEN.log"
-    echo done
-  else
-    echo "failed:$rc"
-  fi
-elif [ -f "$pidfile" ] && kill -0 "$(cat "$pidfile")" 2>/dev/null; then
-  echo running
-else
-  echo missing
-fi
-REMOTE
-)
-    case "$metrics_state" in
-      done) echo "== Recalcul analytique terminé"; break ;;
-      running) sleep 10 ;;
-      ssh_error) ssh_errors=$((ssh_errors + 1)); [ "$ssh_errors" -le 10 ] || { echo "Échec de la liaison SSH pendant l'attente du recalcul" >&2; exit 1; }; sleep 15 ;;
-      failed:*)
-        error_type=$(remote_sh "ROOT=$root TOKEN=$sha-$version bash -s" <<'REMOTE'
-set -euo pipefail
-log="$ROOT/logs/deploy-metrics-$TOKEN.log"
-line=$(grep -E '^[A-Za-z_][A-Za-z0-9_.]*(Error|Exception)(:|$)' "$log" 2>/dev/null | tail -1 || true)
-error=$(sed -nE 's/^([A-Za-z_][A-Za-z0-9_.]*(Error|Exception))(:.*)?$/\1/p' <<< "$line")
-db_code=$(sed -nE 's/^[A-Za-z_][A-Za-z0-9_.]*(Error|Exception): \(([0-9]+),.*/\2/p' <<< "$line")
-printf '%s%s' "$error" "${db_code:+ errno=$db_code}"
-REMOTE
-)
-        echo "Échec du recalcul analytique (code de retour $metrics_state${error_type:+, erreur $error_type})" >&2
-        exit 1 ;;
-      *) echo "Échec du recalcul analytique (processus terminé sans code de sortie)" >&2; exit 1 ;;
-    esac
-  done
-  if [ "$metrics_state" != done ]; then echo "Échec du recalcul analytique (délai dépassé)" >&2; exit 1; fi
-
+  phase="vérification des calculs financiers"
   echo "== Vérification des calculs financiers avec les calendriers de séance"
   remote_sh "cd $root && set -a && . ./private/env && set +a && PYTHONPATH=$root .venv/bin/python scripts/verify_financial_release.py"
 
@@ -281,10 +220,12 @@ PYVERIFY
   phase="vérification publique"
   echo "== Vérification publique"
   public_check "$version"
-  for page in login.html recover.html reset.html verify-email.html; do
-    test "$(curl -s -o /dev/null -w '%{http_code}' "$base/$page")" = 200 || exit 4
-  done
-  echo "Pages de connexion, récupération et confirmation : HTTP 200"
+  if [ -z "$sandbox" ]; then
+    for page in login.html recover.html reset.html verify-email.html; do
+      test "$(curl -s -o /dev/null -w '%{http_code}' "$base/$page")" = 200 || exit 4
+    done
+    echo "Pages de connexion, récupération et confirmation : HTTP 200"
+  fi
 )
 rc=$?
 set -e

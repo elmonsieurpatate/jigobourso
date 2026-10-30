@@ -12,6 +12,7 @@ import math
 from collections import defaultdict
 
 from .series import prepare_series
+from ..shared.db import ensure
 
 WEEKS = 52                 # fenêtre : 52 semaines calendaires
 MIN_WEEKS = 40             # rendements hebdomadaires indépendants exigés dans chaque série de même jour de semaine
@@ -200,8 +201,6 @@ def coverage(conn):
 
 def build(conn, now):
     """Prétraitement borné en mémoire, jamais exécuté par Explorer ou une fiche."""
-    import os
-    os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
     import numpy as np
     day = now.date()
     start = window_start(day)
@@ -266,7 +265,6 @@ def build(conn, now):
         valid = (count >= MIN_WEEKS * MIN_PARTITIONS) & (vx > 1e-15) & (vy > 1e-15)
         cor = np.full(count.shape, -2.0)
         np.divide(x[sl] @ x.T - sx * sy / safe, den, out=cor, where=valid)
-        conn.ping(reconnect=True)          # l'hébergeur ferme une connexion inactive après 20 s (wait_timeout) : le calcul entre deux requêtes peut durer plus longtemps
         for local, i in enumerate(range(off, min(off + 32, n))):
             # Même ISIN/instrument : autre cotation, pas un autre fonds.
             candidates = [j for j in np.argsort(-cor[local], kind='stable') if j != i and cor[local, j] >= 0.8 and meta[j]['instrument_id'] != meta[i]['instrument_id']]
@@ -280,7 +278,7 @@ def build(conn, now):
                         break
             payloads[i]['similar'].sort(key=lambda x: -x['coefficient'])
     stamp = now.replace(tzinfo=None, microsecond=0)
-    conn.ping(reconnect=True)
+    ensure(conn)                               # le calcul ci-dessus n'interroge pas la base ; rien n'est encore écrit
     with conn.cursor() as c:
         c.executemany('INSERT INTO etf_analysis(listing_id,built_at,payload,returns_json) VALUES (%s,%s,%s,%s) ON DUPLICATE KEY UPDATE built_at=VALUES(built_at),payload=VALUES(payload),returns_json=VALUES(returns_json)',
                       [(m['id'], stamp, json.dumps(p, default=str, allow_nan=False), json.dumps({k: round(x_, 6) for k, x_ in v.items()}, allow_nan=False)) for m, p, v in zip(meta, payloads, vectors)])

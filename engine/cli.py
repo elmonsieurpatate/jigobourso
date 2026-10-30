@@ -103,6 +103,7 @@ def main(argv=None):
     job.add_argument('--name', required=True)
     job.add_argument('--trigger', default='admin', choices=('admin', 'cron', 'system'))
     sub.add_parser('metrics', help='recalculer les mesures de stratégie')
+    sub.add_parser('etf', help='recalculer la similarité des ETF (indépendant des mesures)')
     back = sub.add_parser('suivi-backfill', help='reconstituer les classements des dernières séances (origine « reconstitué »)')
     back.add_argument('--sessions', type=int, default=30)
     for name in ('fdb-state', 'yahoo-state', 'titles', 'rules-save', 'rules-reset', 'funnel', 'funnel-items', 'funnel-explain', 'schedule-get', 'schedule-save', 'job-check', 'jobs-list', 'job-detail'):
@@ -143,6 +144,9 @@ def main(argv=None):
         elif args.cmd == 'metrics':
             from engine.analytics import compute
             print(compute.compute_all(conn, now))
+        elif args.cmd == 'etf':
+            from engine.analytics import etf
+            print(etf.build(conn, now))
     return 0
 
 
