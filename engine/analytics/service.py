@@ -427,7 +427,7 @@ def explore(conn, request):
                   'signals': signals.row_signals(a, e['kind'], ref, prefilter_cfg, a.get('quote_age_days')), 'etf_group': group_of.get(e['id']), 'etf_group_info': group_info.get(e['id'])})
         out.append(r)
     if not export:
-        _attach_curves(conn, out)
+        _attach_curves(conn, out, ref)
     reasons = defaultdict(int)
     for e in base:
         if e['status'] != 'retained':
@@ -440,7 +440,7 @@ def explore(conn, request):
             countries[e['country']] += 1
         if e['category']:
             categories[e['category']] += 1
-    return {'etf_concentration': etf_concentration, 'config': config, 'total': total, 'page': page, 'pages': max(1, -(-total // size)), 'rows': out, 'ref_sessions': ref,
+    return {'etf_concentration': etf_concentration, 'config': config, 'total': total, 'page': page, 'pages': max(1, -(-total // size)), 'rows': out, 'ref_sessions': ref, 'curve_label': signals.period_label(ref),
             'universe': len(entries), 'examined': len(base), 'tradable': {'on': bool(view.get('tradable', True)), 'masked': masked}, 'level_filters': {'masked': level_masked, 'counts': level_counts},
             'counts': {g: dict(c) for g, c in counts.items()}, 'scope_counts': scope_counts, 'populations': {g: sum(c.values()) for g, c in counts.items()},
             'reasons': dict(reasons), 'facets': {'markets': dict(markets), 'countries': dict(sorted(countries.items())), 'categories': dict(sorted(categories.items()))}}
@@ -474,18 +474,28 @@ def _search_excluded(conn, query, kind, market):
              'quality': None, 'measures': {}, 'reasons': []} for r in rows]
 
 
-def _attach_curves(conn, rows, points=66):
+def downsample(values, points):
+    """Au plus `points` valeurs réparties régulièrement, première et dernière comprises (la forme de la courbe est conservée)."""
+    if len(values) <= points:
+        return list(values)
+    last = len(values) - 1
+    return [values[round(i * last / (points - 1))] for i in range(points)]
+
+
+def _attach_curves(conn, rows, sessions=63, points=66):
+    """Petite courbe « Tendance » de chaque ligne : les `sessions` dernières clôtures, c'est-à-dire la période la plus longue de la stratégie (la même que la fenêtre de référence
+    des colonnes), ramenées à `points` valeurs au plus."""
     ids = [r['id'] for r in rows]
     if not ids:
         return
     with conn.cursor() as cur:
         cur.execute(f"SELECT listing_id, price_date, close_px FROM daily_prices WHERE listing_id IN ({','.join(['%s'] * len(ids))}) AND price_date >= %s ORDER BY listing_id, price_date",
-                    ids + [datetime.date.today() - datetime.timedelta(days=110)])
+                    ids + [datetime.date.today() - datetime.timedelta(days=int(sessions * 1.6) + 12)])
         curves = defaultdict(list)
         for r in cur.fetchall():
             curves[r['listing_id']].append(float(r['close_px']))
     for r in rows:
-        r['curve'] = curves.get(r['id'], [])[-points:]
+        r['curve'] = downsample(curves.get(r['id'], [])[-(sessions + 1):], points)
 
 
 def instrument_sheet(conn, request):

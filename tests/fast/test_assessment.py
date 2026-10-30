@@ -122,3 +122,10 @@ def test_the_interface_exposes_the_three_multi_choice_filters_and_the_summary():
     assert "'regularity', 'risk', 'liquidity'" in (ROOT / 'app/routes/explore.php').read_text()
     assert 'JEtf.assessment(s.assessment)' in (ROOT / 'app/public/assets/titre.js').read_text()
     assert 's.period' in (ROOT / 'app/public/assets/etf.js').read_text()
+
+
+def test_downsample_keeps_first_and_last_values_and_the_shape():
+    values = list(range(253))
+    out = service.downsample(values, 66)
+    assert len(out) == 66 and out[0] == 0 and out[-1] == 252 and out == sorted(out)
+    assert service.downsample([1, 2, 3], 66) == [1, 2, 3]

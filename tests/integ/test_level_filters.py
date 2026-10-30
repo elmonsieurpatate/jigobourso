@@ -45,7 +45,7 @@ def seed(conn):
 
 
 def explore(conn, **view):
-    return service.explore(conn, {'preset': 'fast', 'view': dict({'status': 'all', 'tradable': False, 'page_size': 50}, **view)})
+    return service.explore(conn, {'config': 'fast', 'view': dict({'status': 'all', 'tradable': False, 'page_size': 50}, **view)})
 
 
 def test_level_filters_hide_without_changing_rank_score_or_relative_order():
@@ -86,3 +86,18 @@ def test_the_sheet_carries_the_assessment_and_pills_with_their_period():
     assert a['label'] in ('Très favorable', 'Favorable', 'Mitigé', 'Défavorable', 'Indéterminé') and a['period'] == '1 mois' and a['closing']
     periods = {s['key']: s.get('period') for s in sheet['signals']}
     assert periods['regularity'] == '1 mois' and periods['risk'] == '1 mois' and periods['liquidity'] == '3 mois'
+
+
+def test_the_trend_curve_covers_the_longest_period_of_the_strategy():
+    conn = connect()
+    seed(conn)
+    month = explore(conn)                                                                  # « Croissance rapide » : semaine et mois
+    assert month['curve_label'] == '1 mois' and all(len(r['curve']) == 22 for r in month['rows'])
+    quarter = service.explore(conn, {'config': 'regular', 'view': {'status': 'all', 'tradable': False, 'page_size': 50}})
+    assert quarter['curve_label'] == '3 mois' and all(len(r['curve']) == 64 for r in quarter['rows'])
+    cfg = service.strategy.preset('regular')
+    for p in cfg['periods']:
+        p['enabled'] = p['id'] == 'year'
+    year = service.explore(conn, {'config': cfg, 'view': {'status': 'all', 'tradable': False, 'page_size': 50}})
+    assert year['curve_label'] == '1 an' and all(len(r['curve']) == 66 for r in year['rows'])              # 253 clôtures ramenées à 66 points
+    r = year['rows'][0]
