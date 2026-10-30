@@ -477,7 +477,8 @@ def _recompute(conn, now, log, which):
 def gaps_all(conn, client, now, log):
     """« Combler les clôtures manquantes » sur tout le catalogue : un appel Yahoo par titre incomplet, sans le plafond ni le délai de la maintenance ; reprise possible si Yahoo limite."""
     rows = collect.collection_set(conn)
-    r = _step(log, 'Clôtures manquantes', lambda: collect.fill_gaps_batch(conn, client, rows, now, limit=len(rows), budget_s=6 * 3600, force=True),
+    r = _step(log, 'Clôtures manquantes', lambda: collect.fill_gaps_batch(conn, client, rows, now, limit=len(rows), budget_s=6 * 3600, force=True,
+                                                              progress=lambda d, t: log.progress(f'Clôtures manquantes : {d} / {t} titres') if hasattr(log, 'progress') else None),
               lambda r: f'{r["added"]} clôtures ajoutées sur {r["examined"]} titres examinés, {r["remaining"]} restent à examiner' + (' (limitation Yahoo : relancez plus tard)' if r['rate_limited'] else ''))
     if r['added']:
         _step(log, 'Détection des sauts de cours', lambda: splits.detect(conn, now), lambda n: f'{n} nouveaux sauts ressemblant à un split')

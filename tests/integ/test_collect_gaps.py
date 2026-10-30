@@ -95,3 +95,10 @@ def test_manual_force_ignores_the_retry_delay_but_automatic_runs_do_not(conn):
     conn.commit()
     assert collect.fill_gaps_batch(conn, ChartClient(), rows, NOW)['examined'] == 0                       # automatique : délai de 30 jours
     assert collect.fill_gaps_batch(conn, ChartClient(), rows, NOW, force=True)['examined'] == 1           # manuel : repasse sur tout
+
+
+def test_progress_reports_done_over_total_after_each_title(conn):
+    rows = [{'listing_id': 1, 'symbol': 'AAA', 'mic': 'XNAS'}, {'listing_id': 2, 'symbol': 'BBB', 'mic': 'XNAS'}]
+    seen = []
+    collect.fill_gaps_batch(conn, ChartClient(), rows, NOW, progress=lambda d, t: seen.append((d, t)))
+    assert seen == [(1, 2), (2, 2)]

@@ -220,9 +220,9 @@ GAP_BUDGET_S = 60          # ...et au plus ce temps (secondes) : un appel Yahoo 
 GAP_RETRY_DAYS = 30        # un titre déjà examiné n'est pas redemandé avant ce délai (les jours que Yahoo n'a vraiment pas restent absents)
 
 
-def fill_gaps_batch(conn, client, rows, now, limit=GAP_LIMIT, budget_s=GAP_BUDGET_S, force=False):
+def fill_gaps_batch(conn, client, rows, now, limit=GAP_LIMIT, budget_s=GAP_BUDGET_S, force=False, progress=None):
     """Un lot de titres dont l'historique d'un an est incomplet, les moins troués d'abord. Arrêt au premier 429 (le titre en cours n'est pas marqué : il sera repris).
-    `force` (demande manuelle) ignore le délai de 30 jours entre deux essais sur un même titre."""
+    `force` (demande manuelle) ignore le délai de 30 jours entre deux essais sur un même titre. `progress(faits, total)` est appelé après chaque titre."""
     tried = setting(conn, 'gap_fill_tried', {})
     today = naive_utc(now).date()
     by_id = {r['listing_id']: r for r in rows}
@@ -245,6 +245,8 @@ def fill_gaps_batch(conn, client, rows, now, limit=GAP_LIMIT, budget_s=GAP_BUDGE
             continue
         tried[str(i)] = today.isoformat()
         done, added = done + 1, added + n
+        if progress:
+            progress(done, min(len(todo), limit))
     keep = {k: v for k, v in tried.items() if (today - datetime.date.fromisoformat(v)).days < GAP_RETRY_DAYS}
     with conn.cursor() as cur:
         cur.execute('INSERT INTO settings(name, value_json, updated_at) VALUES (%s,%s,%s) ON DUPLICATE KEY UPDATE value_json=VALUES(value_json), updated_at=VALUES(updated_at)',
