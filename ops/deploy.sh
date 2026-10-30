@@ -56,6 +56,17 @@ test "$(readlink "$DOMAIN/public_html/v2")" = "../jigobourso-v2/app/public" && e
 php --version | head -1
 command -v rsync mariadb-dump > /dev/null && echo "rsync et mariadb-dump OK"
 df -h "$DOMAIN" | tail -1
+# Read only: expose a release identifier and only the exception class from a
+# failed detached metrics job. Never print the private job log (it can contain
+# identifiers and query details).
+if [ -f "$ROOT/.deployed" ]; then
+  sed -nE 's/^commit=([0-9a-f]{40})$/release commit=\1/p' "$ROOT/.deployed"
+fi
+log=$(ls -1t "$ROOT"/logs/deploy-metrics-*.log 2>/dev/null | head -1 || true)
+if [ -n "$log" ]; then
+  error=$(sed -nE 's/^([A-Za-z_][A-Za-z0-9_.]*(Error|Exception))(:.*)?$/\1/p' "$log" | tail -1)
+  [ -z "$error" ] || echo "dernier recalcul en échec : type $error"
+fi
 REMOTE
 
 if [ "$operation" = diagnostic ]; then echo "Diagnostic terminé : rien modifié."; exit 0; fi
@@ -215,7 +226,15 @@ REMOTE
     case "$metrics_state" in
       done) echo "== Recalcul analytique terminé"; break ;;
       running) sleep 10 ;;
-      failed:*) echo "Échec du recalcul analytique (code de retour $metrics_state)" >&2; exit 1 ;;
+      failed:*)
+        error_type=$(remote_sh "ROOT=$root TOKEN=$sha-$version bash -s" <<'REMOTE'
+set -euo pipefail
+log="$ROOT/logs/deploy-metrics-$TOKEN.log"
+sed -nE 's/^([A-Za-z_][A-Za-z0-9_.]*(Error|Exception))(:.*)?$/\1/p' "$log" 2>/dev/null | tail -1
+REMOTE
+)
+        echo "Échec du recalcul analytique (code de retour $metrics_state${error_type:+, erreur $error_type})" >&2
+        exit 1 ;;
       *) echo "Échec du recalcul analytique (processus terminé sans code de sortie)" >&2; exit 1 ;;
     esac
   done
