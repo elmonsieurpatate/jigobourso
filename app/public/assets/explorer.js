@@ -18,6 +18,8 @@
   text.forEach(k => { const v = k === 'q' ? (url.has('q') && saved.pageKey !== location.pathname + location.search ? url.get('q') : (saved.view || {}).q) : (saved.view || {})[k]; if (v !== undefined && v !== null && el(k)) el(k).value = v; });
   CHECKS.forEach(k => { if (el(k) && (saved.view || {})[k]) el(k).checked = true; });
   if ((saved.view || {}).tradable === false) el('tradable').checked = false;         // activé par défaut ; seul un choix explicite de le désactiver est conservé
+  const MS = { country: JMulti(el('country')), category: JMulti(el('category')) };
+  ['country', 'category'].forEach(k => { const v = (saved.view || {})[k]; if (v) el(k).value = v; });
   let timer, seq = 0, lastRes = null;
 
   /* bandeau de sources */
@@ -183,9 +185,10 @@
     el('pager').innerHTML = '<span class="muted small">Chaque groupe est classé à part : un ETF n’est jamais comparé à une action pour le rang ; ici les deux classements sont côte à côte.</span>';
   }
   function fillFacets(res) {
-    if (el('country').options.length === 1) Object.entries(res.facets.countries).forEach(([c, n]) => el('country').insertAdjacentHTML('beforeend', `<option value="${J.esc(c)}">${J.esc(c)} (${n})</option>`));
+    if (!MS.country.loaded) { MS.country.loaded = 1; MS.country.set(Object.entries(res.facets.countries).map(([c, n]) => [c, c, n])); }
+    if (!MS.category.loaded) { MS.category.loaded = 1; MS.category.set(Object.entries(res.facets.categories || {}).sort((a, b) => a[0].localeCompare(b[0], 'fr')).map(([c, n]) => [c, c, n])); }
     if (el('market').options.length === 1) Object.entries(res.facets.markets).sort((a, b) => b[1] - a[1]).forEach(([m, n]) => el('market').insertAdjacentHTML('beforeend', `<option value="${J.esc(m)}">${J.esc(MARKETS[m] || m)} (${n})</option>`));
-    ['country', 'market'].forEach(k => { const v = (saved.view || {})[k]; if (v && !el(k).dataset.restored) { el(k).value = v; el(k).dataset.restored = 1; } });
+    ['market'].forEach(k => { const v = (saved.view || {})[k]; if (v && !el(k).dataset.restored) { el(k).value = v; el(k).dataset.restored = 1; } });
     el('filters-note').textContent = 'Les filtres numériques utilisent les mesures sur ' + res.ref_sessions + ' séances (la plus longue période active).';
   }
   el('compare-btn').onclick = () => { S.compare = !S.compare; el('compare-btn').classList.toggle('primary', S.compare); el('compare-btn').textContent = S.compare ? 'Retour au tableau' : 'Comparer actions / ETF'; S.page = 1; load(); };

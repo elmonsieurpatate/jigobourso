@@ -279,11 +279,11 @@ def scoped_entries(conn, config, view, rates=None, aux=None, now=None):
     entries = cached_verdicts(conn, config)         # verdict de chaque titre éligible pour CETTE configuration (jamais pour un préréglage par défaut)
     ref = _reference_window(config)
     aux = aux if aux is not None else _aux(conn, ref, rates)
-    kind, market, country = view.get('kind') or '', view.get('market') or '', view.get('country') or ''
-    category = (view.get('category') or '').casefold()
+    kind, market = view.get('kind') or '', view.get('market') or ''
+    countries, categories = _choices(view.get('country')), {c.casefold() for c in _choices(view.get('category'))}         # plusieurs choix possibles, séparés par « | »
     owned = set(view.get('owned_ids') or [])
     base = [e for e in entries if (not kind or e['kind'] == kind) and (not market or e['mic'] == market)
-            and (not country or e['country'] == country) and (not category or category in (e['category'] or '').casefold())]
+            and (not countries or e['country'] in countries) and (not categories or (e['category'] or '').casefold() in categories)]
     if view.get('pea'):
         base = [e for e in base if pea_status(e['kind'], e['country'], e['mic']) == 'probable']
     if view.get('owned_only'):
@@ -390,15 +390,23 @@ def explore(conn, request):
         if e['status'] != 'retained':
             for f in e['fails']:
                 reasons[f] += 1
-    markets, countries = defaultdict(int), defaultdict(int)
+    markets, countries, categories = defaultdict(int), defaultdict(int), defaultdict(int)
     for e in entries:
         markets[e['mic']] += 1
         if e['country']:
             countries[e['country']] += 1
+        if e['category']:
+            categories[e['category']] += 1
     return {'etf_concentration': etf_concentration, 'config': config, 'total': total, 'page': page, 'pages': max(1, -(-total // size)), 'rows': out, 'ref_sessions': ref,
             'universe': len(entries), 'examined': len(base), 'tradable': {'on': bool(view.get('tradable', True)), 'masked': masked},
             'counts': {g: dict(c) for g, c in counts.items()}, 'scope_counts': scope_counts, 'populations': {g: sum(c.values()) for g, c in counts.items()},
-            'reasons': dict(reasons), 'facets': {'markets': dict(markets), 'countries': dict(sorted(countries.items()))}}
+            'reasons': dict(reasons), 'facets': {'markets': dict(markets), 'countries': dict(sorted(countries.items())), 'categories': dict(sorted(categories.items()))}}
+
+
+def _choices(value):
+    """Valeurs d'un filtre à choix multiple (« A|B ») ; une liste est aussi acceptée."""
+    items = value if isinstance(value, (list, tuple)) else str(value or '').split('|')
+    return {x.strip() for x in items if x and x.strip()}
 
 
 def _search_excluded(conn, query, kind, market):
