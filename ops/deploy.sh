@@ -64,8 +64,10 @@ if [ -f "$ROOT/.deployed" ]; then
 fi
 log=$(ls -1t "$ROOT"/logs/deploy-metrics-*.log 2>/dev/null | head -1 || true)
 if [ -n "$log" ]; then
-  error=$(sed -nE 's/^([A-Za-z_][A-Za-z0-9_.]*(Error|Exception))(:.*)?$/\1/p' "$log" | tail -1)
-  [ -z "$error" ] || echo "dernier recalcul en échec : type $error"
+  error_line=$(grep -E '^[A-Za-z_][A-Za-z0-9_.]*(Error|Exception)(:|$)' "$log" | tail -1 || true)
+  error=$(sed -nE 's/^([A-Za-z_][A-Za-z0-9_.]*(Error|Exception))(:.*)?$/\1/p' <<< "$error_line")
+  db_code=$(sed -nE 's/^[A-Za-z_][A-Za-z0-9_.]*(Error|Exception): \(([0-9]+),.*/\2/p' <<< "$error_line")
+  [ -z "$error" ] || echo "dernier recalcul en échec : type $error${db_code:+, code MariaDB $db_code}"
 fi
 REMOTE
 
