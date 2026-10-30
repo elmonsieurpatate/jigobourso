@@ -14,11 +14,12 @@ const BASE='http://127.0.0.1:18089';
   await page.goto(BASE+'/login.html');await page.fill('#u','review_user');await page.fill('#p','review-local-password');await page.click('#auth-form button.primary');await page.waitForURL('**/index.html');
   await page.evaluate(()=>{localStorage.clear();sessionStorage.clear()});
   await load();
+  await page.locator('#status-tabs button[data-s="all"]').click();await page.waitForTimeout(1200);      // onglet « Tous » : les titres de test ne sont pas tous « retenus »
   ok('actif_par_defaut',await page.locator('#tradable').isChecked());
   const on=await symbols();
   const limited=['TEST03.PA','TEST04.PA','TEST05.PA','TEST06.PA','TEST07.PA','TEST08.PA'];
   ok('limitees_masquees',limited.every(s=>!on.includes(s)),on.slice(0,10));
-  ok('visibles_presentes',on.includes('TEST09.PA')||on.includes('TEST13.PA')||on.length>0,on.length);
+  ok('visibles_presentes',['TEST09.PA','TEST13.PA'].every(x=>on.includes(x)),on.length);
   const note=await page.locator('#tradable-note').innerText();
   ok('note_masques',/masqué/.test(note),note);
   ok('rang_original_affiche',await page.locator('.rtable tbody tr .rk .sub').first().innerText().then(t=>/^rang \d+/.test(t),()=>false));
@@ -26,8 +27,8 @@ const BASE='http://127.0.0.1:18089';
   await page.locator('#tradable').uncheck();
   ok('tout_affiche',await retry(async()=>{const all=await symbols();return limited.every(s=>all.includes(s))}));
   const off=await symbols();
-  const masked=Number((note.match(/(\d+)\s+titre/)||[])[1]);
-  ok('compte_coherent',masked>0&&off.length-on.length===masked,{masked,on:on.length,off:off.length});
+  const masked=Number((note.match(/(\d+)\s+titres?\s+masqu/)||[])[1]);
+  ok('compte_coherent',masked>=6&&off.length-on.length===masked,{note,masked,on:on.length,off:off.length});
   ok('note_tout_affiche',/Tous les titres/.test(await page.locator('#tradable-note').innerText()));
   // préférence conservée à la navigation
   await load();
