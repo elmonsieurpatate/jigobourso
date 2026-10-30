@@ -52,6 +52,7 @@ tar xzf "$BACKUPS/$FILE" -C "$tmp"
 cd "$tmp/jigobourso-v2"
 rsync -rlt --delete --exclude=__pycache__ app engine db docs scripts README.md requirements.txt "$ROOT/"
 "$ROOT/.venv/bin/python" -c "import sys; sys.path.insert(0, '$ROOT'); import engine.cli" && echo "moteur importable après restauration"
+printf 'restored_from=%s\ndate=%s\n' "$FILE" "$(date -u +%FT%TZ)" > "$ROOT/.deployed"
 echo "code restauré depuis $FILE"
 REMOTE
 }
