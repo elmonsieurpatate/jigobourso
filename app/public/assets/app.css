@@ -274,3 +274,11 @@ tr.in-family td.name { box-shadow: inset 2px 0 0 color-mix(in srgb, var(--warn) 
 .ms-row { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 9px; cursor: pointer; font-size: .9rem; color: var(--text); font-weight: 400; }
 .ms-row:hover { background: var(--surface-2); }
 .ms-foot { display: flex; justify-content: space-between; gap: 8px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
+
+.fam-toggle { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; padding: 2px 10px 2px 4px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface-2); color: var(--muted); font: inherit; font-size: .78rem; font-weight: 600; cursor: pointer; }
+.fam-toggle:hover { border-color: var(--accent); color: var(--text); } .fam-toggle:focus-visible { outline: 0; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent); }
+.fam-sign { display: inline-grid; place-content: center; width: 18px; height: 18px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); font-weight: 800; line-height: 1; }
+tr[data-child-of] td { background: color-mix(in srgb, var(--surface-2) 55%, transparent); } tr[data-child-of] td.name { padding-left: 26px; }
+tr[hidden] { display: none; }
+.ms-acts { display: flex; gap: 6px; flex-wrap: wrap; }
+.ms-foot { align-items: center; flex-wrap: wrap; }

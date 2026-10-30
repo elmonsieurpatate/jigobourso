@@ -134,6 +134,21 @@
     const filtered = lastRes && lastRes.tradable && lastRes.tradable.on && S.sort === 'rank' && r.position;
     return filtered ? `${r.position}<span class="sub" style="display:block" title="Rang dans le catalogue complet, sans filtre">rang ${r.rank || '·'}</span>` : (r.rank || '·');
   }
+  /* ETF « presque identiques » (Groupe A, B…) : le mieux classé reste visible, les autres se déplient sous lui avec « + ». Rangs, scores et ordre ne changent pas. */
+  const openGroups = new Set();
+  function groupedRows(rows) {
+    const members = {};
+    rows.forEach(r => { if (r.etf_group) (members[r.etf_group] = members[r.etf_group] || []).push(r); });
+    const open = g => openGroups.has(g);
+    return rows.map(r => {
+      const g = r.etf_group, list = g ? members[g] : null;
+      if (!list || list.length < 2) return row(r);
+      if (list[0] !== r) return null;
+      const btn = `<button type="button" class="fam-toggle" data-g="${J.esc(g)}" aria-expanded="${open(g)}" title="Afficher ou masquer les ETF presque identiques"><span class="fam-sign">${open(g) ? '−' : '+'}</span> ${list.length - 1} similaire${list.length > 2 ? 's' : ''} · Groupe ${J.esc(g)}</button>`;
+      const lead = row(r).replace(/(<td class="name">[\s\S]*?)<\/td>/, (m, a) => a + btn + '</td>');
+      return lead + list.slice(1).map(c => row(c).replace('<tr ', `<tr data-child-of="${J.esc(g)}" ${open(g) ? '' : 'hidden '}`)).join('');
+    }).filter(x => x !== null).join('');
+  }
   function row(r) {
     const m = r.ref || {};
     const badge = r.status === 'excluded' ? `<span class="badge ko help" title="${J.esc(r.excluded_reason || '')}">Exclu</span>` : J.statusBadge(r.status, r.status_label);
@@ -164,9 +179,10 @@
     if (my !== seq) return;
     lastRes = res; el('tradable-note').textContent = res.tradable.on ? (res.tradable.masked ? `${J.num(res.tradable.masked, 0)} titre${res.tradable.masked > 1 ? 's' : ''} masqué${res.tradable.masked > 1 ? 's' : ''} : valeur échangée estimée trop faible. Décochez pour tout voir.` : 'Aucun titre masqué dans cette vue.') : 'Tous les titres du catalogue sont affichés.';
     drawTabs(res); drawWhy(res); fillFacets(res);
-    el('results').innerHTML = res.rows.length ? JEtf.concentration(res.etf_concentration) + `<p class="small muted" style="margin:0 0 8px">${JEtf.LEGEND}</p><div class="table-wrap"><table class="rtable">${header(res.ref_sessions)}<tbody>${res.rows.map(row).join('')}</tbody></table></div>` : `<div class="empty">${v.q ? 'Aucun titre ne correspond à cette recherche.' : 'Aucun titre dans cette vue avec ces critères et ces filtres.'}</div>`;
+    el('results').innerHTML = res.rows.length ? JEtf.concentration(res.etf_concentration) + `<p class="small muted" style="margin:0 0 8px">${JEtf.LEGEND}</p><div class="table-wrap"><table class="rtable">${header(res.ref_sessions)}<tbody>${groupedRows(res.rows)}</tbody></table></div>` : `<div class="empty">${v.q ? 'Aucun titre ne correspond à cette recherche.' : 'Aucun titre dans cette vue avec ces critères et ces filtres.'}</div>`;
     if (!window.jigoScrollRestored) { window.jigoScrollRestored = true; try { requestAnimationFrame(() => scrollTo(0, +(sessionStorage.getItem('jigo_explorer_scroll') || 0))); } catch (e) {} }
     J.$$('#results tbody tr').forEach(tr => { const a = tr.querySelector('a[data-sheet]'); a.addEventListener('click', () => { persist(); sessionStorage.setItem('jigo_explorer_scroll', String(scrollY)); }); tr.onclick = e => { if (e.target.closest('a,button,input')) return; persist(); window.open(a.href, '_blank', 'noopener'); }; });
+    J.$$('#results .fam-toggle').forEach(b => b.onclick = () => { const g = b.dataset.g, on = !openGroups.has(g); on ? openGroups.add(g) : openGroups.delete(g); b.setAttribute('aria-expanded', on); b.querySelector('.fam-sign').textContent = on ? '−' : '+'; J.$$('#results tr[data-child-of]').forEach(tr => { if (tr.dataset.childOf === g) tr.hidden = !on; }); });
     J.$$('#results th.sortable').forEach(th => th.onclick = () => { const k = th.dataset.k; if (S.sort === k) S.dir = S.dir === 'asc' ? 'desc' : 'asc'; else { S.sort = k; S.dir = ['name', 'price', 'volatility', 'drawdown', 'rank'].includes(k) ? 'asc' : 'desc'; } S.page = 1; load(); });
     el('pager').innerHTML = `<span class="muted small">${J.num(res.examined, 0)} titres examinés sur ${J.num(res.universe, 0)} · ${J.num(res.total, 0)} résultat${res.total > 1 ? 's' : ''}${res.populations.etf && res.populations.equity ? ' · actions et ETF sont classés séparément' : ''} · mesures sur ${res.ref_sessions} séances</span>
       <span class="row gap-s"><select id="size" aria-label="Lignes par page">${[20, 50, 100].map(n => `<option value="${n}" ${n === S.size ? 'selected' : ''}>${n} par page</option>`).join('')}</select><button class="btn small" id="prev" ${res.page <= 1 ? 'disabled' : ''}>←</button><span class="small">Page ${res.page} / ${res.pages}</span><button class="btn small" id="next" ${res.page >= res.pages ? 'disabled' : ''}>→</button></span>`;

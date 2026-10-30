@@ -5,7 +5,7 @@
   window.JMulti = function (input, label) {
     const root = document.createElement('div');
     root.className = 'ms';
-    root.innerHTML = '<button type="button" class="ms-btn" aria-haspopup="listbox" aria-expanded="false"><span class="ms-txt"></span></button><div class="ms-pop" hidden><input type="search" class="ms-q" placeholder="Filtrer la liste" aria-label="Filtrer la liste"><div class="ms-list" role="listbox" aria-multiselectable="true"></div><div class="ms-foot"><button type="button" class="btn small ms-clear">Tout décocher</button><button type="button" class="btn small primary ms-ok">Fermer</button></div></div>';
+    root.innerHTML = '<button type="button" class="ms-btn" aria-haspopup="listbox" aria-expanded="false"><span class="ms-txt"></span></button><div class="ms-pop" hidden><input type="search" class="ms-q" placeholder="Filtrer la liste" aria-label="Filtrer la liste"><div class="ms-list" role="listbox" aria-multiselectable="true"></div><div class="ms-foot"><span class="ms-acts"><button type="button" class="btn small ms-all">Tout sélectionner</button><button type="button" class="btn small ms-clear">Aucun</button></span><button type="button" class="btn small primary ms-ok">Fermer</button></div></div>';
     input.insertAdjacentElement('afterend', root);
     const btn = root.querySelector('.ms-btn'), pop = root.querySelector('.ms-pop'), list = root.querySelector('.ms-list'), q = root.querySelector('.ms-q');
     const raw = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
@@ -30,6 +30,7 @@
     btn.onclick = () => open(pop.hidden);
     root.querySelector('.ms-ok').onclick = () => { open(false); btn.focus(); };
     root.querySelector('.ms-clear').onclick = () => commit([]);
+    root.querySelector('.ms-all').onclick = () => { const term = q.value.trim().toLocaleLowerCase('fr'); commit([...new Set([...chosen(), ...options.filter(o => !term || o[1].toLocaleLowerCase('fr').includes(term)).map(o => o[0])])]); };       // avec un filtre de texte : sélectionne seulement les lignes affichées
     q.oninput = render;
     root.addEventListener('keydown', e => { if (e.key === 'Escape' && !pop.hidden) { open(false); btn.focus(); } });
     document.addEventListener('click', e => { if (!root.contains(e.target)) open(false); });
