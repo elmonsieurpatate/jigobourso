@@ -4,7 +4,7 @@ const BASE='http://127.0.0.1:18089';
 (async()=>{
  const browser=await chromium.launch({executablePath:process.env.JIGO_CHROMIUM,args:['--no-sandbox']}),out={checks:{},errors:[]};
  const ctx=await browser.newContext({viewport:{width:1280,height:900}}),page=await ctx.newPage();
- page.setDefaultTimeout(20000);page.on('pageerror',e=>out.errors.push(e.message));page.on('console',m=>{if(m.type()==='error')out.errors.push(m.text())});
+ page.setDefaultTimeout(20000);page.on('pageerror',e=>out.errors.push(e.message));page.on('console',m=>{if(m.type()==='error'&&!/favicon/.test(m.location().url||''))out.errors.push(m.text())});
  const ok=(name,cond,detail)=>{out.checks[name]=!!cond;if(!cond)out.errors.push('KO '+name+(detail===undefined?'':' : '+JSON.stringify(detail)))};
  const rows=async()=>{await page.locator('.rtable tbody tr').first().waitFor();return page.locator('.rtable tbody tr .name .sub').allInnerTexts()};
  const symbols=async()=>(await rows()).map(t=>t.split(' · ')[0].trim());
