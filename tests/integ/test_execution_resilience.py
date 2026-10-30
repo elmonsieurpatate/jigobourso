@@ -103,3 +103,25 @@ def test_etf_publication_survives_a_connection_closed_during_the_computation(con
     with conn.cursor() as cur:
         cur.execute('SELECT COUNT(*) n FROM etf_analysis')
         assert cur.fetchone()['n'] == 4
+
+
+def test_compute_jobs_share_one_lock_and_a_failed_one_can_be_relaunched(conn):
+    from engine.jobs import tasks
+    started = []
+    with conn.cursor() as cur:
+        cur.execute("INSERT INTO jobs(job_type,trigger_by,status,started_at) VALUES ('etf','admin','running',UTC_TIMESTAMP())")
+    conn.commit()
+    assert run_job(conn, 'maintenance', lambda log: started.append(1) or (0, 0, 'x')) is None           # un calcul en cours bloque les autres calculs dérivés
+    assert not started
+    with pytest.raises(ValueError, match='déjà en cours'):
+        tasks.precheck(conn, 'metrics')
+    with conn.cursor() as cur:
+        cur.execute("UPDATE jobs SET status='failed' WHERE job_type='etf'")
+    conn.commit()
+    tasks.precheck(conn, 'etf')                                                                           # un échec n'empêche pas la relance
+    def boom(log):
+        raise RuntimeError('cause visible')
+    failed = run_job(conn, 'etf', boom, trigger='admin')
+    assert status_of(conn, failed)['status'] == 'failed' and 'cause visible' in status_of(conn, failed)['summary']
+    ok = run_job(conn, 'etf', lambda log: (1, 0, 'relancé'), trigger='admin')
+    assert status_of(conn, ok)['status'] == 'completed'

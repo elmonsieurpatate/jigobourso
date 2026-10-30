@@ -14,8 +14,9 @@ def _now():
 
 # Durée au-delà de laquelle un traitement « en cours » est considéré mort (processus tué, hébergeur, panne) et libère son verrou.
 # Les traitements du cron ont une durée bornée : un verrou resté posé ne doit jamais bloquer le rattrapage pendant des heures.
-STALE_MINUTES = {'catchup': 8, 'maintenance': 45}
+STALE_MINUTES = {'catchup': 8, 'maintenance': 45, 'metrics': 45, 'etf': 45}
 STALE_PREFIX = (('intraday:', 20), ('daily:', 45))
+COMPUTE = ('maintenance', 'metrics', 'etf')     # écrivent les mêmes tables dérivées : jamais deux en même temps (même verrou), qu'ils viennent du cron ou d'une demande explicite
 STALE_DEFAULT = 180            # traitements manuels de l'administration (import, filtres, historiques)
 
 
@@ -40,14 +41,15 @@ def run_job(conn, job_type, fn, trigger='cron'):
     """Exécute fn(log) -> (items_ok, items_error, résumé). Refuse de démarrer si le même type est déjà en cours."""
     recover_interrupted(conn)
     # Verrou nommé le temps de « vérifier puis créer » : deux processus simultanés (cron + test depuis l'administration) ne démarrent pas le même type.
-    lock = 'jigo:job:' + job_type
+    group = COMPUTE if job_type in COMPUTE else (job_type,)
+    lock = 'jigo:job:' + ('compute' if job_type in COMPUTE else job_type)
     with conn.cursor() as cur:
         cur.execute('SELECT GET_LOCK(%s, 0) AS got', (lock,))
         if not cur.fetchone()['got']:
             return None
     try:
         with conn.cursor() as cur:
-            cur.execute("SELECT id FROM jobs WHERE job_type=%s AND status='running'", (job_type,))
+            cur.execute("SELECT id FROM jobs WHERE job_type IN %s AND status='running'", (group,))
             if cur.fetchone():
                 return None
             cur.execute("SELECT id FROM jobs WHERE job_type=%s AND status='queued' ORDER BY id LIMIT 1", (job_type,))

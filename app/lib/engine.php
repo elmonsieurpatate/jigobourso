@@ -26,7 +26,7 @@ function engine_release($fh): void { if (is_resource($fh)) { flock($fh, LOCK_UN)
 // stderr va dans un fichier temporaire (jamais dans un tube : un tube plein bloquerait les deux processus).
 function engine_call(string $command, array $request) {
     $env = [];
-    foreach (['JIGO_DB_HOST', 'JIGO_DB_PORT', 'JIGO_DB_NAME', 'JIGO_DB_USER', 'JIGO_DB_PASSWORD', 'PATH', 'HOME'] as $k) {
+    foreach (['JIGO_DB_HOST', 'JIGO_DB_PORT', 'JIGO_DB_SOCKET', 'JIGO_DB_NAME', 'JIGO_DB_USER', 'JIGO_DB_PASSWORD', 'PATH', 'HOME'] as $k) {
         $v = cfg($k);
         if ($v !== null) $env[$k] = $v;
     }
@@ -74,7 +74,7 @@ function engine_spawn(string $command, string $log, array $args = []): int {
     if (!function_exists('proc_open')) throw new ApiError('proc_open indisponible sur cet hébergement', 503);
     $sh = 'nohup ' . escapeshellarg(python_bin()) . ' -m engine.cli ' . escapeshellarg($command) . implode('', array_map(fn($a) => ' ' . escapeshellarg((string)$a), $args)) . ' >> ' . escapeshellarg($log) . ' 2>&1 < /dev/null & echo $!';
     $env = [];
-    foreach (['JIGO_DB_HOST', 'JIGO_DB_PORT', 'JIGO_DB_NAME', 'JIGO_DB_USER', 'JIGO_DB_PASSWORD', 'JIGO_DATA_DIR', 'JIGO_BACKUP_DIR', 'JIGO_FDB_REF', 'PATH', 'HOME'] as $k) {
+    foreach (['JIGO_DB_HOST', 'JIGO_DB_PORT', 'JIGO_DB_SOCKET', 'JIGO_DB_NAME', 'JIGO_DB_USER', 'JIGO_DB_PASSWORD', 'JIGO_DATA_DIR', 'JIGO_BACKUP_DIR', 'JIGO_FDB_REF', 'PATH', 'HOME'] as $k) {
         $v = cfg($k);
         if ($v !== null) $env[$k] = $v;
     }

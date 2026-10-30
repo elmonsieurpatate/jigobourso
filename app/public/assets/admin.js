@@ -9,11 +9,11 @@
   const STATE = { completed: ['ok', 'Terminé'], completed_with_errors: ['wait', 'Terminé avec erreurs'], failed: ['ko', 'Échec'], running: ['info', 'En cours'], queued: ['info', 'En attente'], paused: ['wait', 'En pause'], interrupted: ['ko', 'Interrompu'] };
   const TSTATE = { ok: ['ok', 'Fonctionne'], late: ['wait', 'En retard'], error: ['ko', 'En erreur'], inactive: ['', 'Désactivée'], never: ['wait', 'Jamais exécutée'], running: ['info', 'En cours'] };
   const JOBNAME = { fdb_import: 'Import FinanceDatabase', fdb_filter: 'Filtrage FinanceDatabase', yahoo_info: 'Import des informations Yahoo', yahoo_filter: 'Filtrage Yahoo', history: 'Import / mise à jour des historiques',
-    maintenance: 'Entretien après collecte', catchup: 'Rattrapage des données manquantes', intraday: 'Barres de 15 min', daily: 'Clôtures quotidiennes', catalogue: 'Import FinanceDatabase (ancien)', nightly: 'Analyse de nuit (ancienne)' };
+    metrics: 'Indicateurs et classements', etf: 'Similarité des ETF', maintenance: 'Entretien après collecte', catchup: 'Rattrapage des données manquantes', intraday: 'Barres de 15 min', daily: 'Clôtures quotidiennes', catalogue: 'Import FinanceDatabase (ancien)', nightly: 'Analyse de nuit (ancienne)' };
   const jobName = t => JOBNAME[t] || (t.includes(':') ? (JOBNAME[t.split(':')[0]] || t.split(':')[0]) + ' · ' + t.split(':')[1] : t);
   const nf = v => v == null ? '–' : J.num(+v, 0);
   const dur = s => s == null ? '–' : s < 90 ? Math.round(s) + ' s' : s < 5400 ? Math.round(s / 60) + ' min' : (s / 3600).toFixed(1).replace('.', ',') + ' h';
-  const MANUAL = ['fdb_import', 'fdb_filter', 'yahoo_info', 'yahoo_filter', 'history'];
+  const MANUAL = ['fdb_import', 'fdb_filter', 'yahoo_info', 'yahoo_filter', 'history', 'maintenance', 'metrics', 'etf'];
 
   async function render() {
     page.innerHTML = '<div class="empty"><span class="spinner"></span></div>';
@@ -275,7 +275,7 @@
           <div class="kpi"><span class="l">Clé cron sur le site</span><span class="v" style="font-size:18px">${site.cron_key_present ? 'Présente' : 'Absente'}</span><span class="small muted">adresse : ${J.esc(site.cron_path)}</span></div></div>
         ${s.diagnosis.length ? `<div class="notice" style="margin-top:12px"><b>Diagnostic</b><ul style="margin:6px 0 0 18px">${s.diagnosis.map(d => `<li class="small">${J.esc(d)}</li>`).join('')}</ul></div>` : '<p class="small muted" style="margin:10px 0 0">Aucun problème détectable.</p>'}
         ${!site.cron_key_present ? '<div class="notice err" style="margin-top:10px">Le site n’a pas de clé cron : l’adresse du cron répondra « clé absente ».</div>' : ''}
-        <div class="row gap-s" style="margin-top:12px;flex-wrap:wrap"><button class="btn" id="cr-test">Tester le déclenchement</button><button class="btn" id="cr-run">Lancer une collecte maintenant</button><span class="small muted">Le test lance un passage comme le ferait le cron, sans le compter comme passage du cron. La collecte lance « Importer / mettre à jour les historiques ».</span></div>
+        <div class="row gap-s" style="margin-top:12px;flex-wrap:wrap"><button class="btn" id="cr-test">Tester le déclenchement</button><button class="btn" id="cr-run">Lancer une collecte maintenant</button><button class="btn" id="cr-maint">Lancer l’entretien maintenant</button><button class="btn" id="cr-etf">Relancer les ETF seuls</button><span class="small muted">Le test lance un passage comme le ferait le cron, sans le compter comme passage du cron. La collecte lance « Importer / mettre à jour les historiques ».</span></div>
         ${c.last_test ? `<p class="small muted" style="margin:8px 0 0">Dernier test manuel : ${J.dateTime(c.last_test.at)} · ${J.esc(c.last_test.done || '')}</p>` : ''}</div>
       <div class="card" style="margin-top:16px"><div class="row between"><h2 style="margin:0">Ce que fait le cron</h2><button class="btn primary" id="cr-save">Enregistrer</button></div>
         <p class="small muted">Uniquement l’entretien des historiques et cotations du catalogue final (et des titres détenus). Il n’importe jamais FinanceDatabase, ne filtre jamais, ne change jamais le catalogue. Après la collecte quotidienne, les indicateurs de l’Explorer sont recalculés sans nouvelle sélection.</p>
@@ -298,6 +298,8 @@
       try { await J.post('admin/cron/save', cfg); J.toast('Planification enregistrée'); render(); } catch (e) { J.toast(e.message); }
     };
     J.$('#cr-test').onclick = async () => { try { const r = await J.post('admin/cron/test'); J.toast(r.note); setTimeout(render, 6000); } catch (e) { J.toast(e.message); } };
+    J.$('#cr-maint').onclick = () => run('maintenance', 'Lancer l’entretien maintenant', 'Sauvegarde des données utilisateur, cours, indicateurs, ETF, suivi, rétention. Démarre tout de suite ; refusé si un calcul est déjà en cours.');
+    J.$('#cr-etf').onclick = () => run('etf', 'Relancer la similarité des ETF', 'Recalcule seulement la similarité des ETF. Ne touche ni aux classements ni aux sauvegardes.');
     J.$('#cr-run').onclick = () => run('history', 'Lancer une collecte maintenant', 'Lance « Importer / mettre à jour les historiques » sur le catalogue final.');
   }
 

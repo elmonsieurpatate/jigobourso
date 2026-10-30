@@ -179,7 +179,7 @@ else
   echo "aucune migration en attente"
 fi
 .venv/bin/python -c "import engine.cli" && echo "moteur importable"
-# Le déploiement ne recalcule rien : il demande seulement à la maintenance (cron, moins de 5 minutes) de recalculer les données dérivées avec le nouveau code.
+# Le déploiement ne recalcule rien : il pose seulement la demande de recalcul (lancé à la toute fin, détaché ; à défaut le cron la reprend) pour recalculer les données dérivées avec le nouveau code.
 .venv/bin/python -c "from engine.shared import settings; from engine.shared.db import connect; c = connect(); settings.put(c, 'maintenance_pending', 'deploy'); c.commit()"
 echo "recalcul des données dérivées demandé à la maintenance (aucun calcul pendant le déploiement)"
 echo "== Contrôle d'intégrité financière"
@@ -241,5 +241,7 @@ fi
 
 remote_sh "ROOT=$root SHA=$sha VERSION=$version bash -s" <<'REMOTE'
 printf 'commit=%s\nversion=%s\ndate=%s\n' "$SHA" "$VERSION" "$(date -u +%FT%TZ)" > "$ROOT/.deployed"
+# Le recalcul demandé démarre tout de suite, détaché (le déploiement ne l'attend pas) ; s'il ne part pas, la demande reste posée et le cron la reprend.
+cd "$ROOT" && set -a && . ./private/env && set +a && PYTHONPATH=$ROOT nohup .venv/bin/python -m engine.cli job --name maintenance --trigger system >> logs/admin.log 2>&1 < /dev/null &
 REMOTE
 echo "Déploiement terminé : $sha"

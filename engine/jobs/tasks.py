@@ -22,7 +22,7 @@ from engine.market.yahoo import RateLimited
 from engine.shared import settings
 from engine.shared.db import ensure
 from . import schedule
-from .runner import recover_interrupted, run_job
+from .runner import COMPUTE, recover_interrupted, run_job
 
 FDB_URL = 'https://github.com/JerBouma/FinanceDatabase.git'
 
@@ -434,13 +434,13 @@ def tick(conn, client, now=None, trigger='cron'):
 
 
 JOBS = ('fdb_import', 'fdb_filter', 'yahoo_info', 'yahoo_filter', 'history')
-MANUAL_LABELS = {'fdb_import': 'Import FinanceDatabase', 'fdb_filter': 'Filtrage FinanceDatabase', 'yahoo_info': 'Import des informations Yahoo',
+MANUAL_LABELS = {'maintenance': 'Entretien après collecte', 'metrics': 'Indicateurs et classements', 'etf': 'Similarité des ETF', 'fdb_import': 'Import FinanceDatabase', 'fdb_filter': 'Filtrage FinanceDatabase', 'yahoo_info': 'Import des informations Yahoo',
                  'yahoo_filter': 'Filtrage Yahoo', 'history': 'Import / mise à jour des historiques'}
 
 
 def precheck(conn, name):
     """Message clair si l'étape précédente n'a pas été faite (ValueError)."""
-    if name not in JOBS:
+    if name not in JOBS + COMPUTE:
         raise ValueError('Traitement inconnu')
     with conn.cursor() as cur:
         if name == 'fdb_filter':
@@ -451,7 +451,7 @@ def precheck(conn, name):
             cur.execute('SELECT COUNT(*) n FROM latest_prices WHERE quote_at IS NOT NULL')
             if not cur.fetchone()['n']:
                 raise ValueError('Importez d’abord les informations Yahoo (étape 3).')
-        cur.execute("SELECT job_type FROM jobs WHERE status IN ('queued','running') AND job_type IN %s LIMIT 1", (JOBS,))
+        cur.execute("SELECT job_type FROM jobs WHERE status IN ('queued','running') AND job_type IN %s LIMIT 1", (COMPUTE if name in COMPUTE else JOBS,))
         busy = cur.fetchone()
     if name == 'yahoo_info' and not info_set(conn):
         raise ValueError('Aucun titre à interroger : filtrez d’abord FinanceDatabase (étape 2).')
@@ -461,9 +461,19 @@ def precheck(conn, name):
         raise ValueError(f'« {MANUAL_LABELS[busy["job_type"]]} » est déjà en cours : attendez sa fin.')
 
 
+def _recompute(conn, now, log, which):
+    """Demande explicite d'un seul calcul dérivé (relance après un échec) : même code que l'étape de la maintenance, mêmes verrous."""
+    if which == 'metrics':
+        n_series, n_metrics = _step(log, 'Indicateurs et classements', lambda: compute.compute_all(conn, now), lambda r: f'{r[0]} séries, {r[1]} lignes de mesures')
+        return n_series, 0, f'séries {n_series}, mesures {n_metrics}'
+    r = _step(log, 'Similarité des ETF', lambda: etf.build(conn, now), lambda r: f'{r["etfs"]} ETF, {r["with_minimum_history"]} avec un historique suffisant')
+    return r['etfs'], 0, f'{r["etfs"]} ETF, {r["with_minimum_history"]} avec un historique suffisant'
+
+
 def run_manual(conn, client, name, now=None, trigger='admin'):
     """Lance un traitement de construction du catalogue (ou la collecte manuelle). Renvoie l'identifiant du traitement."""
     now = now or hours.utcnow()
     fns = {'fdb_import': lambda log: fdb_import(conn, log, now), 'fdb_filter': lambda log: fdb_filter(conn, log, now), 'yahoo_info': lambda log: yahoo_info(conn, client, now, log),
-           'yahoo_filter': lambda log: yahoo_filter(conn, log, now), 'history': lambda log: history(conn, client, now, log)}
+           'yahoo_filter': lambda log: yahoo_filter(conn, log, now), 'history': lambda log: history(conn, client, now, log),
+           'maintenance': lambda log: maintenance(conn, client, now, log), 'metrics': lambda log: _recompute(conn, now, log, 'metrics'), 'etf': lambda log: _recompute(conn, now, log, 'etf')}
     return run_job(conn, name, fns[name], trigger=trigger)

@@ -150,3 +150,14 @@ def test_deploy_script_no_longer_recalculates_or_waits():
         assert forbidden not in text
     assert "'maintenance_pending', 'deploy'" in text and text.count('ControlMaster=auto') == 1
     assert subprocess.run(['bash', '-n', str(ROOT / 'ops/deploy.sh')]).returncode == 0
+
+
+def test_explicit_actions_start_now_and_deploy_starts_the_recalculation_detached():
+    admin = (ROOT / 'app/routes/admin.php').read_text()
+    for job in ("'maintenance'", "'metrics'", "'etf'"):
+        assert job in admin
+    assert admin.count("engine_spawn('job'") == 1                                  # un seul lanceur, détaché : aucune requête HTTP n'attend le calcul
+    assert tasks.COMPUTE == ('maintenance', 'metrics', 'etf')
+    assert set(tasks.COMPUTE) <= set(tasks.MANUAL_LABELS)
+    deploy = (ROOT / 'ops/deploy.sh').read_text()
+    assert '--name maintenance --trigger system' in deploy and deploy.index('.deployed') < deploy.index('--name maintenance')
