@@ -7,3 +7,8 @@ moteur importable
 == Contrôle d'intégrité financière
 PHP valide
 == Attente du recalcul des mesures et classements
+Échec du recalcul analytique (code de retour failed:1)
+Échec déploiement : étape recalcul analytique sur les historiques existants (code 1)
+moteur importable après restauration
+site OK : accueil 200, API répond (200)
+Code restauré ; les données et la base n'ont pas été touchées (les migrations déjà appliquées sont additives).
