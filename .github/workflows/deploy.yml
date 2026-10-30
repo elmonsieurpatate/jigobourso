@@ -1,7 +1,7 @@
 name: Jigobourso V2 — tests puis déploiement Hostinger
 on:
   push:
-    branches: [main, negociabilite]      # la branche d'essai exécute les tests (et le navigateur) ; seul main déploie
+    branches: [main]
   workflow_dispatch:
     inputs:
       operation:
@@ -77,7 +77,7 @@ jobs:
           php -S 127.0.0.1:18089 -t app/public > audit-results/php-server.log 2>&1 &
           php_pid=$!
           show() { for f in audit-results/browser.log audit-results/tradability.log audit-results/php-server.log; do [ -f "$f" ] && echo "::error title=$f::$(grep -v ' 200 \| Accepted\| Closing\| \[200\]' "$f" | tail -c 1400 | tr '\n' '|')"; done; true; }
-          trap 'show; kill "$php_pid"' EXIT
+          trap 'rc=$?; if [ "$rc" -ne 0 ]; then show; fi; kill "$php_pid"' EXIT      # les journaux ne sont affichés qu'en cas d'échec
           node tests/e2e/financial.cjs > audit-results/browser.log 2>&1
           PYTHONPATH="$PWD" python tests/e2e/tradability_seed.py
           timeout 180s node tests/e2e/tradability.cjs > audit-results/tradability.log 2>&1
