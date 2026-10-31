@@ -157,6 +157,7 @@ CREATE TABLE series_state (                                     -- état de la s
   expected_252    SMALLINT UNSIGNED NULL,
   risk_score      TINYINT UNSIGNED NULL,                        -- RÉSERVÉ : jamais calculé (toujours NULL)
   quality         ENUM('ok','insufficient','inconsistent_adjustments','stale','break','incomplete','calendar_unknown') NOT NULL DEFAULT 'ok',
+  momentum_6m     DECIMAL(12,6) NULL,                           -- EXPÉRIMENTAL : variation du cours (%) entre J−126 et J−21 séances ; NULL = non évaluable
   PRIMARY KEY (listing_id),
   CONSTRAINT fk_state_listing FOREIGN KEY (listing_id) REFERENCES listings(id)
 ) ENGINE=InnoDB;

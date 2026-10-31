@@ -3,7 +3,7 @@ import datetime
 import json
 
 from .measures import window_metrics, technical_state
-from .series import usable_closes, find_breaks, clean_window, analyze_series
+from .series import usable_closes, find_breaks, clean_window, analyze_series, momentum_6_1, MOMENTUM_LONG
 from . import strategy
 from ..market import collect
 from ..market.calendar import session_dates, window_calendars
@@ -75,8 +75,8 @@ def compute_all(conn, now, batch=400):
         for i in range(0, len(metric_rows), 5000):
             cur.executemany('''INSERT INTO strategy_metrics(listing_id,sessions,slope,slope_log,r2,perf,volatility,drawdown,er,acceleration,observations,expected_closes,coverage)
                                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)''', metric_rows[i:i + 5000])
-        cur.executemany('''INSERT INTO series_state(listing_id,computed_at,last_close_date,closes_count,close_px,ma20,ma50,ma50_prev,daily_change,gap_to_ma20,break_age,break_dates,coverage_252,observed_252,expected_252,quality)
-                           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)''', state_rows)
+        cur.executemany('''INSERT INTO series_state(listing_id,computed_at,last_close_date,closes_count,close_px,ma20,ma50,ma50_prev,daily_change,gap_to_ma20,break_age,break_dates,coverage_252,observed_252,expected_252,momentum_6m,quality)
+                           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)''', state_rows)
     conn.commit()
     return len(state_rows), len(metric_rows)
 
@@ -99,4 +99,5 @@ def _compute_one(lid, mic, rows, splits, windows, market_latest, stamp, metric_r
     quality = 'insufficient' if len(closes) < 22 else 'stale' if stale else 'break' if breaks and breaks[-1] > len(closes) - 253 else 'ok'
     state_rows.append((lid, stamp, dates[-1] if dates else None, len(closes), t['close'], _dec(t['ma20']), _dec(t['ma50']), _dec(t['ma50_prev']),
                        _dec(t['daily_change'], 4), _dec(t['gap_to_ma20'], 4), (len(closes) - 1 - breaks[-1]) if breaks else None,
-                       ','.join(dates[i] for i in breaks[-3:])[:80] or None, year.get('coverage'), year.get('observations'), year.get('expected_closes'), quality))
+                       ','.join(dates[i] for i in breaks[-3:])[:80] or None, year.get('coverage'), year.get('observations'), year.get('expected_closes'),
+                       _dec(momentum_6_1(dates, closes, breaks, (session_windows or {}).get(MOMENTUM_LONG)), 6), quality))

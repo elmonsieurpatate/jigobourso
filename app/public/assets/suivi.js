@@ -3,9 +3,9 @@
   if (!await J.init('suivi')) return;
   const s = await J.api('suivi'), page = J.$('#page');
   if (!s.days) { page.innerHTML = '<div class="empty">Aucun classement enregistré pour l’instant : le premier le sera cette nuit.</div>'; return; }
-  const HZ = { 1: '1 séance (le lendemain)', 3: '3 séances', 5: '5 séances (1 semaine)' };
+  const HZ = { 1: '1 séance (le lendemain)', 3: '3 séances', 5: '5 séances (1 semaine)', 21: '21 séances (environ 1 mois)', 63: '63 séances (environ 3 mois)' };
   const GROUPS = { equity: 'Actions', etf: 'ETF' };
-  const NAMES = { '*': 'Toutes les stratégies', regular: 'Croissance régulière', fast: 'Croissance rapide', recovery: 'Rebond', low_volatility: 'Hausse calme' };
+  const NAMES = { '*': 'Toutes les stratégies', regular: 'Croissance régulière', fast: 'Croissance rapide', recovery: 'Rebond', low_volatility: 'Hausse calme', momentum: 'Momentum 6 mois (expérimental)' };
   Object.entries(s.presets).forEach(([k, p]) => { p.label = NAMES[k] || p.label; });
   let preset = '*', group = 'equity';
   const ready = Math.max(...Object.values(s.resolved_days));

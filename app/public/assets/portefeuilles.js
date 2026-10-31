@@ -4,7 +4,7 @@
   const page = J.$('#page');
   let list = (await J.api('portfolios')).portfolios;
   let current = +new URLSearchParams(location.search).get('id') || (list.find(p => p.is_default) || list[0] || {}).id;
-  const NAMES = { regular: 'Croissance régulière', fast: 'Croissance rapide', recovery: 'Rebond', low_volatility: 'Hausse calme' };
+  const NAMES = { regular: 'Croissance régulière', fast: 'Croissance rapide', recovery: 'Rebond', low_volatility: 'Hausse calme', momentum: 'Momentum 6 mois (expérimental)' };
 
   const px = (v, c) => v === null || v === undefined ? '–' : J.money(v, c || 'EUR');
   const splitNotice = positions => positions.filter(p => p.splits_applied && p.splits_applied.length).map(p => `<div class="notice" style="margin-top:14px"><b>${J.esc(p.name_catalogue || p.name || p.symbol)}</b> : ${p.splits_applied.map(a => a.ratio >= 1 ? `split ${J.num(a.ratio, 2)} pour 1` : `regroupement ${J.num(1 / a.ratio, 2)} pour 1`).join(', ')} pris en compte automatiquement (Yahoo a ajusté ses cours) : la quantité affichée est celle d’aujourd’hui, le prix de revient total est inchangé.</div>`).join('');

@@ -14,7 +14,7 @@ from .repository import recommendable_candidates
 from .series import usable_closes, find_breaks, prepare_series
 from engine.market.calendar import window_calendars, session_dates, next_session_dates
 
-HORIZONS = (1, 3, 5)
+HORIZONS = (1, 3, 5, 21, 63)      # séances ; 21 et 63 ajoutés avec le Momentum 6 mois (ils s'appliquent à toutes les stratégies suivies, sans changer aucune d'elles)
 TOP_N = 20              # titres gardés par groupe (actions / ETF) et par stratégie
 MAX_STALE_DAYS = 5      # base de calcul trop ancienne : le titre n'est pas évalué ce jour-là
 
@@ -184,7 +184,7 @@ def update_outcomes(conn):
                 cur.execute(f"SELECT id, mic FROM listings WHERE id IN ({','.join(['%s'] * len(part))})", part)
                 mic_by_id.update({r['id']: r['mic'] for r in cur.fetchall()})
         start = datetime.date.fromisoformat(day) - datetime.timedelta(days=10)
-        stop = datetime.date.fromisoformat(day) + datetime.timedelta(days=21)
+        stop = datetime.date.fromisoformat(day) + datetime.timedelta(days=int(max(HORIZONS) * 1.7) + 10)      # 63 séances ≈ 90 jours calendaires, avec les jours fériés
         bars = defaultdict(list)
         with conn.cursor() as cur:
             for i in range(0, len(ids), 3000):

@@ -3,7 +3,10 @@
   const user = await J.init('explorer'); if (!user) return;
   const [P, ov] = await Promise.all([J.api('strategy/presets'), J.api('data/overview').catch(() => null)]);
   const NAMES = { regular: ['Croissance régulière', 'Une hausse soutenue et bien alignée, sur un mois et trois mois.'], fast: ['Croissance rapide', 'Une hausse marquée sur la semaine et le mois, même irrégulière.'],
-    recovery: ['Rebond', 'Repart à la hausse après six mois sans progrès notable.'], low_volatility: ['Hausse calme', 'Une hausse douce avec peu de variations et de replis.'] };
+    recovery: ['Rebond', 'Repart à la hausse après six mois sans progrès notable.'], low_volatility: ['Hausse calme', 'Une hausse douce avec peu de variations et de replis.'],
+    momentum: ['Momentum 6 mois', 'Progression du cours entre il y a 6 mois et il y a 1 mois (le dernier mois est ignoré). Essai : décrit le passé.'] };
+  const EXP = new Set(P.experimental || []);
+  const EXP_NOTE = 'Stratégie expérimentale : elle classe les titres selon leur progression passée entre il y a 6 mois et il y a 1 mois. Elle décrit le passé, ne prédit pas la suite et n’a pas démontré de supériorité sur les autres profils.';
   const CRIT = { min_slope: 'pente insuffisante', min_r2: 'régularité insuffisante', min_er: 'efficacité insuffisante', min_return: 'performance trop faible', max_return: 'performance trop forte',
     max_volatility: 'volatilité trop forte', max_drawdown: 'repli trop fort', data: 'historique insuffisant ou rupture de cours', freshness: 'cours non à jour',
     above_ma50: 'cours sous la moyenne 50 j', ma50_rising: 'moyenne 50 j orientée à la baisse', max_daily_change: 'variation du jour trop forte', max_gap_ma20: 'écart à la moyenne 20 j trop grand' };
@@ -36,12 +39,12 @@
 
   function freeConfig() { const c = JSON.parse(JSON.stringify(P.presets.regular)); c.name = 'free'; c.periods.forEach(p => { p.enabled = p.id === 'month'; ['min_slope', 'min_r2', 'min_er', 'min_return', 'max_return', 'max_volatility', 'max_drawdown'].forEach(f => p[f] = null); }); c.ranking.mode = 'trend'; return c; }
   function drawStrategies() {
-    el('strats').innerHTML = Object.keys(P.presets).map(k => `<button class="strat ${S.preset === k ? 'on' : ''}" data-k="${k}"><b>${NAMES[k][0]}</b><span>${NAMES[k][1]}</span></button>`).join('') +
+    el('strats').innerHTML = Object.keys(P.presets).map(k => `<button class="strat ${S.preset === k ? 'on' : ''}" data-k="${k}"><b>${NAMES[k][0]}${EXP.has(k) ? ' <i class="badge">expérimental</i>' : ''}</b><span>${NAMES[k][1]}</span></button>`).join('') +
       `<button class="strat ${S.preset === 'free' ? 'on' : ''}" data-k="free"><b>Recherche libre</b><span>Aucun critère de départ : seuls vos filtres et vos réglages décident.</span></button>` +
       (S.preset === 'custom' ? `<button class="strat on"><b>Vos réglages${S.label ? ' · ' + J.esc(S.label) : ''}</b><span>Les critères ci-dessous sont appliqués tels quels, sans passer par un profil.</span></button>` : '');
     J.$$('#strats .strat[data-k]').forEach(b => b.onclick = () => { S.label = null; S.preset = b.dataset.k; S.config = S.preset === 'free' ? freeConfig() : JSON.parse(JSON.stringify(P.presets[S.preset])); S.page = 1; persist(); drawStrategies(); drawEditor(); load(); });
     const act = S.config.periods.filter(p => p.enabled).map(p => J.PERIODS[p.id].toLowerCase() + ' (' + p.sessions + ' séances)');
-    el('strategy-summary').textContent = 'Périodes : ' + act.join(', ') + ' · classement par ' + ({ trend: 'pente', performance: 'performance', regularity: 'régularité', stability: 'stabilité' }[S.config.ranking.mode]);
+    el('strategy-summary').textContent = 'Périodes : ' + act.join(', ') + ' · classement par ' + ({ trend: 'pente', performance: 'performance', regularity: 'régularité', stability: 'stabilité', momentum: 'momentum 6 mois (J−126 → J−21 séances)' }[S.config.ranking.mode]) + (EXP.has(S.preset) ? ' · ' + EXP_NOTE : '');
   }
   function view() {
     const v = { q: el('q').value.trim(), kind: el('kind').value, market: el('market').value };
@@ -67,7 +70,7 @@
       <label>Pente exigée<select id="g-slope"><option value="none">Aucune</option>${Object.entries({ gentle: 'Douce (doublement en ~8 ans)', moderate: 'Modérée (~4 ans)', strong: 'Forte (~2 ans)', very_strong: 'Très forte (~1 an)' }).map(([k, l]) => `<option value="${k}" ${k === sl ? 'selected' : ''}>${l}</option>`).join('')}${sl === 'custom' ? '<option value="custom" selected>Personnalisée</option>' : ''}</select></label>
       <label>Régularité exigée<select id="g-r2"><option value="none">Aucune</option>${Object.entries({ flexible: 'Souple (R² ≥ 0,56)', balanced: 'Équilibrée (R² ≥ 0,75)', strict: 'Stricte (R² ≥ 0,89)' }).map(([k, l]) => `<option value="${k}" ${k === rl ? 'selected' : ''}>${l}</option>`).join('')}${rl === 'custom' ? '<option value="custom" selected>Personnalisée</option>' : ''}</select></label>
       <label>Tolérance aux corrections<select id="g-dd">${[['', 'Aucune limite'], ['5', 'Repli max. 5 %'], ['10', 'Repli max. 10 %'], ['20', 'Repli max. 20 %']].map(([v, l]) => `<option value="${v}" ${v === dd ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
-      <label>Classer par<select id="r-mode">${[['trend', 'Pente'], ['performance', 'Performance'], ['regularity', 'Régularité'], ['stability', 'Stabilité (faible volatilité)']].map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select></label></div>
+      <label>Classer par<select id="r-mode">${[['trend', 'Pente'], ['performance', 'Performance'], ['regularity', 'Régularité'], ['stability', 'Stabilité (faible volatilité)'], ['momentum', 'Momentum 6 mois (expérimental)']].map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select></label></div>
       <p class="muted small" style="margin:8px 0 0">Ces réglages s’appliquent à chaque période cochée. Pour un réglage différent par période, passez au réglage détaillé.</p></div>
     <div id="detail" ${S.level === 'detail' ? '' : 'hidden'}><div class="table-wrap"><table><thead><tr><th>Période</th><th class="num">Pente min. (%/séance)</th><th class="num">R² min.</th><th class="num">ER min.</th><th class="num">Perf. min. (%)</th><th class="num">Perf. max. (%)</th><th class="num">Volat. max.</th><th class="num">Repli max. (%)</th><th class="num">Poids</th></tr></thead><tbody>
     ${c.periods.map(p => `<tr><td>${J.PERIODS[p.id]}</td><td class="num">${num(p, 'min_slope', .01)}</td><td class="num">${num(p, 'min_r2', .01)}</td><td class="num">${num(p, 'min_er', .01)}</td><td class="num">${num(p, 'min_return', 1)}</td><td class="num">${num(p, 'max_return', 1)}</td><td class="num">${num(p, 'max_volatility', .1)}</td><td class="num">${num(p, 'max_drawdown', 1)}</td><td class="num"><input type="number" min="0" step=".5" data-w="${p.id}" value="${(c.ranking.weights || {})[p.id] ?? 1}" style="width:64px"></td></tr>`).join('')}</tbody></table></div>
@@ -75,7 +78,7 @@
       <label class="row gap-s small"><input type="checkbox" id="t-ma50r" ${c.technical.ma50_rising ? 'checked' : ''}> Moyenne 50 j en hausse</label>
       <label class="row gap-s small">Variation du jour max. (%) <input type="number" id="t-day" value="${c.technical.max_daily_change ?? ''}" style="width:70px"></label>
       <label class="row gap-s small">Écart moy. 20 j max. (%) <input type="number" id="t-gap" value="${c.technical.max_gap_ma20 ?? ''}" style="width:70px"></label>
-      <label class="row gap-s small">Classer par <select id="r-mode2">${[['trend', 'Pente'], ['performance', 'Performance'], ['regularity', 'Régularité'], ['stability', 'Stabilité']].map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select></label></div></div>
+      <label class="row gap-s small">Classer par <select id="r-mode2">${[['trend', 'Pente'], ['performance', 'Performance'], ['regularity', 'Régularité'], ['stability', 'Stabilité'], ['momentum', 'Momentum 6 mois']].map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select></label></div></div>
     <div id="editor-msg" class="notice err" hidden style="margin-top:10px"></div>
     <div class="row" style="margin-top:12px"><button class="btn primary" id="apply">Appliquer</button><select id="save-to" aria-label="Portefeuille"><option value="">Enregistrer pour un portefeuille…</option></select><button class="btn" id="save-btn">Enregistrer</button></div>`;
     J.$('#r-mode', box).value = c.ranking.mode; J.$('#r-mode2', box).value = c.ranking.mode;
@@ -166,7 +169,7 @@
       <td class="hide-s" title="Clôtures sur ${J.esc((lastRes || {}).curve_label || '3 mois')} : la période la plus longue de la stratégie">${J.spark(r.curve)}</td>
       <td class="num ${J.cls(m.slope)}">${m.slope !== null && m.slope !== undefined ? J.num(m.slope, 3) : '–'}</td><td class="num">${J.num(m.r2, 2)}</td><td class="num ${J.cls(m.perf)}">${J.pct(m.perf, 1)}</td>
       <td class="num">${m.volatility !== null && m.volatility !== undefined ? J.num(m.volatility, 2) : '–'}</td><td class="num">${m.drawdown !== null && m.drawdown !== undefined ? J.num(m.drawdown, 1) + ' %' : '–'}</td>
-      <td class="num">${r.volume ? J.num(r.volume, 0) : '–'}</td><td class="num">${r.score !== null && r.score !== undefined ? `<b>${J.num(r.score, 0)}</b><div class="score-bar"><i style="width:${r.score}%"></i></div>` : '–'}</td>
+      <td class="num">${r.volume ? J.num(r.volume, 0) : '–'}</td><td class="num">${r.score !== null && r.score !== undefined ? `<b>${J.num(r.score, 0)}</b><div class="score-bar"><i style="width:${r.score}%"></i></div>` : '–'}${S.config.ranking.mode === 'momentum' && r.momentum !== null && r.momentum !== undefined ? `<span class="sub ${J.cls(r.momentum)}" style="display:block" title="Variation du cours entre il y a 126 et il y a 21 séances">mom. ${J.pct(r.momentum, 1)}</span>` : ''}</td>
       <td class="hide-s small">${analystCell(r.analyst)}</td>
       <td class="num small ${r.quality && r.quality !== 'ok' ? 'warn' : ''}" title="${{ ok: 'À jour', stale: 'Clôture en retard', insufficient: 'Historique court', incomplete: 'Historique incomplet : des séances de marché sont absentes', calendar_unknown: 'Calendrier de séances indisponible pour cette place', break: 'Rupture de cours' }[r.quality] || ''}">${fresh}${r.quality && r.quality !== 'ok' ? ' ⚠' : ''}</td><td>${badge}</td></tr>`;
   }

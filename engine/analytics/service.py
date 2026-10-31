@@ -75,7 +75,7 @@ def _load_universe(conn, windows, ids=None):
         cur.execute("""SELECT l.id, l.symbol, l.mic, l.currency, i.name, i.isin, i.kind, i.country, i.category,
                               p.price, p.price_time, p.source AS price_source, p.currency AS price_currency, p.avg_volume_3m,
                        s.last_close_date, s.closes_count, s.close_px, s.ma20, s.ma50, s.ma50_prev, s.daily_change, s.gap_to_ma20, s.quality, s.break_dates,
-                       s.coverage_252, s.expected_252
+                       s.coverage_252, s.expected_252, s.momentum_6m
                        FROM v_recommendable r JOIN listings l ON l.id=r.listing_id JOIN instruments i ON i.id=l.instrument_id
                        LEFT JOIN latest_prices p ON p.listing_id=l.id LEFT JOIN series_state s ON s.listing_id=l.id""" + only, list(ids or []))
         universe = cur.fetchall()
@@ -151,7 +151,7 @@ def judge_universe(conn, config, ids=None):
             u['quality'] = 'incomplete'
         elif u['quality'] not in ('break', 'insufficient') and any(n in missing and missing[n] == 'calendar' for n in windows):
             u['quality'] = 'calendar_unknown'
-        v = strategy.judge(config, measures, tech, missing, last, expected or None)
+        v = strategy.judge(config, measures, tech, missing, last, expected or None, momentum=None if u.get('momentum_6m') is None else float(u['momentum_6m']))
         if u['quality'] == 'incomplete' and v['status'] == 'unknown':
             v['status_label'] = 'Historique incomplet'
         v.update(key=u['id'], group='etf' if u['kind'] == 'etf' else 'equity', symbol=u['symbol'], row=u)
@@ -168,7 +168,7 @@ def _row(v, rates, conn=None):
             'kind': u['kind'], 'category': u['category'], 'country': u['country'], 'pea': pea_status(u['kind'], u['country'], u['mic']) == 'probable',
             'currency': cur, 'price': price, 'price_eur': price * factor if price is not None and factor else None,
             'price_time': u['price_time'].isoformat(sep=' ') if u['price_time'] else None, 'price_source': u['price_source'],
-            'status': v['status'], 'status_label': STATUS_LABELS[v['status']], 'score': v['score'], 'rank': v['rank'],
+            'status': v['status'], 'status_label': STATUS_LABELS[v['status']], 'score': v['score'], 'rank': v['rank'], 'momentum': v.get('momentum'),
             'quality': u['quality'], 'price_stale': hours.price_is_stale(u['mic'], u['price_time'], hours.utcnow(), expected_close(conn, u['mic']) if conn is not None else None, last_collection(conn, u['mic']) if conn is not None else None), 'measures': {str(n): m for n, m in v['measures'].items()}, 'reasons': v['reasons']}
 
 
@@ -516,7 +516,7 @@ def instrument_sheet(conn, request):
         daily_volume = [None if r['volume'] is None else int(r['volume']) for r in rows]
         cur.execute("""SELECT l.id, l.mic, l.symbol, l.currency, l.status, l.is_primary FROM listings l WHERE l.instrument_id=%s AND l.id<>%s ORDER BY l.is_primary DESC, l.mic""", (u['instrument_id'], lid))
         siblings = cur.fetchall()
-        cur.execute('SELECT quality, closes_count, last_close_date, ma20, ma50, ma50_prev, daily_change, gap_to_ma20, break_dates, coverage_252, observed_252, expected_252 FROM series_state WHERE listing_id=%s', (lid,))
+        cur.execute('SELECT quality, closes_count, last_close_date, ma20, ma50, ma50_prev, daily_change, gap_to_ma20, break_dates, coverage_252, observed_252, expected_252, momentum_6m FROM series_state WHERE listing_id=%s', (lid,))
         state = cur.fetchone() or {}
     price = float(u['price']) if u['price'] is not None else None
     factor = to_eur_factor(u['price_currency'] or u['currency'], rates)
@@ -582,7 +582,7 @@ def instrument_sheet(conn, request):
         from . import etf
         sheet['etf_analysis'] = etf.load(conn, [lid]).get(lid)
         sheet['etf_compare'] = etf.compare(conn, lid)
-    sheet['strategy'] = {'name': config.get('name'), 'ranking': config['ranking']['mode'], 'source': request.get('source') or None,
+    sheet['strategy'] = {'name': config.get('name'), 'ranking': config['ranking']['mode'], 'source': request.get('source') or None, 'experimental': config.get('name') in strategy.EXPERIMENTAL,
                          'technical': {k: v for k, v in config['technical'].items() if v},
                          'periods': [{'id': p['id'], 'label': strategy.LABELS[p['id']], 'sessions': p['sessions'], 'criteria': {f: p[f] for f, _, _ in strategy.CRITERIA if p[f] is not None}} for p in config['periods'] if p['enabled']]}
     sheet['config_periods'] = [{'id': p['id'], 'label': strategy.LABELS[p['id']], 'sessions': p['sessions'], 'enabled': p['enabled']} for p in config['periods']]
