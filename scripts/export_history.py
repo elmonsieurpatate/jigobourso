@@ -14,6 +14,7 @@ import argparse
 import csv
 import datetime
 import gzip
+import http.client
 import json
 import os
 import random
@@ -148,6 +149,12 @@ def fetch_with_retry(transport, symbol, years, sleep=time.sleep, log=lambda *_: 
             if attempt == last or not TRANSIENT.match(str(e)):
                 raise
             wait, why = RETRY_WAITS[attempt], str(e)
+        except (OSError, http.client.HTTPException, json.JSONDecodeError) as e:
+            # Connexion coupée par Yahoo (RemoteDisconnected), délai dépassé, réponse tronquée : urllib ne les convertit pas toujours en erreur Yahoo, c'est une panne passagère.
+            why = f'réseau : {type(e).__name__}'
+            if attempt == last:
+                raise YahooError(f'{why} : {e}') from e
+            wait = RETRY_WAITS[attempt]
         wait = min(900.0, wait + jitter(wait))
         if stats is not None:
             stats['retries'] = stats.get('retries', 0) + 1
@@ -180,6 +187,11 @@ def export(universe, transport, out, years=10, log=lambda *_: None, sleep=time.s
             if failures >= MAX_CONSECUTIVE_FAILURES:
                 stats['blocked'], stats['remaining'] = True, len(todo) - n - 1
                 break
+            continue
+        except Exception as e:                                       # noqa: BLE001 : imprévu : un seul titre ne doit pas faire perdre le bilan d'un export de plusieurs dizaines de minutes
+            stats['errors'] += 1
+            with open(os.path.join(out, 'errors.log'), 'a', encoding='utf-8') as fh:
+                fh.write(f"{u['key']}\t{u['symbol']}\t(imprévu) {type(e).__name__}: {e}\n")
             continue
         failures = 0
         if data is None:

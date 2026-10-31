@@ -1,6 +1,8 @@
 """Export de l'historique long (scripts/export_history.py) : lecture de la réponse Yahoo, fichiers atomiques, reprise, arrêt propre sur un 429."""
 import csv
 import gzip
+import http.client
+import socket
 import importlib.util
 import json
 import os
@@ -149,3 +151,29 @@ def test_persistent_blocking_stops_the_export_instead_of_hammering_yahoo(tmp_pat
     stats = eh.export(universe, transport, str(tmp_path), sleep=lambda w: None)
     assert stats['blocked'] and stats['errors'] == eh.MAX_CONSECUTIVE_FAILURES and stats['remaining'] == 20 - eh.MAX_CONSECUTIVE_FAILURES
     assert len(transport.calls) == eh.MAX_CONSECUTIVE_FAILURES * (len(eh.RETRY_WAITS) + 1)     # bornée : pas de boucle sans fin
+
+
+def test_dropped_connection_is_a_transient_failure_not_a_crash(tmp_path):
+    good = payload([10.0, 11.0], [9.0, 10.0])
+    drop = http.client.RemoteDisconnected('Remote end closed connection without response')
+    transport = FakeTransport({'AAA': [drop, socket.timeout('timed out'), good], 'BBB': good, 'CCC': good})
+    waits = []
+    stats = eh.export(UNIVERSE, transport, str(tmp_path), sleep=waits.append)
+    assert stats['done'] == 3 and stats['errors'] == 0 and stats['retries'] == 2 and len(waits) == 2          # reproduit le plantage observé sur le serveur
+
+
+def test_persistent_dropped_connection_is_logged_and_the_export_goes_on(tmp_path):
+    good = payload([10.0, 11.0], [9.0, 10.0])
+    transport = FakeTransport({'AAA': http.client.RemoteDisconnected('closed'), 'BBB': good, 'CCC': good})
+    stats = eh.export(UNIVERSE, transport, str(tmp_path), sleep=lambda w: None)
+    assert stats['done'] == 2 and stats['errors'] == 1 and not stats['blocked']
+    assert 'réseau : RemoteDisconnected' in open(os.path.join(str(tmp_path), 'errors.log'), encoding='utf-8').read()
+    assert not os.path.exists(eh.history_path(str(tmp_path), 1))                  # pas enregistré : redemandé à la relance
+
+
+def test_unexpected_error_on_one_title_does_not_lose_the_summary(tmp_path):
+    good = payload([10.0, 11.0], [9.0, 10.0])
+    transport = FakeTransport({'AAA': {'chart': 'inattendu'}, 'BBB': good, 'CCC': good})
+    stats = eh.export(UNIVERSE, transport, str(tmp_path), sleep=lambda w: None)
+    assert stats['done'] == 2 and stats['errors'] == 1
+    assert '(imprévu)' in open(os.path.join(str(tmp_path), 'errors.log'), encoding='utf-8').read()
