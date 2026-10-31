@@ -83,7 +83,8 @@ def test_end_to_end_structure_and_costs():
     cands = series(120, 330, 0.2, 0.002, 0.015, 5)
     study, dates = study_for(cands, dates=4)
     results = study.results(top=10, cost_bps=10, step=21, draws=100, seed=1)
-    assert results and {r['strategy'] for r in results} <= set(PRESETS) | {bt.BASELINE}
+    assert results and {r['strategy'] for r in results} <= set(PRESETS) | set(bt.DEFAULT_SIGNALS)
+    assert set(bt.DEFAULT_SIGNALS) <= {r['strategy'] for r in results} | {'mix_mom_lowvol'}
     for r in results:
         assert abs((r['excess_gross'] - r['excess_net']) - 0.2) < 0.02          # 2 × 10 pb = 0,2 point par rééquilibrage
         assert 0 < r['p_random'] <= 1 and r['dates'] <= len(dates)
@@ -147,3 +148,53 @@ def test_csv_source_gives_the_same_study_as_the_candidates_it_was_built_from(tmp
 def pytest_approx(value):
     import pytest
     return pytest.approx(value)
+
+
+def fn(name):
+    return bt.SIGNALS[name][0]
+
+
+def test_signal_formulas_on_known_series():
+    up = [100 * 1.01 ** i for i in range(300)]
+    assert abs(fn('mom_12_1')(up) - (1.01 ** 231 - 1)) < 1e-9           # de il y a 252 à il y a 21 séances
+    assert abs(fn('mom_6_1')(up) - (1.01 ** 105 - 1)) < 1e-9
+    assert abs(fn('reversal_1m')(up) + (1.01 ** 21 - 1)) < 1e-9           # les plus mauvais du mois en tête : score négatif sur une hausse
+    assert fn('near_52w_high')(up) == 1.0
+    assert fn('low_vol_126')(up) == 0 or abs(fn('low_vol_126')(up)) < 1e-12
+    assert fn('smooth_mom')(up) > 0 and fn('trend_mom')(up) is not None and fn('dual_mom')(up) is not None
+    down = [100 * 0.995 ** i for i in range(300)]
+    assert fn('trend_mom')(down) is None and fn('dual_mom')(down) is None  # filtres : pas de signal en baisse
+    assert all(f(up[:50]) is None for n, f in ((n, v[0]) for n, v in bt.SIGNALS.items()) if n not in ('mom_3_1', 'reversal_1m'))   # historique trop court
+
+
+def test_low_volatility_ranks_smooth_above_choppy():
+    rnd = random.Random(2)
+    smooth = [100 * 1.001 ** i * math.exp(rnd.gauss(0, 0.002)) for i in range(300)]
+    choppy = [100 * 1.001 ** i * math.exp(rnd.gauss(0, 0.03)) for i in range(300)]
+    assert fn('low_vol_126')(smooth) > fn('low_vol_126')(choppy)
+
+
+def test_signal_scores_ignore_the_future_and_composites_work():
+    cands = series(60, 330, 0.3, 0.003, 0.015, 3)
+    study, dates = study_for(cands, dates=3)
+    t = dates[0]
+    before = {k: dict(v) for k, v in study.scores.items() if k[0] == t}
+    rnd = random.Random(5)
+    changed = [dict(c, bars=[(d, p * (1 if d <= t else math.exp(rnd.gauss(0, 0.5))), a) for d, p, a in c['bars']]) for c in cands]
+    after_study, _ = study_for(changed, dates=3)
+    after = {k: dict(v) for k, v in after_study.scores.items() if k[0] == t}
+    assert before and before == after
+    picks = study.picks(top=10)
+    assert any(k[1] == 'mix_mom_lowvol' for k in picks) and any(k[1] == 'mom_12_1' for k in picks)
+
+
+def test_unknown_signal_is_refused_and_signals_can_be_chosen():
+    import pytest
+    with pytest.raises(ValueError):
+        bt.Study(PRESETS, (21,), ['2026-01-01'], signals=('inconnu',))
+    cands = series(60, 330, 0.2, 0.002, 0.015, 8)
+    prepared = [bt.prepare(c) for c in cands]
+    dates = bt.pick_dates(bt.reference_dates(prepared), (21,), 21, 3)
+    study = bt.Study((), (21,), dates, signals=('mom_12_1',))
+    study.add(prepared)
+    assert {r['strategy'] for r in study.results(top=10, draws=20)} == {'mom_12_1'}

@@ -4,7 +4,7 @@
 titres de chaque groupe (actions / ETF) pour chaque profil, puis mesure leur rendement `h` séances plus tard. Il le compare :
   - à l'univers entier (moyenne équipondérée des titres évaluables ce jour-là) ;
   - à des tirages au hasard de même taille (p-valeur : part des tirages qui font au moins aussi bien, sur les dates SANS chevauchement) ;
-  - à un momentum naïf « 6 mois moins le dernier mois », classé sur la même date.
+  - à d'autres règles de classement (momentum 12-1, faible volatilité, retournement…, voir SIGNALS), classées sur la même date, avec le même nombre de titres.
 Les coûts sont retirés : `--cost-bps` points de base par achat ou vente, renouvellement complet supposé à chaque rééquilibrage.
 Il rapporte aussi le risque de chaque sélection (dispersion des rendements, 10 % les plus bas, part de rendements négatifs) et des écarts MÉDIANS, moins sensibles aux cas extrêmes.
 
@@ -39,6 +39,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
 from engine.analytics import strategy                                        # noqa: E402
+from engine.analytics.measures import window_metrics                         # noqa: E402
 from engine.analytics.series import analyze_series, prepare_series          # noqa: E402
 
 MAX_STALE_DAYS = 5          # dernière clôture trop ancienne à la date t : le titre n'est pas évalué ce jour-là (comme le Suivi)
@@ -101,17 +102,95 @@ def forward_return(full, t, h):
     return 100 * (closes[j] / closes[base] - 1)
 
 
+
+# ───────── autres stratégies : des règles de classement sur les seuls cours passés ─────────
+# Chaque signal reçoit les clôtures visibles à la date t (jamais une clôture postérieure, et seulement celles qui suivent la dernière rupture de cours) et renvoie un score
+# (plus haut = mieux classé) ou None (titre non classé ce jour-là). Ajouter une idée = ajouter une ligne ici ; elle est alors testée comme les profils de l'application.
+# Règle de méthode : la liste est COURTE et fixée À L'AVANCE. Chaque variante testée de plus augmente la part de « succès » dus au hasard.
+def _mom(long, skip):
+    """Rendement entre il y a `long` séances et il y a `skip` séances (on ignore le dernier mois, dont l'effet tend à se retourner)."""
+    return lambda c: c[-1 - skip] / c[-1 - long] - 1 if len(c) > long else None
+
+
+def _vol(window):
+    def spread(c):
+        if len(c) <= window:
+            return None
+        return statistics.pstdev([math.log(c[i] / c[i - 1]) for i in range(len(c) - window, len(c))])
+    return spread
+
+
+def _low_vol(c):
+    v = _vol(126)(c)
+    return None if v is None else -v
+
+
+def _risk_adjusted(c):
+    m, v = _mom(126, 21)(c), _vol(126)(c)
+    return None if m is None or not v else m / v
+
+
+def _near_high(c):
+    return c[-1] / max(c[-252:]) if len(c) >= 252 else None
+
+
+def _trend_filtered(c):
+    m = _mom(126, 21)(c)
+    return m if m is not None and len(c) >= 200 and c[-1] > statistics.fmean(c[-200:]) else None
+
+
+def _smooth(c):
+    w = window_metrics(c[-127:]) if len(c) >= 127 else None
+    return None if not w or w['slope'] is None or w['r2'] is None else w['slope'] * w['r2']
+
+
+def _dual(c):
+    m = _mom(252, 21)(c)
+    return m if m is not None and m > 0 else None
+
+
+SIGNALS = {
+    'mom_6_1': (_mom(126, 21), "momentum simple : rendement de il y a 6 mois à il y a 1 mois (référence)"),
+    'mom_12_1': (_mom(252, 21), "momentum classique : de il y a 12 mois à il y a 1 mois"),
+    'mom_3_1': (_mom(63, 21), "momentum court : de il y a 3 mois à il y a 1 mois"),
+    'reversal_1m': (lambda c: -(c[-1] / c[-22] - 1) if len(c) > 21 else None, "retournement : les plus mauvais du dernier mois (contraire du momentum)"),
+    'low_vol_126': (_low_vol, "faible volatilité : variations quotidiennes les plus faibles sur 6 mois"),
+    'risk_adj_mom': (_risk_adjusted, "momentum 6-1 divisé par la volatilité (rendement par unité de risque)"),
+    'near_52w_high': (_near_high, "proximité du plus haut sur 12 mois"),
+    'trend_mom': (_trend_filtered, "momentum 6-1, seulement si le cours est au-dessus de sa moyenne sur 200 séances"),
+    'smooth_mom': (_smooth, "pente × régularité (R²) sur 6 mois : montée droite plutôt que saccadée"),
+    'dual_mom': (_dual, "momentum 12-1, seulement s'il est positif (momentum absolu + relatif)"),
+}
+COMPOSITES = {'mix_mom_lowvol': (('mom_12_1', 'low_vol_126'), "moyenne des rangs de momentum 12-1 et de faible volatilité")}
+DEFAULT_SIGNALS = tuple(SIGNALS) + tuple(COMPOSITES)
+
+
+def signal_labels():
+    return {**{k: v[1] for k, v in SIGNALS.items()}, **{k: v[1] for k, v in COMPOSITES.items()}}
+
+
+def _percentile_ranks(scores):
+    """{clé: rang centile 0-100} (ex æquo = moyenne des rangs), comme le classement de l'application."""
+    return strategy._percentiles(scores)
+
+
 # ───────── passage d'un lot de titres ─────────
 class Study:
     """Accumule, date par date, les verdicts retenus et les rendements futurs. Seuls les verdicts retenus restent en mémoire (le rang ne dépend que d'eux)."""
 
-    def __init__(self, presets, horizons, dates):
+    def __init__(self, presets, horizons, dates, signals=DEFAULT_SIGNALS):
         self.configs = {name: strategy.validate(strategy.preset(name)) for name in presets}
+        unknown = [n for n in signals if n not in SIGNALS and n not in COMPOSITES]
+        if unknown:
+            raise ValueError('Signal inconnu : ' + ', '.join(unknown))
+        self.signal_names = tuple(signals)
+        needed = {n for n in self.signal_names if n in SIGNALS} | {c for n in self.signal_names if n in COMPOSITES for c in COMPOSITES[n][0]}
+        self.computed = tuple(sorted(needed))
         self.horizons, self.dates = tuple(horizons), tuple(dates)
         self.windows = sorted({n for cfg in self.configs.values() for n in strategy.required_sessions(cfg)})
         self.retained = defaultdict(list)       # (date, preset) -> [verdict retenu]
         self.universe = defaultdict(dict)       # (date, group) -> {clé: {h: rendement}}
-        self.momentum = defaultdict(dict)       # (date, group) -> {clé: score}
+        self.scores = defaultdict(dict)         # (date, group, signal) -> {clé: score}
 
     def add(self, candidates):
         for raw in candidates:
@@ -126,8 +205,11 @@ class Study:
                 # Le titre est évalué et classé même sans rendement futur : écarter d'avance ceux dont l'avenir est inconnu ou cassé ferait entrer le futur dans la sélection.
                 # Leur résultat manquera seulement à la mesure (voir `results` : colonne « sél. » = titres de la sélection dont le rendement est connu).
                 self.universe[(t, c['group'])][c['key']] = {h: r for h, r in fwd.items() if r is not None}
-                if len(closes) > 127 and not any(b > len(closes) - 128 for b in breaks):
-                    self.momentum[(t, c['group'])][c['key']] = closes[-22] / closes[-127] - 1
+                usable = closes[breaks[-1]:] if breaks else closes                      # seulement les clôtures qui suivent la dernière rupture de cours
+                for name in self.computed:
+                    score = SIGNALS[name][0](usable)
+                    if score is not None and math.isfinite(score):
+                        self.scores[(t, c['group'], name)][c['key']] = score
                 for name, cfg in self.configs.items():
                     v = strategy.judge(cfg, measures, tech, missing, dates[-1], None)
                     if v['status'] == 'retained':
@@ -135,7 +217,7 @@ class Study:
 
     # ───────── agrégation ─────────
     def picks(self, top, only_dates=None):
-        """{(date, nom, groupe): [clés]} : les `top` premiers de chaque profil, et du momentum naïf."""
+        """{(date, nom, groupe): [clés]} : les `top` premiers de chaque profil de l'application et de chaque signal testé."""
         out = {}
         for t in (only_dates if only_dates is not None else self.dates):
             for name, cfg in self.configs.items():
@@ -145,10 +227,17 @@ class Study:
                     if keys:
                         out[(t, name, group)] = keys
             for group in ('equity', 'etf'):
-                scores = self.momentum.get((t, group), {})
-                keys = [k for k, _ in sorted(scores.items(), key=lambda kv: (-kv[1], str(kv[0])))[:top]]
-                if keys:
-                    out[(t, BASELINE, group)] = keys
+                for name in self.signal_names:
+                    if name in COMPOSITES:
+                        parts = [self.scores.get((t, group, c), {}) for c in COMPOSITES[name][0]]
+                        common = set.intersection(*(set(p) for p in parts)) if parts else set()
+                        ranks = [_percentile_ranks({k: p[k] for k in common}) for p in parts]
+                        scores = {k: statistics.fmean(r[k] for r in ranks) for k in common}
+                    else:
+                        scores = self.scores.get((t, group, name), {})
+                    keys = [k for k, _ in sorted(scores.items(), key=lambda kv: (-kv[1], str(kv[0])))[:top]]
+                    if keys:
+                        out[(t, name, group)] = keys
         return out
 
     def results(self, top=20, cost_bps=10.0, step=21, draws=500, seed=1, only_dates=None, period=None):
@@ -157,7 +246,7 @@ class Study:
         rng = random.Random(seed)
         cost = 2 * cost_bps / 100.0                         # aller-retour, en points de rendement, une fois par rééquilibrage
         out = []
-        for name in list(self.configs) + [BASELINE]:
+        for name in list(self.configs) + list(self.signal_names):
             for group in ('equity', 'etf'):
                 for h in self.horizons:
                     rows = []
@@ -233,10 +322,12 @@ def render(results, meta):
             k = r['risk']
             lines.append(f"{r['strategy']:<15}{r['group']:<8}{r['horizon']:>4}{k['pick_spread']:>10.1f}%{k['universe_spread']:>8.1f}%{k['pick_p10']:>9.1f}%{k['universe_p10']:>8.1f}%"
                          f"{k['pick_negative']:>10}%{k['universe_negative']:>8}%")
-        lines.append('')
+        lines += [f"{len(part)} lignes dans cette période : environ {0.05 * len(part):.1f} d'entre elles auront p < 0,05 par pur hasard.", '']
     lines += ['Lecture : « excès » = rendement moyen de la sélection moins celui de l\'univers, en points de rendement sur l\'horizon h (séances) ; « méd. » = même écart sur les médianes.',
               '« p hasard » : part de tirages au hasard de même taille qui font au moins aussi bien (petit = peu probable par chance). « t net » et « p hasard » : dates sans chevauchement.', '', 'Limites :']
     lines += [f'  - {c}' for c in CAVEATS]
+    if meta.get('signals'):
+        lines += ['', f"Stratégies testées en plus des profils de l'application ({meta.get('variants', '?')} variantes au total) :"] + [f'  - {n} : {d}' for n, d in meta['signals'].items()]
     return '\n'.join(lines)
 
 
@@ -309,6 +400,8 @@ def main(argv=None):
     ap.add_argument('--step', type=int, default=21, help='séances entre deux rééquilibrages')
     ap.add_argument('--dates', type=int, default=None, help='nombre de dates de rééquilibrage (défaut : 10 pour la base, toutes pour csv ; 0 = toutes)')
     ap.add_argument('--top', type=int, default=20, help='titres gardés par groupe et par profil')
+    ap.add_argument('--signals', nargs='+', default=list(DEFAULT_SIGNALS), help='stratégies à tester en plus des profils de l\'application (voir SIGNALS) ; liste COURTE, fixée à l\'avance')
+    ap.add_argument('--no-presets', action='store_true', help='ne pas rejouer les quatre profils de l\'application (plus rapide, moins de variantes comptées)')
     ap.add_argument('--cost-bps', type=float, default=10.0, help='coût par achat ou vente, en points de base')
     ap.add_argument('--split-date', help='AAAA-MM-JJ : sépare « calibration » (avant) et « validation » (à partir de cette date)')
     ap.add_argument('--sample', type=int, default=0, help="sous-échantillon aléatoire de l'univers (0 = tout)")
@@ -339,7 +432,8 @@ def main(argv=None):
         if len(dates) < 3:
             print('Historique insuffisant pour un test chronologique (moins de 3 dates).', file=sys.stderr)
             return 3
-        study, titles, t0 = Study(strategy.PRESETS, args.horizon, dates), 0, time.monotonic()
+        presets = () if args.no_presets else strategy.PRESETS
+        study, titles, t0 = Study(presets, args.horizon, dates, args.signals), 0, time.monotonic()
         for lot in batches():
             study.add(prepare(c) for c in lot)
             titles += len(lot)
@@ -358,7 +452,8 @@ def main(argv=None):
             results += study.results(args.top, args.cost_bps, args.step, args.draws, args.seed, only_dates=part, period=f'{label} ({part[0]} → {part[-1]}, {len(part)} dates)')
     else:
         results = study.results(args.top, args.cost_bps, args.step, args.draws, args.seed)
-    meta = {'titles': titles, 'dates': dates, 'top': args.top, 'cost_bps': args.cost_bps, 'horizons': args.horizon, 'split_date': args.split_date, 'source': args.source, 'caveats': CAVEATS}
+    meta = {'titles': titles, 'dates': dates, 'top': args.top, 'cost_bps': args.cost_bps, 'horizons': args.horizon, 'split_date': args.split_date, 'source': args.source, 'caveats': CAVEATS,
+            'variants': len(study.configs) + len(study.signal_names), 'signals': {n: signal_labels()[n] for n in study.signal_names}}
     print(render(results, meta))
     if args.json:
         with open(args.json, 'w', encoding='utf-8') as fh:
