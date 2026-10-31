@@ -46,6 +46,8 @@ MAX_STALE_DAYS = 5          # dernière clôture trop ancienne à la date t : le
 MIN_CLOSES = 30
 DECISION_BARS = 420         # clôtures visibles par le classement à chaque date (l'application en garde environ 400)
 BASELINE = 'mom_6_1'
+REGIME_LOOKBACK = 252       # le « marché » est en hausse si le titre médian de l'univers a gagné sur les 12 derniers mois, en baisse sinon
+REGIME_MIN_TITLES = 50
 CAVEATS = (
     "Univers d'aujourd'hui : les titres radiés ou sortis du catalogue sont absents (biais de survie) et le préfiltre de liquidité d'aujourd'hui est appliqué au passé.",
     "Source « db » : rendements en devise locale, hors dividendes. Source « csv » : cours ajustés des dividendes et des splits, en devise locale.",
@@ -193,6 +195,7 @@ class Study:
         self.retained = defaultdict(list)       # (date, preset) -> [verdict retenu]
         self.universe = defaultdict(dict)       # (date, group) -> {clé: {h: rendement}}
         self.scores = defaultdict(dict)         # (date, group, signal) -> {clé: score}
+        self.regime_samples = defaultdict(list)  # date -> rendements sur 12 mois des titres visibles ce jour-là
 
     def add(self, candidates):
         for raw in candidates:
@@ -208,6 +211,8 @@ class Study:
                 # Leur résultat manquera seulement à la mesure (voir `results` : colonne « sél. » = titres de la sélection dont le rendement est connu).
                 self.universe[(t, c['group'])][c['key']] = {h: r for h, r in fwd.items() if r is not None}
                 usable = closes[breaks[-1]:] if breaks else closes                      # seulement les clôtures qui suivent la dernière rupture de cours
+                if len(usable) > REGIME_LOOKBACK:
+                    self.regime_samples[t].append(usable[-1] / usable[-1 - REGIME_LOOKBACK] - 1)
                 for name in self.computed:
                     score = SIGNALS[name][0](usable)
                     if score is not None and math.isfinite(score):
@@ -216,6 +221,10 @@ class Study:
                     v = strategy.judge(cfg, measures, tech, missing, dates[-1], None)
                     if v['status'] == 'retained':
                         self.retained[(t, name)].append(dict(v, key=c['key'], group=c['group'], symbol=c['symbol']))
+
+    def regimes(self, min_titles=REGIME_MIN_TITLES):
+        """{date: 'hausse' | 'baisse'} d'après le rendement MÉDIAN sur 12 mois de l'univers visible à cette date (sans indice externe) ; date absente = trop peu de titres pour en juger."""
+        return {t: ('hausse' if statistics.median(v) > 0 else 'baisse') for t, v in self.regime_samples.items() if len(v) >= min_titles}
 
     # ───────── agrégation ─────────
     def picks(self, top, only_dates=None):
@@ -425,14 +434,17 @@ def main(argv=None):
     ap.add_argument('--min-share', type=float, default=None, help="part minimale du plus grand nombre de titres ayant une clôture pour qu'une date soit retenue (défaut : 0,5 base ; 0,1 csv)")
     ap.add_argument('--min-titles', type=int, default=None, help='nombre minimal de titres ayant une clôture à une date (défaut : 0 base ; 150 csv)')
     ap.add_argument('--min-pool', type=int, default=None, help="univers minimal d'un groupe à une date pour la comparer (défaut : 0 base ; 100 csv) : en dessous, « les 20 premiers » n'est pas une sélection")
+    ap.add_argument('--until', help="AAAA-MM-JJ : ne rejoue que les dates jusqu'à celle-ci (plus rapide ; ne calcule ni n'affiche rien de plus récent, par exemple pour garder une période en réserve)")
     ap.add_argument('--split-date', help='AAAA-MM-JJ : sépare « calibration » (avant) et « validation » (à partir de cette date)')
+    ap.add_argument('--by-regime', action='store_true', help="sépare chaque période en dates de marché en hausse et en baisse (médiane de l'univers sur 12 mois) : une stratégie qui ne marche qu'en hausse se voit ici")
     ap.add_argument('--sample', type=int, default=0, help="sous-échantillon aléatoire de l'univers (0 = tout)")
     ap.add_argument('--seed', type=int, default=1)
     ap.add_argument('--draws', type=int, default=500, help='tirages au hasard pour la p-valeur')
     ap.add_argument('--json', help='écrit aussi les résultats (avec le détail par date) dans ce fichier')
     args = ap.parse_args(argv)
-    if args.split_date:
-        datetime.date.fromisoformat(args.split_date)
+    for given in (args.split_date, args.until):
+        if given:
+            datetime.date.fromisoformat(given)
     how_many = args.dates if args.dates is not None else (10 if args.source == 'db' else 0)
     long_history = args.source == 'csv'
     min_share = args.min_share if args.min_share is not None else (0.1 if long_history else 0.5)
@@ -455,6 +467,8 @@ def main(argv=None):
             calendar = reference_calendar_db(conn)
             batches = lambda: load_batches(conn, len(calendar) + 5, args.sample, args.seed)     # noqa: E731
         dates = pick_dates(calendar, args.horizon, args.step, how_many)
+        if args.until:
+            dates = [d for d in dates if d <= args.until]
         if len(dates) < 3:
             print('Historique insuffisant pour un test chronologique (moins de 3 dates).', file=sys.stderr)
             return 3
@@ -469,15 +483,29 @@ def main(argv=None):
     finally:
         if conn:
             conn.close()
+    sections = split_periods(dates, args.split_date) if args.split_date else [(None, dates)]
+    kept = []
+    for label, part in sections:
+        if len(part) >= 3:
+            kept.append((label, part))
+        else:
+            print(f'Période « {label} » : moins de 3 dates, ignorée.', file=sys.stderr)
+    sections = kept
+    if args.by_regime:
+        regimes, expanded = study.regimes(), []
+        for label, part in sections:
+            for regime in ('hausse', 'baisse'):
+                sub = [d for d in part if regimes.get(d) == regime]
+                name = ' · '.join(x for x in (label, f'marché en {regime}') if x)
+                if len(sub) >= 3:
+                    expanded.append((name, sub))
+                else:
+                    print(f'« {name} » : moins de 3 dates, ignorée.', file=sys.stderr)
+        sections = expanded
     results = []
-    if args.split_date:
-        for label, part in split_periods(dates, args.split_date):
-            if len(part) < 3:
-                print(f'Période « {label} » : moins de 3 dates, ignorée.', file=sys.stderr)
-                continue
-            results += study.results(args.top, args.cost_bps, args.step, args.draws, args.seed, only_dates=part, period=f'{label} ({part[0]} → {part[-1]}, {len(part)} dates)', min_pool=min_pool)
-    else:
-        results = study.results(args.top, args.cost_bps, args.step, args.draws, args.seed, min_pool=min_pool)
+    for label, part in sections:
+        span = f'{part[0]} → {part[-1]}, {len(part)} dates'
+        results += study.results(args.top, args.cost_bps, args.step, args.draws, args.seed, only_dates=part, period=f'{label} ({span})' if label else None, min_pool=min_pool)
     meta = {'titles': titles, 'dates': dates, 'top': args.top, 'cost_bps': args.cost_bps, 'horizons': args.horizon, 'split_date': args.split_date, 'source': args.source, 'caveats': CAVEATS,
             'variants': len(study.configs) + len(study.signal_names), 'signals': {n: signal_labels()[n] for n in study.signal_names}}
     print(render(results, meta))

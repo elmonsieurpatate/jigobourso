@@ -1,6 +1,7 @@
 """Test chronologique des stratégies (scripts/backtest_walkforward.py) : pas de regard vers l'avenir, rendements futurs exacts, exécution de bout en bout."""
 import datetime
 import importlib.util
+import json
 import math
 import os
 import random
@@ -224,3 +225,54 @@ def test_small_universe_dates_are_skipped_by_min_pool():
     study, _ = study_for(series(120, 330, 0.2, 0.002, 0.015, 5), dates=4)
     assert study.results(top=10, draws=20)
     assert study.results(top=10, draws=20, min_pool=1000) == []              # univers de 120 titres < 1000 : aucune comparaison
+
+
+def regime_series(n_titles, seed):
+    """Marché entier en forte hausse sur 350 séances puis en forte baisse sur 250 : un régime commun à tous les titres."""
+    rnd, days, out = random.Random(seed), business_days(600), []
+    for i in range(n_titles):
+        price, bars = 100.0, []
+        for k, d in enumerate(days):
+            price *= math.exp(rnd.gauss(0.004 if k < 350 else -0.006, 0.01))
+            bars.append((d, price, None))
+        out.append({'key': i, 'symbol': f'S{i}', 'group': 'equity', 'bars': bars, 'split_dates': []})
+    return out
+
+
+def test_market_regime_follows_the_median_title():
+    study, dates = study_for(regime_series(80, 4), dates=12)
+    regimes = study.regimes(min_titles=50)
+    early = [d for d in dates if d <= business_days(600)[350]]
+    late = [d for d in dates if d >= business_days(600)[500]]
+    assert early and late
+    assert all(regimes[d] == 'hausse' for d in early) and all(regimes[d] == 'baisse' for d in late)
+    assert study.regimes(min_titles=500) == {}                  # trop peu de titres pour juger : aucune date classée
+
+
+def test_cli_by_regime_puts_the_old_period_first(tmp_path, capsys):
+    cands = regime_series(70, 6)
+    for c in cands:
+        eh.write_history(str(tmp_path), c['key'], [(d, p, p, None) for d, p, _ in c['bars']])
+    eh.write_universe(str(tmp_path), [{'key': c['key'], 'symbol': c['symbol'], 'mic': 'XNYS', 'kind': 'equity', 'country': '', 'currency': 'USD'} for c in cands])
+    cut = business_days(600)[440]
+    rc = bt.main(['--source', 'csv', '--csv-dir', str(tmp_path), '--split-date', cut, '--by-regime', '--horizon', '21', '--step', '7', '--min-titles', '0', '--min-pool', '0',
+                  '--signals', 'mom_12_1', '--draws', '20'])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert '── calibration' in out and '── validation' in out and 'marché en hausse' in out and 'marché en baisse' in out
+    assert out.index('── calibration') < out.index('── validation')            # la partie « neuve » s'affiche d'abord : l'extraction par awk ne montre pas l'autre
+
+
+def test_cli_until_keeps_the_recent_period_out_of_the_run(tmp_path, capsys):
+    cands = regime_series(70, 8)
+    for c in cands:
+        eh.write_history(str(tmp_path), c['key'], [(d, p, p, None) for d, p, _ in c['bars']])
+    eh.write_universe(str(tmp_path), [{'key': c['key'], 'symbol': c['symbol'], 'mic': 'XNYS', 'kind': 'equity', 'country': '', 'currency': 'USD'} for c in cands])
+    cut = business_days(600)[440]
+    rc = bt.main(['--source', 'csv', '--csv-dir', str(tmp_path), '--until', cut, '--by-regime', '--horizon', '21', '--step', '7', '--min-titles', '0', '--min-pool', '0',
+                  '--signals', 'mom_12_1', '--json', str(tmp_path / 'r.json'), '--draws', '20'])
+    out = capsys.readouterr().out
+    assert rc == 0 and 'marché en hausse' in out
+    saved = json.load(open(tmp_path / 'r.json', encoding='utf-8'))
+    assert all(d['date'] <= cut for r in saved['results'] for d in r['by_date'])      # aucune date récente n'a été rejouée
+    assert max(saved['meta']['dates']) <= cut
