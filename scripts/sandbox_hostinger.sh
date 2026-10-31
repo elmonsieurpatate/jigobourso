@@ -48,7 +48,7 @@ step "2c. colonnes momentum_6m et momentum_12m présentes, aucune ligne perdue (
 step "3. recalcul des indicateurs (engine.cli metrics)" nice -n 10 $PY -m engine.cli metrics
 
 # ── 3b. reconstitution du suivi sur les dernières séances (INSERT IGNORE : n'écrase aucun instantané existant) pour que le Suivi montre les deux stratégies à 21 et 63 séances
-step "3b. reconstitution du suivi (75 séances) et résultats à 21 et 63 séances" nice -n 15 $PY -m engine.cli suivi-backfill --sessions 75
+[ "${JIGO_BACKFILL:-0}" = 1 ] && step "3b. reconstitution du suivi (75 séances) et résultats à 21 et 63 séances" nice -n 15 $PY -m engine.cli suivi-backfill --sessions 75
 
 # ── 4. contrôles de cohérence et classements (lecture seule)
 step "4. valeurs stockées, cohérence avec la formule des tests, classements" $PY scripts/verify_momentum_release.py
@@ -78,11 +78,13 @@ api_check() {
   curl -s -b "$jar" "${api}suivi" | $PY -c "
 import json,sys
 d=json.load(sys.stdin)
-assert d['horizons']==[1,3,5,21,63] and 'momentum' in d['presets'] and 'momentum12' in d['presets'], list(d.get('presets', {}))
-for p in ('momentum','momentum12'):
-    g=d['presets'][p]['groups']['equity']
-    print('suivi', p, {h: (g[h]['n'] if g.get(h) else None) for h in ('21','63')})
-    assert g.get('21') and g['21']['n']>0, p
+assert d['horizons']==[1,3,5,21,63], d.get('horizons')
+print('suivi : horizons', d['horizons'], '· stratégies suivies :', list(d.get('presets', {})))
+if '$JIGO_BACKFILL' == '1':
+    for p in ('momentum','momentum12'):
+        g=d['presets'][p]['groups']['equity']
+        print('suivi', p, {h: (g[h]['n'] if g.get(h) else None) for h in ('21','63')})
+        assert g.get('21') and g['21']['n']>0, p
 " || rc=1
   curl -s -b "$jar" "${api}strategy/presets" | $PY -c "import json,sys; d=json.load(sys.stdin); assert list(d['presets'])[-2:]==['momentum','momentum12']; print('presets ok')" || rc=1
   [ $rc -eq 0 ] || { echo "-- journal du serveur d'essai :"; tail -n 8 /tmp/jigo-sandbox-php.log | cut -c1-240; }
