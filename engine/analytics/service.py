@@ -75,7 +75,7 @@ def _load_universe(conn, windows, ids=None):
         cur.execute("""SELECT l.id, l.symbol, l.mic, l.currency, i.name, i.isin, i.kind, i.country, i.category,
                               p.price, p.price_time, p.source AS price_source, p.currency AS price_currency, p.avg_volume_3m,
                        s.last_close_date, s.closes_count, s.close_px, s.ma20, s.ma50, s.ma50_prev, s.daily_change, s.gap_to_ma20, s.quality, s.break_dates,
-                       s.coverage_252, s.expected_252, s.momentum_6m
+                       s.coverage_252, s.expected_252, s.momentum_6m, s.momentum_12m
                        FROM v_recommendable r JOIN listings l ON l.id=r.listing_id JOIN instruments i ON i.id=l.instrument_id
                        LEFT JOIN latest_prices p ON p.listing_id=l.id LEFT JOIN series_state s ON s.listing_id=l.id""" + only, list(ids or []))
         universe = cur.fetchall()
@@ -151,7 +151,8 @@ def judge_universe(conn, config, ids=None):
             u['quality'] = 'incomplete'
         elif u['quality'] not in ('break', 'insufficient') and any(n in missing and missing[n] == 'calendar' for n in windows):
             u['quality'] = 'calendar_unknown'
-        v = strategy.judge(config, measures, tech, missing, last, expected or None, momentum=None if u.get('momentum_6m') is None else float(u['momentum_6m']))
+        saved_momentum = u.get('momentum_12m') if config['ranking']['mode'] == 'momentum12' else u.get('momentum_6m')
+        v = strategy.judge(config, measures, tech, missing, last, expected or None, momentum=None if saved_momentum is None else float(saved_momentum))
         if u['quality'] == 'incomplete' and v['status'] == 'unknown':
             v['status_label'] = 'Historique incomplet'
         v.update(key=u['id'], group='etf' if u['kind'] == 'etf' else 'equity', symbol=u['symbol'], row=u)
@@ -516,7 +517,7 @@ def instrument_sheet(conn, request):
         daily_volume = [None if r['volume'] is None else int(r['volume']) for r in rows]
         cur.execute("""SELECT l.id, l.mic, l.symbol, l.currency, l.status, l.is_primary FROM listings l WHERE l.instrument_id=%s AND l.id<>%s ORDER BY l.is_primary DESC, l.mic""", (u['instrument_id'], lid))
         siblings = cur.fetchall()
-        cur.execute('SELECT quality, closes_count, last_close_date, ma20, ma50, ma50_prev, daily_change, gap_to_ma20, break_dates, coverage_252, observed_252, expected_252, momentum_6m FROM series_state WHERE listing_id=%s', (lid,))
+        cur.execute('SELECT quality, closes_count, last_close_date, ma20, ma50, ma50_prev, daily_change, gap_to_ma20, break_dates, coverage_252, observed_252, expected_252, momentum_6m, momentum_12m FROM series_state WHERE listing_id=%s', (lid,))
         state = cur.fetchone() or {}
     price = float(u['price']) if u['price'] is not None else None
     factor = to_eur_factor(u['price_currency'] or u['currency'], rates)

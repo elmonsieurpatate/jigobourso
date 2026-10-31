@@ -1,4 +1,4 @@
-"""Stratégie expérimentale « Momentum 6 mois » : mesure entre J−126 et J−21 séances, jugement, classement, et garantie que les quatre profils existants ne changent pas."""
+"""Stratégies « Momentum 6 mois » (J−126 → J−21) et « Momentum 12 mois » (J−252 → J−21) : mesure, jugement, classement, suivi, et garantie que les quatre profils existants ne changent pas."""
 import datetime
 import hashlib
 import importlib.util
@@ -8,7 +8,7 @@ import os
 
 from engine.analytics import strategy as S
 from engine.analytics import tracking
-from engine.analytics.series import momentum_6_1, MOMENTUM_LONG, MOMENTUM_SKIP
+from engine.analytics.series import momentum_6_1, momentum_12_1, MOMENTUM_LONG, MOMENTUM_LONG_12, MOMENTUM_SKIP
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -34,8 +34,8 @@ FINGERPRINTS = {   # empreintes calculées sur le code AVANT l'ajout du cinquiè
 def test_the_four_existing_strategies_are_byte_for_byte_unchanged():
     for name, expected in FINGERPRINTS.items():
         assert hashlib.sha256(json.dumps(S.preset(name), sort_keys=True).encode()).hexdigest() == expected, name
-    assert S.PRESETS[:4] == ('regular', 'fast', 'recovery', 'low_volatility') and S.PRESETS[4] == 'momentum'
-    assert S.EXPERIMENTAL == ('momentum',) and S.RANK_MODES[:4] == ('trend', 'performance', 'regularity', 'stability')
+    assert S.PRESETS[:4] == ('regular', 'fast', 'recovery', 'low_volatility') and S.PRESETS[4:] == ('momentum', 'momentum12')
+    assert S.EXPERIMENTAL == ('momentum', 'momentum12') and S.RANK_MODES[:4] == ('trend', 'performance', 'regularity', 'stability')
 
 
 def test_momentum_preset_is_valid_and_has_no_threshold():
@@ -82,12 +82,70 @@ def test_short_history_and_price_breaks_make_the_measure_unavailable():
     assert momentum_6_1(d, closes, [first - 5]) is not None                                # rupture antérieure à la fenêtre : sans effet
 
 
-def test_same_definition_as_the_backtest_signal_mom_6_1():
-    spec = importlib.util.spec_from_file_location('backtest_walkforward', os.path.join(ROOT, 'scripts', 'backtest_walkforward.py'))
-    bw = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(bw)
-    closes = [100 * math.exp(0.0004 * i + 0.03 * math.sin(i / 7)) for i in range(220)]
-    assert abs(momentum_6_1(days(220), closes, []) - 100 * bw.SIGNALS['mom_6_1'][0](closes)) < 1e-9        # ce qui a été testé est ce qui est calculé
+def test_same_definition_as_the_backtest_signals():
+    # Les tests chronologiques (signaux mom_6_1 et mom_12_1 de scripts/backtest_walkforward.py) calculent c[-22] / c[-127] - 1 et c[-22] / c[-253] - 1 sur les clôtures visibles.
+    closes = [100 * math.exp(0.0004 * i + 0.03 * math.sin(i / 7)) for i in range(320)]
+    assert abs(momentum_6_1(days(320), closes, []) - 100 * (closes[-22] / closes[-127] - 1)) < 1e-9
+    assert abs(momentum_12_1(days(320), closes, []) - 100 * (closes[-22] / closes[-253] - 1)) < 1e-9
+
+
+# ───────── Momentum 12 mois : J−252 → J−21 ─────────
+def test_momentum_12_is_the_change_between_252_and_21_sessions_ago():
+    closes = growth(320)
+    assert abs(momentum_12_1(days(320), closes, []) - 100 * ((1.01) ** (MOMENTUM_LONG_12 - MOMENTUM_SKIP) - 1)) < 1e-9
+    assert (MOMENTUM_LONG_12, MOMENTUM_SKIP) == (252, 21)
+
+
+def test_momentum_12_ignores_the_last_month_and_never_estimates():
+    steady = growth(320, 0.002)
+    crash = steady[:-21] + [steady[-22] * 0.5 ** ((i + 1) / 21) for i in range(21)]
+    d = days(320)
+    assert momentum_12_1(d, crash, []) == momentum_12_1(d, steady, [])
+    expected_dates = d[-253:]
+    assert abs(momentum_12_1(d, steady, [], expected_dates) - momentum_12_1(d, steady, [])) < 1e-9
+    assert momentum_12_1(d[:-22] + d[-21:], steady[:-22] + steady[-21:], [], expected_dates) is None        # clôture de J−21 absente
+    assert momentum_12_1(d, steady, [], expected_dates[:200]) is None                                       # calendrier trop court
+    assert momentum_12_1(days(250), growth(250), []) is None                                                # moins de 253 clôtures
+    first = 319 - MOMENTUM_LONG_12
+    assert momentum_12_1(d, steady, [first + 5]) is None and momentum_12_1(d, steady, [first - 5]) is not None
+
+
+def test_momentum_12_preset_is_valid_has_no_threshold_and_uses_the_year_window():
+    cfg = S.validate(S.preset('momentum12'))
+    assert cfg['name'] == 'momentum12' and cfg['ranking']['mode'] == 'momentum12'
+    enabled = [p for p in cfg['periods'] if p['enabled']]
+    assert [p['id'] for p in enabled] == ['year'] and enabled[0]['sessions'] == 252 and all(p[f] is None for p in enabled for f, _, _ in S.CRITERIA)
+    assert S.required_sessions(cfg) == [252] or 252 in S.required_sessions(cfg)
+    assert S.preset('momentum') != S.preset('momentum12') and S.MOMENTUM_WINDOWS == {'momentum': 126, 'momentum12': 252}
+
+
+def test_each_strategy_ranks_on_its_own_window():
+    short = [verdict(1, 'equity', 5.0), verdict(2, 'equity', 30.0)]
+    for name in ('momentum', 'momentum12'):
+        out = {v['key']: v for v in S.rank(S.validate(S.preset(name)), [dict(v) for v in short])}
+        assert out[2]['rank'] == 1 and out[1]['rank'] == 2
+    cfg = S.validate(S.preset('momentum12'))
+    j = S.judge(cfg, {252: {'sessions': 252, 'perf': 10.0, 'slope': 0.05, 'r2': 0.8, 'volatility': 1.0, 'drawdown': 5.0, 'er': 0.3}}, {}, {})
+    assert j['status'] == 'unknown' and any(r['metric'] == 'momentum' and r['threshold'] == 253 for r in j['reasons'])
+    assert S.judge(cfg, {252: {'sessions': 252, 'perf': 1.0, 'slope': 0.0, 'r2': 0.1, 'volatility': 9.0, 'drawdown': 50.0, 'er': 0.0}}, {}, {}, momentum=-4.0)['status'] == 'retained'   # aucun seuil
+
+
+def test_end_to_end_ranking_for_both_strategies_ignores_the_last_month():
+    d = days(320)
+
+    def bars(path):
+        return [(day, c, None) for day, c in zip(d, path)]
+    steady = growth(320, 0.003)
+    winner_then_crash = steady[:-21] + [steady[-22] * 0.6 ** ((i + 1) / 21) for i in range(21)]
+    flat_then_surge = [100.0] * 299 + [100.0 * 1.5 ** ((i + 1) / 21) for i in range(21)]
+    laggard = [100 * (0.999) ** i for i in range(320)]
+    recent_only = [100.0] * 190 + [100.0 * 1.005 ** (i + 1) for i in range(130)]                  # progresse seulement sur les 6 derniers mois
+    cands = [{'key': k, 'group': 'equity', 'symbol': s, 'bars': bars(p)} for k, s, p in ((1, 'WIN', winner_then_crash), (2, 'SURGE', flat_then_surge), (3, 'LAG', laggard), (4, 'RECENT', recent_only))]
+    six = {v['symbol']: v for v in S.evaluate(S.preset('momentum'), cands)}
+    twelve = {v['symbol']: v for v in S.evaluate(S.preset('momentum12'), cands)}
+    assert [six[k]['rank'] for k in ('RECENT', 'WIN', 'SURGE', 'LAG')] == [1, 2, 3, 4] and abs(six['SURGE']['momentum']) < 1e-9
+    assert [twelve[k]['rank'] for k in ('WIN', 'RECENT', 'SURGE', 'LAG')] == [1, 2, 3, 4] and abs(twelve['SURGE']['momentum']) < 1e-9          # la fenêtre change le classement
+    assert six['WIN']['momentum'] != twelve['WIN']['momentum']                                     # deux fenêtres, deux mesures
 
 
 # ───────── jugement et classement ─────────

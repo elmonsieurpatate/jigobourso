@@ -118,19 +118,15 @@ def prepare_series(bars, splits=()):
 
 
 MOMENTUM_LONG = 126      # séances : début de la fenêtre du « Momentum 6 mois » (J−126)
-MOMENTUM_SKIP = 21       # séances : fin de la fenêtre (J−21) ; le dernier mois est volontairement ignoré
+MOMENTUM_LONG_12 = 252   # séances : début de la fenêtre du « Momentum 12 mois » (J−252)
+MOMENTUM_SKIP = 21       # séances : fin des deux fenêtres (J−21) ; le dernier mois est volontairement ignoré
 
 
-def momentum_6_1(dates, closes, breaks, expected=None):
-    """Momentum 6 mois : variation du cours (en %) entre J−126 et J−21 séances. None si la mesure n'est pas fiable.
-
-    `expected` : les 127 séances attendues par le calendrier de la place, la dernière étant J ; sans calendrier, on compte les clôtures de la série (J−126 = 127e clôture avant la dernière).
-    Jamais d'estimation : une clôture absente à l'une des deux dates, ou une rupture de cours non expliquée après J−126, rend la mesure indisponible.
-    Même définition que le test chronologique (scripts/backtest_walkforward.py, signal mom_6_1)."""
+def _momentum(dates, closes, breaks, expected, long_window):
     if expected:
-        if len(expected) <= MOMENTUM_LONG:
+        if len(expected) <= long_window:
             return None
-        start, end = expected[-1 - MOMENTUM_LONG], expected[-1 - MOMENTUM_SKIP]
+        start, end = expected[-1 - long_window], expected[-1 - MOMENTUM_SKIP]
         observed = dict(zip(dates, closes))
         if start not in observed or end not in observed or not (observed[start] > 0):
             return None
@@ -139,12 +135,27 @@ def momentum_6_1(dates, closes, breaks, expected=None):
             return None
         return 100 * (observed[end] / observed[start] - 1)
     n = len(closes)
-    if n <= MOMENTUM_LONG:
+    if n <= long_window:
         return None
-    first, last = n - 1 - MOMENTUM_LONG, n - 1 - MOMENTUM_SKIP
+    first, last = n - 1 - long_window, n - 1 - MOMENTUM_SKIP
     if any(b > first for b in breaks) or not (closes[first] > 0):
         return None
     return 100 * (closes[last] / closes[first] - 1)
+
+
+def momentum_6_1(dates, closes, breaks, expected=None):
+    """Momentum 6 mois : variation du cours (en %) entre J−126 et J−21 séances. None si la mesure n'est pas fiable.
+
+    `expected` : les 127 séances attendues par le calendrier de la place, la dernière étant J ; sans calendrier, on compte les clôtures de la série (J−126 = 127e clôture avant la dernière).
+    Jamais d'estimation : une clôture absente à l'une des deux dates, ou une rupture de cours non expliquée après J−126, rend la mesure indisponible.
+    Même définition que le test chronologique (scripts/backtest_walkforward.py, signal mom_6_1)."""
+    return _momentum(dates, closes, breaks, expected, MOMENTUM_LONG)
+
+
+def momentum_12_1(dates, closes, breaks, expected=None):
+    """Momentum 12 mois : variation du cours (en %) entre J−252 et J−21 séances (253 séances attendues, la dernière étant J). Mêmes règles que le Momentum 6 mois.
+    Même définition que le test chronologique (signal mom_12_1)."""
+    return _momentum(dates, closes, breaks, expected, MOMENTUM_LONG_12)
 
 
 def analyze_series(bars, windows, splits=(), session_windows=None, technical_sessions=None):

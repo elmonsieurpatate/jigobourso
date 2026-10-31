@@ -43,6 +43,15 @@ Niveaux de pente = temps pour doubler à ce rythme : doux 8 ans (0,034 %/séance
 
 Calibrage du 28/10/2026 sur 9 700 titres réels. Avec les seuils initiaux, « régulière » ne retenait que 52 actions (R² 0,75 sur deux périodes) et « calme » 4 : trop peu pour offrir un choix. Variantes testées : voir l'historique du calibrage dans ce paragraphe ; les réglages restent modifiables par l'utilisateur.
 
+## Stratégies « Momentum 6 mois » et « Momentum 12 mois » (essai, 31/10/2026)
+
+- **Mesure** : variation du cours, en %, entre J−126 et J−21 séances (6 mois) ou entre J−252 et J−21 séances (12 mois). Le dernier mois est volontairement ignoré. Aucun seuil : seul le rang compte (percentile parmi les titres retenus du même groupe, actions et ETF classés séparément).
+- **Fiabilité** : la mesure utilise le calendrier de la place (127 ou 253 séances attendues). Une clôture absente à l'une des deux dates, un historique trop court ou une rupture de cours non expliquée après le début de la fenêtre rendent le titre « non évaluable » : jamais d'estimation, jamais de cours futur.
+- **Même définition que les tests** : ce qui est calculé est le signal `mom_6_1` / `mom_12_1` de `scripts/backtest_walkforward.py` (rapport `c[-22] / c[-127] - 1` et `c[-22] / c[-253] - 1` sur les clôtures visibles).
+- **Stockage** : `series_state.momentum_6m` et `series_state.momentum_12m`, recalculés avec les autres indicateurs (migrations additives `20261031_momentum_6m.sql` et `20261101_momentum_12m.sql`).
+- **Ce que l'historique a montré** (titres encore cotés aujourd'hui, périodes déjà consultées, donc à lire avec prudence) : le classement du Momentum 6-1 a présenté un avantage moyen sur l'ensemble des titres négociables, qui diminue quand la liquidité exigée augmente et après frais (excès net d'environ +0,5 point par mois pour un rééquilibrage mensuel, non établi statistiquement) ; pertes brutales possibles (mois à plus de −25 %, baisses de plus de 50 % depuis un sommet) ; sélections concentrées sur des titres volatils et sur un même pays. Le Momentum 12-1 donne des résultats voisins, sans différence statistiquement établie avec le 6-1. **Aucune performance n'est promise** ; les profils sont signalés « essai » dans l'interface et le suivi réel (page Suivi, 21 et 63 séances) servira à les confirmer sur des observations nouvelles.
+- **Les quatre profils existants ne changent pas** (empreintes vérifiées par test).
+
 ## Pastilles, filtres de niveau et résumé du profil
 Information seulement : rien de ce qui suit n'entre dans un score, un classement, un critère ou un filtre de stratégie.
 - **Période des pastilles.** Régularité (R²) et volatilité/repli se mesurent sur la période de la stratégie active (la plus longue période cochée, ramenée à 1 semaine, 1 mois, 3 mois, 6 mois ou 1 an) : la pastille l'indique (« Régulière · 1 mois »). La négociabilité se mesure sur une autre durée, indépendante de la stratégie : volume moyen 3 mois × cours (« Facilement négociable · 3 mois »).

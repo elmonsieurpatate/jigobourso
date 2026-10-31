@@ -6,6 +6,7 @@ Référence : les besoins utilisateur, pas l'ancienne implémentation. Chaque li
 |---|---|---|
 | Trouver les meilleurs titres | Explorer `rapport.html`, snapshot JSON de 107 Mo recalculé par cron | **Explorer** `index.html` : évaluation à la demande depuis la base (mesures pré-calculées la nuit), 4 stratégies en cartes, éditeur avancé |
 | Quatre stratégies | `regular`, `fast`, `recovery`, `low_volatility` + niveaux de pente/régularité | **Conservées et redéfinies** : Croissance régulière, rapide, Rebond, Hausse calme (réglages documentés dans `docs/METHODE.md`) |
+| Deux stratégies « momentum » (essai) | `momentum` (6 mois, J−126 → J−21 séances), `momentum12` (12 mois, J−252 → J−21 séances) | **Ajoutées** : classement par la progression passée en ignorant le dernier mois, sans seuil ; filtres habituels et négociabilité conservés ; suivi à 21 et 63 séances (`docs/METHODE.md`) |
 | Périodes réglables | six horizons, séances 1–252 | **Conservé** : six périodes, 1–252 séances, sept critères chacune |
 | Tri / mode de classement | trend, performance, regularity, stability + exposant k | **Conservé** (4 modes, poids par période) ; exposant k **supprimé** (peu lisible) |
 | Filtres techniques | MA50, MA50 ascendante, variation max, écart MA20 | **Conservés** |
