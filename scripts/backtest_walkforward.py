@@ -349,6 +349,17 @@ def reference_calendar_db(conn):
     return reference_calendar(conn)
 
 
+MAX_MEDIAN_GAP_DAYS = 4
+
+
+def is_daily(dates):
+    """Vrai si l'écart médian entre deux dates consécutives est de quelques jours au plus (un fichier mensuel ou hebdomadaire fausserait tout le test)."""
+    if len(dates) < 10:
+        return True
+    days = [datetime.date.fromisoformat(d) for d in dates]
+    return statistics.median((b - a).days for a, b in zip(days, days[1:])) <= MAX_MEDIAN_GAP_DAYS
+
+
 def csv_universe(directory):
     with open(os.path.join(directory, 'universe.csv'), encoding='utf-8', newline='') as fh:
         return list(csv.DictReader(fh))
@@ -360,14 +371,20 @@ def _history_file(directory, key):
 
 def csv_calendar(directory, universe):
     """Séances de référence, en ne lisant que la colonne des dates (le calendrier doit être connu avant de traiter les titres par lots)."""
-    count = defaultdict(int)
+    count, skipped = defaultdict(int), 0
     for u in universe:
         path = _history_file(directory, u['key'])
         if not os.path.exists(path):
             continue
         with gzip.open(path, 'rt', encoding='utf-8', newline='') as fh:
-            for row in csv.DictReader(fh):
-                count[row['date']] += 1
+            dates = [row['date'] for row in csv.DictReader(fh)]
+        if not is_daily(dates):
+            skipped += 1
+            continue
+        for d in dates:
+            count[d] += 1
+    if skipped:
+        print(f'{skipped} fichier(s) non quotidien(s) ignoré(s) (écart médian > {MAX_MEDIAN_GAP_DAYS} jours) : refaire l\'export avec le script à jour.', file=sys.stderr)
     return calendar_from_counts(count)
 
 
@@ -381,7 +398,7 @@ def csv_batches(directory, universe, sample=0, seed=1, batch=100):
         for u in rows[start:start + batch]:
             with gzip.open(_history_file(directory, u['key']), 'rt', encoding='utf-8', newline='') as fh:
                 bars = [(r['date'], float(r['close']), float(r['adjclose'])) for r in csv.DictReader(fh)]
-            if bars:
+            if bars and is_daily([b[0] for b in bars]):
                 out.append({'key': u['key'], 'symbol': u['symbol'], 'mic': u.get('mic'), 'group': 'etf' if u.get('kind') == 'etf' else 'equity', 'bars': bars, 'split_dates': []})
         yield out
 

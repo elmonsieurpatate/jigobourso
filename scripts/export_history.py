@@ -12,10 +12,13 @@ Connexion à la base : variables JIGO_DB_* (comme le moteur). Sur l'hébergement
 """
 import argparse
 import csv
+import datetime
 import gzip
 import json
 import os
 import random
+import re
+import statistics
 import sys
 import time
 import urllib.parse
@@ -84,33 +87,101 @@ def write_universe(out, universe):
             w.writerow([u.get(f) if u.get(f) is not None else '' for f in UNIVERSE_FIELDS])
 
 
-def fetch_daily(transport, symbol, years):
-    """Un appel Yahoo : historique quotidien ajusté sur `years` ans (ou `max`)."""
-    params = {'range': 'max' if years == 0 else f'{int(years)}y', 'interval': '1d', 'events': 'div|split', 'includeAdjustedClose': 'true', 'includePrePost': 'false'}
-    return parse_daily(json.loads(transport.get('/v8/finance/chart/' + urllib.parse.quote(symbol, safe=''), params)))
+MAX_MEDIAN_GAP_DAYS = 4          # un historique quotidien a un écart médian de 1 jour (3 le week-end) ; un historique mensuel ou hebdomadaire est refusé
 
 
-def export(universe, transport, out, years=10, log=lambda *_: None, sleep=lambda s: None):
+def median_gap_days(rows):
+    """Écart médian, en jours, entre deux dates consécutives (None si trop peu de lignes pour en juger)."""
+    if len(rows) < 10:
+        return None
+    days = [datetime.date.fromisoformat(r[0]) for r in rows]
+    return statistics.median((b - a).days for a, b in zip(days, days[1:]))
+
+
+def fetch_daily(transport, symbol, years, now=None):
+    """Un appel Yahoo : historique quotidien ajusté sur `years` ans (0 = depuis le début).
+
+    La période est donnée par dates (`period1` / `period2`) et NON par `range=max` : avec `range=max` Yahoo renvoie un point par MOIS, même avec interval=1d.
+    Par prudence, une réponse dont l'écart médian entre deux dates dépasse 4 jours est refusée (YahooError) plutôt qu'enregistrée comme quotidienne."""
+    end = int(now if now is not None else time.time())
+    start = 0 if years == 0 else end - int(years * 365.25 * 86400)
+    params = {'period1': start, 'period2': end + 86400, 'interval': '1d', 'events': 'div|split', 'includeAdjustedClose': 'true', 'includePrePost': 'false'}
+    data = parse_daily(json.loads(transport.get('/v8/finance/chart/' + urllib.parse.quote(symbol, safe=''), params)))
+    gap = median_gap_days(data['rows']) if data else None
+    if gap is not None and gap > MAX_MEDIAN_GAP_DAYS:
+        raise YahooError(f'historique non quotidien (écart médian {gap:g} jours)')
+    return data
+
+
+RETRY_WAITS = (20, 60, 180, 420)        # secondes avant la 2e, 3e, 4e, 5e tentative d'un même titre (une pause plus longue si Yahoo l'indique via Retry-After)
+TRANSIENT = re.compile(r'^(HTTP (408|409|423|424|425|429|5\d\d)|réseau)')          # pannes passagères : 424 compris ; un 404 (symbole inconnu) n'est JAMAIS rejoué
+MAX_CONSECUTIVE_FAILURES = 8            # titres de suite en échec malgré les nouvelles tentatives : Yahoo bloque, on s'arrête (la relance reprend)
+MAX_INTERVAL = 5.0
+
+
+def _retry_after(error):
+    try:
+        return max(0.0, float(error.retry_after))
+    except (TypeError, ValueError):
+        return None
+
+
+def slow_down(transport):
+    """Après un refus de Yahoo, on espace davantage les appels suivants (x1,5, plafonné) : mieux vaut un export plus long qu'un blocage."""
+    if hasattr(transport, 'min_interval'):
+        transport.min_interval = min(MAX_INTERVAL, max(float(transport.min_interval), 0.2) * 1.5)
+
+
+def fetch_with_retry(transport, symbol, years, sleep=time.sleep, log=lambda *_: None, stats=None, jitter=lambda w: random.uniform(0, 0.2 * w)):
+    """`fetch_daily` avec nouvelles tentatives sur les pannes passagères (429, 424, 5xx, réseau) : attente croissante, Retry-After respecté, appels ensuite espacés.
+    Après la dernière tentative, l'erreur remonte (RateLimited arrête proprement l'export ; une autre erreur est notée et le titre sera redemandé à la relance)."""
+    last = len(RETRY_WAITS)
+    for attempt in range(last + 1):
+        try:
+            return fetch_daily(transport, symbol, years)
+        except RateLimited as e:
+            if attempt == last:
+                raise
+            wait, why = _retry_after(e) or RETRY_WAITS[attempt], 'HTTP 429'
+            slow_down(transport)
+        except YahooError as e:
+            if attempt == last or not TRANSIENT.match(str(e)):
+                raise
+            wait, why = RETRY_WAITS[attempt], str(e)
+        wait = min(900.0, wait + jitter(wait))
+        if stats is not None:
+            stats['retries'] = stats.get('retries', 0) + 1
+        log(f'{symbol} : {why}, nouvelle tentative dans {wait:.0f} s ({attempt + 2}/{last + 1})')
+        sleep(wait)
+
+
+def export(universe, transport, out, years=10, log=lambda *_: None, sleep=time.sleep):
     """Exporte les titres pas encore exportés. Renvoie {'done': n, 'already': n, 'empty': n, 'errors': n, 'remaining': n, 'rate_limited': bool}."""
     write_universe(out, universe)
-    stats = {'done': 0, 'already': 0, 'empty': 0, 'errors': 0, 'remaining': 0, 'rate_limited': False}
+    stats = {'done': 0, 'already': 0, 'empty': 0, 'errors': 0, 'retries': 0, 'remaining': 0, 'rate_limited': False, 'blocked': False}
     todo = []
     for u in universe:
         if os.path.exists(history_path(out, u['key'])):
             stats['already'] += 1
         else:
             todo.append(u)
+    failures = 0
     for n, u in enumerate(todo):
         try:
-            data = fetch_daily(transport, u['symbol'], years)
+            data = fetch_with_retry(transport, u['symbol'], years, sleep, log, stats)
         except RateLimited:
             stats['rate_limited'], stats['remaining'] = True, len(todo) - n
             break
-        except (YahooError, ValueError) as e:                      # symbole inconnu, réponse illisible : on passe au suivant, noté dans errors.log
+        except (YahooError, ValueError) as e:                      # symbole inconnu, réponse illisible, panne persistante : noté dans errors.log, le titre sera redemandé à la relance
             stats['errors'] += 1
             with open(os.path.join(out, 'errors.log'), 'a', encoding='utf-8') as fh:
                 fh.write(f"{u['key']}\t{u['symbol']}\t{type(e).__name__}: {e}\n")
+            failures += 1 if TRANSIENT.match(str(e)) else 0
+            if failures >= MAX_CONSECUTIVE_FAILURES:
+                stats['blocked'], stats['remaining'] = True, len(todo) - n - 1
+                break
             continue
+        failures = 0
         if data is None:
             stats['empty'] += 1
             write_history(out, u['key'], [])                         # marque « déjà demandé, rien reçu » : pas de nouvel appel à la relance
@@ -119,7 +190,6 @@ def export(universe, transport, out, years=10, log=lambda *_: None, sleep=lambda
             stats['done'] += 1
         if (n + 1) % 25 == 0:
             log(f"{n + 1}/{len(todo)} titres")
-        sleep(0)
     return stats
 
 
@@ -136,10 +206,10 @@ def load_universe(conn, sample=0, seed=1):
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     ap.add_argument('--out', required=True, help='dossier de destination (créé si besoin, hors de l\'application)')
-    ap.add_argument('--years', type=int, default=10, help='profondeur en années (0 = tout ce que Yahoo fournit)')
+    ap.add_argument('--years', type=int, default=10, help='profondeur en années (0 = depuis le début de la cotation)')
     ap.add_argument('--sample', type=int, default=1500, help='sous-échantillon aléatoire de l\'univers (0 = tout)')
     ap.add_argument('--seed', type=int, default=1)
-    ap.add_argument('--min-interval', type=float, default=0.6, help='pause minimale entre deux appels Yahoo (secondes)')
+    ap.add_argument('--min-interval', type=float, default=0.8, help='pause minimale entre deux appels Yahoo (secondes) ; augmentée toute seule après un refus')
     args = ap.parse_args(argv)
     from engine.market.yahoo import UrllibTransport
     from engine.shared.db import connect
@@ -155,8 +225,8 @@ def main(argv=None):
     t0 = time.monotonic()
     stats = export(universe, UrllibTransport(min_interval=args.min_interval), os.path.expanduser(args.out), args.years, log=lambda m: print(f'{m} · {time.monotonic() - t0:.0f} s', file=sys.stderr))
     print(json.dumps(stats, ensure_ascii=False))
-    if stats['rate_limited']:
-        print('Yahoo a répondu « trop de requêtes » : relancez la même commande plus tard, le script reprend là où il s\'est arrêté.', file=sys.stderr)
+    if stats['rate_limited'] or stats['blocked']:
+        print('Yahoo limite ou bloque les appels : relancez la même commande dans une heure environ, le script reprend là où il s\'est arrêté.', file=sys.stderr)
         return 4
     return 0
 

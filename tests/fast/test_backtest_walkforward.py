@@ -198,3 +198,14 @@ def test_unknown_signal_is_refused_and_signals_can_be_chosen():
     study = bt.Study((), (21,), dates, signals=('mom_12_1',))
     study.add(prepared)
     assert {r['strategy'] for r in study.results(top=10, draws=20)} == {'mom_12_1'}
+
+
+def test_non_daily_history_files_are_skipped(tmp_path):
+    daily = series(1, 200, 0.0, 0.0, 0.01, 1)[0]
+    monthly_days = [(datetime.date(2000, 1, 1) + datetime.timedelta(days=30 * i)).isoformat() for i in range(120)]
+    eh.write_history(str(tmp_path), 1, [(d, p, a, None) for d, p, a in [(d, 100.0 + i, 100.0 + i) for i, d in enumerate(monthly_days)]])
+    eh.write_history(str(tmp_path), 2, [(d, p, p, None) for d, p, _ in daily['bars']])
+    eh.write_universe(str(tmp_path), [{'key': k, 'symbol': f'S{k}', 'mic': 'XNYS', 'kind': 'equity', 'country': '', 'currency': 'USD'} for k in (1, 2)])
+    universe = bt.csv_universe(str(tmp_path))
+    assert bt.csv_calendar(str(tmp_path), universe) == [d for d, _, _ in daily['bars']]            # le fichier mensuel n'entre pas dans le calendrier
+    assert [c['key'] for lot in bt.csv_batches(str(tmp_path), universe) for c in lot] == ['2']       # ni dans l'étude
