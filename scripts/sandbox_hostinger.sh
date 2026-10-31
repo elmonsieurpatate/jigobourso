@@ -60,14 +60,14 @@ step "4d. syntaxe PHP du site" bash -c "find app -name '*.php' -print0 | xargs -
 
 # ── 5. PHP + API sur un serveur local isolé (base d'essai, compte d'essai créé DANS la base d'essai seulement)
 api_check() {
-  local port=18090 jar; jar=$(mktemp); local pw='Sandbox-only-pass-2026'
+  local port=18090 jar; jar=$(mktemp); local pw='Sandbox-only-pass-2026' user="sandbox_$$"
   export JIGO_ENGINE_ROOT="$PWD" JIGO_PYTHON="$PY"
-  php scripts/create_user.php sandbox_user "$pw" --admin --email=sandbox@example.test > /dev/null || return 1
+  php scripts/create_user.php "$user" "$pw" --admin --email="$user@example.test" > /dev/null || return 1
   php -S 127.0.0.1:$port -t app/public > /tmp/jigo-sandbox-php.log 2>&1 &
   local pid=$!; local rc=0 api="http://127.0.0.1:$port/api.php?r="
   for _ in $(seq 1 30); do curl -s -o /dev/null "${api}auth/me" && break; sleep 1; done
   echo "serveur d'essai : $(curl -s -o /dev/null -w 'HTTP %{http_code}' "${api}auth/me")"
-  curl -sS -c "$jar" -H 'Content-Type: application/json' -d "{\"username\":\"sandbox_user\",\"password\":\"$pw\"}" "${api}auth/login" | $PY -c "import json,sys; raw=sys.stdin.read(); d=json.loads(raw) if raw.strip() else {}; assert d.get('user'), raw[:300]" || rc=1
+  curl -sS -c "$jar" -H 'Content-Type: application/json' -d "{\"username\":\"$user\",\"password\":\"$pw\"}" "${api}auth/login" | $PY -c "import json,sys; raw=sys.stdin.read(); d=json.loads(raw) if raw.strip() else {}; assert d.get('user'), raw[:300]" || rc=1
   for p in momentum momentum12 regular; do
     curl -s -b "$jar" -H 'Content-Type: application/json' -d "{\"config\":\"$p\",\"view\":{\"status\":\"retained\",\"kind\":\"equity\",\"page_size\":20}}" "${api}explore" \
       | $PY -c "import json,sys; d=json.load(sys.stdin); r=d['rows']; assert d['config']['name']=='$p' and r, d.get('error'); print('$p', d['total'], 'retenus ; premier :', r[0]['symbol'], r[0].get('momentum'))" || rc=1
