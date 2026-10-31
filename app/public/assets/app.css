@@ -80,7 +80,8 @@ dialog::backdrop { background: rgba(10, 16, 24, .55); } dialog .head { padding: 
 .sliders { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--line); background: color-mix(in srgb, var(--surface-2) 45%, var(--surface)); border-radius: 0 0 var(--radius) var(--radius); }
 .sl { padding: 16px 18px 18px; border-left: 1px solid var(--line); min-width: 0; } .sl:first-child { border-left: 0; }
 .sl-head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; } .sl-head b { font-size: 1rem; white-space: nowrap; } .sl-chart { margin-left: auto; line-height: 0; width: 96px; flex: none; } .sl-chart svg { width: 100%; height: auto; }
-.sl.off { opacity: .55; }
+.sl.idle .sl-head b { color: var(--muted); } .sl.idle .dr-fill { background: color-mix(in srgb, var(--muted) 55%, var(--line)); } .sl.idle .dr-th { border-color: color-mix(in srgb, var(--muted) 60%, var(--line)); }
+.mact { flex: 0 0 auto; } .mact .btn { height: 42px; padding: 0 22px; } #apply-menu.pending { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 30%, transparent); animation: pend 1.6s ease-in-out infinite; } @keyframes pend { 50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--accent) 12%, transparent); } }
 .dr { display: grid; gap: 14px; } .dr-track { position: relative; height: 6px; border-radius: 99px; background: var(--line); margin: 8px 10px; touch-action: none; }
 .dr-track::before { content: ""; position: absolute; inset: -12px 0; }
 .dr-fill { position: absolute; top: 0; bottom: 0; border-radius: 99px; background: var(--accent); }

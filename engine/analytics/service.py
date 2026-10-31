@@ -586,7 +586,7 @@ def instrument_sheet(conn, request):
         from . import etf
         sheet['etf_analysis'] = etf.load(conn, [lid]).get(lid)
         sheet['etf_compare'] = etf.compare(conn, lid)
-    sheet['strategy'] = {'name': config.get('name'), 'ranking': config['ranking']['mode'], 'source': request.get('source') or None, 'experimental': config.get('name') in strategy.EXPERIMENTAL,
+    sheet['strategy'] = {'name': config.get('name'), 'ranking': config['ranking']['mode'], 'source': request.get('source') or None, 'experimental': config.get('name') in strategy.EXPERIMENTAL or config['ranking']['mode'] in strategy.MOMENTUM_WINDOWS,
                          'technical': {k: v for k, v in config['technical'].items() if v},
                          'periods': [{'id': p['id'], 'label': strategy.LABELS[p['id']], 'sessions': p['sessions'], 'criteria': {f: p[f] for f, _, _ in strategy.CRITERIA if p[f] is not None}} for p in config['periods'] if p['enabled']]}
     sheet['config_periods'] = [{'id': p['id'], 'label': strategy.LABELS[p['id']], 'sessions': p['sessions'], 'enabled': p['enabled']} for p in config['periods']]

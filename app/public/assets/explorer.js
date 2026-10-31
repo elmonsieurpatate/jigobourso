@@ -51,7 +51,7 @@
     J.$$('#strats .strat[data-k]').forEach(b => { b.onclick = e => { if (e.target.closest('.q')) return; choose(b.dataset.k); }; b.onkeydown = e => { if ((e.key === 'Enter' || e.key === ' ') && e.target === b) { e.preventDefault(); choose(b.dataset.k); } }; });
     J.$$('#strats .q').forEach(q => q.onclick = e => { e.stopPropagation(); JMenu.pop(q, helpHtml(q.dataset.help)); });
     const act = S.config.periods.filter(p => p.enabled).map(p => J.PERIODS[p.id].toLowerCase() + ' (' + p.sessions + ' séances)');
-    el('strategy-summary').textContent = 'Périodes : ' + act.join(', ') + ' · classement par ' + ({ trend: 'pente', performance: 'performance', regularity: 'régularité', stability: 'stabilité', momentum: 'momentum 6 mois (J−126 → J−21 séances)', momentum12: 'momentum 12 mois (J−252 → J−21 séances)' }[S.config.ranking.mode]) + (EXP.has(S.preset) ? ' · ' + EXP_NOTE(S.preset) : '');
+    el('strategy-summary').textContent = 'Périodes : ' + act.join(', ') + ' · classement par ' + ({ trend: 'pente', performance: 'performance', regularity: 'régularité', stability: 'stabilité', momentum: 'momentum 6 mois (J−126 → J−21 séances)', momentum12: 'momentum 12 mois (J−252 → J−21 séances)' }[S.config.ranking.mode]) + (MOM_WIN[S.config.ranking.mode] ? ' · ' + EXP_NOTE(S.config.ranking.mode) : (EXP.has(S.preset) ? ' · ' + EXP_NOTE(S.preset) : ''));
     drawSliders();
   }
   function view() {
@@ -122,22 +122,30 @@
     { id: 'slope1', title: 'Pente (1 mois)', field: 'min_slope', scope: 'month', min: 0, max: 100, step: 1, dec: 0, side: 'low', unit: '% /an', chart: 'slope1', to: yearly, from: perSession, help: 'Même mesure que la pente sur 3 mois, mais sur le dernier mois : elle réagit plus vite aux changements de rythme.' },
     { id: 'vol3', title: 'Volatilité (3 mois)', field: 'max_volatility', scope: 'quarter', min: 0, max: 10, step: .1, dec: 1, side: 'high', unit: '% /séance', chart: 'wave', help: 'La volatilité mesure l’amplitude des variations quotidiennes sur 3 mois. Ce curseur fixe le maximum accepté : plus il est bas, plus les titres retenus varient calmement.' }
   ];
+  const CRIT_FIELDS = ['min_slope', 'min_r2', 'min_er', 'min_return', 'max_return', 'max_volatility', 'max_drawdown'], BASE_PERIOD = { momentum: 'half', momentum12: 'year' };
   function drawSliders() {
     const box = el('sliders'); if (!box) return;
     box.innerHTML = SLIDERS.map(d => `<div class="sl" data-s="${d.id}"><div class="sl-head"><b>${d.title}</b><button type="button" class="q" data-sh="${d.id}" aria-label="Explication : ${J.esc(d.title)}" aria-expanded="false">?</button><span class="sl-chart"></span></div><div class="sl-body"></div></div>`).join('');
     SLIDERS.forEach(d => {
-      const host = J.$(`.sl[data-s="${d.id}"]`, box), ps = d.scope === 'all' ? S.config.periods.filter(p => p.enabled && p.sessions >= 3) : S.config.periods.filter(p => p.id === d.scope && p.enabled);
-      const raw = ps.length ? ps[0][d.field] : null, ui = raw === null || raw === undefined ? null : (d.to ? d.to(raw) : raw);
+      const host = J.$(`.sl[data-s="${d.id}"]`, box), targets = d.scope === 'all' ? S.config.periods.filter(p => p.enabled && p.sessions >= 3) : S.config.periods.filter(p => p.id === d.scope);
+      const idle = !targets.length || !targets.some(p => p.enabled);          // période non utilisée par la stratégie : réglable quand même (elle devient un critère)
+      const raw = idle ? null : targets.find(p => p.enabled)[d.field], ui = raw === null || raw === undefined ? null : (d.to ? d.to(raw) : raw);
       const low = d.side === 'low' ? Math.max(d.min, Math.min(d.max, ui === null ? d.min : ui)) : d.min, high = d.side === 'high' ? Math.max(d.min, Math.min(d.max, ui === null ? d.max : ui)) : d.max;
       const draw = (l, h) => { J.$('.sl-chart', host).innerHTML = JMenu.chart(d.chart, ((d.side === 'low' ? l : h) - d.min) / (d.max - d.min)); };
-      if (!ps.length) host.classList.add('off');
-      host.querySelector('.q').onclick = e => { e.stopPropagation(); JMenu.pop(e.currentTarget, `<b>${J.esc(d.title)}</b><p>${J.esc(d.help)}</p>${ps.length ? '' : '<p class="helpwarn">Cette stratégie n’utilise pas cette période : le curseur n’agit pas. Cochez-la dans « Régler la stratégie » pour l’utiliser.</p>'}`); };
-      JMenu.dualRange(J.$('.sl-body', host), { label: d.title, min: d.min, max: d.max, step: d.step, dec: d.dec, unit: d.unit, low, high, lockLow: d.side === 'high', lockHigh: d.side === 'low', disabled: !ps.length, onInput: draw,
+      if (idle) host.classList.add('idle');
+      host.querySelector('.q').onclick = e => { e.stopPropagation(); JMenu.pop(e.currentTarget, `<b>${J.esc(d.title)}</b><p>${J.esc(d.help)}</p>${idle ? '<p class="helpwarn">Cette stratégie n’utilise pas cette période pour l’instant : régler ce curseur l’ajoute comme critère supplémentaire.</p>' : ''}<p class="muted small">Le réglage s’applique quand vous cliquez sur « Appliquer ».</p>`); };
+      JMenu.dualRange(J.$('.sl-body', host), { label: d.title, min: d.min, max: d.max, step: d.step, dec: d.dec, unit: d.unit, low, high, lockLow: d.side === 'high', lockHigh: d.side === 'low', onInput: draw,
         onChange: (l, h) => {
           const u = d.side === 'low' ? l : h, none = d.side === 'low' ? u <= d.min : u >= d.max, val = none ? null : (d.from ? d.from(u) : u);
-          if ((raw ?? null) === val || (ui !== null && Math.abs(ui - u) < 1e-9) || (ui === null && none)) return;
-          S.config.periods.forEach(p => { if (ps.some(x => x.id === p.id)) p[d.field] = val; });
-          S.config.name = 'custom'; S.preset = 'custom'; S.label = null; S.page = 1; persist(); drawStrategies(); if (!el('editor').hidden) drawEditor(); load();
+          if (idle ? val === null : ((raw ?? null) === val || (ui !== null && Math.abs(ui - u) < 1e-9))) return;
+          const mode = S.config.ranking.mode;
+          S.config.periods.forEach(p => {
+            if (!targets.some(x => x.id === p.id)) return;
+            if (val !== null) p.enabled = true;
+            p[d.field] = val;
+            if (val === null && BASE_PERIOD[mode] && p.id !== BASE_PERIOD[mode] && CRIT_FIELDS.every(f => p[f] === null || p[f] === undefined)) p.enabled = false;   // période ajoutée par un curseur puis vidée : retirée
+          });
+          S.config.name = 'custom'; S.preset = 'custom'; S.label = null; persist(); drawStrategies(); if (!el('editor').hidden) drawEditor(); markDirty();
         } });
     });
   }
@@ -238,7 +246,7 @@
       Object.entries(groups).map(([per, list]) => `<h3 style="margin:10px 0 6px;font-size:.95rem">${J.esc(label(per))}</h3>` + list.sort((a, b) => b[1] - a[1]).map(([crit, n]) => `<div class="row between small" style="gap:10px"><span style="min-width:230px">${J.esc(CRIT[crit] || crit)}</span><div class="bar" style="flex:1"><i style="width:${Math.min(100, 100 * n / total)}%"></i></div><span class="muted" style="min-width:90px;text-align:right">${J.num(n, 0)} · ${J.num(100 * n / total, 0)} %</span></div>`).join('')).join('') : '<p class="muted">Aucun titre écarté avec ces filtres.</p>';
   }
   async function load() {
-    const my = ++seq; el('results').innerHTML = '<div class="empty"><span class="spinner"></span></div>';
+    const my = ++seq; el('apply-menu').classList.remove('pending'); el('results').innerHTML = '<div class="empty"><span class="spinner"></span></div>';
     persist();
     if (S.compare) return loadCompare(my);
     const v = { ...view(), status: S.status, sort: S.sort, dir: S.dir, page: S.page, page_size: S.size };
@@ -288,7 +296,12 @@
   };
   el('reset-filters').onclick = () => { FILTERS.forEach(k => el(k).value = ''); CHECKS.forEach(k => el(k).checked = false); el('kind').value = ''; el('market').value = ''; syncMenu(); el('tradable').checked = true; S.page = 1; load(); };
   el('tradable').onchange = () => { S.page = 1; load(); };
-  [...text, ...CHECKS].forEach(k => el(k).addEventListener(el(k).type === 'search' || el(k).type === 'number' || el(k).placeholder ? 'input' : 'change', () => { clearTimeout(timer); timer = setTimeout(() => { S.page = 1; if (el('q').value.trim()) S.status = 'all'; load(); }, 350); }));
+  /* Les réglages et filtres ne lancent plus la recherche à chaque geste (trop lent) : un bouton « Appliquer » (ou la touche Entrée) la déclenche. */
+  function applyMenu() { clearTimeout(timer); S.page = 1; if (el('q').value.trim()) S.status = 'all'; load(); }
+  function markDirty() { el('apply-menu').classList.add('pending'); }
+  [...text, ...CHECKS].forEach(k => el(k).addEventListener(el(k).type === 'search' || el(k).type === 'number' || el(k).placeholder ? 'input' : 'change', markDirty));
+  el('apply-menu').onclick = applyMenu;
+  ['q', 'min_price', 'budget', 'min_score', 'max_volatility', 'max_drawdown', 'min_volume'].forEach(k => el(k).addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); applyMenu(); } }));
   /* liens du menu latéral : ?kind=, ?compare=1, ?preset= */
   if (url.get('kind')) el('kind').value = url.get('kind');
   if (url.get('preset') === 'free') { S.preset = 'free'; S.label = null; S.config = freeConfig(); } else if (P.presets[url.get('preset')]) { S.preset = url.get('preset'); S.label = null; S.config = JSON.parse(JSON.stringify(P.presets[S.preset])); }

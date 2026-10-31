@@ -189,6 +189,9 @@ def test_fiche_exposes_both_momentums_and_the_flag():
     assert abs(sheet['state']['momentum_12m'] - expected_momentum12(UNIVERSE[0][4])) < 1e-4 and abs(sheet['state']['momentum_6m'] - expected_momentum(UNIVERSE[0][4])) < 1e-4
     assert sheet['strategy']['experimental'] is True and sheet['strategy']['ranking'] == 'momentum12' and sheet['verdict']['status'] == 'retained'
     assert sheet['verdict']['rank'] == 2 and sheet['verdict']['of'] == 5
+    custom = strategy.preset('momentum12')
+    custom['name'] = 'custom'                                       # réglages personnels fondés sur un classement par momentum : la mise en garde reste affichée
+    assert service.instrument_sheet(conn, {'listing_id': 1, 'config': custom})['strategy']['experimental'] is True
 
 
 def test_explorer_capitalisation_filter_uses_the_size_classes():
