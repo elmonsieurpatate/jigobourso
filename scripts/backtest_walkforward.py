@@ -55,20 +55,22 @@ CAVEATS = (
 
 
 # ───────── calendrier et données ─────────
-def calendar_from_counts(count):
-    """Séances de référence : dates où au moins la moitié du plus grand nombre de séries a une clôture (même règle que tracking.reference_calendar)."""
+def calendar_from_counts(count, min_share=0.5, min_titles=0):
+    """Séances de référence : dates où au moins `min_share` du plus grand nombre de séries (et au moins `min_titles` titres) ont une clôture.
+    Par défaut la moitié, comme tracking.reference_calendar. Pour un historique LONG, cette règle écarte tout ce qui précède l'arrivée de la moitié des titres
+    (ici mi-2016 : près de la moitié des titres ont moins de dix ans) ; on la baisse alors (`--min-share`), en acceptant des univers plus petits aux dates anciennes."""
     if not count:
         return []
     biggest = max(count.values())
-    return sorted(d for d, n in count.items() if n >= biggest / 2)
+    return sorted(d for d, n in count.items() if n >= max(biggest * min_share, min_titles))
 
 
-def reference_dates(candidates):
+def reference_dates(candidates, min_share=0.5, min_titles=0):
     count = defaultdict(int)
     for c in candidates:
         for d in c['dates']:
             count[d] += 1
-    return calendar_from_counts(count)
+    return calendar_from_counts(count, min_share, min_titles)
 
 
 def pick_dates(calendar, horizons, step, how_many, first_index=126):
@@ -240,7 +242,7 @@ class Study:
                         out[(t, name, group)] = keys
         return out
 
-    def results(self, top=20, cost_bps=10.0, step=21, draws=500, seed=1, only_dates=None, period=None):
+    def results(self, top=20, cost_bps=10.0, step=21, draws=500, seed=1, only_dates=None, period=None, min_pool=0):
         dates = tuple(only_dates) if only_dates is not None else self.dates
         picks = self.picks(top, dates)
         rng = random.Random(seed)
@@ -254,7 +256,7 @@ class Study:
                         keys = picks.get((t, name, group))
                         uni = {k: r[h] for k, r in self.universe.get((t, group), {}).items() if h in r}
                         got = [uni[k] for k in (keys or []) if k in uni]
-                        if not got or len(uni) < 2 * len(got):
+                        if not got or len(uni) < max(2 * len(got), min_pool):          # univers trop petit à cette date pour que « top N » soit une vraie sélection
                             continue
                         pool = list(uni.values())
                         rows.append({'date': t, 'k': len(got), 'got': got, 'pool': pool, 'pick': statistics.fmean(got), 'uni': statistics.fmean(pool),
@@ -369,7 +371,7 @@ def _history_file(directory, key):
     return os.path.join(directory, 'history', f'{key}.csv.gz')
 
 
-def csv_calendar(directory, universe):
+def csv_calendar(directory, universe, min_share=0.5, min_titles=0):
     """Séances de référence, en ne lisant que la colonne des dates (le calendrier doit être connu avant de traiter les titres par lots)."""
     count, skipped = defaultdict(int), 0
     for u in universe:
@@ -385,7 +387,7 @@ def csv_calendar(directory, universe):
             count[d] += 1
     if skipped:
         print(f'{skipped} fichier(s) non quotidien(s) ignoré(s) (écart médian > {MAX_MEDIAN_GAP_DAYS} jours) : refaire l\'export avec le script à jour.', file=sys.stderr)
-    return calendar_from_counts(count)
+    return calendar_from_counts(count, min_share, min_titles)
 
 
 def csv_batches(directory, universe, sample=0, seed=1, batch=100):
@@ -420,6 +422,9 @@ def main(argv=None):
     ap.add_argument('--signals', nargs='+', default=list(DEFAULT_SIGNALS), help='stratégies à tester en plus des profils de l\'application (voir SIGNALS) ; liste COURTE, fixée à l\'avance')
     ap.add_argument('--no-presets', action='store_true', help='ne pas rejouer les quatre profils de l\'application (plus rapide, moins de variantes comptées)')
     ap.add_argument('--cost-bps', type=float, default=10.0, help='coût par achat ou vente, en points de base')
+    ap.add_argument('--min-share', type=float, default=None, help="part minimale du plus grand nombre de titres ayant une clôture pour qu'une date soit retenue (défaut : 0,5 base ; 0,1 csv)")
+    ap.add_argument('--min-titles', type=int, default=None, help='nombre minimal de titres ayant une clôture à une date (défaut : 0 base ; 150 csv)')
+    ap.add_argument('--min-pool', type=int, default=None, help="univers minimal d'un groupe à une date pour la comparer (défaut : 0 base ; 100 csv) : en dessous, « les 20 premiers » n'est pas une sélection")
     ap.add_argument('--split-date', help='AAAA-MM-JJ : sépare « calibration » (avant) et « validation » (à partir de cette date)')
     ap.add_argument('--sample', type=int, default=0, help="sous-échantillon aléatoire de l'univers (0 = tout)")
     ap.add_argument('--seed', type=int, default=1)
@@ -429,6 +434,10 @@ def main(argv=None):
     if args.split_date:
         datetime.date.fromisoformat(args.split_date)
     how_many = args.dates if args.dates is not None else (10 if args.source == 'db' else 0)
+    long_history = args.source == 'csv'
+    min_share = args.min_share if args.min_share is not None else (0.1 if long_history else 0.5)
+    min_titles = args.min_titles if args.min_titles is not None else (150 if long_history else 0)
+    min_pool = args.min_pool if args.min_pool is not None else (100 if long_history else 0)
     conn = None
     try:
         if args.source == 'csv':
@@ -436,7 +445,7 @@ def main(argv=None):
                 ap.error('--csv-dir est obligatoire avec --source csv')
             directory = os.path.expanduser(args.csv_dir)
             universe = csv_universe(directory)
-            calendar = csv_calendar(directory, universe)
+            calendar = csv_calendar(directory, universe, min_share, min_titles)
             batches = lambda: csv_batches(directory, universe, args.sample, args.seed)          # noqa: E731
         else:
             from engine.shared.db import connect
@@ -466,9 +475,9 @@ def main(argv=None):
             if len(part) < 3:
                 print(f'Période « {label} » : moins de 3 dates, ignorée.', file=sys.stderr)
                 continue
-            results += study.results(args.top, args.cost_bps, args.step, args.draws, args.seed, only_dates=part, period=f'{label} ({part[0]} → {part[-1]}, {len(part)} dates)')
+            results += study.results(args.top, args.cost_bps, args.step, args.draws, args.seed, only_dates=part, period=f'{label} ({part[0]} → {part[-1]}, {len(part)} dates)', min_pool=min_pool)
     else:
-        results = study.results(args.top, args.cost_bps, args.step, args.draws, args.seed)
+        results = study.results(args.top, args.cost_bps, args.step, args.draws, args.seed, min_pool=min_pool)
     meta = {'titles': titles, 'dates': dates, 'top': args.top, 'cost_bps': args.cost_bps, 'horizons': args.horizon, 'split_date': args.split_date, 'source': args.source, 'caveats': CAVEATS,
             'variants': len(study.configs) + len(study.signal_names), 'signals': {n: signal_labels()[n] for n in study.signal_names}}
     print(render(results, meta))

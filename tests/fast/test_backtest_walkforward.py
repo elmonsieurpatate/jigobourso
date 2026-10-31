@@ -209,3 +209,18 @@ def test_non_daily_history_files_are_skipped(tmp_path):
     universe = bt.csv_universe(str(tmp_path))
     assert bt.csv_calendar(str(tmp_path), universe) == [d for d, _, _ in daily['bars']]            # le fichier mensuel n'entre pas dans le calendrier
     assert [c['key'] for lot in bt.csv_batches(str(tmp_path), universe) for c in lot] == ['2']       # ni dans l'étude
+
+
+def test_coverage_rule_can_be_lowered_to_reach_old_history():
+    """Reproduit le défaut observé : avec la règle « la moitié des titres », tout ce qui précède l'arrivée de la moitié des titres disparaît du calendrier."""
+    count = {f'2010-01-{d:02d}': 40 for d in range(1, 11)}                      # 40 titres existent déjà…
+    count.update({f'2020-01-{d:02d}': 100 for d in range(1, 11)})               # …100 plus tard
+    assert bt.calendar_from_counts(count) == sorted(k for k in count if k.startswith('2020'))
+    assert bt.calendar_from_counts(count, min_share=0.2) == sorted(count)
+    assert bt.calendar_from_counts(count, min_share=0.2, min_titles=50) == sorted(k for k in count if k.startswith('2020'))
+
+
+def test_small_universe_dates_are_skipped_by_min_pool():
+    study, _ = study_for(series(120, 330, 0.2, 0.002, 0.015, 5), dates=4)
+    assert study.results(top=10, draws=20)
+    assert study.results(top=10, draws=20, min_pool=1000) == []              # univers de 120 titres < 1000 : aucune comparaison
