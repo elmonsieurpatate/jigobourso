@@ -78,7 +78,27 @@ def deciles(d):
         print(f"{r['signal']:14} h={r['horizon']:2} D1={f(r['decile_mean'][0], 1)} D5={f(r['decile_mean'][4], 1)} D10={f(r['decile_mean'][9], 1)} D10-D1 {f(s['mean'])} [{f(s['ci_low'])};{f(s['ci_high'])}] %dates D10>D1={r['share_dates_d10_above_d1']:.0f} monotonie={f(r['monotonicity'], 2)}")
 
 
+def periods(d):
+    print('STABILITÉ PAR SOUS-PÉRIODE (Top 20, actions, usd_1M, entrée à t) : excès brut | net 30 pb')
+    for r in d:
+        if r['group'] == 'equity' and r['scenario'] == 'usd_1M' and r['slice'] == 'Top 20' and r['lag'] == 0:
+            pg, pn = r['periods_gross'], r['periods_net30']
+            print(f"{SL.get(r['strategy'], r['strategy']):13} h={r['horizon']:2} " + ' ; '.join(f"{k.split()[0]} {f(pg[k]['mean'])}|{f(pn[k]['mean'])} (n={pg[k]['dates']})" for k in pg))
+    print('\nETF (Top 20, scénario aucun et usd_1M) : excès brut [IC] | net30 | n')
+    for r in d:
+        if r['group'] == 'etf' and r['slice'] == 'Top 20' and r['lag'] == 0 and r['horizon'] in (21, 63):
+            g = r['excess_gross']
+            print(f"  {SL.get(r['strategy'], r['strategy']):13} {r['scenario']:7} h={r['horizon']:2} n={r['dates']:3} sél={f(r['pick_mean'])} univ={f(r['universe_mean'])} excès {f(g['mean'])} [{f(g['ci_low'])};{f(g['ci_high'])}] net30={f(r['excess_net']['30'])}")
+    print('\nSENSIBILITÉ À L\'EXÉCUTION (entrée t+1), Top 20 usd_1M : excès brut lag0 → lag1')
+    base = {(r['strategy'], r['horizon']): r for r in d if r['group'] == 'equity' and r['scenario'] == 'usd_1M' and r['slice'] == 'Top 20' and r['lag'] == 0}
+    for r in d:
+        if r['group'] == 'equity' and r['scenario'] == 'usd_1M' and r['slice'] == 'Top 20' and r['lag'] == 1:
+            b = base[(r['strategy'], r['horizon'])]
+            print(f"  {SL.get(r['strategy'], r['strategy']):13} h={r['horizon']:2} {f(b['excess_gross']['mean'])} → {f(r['excess_gross']['mean'])}")
+
+
 if __name__ == '__main__':
     base, name = sys.argv[1], sys.argv[2]
-    with open(os.path.join(os.path.expanduser(base), f'{name}.json'), encoding='utf-8') as fh:
+    file_name = "rank" if name == "periods" else name
+    with open(os.path.join(os.path.expanduser(base), f"{file_name}.json"), encoding='utf-8') as fh:
         globals()[name](json.load(fh))
