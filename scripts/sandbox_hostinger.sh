@@ -20,6 +20,9 @@ case "$PWD" in */public_html*|*/jigobourso-v2) echo "REFUS : lancez ce script de
 export JIGO_DB_PORT="${JIGO_DB_PORT:-3306}" PYTHONPATH="$PWD" JIGO_ENV_FILE=/nonexistent
 SQL() { MYSQL_PWD="$JIGO_DB_PASSWORD" mariadb -h"$JIGO_DB_HOST" -P"$JIGO_DB_PORT" -u"$JIGO_DB_USER" "$JIGO_DB_NAME" "$@"; }
 echo "Copie testée : $PWD · base d'essai : $JIGO_DB_NAME · python : $PY"
+if [ "${JIGO_ONLY_BRIDGE:-0}" = 1 ]; then        # relance rapide du seul contrôle du pont PHP (base d'essai déjà préparée)
+  JIGO_ENGINE_ROOT="$PWD" JIGO_PYTHON="$PY" php scripts/verify_php_bridge.php; exit $?
+fi
 
 tables=$(SQL -N -e 'SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE()') || { echo "Connexion à la base d'essai impossible."; exit 2; }
 
@@ -58,40 +61,9 @@ step "4b. presets : 6 stratégies, 4 inchangées, deux momentums à l'essai" che
 step "4c. Suivi lisible (horizons 1, 3, 5, 21, 63)" check suivi '{}' "assert d['horizons']==[1,3,5,21,63], d.get('horizons'); print('ok')"
 step "4d. syntaxe PHP du site" bash -c "find app -name '*.php' -print0 | xargs -0 -n1 php -l > /dev/null"
 
-# ── 5. PHP + API sur un serveur local isolé (base d'essai, compte d'essai créé DANS la base d'essai seulement)
-api_check() {
-  local port=$((20000 + RANDOM % 20000)) jar; jar=$(mktemp); local pw='Sandbox-only-pass-2026' user="sandbox_$$"
-  export JIGO_ENGINE_ROOT="$PWD" JIGO_PYTHON="$PY"
-  php scripts/create_user.php "$user" "$pw" --admin --email="$user@example.test" > /dev/null || return 1
-  php -S 127.0.0.1:$port -t app/public > /tmp/jigo-sandbox-php.log 2>&1 &
-  local pid=$!; trap "kill $pid 2>/dev/null" RETURN; local rc=0 api="http://127.0.0.1:$port/api.php?r="
-  for _ in $(seq 1 30); do curl -s -o /dev/null "${api}auth/me" && break; sleep 1; done
-  echo "serveur d'essai : $(curl -s -o /dev/null -w 'HTTP %{http_code}' "${api}auth/me")"
-  curl -sS -c "$jar" -H 'Content-Type: application/json' -d "{\"username\":\"$user\",\"password\":\"$pw\"}" "${api}auth/login" | $PY -c "import json,sys; raw=sys.stdin.read(); d=json.loads(raw) if raw.strip() else {}; assert d.get('user'), raw[:300]" || rc=1
-  for p in momentum momentum12 regular; do
-    curl -s -b "$jar" -H 'Content-Type: application/json' -d "{\"config\":\"$p\",\"view\":{\"status\":\"retained\",\"kind\":\"equity\",\"page_size\":20}}" "${api}explore" \
-      | $PY -c "import json,sys; d=json.load(sys.stdin); r=d['rows']; assert d['config']['name']=='$p' and r, d.get('error'); print('$p', d['total'], 'retenus ; premier :', r[0]['symbol'], r[0].get('momentum'))" || rc=1
-  done
-  id=$(curl -s -b "$jar" -H 'Content-Type: application/json' -d '{"config":"momentum12","view":{"status":"retained","kind":"equity","page_size":1}}' "${api}explore" | $PY -c "import json,sys; print(json.load(sys.stdin)['rows'][0]['id'])")
-  curl -s -b "$jar" -H 'Content-Type: application/json' -d "{\"id\":$id,\"config\":$(curl -s -b "$jar" "${api}strategy/presets" | $PY -c "import json,sys; print(json.dumps(json.load(sys.stdin)['presets']['momentum12']))")}" "${api}sheet" \
-    | $PY -c "import json,sys; d=json.load(sys.stdin); assert d['strategy']['experimental'] and d['strategy']['ranking']=='momentum12' and d['state']['momentum_12m'] is not None, d.get('error'); print('fiche ok :', d['state']['momentum_12m'])" || rc=1
-  curl -s -b "$jar" "${api}suivi" | $PY -c "
-import json,sys
-d=json.load(sys.stdin)
-assert d['horizons']==[1,3,5,21,63], d.get('horizons')
-print('suivi : horizons', d['horizons'], '· stratégies suivies :', list(d.get('presets', {})))
-if '${JIGO_BACKFILL:-0}' == '1':
-    for p in ('momentum','momentum12'):
-        g=d['presets'][p]['groups']['equity']
-        print('suivi', p, {h: (g[h]['n'] if g.get(h) else None) for h in ('21','63')})
-        assert g.get('21') and g['21']['n']>0, p
-" || rc=1
-  curl -s -b "$jar" "${api}strategy/presets" | $PY -c "import json,sys; d=json.load(sys.stdin); assert list(d['presets'])[-2:]==['momentum','momentum12']; print('presets ok')" || rc=1
-  [ $rc -eq 0 ] || { echo "-- journal du serveur d'essai :"; tail -n 8 /tmp/jigo-sandbox-php.log | cut -c1-240; }
-  kill $pid 2>/dev/null; rm -f "$jar"
-  return $rc
-}
-step "5. PHP + API (serveur local isolé) : Explorer, fiche, Suivi, profils" api_check
+# ── 5. pont PHP -> moteur (le même appel que l'API) : profils, Explorer, fiche, Suivi. Le parcours HTTP complet (connexion, pages) est vérifié par les tests de navigateur de la chaîne GitHub.
+bridge() { JIGO_ENGINE_ROOT="$PWD" JIGO_PYTHON="$PY" php scripts/verify_php_bridge.php; }
+step "5. pont PHP vers le moteur : Explorer, fiche, Suivi, profils" bridge
 echo
 echo "══ BILAN"
 echo "réussi :${ok:- aucun}"
