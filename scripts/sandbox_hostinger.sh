@@ -47,6 +47,9 @@ step "2c. colonnes momentum_6m et momentum_12m présentes, aucune ligne perdue (
 # ── 3. calcul des indicateurs (clôtures déjà en base, aucun réseau)
 step "3. recalcul des indicateurs (engine.cli metrics)" nice -n 10 $PY -m engine.cli metrics
 
+# ── 3b. reconstitution du suivi sur les dernières séances (INSERT IGNORE : n'écrase aucun instantané existant) pour que le Suivi montre les deux stratégies à 21 et 63 séances
+step "3b. reconstitution du suivi (75 séances) et résultats à 21 et 63 séances" nice -n 15 $PY -m engine.cli suivi-backfill --sessions 75
+
 # ── 4. contrôles de cohérence et classements (lecture seule)
 step "4. valeurs stockées, cohérence avec la formule des tests, classements" $PY scripts/verify_momentum_release.py
 
@@ -61,9 +64,10 @@ api_check() {
   export JIGO_ENGINE_ROOT="$PWD" JIGO_PYTHON="$PY"
   php scripts/create_user.php sandbox_user "$pw" --admin --email=sandbox@example.test > /dev/null || return 1
   php -S 127.0.0.1:$port -t app/public > /tmp/jigo-sandbox-php.log 2>&1 &
-  local pid=$!; sleep 2
-  local rc=0 api="http://127.0.0.1:$port/api.php?r="
-  curl -s -c "$jar" -H 'Content-Type: application/json' -d "{\"username\":\"sandbox_user\",\"password\":\"$pw\"}" "${api}auth/login" | $PY -c "import json,sys; assert json.load(sys.stdin).get('user')" || rc=1
+  local pid=$!; local rc=0 api="http://127.0.0.1:$port/api.php?r="
+  for _ in $(seq 1 30); do curl -s -o /dev/null "${api}auth/me" && break; sleep 1; done
+  echo "serveur d'essai : $(curl -s -o /dev/null -w 'HTTP %{http_code}' "${api}auth/me")"
+  curl -sS -c "$jar" -H 'Content-Type: application/json' -d "{\"username\":\"sandbox_user\",\"password\":\"$pw\"}" "${api}auth/login" | $PY -c "import json,sys; raw=sys.stdin.read(); d=json.loads(raw) if raw.strip() else {}; assert d.get('user'), raw[:300]" || rc=1
   for p in momentum momentum12 regular; do
     curl -s -b "$jar" -H 'Content-Type: application/json' -d "{\"config\":\"$p\",\"view\":{\"status\":\"retained\",\"kind\":\"equity\",\"page_size\":20}}" "${api}explore" \
       | $PY -c "import json,sys; d=json.load(sys.stdin); r=d['rows']; assert d['config']['name']=='$p' and r, d.get('error'); print('$p', d['total'], 'retenus ; premier :', r[0]['symbol'], r[0].get('momentum'))" || rc=1
@@ -71,8 +75,17 @@ api_check() {
   id=$(curl -s -b "$jar" -H 'Content-Type: application/json' -d '{"config":"momentum12","view":{"status":"retained","kind":"equity","page_size":1}}' "${api}explore" | $PY -c "import json,sys; print(json.load(sys.stdin)['rows'][0]['id'])")
   curl -s -b "$jar" -H 'Content-Type: application/json' -d "{\"id\":$id,\"config\":$(curl -s -b "$jar" "${api}strategy/presets" | $PY -c "import json,sys; print(json.dumps(json.load(sys.stdin)['presets']['momentum12']))")}" "${api}sheet" \
     | $PY -c "import json,sys; d=json.load(sys.stdin); assert d['strategy']['experimental'] and d['strategy']['ranking']=='momentum12' and d['state']['momentum_12m'] is not None, d.get('error'); print('fiche ok :', d['state']['momentum_12m'])" || rc=1
-  curl -s -b "$jar" "${api}suivi" | $PY -c "import json,sys; d=json.load(sys.stdin); assert d['horizons']==[1,3,5,21,63] and 'momentum' in d['presets'] and 'momentum12' in d['presets']; print('suivi ok')" || rc=1
+  curl -s -b "$jar" "${api}suivi" | $PY -c "
+import json,sys
+d=json.load(sys.stdin)
+assert d['horizons']==[1,3,5,21,63] and 'momentum' in d['presets'] and 'momentum12' in d['presets'], list(d.get('presets', {}))
+for p in ('momentum','momentum12'):
+    g=d['presets'][p]['groups']['equity']
+    print('suivi', p, {h: (g[h]['n'] if g.get(h) else None) for h in ('21','63')})
+    assert g.get('21') and g['21']['n']>0, p
+" || rc=1
   curl -s -b "$jar" "${api}strategy/presets" | $PY -c "import json,sys; d=json.load(sys.stdin); assert list(d['presets'])[-2:]==['momentum','momentum12']; print('presets ok')" || rc=1
+  [ $rc -eq 0 ] || { echo "-- journal du serveur d'essai :"; tail -n 8 /tmp/jigo-sandbox-php.log | cut -c1-240; }
   kill $pid 2>/dev/null; rm -f "$jar"
   return $rc
 }
