@@ -3,20 +3,29 @@
 À chaque date de rééquilibrage t (tous les `--step` séances), le script rejoue l'Explorer avec les seules clôtures antérieures ou égales à t, garde les `--top` premiers
 titres de chaque groupe (actions / ETF) pour chaque profil, puis mesure leur rendement `h` séances plus tard. Il le compare :
   - à l'univers entier (moyenne équipondérée des titres évaluables ce jour-là) ;
-  - à des tirages au hasard de même taille (p-valeur : part des tirages qui font au moins aussi bien) ;
+  - à des tirages au hasard de même taille (p-valeur : part des tirages qui font au moins aussi bien, sur les dates SANS chevauchement) ;
   - à un momentum naïf « 6 mois moins le dernier mois », classé sur la même date.
 Les coûts sont retirés : `--cost-bps` points de base par achat ou vente, renouvellement complet supposé à chaque rééquilibrage.
+Il rapporte aussi le risque de chaque sélection (dispersion des rendements, 10 % les plus bas, part de rendements négatifs) et des écarts MÉDIANS, moins sensibles aux cas extrêmes.
+
+Deux sources de données :
+  --source db  (défaut) : la base de l'application (≈ 400 séances), variables JIGO_DB_* ;
+  --source csv --csv-dir DOSSIER : l'historique long produit par scripts/export_history.py (jusqu'à 10 ans, cours ajustés des dividendes). Beaucoup plus de dates, donc des
+                          résultats moins dépendants d'un seul climat de marché.
+`--split-date AAAA-MM-JJ` coupe les dates en deux : « calibration » (avant) et « validation » (à partir de cette date). Règle de méthode : on peut ajuster un réglage en regardant la
+calibration ; la validation, elle, ne se regarde qu'UNE fois, pour confirmer, jamais pour ajuster.
 
 CE QUE LE TEST NE PEUT PAS FAIRE (rappelé dans la sortie) : l'univers est celui d'AUJOURD'HUI (titres radiés absents, préfiltre de liquidité d'aujourd'hui appliqué au passé),
-les rendements sont hors dividendes et en devise locale, et l'historique en base (≈ 400 séances) ne donne que quelques dates indépendantes. Un résultat favorable n'est donc
-pas une promesse ; un résultat nul ou défavorable, lui, est une information.
+et le nombre de dates indépendantes reste limité. Un résultat favorable n'est pas une promesse ; un résultat nul ou défavorable, lui, est une information.
 
-Usage : python scripts/backtest_walkforward.py [--horizon 21 63] [--step 21] [--dates 10] [--top 20] [--cost-bps 10] [--sample 3000] [--seed 1] [--json sortie.json]
-Connexion : variables JIGO_DB_* (comme le moteur). Sur l'hébergement : PYTHONPATH=$PWD .venv/bin/python scripts/backtest_walkforward.py
+Usage : python scripts/backtest_walkforward.py [--source csv --csv-dir ~/tmp-history] [--horizon 21 63] [--step 21] [--dates N] [--top 20] [--cost-bps 10]
+                                              [--split-date 2023-01-01] [--sample 3000] [--seed 1] [--json sortie.json]
 """
 import argparse
 import bisect
+import csv
 import datetime
+import gzip
 import json
 import math
 import os
@@ -34,33 +43,38 @@ from engine.analytics.series import analyze_series, prepare_series          # no
 
 MAX_STALE_DAYS = 5          # dernière clôture trop ancienne à la date t : le titre n'est pas évalué ce jour-là (comme le Suivi)
 MIN_CLOSES = 30
+DECISION_BARS = 420         # clôtures visibles par le classement à chaque date (l'application en garde environ 400)
 BASELINE = 'mom_6_1'
 CAVEATS = (
     "Univers d'aujourd'hui : les titres radiés ou sortis du catalogue sont absents (biais de survie) et le préfiltre de liquidité d'aujourd'hui est appliqué au passé.",
-    "Rendements en devise locale, hors dividendes, sur cours bruts corrigés des seuls splits confirmés.",
-    "Peu de dates indépendantes : lire la t-stat et la p-valeur, pas seulement la moyenne. Les rendements de dates voisines se chevauchent quand `step` < `horizon`.",
+    "Source « db » : rendements en devise locale, hors dividendes. Source « csv » : cours ajustés des dividendes et des splits, en devise locale.",
+    "Peu de dates indépendantes : lire la t-stat et la p-valeur (calculées sans chevauchement), pas seulement la moyenne. Une ligne « significative » sur vingt arrive par hasard.",
     "Le test mesure si le classement aurait précédé de meilleurs rendements dans l'échantillon ; il ne prouve rien sur l'avenir.",
 )
 
 
 # ───────── calendrier et données ─────────
-def reference_dates(candidates):
+def calendar_from_counts(count):
     """Séances de référence : dates où au moins la moitié du plus grand nombre de séries a une clôture (même règle que tracking.reference_calendar)."""
-    count = defaultdict(int)
-    for c in candidates:
-        for d in c['dates']:
-            count[d] += 1
     if not count:
         return []
     biggest = max(count.values())
     return sorted(d for d, n in count.items() if n >= biggest / 2)
 
 
+def reference_dates(candidates):
+    count = defaultdict(int)
+    for c in candidates:
+        for d in c['dates']:
+            count[d] += 1
+    return calendar_from_counts(count)
+
+
 def pick_dates(calendar, horizons, step, how_many, first_index=126):
-    """Dates de rééquilibrage : les plus récentes possibles (il faut `max(horizons)` séances derrière chacune), espacées de `step`."""
+    """Dates de rééquilibrage : les plus récentes possibles (il faut `max(horizons)` séances derrière chacune), espacées de `step`. `how_many` = 0 : toutes."""
     last = len(calendar) - 1 - max(horizons)
     out, i = [], last
-    while i >= first_index and len(out) < how_many:
+    while i >= first_index and (not how_many or len(out) < how_many):
         out.append(calendar[i])
         i -= step
     return sorted(out)
@@ -106,7 +120,8 @@ class Study:
                 n = bisect.bisect_right(c['dates'], t)
                 if n < MIN_CLOSES or (datetime.date.fromisoformat(t) - datetime.date.fromisoformat(c['dates'][n - 1])).days > MAX_STALE_DAYS:
                     continue
-                dates, closes, _, breaks, measures, missing, tech = analyze_series(c['bars'][:n], self.windows, c.get('split_dates') or ())
+                visible = c['bars'][max(0, n - DECISION_BARS):n]                    # jamais une clôture postérieure à t
+                dates, closes, _, breaks, measures, missing, tech = analyze_series(visible, self.windows, c.get('split_dates') or ())
                 fwd = {h: forward_return(c['full'], t, h) for h in self.horizons}
                 # Le titre est évalué et classé même sans rendement futur : écarter d'avance ceux dont l'avenir est inconnu ou cassé ferait entrer le futur dans la sélection.
                 # Leur résultat manquera seulement à la mesure (voir `results` : colonne « sél. » = titres de la sélection dont le rendement est connu).
@@ -119,10 +134,10 @@ class Study:
                         self.retained[(t, name)].append(dict(v, key=c['key'], group=c['group'], symbol=c['symbol']))
 
     # ───────── agrégation ─────────
-    def picks(self, top):
+    def picks(self, top, only_dates=None):
         """{(date, nom, groupe): [clés]} : les `top` premiers de chaque profil, et du momentum naïf."""
         out = {}
-        for t in self.dates:
+        for t in (only_dates if only_dates is not None else self.dates):
             for name, cfg in self.configs.items():
                 ranked = strategy.rank(cfg, self.retained.get((t, name), []))
                 for group in ('equity', 'etf'):
@@ -136,43 +151,58 @@ class Study:
                     out[(t, BASELINE, group)] = keys
         return out
 
-    def results(self, top=20, cost_bps=10.0, step=21, draws=500, seed=1):
-        picks = self.picks(top)
+    def results(self, top=20, cost_bps=10.0, step=21, draws=500, seed=1, only_dates=None, period=None):
+        dates = tuple(only_dates) if only_dates is not None else self.dates
+        picks = self.picks(top, dates)
         rng = random.Random(seed)
         cost = 2 * cost_bps / 100.0                         # aller-retour, en points de rendement, une fois par rééquilibrage
-        names = list(self.configs) + [BASELINE]
         out = []
-        for name in names:
+        for name in list(self.configs) + [BASELINE]:
             for group in ('equity', 'etf'):
                 for h in self.horizons:
                     rows = []
-                    for t in self.dates:
+                    for t in dates:
                         keys = picks.get((t, name, group))
                         uni = {k: r[h] for k, r in self.universe.get((t, group), {}).items() if h in r}
                         got = [uni[k] for k in (keys or []) if k in uni]
                         if not got or len(uni) < 2 * len(got):
                             continue
-                        rows.append({'date': t, 'k': len(got), 'pick': statistics.fmean(got), 'uni': statistics.fmean(uni.values()), 'pool': list(uni.values())})
+                        pool = list(uni.values())
+                        rows.append({'date': t, 'k': len(got), 'got': got, 'pool': pool, 'pick': statistics.fmean(got), 'uni': statistics.fmean(pool),
+                                     'median_gap': statistics.median(got) - statistics.median(pool)})
                     if not rows:
                         continue
-                    excess = [r['pick'] - r['uni'] for r in rows]
+                    for r in rows:
+                        r['excess'] = r['pick'] - r['uni']
                     spacing = max(1, math.ceil(h / step))
-                    indep = excess[::spacing]                # sous-échantillon sans chevauchement pour la t-stat
-                    net = [e - cost for e in excess]
-                    net_indep = net[::spacing]
-                    sims = []
-                    for _ in range(draws):
-                        sims.append(statistics.fmean(statistics.fmean(rng.sample(r['pool'], r['k'])) - r['uni'] for r in rows))
-                    obs = statistics.fmean(excess)
+                    indep = rows[::spacing]                  # sous-échantillon sans chevauchement : t-stat et p-valeur n'utilisent que lui
+                    net = [r['excess'] - cost for r in rows]
+                    p_random = None
+                    if len(indep) >= 3:
+                        obs = statistics.fmean(r['excess'] for r in indep)
+                        sims = [statistics.fmean(statistics.fmean(rng.sample(r['pool'], r['k'])) - r['uni'] for r in indep) for _ in range(draws)]
+                        p_random = round((1 + sum(1 for s in sims if s >= obs)) / (draws + 1), 3)
+                    pick_all, uni_all = [x for r in rows for x in r['got']], [x for r in rows for x in r['pool']]
                     out.append({
-                        'strategy': name, 'group': group, 'horizon': h, 'dates': len(rows), 'independent_dates': len(indep),
+                        'strategy': name, 'group': group, 'horizon': h, 'period': period, 'dates': len(rows), 'independent_dates': len(indep),
                         'avg_picks': round(statistics.fmean(r['k'] for r in rows), 1),
                         'pick_mean': round(statistics.fmean(r['pick'] for r in rows), 2), 'universe_mean': round(statistics.fmean(r['uni'] for r in rows), 2),
-                        'excess_gross': round(obs, 2), 'excess_net': round(statistics.fmean(net), 2),
-                        't_net': _tstat(net_indep), 'share_positive': round(100 * sum(1 for e in net if e > 0) / len(net)),
-                        'p_random': round((1 + sum(1 for s in sims if s >= obs)) / (draws + 1), 3),
+                        'excess_gross': round(statistics.fmean(r['excess'] for r in rows), 2), 'excess_net': round(statistics.fmean(net), 2),
+                        'excess_median': round(statistics.fmean(r['median_gap'] for r in rows), 2),
+                        't_net': _tstat([e - cost for e in (r['excess'] for r in indep)]), 'share_positive': round(100 * sum(1 for e in net if e > 0) / len(net)),
+                        'p_random': p_random,
+                        'risk': {'pick_spread': round(statistics.pstdev(pick_all), 2), 'universe_spread': round(statistics.pstdev(uni_all), 2),
+                                 'pick_p10': round(_quantile(pick_all, 0.10), 2), 'universe_p10': round(_quantile(uni_all, 0.10), 2),
+                                 'pick_negative': round(100 * sum(1 for x in pick_all if x < 0) / len(pick_all)),
+                                 'universe_negative': round(100 * sum(1 for x in uni_all if x < 0) / len(uni_all))},
+                        'by_date': [{'date': r['date'], 'picks': r['k'], 'pick': round(r['pick'], 2), 'universe': round(r['uni'], 2), 'excess': round(r['excess'], 2)} for r in rows],
                     })
         return out
+
+
+def _quantile(values, q):
+    v = sorted(values)
+    return v[min(len(v) - 1, int(q * len(v)))]
 
 
 def _tstat(values):
@@ -184,22 +214,35 @@ def _tstat(values):
 
 # ───────── présentation ─────────
 def render(results, meta):
-    lines = [f"Test chronologique · {meta['titles']} titres · {len(meta['dates'])} dates ({meta['dates'][0]} → {meta['dates'][-1]}) · top {meta['top']} par groupe · coût {meta['cost_bps']} pb par sens", '']
-    head = f"{'profil':<15}{'groupe':<8}{'h':>4}{'dates':>6}{'indép.':>7}{'sél.':>6}{'sélection':>10}{'univers':>9}{'excès brut':>11}{'excès net':>10}{'t net':>7}{'% dates+':>9}{'p hasard':>9}"
-    lines.append(head)
-    lines.append('-' * len(head))
-    for r in sorted(results, key=lambda r: (r['group'], r['horizon'], r['strategy'])):
-        t = '—' if r['t_net'] is None else f"{r['t_net']:.2f}"
-        lines.append(f"{r['strategy']:<15}{r['group']:<8}{r['horizon']:>4}{r['dates']:>6}{r['independent_dates']:>7}{r['avg_picks']:>6}{r['pick_mean']:>9.2f}%{r['universe_mean']:>8.2f}%"
-                     f"{r['excess_gross']:>10.2f}%{r['excess_net']:>9.2f}%{t:>7}{r['share_positive']:>8}%{r['p_random']:>9.3f}")
-    lines += ['', 'Lecture : « excès » = rendement moyen de la sélection moins celui de l\'univers, en points de rendement sur l\'horizon h (séances).',
-              '« p hasard » : part de tirages au hasard de même taille qui font au moins aussi bien (petit = peu probable par chance). « t net » : sur dates sans chevauchement.', '', 'Limites :']
+    dates = meta['dates']
+    lines = [f"Test chronologique · {meta['titles']} titres · {len(dates)} dates ({dates[0]} → {dates[-1]}) · top {meta['top']} par groupe · coût {meta['cost_bps']} pb par sens"
+             + (f" · coupure {meta['split_date']}" if meta.get('split_date') else ''), '']
+    head = (f"{'profil':<15}{'groupe':<8}{'h':>4}{'dates':>6}{'indép.':>7}{'sél.':>6}{'sélection':>10}{'univers':>9}{'excès brut':>11}{'excès net':>10}{'excès méd.':>11}"
+            f"{'t net':>7}{'% dates+':>9}{'p hasard':>9}")
+    for period in dict.fromkeys(r.get('period') for r in results):
+        part = [r for r in results if r.get('period') == period]
+        lines += ([f'── {period} ──'] if period else []) + [head, '-' * len(head)]
+        for r in sorted(part, key=lambda r: (r['group'], r['horizon'], r['strategy'])):
+            t = '—' if r['t_net'] is None else f"{r['t_net']:.2f}"
+            p = '—' if r['p_random'] is None else f"{r['p_random']:.3f}"
+            lines.append(f"{r['strategy']:<15}{r['group']:<8}{r['horizon']:>4}{r['dates']:>6}{r['independent_dates']:>7}{r['avg_picks']:>6}{r['pick_mean']:>9.2f}%{r['universe_mean']:>8.2f}%"
+                         f"{r['excess_gross']:>10.2f}%{r['excess_net']:>9.2f}%{r['excess_median']:>10.2f}%{t:>7}{r['share_positive']:>8}%{p:>9}")
+        lines += ['', f"Risque des sélections{' · ' + period if period else ''} (rendements individuels sur l'horizon, tous titres et dates confondus) :",
+                  f"{'profil':<15}{'groupe':<8}{'h':>4}{'dispersion':>11}{'univers':>9}{'10 % bas':>10}{'univers':>9}{'% négatifs':>11}{'univers':>9}"]
+        for r in sorted(part, key=lambda r: (r['group'], r['horizon'], r['strategy'])):
+            k = r['risk']
+            lines.append(f"{r['strategy']:<15}{r['group']:<8}{r['horizon']:>4}{k['pick_spread']:>10.1f}%{k['universe_spread']:>8.1f}%{k['pick_p10']:>9.1f}%{k['universe_p10']:>8.1f}%"
+                         f"{k['pick_negative']:>10}%{k['universe_negative']:>8}%")
+        lines.append('')
+    lines += ['Lecture : « excès » = rendement moyen de la sélection moins celui de l\'univers, en points de rendement sur l\'horizon h (séances) ; « méd. » = même écart sur les médianes.',
+              '« p hasard » : part de tirages au hasard de même taille qui font au moins aussi bien (petit = peu probable par chance). « t net » et « p hasard » : dates sans chevauchement.', '', 'Limites :']
     lines += [f'  - {c}' for c in CAVEATS]
     return '\n'.join(lines)
 
 
-# ───────── lecture de la base (lecture seule) ─────────
+# ───────── sources de données ─────────
 def load_batches(conn, history, sample, seed, batch=300):
+    """Base de l'application (lecture seule)."""
     from engine.analytics.repository import recommendable_candidates
     with conn.cursor() as cur:
         cur.execute('SELECT listing_id FROM v_recommendable ORDER BY listing_id')
@@ -215,38 +258,107 @@ def reference_calendar_db(conn):
     return reference_calendar(conn)
 
 
+def csv_universe(directory):
+    with open(os.path.join(directory, 'universe.csv'), encoding='utf-8', newline='') as fh:
+        return list(csv.DictReader(fh))
+
+
+def _history_file(directory, key):
+    return os.path.join(directory, 'history', f'{key}.csv.gz')
+
+
+def csv_calendar(directory, universe):
+    """Séances de référence, en ne lisant que la colonne des dates (le calendrier doit être connu avant de traiter les titres par lots)."""
+    count = defaultdict(int)
+    for u in universe:
+        path = _history_file(directory, u['key'])
+        if not os.path.exists(path):
+            continue
+        with gzip.open(path, 'rt', encoding='utf-8', newline='') as fh:
+            for row in csv.DictReader(fh):
+                count[row['date']] += 1
+    return calendar_from_counts(count)
+
+
+def csv_batches(directory, universe, sample=0, seed=1, batch=100):
+    """Historique long exporté par scripts/export_history.py : les cours ajustés servent de base (rendement total), le cours brut est conservé."""
+    rows = [u for u in universe if os.path.exists(_history_file(directory, u['key']))]
+    if sample and sample < len(rows):
+        rows = sorted(random.Random(seed).sample(rows, sample), key=lambda u: u['key'])
+    for start in range(0, len(rows), batch):
+        out = []
+        for u in rows[start:start + batch]:
+            with gzip.open(_history_file(directory, u['key']), 'rt', encoding='utf-8', newline='') as fh:
+                bars = [(r['date'], float(r['close']), float(r['adjclose'])) for r in csv.DictReader(fh)]
+            if bars:
+                out.append({'key': u['key'], 'symbol': u['symbol'], 'mic': u.get('mic'), 'group': 'etf' if u.get('kind') == 'etf' else 'equity', 'bars': bars, 'split_dates': []})
+        yield out
+
+
+def split_periods(dates, split_date):
+    before = [d for d in dates if d < split_date]
+    after = [d for d in dates if d >= split_date]
+    return [('calibration', before), ('validation', after)]
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
+    ap.add_argument('--source', choices=('db', 'csv'), default='db')
+    ap.add_argument('--csv-dir', help="dossier produit par scripts/export_history.py (avec --source csv)")
     ap.add_argument('--horizon', type=int, nargs='+', default=[21, 63], help='horizons en séances')
     ap.add_argument('--step', type=int, default=21, help='séances entre deux rééquilibrages')
-    ap.add_argument('--dates', type=int, default=10, help='nombre de dates de rééquilibrage')
+    ap.add_argument('--dates', type=int, default=None, help='nombre de dates de rééquilibrage (défaut : 10 pour la base, toutes pour csv ; 0 = toutes)')
     ap.add_argument('--top', type=int, default=20, help='titres gardés par groupe et par profil')
     ap.add_argument('--cost-bps', type=float, default=10.0, help='coût par achat ou vente, en points de base')
-    ap.add_argument('--sample', type=int, default=0, help='sous-échantillon aléatoire de l\'univers (0 = tout)')
+    ap.add_argument('--split-date', help='AAAA-MM-JJ : sépare « calibration » (avant) et « validation » (à partir de cette date)')
+    ap.add_argument('--sample', type=int, default=0, help="sous-échantillon aléatoire de l'univers (0 = tout)")
     ap.add_argument('--seed', type=int, default=1)
     ap.add_argument('--draws', type=int, default=500, help='tirages au hasard pour la p-valeur')
-    ap.add_argument('--json', help='écrit aussi les résultats dans ce fichier')
+    ap.add_argument('--json', help='écrit aussi les résultats (avec le détail par date) dans ce fichier')
     args = ap.parse_args(argv)
-    from engine.shared.db import connect
-    conn = connect()
+    if args.split_date:
+        datetime.date.fromisoformat(args.split_date)
+    how_many = args.dates if args.dates is not None else (10 if args.source == 'db' else 0)
+    conn = None
     try:
-        with conn.cursor() as cur:
-            cur.execute('SET SESSION TRANSACTION READ ONLY')
-        calendar = reference_calendar_db(conn)
-        dates = pick_dates(calendar, args.horizon, args.step, args.dates)
+        if args.source == 'csv':
+            if not args.csv_dir:
+                ap.error('--csv-dir est obligatoire avec --source csv')
+            directory = os.path.expanduser(args.csv_dir)
+            universe = csv_universe(directory)
+            calendar = csv_calendar(directory, universe)
+            batches = lambda: csv_batches(directory, universe, args.sample, args.seed)          # noqa: E731
+        else:
+            from engine.shared.db import connect
+            conn = connect()
+            with conn.cursor() as cur:
+                cur.execute('SET SESSION TRANSACTION READ ONLY')
+            calendar = reference_calendar_db(conn)
+            batches = lambda: load_batches(conn, len(calendar) + 5, args.sample, args.seed)     # noqa: E731
+        dates = pick_dates(calendar, args.horizon, args.step, how_many)
         if len(dates) < 3:
             print('Historique insuffisant pour un test chronologique (moins de 3 dates).', file=sys.stderr)
             return 3
         study, titles, t0 = Study(strategy.PRESETS, args.horizon, dates), 0, time.monotonic()
-        for lot in load_batches(conn, history=len(calendar) + 5, sample=args.sample, seed=args.seed):
+        for lot in batches():
             study.add(prepare(c) for c in lot)
             titles += len(lot)
             print(f'{titles} titres · {time.monotonic() - t0:.0f} s', file=sys.stderr)
-        conn.rollback()
+        if conn:
+            conn.rollback()
     finally:
-        conn.close()
-    results = study.results(args.top, args.cost_bps, args.step, args.draws, args.seed)
-    meta = {'titles': titles, 'dates': dates, 'top': args.top, 'cost_bps': args.cost_bps, 'horizons': args.horizon, 'caveats': CAVEATS}
+        if conn:
+            conn.close()
+    results = []
+    if args.split_date:
+        for label, part in split_periods(dates, args.split_date):
+            if len(part) < 3:
+                print(f'Période « {label} » : moins de 3 dates, ignorée.', file=sys.stderr)
+                continue
+            results += study.results(args.top, args.cost_bps, args.step, args.draws, args.seed, only_dates=part, period=f'{label} ({part[0]} → {part[-1]}, {len(part)} dates)')
+    else:
+        results = study.results(args.top, args.cost_bps, args.step, args.draws, args.seed)
+    meta = {'titles': titles, 'dates': dates, 'top': args.top, 'cost_bps': args.cost_bps, 'horizons': args.horizon, 'split_date': args.split_date, 'source': args.source, 'caveats': CAVEATS}
     print(render(results, meta))
     if args.json:
         with open(args.json, 'w', encoding='utf-8') as fh:
