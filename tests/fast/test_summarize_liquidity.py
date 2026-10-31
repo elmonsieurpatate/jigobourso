@@ -60,3 +60,28 @@ def test_cli_reads_the_json_file(tmp_path, capsys):
     assert sl.main(['--json', str(path), '--from', '1993-01-01', '--to', '1995-12-31']) == 0
     out = capsys.readouterr().out
     assert 'dates ≥ 1993-01-01' in out and 'IC95%' in out and 'strict' in out
+
+
+def two_periods():
+    old = [(f'1995-{m:02d}-15', 2.0, 1.0) for m in range(1, 7)]
+    old_strict = [(f'1995-{m:02d}-15', 1.5, 1.0) for m in range(2, 7)]                     # janvier 1995 absent du scénario strict
+    new = [(f'2020-{m:02d}-15', 3.0, 1.0) for m in range(1, 5)]
+    return {'results': [entry('aucun', 'ancienne', 21, old), entry('strict', 'ancienne', 21, old_strict), entry('aucun', 'recente', 21, new), entry('strict', 'recente', 21, new)]}
+
+
+def test_pooled_tables_put_the_common_dates_of_each_period_end_to_end():
+    text = sl.render(two_periods(), pooled_only=True)
+    assert 'TOUTES PÉRIODES ENSEMBLE · 21 séances' in text and '(9 dates)' in text            # 5 dates communes (ancienne) + 4 (récente)
+    assert 'ancienne' not in text and 'Comparaisons multiples' in text                         # seulement le tableau combiné
+    groups = sl.collect(two_periods())
+    lines = sl.pooled_tables(groups)
+    aucun = [l for l in lines if l.startswith('aucun')][0]
+    assert ' 9 ' in aucun                                                                      # 9 dates, une estimation unique
+
+
+def test_cli_pooled_flag(tmp_path, capsys):
+    path = tmp_path / 'r.json'
+    path.write_text(json.dumps(two_periods()), encoding='utf-8')
+    assert sl.main(['--json', str(path), '--pooled']) == 0
+    out = capsys.readouterr().out
+    assert 'dates propres à chaque scénario' in out and 'TOUTES PÉRIODES ENSEMBLE' in out

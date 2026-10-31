@@ -81,17 +81,42 @@ def table(title, scenarios, horizon):
     return lines
 
 
-def render(data, start=None, end=None):
+def pooled_tables(groups):
+    """Toutes périodes ensemble : pour chaque horizon et scénario, les dates COMMUNES à tous les scénarios de chaque période, mises bout à bout. Une seule estimation, un seul intervalle."""
+    lines = []
+    horizons = sorted({h for _, h in groups})
+    for horizon in horizons:
+        parts = [scen for (_, h), scen in groups.items() if h == horizon and scen]
+        names = list(parts[0]) if parts else []
+        pooled = {}
+        for name in names:
+            rows = []
+            for scen in parts:
+                common = set.intersection(*(set(r) for r in scen.values()))
+                rows += [(d, *scen[name][d]) for d in sorted(common)]
+            pooled[name] = rows
+        count = len(next(iter(pooled.values()), []))
+        lines += table(f'── TOUTES PÉRIODES ENSEMBLE · {horizon} séances · dates communes de chaque période ({count} dates) ──', [(n, pooled[n]) for n in names], horizon) + ['']
+    comparisons = len(horizons) * max((len(scen) for scen in groups.values()), default=0)
+    if comparisons:
+        threshold = round(statistics.NormalDist().inv_cdf(1 - 0.025 / comparisons), 2)          # test bilatéral à 5 % divisé par le nombre de lignes
+        lines.append(f'Comparaisons multiples : {comparisons} lignes (scénarios × horizons) ; pour garder un risque de faux positif de 5 % sur l\'ensemble (Bonferroni), un t net devrait dépasser environ {threshold}.')
+    return lines
+
+
+def render(data, start=None, end=None, pooled=False, pooled_only=False):
     groups = collect(data, start, end)
     span = ' · '.join(x for x in (f'dates ≥ {start}' if start else '', f'dates ≤ {end}' if end else '') if x) or 'toutes les dates'
     lines = [f'Relecture du test de liquidité · {span}', '']
-    for (period, horizon) in sorted(groups, key=lambda k: (k[0], k[1])):
+    for (period, horizon) in ([] if pooled_only else sorted(groups, key=lambda k: (k[0], k[1]))):
         scen = groups[(period, horizon)]
         order = list(scen)
         lines += table(f'── {period} · {horizon} séances · dates propres à chaque scénario ──', [(n, [(d, *v) for d, v in scen[n].items()]) for n in order], horizon) + ['']
         common = set.intersection(*(set(rows) for rows in scen.values())) if scen else set()
         lines += table(f'── {period} · {horizon} séances · DATES COMMUNES à tous les scénarios ({len(common)} dates) ──',
                        [(n, [(d, *scen[n][d]) for d in sorted(common)]) for n in order], horizon) + ['']
+    if pooled or pooled_only:
+        lines += pooled_tables(groups)
     lines += ["Lecture : « excès » = sélection moins univers éligible, en points sur l'horizon ; « net » = excès moins l'aller-retour (2 × coût). « t net » et l'intervalle utilisent les dates sans",
              "chevauchement (une sur trois à 63 séances). Un intervalle qui contient 0 signifie que l'avantage n'est pas établi statistiquement, même si la moyenne est positive."]
     return '\n'.join(lines)
@@ -102,10 +127,12 @@ def main(argv=None):
     ap.add_argument('--json', required=True, help='fichier produit par backtest_liquidity.py --json')
     ap.add_argument('--from', dest='start', help='AAAA-MM-JJ : première date gardée')
     ap.add_argument('--to', dest='end', help='AAAA-MM-JJ : dernière date gardée')
+    ap.add_argument('--pooled', action='store_true', help='ajoute les tableaux « toutes périodes ensemble »')
+    ap.add_argument('--pooled-only', action='store_true', help='affiche seulement les tableaux « toutes périodes ensemble »')
     args = ap.parse_args(argv)
     with open(args.json, encoding='utf-8') as fh:
         data = json.load(fh)
-    print(render(data, args.start, args.end))
+    print(render(data, args.start, args.end, args.pooled, args.pooled_only))
     return 0
 
 
