@@ -7,20 +7,26 @@
 
 <p class="muted small" style="margin:0 0 8px">Un profil ne fait que préremplir les critères : dès que vous les modifiez, votre configuration est appliquée telle quelle. Les filtres déterminent les titres examinés ; le classement se fait ensuite parmi eux.</p>
 <section aria-label="Stratégie"><div class="strat-cards" id="strats"></div></section>
+<section class="card menu" id="menu" aria-label="Recherche et critères">
+  <div class="menu-bar">
+    <label class="mi search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="q" type="search" placeholder="Rechercher un titre, un symbole…" aria-label="Nom, symbole ou ISIN"></label>
+    <label class="mi market"><span class="flag" id="market-flag" aria-hidden="true"></span><select id="market" aria-label="Place"><option value="">Toutes les places</option><option value="__pea">Europe (PEA)</option></select></label>
+    <div class="mf"><span>Type</span><select id="kind" aria-label="Type"><option value="">Actions et ETF</option><option value="equity">Actions</option><option value="etf">ETF</option></select></div>
+    <div class="mf"><span>Prix</span><select id="f-price" aria-label="Prix d’une part"><option value="">Tout</option><option value="|10">≤ 10 €</option><option value="10|50">10 à 50 €</option><option value="50|200">50 à 200 €</option><option value="200|">&gt; 200 €</option></select></div>
+    <div class="mf"><span>Volume</span><select id="f-volume" aria-label="Volume moyen par jour"><option value="">Tout</option><option value="10000">≥ 10 000 titres/j</option><option value="100000">≥ 100 000 titres/j</option><option value="1000000">≥ 1 million de titres/j</option></select></div>
+    <div class="mf"><span>Capitalisation</span><select id="cap" aria-label="Capitalisation boursière"><option value="">Tout</option><option value="micro">Micro (&lt; 300 M€)</option><option value="small">Petite (0,3 à 2 Md€)</option><option value="mid">Moyenne (2 à 10 Md€)</option><option value="large">Grande (10 à 200 Md€)</option><option value="mega">Très grande (&gt; 200 Md€)</option></select></div>
+    <div class="mf fld"><span>Secteur</span><input type="hidden" id="category"></div>
+  </div>
+  <div class="sliders" id="sliders"></div>
+</section>
 <section id="editor" class="card" hidden style="margin-top:14px"></section>
 <div class="row" style="margin-top:10px"><button class="btn drawer-toggle" id="edit-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg> Régler la stratégie</button><button class="btn drawer-toggle" id="filters-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h18l-7 8v5l-4 2v-7z"/></svg> Filtres avancés <span class="count-pill" id="filters-count" hidden></span></button><span class="muted small" id="strategy-summary"></span><span class="grow" style="flex:1"></span><span class="row gap-s" id="saved"></span></div>
 
 <section class="card" style="margin-top:12px;padding:0">
   <div style="padding:14px 18px 0"><div class="tabs" id="status-tabs" style="margin-bottom:0"></div></div>
-  <div class="row tool-row">
-    <input id="q" type="search" placeholder="Nom, symbole ou ISIN" style="flex:1;min-width:180px">
-    <select id="kind" aria-label="Type"><option value="">Actions et ETF</option><option value="equity">Actions</option><option value="etf">ETF</option></select>
-    <select id="market" aria-label="Place"><option value="">Toutes les places</option></select>
-  </div>
   <div class="tradable-row"><label class="switch-label"><input type="checkbox" class="switch" id="tradable" checked role="switch"> Titres facilement négociables</label><span class="small muted" id="tradable-note"></span></div><div class="small muted" id="level-note" style="margin:2px 0 6px"></div>
   <div class="filters" id="filters" hidden>
     <div class="fld"><span>Pays</span><input type="hidden" id="country"></div>
-    <div class="fld"><span>Catégorie ou secteur</span><input type="hidden" id="category"></div>
     <div class="fld"><span>Régularité <span class="muted small">(période de la stratégie)</span></span><input type="hidden" id="regularity"></div>
     <div class="fld"><span>Volatilité <span class="muted small">(période de la stratégie)</span></span><input type="hidden" id="risk"></div>
     <div class="fld"><span>Négociabilité <span class="muted small">(volume moyen 3 mois)</span></span><input type="hidden" id="liquidity"></div>
@@ -44,4 +50,4 @@
 <details class="card" id="why" style="margin-top:14px"><summary style="cursor:pointer;font-weight:700">Pourquoi des titres sont écartés ? <span class="muted small" style="font-weight:400">statistiques par critère</span></summary><div id="why-body" style="margin-top:12px"></div></details>
 <p class="muted small" style="margin-top:14px">Analyse descriptive des cours passés, sans conseil ni promesse de performance. Un titre « retenu » remplit vos critères ; ce n’est pas une recommandation d’achat. Catalogue : FinanceDatabase · Cours : Yahoo Finance.</p>
 </main>
-<script src="assets/app.js?v=202610301418"></script><script src="assets/etf.js?v=202610301418"></script><script src="assets/multiselect.js?v=202610301418"></script><script src="assets/explorer.js?v=202610301418"></script></body></html>
+<script src="assets/app.js?v=202610301418"></script><script src="assets/etf.js?v=202610301418"></script><script src="assets/explorer-menu.js?v=202610301418"></script><script src="assets/multiselect.js?v=202610301418"></script><script src="assets/explorer.js?v=202610301418"></script></body></html>

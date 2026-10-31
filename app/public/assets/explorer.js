@@ -15,7 +15,7 @@
   const LEVELS = { regularity: [['ok', 'Régulière'], ['warn', 'Moyennement régulière'], ['bad', 'Irrégulière'], ['unknown', 'Inconnue']],
     risk: [['ok', 'Volatilité faible'], ['warn', 'Volatilité modérée'], ['bad', 'Volatilité forte'], ['unknown', 'Inconnue']],
     liquidity: [['ok', 'Facilement négociable'], ['warn', 'À surveiller'], ['bad', 'Limitée'], ['unknown', 'Non déterminée']] };
-  const FILTERS = ['country', 'category', 'regularity', 'risk', 'liquidity', 'budget', 'min_price', 'min_score', 'max_volatility', 'max_drawdown', 'min_volume'];
+  const FILTERS = ['country', 'category', 'regularity', 'risk', 'liquidity', 'budget', 'min_price', 'min_score', 'max_volatility', 'max_drawdown', 'min_volume', 'cap'];
   const CHECKS = ['pea', 'mine', 'open_now', 'fresh_only'];
   const MARKETS = { XETR: 'Xetra', XPAR: 'Paris', XAMS: 'Amsterdam', XLON: 'Londres', XMIL: 'Milan', XMAD: 'Madrid', XSTO: 'Stockholm', XOSL: 'Oslo', XSWX: 'Zurich', XNAS: 'Nasdaq', XNYS: 'NYSE', XASE: 'NYSE American', ARCX: 'NYSE Arca', BATS: 'Cboe' };
   const url = new URLSearchParams(location.search);
@@ -25,6 +25,7 @@
   const text = ['q', 'kind', 'market', ...FILTERS];
   text.forEach(k => { const v = k === 'q' ? (url.has('q') && saved.pageKey !== location.pathname + location.search ? url.get('q') : (saved.view || {}).q) : (saved.view || {})[k]; if (v !== undefined && v !== null && el(k)) el(k).value = v; });
   CHECKS.forEach(k => { if (el(k) && (saved.view || {})[k]) el(k).checked = true; });
+  if ((saved.view || {}).market_ui === '__pea') el('market').value = '__pea';
   if ((saved.view || {}).tradable === false) el('tradable').checked = false;         // activé par défaut ; seul un choix explicite de le désactiver est conservé
   const MS = { country: JMulti(el('country')), category: JMulti(el('category')), regularity: JMulti(el('regularity')), risk: JMulti(el('risk')), liquidity: JMulti(el('liquidity')) };
   Object.keys(LEVELS).forEach(k => MS[k].set(LEVELS[k].map(([v, l]) => [v, l, ''])));
@@ -40,23 +41,29 @@
   }
 
   function freeConfig() { const c = JSON.parse(JSON.stringify(P.presets.regular)); c.name = 'free'; c.periods.forEach(p => { p.enabled = p.id === 'month'; ['min_slope', 'min_r2', 'min_er', 'min_return', 'max_return', 'max_volatility', 'max_drawdown'].forEach(f => p[f] = null); }); c.ranking.mode = 'trend'; return c; }
+  const SUB = { regular: 'Hausse stable', fast: 'Hausse marquée', recovery: 'Après une baisse', low_volatility: 'Peu de variations', momentum: '126 → 21 séances', momentum12: '252 → 21 séances' };
+  const helpHtml = k => `<b>${J.esc(NAMES[k][0])}</b><p>${J.esc(NAMES[k][1])}</p>${EXP.has(k) ? `<p class="helpwarn">${J.esc(EXP_NOTE(k))}</p>` : ''}`;
   function drawStrategies() {
-    el('strats').innerHTML = Object.keys(P.presets).map(k => `<button class="strat ${S.preset === k ? 'on' : ''}" data-k="${k}"><b>${NAMES[k][0]}${EXP.has(k) ? ' <i class="badge">essai</i>' : ''}</b><span>${NAMES[k][1]}</span></button>`).join('') +
-      `<button class="strat ${S.preset === 'free' ? 'on' : ''}" data-k="free"><b>Recherche libre</b><span>Aucun critère de départ : seuls vos filtres et vos réglages décident.</span></button>` +
-      (S.preset === 'custom' ? `<button class="strat on"><b>Vos réglages${S.label ? ' · ' + J.esc(S.label) : ''}</b><span>Les critères ci-dessous sont appliqués tels quels, sans passer par un profil.</span></button>` : '');
-    J.$$('#strats .strat[data-k]').forEach(b => b.onclick = () => { S.label = null; S.preset = b.dataset.k; S.config = S.preset === 'free' ? freeConfig() : JSON.parse(JSON.stringify(P.presets[S.preset])); S.page = 1; persist(); drawStrategies(); drawEditor(); load(); });
+    el('strats').innerHTML = '<div class="strat-grid">' + Object.keys(P.presets).map(k => `<div class="strat ${S.preset === k ? 'on' : ''} ${EXP.has(k) ? 'exp' : ''}" role="button" tabindex="0" aria-pressed="${S.preset === k}" data-k="${k}"><span class="ico">${JMenu.icon(k)}</span><span class="tx"><b>${NAMES[k][0]}</b><span>${SUB[k] || ''}</span></span><button type="button" class="q" data-help="${k}" aria-label="Explication : ${J.esc(NAMES[k][0])}" aria-expanded="false">?</button></div>`).join('') + '</div>' +
+      '<div class="strat-extra">' + `<button class="strat slim ${S.preset === 'free' ? 'on' : ''}" data-k="free"><span class="ico">${JMenu.icon('free')}</span><span class="tx"><b>Recherche libre</b><span>Aucun critère de départ</span></span></button>` +
+      (S.preset === 'custom' ? `<button class="strat slim on"><span class="ico">${JMenu.icon('custom')}</span><span class="tx"><b>Vos réglages${S.label ? ' · ' + J.esc(S.label) : ''}</b><span>Critères appliqués tels quels</span></span></button>` : '') + '</div>';
+    const choose = k => { S.label = null; S.preset = k; S.config = S.preset === 'free' ? freeConfig() : JSON.parse(JSON.stringify(P.presets[S.preset])); S.page = 1; persist(); drawStrategies(); drawEditor(); load(); };
+    J.$$('#strats .strat[data-k]').forEach(b => { b.onclick = e => { if (e.target.closest('.q')) return; choose(b.dataset.k); }; b.onkeydown = e => { if ((e.key === 'Enter' || e.key === ' ') && e.target === b) { e.preventDefault(); choose(b.dataset.k); } }; });
+    J.$$('#strats .q').forEach(q => q.onclick = e => { e.stopPropagation(); JMenu.pop(q, helpHtml(q.dataset.help)); });
     const act = S.config.periods.filter(p => p.enabled).map(p => J.PERIODS[p.id].toLowerCase() + ' (' + p.sessions + ' séances)');
     el('strategy-summary').textContent = 'Périodes : ' + act.join(', ') + ' · classement par ' + ({ trend: 'pente', performance: 'performance', regularity: 'régularité', stability: 'stabilité', momentum: 'momentum 6 mois (J−126 → J−21 séances)', momentum12: 'momentum 12 mois (J−252 → J−21 séances)' }[S.config.ranking.mode]) + (EXP.has(S.preset) ? ' · ' + EXP_NOTE(S.preset) : '');
+    drawSliders();
   }
   function view() {
-    const v = { q: el('q').value.trim(), kind: el('kind').value, market: el('market').value };
+    const v = { q: el('q').value.trim(), kind: el('kind').value, market: el('market').value === '__pea' ? '' : el('market').value };
     FILTERS.forEach(k => { v[k] = el(k).value.trim(); });
     CHECKS.forEach(k => { v[k === 'mine' ? 'owned_only' : k] = el(k).checked; });
+    if (el('market').value === '__pea') v.pea = true;
     v.tradable = el('tradable').checked;
     return v;
   }
   addEventListener('pagehide', () => { persist(); try { sessionStorage.setItem('jigo_explorer_scroll', String(scrollY)); } catch (e) {} });
-  function persist() { try { localStorage.setItem('jigo_explorer2', JSON.stringify({ pageKey: location.pathname + location.search, preset: S.preset, config: S.config, status: S.status, page: S.page, level: S.level, compare: S.compare, sort: S.sort, dir: S.dir, size: S.size, view: { ...view(), mine: el('mine').checked }, label: S.label || null })); sessionStorage.setItem('jigo_explorer2', localStorage.getItem('jigo_explorer2')); } catch (e) { } }
+  function persist() { try { localStorage.setItem('jigo_explorer2', JSON.stringify({ pageKey: location.pathname + location.search, preset: S.preset, config: S.config, status: S.status, page: S.page, level: S.level, compare: S.compare, sort: S.sort, dir: S.dir, size: S.size, view: { ...view(), mine: el('mine').checked, market_ui: el('market').value }, label: S.label || null })); sessionStorage.setItem('jigo_explorer2', localStorage.getItem('jigo_explorer2')); } catch (e) { } }
 
   /* éditeur : réglages guidés + détaillé */
   const levelOpts = (obj, labels, cur) => Object.entries(labels).map(([k, l]) => `<option value="${k}" ${k === cur ? 'selected' : ''}>${l}</option>`).join('');
@@ -106,6 +113,54 @@
     try { S.config = (await J.post('strategy/validate', c)).config; m.hidden = true; } catch (e) { m.textContent = e.message; m.hidden = false; return false; }
     S.config.name = 'custom'; S.preset = 'custom'; S.page = 1; persist(); drawStrategies(); load(); return true;
   }
+
+  /* curseurs de critères : ils lisent et modifient la configuration de la stratégie (période concernée), comme le réglage guidé */
+  const yearly = s => 100 * (Math.pow(1 + s / 100, 252) - 1), perSession = a => Number((100 * (Math.pow(1 + a / 100, 1 / 252) - 1)).toFixed(5));
+  const SLIDERS = [
+    { id: 'r2', title: 'Régularité (R²)', field: 'min_r2', scope: 'all', min: 0, max: 1, step: .01, dec: 2, side: 'low', chart: 'r2', help: 'Le R² mesure la régularité de la hausse : 1 = ligne droite parfaite, 0 = hausse très irrégulière. Ce curseur fixe le R² minimum exigé pour chaque période utilisée par la stratégie.' },
+    { id: 'slope3', title: 'Pente (3 mois)', field: 'min_slope', scope: 'quarter', min: 0, max: 100, step: 1, dec: 0, side: 'low', unit: '% /an', chart: 'slope3', to: yearly, from: perSession, help: 'La pente est la hausse moyenne du cours sur 3 mois, exprimée en rythme annuel. Un titre dont la pente est inférieure au minimum choisi n’est pas retenu.' },
+    { id: 'slope1', title: 'Pente (1 mois)', field: 'min_slope', scope: 'month', min: 0, max: 100, step: 1, dec: 0, side: 'low', unit: '% /an', chart: 'slope1', to: yearly, from: perSession, help: 'Même mesure que la pente sur 3 mois, mais sur le dernier mois : elle réagit plus vite aux changements de rythme.' },
+    { id: 'vol3', title: 'Volatilité (3 mois)', field: 'max_volatility', scope: 'quarter', min: 0, max: 10, step: .1, dec: 1, side: 'high', unit: '% /séance', chart: 'wave', help: 'La volatilité mesure l’amplitude des variations quotidiennes sur 3 mois. Ce curseur fixe le maximum accepté : plus il est bas, plus les titres retenus varient calmement.' }
+  ];
+  function drawSliders() {
+    const box = el('sliders'); if (!box) return;
+    box.innerHTML = SLIDERS.map(d => `<div class="sl" data-s="${d.id}"><div class="sl-head"><b>${d.title}</b><button type="button" class="q" data-sh="${d.id}" aria-label="Explication : ${J.esc(d.title)}" aria-expanded="false">?</button><span class="sl-chart"></span></div><div class="sl-body"></div></div>`).join('');
+    SLIDERS.forEach(d => {
+      const host = J.$(`.sl[data-s="${d.id}"]`, box), ps = d.scope === 'all' ? S.config.periods.filter(p => p.enabled && p.sessions >= 3) : S.config.periods.filter(p => p.id === d.scope && p.enabled);
+      const raw = ps.length ? ps[0][d.field] : null, ui = raw === null || raw === undefined ? null : (d.to ? d.to(raw) : raw);
+      const low = d.side === 'low' ? Math.max(d.min, Math.min(d.max, ui === null ? d.min : ui)) : d.min, high = d.side === 'high' ? Math.max(d.min, Math.min(d.max, ui === null ? d.max : ui)) : d.max;
+      const draw = (l, h) => { J.$('.sl-chart', host).innerHTML = JMenu.chart(d.chart, ((d.side === 'low' ? l : h) - d.min) / (d.max - d.min)); };
+      if (!ps.length) host.classList.add('off');
+      host.querySelector('.q').onclick = e => { e.stopPropagation(); JMenu.pop(e.currentTarget, `<b>${J.esc(d.title)}</b><p>${J.esc(d.help)}</p>${ps.length ? '' : '<p class="helpwarn">Cette stratégie n’utilise pas cette période : le curseur n’agit pas. Cochez-la dans « Régler la stratégie » pour l’utiliser.</p>'}`); };
+      JMenu.dualRange(J.$('.sl-body', host), { label: d.title, min: d.min, max: d.max, step: d.step, dec: d.dec, unit: d.unit, low, high, lockLow: d.side === 'high', lockHigh: d.side === 'low', disabled: !ps.length, onInput: draw,
+        onChange: (l, h) => {
+          const u = d.side === 'low' ? l : h, none = d.side === 'low' ? u <= d.min : u >= d.max, val = none ? null : (d.from ? d.from(u) : u);
+          if ((raw ?? null) === val || (ui !== null && Math.abs(ui - u) < 1e-9) || (ui === null && none)) return;
+          S.config.periods.forEach(p => { if (ps.some(x => x.id === p.id)) p[d.field] = val; });
+          S.config.name = 'custom'; S.preset = 'custom'; S.label = null; S.page = 1; persist(); drawStrategies(); if (!el('editor').hidden) drawEditor(); load();
+        } });
+    });
+  }
+  /* raccourcis Prix et Volume : ils écrivent dans les champs du tiroir « Filtres avancés » (une seule source de vérité) */
+  const bands = { 'f-price': [['min_price', 'budget'], v => v.split('|')], 'f-volume': [['min_volume'], v => [v]] };
+  function syncMenu() {
+    Object.entries(bands).forEach(([id, [fields, split]]) => {
+      const sel = el(id), cur = fields.map(f => el(f).value.trim()).join('|'), match = [...sel.options].find(o => o.value !== 'custom' && split(o.value).join('|') === (fields.length === 1 ? cur : cur));
+      [...sel.querySelectorAll('option[value="custom"]')].forEach(o => o.remove());
+      if (!cur.replace(/\|/g, '')) sel.value = '';
+      else if (match) sel.value = match.value;
+      else { sel.insertAdjacentHTML('beforeend', '<option value="custom">Personnalisé</option>'); sel.value = 'custom'; }
+    });
+    el('market-flag').innerHTML = el('market').value === '__pea' ? EU_FLAG : GLOBE;
+  }
+  const EU_FLAG = '<svg viewBox="0 0 28 20" width="28" height="20" aria-hidden="true"><rect width="28" height="20" rx="3" fill="#0b4ea2"/>' + Array.from({ length: 12 }, (_, i) => `<circle cx="${14 + 6.5 * Math.sin(i * Math.PI / 6)}" cy="${10 - 6.5 * Math.cos(i * Math.PI / 6)}" r="1.05" fill="#ffd400"/>`).join('') + '</svg>';
+  const GLOBE = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></svg>';
+  Object.entries(bands).forEach(([id, [fields, split]]) => el(id).addEventListener('change', () => {
+    const v = el(id).value; if (v === 'custom') return;
+    const parts = split(v); fields.forEach((f, i) => { el(f).value = parts[i] || ''; });
+    el(fields[0]).dispatchEvent(new Event('input', { bubbles: true }));
+  }));
+  el('market').addEventListener('change', syncMenu);
   /* recherches enregistrées : critères + filtres + tri */
   let searches = [];
   async function drawSaved() {
@@ -218,8 +273,8 @@
     Object.keys(LEVELS).forEach(k => MS[k].set(LEVELS[k].map(([v, l]) => [v, l, (((res.level_filters || {}).counts || {})[k] || {})[v] || 0])));
     if (!MS.country.loaded) { MS.country.loaded = 1; MS.country.set(Object.entries(res.facets.countries).map(([c, n]) => [c, c, n])); }
     if (!MS.category.loaded) { MS.category.loaded = 1; MS.category.set(Object.entries(res.facets.categories || {}).sort((a, b) => a[0].localeCompare(b[0], 'fr')).map(([c, n]) => [c, c, n])); }
-    if (el('market').options.length === 1) Object.entries(res.facets.markets).sort((a, b) => b[1] - a[1]).forEach(([m, n]) => el('market').insertAdjacentHTML('beforeend', `<option value="${J.esc(m)}">${J.esc(MARKETS[m] || m)} (${n})</option>`));
-    ['market'].forEach(k => { const v = (saved.view || {})[k]; if (v && !el(k).dataset.restored) { el(k).value = v; el(k).dataset.restored = 1; } });
+    if (!el('market').dataset.filled && (el('market').dataset.filled = 1)) Object.entries(res.facets.markets).sort((a, b) => b[1] - a[1]).forEach(([m, n]) => el('market').insertAdjacentHTML('beforeend', `<option value="${J.esc(m)}">${J.esc(MARKETS[m] || m)} (${n})</option>`));
+    ['market'].forEach(k => { const v = (saved.view || {})[k]; if (v && !el(k).dataset.restored) { el(k).value = v; el(k).dataset.restored = 1; } }); syncMenu();
     el('filters-note').textContent = 'Les filtres numériques utilisent les mesures sur ' + res.ref_sessions + ' séances (la plus longue période active).';
   }
   el('compare-btn').onclick = () => { S.compare = !S.compare; el('compare-btn').classList.toggle('primary', S.compare); el('compare-btn').textContent = S.compare ? 'Retour au tableau' : 'Comparer actions / ETF'; S.page = 1; load(); };
@@ -231,13 +286,13 @@
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + [head.join(';'), ...lines].join('\r\n')], { type: 'text/csv;charset=utf-8' })); a.download = 'jigobourso-explorer-' + new Date().toISOString().slice(0, 10) + '.csv'; a.click();
     J.toast(res.rows.length + ' lignes exportées' + (res.total > res.rows.length ? ' (limite de 3 000)' : ''));
   };
-  el('reset-filters').onclick = () => { FILTERS.forEach(k => el(k).value = ''); CHECKS.forEach(k => el(k).checked = false); el('kind').value = ''; el('market').value = ''; el('tradable').checked = true; S.page = 1; load(); };
+  el('reset-filters').onclick = () => { FILTERS.forEach(k => el(k).value = ''); CHECKS.forEach(k => el(k).checked = false); el('kind').value = ''; el('market').value = ''; syncMenu(); el('tradable').checked = true; S.page = 1; load(); };
   el('tradable').onchange = () => { S.page = 1; load(); };
   [...text, ...CHECKS].forEach(k => el(k).addEventListener(el(k).type === 'search' || el(k).type === 'number' || el(k).placeholder ? 'input' : 'change', () => { clearTimeout(timer); timer = setTimeout(() => { S.page = 1; if (el('q').value.trim()) S.status = 'all'; load(); }, 350); }));
   /* liens du menu latéral : ?kind=, ?compare=1, ?preset= */
   if (url.get('kind')) el('kind').value = url.get('kind');
   if (url.get('preset') === 'free') { S.preset = 'free'; S.label = null; S.config = freeConfig(); } else if (P.presets[url.get('preset')]) { S.preset = url.get('preset'); S.label = null; S.config = JSON.parse(JSON.stringify(P.presets[S.preset])); }
-  drawSources(); drawStrategies(); drawSaved(); if (el('q').value) S.status = 'all';
+  drawSources(); drawStrategies(); syncMenu(); drawSaved(); if (el('q').value) S.status = 'all';
   if (url.get('compare')) { S.compare = true; el('compare-btn').classList.add('primary'); el('compare-btn').textContent = 'Retour au tableau'; }
   if (FILTERS.some(k => el(k).value) || CHECKS.some(k => el(k).checked)) el('filters').hidden = false;
   load();

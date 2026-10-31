@@ -1,0 +1,27 @@
+[
+  {
+    "width": 375,
+    "email_login": true,
+    "ranking_preserved": true,
+    "horizontal_overflow": false,
+    "ok": true
+  },
+  {
+    "width": 390,
+    "email_login": true,
+    "ranking_preserved": true,
+    "horizontal_overflow": false,
+    "ok": true
+  },
+  {
+    "width": 1280,
+    "email_login": true,
+    "ranking_preserved": true,
+    "horizontal_overflow": false,
+    "ok": true
+  },
+  {
+    "account_round_trip": true,
+    "ok": true
+  }
+]

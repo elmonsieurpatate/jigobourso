@@ -189,3 +189,22 @@ def test_fiche_exposes_both_momentums_and_the_flag():
     assert abs(sheet['state']['momentum_12m'] - expected_momentum12(UNIVERSE[0][4])) < 1e-4 and abs(sheet['state']['momentum_6m'] - expected_momentum(UNIVERSE[0][4])) < 1e-4
     assert sheet['strategy']['experimental'] is True and sheet['strategy']['ranking'] == 'momentum12' and sheet['verdict']['status'] == 'retained'
     assert sheet['verdict']['rank'] == 2 and sheet['verdict']['of'] == 5
+
+
+def test_explorer_capitalisation_filter_uses_the_size_classes():
+    conn = connect()
+    seed(conn)
+    with conn.cursor() as cur:
+        for lid, cap in ((1, 5_000_000_000), (2, 500_000_000), (3, 100_000_000), (7, 40_000_000_000)):
+            cur.execute('UPDATE latest_prices SET market_cap=%s WHERE listing_id=%s', (cap, lid))
+    conn.commit()
+
+    def symbols(cap):
+        res = service.explore(conn, {'config': 'momentum', 'view': {'status': 'all', 'tradable': False, 'cap': cap, 'page_size': 50}})
+        return sorted(r['symbol'] for r in res['rows'])
+    assert symbols('mid') == ['STAR.DE']                                                    # 2 à 10 Md€
+    assert symbols('micro|small') == ['CRASH.DE', 'SURGE.DE']                               # plusieurs choix possibles
+    assert symbols('large') == []                                                           # un ETF (ici 40 Md€) n'a pas de classe de taille d'actions : jamais classé « grande capitalisation »
+    assert 'LAG.DE' not in symbols('mid|small|micro|large|mega')                            # capitalisation inconnue : exclue dès qu'un filtre de taille est posé
+    assert len(symbols('')) >= 6                                                            # sans filtre : tout l'univers
+    assert symbols('inconnue') == symbols('')                                               # une valeur inconnue est ignorée, jamais une exclusion silencieuse

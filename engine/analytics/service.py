@@ -262,14 +262,14 @@ def _daily_eur(a):
 def _aux(conn, ref, rates):
     """Données de filtre et de tri pour tout l'univers : prix, volume, fraîcheur et mesures de la fenêtre de référence `ref`."""
     with conn.cursor() as cur:
-        cur.execute("""SELECT p.listing_id id, p.price, COALESCE(p.currency, l.currency) cur, p.avg_volume_3m volume, p.avg_volume_10d volume_10d, p.analyst_rating analyst, p.quote_at, l.mic, s.last_close_date, s.quality
+        cur.execute("""SELECT p.listing_id id, p.price, COALESCE(p.currency, l.currency) cur, p.avg_volume_3m volume, p.avg_volume_10d volume_10d, p.analyst_rating analyst, p.market_cap, p.quote_at, l.mic, s.last_close_date, s.quality
                        FROM latest_prices p JOIN listings l ON l.id=p.listing_id LEFT JOIN series_state s ON s.listing_id=l.id""")
         out = {}
         for r in cur.fetchall():
             price = None if r['price'] is None else float(r['price'])
             f = to_eur_factor(r['cur'], rates)
             age = None if r['quote_at'] is None else max(0.0, (hours.utcnow().replace(tzinfo=None) - r['quote_at']).total_seconds() / 86400)
-            out[r['id']] = {'price': price, 'price_eur': price * f if price is not None and f else None, 'volume': r['volume'], 'volume_10d': r['volume_10d'], 'analyst': r['analyst'], 'quote_age_days': age,
+            out[r['id']] = {'price': price, 'price_eur': price * f if price is not None and f else None, 'cap': _size_key(r['market_cap'], r['cur'], rates), 'volume': r['volume'], 'volume_10d': r['volume_10d'], 'analyst': r['analyst'], 'quote_age_days': age,
                             'last_close': r['last_close_date'], 'quality': 'stale' if r['last_close_date'] and str(r['last_close_date']) < expected_close(conn, r['mic']) else r['quality']}
         cur.execute('SELECT listing_id, slope, r2, perf, volatility, drawdown FROM strategy_metrics WHERE sessions=%s', (ref,))
         for r in cur.fetchall():
@@ -306,6 +306,7 @@ def scoped_entries(conn, config, view, rates=None, aux=None, now=None):
     aux = aux if aux is not None else _aux(conn, ref, rates)
     kind, market = view.get('kind') or '', view.get('market') or ''
     countries, categories = _choices(view.get('country')), {c.casefold() for c in _choices(view.get('category'))}         # plusieurs choix possibles, séparés par « | »
+    caps = {c for c in _choices(view.get('cap')) if c in ('micro', 'small', 'mid', 'large', 'mega')}
     owned = set(view.get('owned_ids') or [])
     base = [e for e in entries if (not kind or e['kind'] == kind) and (not market or e['mic'] == market)
             and (not countries or e['country'] in countries) and (not categories or (e['category'] or '').casefold() in categories)]
@@ -327,6 +328,8 @@ def scoped_entries(conn, config, view, rates=None, aux=None, now=None):
         if max_dd is not None and (a.get('drawdown') is None or a['drawdown'] > max_dd):
             return False
         if min_volume is not None and (a.get('volume') is None or a['volume'] < min_volume):
+            return False
+        if caps and (e['kind'] != 'equity' or a.get('cap') not in caps):       # la taille ne concerne que les actions : un ETF n'a pas de capitalisation boursière
             return False
         return not (view.get('fresh_only') and a.get('quality') != 'ok')
     base = [e for e in base if keep(e)]
@@ -636,6 +639,7 @@ def analyst_view(raw):
     return {'score': score, 'label': fr, 'raw': raw, 'text': ('%s (%s)' % (fr, ('%.1f' % score).replace('.', ','))) if fr else 'Note ' + ('%.1f' % score).replace('.', ',')}
 
 
+_SIZE_KEYS = ((300e6, 'micro'), (2e9, 'small'), (10e9, 'mid'), (200e9, 'large'), (float('inf'), 'mega'))     # clés du filtre « Capitalisation » de l'Explorer (mêmes seuils que les libellés ci-dessous)
 _SIZE_CLASSES = ((300e6, 'micro-capitalisation'), (2e9, 'petite capitalisation'), (10e9, 'capitalisation moyenne'), (200e9, 'grande capitalisation'), (float('inf'), 'très grande capitalisation'))
 
 
@@ -648,6 +652,17 @@ def _size_class(market_cap, currency, rates):
         return None
     eur = float(market_cap) * f
     return next(label for limit, label in _SIZE_CLASSES if eur < limit)
+
+
+def _size_key(market_cap, currency, rates):
+    """Clé de taille (micro, small, mid, large, mega) en euros ; None si inconnue (ETF, devise non ordinaire, capitalisation absente)."""
+    if not market_cap or currency in (None, 'GBp', 'ZAc', 'ILA'):
+        return None
+    f = to_eur_factor(currency, rates)
+    if not f:
+        return None
+    eur = float(market_cap) * f
+    return next(key for limit, key in _SIZE_KEYS if eur < limit)
 
 
 def _activity_note(u):
