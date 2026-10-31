@@ -1,7 +1,7 @@
 """Export de l'historique quotidien LONG (jusqu'à 10 ans, dividendes inclus) vers des fichiers, pour la recherche hors production.
 
 Rien n'est écrit en base ni dans l'application : le script lit la liste des titres recommandables (lecture seule), interroge Yahoo (un appel par titre, avec pause), et
-dépose un fichier `history/<clé>.csv.gz` par titre dans le dossier choisi, plus `universe.csv` (clé, symbole, place, type, pays, devise). Il est REPRENABLE : un titre
+dépose un fichier `history/<clé>.csv.gz` par titre dans le dossier choisi, plus `universe.csv` (clé, symbole, place, type, pays, devise, secteur). Il est REPRENABLE : un titre
 déjà exporté n'est pas redemandé, et un 429 de Yahoo arrête proprement le passage (relancer plus tard reprend là où il s'est arrêté).
 
 Colonnes exportées : date, close (cours de clôture), adjclose (cours ajusté des splits ET des dividendes, base « rendement total »), volume.
@@ -29,7 +29,7 @@ sys.path.insert(0, ROOT)
 
 from engine.market.yahoo import RateLimited, YahooError, local_date, _num   # noqa: E402
 
-UNIVERSE_FIELDS = ('key', 'symbol', 'mic', 'kind', 'country', 'currency')
+UNIVERSE_FIELDS = ('key', 'symbol', 'mic', 'kind', 'country', 'currency', 'category')
 HISTORY_FIELDS = ('date', 'close', 'adjclose', 'volume')
 
 
@@ -207,12 +207,23 @@ def export(universe, transport, out, years=10, log=lambda *_: None, sleep=time.s
 
 def load_universe(conn, sample=0, seed=1):
     with conn.cursor() as cur:
-        cur.execute("""SELECT l.id AS `key`, l.symbol, l.mic, i.kind, i.country, l.currency FROM v_recommendable r
+        cur.execute("""SELECT l.id AS `key`, l.symbol, l.mic, i.kind, i.country, l.currency, i.category FROM v_recommendable r
                        JOIN listings l ON l.id = r.listing_id JOIN instruments i ON i.id = l.instrument_id ORDER BY l.id""")
         rows = cur.fetchall()
     if sample and sample < len(rows):
         rows = sorted(random.Random(seed).sample(rows, sample), key=lambda r: r['key'])
     return rows
+
+
+def update_universe(universe, out):
+    """Réécrit universe.csv d'un export déjà fait en y ajoutant le secteur (colonne `category`), SANS aucun appel Yahoo : seuls les titres déjà présents dans le dossier sont gardés.
+    Renvoie le nombre de titres écrits."""
+    path = os.path.join(out, 'universe.csv')
+    with open(path, encoding='utf-8', newline='') as fh:
+        known = {row['key'] for row in csv.DictReader(fh)}
+    kept = [u for u in universe if str(u['key']) in known]
+    write_universe(out, kept)
+    return len(kept)
 
 
 def main(argv=None):
@@ -222,6 +233,7 @@ def main(argv=None):
     ap.add_argument('--sample', type=int, default=1500, help='sous-échantillon aléatoire de l\'univers (0 = tout)')
     ap.add_argument('--seed', type=int, default=1)
     ap.add_argument('--min-interval', type=float, default=0.8, help='pause minimale entre deux appels Yahoo (secondes) ; augmentée toute seule après un refus')
+    ap.add_argument('--update-universe', action='store_true', help='ajoute seulement le secteur à universe.csv d\'un export existant (aucun appel Yahoo)')
     args = ap.parse_args(argv)
     from engine.market.yahoo import UrllibTransport
     from engine.shared.db import connect
@@ -229,10 +241,13 @@ def main(argv=None):
     try:
         with conn.cursor() as cur:
             cur.execute('SET SESSION TRANSACTION READ ONLY')
-        universe = load_universe(conn, args.sample, args.seed)
+        universe = load_universe(conn, 0 if args.update_universe else args.sample, args.seed)
         conn.rollback()
     finally:
         conn.close()
+    if args.update_universe:
+        print(f'{update_universe(universe, os.path.expanduser(args.out))} titres mis à jour (secteur ajouté)', file=sys.stderr)
+        return 0
     print(f'{len(universe)} titres à exporter vers {args.out}', file=sys.stderr)
     t0 = time.monotonic()
     stats = export(universe, UrllibTransport(min_interval=args.min_interval), os.path.expanduser(args.out), args.years, log=lambda m: print(f'{m} · {time.monotonic() - t0:.0f} s', file=sys.stderr))
