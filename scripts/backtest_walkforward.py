@@ -407,10 +407,14 @@ def csv_batches(directory, universe, sample=0, seed=1, batch=100):
     for start in range(0, len(rows), batch):
         out = []
         for u in rows[start:start + batch]:
+            bars, volumes = [], []
             with gzip.open(_history_file(directory, u['key']), 'rt', encoding='utf-8', newline='') as fh:
-                bars = [(r['date'], float(r['close']), float(r['adjclose'])) for r in csv.DictReader(fh)]
+                for r in csv.DictReader(fh):
+                    bars.append((r['date'], float(r['close']), float(r['adjclose'])))
+                    volumes.append(int(float(r['volume'])) if r.get('volume') not in (None, '') else None)
             if bars and is_daily([b[0] for b in bars]):
-                out.append({'key': u['key'], 'symbol': u['symbol'], 'mic': u.get('mic'), 'group': 'etf' if u.get('kind') == 'etf' else 'equity', 'bars': bars, 'split_dates': []})
+                out.append({'key': u['key'], 'symbol': u['symbol'], 'mic': u.get('mic'), 'group': 'etf' if u.get('kind') == 'etf' else 'equity', 'bars': bars, 'split_dates': [],
+                            'volumes': volumes, 'currency': (u.get('currency') or None)})
         yield out
 
 
