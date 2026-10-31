@@ -56,7 +56,7 @@ SCENARIOS = (
     ('relatif_50%', ('rel', 0.50)),
     ('relatif_25%', ('rel', 0.25)),
 )
-PERIODS = (('1993-2015', None, '2015-12-31'), ('2017-2026', '2017-01-01', None))
+PERIODS = (('1993-2015', '1993-01-01', '2015-12-31'), ('2017-2026', '2017-01-01', None))      # correction : la première version n'avait pas de date de début (le test remontait à 1984)
 SIGNAL = 'mom_6_1'
 
 

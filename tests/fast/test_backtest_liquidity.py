@@ -56,7 +56,7 @@ def test_protocol_is_frozen_before_any_result():
     assert bl.HORIZONS == (21, 63) and bl.COSTS_BPS == (10, 30, 60) and bl.SIGNAL == 'mom_6_1'
     assert bl.SCENARIOS == (('aucun', None), ('usd_0,25M', ('usd', 250_000.0)), ('usd_1M', ('usd', 1_000_000.0)), ('usd_5M', ('usd', 5_000_000.0)),
                             ('relatif_50%', ('rel', 0.50)), ('relatif_25%', ('rel', 0.25)))
-    assert bl.PERIODS == (('1993-2015', None, '2015-12-31'), ('2017-2026', '2017-01-01', None))
+    assert bl.PERIODS == (('1993-2015', '1993-01-01', '2015-12-31'), ('2017-2026', '2017-01-01', None))        # début 1993 imposé (la première version l'omettait : 1984)
 
 
 # ───────── aucune donnée postérieure à la date, fenêtre antérieure ─────────
