@@ -1,7 +1,8 @@
 /* Page Explorer : stratégie réglable, filtres avancés, tableau triable, comparaison actions / ETF, statistiques d'exclusion, export CSV. */
 (async () => {
   const user = await J.init('explorer'); if (!user) return;
-  const [P, ov] = await Promise.all([J.api('strategy/presets'), J.api('data/overview').catch(() => null)]);
+  const [P, ov, mine0] = await Promise.all([J.api('strategy/presets'), J.api('data/overview').catch(() => null), J.api('presets/mine').catch(() => ({ presets: {} }))]);
+  let MINE = mine0.presets && !Array.isArray(mine0.presets) ? mine0.presets : {};           // réglages personnels des stratégies de départ : { clé: { config, view, updated_at } }
   const NAMES = { regular: ['Croissance régulière', 'Une hausse soutenue et bien alignée, sur un mois et trois mois.'], fast: ['Croissance rapide', 'Une hausse marquée sur la semaine et le mois, même irrégulière.'],
     recovery: ['Rebond', 'Repart à la hausse après six mois sans progrès notable.'], low_volatility: ['Hausse calme', 'Une hausse douce avec peu de variations et de replis.'],
     momentum: ['Momentum 6 mois', 'Les titres qui ont le plus progressé entre il y a 6 mois et il y a 1 mois (le dernier mois est ignoré). Décrit le passé.'],
@@ -20,7 +21,7 @@
   const MARKETS = { XETR: 'Xetra', XPAR: 'Paris', XAMS: 'Amsterdam', XLON: 'Londres', XMIL: 'Milan', XMAD: 'Madrid', XSTO: 'Stockholm', XOSL: 'Oslo', XSWX: 'Zurich', XNAS: 'Nasdaq', XNYS: 'NYSE', XASE: 'NYSE American', ARCX: 'NYSE Arca', BATS: 'Cboe' };
   const url = new URLSearchParams(location.search);
   const saved = (() => { try { return JSON.parse(sessionStorage.getItem('jigo_explorer2')) || JSON.parse(localStorage.getItem('jigo_explorer2')) || {}; } catch (e) { return {}; } })();
-  const S = { preset: saved.preset || 'regular', label: saved.label || null, config: saved.config || P.presets[saved.preset || 'regular'], status: saved.status || 'retained', page: saved.page || 1, sort: saved.sort || 'rank', dir: saved.dir || 'asc', size: saved.size || 20, level: saved.level || 'guided', compare: !!saved.compare };
+  const S = { preset: saved.preset || 'regular', label: saved.label || null, config: saved.config || P.presets[saved.preset || 'regular'], status: saved.status || 'retained', page: saved.page || 1, sort: saved.sort || 'rank', dir: saved.dir || 'asc', size: saved.size || 20, level: saved.level || 'guided', compare: !!saved.compare, base: saved.base || null };
   const el = id => J.$('#' + id);
   const text = ['q', 'kind', 'market', ...FILTERS];
   text.forEach(k => { const v = k === 'q' ? (url.has('q') && saved.pageKey !== location.pathname + location.search ? url.get('q') : (saved.view || {}).q) : (saved.view || {})[k]; if (v !== undefined && v !== null && el(k)) el(k).value = v; });
@@ -44,11 +45,11 @@
   const SUB = { regular: 'Hausse stable', fast: 'Hausse marquée', recovery: 'Après une baisse', low_volatility: 'Peu de variations', momentum: '126 → 21 séances', momentum12: '252 → 21 séances' };
   const helpHtml = k => `<b>${J.esc(NAMES[k][0])}</b><p>${J.esc(NAMES[k][1])}</p>${EXP.has(k) ? `<p class="helpwarn">${J.esc(EXP_NOTE(k))}</p>` : ''}`;
   function drawStrategies() {
-    el('strats').innerHTML = '<div class="strat-grid">' + Object.keys(P.presets).map(k => `<div class="strat ${S.preset === k ? 'on' : ''} ${EXP.has(k) ? 'exp' : ''}" role="button" tabindex="0" aria-pressed="${S.preset === k}" data-k="${k}"><span class="ico">${JMenu.icon(k)}</span><span class="tx"><b>${NAMES[k][0]}</b><span>${SUB[k] || ''}</span></span><button type="button" class="q" data-help="${k}" aria-label="Explication : ${J.esc(NAMES[k][0])}" aria-expanded="false">?</button></div>`).join('') + '</div>' +
+    el('strats').innerHTML = '<div class="strat-grid">' + Object.keys(P.presets).map(k => `<div class="strat ${S.preset === k ? 'on' : ''} ${EXP.has(k) ? 'exp' : ''}" role="button" tabindex="0" aria-pressed="${S.preset === k}" data-k="${k}"><span class="ico">${JMenu.icon(k)}</span><span class="tx"><b>${NAMES[k][0]}${MINE[k] ? ' <i class="mod" title="Vous avez enregistré votre propre réglage pour cette stratégie">modifiée</i>' : ''}</b><span>${SUB[k] || ''}</span></span><button type="button" class="q" data-help="${k}" aria-label="Explication : ${J.esc(NAMES[k][0])}" aria-expanded="false">?</button></div>`).join('') + '</div>' +
       '<div class="strat-extra">' + `<button class="strat slim ${S.preset === 'free' ? 'on' : ''}" data-k="free"><span class="ico">${JMenu.icon('free')}</span><span class="tx"><b>Recherche libre</b><span>Aucun critère de départ</span></span></button>` +
       (S.preset === 'custom' ? `<button class="strat slim on"><span class="ico">${JMenu.icon('custom')}</span><span class="tx"><b>Vos réglages${S.label ? ' · ' + J.esc(S.label) : ''}</b><span>Critères appliqués tels quels</span></span></button>` : '') + '</div>';
-    const choose = k => { S.label = null; S.preset = k; S.config = S.preset === 'free' ? freeConfig() : JSON.parse(JSON.stringify(P.presets[S.preset])); S.page = 1; persist(); drawStrategies(); drawEditor(); load(); };
     J.$$('#strats .strat[data-k]').forEach(b => { b.onclick = e => { if (e.target.closest('.q')) return; choose(b.dataset.k); }; b.onkeydown = e => { if ((e.key === 'Enter' || e.key === ' ') && e.target === b) { e.preventDefault(); choose(b.dataset.k); } }; });
+    syncReset();
     J.$$('#strats .q').forEach(q => q.onclick = e => { e.stopPropagation(); JMenu.pop(q, helpHtml(q.dataset.help)); });
     const act = S.config.periods.filter(p => p.enabled).map(p => J.PERIODS[p.id].toLowerCase() + ' (' + p.sessions + ' séances)');
     el('strategy-summary').textContent = 'Périodes : ' + act.join(', ') + ' · classement par ' + ({ trend: 'pente', performance: 'performance', regularity: 'régularité', stability: 'stabilité', momentum: 'momentum 6 mois (J−126 → J−21 séances)', momentum12: 'momentum 12 mois (J−252 → J−21 séances)' }[S.config.ranking.mode]) + (MOM_WIN[S.config.ranking.mode] ? ' · ' + EXP_NOTE(S.config.ranking.mode) : (EXP.has(S.preset) ? ' · ' + EXP_NOTE(S.preset) : ''));
@@ -63,7 +64,7 @@
     return v;
   }
   addEventListener('pagehide', () => { persist(); try { sessionStorage.setItem('jigo_explorer_scroll', String(scrollY)); } catch (e) {} });
-  function persist() { try { localStorage.setItem('jigo_explorer2', JSON.stringify({ pageKey: location.pathname + location.search, preset: S.preset, config: S.config, status: S.status, page: S.page, level: S.level, compare: S.compare, sort: S.sort, dir: S.dir, size: S.size, view: { ...view(), mine: el('mine').checked, market_ui: el('market').value }, label: S.label || null })); sessionStorage.setItem('jigo_explorer2', localStorage.getItem('jigo_explorer2')); } catch (e) { } }
+  function persist() { try { localStorage.setItem('jigo_explorer2', JSON.stringify({ pageKey: location.pathname + location.search, preset: S.preset, base: S.base || null, config: S.config, status: S.status, page: S.page, level: S.level, compare: S.compare, sort: S.sort, dir: S.dir, size: S.size, view: { ...view(), mine: el('mine').checked, market_ui: el('market').value }, label: S.label || null })); sessionStorage.setItem('jigo_explorer2', localStorage.getItem('jigo_explorer2')); } catch (e) { } }
 
   /* éditeur : réglages guidés + détaillé */
   const levelOpts = (obj, labels, cur) => Object.entries(labels).map(([k, l]) => `<option value="${k}" ${k === cur ? 'selected' : ''}>${l}</option>`).join('');
@@ -111,7 +112,7 @@
     }
     const m = J.$('#editor-msg', box);
     try { S.config = (await J.post('strategy/validate', c)).config; m.hidden = true; } catch (e) { m.textContent = e.message; m.hidden = false; return false; }
-    S.config.name = 'custom'; S.preset = 'custom'; S.page = 1; persist(); drawStrategies(); load(); return true;
+    if (P.presets[S.preset]) S.base = S.preset; S.config.name = 'custom'; S.preset = 'custom'; S.page = 1; persist(); drawStrategies(); load(); return true;
   }
 
   /* curseurs de critères : ils lisent et modifient la configuration de la stratégie (période concernée), comme le réglage guidé */
@@ -139,7 +140,7 @@
           const u = d.side === 'low' ? l : h, none = d.side === 'low' ? u <= d.min : u >= d.max, val = none ? null : (d.from ? d.from(u) : u);
           if ((raw ?? null) === val || (ui !== null && Math.abs(ui - u) < 1e-9)) return;
           S.config.periods.forEach(p => { if (targets.some(x => x.id === p.id)) p[d.field] = val; });
-          S.config.name = 'custom'; S.preset = 'custom'; S.label = null; persist(); drawStrategies(); if (!el('editor').hidden) drawEditor(); markDirty();
+          if (P.presets[S.preset]) S.base = S.preset; S.config.name = 'custom'; S.preset = 'custom'; S.label = null; persist(); drawStrategies(); if (!el('editor').hidden) drawEditor(); markDirty();
         } });
     });
   }
@@ -165,18 +166,75 @@
   el('market').addEventListener('change', syncMenu);
   /* recherches enregistrées : critères + filtres + tri */
   let searches = [];
+  /* réglages personnels : choisir, remplacer, remettre par défaut */
+  function setView(v) {
+    v = v || {};
+    [...FILTERS, 'kind', 'market'].forEach(k => { el(k).value = v[k] ?? ''; }); el('pea').checked = !!v.pea; el('mine').checked = !!v.owned_only; el('open_now').checked = !!v.open_now; el('fresh_only').checked = !!v.fresh_only; el('tradable').checked = v.tradable !== false;
+    S.sort = v.sort || 'rank'; S.dir = v.dir || 'asc'; el('filters').hidden = !(FILTERS.some(k => el(k).value) || CHECKS.some(k => el(k).checked)); syncMenu();
+  }
+  function presetConfig(k) { const c = JSON.parse(JSON.stringify(MINE[k] ? MINE[k].config : P.presets[k])); c.name = k; return c; }
+  function choose(k) {
+    S.label = null; S.preset = k; S.base = P.presets[k] ? k : null; S.page = 1;
+    if (k === 'free') S.config = freeConfig(); else { S.config = presetConfig(k); if (MINE[k]) setView(MINE[k].view); }
+    persist(); drawStrategies(); drawEditor(); load();
+  }
+  const baseKey = () => P.presets[S.preset] ? S.preset : (S.base && P.presets[S.base] ? S.base : null);
+  function syncReset() { const b = el('reset-default'); if (!b) return; const k = baseKey(); b.hidden = !(k && MINE[k]); if (k) b.textContent = 'Remettre « ' + NAMES[k][0] + ' » par défaut'; }
+  async function resetPreset(k) {
+    if (!await J.confirm('Remettre par défaut', 'Le réglage de « ' + NAMES[k][0] + ' » redeviendra celui de départ : les critères et filtres que vous aviez enregistrés pour cette stratégie seront supprimés.', 'Remettre par défaut')) return false;
+    await J.post('preset/reset', { preset: k }); delete MINE[k];
+    if (baseKey() === k) choose(k); else drawStrategies();
+    J.toast('« ' + NAMES[k][0] + ' » : réglage de départ rétabli'); return true;
+  }
+  const savedView = () => ({ ...view(), sort: S.sort, dir: S.dir });
+  function openManage() {
+    const body = () => {
+      const dflt = Object.keys(P.presets).map(k => `<tr><td><b>${J.esc(NAMES[k][0])}</b><div class="small muted">${J.esc(SUB[k] || '')}</div></td><td>${MINE[k] ? `<span class="badge info">Modifiée · ${J.date(MINE[k].updated_at)}</span>` : '<span class="badge">Réglage de départ</span>'}</td><td class="num nowrap"><button type="button" class="btn small" data-use="${k}">Utiliser</button> <button type="button" class="btn small" data-reset="${k}" ${MINE[k] ? '' : 'disabled'}>Remettre par défaut</button></td></tr>`).join('');
+      const own = searches.map(x => `<tr><td><b>${J.esc(x.name)}</b></td><td class="small muted">${J.date(x.updated_at)}</td><td class="num nowrap"><button type="button" class="btn small" data-suse="${x.id}">Utiliser</button> <button type="button" class="btn small" data-sren="${x.id}">Renommer</button> <button type="button" class="btn small danger" data-sdel="${x.id}">Supprimer</button></td></tr>`).join('');
+      return `<h3 style="margin:0 0 6px">Stratégies de départ</h3><table class="dense"><tbody>${dflt}</tbody></table>
+        <h3 style="margin:16px 0 6px">Mes recherches enregistrées</h3>${searches.length ? `<table class="dense"><tbody>${own}</tbody></table>` : '<p class="small muted" style="margin:0">Aucune pour l’instant : réglez vos critères et filtres, puis « Enregistrer ».</p>'}
+        <p class="small muted" style="margin:14px 0 0">Pour modifier une stratégie : choisissez-la, changez ses critères et filtres, puis « Enregistrer » et choisissez de remplacer son réglage. « Remettre par défaut » rétablit le réglage de départ.</p>`;
+    };
+    const d = J.dialog({ title: 'Gérer mes stratégies', body: body(), actions: [{ label: 'Fermer', run: () => { } }] });
+    const redraw = () => { J.$('.body', d).innerHTML = body(); };
+    d.addEventListener('click', async e => {
+      const t = e.target.closest('button[data-use],button[data-reset],button[data-suse],button[data-sren],button[data-sdel]'); if (!t || t.disabled) return;
+      const ds = t.dataset, x = ds.suse || ds.sren || ds.sdel ? searches.find(y => y.id == (ds.suse || ds.sren || ds.sdel)) : null;
+      try {
+        if (ds.use) { d.close(); choose(ds.use); }
+        else if (ds.reset) { if (await resetPreset(ds.reset)) redraw(); }
+        else if (ds.suse && x) { d.close(); applySearch(x); }
+        else if (ds.sdel && x) { if (await J.confirm('Supprimer la recherche', '« ' + x.name + ' » sera supprimée.', 'Supprimer')) { await J.post('search/delete', { id: +x.id }); await drawSaved(); redraw(); } }
+        else if (ds.sren && x) J.dialog({ title: 'Renommer la recherche', body: J.field('Nouveau nom', `<input id="rn-name" maxlength="80" value="${J.esc(x.name)}" autofocus>`),
+          actions: [{ label: 'Annuler', run: () => { } }, { label: 'Renommer', cls: 'primary', run: async dd => { const name = J.$('#rn-name', dd).value.trim(); if (!name || name === x.name) return false; if (searches.some(y => y.name === name)) { J.formError(dd, 'Ce nom existe déjà.'); return true; } await J.post('search/save', { name, config: x.config, view: x.view }); await J.post('search/delete', { id: +x.id }); await drawSaved(); redraw(); } }] });
+      } catch (err) { J.toast(err.message); }
+    });
+  }
   async function drawSaved() {
     searches = (await J.api('searches')).searches;
-    el('saved').innerHTML = `<select id="saved-sel" aria-label="Mes recherches"><option value="">Mes recherches (${searches.length})</option>${searches.map(x => `<option value="${x.id}">${J.esc(x.name)}</option>`).join('')}</select><button class="btn small" id="saved-save">Enregistrer cette recherche</button><button class="btn small danger" id="saved-del" hidden>Supprimer</button>`;
+    el('saved').innerHTML = `<select id="saved-sel" aria-label="Mes recherches"><option value="">Mes recherches (${searches.length})</option>${searches.map(x => `<option value="${x.id}">${J.esc(x.name)}</option>`).join('')}</select><button class="btn small" id="saved-save">Enregistrer</button><button class="btn small" id="saved-manage">Gérer…</button><button class="btn small" id="reset-default" hidden></button><button class="btn small danger" id="saved-del" hidden>Supprimer</button>`;
     el('saved-sel').onchange = () => { const x = searches.find(y => y.id == el('saved-sel').value); el('saved-del').hidden = !x; if (!x) return; applySearch(x); };
     el('saved-del').onclick = async () => { const x = searches.find(y => y.id == el('saved-sel').value); if (x && await J.confirm('Supprimer la recherche', '« ' + x.name + ' » sera supprimée.', 'Supprimer')) { await J.post('search/delete', { id: +x.id }); drawSaved(); } };
-    el('saved-save').onclick = () => J.dialog({ title: 'Enregistrer cette recherche', body: J.field('Nom', `<input id="sv-name" maxlength="80" value="${J.esc(S.label || '')}" autofocus>`) + '<p class="small muted">Enregistre vos critères, périodes, filtres et tri. Un nom existant est remplacé.</p>',
-      actions: [{ label: 'Annuler', run: () => { } }, { label: 'Enregistrer', cls: 'primary', run: async d => { const name = J.$('#sv-name', d).value.trim(); if (!name) return true; try { await J.post('search/save', { name, config: S.config, view: { ...view(), sort: S.sort, dir: S.dir } }); } catch (e) { J.formError(d, e.message); return true; } S.label = name; persist(); await drawSaved(); drawStrategies(); J.toast('Recherche enregistrée'); } }] });
+    el('saved-manage').onclick = openManage; el('reset-default').onclick = () => { const k = baseKey(); if (k) resetPreset(k); }; syncReset();
+    el('saved-save').onclick = () => {
+      const base = baseKey();
+      J.dialog({ title: 'Enregistrer vos réglages', onopen: d => { const t = J.$('#sv-target', d); if (t) t.onchange = () => { J.$('#sv-namebox', d).hidden = t.value === 'preset'; }; },
+        body: (base ? J.field('Où enregistrer ?', `<select id="sv-target"><option value="new">Une recherche à part, avec un nom</option><option value="preset">Le réglage de « ${J.esc(NAMES[base][0])} » (remplace son réglage de départ)</option></select>`) : '') + `<div id="sv-namebox">${J.field('Nom', `<input id="sv-name" maxlength="80" value="${J.esc(S.label || '')}" autofocus>`)}</div><p class="small muted">Enregistre vos critères, périodes, filtres et tri. Un nom existant est remplacé. Vous pourrez toujours remettre une stratégie de départ par défaut (« Gérer… »).</p>`,
+        actions: [{ label: 'Annuler', run: () => { } }, { label: 'Enregistrer', cls: 'primary', run: async d => {
+          const target = (J.$('#sv-target', d) || {}).value || 'new';
+          if (target === 'preset' && base) {
+            const v = savedView(); try { await J.post('preset/save', { preset: base, config: S.config, view: v }); } catch (e) { J.formError(d, e.message); return true; }
+            MINE[base] = { config: JSON.parse(JSON.stringify(S.config)), view: v, updated_at: new Date().toISOString().slice(0, 19).replace('T', ' ') };
+            S.preset = base; S.config.name = base; S.label = null; persist(); drawStrategies(); J.toast('Réglage de « ' + NAMES[base][0] + ' » enregistré'); return false;
+          }
+          const name = J.$('#sv-name', d).value.trim(); if (!name) return true;
+          try { await J.post('search/save', { name, config: S.config, view: savedView() }); } catch (e) { J.formError(d, e.message); return true; }
+          S.label = name; persist(); await drawSaved(); drawStrategies(); J.toast('Recherche « ' + name + ' » enregistrée'); return false;
+        } }] });
+    };
   }
   function applySearch(x) {
-    S.config = x.config; S.preset = 'custom'; S.label = x.name; S.page = 1; const v = x.view || {};
-    [...FILTERS, 'kind', 'market'].forEach(k => { el(k).value = v[k] ?? ''; }); el('pea').checked = !!v.pea; el('mine').checked = !!v.owned_only; el('open_now').checked = !!v.open_now; el('fresh_only').checked = !!v.fresh_only; el('tradable').checked = v.tradable !== false;
-    S.sort = v.sort || 'rank'; S.dir = v.dir || 'asc'; el('filters').hidden = !(FILTERS.some(k => el(k).value) || CHECKS.some(k => el(k).checked));
+    S.config = x.config; S.preset = 'custom'; S.base = null; S.label = x.name; S.page = 1; setView(x.view);
     persist(); drawStrategies(); if (!el('editor').hidden) drawEditor(); load();
   }
   el('edit-btn').onclick = () => { const e = el('editor'); e.hidden = !e.hidden; if (!e.hidden) drawEditor(); };
@@ -298,7 +356,7 @@
   ['q', 'min_price', 'budget', 'min_score', 'max_volatility', 'max_drawdown', 'min_volume'].forEach(k => el(k).addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); applyMenu(); } }));
   /* liens du menu latéral : ?kind=, ?compare=1, ?preset= */
   if (url.get('kind')) el('kind').value = url.get('kind');
-  if (url.get('preset') === 'free') { S.preset = 'free'; S.label = null; S.config = freeConfig(); } else if (P.presets[url.get('preset')]) { S.preset = url.get('preset'); S.label = null; S.config = JSON.parse(JSON.stringify(P.presets[S.preset])); }
+  if (url.get('preset') === 'free') { S.preset = 'free'; S.label = null; S.config = freeConfig(); } else if (P.presets[url.get('preset')]) { S.preset = url.get('preset'); S.base = S.preset; S.label = null; S.config = presetConfig(S.preset); if (MINE[S.preset]) setView(MINE[S.preset].view); }
   drawSources(); drawStrategies(); syncMenu(); drawSaved(); if (el('q').value) S.status = 'all';
   if (url.get('compare')) { S.compare = true; el('compare-btn').classList.add('primary'); el('compare-btn').textContent = 'Retour au tableau'; }
   if (FILTERS.some(k => el(k).value) || CHECKS.some(k => el(k).checked)) el('filters').hidden = false;

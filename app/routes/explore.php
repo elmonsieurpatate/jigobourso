@@ -22,6 +22,15 @@ function held_listing_ids(int $userId): array {
     return array_values(array_map('intval', array_keys(array_filter($qty, function ($q) { return $q > 0.000000001; }))));
 }
 
+/** Filtres de vue conservés dans une recherche ou un réglage enregistré : valeurs simples seulement, clés connues seulement. */
+function clean_view($in): array {
+    $view = [];
+    if (!is_array($in)) return $view;
+    foreach (['kind', 'market', 'country', 'category', 'budget', 'min_price', 'max_price', 'min_score', 'max_volatility', 'max_drawdown', 'min_volume', 'cap', 'regularity', 'risk', 'liquidity', 'pea', 'owned_only', 'open_now', 'fresh_only', 'sort', 'dir'] as $k)
+        if (isset($in[$k]) && is_scalar($in[$k]) && $in[$k] !== '' && $in[$k] !== false) $view[$k] = $in[$k];
+    return $view;
+}
+
 return [
     'strategy/presets' => function () { require_user(); return engine_call('presets', []); },
     'strategy/validate' => function () { need_post(); require_user(); return ['config' => engine_call('validate-config', body())]; },
@@ -78,12 +87,31 @@ return [
         need_post(); $u = require_user(); $b = body();
         $name = str_in($b, 'name', 80);
         $config = engine_call('validate-config', is_array($b['config'] ?? null) ? $b['config'] : []);
-        $view = [];
-        foreach (['kind', 'market', 'country', 'category', 'budget', 'min_price', 'max_price', 'min_score', 'max_volatility', 'max_drawdown', 'min_volume', 'cap', 'regularity', 'risk', 'liquidity', 'pea', 'owned_only', 'open_now', 'fresh_only', 'sort', 'dir'] as $k)
-            if (isset($b['view'][$k]) && is_scalar($b['view'][$k]) && $b['view'][$k] !== '' && $b['view'][$k] !== false) $view[$k] = $b['view'][$k];
+        $view = clean_view($b['view'] ?? []);
         if (!q('SELECT 1 FROM saved_searches WHERE user_id = ? AND name = ?', [$u['id'], $name])->fetch() && (int)q('SELECT COUNT(*) FROM saved_searches WHERE user_id = ?', [$u['id']])->fetchColumn() >= 50) throw new ApiError('50 recherches enregistrées au maximum', 422);
         q('INSERT INTO saved_searches(user_id, name, config, view, created_at, updated_at) VALUES (?,?,?,?,?,?) ON DUPLICATE KEY UPDATE config = VALUES(config), view = VALUES(view), updated_at = VALUES(updated_at)',
           [$u['id'], $name, json_encode($config), json_encode($view ?: new stdClass()), now_utc(), now_utc()]);
+        return ['ok' => true];
+    },
+    'presets/mine' => function () {
+        $u = require_user();
+        $out = [];
+        foreach (q('SELECT preset, config, view, updated_at FROM saved_presets WHERE user_id = ?', [$u['id']])->fetchAll() as $r)
+            $out[$r['preset']] = ['config' => json_decode($r['config'], true), 'view' => json_decode($r['view'], true) ?: new stdClass(), 'updated_at' => $r['updated_at']];
+        return ['presets' => $out ?: new stdClass()];
+    },
+    'preset/save' => function () {
+        need_post(); $u = require_user(); $b = body();
+        $preset = (string)($b['preset'] ?? '');
+        if (!in_array($preset, array_keys(engine_call('presets', [])['presets']), true)) throw new ApiError('Stratégie inconnue', 422);
+        $config = engine_call('validate-config', is_array($b['config'] ?? null) ? $b['config'] : []);
+        q('INSERT INTO saved_presets(user_id, preset, config, view, updated_at) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE config = VALUES(config), view = VALUES(view), updated_at = VALUES(updated_at)',
+          [$u['id'], $preset, json_encode($config), json_encode(clean_view($b['view'] ?? []) ?: new stdClass()), now_utc()]);
+        return ['ok' => true];
+    },
+    'preset/reset' => function () {
+        need_post(); $u = require_user();
+        q('DELETE FROM saved_presets WHERE user_id = ? AND preset = ?', [$u['id'], (string)(body()['preset'] ?? '')]);
         return ['ok' => true];
     },
     'search/delete' => function () {
