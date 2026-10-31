@@ -17,7 +17,7 @@ try {
         if ($name === 'momentum12' && $rows) $first = $rows[0]['id'];
     }
     if ($first) {
-        $s = engine_call('sheet', ['id' => $first, 'config' => $p['presets']['momentum12']]);
+        $s = engine_call('sheet', ['listing_id' => $first, 'config' => $p['presets']['momentum12']]);
         check(($s['strategy']['experimental'] ?? false) === true && ($s['strategy']['ranking'] ?? '') === 'momentum12' && isset($s['state']['momentum_12m']) && isset($s['state']['momentum_6m']), 'fiche : deux momentums exposés, profil à l\'essai', $problems);
     }
     $t = engine_call('suivi', []);
