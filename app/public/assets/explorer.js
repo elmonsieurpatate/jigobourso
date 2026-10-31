@@ -116,35 +116,29 @@
 
   /* curseurs de critères : ils lisent et modifient la configuration de la stratégie (période concernée), comme le réglage guidé */
   const yearly = s => 100 * (Math.pow(1 + s / 100, 252) - 1), perSession = a => Number((100 * (Math.pow(1 + a / 100, 1 / 252) - 1)).toFixed(5));
+  const SPAN = n => ({ 1: '1 jour', 5: '1 semaine', 21: '1 mois', 63: '3 mois', 126: '6 mois', 252: '12 mois' }[n] || n + ' séances');
+  /* Pente et volatilité se règlent sur la période la plus longue de la stratégie (6 mois pour Momentum 6 mois, 12 mois pour Momentum 12 mois, 3 mois pour Croissance régulière…). */
   const SLIDERS = [
-    { id: 'r2', title: 'Régularité (R²)', field: 'min_r2', scope: 'all', min: 0, max: 1, step: .01, dec: 2, side: 'low', chart: 'r2', help: 'Le R² mesure la régularité de la hausse : 1 = ligne droite parfaite, 0 = hausse très irrégulière. Ce curseur fixe le R² minimum exigé pour chaque période utilisée par la stratégie.' },
-    { id: 'slope3', title: 'Pente (3 mois)', field: 'min_slope', scope: 'quarter', min: 0, max: 100, step: 1, dec: 0, side: 'low', unit: '% /an', chart: 'slope3', to: yearly, from: perSession, help: 'La pente est la hausse moyenne du cours sur 3 mois, exprimée en rythme annuel. Un titre dont la pente est inférieure au minimum choisi n’est pas retenu.' },
-    { id: 'slope1', title: 'Pente (1 mois)', field: 'min_slope', scope: 'month', min: 0, max: 100, step: 1, dec: 0, side: 'low', unit: '% /an', chart: 'slope1', to: yearly, from: perSession, help: 'Même mesure que la pente sur 3 mois, mais sur le dernier mois : elle réagit plus vite aux changements de rythme.' },
-    { id: 'vol3', title: 'Volatilité (3 mois)', field: 'max_volatility', scope: 'quarter', min: 0, max: 10, step: .1, dec: 1, side: 'high', unit: '% /séance', chart: 'wave', help: 'La volatilité mesure l’amplitude des variations quotidiennes sur 3 mois. Ce curseur fixe le maximum accepté : plus il est bas, plus les titres retenus varient calmement.' }
+    { id: 'r2', title: () => 'Régularité (R²)', field: 'min_r2', scope: 'all', min: 0, max: 1, step: .01, dec: 2, side: 'low', chart: 'r2', help: () => 'Le R² mesure la régularité de la hausse : 1 = ligne droite parfaite, 0 = hausse très irrégulière. Ce curseur fixe le R² minimum exigé pour chaque période utilisée par la stratégie.' },
+    { id: 'slope', title: n => `Pente (${SPAN(n)})`, field: 'min_slope', scope: 'longest', min: 0, max: 100, step: 1, dec: 0, side: 'low', unit: '% /an', chart: 'slope3', to: yearly, from: perSession, help: n => `La pente est la hausse moyenne du cours sur ${SPAN(n)} (la période la plus longue de la stratégie), exprimée en rythme annuel. Un titre dont la pente est inférieure au minimum choisi n’est pas retenu.` },
+    { id: 'vol', title: n => `Volatilité (${SPAN(n)})`, field: 'max_volatility', scope: 'longest', min: 0, max: 10, step: .1, dec: 1, side: 'high', unit: '% /séance', chart: 'wave', help: n => `La volatilité mesure l’amplitude des variations quotidiennes sur ${SPAN(n)} (la période la plus longue de la stratégie). Ce curseur fixe le maximum accepté : plus il est bas, plus les titres retenus varient calmement.` }
   ];
-  const CRIT_FIELDS = ['min_slope', 'min_r2', 'min_er', 'min_return', 'max_return', 'max_volatility', 'max_drawdown'], BASE_PERIOD = { momentum: 'half', momentum12: 'year' };
   function drawSliders() {
     const box = el('sliders'); if (!box) return;
-    box.innerHTML = SLIDERS.map(d => `<div class="sl" data-s="${d.id}"><div class="sl-head"><b>${d.title}</b><button type="button" class="q" data-sh="${d.id}" aria-label="Explication : ${J.esc(d.title)}" aria-expanded="false">?</button><span class="sl-chart"></span></div><div class="sl-body"></div></div>`).join('');
+    const enabled = S.config.periods.filter(p => p.enabled), longest = enabled.reduce((m, p) => p.sessions > (m ? m.sessions : 0) ? p : m, null);
+    const spanN = longest ? longest.sessions : 63;
+    box.innerHTML = SLIDERS.map(d => `<div class="sl" data-s="${d.id}"><div class="sl-head"><b>${d.title(spanN)}</b><button type="button" class="q" data-sh="${d.id}" aria-label="Explication : ${J.esc(d.title(spanN))}" aria-expanded="false">?</button><span class="sl-chart"></span></div><div class="sl-body"></div></div>`).join('');
     SLIDERS.forEach(d => {
-      const host = J.$(`.sl[data-s="${d.id}"]`, box), targets = d.scope === 'all' ? S.config.periods.filter(p => p.enabled && p.sessions >= 3) : S.config.periods.filter(p => p.id === d.scope);
-      const idle = !targets.length || !targets.some(p => p.enabled);          // période non utilisée par la stratégie : réglable quand même (elle devient un critère)
-      const raw = idle ? null : targets.find(p => p.enabled)[d.field], ui = raw === null || raw === undefined ? null : (d.to ? d.to(raw) : raw);
+      const host = J.$(`.sl[data-s="${d.id}"]`, box), targets = d.scope === 'all' ? enabled.filter(p => p.sessions >= 3) : (longest ? [longest] : []);
+      const raw = targets.length ? targets[0][d.field] : null, ui = raw === null || raw === undefined ? null : (d.to ? d.to(raw) : raw);
       const low = d.side === 'low' ? Math.max(d.min, Math.min(d.max, ui === null ? d.min : ui)) : d.min, high = d.side === 'high' ? Math.max(d.min, Math.min(d.max, ui === null ? d.max : ui)) : d.max;
       const draw = (l, h) => { J.$('.sl-chart', host).innerHTML = JMenu.chart(d.chart, ((d.side === 'low' ? l : h) - d.min) / (d.max - d.min)); };
-      if (idle) host.classList.add('idle');
-      host.querySelector('.q').onclick = e => { e.stopPropagation(); JMenu.pop(e.currentTarget, `<b>${J.esc(d.title)}</b><p>${J.esc(d.help)}</p>${idle ? '<p class="helpwarn">Cette stratégie n’utilise pas cette période pour l’instant : régler ce curseur l’ajoute comme critère supplémentaire.</p>' : ''}<p class="muted small">Le réglage s’applique quand vous cliquez sur « Appliquer ».</p>`); };
-      JMenu.dualRange(J.$('.sl-body', host), { label: d.title, min: d.min, max: d.max, step: d.step, dec: d.dec, unit: d.unit, low, high, lockLow: d.side === 'high', lockHigh: d.side === 'low', onInput: draw,
+      host.querySelector('.q').onclick = e => { e.stopPropagation(); JMenu.pop(e.currentTarget, `<b>${J.esc(d.title(spanN))}</b><p>${J.esc(d.help(spanN))}</p><p class="muted small">Le réglage s’applique quand vous cliquez sur « Appliquer ».</p>`); };
+      JMenu.dualRange(J.$('.sl-body', host), { label: d.title(spanN), min: d.min, max: d.max, step: d.step, dec: d.dec, unit: d.unit, low, high, lockLow: d.side === 'high', lockHigh: d.side === 'low', disabled: !targets.length, onInput: draw,
         onChange: (l, h) => {
           const u = d.side === 'low' ? l : h, none = d.side === 'low' ? u <= d.min : u >= d.max, val = none ? null : (d.from ? d.from(u) : u);
-          if (idle ? val === null : ((raw ?? null) === val || (ui !== null && Math.abs(ui - u) < 1e-9))) return;
-          const mode = S.config.ranking.mode;
-          S.config.periods.forEach(p => {
-            if (!targets.some(x => x.id === p.id)) return;
-            if (val !== null) p.enabled = true;
-            p[d.field] = val;
-            if (val === null && BASE_PERIOD[mode] && p.id !== BASE_PERIOD[mode] && CRIT_FIELDS.every(f => p[f] === null || p[f] === undefined)) p.enabled = false;   // période ajoutée par un curseur puis vidée : retirée
-          });
+          if ((raw ?? null) === val || (ui !== null && Math.abs(ui - u) < 1e-9)) return;
+          S.config.periods.forEach(p => { if (targets.some(x => x.id === p.id)) p[d.field] = val; });
           S.config.name = 'custom'; S.preset = 'custom'; S.label = null; persist(); drawStrategies(); if (!el('editor').hidden) drawEditor(); markDirty();
         } });
     });
