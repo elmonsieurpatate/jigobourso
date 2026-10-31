@@ -1,0 +1,2200 @@
+[Sat Oct 31 15:56:04 2026] PHP 8.3.6 Development Server (http://127.0.0.1:18089) started
+[Sat Oct 31 15:56:09 2026] 127.0.0.1:39242 Accepted
+[Sat Oct 31 15:56:09 2026] 127.0.0.1:39242 [200]: GET /login.html
+[Sat Oct 31 15:56:09 2026] 127.0.0.1:39242 Closing
+[Sat Oct 31 15:56:09 2026] 127.0.0.1:39244 Accepted
+[Sat Oct 31 15:56:09 2026] 127.0.0.1:39256 Accepted
+[Sat Oct 31 15:56:09 2026] 127.0.0.1:39260 Accepted
+[Sat Oct 31 15:56:09 2026] 127.0.0.1:39272 Accepted
+[Sat Oct 31 15:56:09 2026] 127.0.0.1:39244 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:56:09 2026] 127.0.0.1:39256 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:56:09 2026] 127.0.0.1:39244 Closing
+[Sat Oct 31 15:56:09 2026] 127.0.0.1:39260 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:56:09 2026] 127.0.0.1:39272 [200]: GET /assets/auth-pages.js?v=202610301418
+[Sat Oct 31 15:56:09 2026] 127.0.0.1:39256 Closing
+[Sat Oct 31 15:56:09 2026] 127.0.0.1:39260 Closing
+[Sat Oct 31 15:56:09 2026] 127.0.0.1:39272 Closing
+[Sat Oct 31 15:56:09 2026] 127.0.0.1:39282 Accepted
+[Sat Oct 31 15:56:09 2026] 127.0.0.1:39282 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:56:09 2026] 127.0.0.1:39282 Closing
+[Sat Oct 31 15:56:09 2026] 127.0.0.1:39294 Accepted
+[Sat Oct 31 15:56:09 2026] 127.0.0.1:39294 [404]: GET /favicon.ico - No such file or directory
+[Sat Oct 31 15:56:09 2026] 127.0.0.1:39294 Closing
+[Sat Oct 31 15:56:09 2026] 127.0.0.1:39306 Accepted
+[Sat Oct 31 15:56:09 2026] 127.0.0.1:39306 [200]: POST /api.php?r=auth%2Flogin
+[Sat Oct 31 15:56:09 2026] 127.0.0.1:39306 Closing
+[Sat Oct 31 15:56:09 2026] 127.0.0.1:39310 Accepted
+[Sat Oct 31 15:56:09 2026] 127.0.0.1:39310 [200]: GET /index.html
+[Sat Oct 31 15:56:09 2026] 127.0.0.1:39310 Closing
+[Sat Oct 31 15:56:09 2026] 127.0.0.1:39324 Accepted
+[Sat Oct 31 15:56:09 2026] 127.0.0.1:39330 Accepted
+[Sat Oct 31 15:56:09 2026] 127.0.0.1:39342 Accepted
+[Sat Oct 31 15:56:09 2026] 127.0.0.1:39358 Accepted
+[Sat Oct 31 15:56:09 2026] 127.0.0.1:39368 Accepted
+[Sat Oct 31 15:56:09 2026] 127.0.0.1:39380 Accepted
+[Sat Oct 31 15:56:09 2026] 127.0.0.1:39324 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:56:09 2026] 127.0.0.1:39324 Closing
+[Sat Oct 31 15:56:09 2026] 127.0.0.1:39330 [200]: GET /assets/etf.js?v=202610301418
+[Sat Oct 31 15:56:09 2026] 127.0.0.1:39330 Closing
+[Sat Oct 31 15:56:09 2026] 127.0.0.1:39342 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:56:09 2026] 127.0.0.1:39342 Closing
+[Sat Oct 31 15:56:09 2026] 127.0.0.1:39358 [200]: GET /assets/explorer-menu.js?v=202610301418
+[Sat Oct 31 15:56:09 2026] 127.0.0.1:39358 Closing
+[Sat Oct 31 15:56:09 2026] 127.0.0.1:39368 [200]: GET /assets/multiselect.js?v=202610301418
+[Sat Oct 31 15:56:09 2026] 127.0.0.1:39368 Closing
+[Sat Oct 31 15:56:09 2026] 127.0.0.1:39380 [200]: GET /assets/explorer.js?v=202610301418
+[Sat Oct 31 15:56:09 2026] 127.0.0.1:39380 Closing
+[Sat Oct 31 15:56:09 2026] 127.0.0.1:39396 Accepted
+[Sat Oct 31 15:56:09 2026] 127.0.0.1:39396 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:56:09 2026] 127.0.0.1:39396 Closing
+[Sat Oct 31 15:56:09 2026] 127.0.0.1:39410 Accepted
+[Sat Oct 31 15:56:09 2026] 127.0.0.1:39410 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:56:09 2026] 127.0.0.1:39410 Closing
+[Sat Oct 31 15:56:09 2026] 127.0.0.1:39412 Accepted
+[Sat Oct 31 15:56:09 2026] 127.0.0.1:39412 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:56:09 2026] 127.0.0.1:39412 Closing
+[Sat Oct 31 15:56:09 2026] 127.0.0.1:39424 Accepted
+[Sat Oct 31 15:56:09 2026] 127.0.0.1:39428 Accepted
+[Sat Oct 31 15:56:10 2026] 127.0.0.1:39424 [200]: GET /api.php?r=strategy%2Fpresets
+[Sat Oct 31 15:56:10 2026] 127.0.0.1:39424 Closing
+[Sat Oct 31 15:56:10 2026] 127.0.0.1:39428 [200]: GET /api.php?r=data%2Foverview
+[Sat Oct 31 15:56:10 2026] 127.0.0.1:39428 Closing
+[Sat Oct 31 15:56:10 2026] 127.0.0.1:39432 Accepted
+[Sat Oct 31 15:56:10 2026] 127.0.0.1:39432 [200]: GET /api.php?r=searches
+[Sat Oct 31 15:56:10 2026] 127.0.0.1:39432 Closing
+[Sat Oct 31 15:56:10 2026] 127.0.0.1:39444 Accepted
+[Sat Oct 31 15:56:11 2026] 127.0.0.1:39444 [200]: POST /api.php?r=explore
+[Sat Oct 31 15:56:11 2026] 127.0.0.1:39444 Closing
+[Sat Oct 31 15:56:11 2026] 127.0.0.1:39456 Accepted
+[Sat Oct 31 15:56:11 2026] 127.0.0.1:39456 [200]: GET /titre.html?id=1
+[Sat Oct 31 15:56:11 2026] 127.0.0.1:39456 Closing
+[Sat Oct 31 15:56:11 2026] 127.0.0.1:39458 Accepted
+[Sat Oct 31 15:56:11 2026] 127.0.0.1:39458 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:56:11 2026] 127.0.0.1:39458 Closing
+[Sat Oct 31 15:56:11 2026] 127.0.0.1:39472 Accepted
+[Sat Oct 31 15:56:11 2026] 127.0.0.1:39474 Accepted
+[Sat Oct 31 15:56:11 2026] 127.0.0.1:39478 Accepted
+[Sat Oct 31 15:56:11 2026] 127.0.0.1:39492 Accepted
+[Sat Oct 31 15:56:11 2026] 127.0.0.1:39502 Accepted
+[Sat Oct 31 15:56:11 2026] 127.0.0.1:39516 Accepted
+[Sat Oct 31 15:56:11 2026] 127.0.0.1:39472 [200]: GET /assets/charts.js?v=202610301418
+[Sat Oct 31 15:56:11 2026] 127.0.0.1:39472 Closing
+[Sat Oct 31 15:56:11 2026] 127.0.0.1:39474 [200]: GET /assets/intraday.js?v=202610301418
+[Sat Oct 31 15:56:11 2026] 127.0.0.1:39474 Closing
+[Sat Oct 31 15:56:11 2026] 127.0.0.1:39478 [200]: GET /assets/tx.js?v=202610301418
+[Sat Oct 31 15:56:11 2026] 127.0.0.1:39492 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:56:11 2026] 127.0.0.1:39502 [200]: GET /assets/titre.js?v=202610301418
+[Sat Oct 31 15:56:11 2026] 127.0.0.1:39516 [200]: GET /assets/etf.js?v=202610301418
+[Sat Oct 31 15:56:11 2026] 127.0.0.1:39478 Closing
+[Sat Oct 31 15:56:11 2026] 127.0.0.1:39492 Closing
+[Sat Oct 31 15:56:11 2026] 127.0.0.1:39502 Closing
+[Sat Oct 31 15:56:11 2026] 127.0.0.1:39516 Closing
+[Sat Oct 31 15:56:11 2026] 127.0.0.1:39528 Accepted
+[Sat Oct 31 15:56:11 2026] 127.0.0.1:39528 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:56:11 2026] 127.0.0.1:39528 Closing
+[Sat Oct 31 15:56:11 2026] 127.0.0.1:39542 Accepted
+[Sat Oct 31 15:56:11 2026] 127.0.0.1:39542 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:56:11 2026] 127.0.0.1:39542 Closing
+[Sat Oct 31 15:56:11 2026] 127.0.0.1:39556 Accepted
+[Sat Oct 31 15:56:11 2026] 127.0.0.1:39556 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:56:11 2026] 127.0.0.1:39556 Closing
+[Sat Oct 31 15:56:11 2026] 127.0.0.1:39572 Accepted
+[Sat Oct 31 15:56:11 2026] 127.0.0.1:39572 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:56:11 2026] 127.0.0.1:39572 Closing
+[Sat Oct 31 15:56:11 2026] 127.0.0.1:39582 Accepted
+[Sat Oct 31 15:56:12 2026] 127.0.0.1:39582 [200]: GET /api.php?r=strategy%2Fpresets
+[Sat Oct 31 15:56:12 2026] 127.0.0.1:39582 Closing
+[Sat Oct 31 15:56:12 2026] 127.0.0.1:39594 Accepted
+[Sat Oct 31 15:56:12 2026] 127.0.0.1:39594 [200]: POST /api.php?r=sheet
+[Sat Oct 31 15:56:12 2026] 127.0.0.1:39594 Closing
+[Sat Oct 31 15:56:13 2026] 127.0.0.1:39600 Accepted
+[Sat Oct 31 15:56:13 2026] 127.0.0.1:39600 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:56:13 2026] 127.0.0.1:39600 Closing
+[Sat Oct 31 15:56:13 2026] 127.0.0.1:39608 Accepted
+[Sat Oct 31 15:56:13 2026] 127.0.0.1:39608 [200]: GET /titre.html?id=1001
+[Sat Oct 31 15:56:13 2026] 127.0.0.1:39608 Closing
+[Sat Oct 31 15:56:13 2026] 127.0.0.1:39612 Accepted
+[Sat Oct 31 15:56:13 2026] 127.0.0.1:39628 Accepted
+[Sat Oct 31 15:56:13 2026] 127.0.0.1:39630 Accepted
+[Sat Oct 31 15:56:13 2026] 127.0.0.1:39636 Accepted
+[Sat Oct 31 15:56:13 2026] 127.0.0.1:39648 Accepted
+[Sat Oct 31 15:56:13 2026] 127.0.0.1:39612 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:56:13 2026] 127.0.0.1:39612 Closing
+[Sat Oct 31 15:56:13 2026] 127.0.0.1:39654 Accepted
+[Sat Oct 31 15:56:13 2026] 127.0.0.1:39666 Accepted
+[Sat Oct 31 15:56:13 2026] 127.0.0.1:39628 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:56:13 2026] 127.0.0.1:39628 Closing
+[Sat Oct 31 15:56:13 2026] 127.0.0.1:39630 [200]: GET /assets/charts.js?v=202610301418
+[Sat Oct 31 15:56:13 2026] 127.0.0.1:39630 Closing
+[Sat Oct 31 15:56:13 2026] 127.0.0.1:39636 [200]: GET /assets/intraday.js?v=202610301418
+[Sat Oct 31 15:56:13 2026] 127.0.0.1:39636 Closing
+[Sat Oct 31 15:56:13 2026] 127.0.0.1:39648 [200]: GET /assets/tx.js?v=202610301418
+[Sat Oct 31 15:56:13 2026] 127.0.0.1:39654 [200]: GET /assets/etf.js?v=202610301418
+[Sat Oct 31 15:56:13 2026] 127.0.0.1:39648 Closing
+[Sat Oct 31 15:56:13 2026] 127.0.0.1:39666 [200]: GET /assets/titre.js?v=202610301418
+[Sat Oct 31 15:56:13 2026] 127.0.0.1:39654 Closing
+[Sat Oct 31 15:56:13 2026] 127.0.0.1:39666 Closing
+[Sat Oct 31 15:56:13 2026] 127.0.0.1:39680 Accepted
+[Sat Oct 31 15:56:13 2026] 127.0.0.1:39680 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:56:13 2026] 127.0.0.1:39680 Closing
+[Sat Oct 31 15:56:13 2026] 127.0.0.1:39694 Accepted
+[Sat Oct 31 15:56:13 2026] 127.0.0.1:39694 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:56:13 2026] 127.0.0.1:39694 Closing
+[Sat Oct 31 15:56:13 2026] 127.0.0.1:39708 Accepted
+[Sat Oct 31 15:56:13 2026] 127.0.0.1:39708 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:56:13 2026] 127.0.0.1:39708 Closing
+[Sat Oct 31 15:56:13 2026] 127.0.0.1:39714 Accepted
+[Sat Oct 31 15:56:13 2026] 127.0.0.1:39714 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:56:13 2026] 127.0.0.1:39714 Closing
+[Sat Oct 31 15:56:13 2026] 127.0.0.1:39724 Accepted
+[Sat Oct 31 15:56:13 2026] 127.0.0.1:39724 [200]: GET /api.php?r=strategy%2Fpresets
+[Sat Oct 31 15:56:13 2026] 127.0.0.1:39724 Closing
+[Sat Oct 31 15:56:13 2026] 127.0.0.1:39728 Accepted
+[Sat Oct 31 15:56:14 2026] 127.0.0.1:39728 [200]: POST /api.php?r=sheet
+[Sat Oct 31 15:56:14 2026] 127.0.0.1:39728 Closing
+[Sat Oct 31 15:56:14 2026] 127.0.0.1:39742 Accepted
+[Sat Oct 31 15:56:14 2026] 127.0.0.1:39742 [200]: GET /portefeuilles.html
+[Sat Oct 31 15:56:14 2026] 127.0.0.1:39742 Closing
+[Sat Oct 31 15:56:14 2026] 127.0.0.1:39754 Accepted
+[Sat Oct 31 15:56:14 2026] 127.0.0.1:39760 Accepted
+[Sat Oct 31 15:56:14 2026] 127.0.0.1:39772 Accepted
+[Sat Oct 31 15:56:14 2026] 127.0.0.1:39782 Accepted
+[Sat Oct 31 15:56:14 2026] 127.0.0.1:39796 Accepted
+[Sat Oct 31 15:56:14 2026] 127.0.0.1:39800 Accepted
+[Sat Oct 31 15:56:14 2026] 127.0.0.1:39754 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:56:14 2026] 127.0.0.1:39754 Closing
+[Sat Oct 31 15:56:14 2026] 127.0.0.1:39760 [200]: GET /assets/portefeuilles.js?v=202610301418
+[Sat Oct 31 15:56:14 2026] 127.0.0.1:39760 Closing
+[Sat Oct 31 15:56:14 2026] 127.0.0.1:39772 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:56:14 2026] 127.0.0.1:39772 Closing
+[Sat Oct 31 15:56:14 2026] 127.0.0.1:39782 [200]: GET /assets/charts.js?v=202610301418
+[Sat Oct 31 15:56:14 2026] 127.0.0.1:39796 [200]: GET /assets/tx.js?v=202610301418
+[Sat Oct 31 15:56:14 2026] 127.0.0.1:39782 Closing
+[Sat Oct 31 15:56:14 2026] 127.0.0.1:39796 Closing
+[Sat Oct 31 15:56:14 2026] 127.0.0.1:39800 [200]: GET /assets/etf.js?v=202610301418
+[Sat Oct 31 15:56:14 2026] 127.0.0.1:39800 Closing
+[Sat Oct 31 15:56:14 2026] 127.0.0.1:39816 Accepted
+[Sat Oct 31 15:56:14 2026] 127.0.0.1:39816 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:56:14 2026] 127.0.0.1:39816 Closing
+[Sat Oct 31 15:56:14 2026] 127.0.0.1:39826 Accepted
+[Sat Oct 31 15:56:14 2026] 127.0.0.1:39826 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:56:14 2026] 127.0.0.1:39826 Closing
+[Sat Oct 31 15:56:14 2026] 127.0.0.1:39832 Accepted
+[Sat Oct 31 15:56:14 2026] 127.0.0.1:39832 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:56:14 2026] 127.0.0.1:39832 Closing
+[Sat Oct 31 15:56:14 2026] 127.0.0.1:39836 Accepted
+[Sat Oct 31 15:56:14 2026] 127.0.0.1:39836 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:56:14 2026] 127.0.0.1:39836 Closing
+[Sat Oct 31 15:56:14 2026] 127.0.0.1:48830 Accepted
+[Sat Oct 31 15:56:14 2026] 127.0.0.1:48830 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:56:14 2026] 127.0.0.1:48830 Closing
+[Sat Oct 31 15:56:14 2026] 127.0.0.1:48846 Accepted
+[Sat Oct 31 15:56:15 2026] 127.0.0.1:48846 [200]: GET /api.php?r=portfolio&id=1
+[Sat Oct 31 15:56:15 2026] 127.0.0.1:48846 Closing
+[Sat Oct 31 15:56:15 2026] 127.0.0.1:48862 Accepted
+[Sat Oct 31 15:56:15 2026] 127.0.0.1:48862 [200]: GET /admin.html
+[Sat Oct 31 15:56:15 2026] 127.0.0.1:48862 Closing
+[Sat Oct 31 15:56:15 2026] 127.0.0.1:48876 Accepted
+[Sat Oct 31 15:56:15 2026] 127.0.0.1:48878 Accepted
+[Sat Oct 31 15:56:15 2026] 127.0.0.1:48890 Accepted
+[Sat Oct 31 15:56:15 2026] 127.0.0.1:48876 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:56:15 2026] 127.0.0.1:48878 [200]: GET /assets/admin.js?v=202610301418
+[Sat Oct 31 15:56:15 2026] 127.0.0.1:48890 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:56:15 2026] 127.0.0.1:48876 Closing
+[Sat Oct 31 15:56:15 2026] 127.0.0.1:48878 Closing
+[Sat Oct 31 15:56:15 2026] 127.0.0.1:48890 Closing
+[Sat Oct 31 15:56:15 2026] 127.0.0.1:48900 Accepted
+[Sat Oct 31 15:56:15 2026] 127.0.0.1:48900 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:56:15 2026] 127.0.0.1:48900 Closing
+[Sat Oct 31 15:56:15 2026] 127.0.0.1:48904 Accepted
+[Sat Oct 31 15:56:15 2026] 127.0.0.1:48904 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:56:15 2026] 127.0.0.1:48904 Closing
+[Sat Oct 31 15:56:15 2026] 127.0.0.1:48910 Accepted
+[Sat Oct 31 15:56:15 2026] 127.0.0.1:48910 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:56:15 2026] 127.0.0.1:48910 Closing
+[Sat Oct 31 15:56:15 2026] 127.0.0.1:48926 Accepted
+[Sat Oct 31 15:56:15 2026] 127.0.0.1:48926 [200]: GET /api.php?r=admin%2Ffdb
+[Sat Oct 31 15:56:15 2026] 127.0.0.1:48926 Closing
+[Sat Oct 31 15:56:15 2026] 127.0.0.1:48936 Accepted
+[Sat Oct 31 15:56:15 2026] 127.0.0.1:48936 [200]: GET /api.php?r=admin%2Fjobs&status=running
+[Sat Oct 31 15:56:15 2026] 127.0.0.1:48936 Closing
+[Sat Oct 31 15:56:16 2026] 127.0.0.1:48940 Accepted
+[Sat Oct 31 15:56:16 2026] 127.0.0.1:48940 [200]: GET /login.html
+[Sat Oct 31 15:56:16 2026] 127.0.0.1:48940 Closing
+[Sat Oct 31 15:56:16 2026] 127.0.0.1:48950 Accepted
+[Sat Oct 31 15:56:16 2026] 127.0.0.1:48950 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:56:16 2026] 127.0.0.1:48950 Closing
+[Sat Oct 31 15:56:16 2026] 127.0.0.1:48966 Accepted
+[Sat Oct 31 15:56:16 2026] 127.0.0.1:48972 Accepted
+[Sat Oct 31 15:56:16 2026] 127.0.0.1:48966 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:56:16 2026] 127.0.0.1:48986 Accepted
+[Sat Oct 31 15:56:16 2026] 127.0.0.1:48972 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:56:16 2026] 127.0.0.1:48986 [200]: GET /assets/auth-pages.js?v=202610301418
+[Sat Oct 31 15:56:16 2026] 127.0.0.1:48966 Closing
+[Sat Oct 31 15:56:16 2026] 127.0.0.1:48972 Closing
+[Sat Oct 31 15:56:16 2026] 127.0.0.1:48986 Closing
+[Sat Oct 31 15:56:16 2026] 127.0.0.1:48998 Accepted
+[Sat Oct 31 15:56:16 2026] 127.0.0.1:48998 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:56:16 2026] 127.0.0.1:48998 Closing
+[Sat Oct 31 15:56:17 2026] 127.0.0.1:49004 Accepted
+[Sat Oct 31 15:56:17 2026] 127.0.0.1:49004 [200]: POST /api.php?r=auth%2Flogin
+[Sat Oct 31 15:56:17 2026] 127.0.0.1:49004 Closing
+[Sat Oct 31 15:56:17 2026] 127.0.0.1:49012 Accepted
+[Sat Oct 31 15:56:17 2026] 127.0.0.1:49012 [200]: GET /index.html
+[Sat Oct 31 15:56:17 2026] 127.0.0.1:49012 Closing
+[Sat Oct 31 15:56:17 2026] 127.0.0.1:49022 Accepted
+[Sat Oct 31 15:56:17 2026] 127.0.0.1:49026 Accepted
+[Sat Oct 31 15:56:17 2026] 127.0.0.1:49032 Accepted
+[Sat Oct 31 15:56:17 2026] 127.0.0.1:49034 Accepted
+[Sat Oct 31 15:56:17 2026] 127.0.0.1:49050 Accepted
+[Sat Oct 31 15:56:17 2026] 127.0.0.1:49054 Accepted
+[Sat Oct 31 15:56:17 2026] 127.0.0.1:49022 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:56:17 2026] 127.0.0.1:49022 Closing
+[Sat Oct 31 15:56:17 2026] 127.0.0.1:49026 [200]: GET /assets/etf.js?v=202610301418
+[Sat Oct 31 15:56:17 2026] 127.0.0.1:49026 Closing
+[Sat Oct 31 15:56:17 2026] 127.0.0.1:49032 [200]: GET /assets/explorer-menu.js?v=202610301418
+[Sat Oct 31 15:56:17 2026] 127.0.0.1:49032 Closing
+[Sat Oct 31 15:56:17 2026] 127.0.0.1:49034 [200]: GET /assets/multiselect.js?v=202610301418
+[Sat Oct 31 15:56:17 2026] 127.0.0.1:49034 Closing
+[Sat Oct 31 15:56:17 2026] 127.0.0.1:49050 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:56:17 2026] 127.0.0.1:49050 Closing
+[Sat Oct 31 15:56:17 2026] 127.0.0.1:49054 [200]: GET /assets/explorer.js?v=202610301418
+[Sat Oct 31 15:56:17 2026] 127.0.0.1:49054 Closing
+[Sat Oct 31 15:56:17 2026] 127.0.0.1:49056 Accepted
+[Sat Oct 31 15:56:17 2026] 127.0.0.1:49056 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:56:17 2026] 127.0.0.1:49056 Closing
+[Sat Oct 31 15:56:17 2026] 127.0.0.1:49058 Accepted
+[Sat Oct 31 15:56:17 2026] 127.0.0.1:49058 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:56:17 2026] 127.0.0.1:49058 Closing
+[Sat Oct 31 15:56:17 2026] 127.0.0.1:49060 Accepted
+[Sat Oct 31 15:56:17 2026] 127.0.0.1:49060 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:56:17 2026] 127.0.0.1:49060 Closing
+[Sat Oct 31 15:56:17 2026] 127.0.0.1:49070 Accepted
+[Sat Oct 31 15:56:17 2026] 127.0.0.1:49082 Accepted
+[Sat Oct 31 15:56:17 2026] 127.0.0.1:49070 [200]: GET /api.php?r=strategy%2Fpresets
+[Sat Oct 31 15:56:17 2026] 127.0.0.1:49070 Closing
+[Sat Oct 31 15:56:17 2026] 127.0.0.1:49082 [200]: GET /api.php?r=data%2Foverview
+[Sat Oct 31 15:56:17 2026] 127.0.0.1:49082 Closing
+[Sat Oct 31 15:56:17 2026] 127.0.0.1:49084 Accepted
+[Sat Oct 31 15:56:17 2026] 127.0.0.1:49084 [200]: GET /api.php?r=searches
+[Sat Oct 31 15:56:17 2026] 127.0.0.1:49084 Closing
+[Sat Oct 31 15:56:17 2026] 127.0.0.1:49094 Accepted
+[Sat Oct 31 15:56:18 2026] 127.0.0.1:49094 [200]: POST /api.php?r=explore
+[Sat Oct 31 15:56:18 2026] 127.0.0.1:49094 Closing
+[Sat Oct 31 15:56:18 2026] 127.0.0.1:49110 Accepted
+[Sat Oct 31 15:56:18 2026] 127.0.0.1:49110 [200]: GET /titre.html?id=1
+[Sat Oct 31 15:56:18 2026] 127.0.0.1:49110 Closing
+[Sat Oct 31 15:56:18 2026] 127.0.0.1:49126 Accepted
+[Sat Oct 31 15:56:18 2026] 127.0.0.1:49140 Accepted
+[Sat Oct 31 15:56:18 2026] 127.0.0.1:49146 Accepted
+[Sat Oct 31 15:56:18 2026] 127.0.0.1:49152 Accepted
+[Sat Oct 31 15:56:18 2026] 127.0.0.1:49164 Accepted
+[Sat Oct 31 15:56:18 2026] 127.0.0.1:49172 Accepted
+[Sat Oct 31 15:56:18 2026] 127.0.0.1:49126 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:56:18 2026] 127.0.0.1:49126 Closing
+[Sat Oct 31 15:56:18 2026] 127.0.0.1:49140 [200]: GET /assets/charts.js?v=202610301418
+[Sat Oct 31 15:56:18 2026] 127.0.0.1:49140 Closing
+[Sat Oct 31 15:56:18 2026] 127.0.0.1:49174 Accepted
+[Sat Oct 31 15:56:18 2026] 127.0.0.1:49146 [200]: GET /assets/intraday.js?v=202610301418
+[Sat Oct 31 15:56:18 2026] 127.0.0.1:49152 [200]: GET /assets/tx.js?v=202610301418
+[Sat Oct 31 15:56:18 2026] 127.0.0.1:49164 [200]: GET /assets/titre.js?v=202610301418
+[Sat Oct 31 15:56:18 2026] 127.0.0.1:49172 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:56:18 2026] 127.0.0.1:49146 Closing
+[Sat Oct 31 15:56:18 2026] 127.0.0.1:49152 Closing
+[Sat Oct 31 15:56:18 2026] 127.0.0.1:49164 Closing
+[Sat Oct 31 15:56:18 2026] 127.0.0.1:49172 Closing
+[Sat Oct 31 15:56:18 2026] 127.0.0.1:49174 [200]: GET /assets/etf.js?v=202610301418
+[Sat Oct 31 15:56:18 2026] 127.0.0.1:49174 Closing
+[Sat Oct 31 15:56:18 2026] 127.0.0.1:49188 Accepted
+[Sat Oct 31 15:56:18 2026] 127.0.0.1:49188 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:56:18 2026] 127.0.0.1:49188 Closing
+[Sat Oct 31 15:56:18 2026] 127.0.0.1:49190 Accepted
+[Sat Oct 31 15:56:18 2026] 127.0.0.1:49190 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:56:18 2026] 127.0.0.1:49190 Closing
+[Sat Oct 31 15:56:18 2026] 127.0.0.1:49202 Accepted
+[Sat Oct 31 15:56:18 2026] 127.0.0.1:49202 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:56:18 2026] 127.0.0.1:49202 Closing
+[Sat Oct 31 15:56:18 2026] 127.0.0.1:49204 Accepted
+[Sat Oct 31 15:56:18 2026] 127.0.0.1:49204 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:56:18 2026] 127.0.0.1:49204 Closing
+[Sat Oct 31 15:56:18 2026] 127.0.0.1:49216 Accepted
+[Sat Oct 31 15:56:18 2026] 127.0.0.1:49216 [200]: GET /api.php?r=strategy%2Fpresets
+[Sat Oct 31 15:56:18 2026] 127.0.0.1:49216 Closing
+[Sat Oct 31 15:56:18 2026] 127.0.0.1:49232 Accepted
+[Sat Oct 31 15:56:19 2026] 127.0.0.1:49232 [200]: POST /api.php?r=sheet
+[Sat Oct 31 15:56:19 2026] 127.0.0.1:49232 Closing
+[Sat Oct 31 15:56:20 2026] 127.0.0.1:49248 Accepted
+[Sat Oct 31 15:56:20 2026] 127.0.0.1:49248 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:56:20 2026] 127.0.0.1:49248 Closing
+[Sat Oct 31 15:56:20 2026] 127.0.0.1:49256 Accepted
+[Sat Oct 31 15:56:20 2026] 127.0.0.1:49256 [200]: GET /titre.html?id=1001
+[Sat Oct 31 15:56:20 2026] 127.0.0.1:49256 Closing
+[Sat Oct 31 15:56:20 2026] 127.0.0.1:49262 Accepted
+[Sat Oct 31 15:56:20 2026] 127.0.0.1:49266 Accepted
+[Sat Oct 31 15:56:20 2026] 127.0.0.1:49280 Accepted
+[Sat Oct 31 15:56:20 2026] 127.0.0.1:49290 Accepted
+[Sat Oct 31 15:56:20 2026] 127.0.0.1:49304 Accepted
+[Sat Oct 31 15:56:20 2026] 127.0.0.1:49308 Accepted
+[Sat Oct 31 15:56:20 2026] 127.0.0.1:49262 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:56:20 2026] 127.0.0.1:49262 Closing
+[Sat Oct 31 15:56:20 2026] 127.0.0.1:49312 Accepted
+[Sat Oct 31 15:56:20 2026] 127.0.0.1:49266 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:56:20 2026] 127.0.0.1:49266 Closing
+[Sat Oct 31 15:56:20 2026] 127.0.0.1:49280 [200]: GET /assets/charts.js?v=202610301418
+[Sat Oct 31 15:56:20 2026] 127.0.0.1:49280 Closing
+[Sat Oct 31 15:56:20 2026] 127.0.0.1:49290 [200]: GET /assets/intraday.js?v=202610301418
+[Sat Oct 31 15:56:20 2026] 127.0.0.1:49290 Closing
+[Sat Oct 31 15:56:20 2026] 127.0.0.1:49304 [200]: GET /assets/tx.js?v=202610301418
+[Sat Oct 31 15:56:20 2026] 127.0.0.1:49304 Closing
+[Sat Oct 31 15:56:20 2026] 127.0.0.1:49308 [200]: GET /assets/etf.js?v=202610301418
+[Sat Oct 31 15:56:20 2026] 127.0.0.1:49308 Closing
+[Sat Oct 31 15:56:20 2026] 127.0.0.1:49312 [200]: GET /assets/titre.js?v=202610301418
+[Sat Oct 31 15:56:20 2026] 127.0.0.1:49312 Closing
+[Sat Oct 31 15:56:20 2026] 127.0.0.1:49320 Accepted
+[Sat Oct 31 15:56:20 2026] 127.0.0.1:49320 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:56:20 2026] 127.0.0.1:49320 Closing
+[Sat Oct 31 15:56:20 2026] 127.0.0.1:49322 Accepted
+[Sat Oct 31 15:56:20 2026] 127.0.0.1:49322 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:56:20 2026] 127.0.0.1:49322 Closing
+[Sat Oct 31 15:56:20 2026] 127.0.0.1:49330 Accepted
+[Sat Oct 31 15:56:20 2026] 127.0.0.1:49330 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:56:20 2026] 127.0.0.1:49330 Closing
+[Sat Oct 31 15:56:20 2026] 127.0.0.1:49344 Accepted
+[Sat Oct 31 15:56:20 2026] 127.0.0.1:49344 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:56:20 2026] 127.0.0.1:49344 Closing
+[Sat Oct 31 15:56:20 2026] 127.0.0.1:49354 Accepted
+[Sat Oct 31 15:56:20 2026] 127.0.0.1:49354 [200]: GET /api.php?r=strategy%2Fpresets
+[Sat Oct 31 15:56:20 2026] 127.0.0.1:49354 Closing
+[Sat Oct 31 15:56:20 2026] 127.0.0.1:49368 Accepted
+[Sat Oct 31 15:56:21 2026] 127.0.0.1:49368 [200]: POST /api.php?r=sheet
+[Sat Oct 31 15:56:21 2026] 127.0.0.1:49368 Closing
+[Sat Oct 31 15:56:21 2026] 127.0.0.1:49382 Accepted
+[Sat Oct 31 15:56:21 2026] 127.0.0.1:49382 [200]: GET /portefeuilles.html
+[Sat Oct 31 15:56:21 2026] 127.0.0.1:49382 Closing
+[Sat Oct 31 15:56:21 2026] 127.0.0.1:49390 Accepted
+[Sat Oct 31 15:56:21 2026] 127.0.0.1:49400 Accepted
+[Sat Oct 31 15:56:21 2026] 127.0.0.1:49412 Accepted
+[Sat Oct 31 15:56:21 2026] 127.0.0.1:49418 Accepted
+[Sat Oct 31 15:56:21 2026] 127.0.0.1:49432 Accepted
+[Sat Oct 31 15:56:21 2026] 127.0.0.1:49440 Accepted
+[Sat Oct 31 15:56:21 2026] 127.0.0.1:49390 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:56:21 2026] 127.0.0.1:49390 Closing
+[Sat Oct 31 15:56:21 2026] 127.0.0.1:49400 [200]: GET /assets/portefeuilles.js?v=202610301418
+[Sat Oct 31 15:56:21 2026] 127.0.0.1:49400 Closing
+[Sat Oct 31 15:56:21 2026] 127.0.0.1:49412 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:56:21 2026] 127.0.0.1:49412 Closing
+[Sat Oct 31 15:56:21 2026] 127.0.0.1:49418 [200]: GET /assets/charts.js?v=202610301418
+[Sat Oct 31 15:56:21 2026] 127.0.0.1:49418 Closing
+[Sat Oct 31 15:56:21 2026] 127.0.0.1:49432 [200]: GET /assets/tx.js?v=202610301418
+[Sat Oct 31 15:56:21 2026] 127.0.0.1:49432 Closing
+[Sat Oct 31 15:56:21 2026] 127.0.0.1:49440 [200]: GET /assets/etf.js?v=202610301418
+[Sat Oct 31 15:56:21 2026] 127.0.0.1:49440 Closing
+[Sat Oct 31 15:56:21 2026] 127.0.0.1:49446 Accepted
+[Sat Oct 31 15:56:21 2026] 127.0.0.1:49446 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:56:21 2026] 127.0.0.1:49446 Closing
+[Sat Oct 31 15:56:21 2026] 127.0.0.1:49456 Accepted
+[Sat Oct 31 15:56:21 2026] 127.0.0.1:49456 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:56:21 2026] 127.0.0.1:49456 Closing
+[Sat Oct 31 15:56:21 2026] 127.0.0.1:49470 Accepted
+[Sat Oct 31 15:56:21 2026] 127.0.0.1:49470 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:56:21 2026] 127.0.0.1:49470 Closing
+[Sat Oct 31 15:56:21 2026] 127.0.0.1:49480 Accepted
+[Sat Oct 31 15:56:21 2026] 127.0.0.1:49480 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:56:21 2026] 127.0.0.1:49480 Closing
+[Sat Oct 31 15:56:21 2026] 127.0.0.1:49496 Accepted
+[Sat Oct 31 15:56:21 2026] 127.0.0.1:49496 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:56:21 2026] 127.0.0.1:49496 Closing
+[Sat Oct 31 15:56:21 2026] 127.0.0.1:49502 Accepted
+[Sat Oct 31 15:56:22 2026] 127.0.0.1:49502 [200]: GET /api.php?r=portfolio&id=1
+[Sat Oct 31 15:56:22 2026] 127.0.0.1:49502 Closing
+[Sat Oct 31 15:56:22 2026] 127.0.0.1:49514 Accepted
+[Sat Oct 31 15:56:22 2026] 127.0.0.1:49514 [200]: GET /admin.html
+[Sat Oct 31 15:56:22 2026] 127.0.0.1:49514 Closing
+[Sat Oct 31 15:56:22 2026] 127.0.0.1:49524 Accepted
+[Sat Oct 31 15:56:22 2026] 127.0.0.1:49526 Accepted
+[Sat Oct 31 15:56:22 2026] 127.0.0.1:49532 Accepted
+[Sat Oct 31 15:56:22 2026] 127.0.0.1:49524 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:56:22 2026] 127.0.0.1:49526 [200]: GET /assets/admin.js?v=202610301418
+[Sat Oct 31 15:56:22 2026] 127.0.0.1:49532 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:56:22 2026] 127.0.0.1:49524 Closing
+[Sat Oct 31 15:56:22 2026] 127.0.0.1:49526 Closing
+[Sat Oct 31 15:56:22 2026] 127.0.0.1:49532 Closing
+[Sat Oct 31 15:56:22 2026] 127.0.0.1:49534 Accepted
+[Sat Oct 31 15:56:22 2026] 127.0.0.1:49534 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:56:22 2026] 127.0.0.1:49534 Closing
+[Sat Oct 31 15:56:22 2026] 127.0.0.1:49542 Accepted
+[Sat Oct 31 15:56:22 2026] 127.0.0.1:49542 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:56:22 2026] 127.0.0.1:49542 Closing
+[Sat Oct 31 15:56:22 2026] 127.0.0.1:49554 Accepted
+[Sat Oct 31 15:56:22 2026] 127.0.0.1:49554 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:56:22 2026] 127.0.0.1:49554 Closing
+[Sat Oct 31 15:56:22 2026] 127.0.0.1:49556 Accepted
+[Sat Oct 31 15:56:22 2026] 127.0.0.1:49556 [200]: GET /api.php?r=admin%2Ffdb
+[Sat Oct 31 15:56:22 2026] 127.0.0.1:49556 Closing
+[Sat Oct 31 15:56:22 2026] 127.0.0.1:49562 Accepted
+[Sat Oct 31 15:56:22 2026] 127.0.0.1:49562 [200]: GET /api.php?r=admin%2Fjobs&status=running
+[Sat Oct 31 15:56:22 2026] 127.0.0.1:49562 Closing
+[Sat Oct 31 15:56:23 2026] 127.0.0.1:49564 Accepted
+[Sat Oct 31 15:56:23 2026] 127.0.0.1:49564 [200]: GET /login.html
+[Sat Oct 31 15:56:23 2026] 127.0.0.1:49564 Closing
+[Sat Oct 31 15:56:23 2026] 127.0.0.1:49576 Accepted
+[Sat Oct 31 15:56:23 2026] 127.0.0.1:49576 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:56:23 2026] 127.0.0.1:49576 Closing
+[Sat Oct 31 15:56:23 2026] 127.0.0.1:49586 Accepted
+[Sat Oct 31 15:56:23 2026] 127.0.0.1:49596 Accepted
+[Sat Oct 31 15:56:23 2026] 127.0.0.1:49608 Accepted
+[Sat Oct 31 15:56:23 2026] 127.0.0.1:49586 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:56:23 2026] 127.0.0.1:49586 Closing
+[Sat Oct 31 15:56:23 2026] 127.0.0.1:49596 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:56:23 2026] 127.0.0.1:49596 Closing
+[Sat Oct 31 15:56:23 2026] 127.0.0.1:49608 [200]: GET /assets/auth-pages.js?v=202610301418
+[Sat Oct 31 15:56:23 2026] 127.0.0.1:49608 Closing
+[Sat Oct 31 15:56:23 2026] 127.0.0.1:49622 Accepted
+[Sat Oct 31 15:56:23 2026] 127.0.0.1:49622 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:56:23 2026] 127.0.0.1:49622 Closing
+[Sat Oct 31 15:56:24 2026] 127.0.0.1:49636 Accepted
+[Sat Oct 31 15:56:24 2026] 127.0.0.1:49636 [200]: POST /api.php?r=auth%2Flogin
+[Sat Oct 31 15:56:24 2026] 127.0.0.1:49636 Closing
+[Sat Oct 31 15:56:24 2026] 127.0.0.1:49640 Accepted
+[Sat Oct 31 15:56:24 2026] 127.0.0.1:49640 [200]: GET /index.html
+[Sat Oct 31 15:56:24 2026] 127.0.0.1:49640 Closing
+[Sat Oct 31 15:56:24 2026] 127.0.0.1:49644 Accepted
+[Sat Oct 31 15:56:24 2026] 127.0.0.1:49652 Accepted
+[Sat Oct 31 15:56:24 2026] 127.0.0.1:49654 Accepted
+[Sat Oct 31 15:56:24 2026] 127.0.0.1:49660 Accepted
+[Sat Oct 31 15:56:24 2026] 127.0.0.1:49670 Accepted
+[Sat Oct 31 15:56:24 2026] 127.0.0.1:49678 Accepted
+[Sat Oct 31 15:56:24 2026] 127.0.0.1:49644 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:56:24 2026] 127.0.0.1:49652 [200]: GET /assets/etf.js?v=202610301418
+[Sat Oct 31 15:56:24 2026] 127.0.0.1:49654 [200]: GET /assets/explorer-menu.js?v=202610301418
+[Sat Oct 31 15:56:24 2026] 127.0.0.1:49644 Closing
+[Sat Oct 31 15:56:24 2026] 127.0.0.1:49652 Closing
+[Sat Oct 31 15:56:24 2026] 127.0.0.1:49654 Closing
+[Sat Oct 31 15:56:24 2026] 127.0.0.1:49660 [200]: GET /assets/multiselect.js?v=202610301418
+[Sat Oct 31 15:56:24 2026] 127.0.0.1:49660 Closing
+[Sat Oct 31 15:56:24 2026] 127.0.0.1:49670 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:56:24 2026] 127.0.0.1:49670 Closing
+[Sat Oct 31 15:56:24 2026] 127.0.0.1:49678 [200]: GET /assets/explorer.js?v=202610301418
+[Sat Oct 31 15:56:24 2026] 127.0.0.1:49678 Closing
+[Sat Oct 31 15:56:24 2026] 127.0.0.1:49690 Accepted
+[Sat Oct 31 15:56:24 2026] 127.0.0.1:49690 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:56:24 2026] 127.0.0.1:49690 Closing
+[Sat Oct 31 15:56:24 2026] 127.0.0.1:49702 Accepted
+[Sat Oct 31 15:56:24 2026] 127.0.0.1:49702 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:56:24 2026] 127.0.0.1:49702 Closing
+[Sat Oct 31 15:56:24 2026] 127.0.0.1:49714 Accepted
+[Sat Oct 31 15:56:24 2026] 127.0.0.1:49726 Accepted
+[Sat Oct 31 15:56:24 2026] 127.0.0.1:49730 Accepted
+[Sat Oct 31 15:56:24 2026] 127.0.0.1:49714 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:56:24 2026] 127.0.0.1:49714 Closing
+[Sat Oct 31 15:56:24 2026] 127.0.0.1:49726 [200]: GET /api.php?r=strategy%2Fpresets
+[Sat Oct 31 15:56:24 2026] 127.0.0.1:49726 Closing
+[Sat Oct 31 15:56:24 2026] 127.0.0.1:49730 [200]: GET /api.php?r=data%2Foverview
+[Sat Oct 31 15:56:24 2026] 127.0.0.1:49730 Closing
+[Sat Oct 31 15:56:24 2026] 127.0.0.1:49742 Accepted
+[Sat Oct 31 15:56:24 2026] 127.0.0.1:49742 [200]: GET /api.php?r=searches
+[Sat Oct 31 15:56:24 2026] 127.0.0.1:49742 Closing
+[Sat Oct 31 15:56:24 2026] 127.0.0.1:49744 Accepted
+[Sat Oct 31 15:56:25 2026] 127.0.0.1:49744 [200]: POST /api.php?r=explore
+[Sat Oct 31 15:56:25 2026] 127.0.0.1:49744 Closing
+[Sat Oct 31 15:56:25 2026] 127.0.0.1:40996 Accepted
+[Sat Oct 31 15:56:25 2026] 127.0.0.1:40996 [200]: GET /titre.html?id=1
+[Sat Oct 31 15:56:25 2026] 127.0.0.1:40996 Closing
+[Sat Oct 31 15:56:25 2026] 127.0.0.1:41008 Accepted
+[Sat Oct 31 15:56:25 2026] 127.0.0.1:41024 Accepted
+[Sat Oct 31 15:56:25 2026] 127.0.0.1:41032 Accepted
+[Sat Oct 31 15:56:25 2026] 127.0.0.1:41040 Accepted
+[Sat Oct 31 15:56:25 2026] 127.0.0.1:41050 Accepted
+[Sat Oct 31 15:56:25 2026] 127.0.0.1:41060 Accepted
+[Sat Oct 31 15:56:25 2026] 127.0.0.1:41008 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:56:25 2026] 127.0.0.1:41008 Closing
+[Sat Oct 31 15:56:25 2026] 127.0.0.1:41024 [200]: GET /assets/charts.js?v=202610301418
+[Sat Oct 31 15:56:25 2026] 127.0.0.1:41024 Closing
+[Sat Oct 31 15:56:25 2026] 127.0.0.1:41068 Accepted
+[Sat Oct 31 15:56:25 2026] 127.0.0.1:41032 [200]: GET /assets/intraday.js?v=202610301418
+[Sat Oct 31 15:56:25 2026] 127.0.0.1:41040 [200]: GET /assets/tx.js?v=202610301418
+[Sat Oct 31 15:56:25 2026] 127.0.0.1:41032 Closing
+[Sat Oct 31 15:56:25 2026] 127.0.0.1:41040 Closing
+[Sat Oct 31 15:56:25 2026] 127.0.0.1:41050 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:56:25 2026] 127.0.0.1:41050 Closing
+[Sat Oct 31 15:56:25 2026] 127.0.0.1:41060 [200]: GET /assets/titre.js?v=202610301418
+[Sat Oct 31 15:56:25 2026] 127.0.0.1:41060 Closing
+[Sat Oct 31 15:56:25 2026] 127.0.0.1:41068 [200]: GET /assets/etf.js?v=202610301418
+[Sat Oct 31 15:56:25 2026] 127.0.0.1:41068 Closing
+[Sat Oct 31 15:56:25 2026] 127.0.0.1:41078 Accepted
+[Sat Oct 31 15:56:25 2026] 127.0.0.1:41078 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:56:25 2026] 127.0.0.1:41078 Closing
+[Sat Oct 31 15:56:25 2026] 127.0.0.1:41082 Accepted
+[Sat Oct 31 15:56:25 2026] 127.0.0.1:41082 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:56:25 2026] 127.0.0.1:41082 Closing
+[Sat Oct 31 15:56:25 2026] 127.0.0.1:41084 Accepted
+[Sat Oct 31 15:56:25 2026] 127.0.0.1:41084 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:56:25 2026] 127.0.0.1:41084 Closing
+[Sat Oct 31 15:56:25 2026] 127.0.0.1:41094 Accepted
+[Sat Oct 31 15:56:25 2026] 127.0.0.1:41094 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:56:25 2026] 127.0.0.1:41094 Closing
+[Sat Oct 31 15:56:25 2026] 127.0.0.1:41110 Accepted
+[Sat Oct 31 15:56:25 2026] 127.0.0.1:41110 [200]: GET /api.php?r=strategy%2Fpresets
+[Sat Oct 31 15:56:25 2026] 127.0.0.1:41110 Closing
+[Sat Oct 31 15:56:25 2026] 127.0.0.1:41124 Accepted
+[Sat Oct 31 15:56:26 2026] 127.0.0.1:41124 [200]: POST /api.php?r=sheet
+[Sat Oct 31 15:56:26 2026] 127.0.0.1:41124 Closing
+[Sat Oct 31 15:56:27 2026] 127.0.0.1:41126 Accepted
+[Sat Oct 31 15:56:27 2026] 127.0.0.1:41126 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:56:27 2026] 127.0.0.1:41126 Closing
+[Sat Oct 31 15:56:27 2026] 127.0.0.1:41130 Accepted
+[Sat Oct 31 15:56:27 2026] 127.0.0.1:41130 [200]: GET /titre.html?id=1001
+[Sat Oct 31 15:56:27 2026] 127.0.0.1:41130 Closing
+[Sat Oct 31 15:56:27 2026] 127.0.0.1:41136 Accepted
+[Sat Oct 31 15:56:27 2026] 127.0.0.1:41146 Accepted
+[Sat Oct 31 15:56:27 2026] 127.0.0.1:41150 Accepted
+[Sat Oct 31 15:56:27 2026] 127.0.0.1:41166 Accepted
+[Sat Oct 31 15:56:27 2026] 127.0.0.1:41182 Accepted
+[Sat Oct 31 15:56:27 2026] 127.0.0.1:41192 Accepted
+[Sat Oct 31 15:56:27 2026] 127.0.0.1:41136 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:56:27 2026] 127.0.0.1:41146 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:56:27 2026] 127.0.0.1:41136 Closing
+[Sat Oct 31 15:56:27 2026] 127.0.0.1:41150 [200]: GET /assets/charts.js?v=202610301418
+[Sat Oct 31 15:56:27 2026] 127.0.0.1:41146 Closing
+[Sat Oct 31 15:56:27 2026] 127.0.0.1:41150 Closing
+[Sat Oct 31 15:56:27 2026] 127.0.0.1:41206 Accepted
+[Sat Oct 31 15:56:27 2026] 127.0.0.1:41166 [200]: GET /assets/intraday.js?v=202610301418
+[Sat Oct 31 15:56:27 2026] 127.0.0.1:41182 [200]: GET /assets/tx.js?v=202610301418
+[Sat Oct 31 15:56:27 2026] 127.0.0.1:41166 Closing
+[Sat Oct 31 15:56:27 2026] 127.0.0.1:41182 Closing
+[Sat Oct 31 15:56:27 2026] 127.0.0.1:41192 [200]: GET /assets/etf.js?v=202610301418
+[Sat Oct 31 15:56:27 2026] 127.0.0.1:41192 Closing
+[Sat Oct 31 15:56:27 2026] 127.0.0.1:41206 [200]: GET /assets/titre.js?v=202610301418
+[Sat Oct 31 15:56:27 2026] 127.0.0.1:41206 Closing
+[Sat Oct 31 15:56:27 2026] 127.0.0.1:41212 Accepted
+[Sat Oct 31 15:56:27 2026] 127.0.0.1:41212 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:56:27 2026] 127.0.0.1:41212 Closing
+[Sat Oct 31 15:56:27 2026] 127.0.0.1:41218 Accepted
+[Sat Oct 31 15:56:27 2026] 127.0.0.1:41218 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:56:27 2026] 127.0.0.1:41218 Closing
+[Sat Oct 31 15:56:27 2026] 127.0.0.1:41226 Accepted
+[Sat Oct 31 15:56:27 2026] 127.0.0.1:41226 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:56:27 2026] 127.0.0.1:41226 Closing
+[Sat Oct 31 15:56:27 2026] 127.0.0.1:41232 Accepted
+[Sat Oct 31 15:56:27 2026] 127.0.0.1:41232 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:56:27 2026] 127.0.0.1:41232 Closing
+[Sat Oct 31 15:56:27 2026] 127.0.0.1:41248 Accepted
+[Sat Oct 31 15:56:27 2026] 127.0.0.1:41248 [200]: GET /api.php?r=strategy%2Fpresets
+[Sat Oct 31 15:56:27 2026] 127.0.0.1:41248 Closing
+[Sat Oct 31 15:56:27 2026] 127.0.0.1:41260 Accepted
+[Sat Oct 31 15:56:28 2026] 127.0.0.1:41260 [200]: POST /api.php?r=sheet
+[Sat Oct 31 15:56:28 2026] 127.0.0.1:41260 Closing
+[Sat Oct 31 15:56:28 2026] 127.0.0.1:41266 Accepted
+[Sat Oct 31 15:56:28 2026] 127.0.0.1:41266 [200]: GET /portefeuilles.html
+[Sat Oct 31 15:56:28 2026] 127.0.0.1:41266 Closing
+[Sat Oct 31 15:56:28 2026] 127.0.0.1:41268 Accepted
+[Sat Oct 31 15:56:28 2026] 127.0.0.1:41272 Accepted
+[Sat Oct 31 15:56:28 2026] 127.0.0.1:41276 Accepted
+[Sat Oct 31 15:56:28 2026] 127.0.0.1:41278 Accepted
+[Sat Oct 31 15:56:28 2026] 127.0.0.1:41288 Accepted
+[Sat Oct 31 15:56:28 2026] 127.0.0.1:41292 Accepted
+[Sat Oct 31 15:56:28 2026] 127.0.0.1:41268 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:56:28 2026] 127.0.0.1:41268 Closing
+[Sat Oct 31 15:56:28 2026] 127.0.0.1:41272 [200]: GET /assets/portefeuilles.js?v=202610301418
+[Sat Oct 31 15:56:28 2026] 127.0.0.1:41272 Closing
+[Sat Oct 31 15:56:28 2026] 127.0.0.1:41276 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:56:28 2026] 127.0.0.1:41278 [200]: GET /assets/charts.js?v=202610301418
+[Sat Oct 31 15:56:28 2026] 127.0.0.1:41288 [200]: GET /assets/tx.js?v=202610301418
+[Sat Oct 31 15:56:28 2026] 127.0.0.1:41292 [200]: GET /assets/etf.js?v=202610301418
+[Sat Oct 31 15:56:28 2026] 127.0.0.1:41276 Closing
+[Sat Oct 31 15:56:28 2026] 127.0.0.1:41278 Closing
+[Sat Oct 31 15:56:28 2026] 127.0.0.1:41288 Closing
+[Sat Oct 31 15:56:28 2026] 127.0.0.1:41292 Closing
+[Sat Oct 31 15:56:28 2026] 127.0.0.1:41296 Accepted
+[Sat Oct 31 15:56:28 2026] 127.0.0.1:41312 Accepted
+[Sat Oct 31 15:56:28 2026] 127.0.0.1:41296 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:56:28 2026] 127.0.0.1:41296 Closing
+[Sat Oct 31 15:56:28 2026] 127.0.0.1:41312 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:56:28 2026] 127.0.0.1:41312 Closing
+[Sat Oct 31 15:56:28 2026] 127.0.0.1:41318 Accepted
+[Sat Oct 31 15:56:28 2026] 127.0.0.1:41318 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:56:28 2026] 127.0.0.1:41318 Closing
+[Sat Oct 31 15:56:28 2026] 127.0.0.1:41332 Accepted
+[Sat Oct 31 15:56:28 2026] 127.0.0.1:41332 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:56:28 2026] 127.0.0.1:41332 Closing
+[Sat Oct 31 15:56:28 2026] 127.0.0.1:41334 Accepted
+[Sat Oct 31 15:56:28 2026] 127.0.0.1:41334 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:56:28 2026] 127.0.0.1:41334 Closing
+[Sat Oct 31 15:56:29 2026] 127.0.0.1:41348 Accepted
+[Sat Oct 31 15:56:29 2026] 127.0.0.1:41348 [200]: GET /api.php?r=portfolio&id=1
+[Sat Oct 31 15:56:29 2026] 127.0.0.1:41348 Closing
+[Sat Oct 31 15:56:29 2026] 127.0.0.1:41360 Accepted
+[Sat Oct 31 15:56:29 2026] 127.0.0.1:41360 [200]: GET /admin.html
+[Sat Oct 31 15:56:29 2026] 127.0.0.1:41360 Closing
+[Sat Oct 31 15:56:29 2026] 127.0.0.1:41370 Accepted
+[Sat Oct 31 15:56:29 2026] 127.0.0.1:41374 Accepted
+[Sat Oct 31 15:56:29 2026] 127.0.0.1:41388 Accepted
+[Sat Oct 31 15:56:29 2026] 127.0.0.1:41370 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:56:29 2026] 127.0.0.1:41374 [200]: GET /assets/admin.js?v=202610301418
+[Sat Oct 31 15:56:29 2026] 127.0.0.1:41370 Closing
+[Sat Oct 31 15:56:29 2026] 127.0.0.1:41374 Closing
+[Sat Oct 31 15:56:29 2026] 127.0.0.1:41388 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:56:29 2026] 127.0.0.1:41388 Closing
+[Sat Oct 31 15:56:29 2026] 127.0.0.1:41402 Accepted
+[Sat Oct 31 15:56:29 2026] 127.0.0.1:41402 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:56:29 2026] 127.0.0.1:41402 Closing
+[Sat Oct 31 15:56:29 2026] 127.0.0.1:41410 Accepted
+[Sat Oct 31 15:56:29 2026] 127.0.0.1:41410 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:56:29 2026] 127.0.0.1:41410 Closing
+[Sat Oct 31 15:56:29 2026] 127.0.0.1:41420 Accepted
+[Sat Oct 31 15:56:29 2026] 127.0.0.1:41420 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:56:29 2026] 127.0.0.1:41420 Closing
+[Sat Oct 31 15:56:29 2026] 127.0.0.1:41426 Accepted
+[Sat Oct 31 15:56:29 2026] 127.0.0.1:41426 [200]: GET /api.php?r=admin%2Ffdb
+[Sat Oct 31 15:56:29 2026] 127.0.0.1:41426 Closing
+[Sat Oct 31 15:56:29 2026] 127.0.0.1:41442 Accepted
+[Sat Oct 31 15:56:29 2026] 127.0.0.1:41442 [200]: GET /api.php?r=admin%2Fjobs&status=running
+[Sat Oct 31 15:56:29 2026] 127.0.0.1:41442 Closing
+[Sat Oct 31 15:56:31 2026] 127.0.0.1:41446 Accepted
+[Sat Oct 31 15:56:31 2026] 127.0.0.1:41446 [200]: GET /login.html
+[Sat Oct 31 15:56:31 2026] 127.0.0.1:41446 Closing
+[Sat Oct 31 15:56:31 2026] 127.0.0.1:41454 Accepted
+[Sat Oct 31 15:56:31 2026] 127.0.0.1:41454 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:56:31 2026] 127.0.0.1:41454 Closing
+[Sat Oct 31 15:56:31 2026] 127.0.0.1:41464 Accepted
+[Sat Oct 31 15:56:31 2026] 127.0.0.1:41476 Accepted
+[Sat Oct 31 15:56:31 2026] 127.0.0.1:41482 Accepted
+[Sat Oct 31 15:56:31 2026] 127.0.0.1:41464 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:56:31 2026] 127.0.0.1:41476 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:56:31 2026] 127.0.0.1:41482 [200]: GET /assets/auth-pages.js?v=202610301418
+[Sat Oct 31 15:56:31 2026] 127.0.0.1:41464 Closing
+[Sat Oct 31 15:56:31 2026] 127.0.0.1:41476 Closing
+[Sat Oct 31 15:56:31 2026] 127.0.0.1:41482 Closing
+[Sat Oct 31 15:56:31 2026] 127.0.0.1:41486 Accepted
+[Sat Oct 31 15:56:31 2026] 127.0.0.1:41486 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:56:31 2026] 127.0.0.1:41486 Closing
+[Sat Oct 31 15:56:31 2026] 127.0.0.1:41492 Accepted
+[Sat Oct 31 15:56:31 2026] 127.0.0.1:41492 [404]: GET /favicon.ico - No such file or directory
+[Sat Oct 31 15:56:31 2026] 127.0.0.1:41492 Closing
+[Sat Oct 31 15:56:32 2026] 127.0.0.1:41494 Accepted
+[Sat Oct 31 15:56:32 2026] 127.0.0.1:41494 [200]: POST /api.php?r=auth%2Flogin
+[Sat Oct 31 15:56:32 2026] 127.0.0.1:41494 Closing
+[Sat Oct 31 15:56:32 2026] 127.0.0.1:41498 Accepted
+[Sat Oct 31 15:56:32 2026] 127.0.0.1:41498 [200]: GET /index.html
+[Sat Oct 31 15:56:32 2026] 127.0.0.1:41498 Closing
+[Sat Oct 31 15:56:32 2026] 127.0.0.1:41506 Accepted
+[Sat Oct 31 15:56:32 2026] 127.0.0.1:41510 Accepted
+[Sat Oct 31 15:56:32 2026] 127.0.0.1:41514 Accepted
+[Sat Oct 31 15:56:32 2026] 127.0.0.1:41506 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:56:32 2026] 127.0.0.1:41506 Closing
+[Sat Oct 31 15:56:32 2026] 127.0.0.1:41510 [200]: GET /assets/etf.js?v=202610301418
+[Sat Oct 31 15:56:32 2026] 127.0.0.1:41510 Closing
+[Sat Oct 31 15:56:32 2026] 127.0.0.1:41514 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:56:32 2026] 127.0.0.1:41514 Closing
+[Sat Oct 31 15:56:32 2026] 127.0.0.1:41522 Accepted
+[Sat Oct 31 15:56:32 2026] 127.0.0.1:41538 Accepted
+[Sat Oct 31 15:56:32 2026] 127.0.0.1:41540 Accepted
+[Sat Oct 31 15:56:32 2026] 127.0.0.1:41522 [200]: GET /assets/explorer-menu.js?v=202610301418
+[Sat Oct 31 15:56:32 2026] 127.0.0.1:41538 [200]: GET /assets/multiselect.js?v=202610301418
+[Sat Oct 31 15:56:32 2026] 127.0.0.1:41540 [200]: GET /assets/explorer.js?v=202610301418
+[Sat Oct 31 15:56:32 2026] 127.0.0.1:41522 Closing
+[Sat Oct 31 15:56:32 2026] 127.0.0.1:41538 Closing
+[Sat Oct 31 15:56:32 2026] 127.0.0.1:41540 Closing
+[Sat Oct 31 15:56:32 2026] 127.0.0.1:41548 Accepted
+[Sat Oct 31 15:56:32 2026] 127.0.0.1:41548 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:56:32 2026] 127.0.0.1:41548 Closing
+[Sat Oct 31 15:56:32 2026] 127.0.0.1:41556 Accepted
+[Sat Oct 31 15:56:32 2026] 127.0.0.1:41556 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:56:32 2026] 127.0.0.1:41556 Closing
+[Sat Oct 31 15:56:32 2026] 127.0.0.1:41570 Accepted
+[Sat Oct 31 15:56:32 2026] 127.0.0.1:41572 Accepted
+[Sat Oct 31 15:56:32 2026] 127.0.0.1:41570 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:56:32 2026] 127.0.0.1:41570 Closing
+[Sat Oct 31 15:56:32 2026] 127.0.0.1:41578 Accepted
+[Sat Oct 31 15:56:32 2026] 127.0.0.1:41572 [200]: GET /api.php?r=strategy%2Fpresets
+[Sat Oct 31 15:56:32 2026] 127.0.0.1:41572 Closing
+[Sat Oct 31 15:56:32 2026] 127.0.0.1:41584 Accepted
+[Sat Oct 31 15:56:32 2026] 127.0.0.1:41578 [200]: GET /api.php?r=data%2Foverview
+[Sat Oct 31 15:56:32 2026] 127.0.0.1:41578 Closing
+[Sat Oct 31 15:56:32 2026] 127.0.0.1:41584 [200]: GET /index.html
+[Sat Oct 31 15:56:32 2026] 127.0.0.1:41584 Closing
+[Sat Oct 31 15:56:32 2026] 127.0.0.1:41596 Accepted
+[Sat Oct 31 15:56:32 2026] 127.0.0.1:41596 [200]: GET /api.php?r=searches
+[Sat Oct 31 15:56:32 2026] 127.0.0.1:41596 Closing
+[Sat Oct 31 15:56:32 2026] 127.0.0.1:41612 Accepted
+[Sat Oct 31 15:56:33 2026] 127.0.0.1:41612 [200]: POST /api.php?r=explore
+[Sat Oct 31 15:56:33 2026] 127.0.0.1:41612 Closing
+[Sat Oct 31 15:56:33 2026] 127.0.0.1:41620 Accepted
+[Sat Oct 31 15:56:33 2026] 127.0.0.1:41634 Accepted
+[Sat Oct 31 15:56:33 2026] 127.0.0.1:41620 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:56:33 2026] 127.0.0.1:41644 Accepted
+[Sat Oct 31 15:56:33 2026] 127.0.0.1:41634 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:56:33 2026] 127.0.0.1:41656 Accepted
+[Sat Oct 31 15:56:33 2026] 127.0.0.1:41644 [200]: GET /assets/etf.js?v=202610301418
+[Sat Oct 31 15:56:33 2026] 127.0.0.1:41672 Accepted
+[Sat Oct 31 15:56:33 2026] 127.0.0.1:41620 Closing
+[Sat Oct 31 15:56:33 2026] 127.0.0.1:41656 [200]: GET /assets/explorer-menu.js?v=202610301418
+[Sat Oct 31 15:56:33 2026] 127.0.0.1:41686 Accepted
+[Sat Oct 31 15:56:33 2026] 127.0.0.1:41634 Closing
+[Sat Oct 31 15:56:33 2026] 127.0.0.1:41672 [200]: GET /assets/multiselect.js?v=202610301418
+[Sat Oct 31 15:56:33 2026] 127.0.0.1:41686 [200]: GET /assets/explorer.js?v=202610301418
+[Sat Oct 31 15:56:33 2026] 127.0.0.1:41644 Closing
+[Sat Oct 31 15:56:33 2026] 127.0.0.1:41656 Closing
+[Sat Oct 31 15:56:33 2026] 127.0.0.1:41672 Closing
+[Sat Oct 31 15:56:33 2026] 127.0.0.1:41686 Closing
+[Sat Oct 31 15:56:33 2026] 127.0.0.1:41696 Accepted
+[Sat Oct 31 15:56:33 2026] 127.0.0.1:41696 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:56:33 2026] 127.0.0.1:41696 Closing
+[Sat Oct 31 15:56:33 2026] 127.0.0.1:41704 Accepted
+[Sat Oct 31 15:56:33 2026] 127.0.0.1:41704 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:56:33 2026] 127.0.0.1:41704 Closing
+[Sat Oct 31 15:56:33 2026] 127.0.0.1:41714 Accepted
+[Sat Oct 31 15:56:33 2026] 127.0.0.1:41718 Accepted
+[Sat Oct 31 15:56:33 2026] 127.0.0.1:41730 Accepted
+[Sat Oct 31 15:56:33 2026] 127.0.0.1:41714 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:56:33 2026] 127.0.0.1:41714 Closing
+[Sat Oct 31 15:56:33 2026] 127.0.0.1:41718 [200]: GET /api.php?r=strategy%2Fpresets
+[Sat Oct 31 15:56:33 2026] 127.0.0.1:41718 Closing
+[Sat Oct 31 15:56:33 2026] 127.0.0.1:41730 [200]: GET /api.php?r=data%2Foverview
+[Sat Oct 31 15:56:33 2026] 127.0.0.1:41730 Closing
+[Sat Oct 31 15:56:33 2026] 127.0.0.1:41740 Accepted
+[Sat Oct 31 15:56:33 2026] 127.0.0.1:41744 Accepted
+[Sat Oct 31 15:56:33 2026] 127.0.0.1:41740 [200]: GET /api.php?r=searches
+[Sat Oct 31 15:56:33 2026] 127.0.0.1:41740 Closing
+[Sat Oct 31 15:56:34 2026] 127.0.0.1:41744 [200]: POST /api.php?r=explore
+[Sat Oct 31 15:56:34 2026] 127.0.0.1:41744 Closing
+[Sat Oct 31 15:56:34 2026] 127.0.0.1:41756 Accepted
+[Sat Oct 31 15:56:35 2026] 127.0.0.1:41756 [200]: POST /api.php?r=explore
+[Sat Oct 31 15:56:35 2026] 127.0.0.1:41756 Closing
+[Sat Oct 31 15:56:35 2026] 127.0.0.1:48228 Accepted
+[Sat Oct 31 15:56:36 2026] 127.0.0.1:48228 [200]: POST /api.php?r=explore
+[Sat Oct 31 15:56:36 2026] 127.0.0.1:48228 Closing
+[Sat Oct 31 15:56:36 2026] 127.0.0.1:48240 Accepted
+[Sat Oct 31 15:56:37 2026] 127.0.0.1:48240 [200]: POST /api.php?r=explore
+[Sat Oct 31 15:56:37 2026] 127.0.0.1:48240 Closing
+[Sat Oct 31 15:56:37 2026] 127.0.0.1:48252 Accepted
+[Sat Oct 31 15:56:37 2026] 127.0.0.1:48252 [200]: GET /index.html
+[Sat Oct 31 15:56:37 2026] 127.0.0.1:48252 Closing
+[Sat Oct 31 15:56:37 2026] 127.0.0.1:48266 Accepted
+[Sat Oct 31 15:56:37 2026] 127.0.0.1:48276 Accepted
+[Sat Oct 31 15:56:37 2026] 127.0.0.1:48292 Accepted
+[Sat Oct 31 15:56:37 2026] 127.0.0.1:48294 Accepted
+[Sat Oct 31 15:56:37 2026] 127.0.0.1:48306 Accepted
+[Sat Oct 31 15:56:37 2026] 127.0.0.1:48266 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:56:37 2026] 127.0.0.1:48276 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:56:37 2026] 127.0.0.1:48292 [200]: GET /assets/etf.js?v=202610301418
+[Sat Oct 31 15:56:37 2026] 127.0.0.1:48294 [200]: GET /assets/explorer-menu.js?v=202610301418
+[Sat Oct 31 15:56:37 2026] 127.0.0.1:48322 Accepted
+[Sat Oct 31 15:56:37 2026] 127.0.0.1:48266 Closing
+[Sat Oct 31 15:56:37 2026] 127.0.0.1:48276 Closing
+[Sat Oct 31 15:56:37 2026] 127.0.0.1:48292 Closing
+[Sat Oct 31 15:56:37 2026] 127.0.0.1:48294 Closing
+[Sat Oct 31 15:56:37 2026] 127.0.0.1:48306 [200]: GET /assets/multiselect.js?v=202610301418
+[Sat Oct 31 15:56:37 2026] 127.0.0.1:48306 Closing
+[Sat Oct 31 15:56:37 2026] 127.0.0.1:48322 [200]: GET /assets/explorer.js?v=202610301418
+[Sat Oct 31 15:56:37 2026] 127.0.0.1:48322 Closing
+[Sat Oct 31 15:56:37 2026] 127.0.0.1:48332 Accepted
+[Sat Oct 31 15:56:37 2026] 127.0.0.1:48332 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:56:37 2026] 127.0.0.1:48332 Closing
+[Sat Oct 31 15:56:37 2026] 127.0.0.1:48340 Accepted
+[Sat Oct 31 15:56:37 2026] 127.0.0.1:48340 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:56:37 2026] 127.0.0.1:48340 Closing
+[Sat Oct 31 15:56:37 2026] 127.0.0.1:48344 Accepted
+[Sat Oct 31 15:56:37 2026] 127.0.0.1:48358 Accepted
+[Sat Oct 31 15:56:37 2026] 127.0.0.1:48360 Accepted
+[Sat Oct 31 15:56:37 2026] 127.0.0.1:48344 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:56:37 2026] 127.0.0.1:48344 Closing
+[Sat Oct 31 15:56:37 2026] 127.0.0.1:48358 [200]: GET /api.php?r=strategy%2Fpresets
+[Sat Oct 31 15:56:37 2026] 127.0.0.1:48358 Closing
+[Sat Oct 31 15:56:38 2026] 127.0.0.1:48360 [200]: GET /api.php?r=data%2Foverview
+[Sat Oct 31 15:56:38 2026] 127.0.0.1:48360 Closing
+[Sat Oct 31 15:56:38 2026] 127.0.0.1:48366 Accepted
+[Sat Oct 31 15:56:38 2026] 127.0.0.1:48370 Accepted
+[Sat Oct 31 15:56:38 2026] 127.0.0.1:48366 [200]: GET /api.php?r=searches
+[Sat Oct 31 15:56:38 2026] 127.0.0.1:48366 Closing
+[Sat Oct 31 15:56:39 2026] 127.0.0.1:48370 [200]: POST /api.php?r=explore
+[Sat Oct 31 15:56:39 2026] 127.0.0.1:48370 Closing
+[Sat Oct 31 15:56:39 2026] 127.0.0.1:48382 Accepted
+[Sat Oct 31 15:56:40 2026] 127.0.0.1:48382 [200]: POST /api.php?r=explore
+[Sat Oct 31 15:56:40 2026] 127.0.0.1:48382 Closing
+[Sat Oct 31 15:56:40 2026] 127.0.0.1:48390 Accepted
+[Sat Oct 31 15:56:40 2026] 127.0.0.1:48404 Accepted
+[Sat Oct 31 15:56:40 2026] 127.0.0.1:48390 [200]: POST /api.php?r=explore
+[Sat Oct 31 15:56:40 2026] 127.0.0.1:48390 Closing
+[Sat Oct 31 15:56:40 2026] 127.0.0.1:48404 [200]: GET /index.html
+[Sat Oct 31 15:56:40 2026] 127.0.0.1:48404 Closing
+[Sat Oct 31 15:56:41 2026] 127.0.0.1:48408 Accepted
+[Sat Oct 31 15:56:41 2026] 127.0.0.1:48412 Accepted
+[Sat Oct 31 15:56:41 2026] 127.0.0.1:48408 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:56:41 2026] 127.0.0.1:48412 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:56:41 2026] 127.0.0.1:48408 Closing
+[Sat Oct 31 15:56:41 2026] 127.0.0.1:48412 Closing
+[Sat Oct 31 15:56:41 2026] 127.0.0.1:48414 Accepted
+[Sat Oct 31 15:56:41 2026] 127.0.0.1:48428 Accepted
+[Sat Oct 31 15:56:41 2026] 127.0.0.1:48436 Accepted
+[Sat Oct 31 15:56:41 2026] 127.0.0.1:48450 Accepted
+[Sat Oct 31 15:56:41 2026] 127.0.0.1:48414 [200]: GET /assets/etf.js?v=202610301418
+[Sat Oct 31 15:56:41 2026] 127.0.0.1:48414 Closing
+[Sat Oct 31 15:56:41 2026] 127.0.0.1:48428 [200]: GET /assets/explorer-menu.js?v=202610301418
+[Sat Oct 31 15:56:41 2026] 127.0.0.1:48428 Closing
+[Sat Oct 31 15:56:41 2026] 127.0.0.1:48436 [200]: GET /assets/multiselect.js?v=202610301418
+[Sat Oct 31 15:56:41 2026] 127.0.0.1:48436 Closing
+[Sat Oct 31 15:56:41 2026] 127.0.0.1:48450 [200]: GET /assets/explorer.js?v=202610301418
+[Sat Oct 31 15:56:41 2026] 127.0.0.1:48450 Closing
+[Sat Oct 31 15:56:41 2026] 127.0.0.1:48460 Accepted
+[Sat Oct 31 15:56:41 2026] 127.0.0.1:48460 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:56:41 2026] 127.0.0.1:48460 Closing
+[Sat Oct 31 15:56:41 2026] 127.0.0.1:48464 Accepted
+[Sat Oct 31 15:56:41 2026] 127.0.0.1:48464 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:56:41 2026] 127.0.0.1:48464 Closing
+[Sat Oct 31 15:56:41 2026] 127.0.0.1:48478 Accepted
+[Sat Oct 31 15:56:41 2026] 127.0.0.1:48490 Accepted
+[Sat Oct 31 15:56:41 2026] 127.0.0.1:48478 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:56:41 2026] 127.0.0.1:48478 Closing
+[Sat Oct 31 15:56:41 2026] 127.0.0.1:48494 Accepted
+[Sat Oct 31 15:56:41 2026] 127.0.0.1:48490 [200]: GET /api.php?r=strategy%2Fpresets
+[Sat Oct 31 15:56:41 2026] 127.0.0.1:48490 Closing
+[Sat Oct 31 15:56:41 2026] 127.0.0.1:48494 [200]: GET /api.php?r=data%2Foverview
+[Sat Oct 31 15:56:41 2026] 127.0.0.1:48494 Closing
+[Sat Oct 31 15:56:41 2026] 127.0.0.1:48496 Accepted
+[Sat Oct 31 15:56:41 2026] 127.0.0.1:48502 Accepted
+[Sat Oct 31 15:56:41 2026] 127.0.0.1:48496 [200]: GET /api.php?r=searches
+[Sat Oct 31 15:56:41 2026] 127.0.0.1:48496 Closing
+[Sat Oct 31 15:56:42 2026] 127.0.0.1:48502 [200]: POST /api.php?r=explore
+[Sat Oct 31 15:56:42 2026] 127.0.0.1:48502 Closing
+[Sat Oct 31 15:56:42 2026] 127.0.0.1:48514 Accepted
+[Sat Oct 31 15:56:43 2026] 127.0.0.1:48514 [200]: POST /api.php?r=explore
+[Sat Oct 31 15:56:43 2026] 127.0.0.1:48514 Closing
+[Sat Oct 31 15:56:43 2026] 127.0.0.1:48528 Accepted
+[Sat Oct 31 15:56:43 2026] 127.0.0.1:48528 [200]: GET /titre.html?id=3
+[Sat Oct 31 15:56:43 2026] 127.0.0.1:48528 Closing
+[Sat Oct 31 15:56:43 2026] 127.0.0.1:48538 Accepted
+[Sat Oct 31 15:56:43 2026] 127.0.0.1:48546 Accepted
+[Sat Oct 31 15:56:43 2026] 127.0.0.1:48550 Accepted
+[Sat Oct 31 15:56:43 2026] 127.0.0.1:48562 Accepted
+[Sat Oct 31 15:56:43 2026] 127.0.0.1:48570 Accepted
+[Sat Oct 31 15:56:43 2026] 127.0.0.1:48538 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:56:43 2026] 127.0.0.1:48546 [200]: GET /assets/charts.js?v=202610301418
+[Sat Oct 31 15:56:43 2026] 127.0.0.1:48550 [200]: GET /assets/intraday.js?v=202610301418
+[Sat Oct 31 15:56:43 2026] 127.0.0.1:48562 [200]: GET /assets/tx.js?v=202610301418
+[Sat Oct 31 15:56:43 2026] 127.0.0.1:48570 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:56:43 2026] 127.0.0.1:48538 Closing
+[Sat Oct 31 15:56:43 2026] 127.0.0.1:48546 Closing
+[Sat Oct 31 15:56:43 2026] 127.0.0.1:48550 Closing
+[Sat Oct 31 15:56:43 2026] 127.0.0.1:48562 Closing
+[Sat Oct 31 15:56:43 2026] 127.0.0.1:48570 Closing
+[Sat Oct 31 15:56:43 2026] 127.0.0.1:48578 Accepted
+[Sat Oct 31 15:56:43 2026] 127.0.0.1:48582 Accepted
+[Sat Oct 31 15:56:43 2026] 127.0.0.1:48578 [200]: GET /assets/titre.js?v=202610301418
+[Sat Oct 31 15:56:43 2026] 127.0.0.1:48578 Closing
+[Sat Oct 31 15:56:43 2026] 127.0.0.1:48582 [200]: GET /assets/etf.js?v=202610301418
+[Sat Oct 31 15:56:43 2026] 127.0.0.1:48582 Closing
+[Sat Oct 31 15:56:43 2026] 127.0.0.1:48596 Accepted
+[Sat Oct 31 15:56:43 2026] 127.0.0.1:48596 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:56:43 2026] 127.0.0.1:48596 Closing
+[Sat Oct 31 15:56:43 2026] 127.0.0.1:48604 Accepted
+[Sat Oct 31 15:56:43 2026] 127.0.0.1:48604 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:56:43 2026] 127.0.0.1:48604 Closing
+[Sat Oct 31 15:56:43 2026] 127.0.0.1:48606 Accepted
+[Sat Oct 31 15:56:43 2026] 127.0.0.1:48606 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:56:43 2026] 127.0.0.1:48606 Closing
+[Sat Oct 31 15:56:43 2026] 127.0.0.1:48612 Accepted
+[Sat Oct 31 15:56:43 2026] 127.0.0.1:48612 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:56:43 2026] 127.0.0.1:48612 Closing
+[Sat Oct 31 15:56:43 2026] 127.0.0.1:48618 Accepted
+[Sat Oct 31 15:56:43 2026] 127.0.0.1:48618 [200]: GET /api.php?r=strategy%2Fpresets
+[Sat Oct 31 15:56:43 2026] 127.0.0.1:48618 Closing
+[Sat Oct 31 15:56:43 2026] 127.0.0.1:48630 Accepted
+[Sat Oct 31 15:56:44 2026] 127.0.0.1:48630 [200]: POST /api.php?r=sheet
+[Sat Oct 31 15:56:44 2026] 127.0.0.1:48630 Closing
+[Sat Oct 31 15:56:45 2026] 127.0.0.1:47146 Accepted
+[Sat Oct 31 15:56:45 2026] 127.0.0.1:47146 [200]: GET /titre.html?id=14
+[Sat Oct 31 15:56:45 2026] 127.0.0.1:47146 Closing
+[Sat Oct 31 15:56:45 2026] 127.0.0.1:47150 Accepted
+[Sat Oct 31 15:56:45 2026] 127.0.0.1:47158 Accepted
+[Sat Oct 31 15:56:45 2026] 127.0.0.1:47150 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:56:45 2026] 127.0.0.1:47168 Accepted
+[Sat Oct 31 15:56:45 2026] 127.0.0.1:47158 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:56:45 2026] 127.0.0.1:47178 Accepted
+[Sat Oct 31 15:56:45 2026] 127.0.0.1:47168 [200]: GET /assets/charts.js?v=202610301418
+[Sat Oct 31 15:56:45 2026] 127.0.0.1:47184 Accepted
+[Sat Oct 31 15:56:45 2026] 127.0.0.1:47150 Closing
+[Sat Oct 31 15:56:45 2026] 127.0.0.1:47178 [200]: GET /assets/intraday.js?v=202610301418
+[Sat Oct 31 15:56:45 2026] 127.0.0.1:47188 Accepted
+[Sat Oct 31 15:56:45 2026] 127.0.0.1:47158 Closing
+[Sat Oct 31 15:56:45 2026] 127.0.0.1:47184 [200]: GET /assets/tx.js?v=202610301418
+[Sat Oct 31 15:56:45 2026] 127.0.0.1:47188 [200]: GET /assets/etf.js?v=202610301418
+[Sat Oct 31 15:56:45 2026] 127.0.0.1:47168 Closing
+[Sat Oct 31 15:56:45 2026] 127.0.0.1:47178 Closing
+[Sat Oct 31 15:56:45 2026] 127.0.0.1:47184 Closing
+[Sat Oct 31 15:56:45 2026] 127.0.0.1:47188 Closing
+[Sat Oct 31 15:56:45 2026] 127.0.0.1:47200 Accepted
+[Sat Oct 31 15:56:45 2026] 127.0.0.1:47200 [200]: GET /assets/titre.js?v=202610301418
+[Sat Oct 31 15:56:45 2026] 127.0.0.1:47200 Closing
+[Sat Oct 31 15:56:45 2026] 127.0.0.1:47212 Accepted
+[Sat Oct 31 15:56:45 2026] 127.0.0.1:47212 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:56:45 2026] 127.0.0.1:47212 Closing
+[Sat Oct 31 15:56:45 2026] 127.0.0.1:47222 Accepted
+[Sat Oct 31 15:56:45 2026] 127.0.0.1:47222 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:56:45 2026] 127.0.0.1:47222 Closing
+[Sat Oct 31 15:56:45 2026] 127.0.0.1:47236 Accepted
+[Sat Oct 31 15:56:45 2026] 127.0.0.1:47236 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:56:45 2026] 127.0.0.1:47236 Closing
+[Sat Oct 31 15:56:45 2026] 127.0.0.1:47244 Accepted
+[Sat Oct 31 15:56:45 2026] 127.0.0.1:47244 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:56:45 2026] 127.0.0.1:47244 Closing
+[Sat Oct 31 15:56:45 2026] 127.0.0.1:47248 Accepted
+[Sat Oct 31 15:56:45 2026] 127.0.0.1:47248 [200]: GET /api.php?r=strategy%2Fpresets
+[Sat Oct 31 15:56:45 2026] 127.0.0.1:47248 Closing
+[Sat Oct 31 15:56:45 2026] 127.0.0.1:47264 Accepted
+[Sat Oct 31 15:56:46 2026] 127.0.0.1:47264 [200]: POST /api.php?r=sheet
+[Sat Oct 31 15:56:46 2026] 127.0.0.1:47264 Closing
+[Sat Oct 31 15:56:47 2026] 127.0.0.1:47270 Accepted
+[Sat Oct 31 15:56:47 2026] 127.0.0.1:47270 [200]: GET /titre.html?id=9
+[Sat Oct 31 15:56:47 2026] 127.0.0.1:47270 Closing
+[Sat Oct 31 15:56:47 2026] 127.0.0.1:47284 Accepted
+[Sat Oct 31 15:56:47 2026] 127.0.0.1:47294 Accepted
+[Sat Oct 31 15:56:47 2026] 127.0.0.1:47304 Accepted
+[Sat Oct 31 15:56:47 2026] 127.0.0.1:47318 Accepted
+[Sat Oct 31 15:56:47 2026] 127.0.0.1:47320 Accepted
+[Sat Oct 31 15:56:47 2026] 127.0.0.1:47336 Accepted
+[Sat Oct 31 15:56:47 2026] 127.0.0.1:47284 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:56:47 2026] 127.0.0.1:47294 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:56:47 2026] 127.0.0.1:47284 Closing
+[Sat Oct 31 15:56:47 2026] 127.0.0.1:47294 Closing
+[Sat Oct 31 15:56:47 2026] 127.0.0.1:47352 Accepted
+[Sat Oct 31 15:56:47 2026] 127.0.0.1:47304 [200]: GET /assets/charts.js?v=202610301418
+[Sat Oct 31 15:56:47 2026] 127.0.0.1:47304 Closing
+[Sat Oct 31 15:56:47 2026] 127.0.0.1:47318 [200]: GET /assets/intraday.js?v=202610301418
+[Sat Oct 31 15:56:47 2026] 127.0.0.1:47318 Closing
+[Sat Oct 31 15:56:47 2026] 127.0.0.1:47320 [200]: GET /assets/tx.js?v=202610301418
+[Sat Oct 31 15:56:47 2026] 127.0.0.1:47320 Closing
+[Sat Oct 31 15:56:47 2026] 127.0.0.1:47336 [200]: GET /assets/etf.js?v=202610301418
+[Sat Oct 31 15:56:47 2026] 127.0.0.1:47336 Closing
+[Sat Oct 31 15:56:47 2026] 127.0.0.1:47352 [200]: GET /assets/titre.js?v=202610301418
+[Sat Oct 31 15:56:47 2026] 127.0.0.1:47352 Closing
+[Sat Oct 31 15:56:47 2026] 127.0.0.1:47364 Accepted
+[Sat Oct 31 15:56:47 2026] 127.0.0.1:47378 Accepted
+[Sat Oct 31 15:56:47 2026] 127.0.0.1:47364 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:56:47 2026] 127.0.0.1:47364 Closing
+[Sat Oct 31 15:56:47 2026] 127.0.0.1:47378 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:56:47 2026] 127.0.0.1:47378 Closing
+[Sat Oct 31 15:56:47 2026] 127.0.0.1:47382 Accepted
+[Sat Oct 31 15:56:47 2026] 127.0.0.1:47382 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:56:47 2026] 127.0.0.1:47382 Closing
+[Sat Oct 31 15:56:47 2026] 127.0.0.1:47390 Accepted
+[Sat Oct 31 15:56:47 2026] 127.0.0.1:47390 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:56:47 2026] 127.0.0.1:47390 Closing
+[Sat Oct 31 15:56:47 2026] 127.0.0.1:47396 Accepted
+[Sat Oct 31 15:56:47 2026] 127.0.0.1:47396 [200]: GET /api.php?r=strategy%2Fpresets
+[Sat Oct 31 15:56:47 2026] 127.0.0.1:47396 Closing
+[Sat Oct 31 15:56:47 2026] 127.0.0.1:47402 Accepted
+[Sat Oct 31 15:56:48 2026] 127.0.0.1:47402 [200]: POST /api.php?r=sheet
+[Sat Oct 31 15:56:48 2026] 127.0.0.1:47402 Closing
+[Sat Oct 31 15:56:49 2026] 127.0.0.1:47414 Accepted
+[Sat Oct 31 15:56:49 2026] 127.0.0.1:47414 [200]: GET /titre.html?id=1004
+[Sat Oct 31 15:56:49 2026] 127.0.0.1:47414 Closing
+[Sat Oct 31 15:56:49 2026] 127.0.0.1:47430 Accepted
+[Sat Oct 31 15:56:49 2026] 127.0.0.1:47436 Accepted
+[Sat Oct 31 15:56:49 2026] 127.0.0.1:47444 Accepted
+[Sat Oct 31 15:56:49 2026] 127.0.0.1:47446 Accepted
+[Sat Oct 31 15:56:49 2026] 127.0.0.1:47458 Accepted
+[Sat Oct 31 15:56:49 2026] 127.0.0.1:47470 Accepted
+[Sat Oct 31 15:56:49 2026] 127.0.0.1:47430 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:56:49 2026] 127.0.0.1:47436 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:56:49 2026] 127.0.0.1:47430 Closing
+[Sat Oct 31 15:56:49 2026] 127.0.0.1:47444 [200]: GET /assets/charts.js?v=202610301418
+[Sat Oct 31 15:56:49 2026] 127.0.0.1:47436 Closing
+[Sat Oct 31 15:56:49 2026] 127.0.0.1:47444 Closing
+[Sat Oct 31 15:56:49 2026] 127.0.0.1:47478 Accepted
+[Sat Oct 31 15:56:49 2026] 127.0.0.1:47446 [200]: GET /assets/intraday.js?v=202610301418
+[Sat Oct 31 15:56:49 2026] 127.0.0.1:47458 [200]: GET /assets/tx.js?v=202610301418
+[Sat Oct 31 15:56:49 2026] 127.0.0.1:47446 Closing
+[Sat Oct 31 15:56:49 2026] 127.0.0.1:47458 Closing
+[Sat Oct 31 15:56:49 2026] 127.0.0.1:47470 [200]: GET /assets/etf.js?v=202610301418
+[Sat Oct 31 15:56:49 2026] 127.0.0.1:47470 Closing
+[Sat Oct 31 15:56:49 2026] 127.0.0.1:47478 [200]: GET /assets/titre.js?v=202610301418
+[Sat Oct 31 15:56:49 2026] 127.0.0.1:47478 Closing
+[Sat Oct 31 15:56:49 2026] 127.0.0.1:47490 Accepted
+[Sat Oct 31 15:56:49 2026] 127.0.0.1:47490 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:56:49 2026] 127.0.0.1:47490 Closing
+[Sat Oct 31 15:56:49 2026] 127.0.0.1:47494 Accepted
+[Sat Oct 31 15:56:49 2026] 127.0.0.1:47494 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:56:49 2026] 127.0.0.1:47494 Closing
+[Sat Oct 31 15:56:49 2026] 127.0.0.1:47500 Accepted
+[Sat Oct 31 15:56:49 2026] 127.0.0.1:47500 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:56:49 2026] 127.0.0.1:47500 Closing
+[Sat Oct 31 15:56:49 2026] 127.0.0.1:47514 Accepted
+[Sat Oct 31 15:56:49 2026] 127.0.0.1:47514 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:56:49 2026] 127.0.0.1:47514 Closing
+[Sat Oct 31 15:56:49 2026] 127.0.0.1:47520 Accepted
+[Sat Oct 31 15:56:49 2026] 127.0.0.1:47520 [200]: GET /api.php?r=strategy%2Fpresets
+[Sat Oct 31 15:56:49 2026] 127.0.0.1:47520 Closing
+[Sat Oct 31 15:56:49 2026] 127.0.0.1:47530 Accepted
+[Sat Oct 31 15:56:50 2026] 127.0.0.1:47530 [200]: POST /api.php?r=sheet
+[Sat Oct 31 15:56:50 2026] 127.0.0.1:47530 Closing
+[Sat Oct 31 15:56:51 2026] 127.0.0.1:47544 Accepted
+[Sat Oct 31 15:56:51 2026] 127.0.0.1:47544 [200]: GET /index.html
+[Sat Oct 31 15:56:51 2026] 127.0.0.1:47544 Closing
+[Sat Oct 31 15:56:51 2026] 127.0.0.1:47554 Accepted
+[Sat Oct 31 15:56:51 2026] 127.0.0.1:47568 Accepted
+[Sat Oct 31 15:56:51 2026] 127.0.0.1:47578 Accepted
+[Sat Oct 31 15:56:51 2026] 127.0.0.1:47594 Accepted
+[Sat Oct 31 15:56:51 2026] 127.0.0.1:47600 Accepted
+[Sat Oct 31 15:56:51 2026] 127.0.0.1:47554 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:56:51 2026] 127.0.0.1:47612 Accepted
+[Sat Oct 31 15:56:51 2026] 127.0.0.1:47554 Closing
+[Sat Oct 31 15:56:51 2026] 127.0.0.1:47568 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:56:51 2026] 127.0.0.1:47568 Closing
+[Sat Oct 31 15:56:51 2026] 127.0.0.1:47578 [200]: GET /assets/etf.js?v=202610301418
+[Sat Oct 31 15:56:51 2026] 127.0.0.1:47578 Closing
+[Sat Oct 31 15:56:51 2026] 127.0.0.1:47594 [200]: GET /assets/explorer-menu.js?v=202610301418
+[Sat Oct 31 15:56:51 2026] 127.0.0.1:47594 Closing
+[Sat Oct 31 15:56:51 2026] 127.0.0.1:47600 [200]: GET /assets/multiselect.js?v=202610301418
+[Sat Oct 31 15:56:51 2026] 127.0.0.1:47600 Closing
+[Sat Oct 31 15:56:51 2026] 127.0.0.1:47612 [200]: GET /assets/explorer.js?v=202610301418
+[Sat Oct 31 15:56:51 2026] 127.0.0.1:47612 Closing
+[Sat Oct 31 15:56:51 2026] 127.0.0.1:47618 Accepted
+[Sat Oct 31 15:56:51 2026] 127.0.0.1:47618 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:56:51 2026] 127.0.0.1:47618 Closing
+[Sat Oct 31 15:56:51 2026] 127.0.0.1:47632 Accepted
+[Sat Oct 31 15:56:51 2026] 127.0.0.1:47632 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:56:51 2026] 127.0.0.1:47632 Closing
+[Sat Oct 31 15:56:51 2026] 127.0.0.1:47638 Accepted
+[Sat Oct 31 15:56:51 2026] 127.0.0.1:47644 Accepted
+[Sat Oct 31 15:56:51 2026] 127.0.0.1:47648 Accepted
+[Sat Oct 31 15:56:51 2026] 127.0.0.1:47638 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:56:51 2026] 127.0.0.1:47638 Closing
+[Sat Oct 31 15:56:52 2026] 127.0.0.1:47644 [200]: GET /api.php?r=strategy%2Fpresets
+[Sat Oct 31 15:56:52 2026] 127.0.0.1:47644 Closing
+[Sat Oct 31 15:56:52 2026] 127.0.0.1:47648 [200]: GET /api.php?r=data%2Foverview
+[Sat Oct 31 15:56:52 2026] 127.0.0.1:47648 Closing
+[Sat Oct 31 15:56:52 2026] 127.0.0.1:47650 Accepted
+[Sat Oct 31 15:56:52 2026] 127.0.0.1:47650 [200]: GET /api.php?r=searches
+[Sat Oct 31 15:56:52 2026] 127.0.0.1:47650 Closing
+[Sat Oct 31 15:56:52 2026] 127.0.0.1:47666 Accepted
+[Sat Oct 31 15:56:53 2026] 127.0.0.1:47666 [200]: POST /api.php?r=explore
+[Sat Oct 31 15:56:53 2026] 127.0.0.1:47666 Closing
+[Sat Oct 31 15:56:53 2026] 127.0.0.1:47680 Accepted
+[Sat Oct 31 15:56:54 2026] 127.0.0.1:47680 [200]: POST /api.php?r=explore
+[Sat Oct 31 15:56:54 2026] 127.0.0.1:47680 Closing
+[Sat Oct 31 15:56:55 2026] 127.0.0.1:39330 Accepted
+[Sat Oct 31 15:56:55 2026] 127.0.0.1:39330 [200]: GET /login.html
+[Sat Oct 31 15:56:55 2026] 127.0.0.1:39330 Closing
+[Sat Oct 31 15:56:55 2026] 127.0.0.1:39332 Accepted
+[Sat Oct 31 15:56:55 2026] 127.0.0.1:39340 Accepted
+[Sat Oct 31 15:56:55 2026] 127.0.0.1:39352 Accepted
+[Sat Oct 31 15:56:55 2026] 127.0.0.1:39360 Accepted
+[Sat Oct 31 15:56:55 2026] 127.0.0.1:39332 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:56:55 2026] 127.0.0.1:39332 Closing
+[Sat Oct 31 15:56:55 2026] 127.0.0.1:39340 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:56:55 2026] 127.0.0.1:39340 Closing
+[Sat Oct 31 15:56:55 2026] 127.0.0.1:39352 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:56:55 2026] 127.0.0.1:39352 Closing
+[Sat Oct 31 15:56:55 2026] 127.0.0.1:39360 [200]: GET /assets/auth-pages.js?v=202610301418
+[Sat Oct 31 15:56:55 2026] 127.0.0.1:39360 Closing
+[Sat Oct 31 15:56:55 2026] 127.0.0.1:39370 Accepted
+[Sat Oct 31 15:56:55 2026] 127.0.0.1:39370 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:56:55 2026] 127.0.0.1:39370 Closing
+[Sat Oct 31 15:56:55 2026] 127.0.0.1:39386 Accepted
+[Sat Oct 31 15:56:55 2026] 127.0.0.1:39386 [404]: GET /favicon.ico - No such file or directory
+[Sat Oct 31 15:56:55 2026] 127.0.0.1:39386 Closing
+[Sat Oct 31 15:56:55 2026] 127.0.0.1:39398 Accepted
+[Sat Oct 31 15:56:55 2026] 127.0.0.1:39398 [200]: POST /api.php?r=auth%2Flogin
+[Sat Oct 31 15:56:55 2026] 127.0.0.1:39398 Closing
+[Sat Oct 31 15:56:55 2026] 127.0.0.1:39406 Accepted
+[Sat Oct 31 15:56:55 2026] 127.0.0.1:39406 [200]: GET /index.html
+[Sat Oct 31 15:56:55 2026] 127.0.0.1:39406 Closing
+[Sat Oct 31 15:56:55 2026] 127.0.0.1:39422 Accepted
+[Sat Oct 31 15:56:55 2026] 127.0.0.1:39424 Accepted
+[Sat Oct 31 15:56:55 2026] 127.0.0.1:39434 Accepted
+[Sat Oct 31 15:56:55 2026] 127.0.0.1:39438 Accepted
+[Sat Oct 31 15:56:55 2026] 127.0.0.1:39448 Accepted
+[Sat Oct 31 15:56:55 2026] 127.0.0.1:39464 Accepted
+[Sat Oct 31 15:56:55 2026] 127.0.0.1:39422 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:56:55 2026] 127.0.0.1:39422 Closing
+[Sat Oct 31 15:56:55 2026] 127.0.0.1:39424 [200]: GET /assets/etf.js?v=202610301418
+[Sat Oct 31 15:56:55 2026] 127.0.0.1:39434 [200]: GET /assets/explorer-menu.js?v=202610301418
+[Sat Oct 31 15:56:55 2026] 127.0.0.1:39424 Closing
+[Sat Oct 31 15:56:55 2026] 127.0.0.1:39438 [200]: GET /assets/multiselect.js?v=202610301418
+[Sat Oct 31 15:56:55 2026] 127.0.0.1:39434 Closing
+[Sat Oct 31 15:56:55 2026] 127.0.0.1:39438 Closing
+[Sat Oct 31 15:56:55 2026] 127.0.0.1:39448 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:56:55 2026] 127.0.0.1:39448 Closing
+[Sat Oct 31 15:56:55 2026] 127.0.0.1:39464 [200]: GET /assets/explorer.js?v=202610301418
+[Sat Oct 31 15:56:55 2026] 127.0.0.1:39464 Closing
+[Sat Oct 31 15:56:56 2026] 127.0.0.1:39468 Accepted
+[Sat Oct 31 15:56:56 2026] 127.0.0.1:39468 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:56:56 2026] 127.0.0.1:39468 Closing
+[Sat Oct 31 15:56:56 2026] 127.0.0.1:39470 Accepted
+[Sat Oct 31 15:56:56 2026] 127.0.0.1:39470 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:56:56 2026] 127.0.0.1:39470 Closing
+[Sat Oct 31 15:56:56 2026] 127.0.0.1:39482 Accepted
+[Sat Oct 31 15:56:56 2026] 127.0.0.1:39482 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:56:56 2026] 127.0.0.1:39482 Closing
+[Sat Oct 31 15:56:56 2026] 127.0.0.1:39496 Accepted
+[Sat Oct 31 15:56:56 2026] 127.0.0.1:39506 Accepted
+[Sat Oct 31 15:56:56 2026] 127.0.0.1:39496 [200]: GET /api.php?r=strategy%2Fpresets
+[Sat Oct 31 15:56:56 2026] 127.0.0.1:39496 Closing
+[Sat Oct 31 15:56:56 2026] 127.0.0.1:39510 Accepted
+[Sat Oct 31 15:56:56 2026] 127.0.0.1:39506 [200]: GET /api.php?r=data%2Foverview
+[Sat Oct 31 15:56:56 2026] 127.0.0.1:39506 Closing
+[Sat Oct 31 15:56:56 2026] 127.0.0.1:39510 [200]: GET /index.html
+[Sat Oct 31 15:56:56 2026] 127.0.0.1:39510 Closing
+[Sat Oct 31 15:56:56 2026] 127.0.0.1:39522 Accepted
+[Sat Oct 31 15:56:56 2026] 127.0.0.1:39536 Accepted
+[Sat Oct 31 15:56:56 2026] 127.0.0.1:39552 Accepted
+[Sat Oct 31 15:56:56 2026] 127.0.0.1:39558 Accepted
+[Sat Oct 31 15:56:56 2026] 127.0.0.1:39570 Accepted
+[Sat Oct 31 15:56:56 2026] 127.0.0.1:39522 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:56:56 2026] 127.0.0.1:39576 Accepted
+[Sat Oct 31 15:56:56 2026] 127.0.0.1:39522 Closing
+[Sat Oct 31 15:56:56 2026] 127.0.0.1:39536 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:56:56 2026] 127.0.0.1:39552 [200]: GET /assets/etf.js?v=202610301418
+[Sat Oct 31 15:56:56 2026] 127.0.0.1:39558 [200]: GET /assets/explorer-menu.js?v=202610301418
+[Sat Oct 31 15:56:56 2026] 127.0.0.1:39536 Closing
+[Sat Oct 31 15:56:56 2026] 127.0.0.1:39552 Closing
+[Sat Oct 31 15:56:56 2026] 127.0.0.1:39558 Closing
+[Sat Oct 31 15:56:56 2026] 127.0.0.1:39570 [200]: GET /assets/multiselect.js?v=202610301418
+[Sat Oct 31 15:56:56 2026] 127.0.0.1:39570 Closing
+[Sat Oct 31 15:56:56 2026] 127.0.0.1:39576 [200]: GET /assets/explorer.js?v=202610301418
+[Sat Oct 31 15:56:56 2026] 127.0.0.1:39576 Closing
+[Sat Oct 31 15:56:56 2026] 127.0.0.1:39582 Accepted
+[Sat Oct 31 15:56:56 2026] 127.0.0.1:39582 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:56:56 2026] 127.0.0.1:39582 Closing
+[Sat Oct 31 15:56:56 2026] 127.0.0.1:39596 Accepted
+[Sat Oct 31 15:56:56 2026] 127.0.0.1:39596 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:56:56 2026] 127.0.0.1:39596 Closing
+[Sat Oct 31 15:56:56 2026] 127.0.0.1:39610 Accepted
+[Sat Oct 31 15:56:56 2026] 127.0.0.1:39616 Accepted
+[Sat Oct 31 15:56:56 2026] 127.0.0.1:39624 Accepted
+[Sat Oct 31 15:56:56 2026] 127.0.0.1:39610 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:56:56 2026] 127.0.0.1:39610 Closing
+[Sat Oct 31 15:56:56 2026] 127.0.0.1:39616 [200]: GET /api.php?r=strategy%2Fpresets
+[Sat Oct 31 15:56:56 2026] 127.0.0.1:39616 Closing
+[Sat Oct 31 15:56:56 2026] 127.0.0.1:39624 [200]: GET /api.php?r=data%2Foverview
+[Sat Oct 31 15:56:56 2026] 127.0.0.1:39624 Closing
+[Sat Oct 31 15:56:56 2026] 127.0.0.1:39630 Accepted
+[Sat Oct 31 15:56:56 2026] 127.0.0.1:39630 [200]: GET /api.php?r=searches
+[Sat Oct 31 15:56:56 2026] 127.0.0.1:39630 Closing
+[Sat Oct 31 15:56:56 2026] 127.0.0.1:39636 Accepted
+[Sat Oct 31 15:56:57 2026] 127.0.0.1:39636 [200]: POST /api.php?r=explore
+[Sat Oct 31 15:56:57 2026] 127.0.0.1:39636 Closing
+[Sat Oct 31 15:56:58 2026] 127.0.0.1:39638 Accepted
+[Sat Oct 31 15:56:58 2026] 127.0.0.1:39652 Accepted
+[Sat Oct 31 15:56:58 2026] 127.0.0.1:39638 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:56:58 2026] 127.0.0.1:39638 Closing
+[Sat Oct 31 15:56:59 2026] 127.0.0.1:39652 [200]: POST /api.php?r=explore
+[Sat Oct 31 15:56:59 2026] 127.0.0.1:39652 Closing
+[Sat Oct 31 15:57:00 2026] 127.0.0.1:39664 Accepted
+[Sat Oct 31 15:57:01 2026] 127.0.0.1:39664 [200]: POST /api.php?r=explore
+[Sat Oct 31 15:57:01 2026] 127.0.0.1:39664 Closing
+[Sat Oct 31 15:57:02 2026] 127.0.0.1:39670 Accepted
+[Sat Oct 31 15:57:02 2026] 127.0.0.1:39670 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:57:02 2026] 127.0.0.1:39670 Closing
+[Sat Oct 31 15:57:02 2026] 127.0.0.1:39674 Accepted
+[Sat Oct 31 15:57:03 2026] 127.0.0.1:39674 [200]: POST /api.php?r=explore
+[Sat Oct 31 15:57:03 2026] 127.0.0.1:39674 Closing
+[Sat Oct 31 15:57:04 2026] 127.0.0.1:39678 Accepted
+[Sat Oct 31 15:57:05 2026] 127.0.0.1:39678 [200]: POST /api.php?r=explore
+[Sat Oct 31 15:57:05 2026] 127.0.0.1:39678 Closing
+[Sat Oct 31 15:57:08 2026] 127.0.0.1:55934 Accepted
+[Sat Oct 31 15:57:09 2026] 127.0.0.1:55934 [200]: POST /api.php?r=explore
+[Sat Oct 31 15:57:09 2026] 127.0.0.1:55934 Closing
+[Sat Oct 31 15:57:10 2026] 127.0.0.1:55938 Accepted
+[Sat Oct 31 15:57:10 2026] 127.0.0.1:55938 [200]: GET /index.html
+[Sat Oct 31 15:57:10 2026] 127.0.0.1:55938 Closing
+[Sat Oct 31 15:57:10 2026] 127.0.0.1:55952 Accepted
+[Sat Oct 31 15:57:10 2026] 127.0.0.1:55962 Accepted
+[Sat Oct 31 15:57:10 2026] 127.0.0.1:55952 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:57:10 2026] 127.0.0.1:55952 Closing
+[Sat Oct 31 15:57:10 2026] 127.0.0.1:55966 Accepted
+[Sat Oct 31 15:57:10 2026] 127.0.0.1:55976 Accepted
+[Sat Oct 31 15:57:10 2026] 127.0.0.1:55992 Accepted
+[Sat Oct 31 15:57:10 2026] 127.0.0.1:55994 Accepted
+[Sat Oct 31 15:57:10 2026] 127.0.0.1:55962 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:57:10 2026] 127.0.0.1:55966 [200]: GET /assets/etf.js?v=202610301418
+[Sat Oct 31 15:57:10 2026] 127.0.0.1:55962 Closing
+[Sat Oct 31 15:57:10 2026] 127.0.0.1:55976 [200]: GET /assets/explorer-menu.js?v=202610301418
+[Sat Oct 31 15:57:10 2026] 127.0.0.1:55966 Closing
+[Sat Oct 31 15:57:10 2026] 127.0.0.1:55976 Closing
+[Sat Oct 31 15:57:10 2026] 127.0.0.1:55992 [200]: GET /assets/multiselect.js?v=202610301418
+[Sat Oct 31 15:57:10 2026] 127.0.0.1:55992 Closing
+[Sat Oct 31 15:57:10 2026] 127.0.0.1:55994 [200]: GET /assets/explorer.js?v=202610301418
+[Sat Oct 31 15:57:10 2026] 127.0.0.1:55994 Closing
+[Sat Oct 31 15:57:10 2026] 127.0.0.1:55996 Accepted
+[Sat Oct 31 15:57:10 2026] 127.0.0.1:55996 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:57:10 2026] 127.0.0.1:55996 Closing
+[Sat Oct 31 15:57:10 2026] 127.0.0.1:55998 Accepted
+[Sat Oct 31 15:57:10 2026] 127.0.0.1:55998 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:57:10 2026] 127.0.0.1:55998 Closing
+[Sat Oct 31 15:57:10 2026] 127.0.0.1:56014 Accepted
+[Sat Oct 31 15:57:10 2026] 127.0.0.1:56024 Accepted
+[Sat Oct 31 15:57:10 2026] 127.0.0.1:56014 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:57:10 2026] 127.0.0.1:56014 Closing
+[Sat Oct 31 15:57:10 2026] 127.0.0.1:56038 Accepted
+[Sat Oct 31 15:57:10 2026] 127.0.0.1:56024 [200]: GET /api.php?r=strategy%2Fpresets
+[Sat Oct 31 15:57:10 2026] 127.0.0.1:56024 Closing
+[Sat Oct 31 15:57:10 2026] 127.0.0.1:56038 [200]: GET /api.php?r=data%2Foverview
+[Sat Oct 31 15:57:10 2026] 127.0.0.1:56038 Closing
+[Sat Oct 31 15:57:10 2026] 127.0.0.1:56044 Accepted
+[Sat Oct 31 15:57:10 2026] 127.0.0.1:56044 [200]: GET /api.php?r=searches
+[Sat Oct 31 15:57:10 2026] 127.0.0.1:56044 Closing
+[Sat Oct 31 15:57:10 2026] 127.0.0.1:56054 Accepted
+[Sat Oct 31 15:57:10 2026] 127.0.0.1:56054 [200]: POST /api.php?r=explore
+[Sat Oct 31 15:57:10 2026] 127.0.0.1:56054 Closing
+[Sat Oct 31 15:57:12 2026] 127.0.0.1:56070 Accepted
+[Sat Oct 31 15:57:12 2026] 127.0.0.1:56070 [200]: POST /api.php?r=explore
+[Sat Oct 31 15:57:12 2026] 127.0.0.1:56070 Closing
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:40922 Accepted
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:40922 [200]: GET /login.html
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:40922 Closing
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:40932 Accepted
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:40944 Accepted
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:40932 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:40932 Closing
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:40944 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:40944 Closing
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:40952 Accepted
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:40964 Accepted
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:40952 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:40964 [200]: GET /assets/auth-pages.js?v=202610301418
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:40952 Closing
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:40964 Closing
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:40976 Accepted
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:40976 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:40976 Closing
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:40980 Accepted
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:40980 [404]: GET /favicon.ico - No such file or directory
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:40980 Closing
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:40992 Accepted
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:40992 [200]: POST /api.php?r=auth%2Flogin
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:40992 Closing
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:41004 Accepted
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:41004 [200]: GET /index.html
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:41004 Closing
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:41008 Accepted
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:41022 Accepted
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:41008 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:41028 Accepted
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:41022 [200]: GET /assets/etf.js?v=202610301418
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:41032 Accepted
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:41028 [200]: GET /assets/explorer-menu.js?v=202610301418
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:41008 Closing
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:41032 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:41022 Closing
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:41028 Closing
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:41032 Closing
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:41034 Accepted
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:41048 Accepted
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:41034 [200]: GET /assets/multiselect.js?v=202610301418
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:41048 [200]: GET /assets/explorer.js?v=202610301418
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:41034 Closing
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:41048 Closing
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:41056 Accepted
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:41056 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:41056 Closing
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:41072 Accepted
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:41072 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:41072 Closing
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:41078 Accepted
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:41078 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:41078 Closing
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:41094 Accepted
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:41100 Accepted
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:41094 [200]: GET /api.php?r=strategy%2Fpresets
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:41094 Closing
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:41100 [200]: GET /api.php?r=data%2Foverview
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:41100 Closing
+[Sat Oct 31 15:57:15 2026] 127.0.0.1:41112 Accepted
+[Sat Oct 31 15:57:16 2026] 127.0.0.1:41112 [200]: GET /api.php?r=strategy%2Fpresets
+[Sat Oct 31 15:57:16 2026] 127.0.0.1:41112 Closing
+[Sat Oct 31 15:57:16 2026] 127.0.0.1:41128 Accepted
+[Sat Oct 31 15:57:16 2026] 127.0.0.1:41134 Accepted
+[Sat Oct 31 15:57:16 2026] 127.0.0.1:41128 [200]: GET /api.php?r=searches
+[Sat Oct 31 15:57:16 2026] 127.0.0.1:41128 Closing
+[Sat Oct 31 15:57:16 2026] 127.0.0.1:41134 [200]: POST /api.php?r=explore
+[Sat Oct 31 15:57:16 2026] 127.0.0.1:41134 Closing
+[Sat Oct 31 15:57:16 2026] 127.0.0.1:41150 Accepted
+[Sat Oct 31 15:57:16 2026] 127.0.0.1:41150 [200]: GET /index.html
+[Sat Oct 31 15:57:16 2026] 127.0.0.1:41150 Closing
+[Sat Oct 31 15:57:17 2026] 127.0.0.1:41154 Accepted
+[Sat Oct 31 15:57:17 2026] 127.0.0.1:41160 Accepted
+[Sat Oct 31 15:57:17 2026] 127.0.0.1:41172 Accepted
+[Sat Oct 31 15:57:17 2026] 127.0.0.1:41154 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:57:17 2026] 127.0.0.1:41154 Closing
+[Sat Oct 31 15:57:17 2026] 127.0.0.1:41160 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:57:17 2026] 127.0.0.1:41160 Closing
+[Sat Oct 31 15:57:17 2026] 127.0.0.1:41172 [200]: GET /assets/etf.js?v=202610301418
+[Sat Oct 31 15:57:17 2026] 127.0.0.1:41172 Closing
+[Sat Oct 31 15:57:17 2026] 127.0.0.1:41178 Accepted
+[Sat Oct 31 15:57:17 2026] 127.0.0.1:41180 Accepted
+[Sat Oct 31 15:57:17 2026] 127.0.0.1:41190 Accepted
+[Sat Oct 31 15:57:17 2026] 127.0.0.1:41178 [200]: GET /assets/explorer-menu.js?v=202610301418
+[Sat Oct 31 15:57:17 2026] 127.0.0.1:41178 Closing
+[Sat Oct 31 15:57:17 2026] 127.0.0.1:41180 [200]: GET /assets/multiselect.js?v=202610301418
+[Sat Oct 31 15:57:17 2026] 127.0.0.1:41180 Closing
+[Sat Oct 31 15:57:17 2026] 127.0.0.1:41190 [200]: GET /assets/explorer.js?v=202610301418
+[Sat Oct 31 15:57:17 2026] 127.0.0.1:41190 Closing
+[Sat Oct 31 15:57:17 2026] 127.0.0.1:41202 Accepted
+[Sat Oct 31 15:57:17 2026] 127.0.0.1:41202 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:57:17 2026] 127.0.0.1:41202 Closing
+[Sat Oct 31 15:57:17 2026] 127.0.0.1:41204 Accepted
+[Sat Oct 31 15:57:17 2026] 127.0.0.1:41204 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:57:17 2026] 127.0.0.1:41204 Closing
+[Sat Oct 31 15:57:17 2026] 127.0.0.1:41214 Accepted
+[Sat Oct 31 15:57:17 2026] 127.0.0.1:41216 Accepted
+[Sat Oct 31 15:57:17 2026] 127.0.0.1:41230 Accepted
+[Sat Oct 31 15:57:17 2026] 127.0.0.1:41214 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:57:17 2026] 127.0.0.1:41214 Closing
+[Sat Oct 31 15:57:17 2026] 127.0.0.1:41216 [200]: GET /api.php?r=strategy%2Fpresets
+[Sat Oct 31 15:57:17 2026] 127.0.0.1:41216 Closing
+[Sat Oct 31 15:57:17 2026] 127.0.0.1:41230 [200]: GET /api.php?r=data%2Foverview
+[Sat Oct 31 15:57:17 2026] 127.0.0.1:41230 Closing
+[Sat Oct 31 15:57:17 2026] 127.0.0.1:41238 Accepted
+[Sat Oct 31 15:57:17 2026] 127.0.0.1:41254 Accepted
+[Sat Oct 31 15:57:17 2026] 127.0.0.1:41238 [200]: GET /api.php?r=searches
+[Sat Oct 31 15:57:17 2026] 127.0.0.1:41238 Closing
+[Sat Oct 31 15:57:18 2026] 127.0.0.1:41254 [200]: POST /api.php?r=explore
+[Sat Oct 31 15:57:18 2026] 127.0.0.1:41254 Closing
+[Sat Oct 31 15:57:18 2026] 127.0.0.1:41268 Accepted
+[Sat Oct 31 15:57:18 2026] 127.0.0.1:41268 [200]: GET /titre.html?src=explorer&id=28
+[Sat Oct 31 15:57:18 2026] 127.0.0.1:41268 Closing
+[Sat Oct 31 15:57:18 2026] 127.0.0.1:41274 Accepted
+[Sat Oct 31 15:57:18 2026] 127.0.0.1:41276 Accepted
+[Sat Oct 31 15:57:18 2026] 127.0.0.1:41286 Accepted
+[Sat Oct 31 15:57:18 2026] 127.0.0.1:41294 Accepted
+[Sat Oct 31 15:57:18 2026] 127.0.0.1:41296 Accepted
+[Sat Oct 31 15:57:18 2026] 127.0.0.1:41308 Accepted
+[Sat Oct 31 15:57:18 2026] 127.0.0.1:41274 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:57:18 2026] 127.0.0.1:41276 [200]: GET /assets/charts.js?v=202610301418
+[Sat Oct 31 15:57:18 2026] 127.0.0.1:41274 Closing
+[Sat Oct 31 15:57:18 2026] 127.0.0.1:41276 Closing
+[Sat Oct 31 15:57:18 2026] 127.0.0.1:41322 Accepted
+[Sat Oct 31 15:57:18 2026] 127.0.0.1:41286 [200]: GET /assets/intraday.js?v=202610301418
+[Sat Oct 31 15:57:18 2026] 127.0.0.1:41286 Closing
+[Sat Oct 31 15:57:18 2026] 127.0.0.1:41294 [200]: GET /assets/tx.js?v=202610301418
+[Sat Oct 31 15:57:18 2026] 127.0.0.1:41294 Closing
+[Sat Oct 31 15:57:18 2026] 127.0.0.1:41296 [200]: GET /assets/titre.js?v=202610301418
+[Sat Oct 31 15:57:18 2026] 127.0.0.1:41296 Closing
+[Sat Oct 31 15:57:18 2026] 127.0.0.1:41308 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:57:18 2026] 127.0.0.1:41308 Closing
+[Sat Oct 31 15:57:18 2026] 127.0.0.1:41322 [200]: GET /assets/etf.js?v=202610301418
+[Sat Oct 31 15:57:18 2026] 127.0.0.1:41322 Closing
+[Sat Oct 31 15:57:18 2026] 127.0.0.1:41326 Accepted
+[Sat Oct 31 15:57:18 2026] 127.0.0.1:41326 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:57:18 2026] 127.0.0.1:41326 Closing
+[Sat Oct 31 15:57:18 2026] 127.0.0.1:41342 Accepted
+[Sat Oct 31 15:57:18 2026] 127.0.0.1:41342 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:57:18 2026] 127.0.0.1:41342 Closing
+[Sat Oct 31 15:57:18 2026] 127.0.0.1:41352 Accepted
+[Sat Oct 31 15:57:18 2026] 127.0.0.1:41352 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:57:18 2026] 127.0.0.1:41352 Closing
+[Sat Oct 31 15:57:18 2026] 127.0.0.1:41368 Accepted
+[Sat Oct 31 15:57:18 2026] 127.0.0.1:41368 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:57:18 2026] 127.0.0.1:41368 Closing
+[Sat Oct 31 15:57:18 2026] 127.0.0.1:41380 Accepted
+[Sat Oct 31 15:57:18 2026] 127.0.0.1:41380 [200]: GET /api.php?r=strategy%2Fpresets
+[Sat Oct 31 15:57:18 2026] 127.0.0.1:41380 Closing
+[Sat Oct 31 15:57:18 2026] 127.0.0.1:41394 Accepted
+[Sat Oct 31 15:57:19 2026] 127.0.0.1:41394 [200]: POST /api.php?r=sheet
+[Sat Oct 31 15:57:19 2026] 127.0.0.1:41394 Closing
+[Sat Oct 31 15:57:20 2026] 127.0.0.1:41402 Accepted
+[Sat Oct 31 15:57:20 2026] 127.0.0.1:41402 [200]: GET /titre.html?src=explorer&id=29
+[Sat Oct 31 15:57:20 2026] 127.0.0.1:41402 Closing
+[Sat Oct 31 15:57:20 2026] 127.0.0.1:41412 Accepted
+[Sat Oct 31 15:57:20 2026] 127.0.0.1:41422 Accepted
+[Sat Oct 31 15:57:20 2026] 127.0.0.1:41426 Accepted
+[Sat Oct 31 15:57:20 2026] 127.0.0.1:41430 Accepted
+[Sat Oct 31 15:57:20 2026] 127.0.0.1:41432 Accepted
+[Sat Oct 31 15:57:20 2026] 127.0.0.1:41412 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:57:20 2026] 127.0.0.1:41440 Accepted
+[Sat Oct 31 15:57:20 2026] 127.0.0.1:41412 Closing
+[Sat Oct 31 15:57:20 2026] 127.0.0.1:41456 Accepted
+[Sat Oct 31 15:57:20 2026] 127.0.0.1:41422 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:57:20 2026] 127.0.0.1:41426 [200]: GET /assets/charts.js?v=202610301418
+[Sat Oct 31 15:57:20 2026] 127.0.0.1:41422 Closing
+[Sat Oct 31 15:57:20 2026] 127.0.0.1:41426 Closing
+[Sat Oct 31 15:57:20 2026] 127.0.0.1:41430 [200]: GET /assets/intraday.js?v=202610301418
+[Sat Oct 31 15:57:20 2026] 127.0.0.1:41430 Closing
+[Sat Oct 31 15:57:20 2026] 127.0.0.1:41432 [200]: GET /assets/tx.js?v=202610301418
+[Sat Oct 31 15:57:20 2026] 127.0.0.1:41432 Closing
+[Sat Oct 31 15:57:20 2026] 127.0.0.1:41440 [200]: GET /assets/etf.js?v=202610301418
+[Sat Oct 31 15:57:20 2026] 127.0.0.1:41440 Closing
+[Sat Oct 31 15:57:20 2026] 127.0.0.1:41456 [200]: GET /assets/titre.js?v=202610301418
+[Sat Oct 31 15:57:20 2026] 127.0.0.1:41456 Closing
+[Sat Oct 31 15:57:20 2026] 127.0.0.1:41470 Accepted
+[Sat Oct 31 15:57:20 2026] 127.0.0.1:41470 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:57:20 2026] 127.0.0.1:41470 Closing
+[Sat Oct 31 15:57:20 2026] 127.0.0.1:41472 Accepted
+[Sat Oct 31 15:57:20 2026] 127.0.0.1:41472 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:57:20 2026] 127.0.0.1:41472 Closing
+[Sat Oct 31 15:57:20 2026] 127.0.0.1:41474 Accepted
+[Sat Oct 31 15:57:20 2026] 127.0.0.1:41474 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:57:20 2026] 127.0.0.1:41474 Closing
+[Sat Oct 31 15:57:20 2026] 127.0.0.1:41476 Accepted
+[Sat Oct 31 15:57:20 2026] 127.0.0.1:41476 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:57:20 2026] 127.0.0.1:41476 Closing
+[Sat Oct 31 15:57:20 2026] 127.0.0.1:41488 Accepted
+[Sat Oct 31 15:57:20 2026] 127.0.0.1:41488 [200]: GET /api.php?r=strategy%2Fpresets
+[Sat Oct 31 15:57:20 2026] 127.0.0.1:41488 Closing
+[Sat Oct 31 15:57:20 2026] 127.0.0.1:41494 Accepted
+[Sat Oct 31 15:57:21 2026] 127.0.0.1:41494 [200]: POST /api.php?r=sheet
+[Sat Oct 31 15:57:21 2026] 127.0.0.1:41494 Closing
+[Sat Oct 31 15:57:21 2026] 127.0.0.1:41506 Accepted
+[Sat Oct 31 15:57:21 2026] 127.0.0.1:41506 [200]: GET /index.html
+[Sat Oct 31 15:57:21 2026] 127.0.0.1:41506 Closing
+[Sat Oct 31 15:57:21 2026] 127.0.0.1:41514 Accepted
+[Sat Oct 31 15:57:21 2026] 127.0.0.1:41516 Accepted
+[Sat Oct 31 15:57:21 2026] 127.0.0.1:41518 Accepted
+[Sat Oct 31 15:57:21 2026] 127.0.0.1:41520 Accepted
+[Sat Oct 31 15:57:21 2026] 127.0.0.1:41536 Accepted
+[Sat Oct 31 15:57:21 2026] 127.0.0.1:41550 Accepted
+[Sat Oct 31 15:57:21 2026] 127.0.0.1:41514 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:57:21 2026] 127.0.0.1:41516 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:57:21 2026] 127.0.0.1:41514 Closing
+[Sat Oct 31 15:57:21 2026] 127.0.0.1:41516 Closing
+[Sat Oct 31 15:57:21 2026] 127.0.0.1:41518 [200]: GET /assets/etf.js?v=202610301418
+[Sat Oct 31 15:57:21 2026] 127.0.0.1:41518 Closing
+[Sat Oct 31 15:57:21 2026] 127.0.0.1:41520 [200]: GET /assets/explorer-menu.js?v=202610301418
+[Sat Oct 31 15:57:21 2026] 127.0.0.1:41520 Closing
+[Sat Oct 31 15:57:21 2026] 127.0.0.1:41536 [200]: GET /assets/multiselect.js?v=202610301418
+[Sat Oct 31 15:57:21 2026] 127.0.0.1:41536 Closing
+[Sat Oct 31 15:57:21 2026] 127.0.0.1:41550 [200]: GET /assets/explorer.js?v=202610301418
+[Sat Oct 31 15:57:21 2026] 127.0.0.1:41550 Closing
+[Sat Oct 31 15:57:21 2026] 127.0.0.1:41552 Accepted
+[Sat Oct 31 15:57:21 2026] 127.0.0.1:41552 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:57:21 2026] 127.0.0.1:41552 Closing
+[Sat Oct 31 15:57:21 2026] 127.0.0.1:41558 Accepted
+[Sat Oct 31 15:57:21 2026] 127.0.0.1:41558 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:57:21 2026] 127.0.0.1:41558 Closing
+[Sat Oct 31 15:57:21 2026] 127.0.0.1:41572 Accepted
+[Sat Oct 31 15:57:21 2026] 127.0.0.1:41572 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:57:21 2026] 127.0.0.1:41572 Closing
+[Sat Oct 31 15:57:21 2026] 127.0.0.1:41586 Accepted
+[Sat Oct 31 15:57:21 2026] 127.0.0.1:41600 Accepted
+[Sat Oct 31 15:57:21 2026] 127.0.0.1:41586 [200]: GET /api.php?r=strategy%2Fpresets
+[Sat Oct 31 15:57:21 2026] 127.0.0.1:41586 Closing
+[Sat Oct 31 15:57:21 2026] 127.0.0.1:41600 [200]: GET /api.php?r=data%2Foverview
+[Sat Oct 31 15:57:21 2026] 127.0.0.1:41600 Closing
+[Sat Oct 31 15:57:21 2026] 127.0.0.1:41616 Accepted
+[Sat Oct 31 15:57:21 2026] 127.0.0.1:41624 Accepted
+[Sat Oct 31 15:57:21 2026] 127.0.0.1:41616 [200]: GET /api.php?r=searches
+[Sat Oct 31 15:57:21 2026] 127.0.0.1:41616 Closing
+[Sat Oct 31 15:57:22 2026] 127.0.0.1:41624 [200]: POST /api.php?r=explore
+[Sat Oct 31 15:57:22 2026] 127.0.0.1:41624 Closing
+[Sat Oct 31 15:57:22 2026] 127.0.0.1:41632 Accepted
+[Sat Oct 31 15:57:22 2026] 127.0.0.1:41632 [200]: GET /login.html
+[Sat Oct 31 15:57:22 2026] 127.0.0.1:41632 Closing
+[Sat Oct 31 15:57:22 2026] 127.0.0.1:41648 Accepted
+[Sat Oct 31 15:57:22 2026] 127.0.0.1:41648 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:57:22 2026] 127.0.0.1:41648 Closing
+[Sat Oct 31 15:57:22 2026] 127.0.0.1:41660 Accepted
+[Sat Oct 31 15:57:22 2026] 127.0.0.1:41668 Accepted
+[Sat Oct 31 15:57:22 2026] 127.0.0.1:41674 Accepted
+[Sat Oct 31 15:57:22 2026] 127.0.0.1:41660 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:57:22 2026] 127.0.0.1:41660 Closing
+[Sat Oct 31 15:57:22 2026] 127.0.0.1:41668 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:57:22 2026] 127.0.0.1:41668 Closing
+[Sat Oct 31 15:57:22 2026] 127.0.0.1:41674 [200]: GET /assets/auth-pages.js?v=202610301418
+[Sat Oct 31 15:57:22 2026] 127.0.0.1:41674 Closing
+[Sat Oct 31 15:57:22 2026] 127.0.0.1:41680 Accepted
+[Sat Oct 31 15:57:22 2026] 127.0.0.1:41680 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:57:22 2026] 127.0.0.1:41680 Closing
+[Sat Oct 31 15:57:23 2026] 127.0.0.1:41694 Accepted
+[Sat Oct 31 15:57:23 2026] 127.0.0.1:41694 [200]: POST /api.php?r=auth%2Flogin
+[Sat Oct 31 15:57:23 2026] 127.0.0.1:41694 Closing
+[Sat Oct 31 15:57:23 2026] 127.0.0.1:41704 Accepted
+[Sat Oct 31 15:57:23 2026] 127.0.0.1:41704 [200]: GET /index.html
+[Sat Oct 31 15:57:23 2026] 127.0.0.1:41704 Closing
+[Sat Oct 31 15:57:23 2026] 127.0.0.1:41712 Accepted
+[Sat Oct 31 15:57:23 2026] 127.0.0.1:41714 Accepted
+[Sat Oct 31 15:57:23 2026] 127.0.0.1:41712 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:57:23 2026] 127.0.0.1:41712 Closing
+[Sat Oct 31 15:57:23 2026] 127.0.0.1:41718 Accepted
+[Sat Oct 31 15:57:23 2026] 127.0.0.1:41730 Accepted
+[Sat Oct 31 15:57:23 2026] 127.0.0.1:41734 Accepted
+[Sat Oct 31 15:57:23 2026] 127.0.0.1:41748 Accepted
+[Sat Oct 31 15:57:23 2026] 127.0.0.1:41714 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:57:23 2026] 127.0.0.1:41718 [200]: GET /assets/etf.js?v=202610301418
+[Sat Oct 31 15:57:23 2026] 127.0.0.1:41714 Closing
+[Sat Oct 31 15:57:23 2026] 127.0.0.1:41718 Closing
+[Sat Oct 31 15:57:23 2026] 127.0.0.1:41730 [200]: GET /assets/explorer-menu.js?v=202610301418
+[Sat Oct 31 15:57:23 2026] 127.0.0.1:41730 Closing
+[Sat Oct 31 15:57:23 2026] 127.0.0.1:41734 [200]: GET /assets/multiselect.js?v=202610301418
+[Sat Oct 31 15:57:23 2026] 127.0.0.1:41734 Closing
+[Sat Oct 31 15:57:23 2026] 127.0.0.1:41748 [200]: GET /assets/explorer.js?v=202610301418
+[Sat Oct 31 15:57:23 2026] 127.0.0.1:41748 Closing
+[Sat Oct 31 15:57:23 2026] 127.0.0.1:41764 Accepted
+[Sat Oct 31 15:57:23 2026] 127.0.0.1:41764 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:57:23 2026] 127.0.0.1:41764 Closing
+[Sat Oct 31 15:57:23 2026] 127.0.0.1:41766 Accepted
+[Sat Oct 31 15:57:23 2026] 127.0.0.1:41766 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:57:23 2026] 127.0.0.1:41766 Closing
+[Sat Oct 31 15:57:23 2026] 127.0.0.1:41776 Accepted
+[Sat Oct 31 15:57:23 2026] 127.0.0.1:41784 Accepted
+[Sat Oct 31 15:57:23 2026] 127.0.0.1:41786 Accepted
+[Sat Oct 31 15:57:23 2026] 127.0.0.1:41776 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:57:23 2026] 127.0.0.1:41776 Closing
+[Sat Oct 31 15:57:23 2026] 127.0.0.1:41784 [200]: GET /api.php?r=strategy%2Fpresets
+[Sat Oct 31 15:57:23 2026] 127.0.0.1:41784 Closing
+[Sat Oct 31 15:57:23 2026] 127.0.0.1:41786 [200]: GET /api.php?r=data%2Foverview
+[Sat Oct 31 15:57:23 2026] 127.0.0.1:41786 Closing
+[Sat Oct 31 15:57:23 2026] 127.0.0.1:41792 Accepted
+[Sat Oct 31 15:57:23 2026] 127.0.0.1:41792 [200]: GET /api.php?r=strategy%2Fpresets
+[Sat Oct 31 15:57:23 2026] 127.0.0.1:41792 Closing
+[Sat Oct 31 15:57:23 2026] 127.0.0.1:41798 Accepted
+[Sat Oct 31 15:57:23 2026] 127.0.0.1:41810 Accepted
+[Sat Oct 31 15:57:23 2026] 127.0.0.1:41798 [200]: GET /api.php?r=searches
+[Sat Oct 31 15:57:23 2026] 127.0.0.1:41798 Closing
+[Sat Oct 31 15:57:24 2026] 127.0.0.1:41810 [200]: POST /api.php?r=explore
+[Sat Oct 31 15:57:24 2026] 127.0.0.1:41810 Closing
+[Sat Oct 31 15:57:24 2026] 127.0.0.1:41820 Accepted
+[Sat Oct 31 15:57:24 2026] 127.0.0.1:41820 [200]: GET /index.html
+[Sat Oct 31 15:57:24 2026] 127.0.0.1:41820 Closing
+[Sat Oct 31 15:57:24 2026] 127.0.0.1:41830 Accepted
+[Sat Oct 31 15:57:24 2026] 127.0.0.1:41846 Accepted
+[Sat Oct 31 15:57:24 2026] 127.0.0.1:41848 Accepted
+[Sat Oct 31 15:57:24 2026] 127.0.0.1:41860 Accepted
+[Sat Oct 31 15:57:24 2026] 127.0.0.1:41870 Accepted
+[Sat Oct 31 15:57:24 2026] 127.0.0.1:41830 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:57:24 2026] 127.0.0.1:41878 Accepted
+[Sat Oct 31 15:57:24 2026] 127.0.0.1:41830 Closing
+[Sat Oct 31 15:57:24 2026] 127.0.0.1:41846 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:57:24 2026] 127.0.0.1:41846 Closing
+[Sat Oct 31 15:57:24 2026] 127.0.0.1:41848 [200]: GET /assets/etf.js?v=202610301418
+[Sat Oct 31 15:57:24 2026] 127.0.0.1:41848 Closing
+[Sat Oct 31 15:57:24 2026] 127.0.0.1:41860 [200]: GET /assets/explorer-menu.js?v=202610301418
+[Sat Oct 31 15:57:24 2026] 127.0.0.1:41860 Closing
+[Sat Oct 31 15:57:24 2026] 127.0.0.1:41870 [200]: GET /assets/multiselect.js?v=202610301418
+[Sat Oct 31 15:57:24 2026] 127.0.0.1:41878 [200]: GET /assets/explorer.js?v=202610301418
+[Sat Oct 31 15:57:24 2026] 127.0.0.1:41870 Closing
+[Sat Oct 31 15:57:24 2026] 127.0.0.1:41878 Closing
+[Sat Oct 31 15:57:24 2026] 127.0.0.1:41882 Accepted
+[Sat Oct 31 15:57:24 2026] 127.0.0.1:41882 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:57:24 2026] 127.0.0.1:41882 Closing
+[Sat Oct 31 15:57:24 2026] 127.0.0.1:41890 Accepted
+[Sat Oct 31 15:57:24 2026] 127.0.0.1:41890 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:57:24 2026] 127.0.0.1:41890 Closing
+[Sat Oct 31 15:57:24 2026] 127.0.0.1:41906 Accepted
+[Sat Oct 31 15:57:24 2026] 127.0.0.1:41908 Accepted
+[Sat Oct 31 15:57:24 2026] 127.0.0.1:41922 Accepted
+[Sat Oct 31 15:57:24 2026] 127.0.0.1:41906 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:57:24 2026] 127.0.0.1:41906 Closing
+[Sat Oct 31 15:57:24 2026] 127.0.0.1:41908 [200]: GET /api.php?r=strategy%2Fpresets
+[Sat Oct 31 15:57:24 2026] 127.0.0.1:41908 Closing
+[Sat Oct 31 15:57:25 2026] 127.0.0.1:41922 [200]: GET /api.php?r=data%2Foverview
+[Sat Oct 31 15:57:25 2026] 127.0.0.1:41922 Closing
+[Sat Oct 31 15:57:25 2026] 127.0.0.1:41466 Accepted
+[Sat Oct 31 15:57:25 2026] 127.0.0.1:41466 [200]: GET /api.php?r=searches
+[Sat Oct 31 15:57:25 2026] 127.0.0.1:41466 Closing
+[Sat Oct 31 15:57:25 2026] 127.0.0.1:41482 Accepted
+[Sat Oct 31 15:57:25 2026] 127.0.0.1:41482 [200]: POST /api.php?r=explore
+[Sat Oct 31 15:57:25 2026] 127.0.0.1:41482 Closing
+[Sat Oct 31 15:57:25 2026] 127.0.0.1:41484 Accepted
+[Sat Oct 31 15:57:25 2026] 127.0.0.1:41484 [200]: GET /titre.html?src=explorer&id=28
+[Sat Oct 31 15:57:25 2026] 127.0.0.1:41484 Closing
+[Sat Oct 31 15:57:25 2026] 127.0.0.1:41494 Accepted
+[Sat Oct 31 15:57:25 2026] 127.0.0.1:41494 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:57:25 2026] 127.0.0.1:41494 Closing
+[Sat Oct 31 15:57:25 2026] 127.0.0.1:41508 Accepted
+[Sat Oct 31 15:57:25 2026] 127.0.0.1:41520 Accepted
+[Sat Oct 31 15:57:25 2026] 127.0.0.1:41534 Accepted
+[Sat Oct 31 15:57:25 2026] 127.0.0.1:41542 Accepted
+[Sat Oct 31 15:57:25 2026] 127.0.0.1:41544 Accepted
+[Sat Oct 31 15:57:25 2026] 127.0.0.1:41548 Accepted
+[Sat Oct 31 15:57:25 2026] 127.0.0.1:41508 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:57:25 2026] 127.0.0.1:41508 Closing
+[Sat Oct 31 15:57:25 2026] 127.0.0.1:41520 [200]: GET /assets/charts.js?v=202610301418
+[Sat Oct 31 15:57:25 2026] 127.0.0.1:41520 Closing
+[Sat Oct 31 15:57:25 2026] 127.0.0.1:41534 [200]: GET /assets/intraday.js?v=202610301418
+[Sat Oct 31 15:57:25 2026] 127.0.0.1:41534 Closing
+[Sat Oct 31 15:57:25 2026] 127.0.0.1:41542 [200]: GET /assets/tx.js?v=202610301418
+[Sat Oct 31 15:57:25 2026] 127.0.0.1:41542 Closing
+[Sat Oct 31 15:57:25 2026] 127.0.0.1:41544 [200]: GET /assets/titre.js?v=202610301418
+[Sat Oct 31 15:57:25 2026] 127.0.0.1:41544 Closing
+[Sat Oct 31 15:57:25 2026] 127.0.0.1:41548 [200]: GET /assets/etf.js?v=202610301418
+[Sat Oct 31 15:57:25 2026] 127.0.0.1:41548 Closing
+[Sat Oct 31 15:57:25 2026] 127.0.0.1:41552 Accepted
+[Sat Oct 31 15:57:25 2026] 127.0.0.1:41552 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:57:25 2026] 127.0.0.1:41552 Closing
+[Sat Oct 31 15:57:25 2026] 127.0.0.1:41566 Accepted
+[Sat Oct 31 15:57:25 2026] 127.0.0.1:41566 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:57:25 2026] 127.0.0.1:41566 Closing
+[Sat Oct 31 15:57:25 2026] 127.0.0.1:41570 Accepted
+[Sat Oct 31 15:57:25 2026] 127.0.0.1:41570 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:57:25 2026] 127.0.0.1:41570 Closing
+[Sat Oct 31 15:57:25 2026] 127.0.0.1:41578 Accepted
+[Sat Oct 31 15:57:25 2026] 127.0.0.1:41578 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:57:25 2026] 127.0.0.1:41578 Closing
+[Sat Oct 31 15:57:25 2026] 127.0.0.1:41588 Accepted
+[Sat Oct 31 15:57:26 2026] 127.0.0.1:41588 [200]: GET /api.php?r=strategy%2Fpresets
+[Sat Oct 31 15:57:26 2026] 127.0.0.1:41588 Closing
+[Sat Oct 31 15:57:26 2026] 127.0.0.1:41600 Accepted
+[Sat Oct 31 15:57:27 2026] 127.0.0.1:41600 [200]: POST /api.php?r=sheet
+[Sat Oct 31 15:57:27 2026] 127.0.0.1:41600 Closing
+[Sat Oct 31 15:57:27 2026] 127.0.0.1:41616 Accepted
+[Sat Oct 31 15:57:27 2026] 127.0.0.1:41616 [200]: GET /titre.html?src=explorer&id=29
+[Sat Oct 31 15:57:27 2026] 127.0.0.1:41616 Closing
+[Sat Oct 31 15:57:27 2026] 127.0.0.1:41622 Accepted
+[Sat Oct 31 15:57:27 2026] 127.0.0.1:41636 Accepted
+[Sat Oct 31 15:57:27 2026] 127.0.0.1:41650 Accepted
+[Sat Oct 31 15:57:27 2026] 127.0.0.1:41622 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:57:27 2026] 127.0.0.1:41622 Closing
+[Sat Oct 31 15:57:27 2026] 127.0.0.1:41656 Accepted
+[Sat Oct 31 15:57:27 2026] 127.0.0.1:41636 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:57:27 2026] 127.0.0.1:41650 [200]: GET /assets/charts.js?v=202610301418
+[Sat Oct 31 15:57:27 2026] 127.0.0.1:41672 Accepted
+[Sat Oct 31 15:57:27 2026] 127.0.0.1:41656 [200]: GET /assets/intraday.js?v=202610301418
+[Sat Oct 31 15:57:27 2026] 127.0.0.1:41678 Accepted
+[Sat Oct 31 15:57:27 2026] 127.0.0.1:41672 [200]: GET /assets/tx.js?v=202610301418
+[Sat Oct 31 15:57:27 2026] 127.0.0.1:41690 Accepted
+[Sat Oct 31 15:57:27 2026] 127.0.0.1:41636 Closing
+[Sat Oct 31 15:57:27 2026] 127.0.0.1:41650 Closing
+[Sat Oct 31 15:57:27 2026] 127.0.0.1:41678 [200]: GET /assets/etf.js?v=202610301418
+[Sat Oct 31 15:57:27 2026] 127.0.0.1:41656 Closing
+[Sat Oct 31 15:57:27 2026] 127.0.0.1:41690 [200]: GET /assets/titre.js?v=202610301418
+[Sat Oct 31 15:57:27 2026] 127.0.0.1:41672 Closing
+[Sat Oct 31 15:57:27 2026] 127.0.0.1:41678 Closing
+[Sat Oct 31 15:57:27 2026] 127.0.0.1:41690 Closing
+[Sat Oct 31 15:57:27 2026] 127.0.0.1:41700 Accepted
+[Sat Oct 31 15:57:27 2026] 127.0.0.1:41700 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:57:27 2026] 127.0.0.1:41700 Closing
+[Sat Oct 31 15:57:27 2026] 127.0.0.1:41702 Accepted
+[Sat Oct 31 15:57:27 2026] 127.0.0.1:41702 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:57:27 2026] 127.0.0.1:41702 Closing
+[Sat Oct 31 15:57:27 2026] 127.0.0.1:41716 Accepted
+[Sat Oct 31 15:57:27 2026] 127.0.0.1:41716 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:57:27 2026] 127.0.0.1:41716 Closing
+[Sat Oct 31 15:57:27 2026] 127.0.0.1:41722 Accepted
+[Sat Oct 31 15:57:27 2026] 127.0.0.1:41722 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:57:27 2026] 127.0.0.1:41722 Closing
+[Sat Oct 31 15:57:27 2026] 127.0.0.1:41734 Accepted
+[Sat Oct 31 15:57:28 2026] 127.0.0.1:41734 [200]: GET /api.php?r=strategy%2Fpresets
+[Sat Oct 31 15:57:28 2026] 127.0.0.1:41734 Closing
+[Sat Oct 31 15:57:28 2026] 127.0.0.1:41736 Accepted
+[Sat Oct 31 15:57:28 2026] 127.0.0.1:41736 [200]: POST /api.php?r=sheet
+[Sat Oct 31 15:57:28 2026] 127.0.0.1:41736 Closing
+[Sat Oct 31 15:57:29 2026] 127.0.0.1:41740 Accepted
+[Sat Oct 31 15:57:29 2026] 127.0.0.1:41740 [200]: GET /index.html
+[Sat Oct 31 15:57:29 2026] 127.0.0.1:41740 Closing
+[Sat Oct 31 15:57:29 2026] 127.0.0.1:41750 Accepted
+[Sat Oct 31 15:57:29 2026] 127.0.0.1:41762 Accepted
+[Sat Oct 31 15:57:29 2026] 127.0.0.1:41750 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:57:29 2026] 127.0.0.1:41776 Accepted
+[Sat Oct 31 15:57:29 2026] 127.0.0.1:41792 Accepted
+[Sat Oct 31 15:57:29 2026] 127.0.0.1:41794 Accepted
+[Sat Oct 31 15:57:29 2026] 127.0.0.1:41750 Closing
+[Sat Oct 31 15:57:29 2026] 127.0.0.1:41804 Accepted
+[Sat Oct 31 15:57:29 2026] 127.0.0.1:41762 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:57:29 2026] 127.0.0.1:41762 Closing
+[Sat Oct 31 15:57:29 2026] 127.0.0.1:41776 [200]: GET /assets/etf.js?v=202610301418
+[Sat Oct 31 15:57:29 2026] 127.0.0.1:41776 Closing
+[Sat Oct 31 15:57:29 2026] 127.0.0.1:41792 [200]: GET /assets/explorer-menu.js?v=202610301418
+[Sat Oct 31 15:57:29 2026] 127.0.0.1:41792 Closing
+[Sat Oct 31 15:57:29 2026] 127.0.0.1:41794 [200]: GET /assets/multiselect.js?v=202610301418
+[Sat Oct 31 15:57:29 2026] 127.0.0.1:41794 Closing
+[Sat Oct 31 15:57:29 2026] 127.0.0.1:41804 [200]: GET /assets/explorer.js?v=202610301418
+[Sat Oct 31 15:57:29 2026] 127.0.0.1:41804 Closing
+[Sat Oct 31 15:57:29 2026] 127.0.0.1:41818 Accepted
+[Sat Oct 31 15:57:29 2026] 127.0.0.1:41818 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:57:29 2026] 127.0.0.1:41818 Closing
+[Sat Oct 31 15:57:29 2026] 127.0.0.1:41828 Accepted
+[Sat Oct 31 15:57:29 2026] 127.0.0.1:41828 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:57:29 2026] 127.0.0.1:41828 Closing
+[Sat Oct 31 15:57:29 2026] 127.0.0.1:41834 Accepted
+[Sat Oct 31 15:57:29 2026] 127.0.0.1:41842 Accepted
+[Sat Oct 31 15:57:29 2026] 127.0.0.1:41834 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:57:29 2026] 127.0.0.1:41834 Closing
+[Sat Oct 31 15:57:29 2026] 127.0.0.1:41844 Accepted
+[Sat Oct 31 15:57:29 2026] 127.0.0.1:41842 [200]: GET /api.php?r=strategy%2Fpresets
+[Sat Oct 31 15:57:29 2026] 127.0.0.1:41842 Closing
+[Sat Oct 31 15:57:29 2026] 127.0.0.1:41844 [200]: GET /api.php?r=data%2Foverview
+[Sat Oct 31 15:57:29 2026] 127.0.0.1:41844 Closing
+[Sat Oct 31 15:57:29 2026] 127.0.0.1:41858 Accepted
+[Sat Oct 31 15:57:29 2026] 127.0.0.1:41868 Accepted
+[Sat Oct 31 15:57:29 2026] 127.0.0.1:41858 [200]: GET /api.php?r=searches
+[Sat Oct 31 15:57:29 2026] 127.0.0.1:41858 Closing
+[Sat Oct 31 15:57:29 2026] 127.0.0.1:41868 [200]: POST /api.php?r=explore
+[Sat Oct 31 15:57:29 2026] 127.0.0.1:41868 Closing
+[Sat Oct 31 15:57:30 2026] 127.0.0.1:41874 Accepted
+[Sat Oct 31 15:57:30 2026] 127.0.0.1:41874 [200]: GET /login.html
+[Sat Oct 31 15:57:30 2026] 127.0.0.1:41874 Closing
+[Sat Oct 31 15:57:30 2026] 127.0.0.1:41888 Accepted
+[Sat Oct 31 15:57:30 2026] 127.0.0.1:41888 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:57:30 2026] 127.0.0.1:41888 Closing
+[Sat Oct 31 15:57:30 2026] 127.0.0.1:41890 Accepted
+[Sat Oct 31 15:57:30 2026] 127.0.0.1:41892 Accepted
+[Sat Oct 31 15:57:30 2026] 127.0.0.1:41896 Accepted
+[Sat Oct 31 15:57:30 2026] 127.0.0.1:41890 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:57:30 2026] 127.0.0.1:41890 Closing
+[Sat Oct 31 15:57:30 2026] 127.0.0.1:41892 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:57:30 2026] 127.0.0.1:41892 Closing
+[Sat Oct 31 15:57:30 2026] 127.0.0.1:41896 [200]: GET /assets/auth-pages.js?v=202610301418
+[Sat Oct 31 15:57:30 2026] 127.0.0.1:41896 Closing
+[Sat Oct 31 15:57:30 2026] 127.0.0.1:41898 Accepted
+[Sat Oct 31 15:57:30 2026] 127.0.0.1:41898 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:57:30 2026] 127.0.0.1:41898 Closing
+[Sat Oct 31 15:57:31 2026] 127.0.0.1:41902 Accepted
+[Sat Oct 31 15:57:31 2026] 127.0.0.1:41902 [200]: POST /api.php?r=auth%2Flogin
+[Sat Oct 31 15:57:31 2026] 127.0.0.1:41902 Closing
+[Sat Oct 31 15:57:31 2026] 127.0.0.1:41918 Accepted
+[Sat Oct 31 15:57:31 2026] 127.0.0.1:41918 [200]: GET /index.html
+[Sat Oct 31 15:57:31 2026] 127.0.0.1:41918 Closing
+[Sat Oct 31 15:57:31 2026] 127.0.0.1:41934 Accepted
+[Sat Oct 31 15:57:31 2026] 127.0.0.1:41934 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:57:31 2026] 127.0.0.1:41934 Closing
+[Sat Oct 31 15:57:31 2026] 127.0.0.1:41936 Accepted
+[Sat Oct 31 15:57:31 2026] 127.0.0.1:41936 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:57:31 2026] 127.0.0.1:41936 Closing
+[Sat Oct 31 15:57:31 2026] 127.0.0.1:41948 Accepted
+[Sat Oct 31 15:57:31 2026] 127.0.0.1:41950 Accepted
+[Sat Oct 31 15:57:31 2026] 127.0.0.1:41948 [200]: GET /assets/etf.js?v=202610301418
+[Sat Oct 31 15:57:31 2026] 127.0.0.1:41950 [200]: GET /assets/explorer-menu.js?v=202610301418
+[Sat Oct 31 15:57:31 2026] 127.0.0.1:41948 Closing
+[Sat Oct 31 15:57:31 2026] 127.0.0.1:41950 Closing
+[Sat Oct 31 15:57:31 2026] 127.0.0.1:41954 Accepted
+[Sat Oct 31 15:57:31 2026] 127.0.0.1:41968 Accepted
+[Sat Oct 31 15:57:31 2026] 127.0.0.1:41954 [200]: GET /assets/multiselect.js?v=202610301418
+[Sat Oct 31 15:57:31 2026] 127.0.0.1:41968 [200]: GET /assets/explorer.js?v=202610301418
+[Sat Oct 31 15:57:31 2026] 127.0.0.1:41954 Closing
+[Sat Oct 31 15:57:31 2026] 127.0.0.1:41968 Closing
+[Sat Oct 31 15:57:31 2026] 127.0.0.1:41974 Accepted
+[Sat Oct 31 15:57:31 2026] 127.0.0.1:41974 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:57:31 2026] 127.0.0.1:41974 Closing
+[Sat Oct 31 15:57:31 2026] 127.0.0.1:41976 Accepted
+[Sat Oct 31 15:57:31 2026] 127.0.0.1:41976 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:57:31 2026] 127.0.0.1:41976 Closing
+[Sat Oct 31 15:57:31 2026] 127.0.0.1:41988 Accepted
+[Sat Oct 31 15:57:31 2026] 127.0.0.1:42004 Accepted
+[Sat Oct 31 15:57:31 2026] 127.0.0.1:42020 Accepted
+[Sat Oct 31 15:57:31 2026] 127.0.0.1:41988 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:57:31 2026] 127.0.0.1:41988 Closing
+[Sat Oct 31 15:57:31 2026] 127.0.0.1:42004 [200]: GET /api.php?r=strategy%2Fpresets
+[Sat Oct 31 15:57:31 2026] 127.0.0.1:42004 Closing
+[Sat Oct 31 15:57:31 2026] 127.0.0.1:42020 [200]: GET /api.php?r=data%2Foverview
+[Sat Oct 31 15:57:31 2026] 127.0.0.1:42020 Closing
+[Sat Oct 31 15:57:31 2026] 127.0.0.1:42030 Accepted
+[Sat Oct 31 15:57:31 2026] 127.0.0.1:42030 [200]: GET /api.php?r=strategy%2Fpresets
+[Sat Oct 31 15:57:31 2026] 127.0.0.1:42030 Closing
+[Sat Oct 31 15:57:31 2026] 127.0.0.1:42034 Accepted
+[Sat Oct 31 15:57:31 2026] 127.0.0.1:42048 Accepted
+[Sat Oct 31 15:57:31 2026] 127.0.0.1:42034 [200]: GET /api.php?r=searches
+[Sat Oct 31 15:57:31 2026] 127.0.0.1:42034 Closing
+[Sat Oct 31 15:57:32 2026] 127.0.0.1:42048 [200]: POST /api.php?r=explore
+[Sat Oct 31 15:57:32 2026] 127.0.0.1:42048 Closing
+[Sat Oct 31 15:57:32 2026] 127.0.0.1:42056 Accepted
+[Sat Oct 31 15:57:32 2026] 127.0.0.1:42056 [200]: GET /index.html
+[Sat Oct 31 15:57:32 2026] 127.0.0.1:42056 Closing
+[Sat Oct 31 15:57:32 2026] 127.0.0.1:42062 Accepted
+[Sat Oct 31 15:57:32 2026] 127.0.0.1:42070 Accepted
+[Sat Oct 31 15:57:32 2026] 127.0.0.1:42086 Accepted
+[Sat Oct 31 15:57:32 2026] 127.0.0.1:42102 Accepted
+[Sat Oct 31 15:57:32 2026] 127.0.0.1:42110 Accepted
+[Sat Oct 31 15:57:32 2026] 127.0.0.1:42120 Accepted
+[Sat Oct 31 15:57:32 2026] 127.0.0.1:42062 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:57:32 2026] 127.0.0.1:42070 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:57:32 2026] 127.0.0.1:42062 Closing
+[Sat Oct 31 15:57:32 2026] 127.0.0.1:42070 Closing
+[Sat Oct 31 15:57:32 2026] 127.0.0.1:42086 [200]: GET /assets/etf.js?v=202610301418
+[Sat Oct 31 15:57:32 2026] 127.0.0.1:42086 Closing
+[Sat Oct 31 15:57:32 2026] 127.0.0.1:42102 [200]: GET /assets/explorer-menu.js?v=202610301418
+[Sat Oct 31 15:57:32 2026] 127.0.0.1:42102 Closing
+[Sat Oct 31 15:57:32 2026] 127.0.0.1:42110 [200]: GET /assets/multiselect.js?v=202610301418
+[Sat Oct 31 15:57:32 2026] 127.0.0.1:42110 Closing
+[Sat Oct 31 15:57:32 2026] 127.0.0.1:42120 [200]: GET /assets/explorer.js?v=202610301418
+[Sat Oct 31 15:57:32 2026] 127.0.0.1:42120 Closing
+[Sat Oct 31 15:57:32 2026] 127.0.0.1:42134 Accepted
+[Sat Oct 31 15:57:32 2026] 127.0.0.1:42134 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:57:32 2026] 127.0.0.1:42134 Closing
+[Sat Oct 31 15:57:32 2026] 127.0.0.1:42146 Accepted
+[Sat Oct 31 15:57:32 2026] 127.0.0.1:42146 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:57:32 2026] 127.0.0.1:42146 Closing
+[Sat Oct 31 15:57:32 2026] 127.0.0.1:42150 Accepted
+[Sat Oct 31 15:57:32 2026] 127.0.0.1:42152 Accepted
+[Sat Oct 31 15:57:32 2026] 127.0.0.1:42160 Accepted
+[Sat Oct 31 15:57:32 2026] 127.0.0.1:42150 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:57:32 2026] 127.0.0.1:42150 Closing
+[Sat Oct 31 15:57:32 2026] 127.0.0.1:42152 [200]: GET /api.php?r=strategy%2Fpresets
+[Sat Oct 31 15:57:32 2026] 127.0.0.1:42152 Closing
+[Sat Oct 31 15:57:32 2026] 127.0.0.1:42160 [200]: GET /api.php?r=data%2Foverview
+[Sat Oct 31 15:57:32 2026] 127.0.0.1:42160 Closing
+[Sat Oct 31 15:57:32 2026] 127.0.0.1:42164 Accepted
+[Sat Oct 31 15:57:32 2026] 127.0.0.1:42176 Accepted
+[Sat Oct 31 15:57:32 2026] 127.0.0.1:42164 [200]: GET /api.php?r=searches
+[Sat Oct 31 15:57:32 2026] 127.0.0.1:42164 Closing
+[Sat Oct 31 15:57:33 2026] 127.0.0.1:42176 [200]: POST /api.php?r=explore
+[Sat Oct 31 15:57:33 2026] 127.0.0.1:42176 Closing
+[Sat Oct 31 15:57:33 2026] 127.0.0.1:42192 Accepted
+[Sat Oct 31 15:57:33 2026] 127.0.0.1:42192 [200]: GET /titre.html?src=explorer&id=28
+[Sat Oct 31 15:57:33 2026] 127.0.0.1:42192 Closing
+[Sat Oct 31 15:57:33 2026] 127.0.0.1:42204 Accepted
+[Sat Oct 31 15:57:33 2026] 127.0.0.1:42204 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:57:33 2026] 127.0.0.1:42204 Closing
+[Sat Oct 31 15:57:33 2026] 127.0.0.1:42212 Accepted
+[Sat Oct 31 15:57:33 2026] 127.0.0.1:42220 Accepted
+[Sat Oct 31 15:57:33 2026] 127.0.0.1:42222 Accepted
+[Sat Oct 31 15:57:33 2026] 127.0.0.1:42228 Accepted
+[Sat Oct 31 15:57:33 2026] 127.0.0.1:42234 Accepted
+[Sat Oct 31 15:57:33 2026] 127.0.0.1:42246 Accepted
+[Sat Oct 31 15:57:33 2026] 127.0.0.1:42212 [200]: GET /assets/charts.js?v=202610301418
+[Sat Oct 31 15:57:33 2026] 127.0.0.1:42212 Closing
+[Sat Oct 31 15:57:33 2026] 127.0.0.1:42220 [200]: GET /assets/intraday.js?v=202610301418
+[Sat Oct 31 15:57:33 2026] 127.0.0.1:42220 Closing
+[Sat Oct 31 15:57:33 2026] 127.0.0.1:42222 [200]: GET /assets/tx.js?v=202610301418
+[Sat Oct 31 15:57:33 2026] 127.0.0.1:42222 Closing
+[Sat Oct 31 15:57:33 2026] 127.0.0.1:42228 [200]: GET /assets/titre.js?v=202610301418
+[Sat Oct 31 15:57:33 2026] 127.0.0.1:42228 Closing
+[Sat Oct 31 15:57:33 2026] 127.0.0.1:42234 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:57:33 2026] 127.0.0.1:42234 Closing
+[Sat Oct 31 15:57:33 2026] 127.0.0.1:42246 [200]: GET /assets/etf.js?v=202610301418
+[Sat Oct 31 15:57:33 2026] 127.0.0.1:42246 Closing
+[Sat Oct 31 15:57:33 2026] 127.0.0.1:42254 Accepted
+[Sat Oct 31 15:57:33 2026] 127.0.0.1:42254 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:57:33 2026] 127.0.0.1:42254 Closing
+[Sat Oct 31 15:57:33 2026] 127.0.0.1:42256 Accepted
+[Sat Oct 31 15:57:33 2026] 127.0.0.1:42256 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:57:33 2026] 127.0.0.1:42256 Closing
+[Sat Oct 31 15:57:33 2026] 127.0.0.1:42264 Accepted
+[Sat Oct 31 15:57:33 2026] 127.0.0.1:42264 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:57:33 2026] 127.0.0.1:42264 Closing
+[Sat Oct 31 15:57:33 2026] 127.0.0.1:42276 Accepted
+[Sat Oct 31 15:57:33 2026] 127.0.0.1:42276 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:57:33 2026] 127.0.0.1:42276 Closing
+[Sat Oct 31 15:57:33 2026] 127.0.0.1:42292 Accepted
+[Sat Oct 31 15:57:33 2026] 127.0.0.1:42292 [200]: GET /api.php?r=strategy%2Fpresets
+[Sat Oct 31 15:57:33 2026] 127.0.0.1:42292 Closing
+[Sat Oct 31 15:57:34 2026] 127.0.0.1:42296 Accepted
+[Sat Oct 31 15:57:35 2026] 127.0.0.1:42296 [200]: POST /api.php?r=sheet
+[Sat Oct 31 15:57:35 2026] 127.0.0.1:42296 Closing
+[Sat Oct 31 15:57:35 2026] 127.0.0.1:37792 Accepted
+[Sat Oct 31 15:57:35 2026] 127.0.0.1:37792 [200]: GET /titre.html?src=explorer&id=29
+[Sat Oct 31 15:57:35 2026] 127.0.0.1:37792 Closing
+[Sat Oct 31 15:57:35 2026] 127.0.0.1:37798 Accepted
+[Sat Oct 31 15:57:35 2026] 127.0.0.1:37798 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:57:35 2026] 127.0.0.1:37798 Closing
+[Sat Oct 31 15:57:35 2026] 127.0.0.1:37804 Accepted
+[Sat Oct 31 15:57:35 2026] 127.0.0.1:37808 Accepted
+[Sat Oct 31 15:57:35 2026] 127.0.0.1:37820 Accepted
+[Sat Oct 31 15:57:35 2026] 127.0.0.1:37828 Accepted
+[Sat Oct 31 15:57:35 2026] 127.0.0.1:37836 Accepted
+[Sat Oct 31 15:57:35 2026] 127.0.0.1:37846 Accepted
+[Sat Oct 31 15:57:35 2026] 127.0.0.1:37804 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:57:35 2026] 127.0.0.1:37804 Closing
+[Sat Oct 31 15:57:35 2026] 127.0.0.1:37808 [200]: GET /assets/charts.js?v=202610301418
+[Sat Oct 31 15:57:35 2026] 127.0.0.1:37808 Closing
+[Sat Oct 31 15:57:35 2026] 127.0.0.1:37820 [200]: GET /assets/intraday.js?v=202610301418
+[Sat Oct 31 15:57:35 2026] 127.0.0.1:37820 Closing
+[Sat Oct 31 15:57:35 2026] 127.0.0.1:37828 [200]: GET /assets/tx.js?v=202610301418
+[Sat Oct 31 15:57:35 2026] 127.0.0.1:37828 Closing
+[Sat Oct 31 15:57:35 2026] 127.0.0.1:37836 [200]: GET /assets/etf.js?v=202610301418
+[Sat Oct 31 15:57:35 2026] 127.0.0.1:37846 [200]: GET /assets/titre.js?v=202610301418
+[Sat Oct 31 15:57:35 2026] 127.0.0.1:37836 Closing
+[Sat Oct 31 15:57:35 2026] 127.0.0.1:37846 Closing
+[Sat Oct 31 15:57:35 2026] 127.0.0.1:37856 Accepted
+[Sat Oct 31 15:57:35 2026] 127.0.0.1:37856 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:57:35 2026] 127.0.0.1:37856 Closing
+[Sat Oct 31 15:57:35 2026] 127.0.0.1:37872 Accepted
+[Sat Oct 31 15:57:35 2026] 127.0.0.1:37872 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:57:35 2026] 127.0.0.1:37872 Closing
+[Sat Oct 31 15:57:35 2026] 127.0.0.1:37880 Accepted
+[Sat Oct 31 15:57:35 2026] 127.0.0.1:37880 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:57:35 2026] 127.0.0.1:37880 Closing
+[Sat Oct 31 15:57:35 2026] 127.0.0.1:37892 Accepted
+[Sat Oct 31 15:57:35 2026] 127.0.0.1:37892 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:57:35 2026] 127.0.0.1:37892 Closing
+[Sat Oct 31 15:57:35 2026] 127.0.0.1:37900 Accepted
+[Sat Oct 31 15:57:35 2026] 127.0.0.1:37900 [200]: GET /api.php?r=strategy%2Fpresets
+[Sat Oct 31 15:57:35 2026] 127.0.0.1:37900 Closing
+[Sat Oct 31 15:57:35 2026] 127.0.0.1:37910 Accepted
+[Sat Oct 31 15:57:36 2026] 127.0.0.1:37910 [200]: POST /api.php?r=sheet
+[Sat Oct 31 15:57:36 2026] 127.0.0.1:37910 Closing
+[Sat Oct 31 15:57:37 2026] 127.0.0.1:37914 Accepted
+[Sat Oct 31 15:57:37 2026] 127.0.0.1:37914 [200]: GET /index.html
+[Sat Oct 31 15:57:37 2026] 127.0.0.1:37914 Closing
+[Sat Oct 31 15:57:37 2026] 127.0.0.1:37926 Accepted
+[Sat Oct 31 15:57:37 2026] 127.0.0.1:37928 Accepted
+[Sat Oct 31 15:57:37 2026] 127.0.0.1:37936 Accepted
+[Sat Oct 31 15:57:37 2026] 127.0.0.1:37944 Accepted
+[Sat Oct 31 15:57:37 2026] 127.0.0.1:37946 Accepted
+[Sat Oct 31 15:57:37 2026] 127.0.0.1:37956 Accepted
+[Sat Oct 31 15:57:37 2026] 127.0.0.1:37926 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:57:37 2026] 127.0.0.1:37926 Closing
+[Sat Oct 31 15:57:37 2026] 127.0.0.1:37928 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:57:37 2026] 127.0.0.1:37936 [200]: GET /assets/etf.js?v=202610301418
+[Sat Oct 31 15:57:37 2026] 127.0.0.1:37944 [200]: GET /assets/explorer-menu.js?v=202610301418
+[Sat Oct 31 15:57:37 2026] 127.0.0.1:37928 Closing
+[Sat Oct 31 15:57:37 2026] 127.0.0.1:37936 Closing
+[Sat Oct 31 15:57:37 2026] 127.0.0.1:37944 Closing
+[Sat Oct 31 15:57:37 2026] 127.0.0.1:37946 [200]: GET /assets/multiselect.js?v=202610301418
+[Sat Oct 31 15:57:37 2026] 127.0.0.1:37946 Closing
+[Sat Oct 31 15:57:37 2026] 127.0.0.1:37956 [200]: GET /assets/explorer.js?v=202610301418
+[Sat Oct 31 15:57:37 2026] 127.0.0.1:37956 Closing
+[Sat Oct 31 15:57:37 2026] 127.0.0.1:37966 Accepted
+[Sat Oct 31 15:57:37 2026] 127.0.0.1:37966 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:57:37 2026] 127.0.0.1:37966 Closing
+[Sat Oct 31 15:57:37 2026] 127.0.0.1:37968 Accepted
+[Sat Oct 31 15:57:37 2026] 127.0.0.1:37968 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:57:37 2026] 127.0.0.1:37968 Closing
+[Sat Oct 31 15:57:37 2026] 127.0.0.1:37972 Accepted
+[Sat Oct 31 15:57:37 2026] 127.0.0.1:37984 Accepted
+[Sat Oct 31 15:57:37 2026] 127.0.0.1:37998 Accepted
+[Sat Oct 31 15:57:37 2026] 127.0.0.1:37972 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:57:37 2026] 127.0.0.1:37972 Closing
+[Sat Oct 31 15:57:37 2026] 127.0.0.1:37984 [200]: GET /api.php?r=strategy%2Fpresets
+[Sat Oct 31 15:57:37 2026] 127.0.0.1:37984 Closing
+[Sat Oct 31 15:57:37 2026] 127.0.0.1:37998 [200]: GET /api.php?r=data%2Foverview
+[Sat Oct 31 15:57:37 2026] 127.0.0.1:37998 Closing
+[Sat Oct 31 15:57:37 2026] 127.0.0.1:38002 Accepted
+[Sat Oct 31 15:57:37 2026] 127.0.0.1:38012 Accepted
+[Sat Oct 31 15:57:37 2026] 127.0.0.1:38002 [200]: GET /api.php?r=searches
+[Sat Oct 31 15:57:37 2026] 127.0.0.1:38002 Closing
+[Sat Oct 31 15:57:37 2026] 127.0.0.1:38012 [200]: POST /api.php?r=explore
+[Sat Oct 31 15:57:37 2026] 127.0.0.1:38012 Closing
+[Sat Oct 31 15:57:38 2026] 127.0.0.1:38018 Accepted
+[Sat Oct 31 15:57:38 2026] 127.0.0.1:38018 [200]: GET /login.html
+[Sat Oct 31 15:57:38 2026] 127.0.0.1:38018 Closing
+[Sat Oct 31 15:57:38 2026] 127.0.0.1:38020 Accepted
+[Sat Oct 31 15:57:38 2026] 127.0.0.1:38030 Accepted
+[Sat Oct 31 15:57:38 2026] 127.0.0.1:38034 Accepted
+[Sat Oct 31 15:57:38 2026] 127.0.0.1:38042 Accepted
+[Sat Oct 31 15:57:38 2026] 127.0.0.1:38020 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:57:38 2026] 127.0.0.1:38030 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:57:38 2026] 127.0.0.1:38034 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:57:38 2026] 127.0.0.1:38020 Closing
+[Sat Oct 31 15:57:38 2026] 127.0.0.1:38030 Closing
+[Sat Oct 31 15:57:38 2026] 127.0.0.1:38034 Closing
+[Sat Oct 31 15:57:38 2026] 127.0.0.1:38042 [200]: GET /assets/auth-pages.js?v=202610301418
+[Sat Oct 31 15:57:38 2026] 127.0.0.1:38042 Closing
+[Sat Oct 31 15:57:38 2026] 127.0.0.1:38054 Accepted
+[Sat Oct 31 15:57:38 2026] 127.0.0.1:38054 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:57:38 2026] 127.0.0.1:38054 Closing
+[Sat Oct 31 15:57:38 2026] 127.0.0.1:38058 Accepted
+[Sat Oct 31 15:57:38 2026] 127.0.0.1:38058 [200]: POST /api.php?r=auth%2Flogin
+[Sat Oct 31 15:57:38 2026] 127.0.0.1:38058 Closing
+[Sat Oct 31 15:57:38 2026] 127.0.0.1:38066 Accepted
+[Sat Oct 31 15:57:38 2026] 127.0.0.1:38066 [200]: GET /index.html
+[Sat Oct 31 15:57:38 2026] 127.0.0.1:38066 Closing
+[Sat Oct 31 15:57:38 2026] 127.0.0.1:38072 Accepted
+[Sat Oct 31 15:57:38 2026] 127.0.0.1:38088 Accepted
+[Sat Oct 31 15:57:38 2026] 127.0.0.1:38102 Accepted
+[Sat Oct 31 15:57:38 2026] 127.0.0.1:38114 Accepted
+[Sat Oct 31 15:57:38 2026] 127.0.0.1:38116 Accepted
+[Sat Oct 31 15:57:38 2026] 127.0.0.1:38122 Accepted
+[Sat Oct 31 15:57:38 2026] 127.0.0.1:38072 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:57:38 2026] 127.0.0.1:38072 Closing
+[Sat Oct 31 15:57:38 2026] 127.0.0.1:38088 [200]: GET /assets/etf.js?v=202610301418
+[Sat Oct 31 15:57:38 2026] 127.0.0.1:38088 Closing
+[Sat Oct 31 15:57:38 2026] 127.0.0.1:38102 [200]: GET /assets/explorer-menu.js?v=202610301418
+[Sat Oct 31 15:57:38 2026] 127.0.0.1:38114 [200]: GET /assets/multiselect.js?v=202610301418
+[Sat Oct 31 15:57:38 2026] 127.0.0.1:38102 Closing
+[Sat Oct 31 15:57:38 2026] 127.0.0.1:38114 Closing
+[Sat Oct 31 15:57:38 2026] 127.0.0.1:38116 [200]: GET /assets/explorer.js?v=202610301418
+[Sat Oct 31 15:57:38 2026] 127.0.0.1:38116 Closing
+[Sat Oct 31 15:57:38 2026] 127.0.0.1:38122 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:57:38 2026] 127.0.0.1:38122 Closing
+[Sat Oct 31 15:57:38 2026] 127.0.0.1:38138 Accepted
+[Sat Oct 31 15:57:38 2026] 127.0.0.1:38138 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:57:38 2026] 127.0.0.1:38138 Closing
+[Sat Oct 31 15:57:38 2026] 127.0.0.1:38152 Accepted
+[Sat Oct 31 15:57:38 2026] 127.0.0.1:38152 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:57:38 2026] 127.0.0.1:38152 Closing
+[Sat Oct 31 15:57:39 2026] 127.0.0.1:38154 Accepted
+[Sat Oct 31 15:57:39 2026] 127.0.0.1:38162 Accepted
+[Sat Oct 31 15:57:39 2026] 127.0.0.1:38166 Accepted
+[Sat Oct 31 15:57:39 2026] 127.0.0.1:38154 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:57:39 2026] 127.0.0.1:38154 Closing
+[Sat Oct 31 15:57:39 2026] 127.0.0.1:38162 [200]: GET /api.php?r=strategy%2Fpresets
+[Sat Oct 31 15:57:39 2026] 127.0.0.1:38162 Closing
+[Sat Oct 31 15:57:39 2026] 127.0.0.1:38166 [200]: GET /api.php?r=data%2Foverview
+[Sat Oct 31 15:57:39 2026] 127.0.0.1:38166 Closing
+[Sat Oct 31 15:57:39 2026] 127.0.0.1:38176 Accepted
+[Sat Oct 31 15:57:39 2026] 127.0.0.1:38176 [200]: POST /api.php?r=auth%2Faccount
+[Sat Oct 31 15:57:39 2026] 127.0.0.1:38176 Closing
+[Sat Oct 31 15:57:39 2026] 127.0.0.1:38182 Accepted
+[Sat Oct 31 15:57:39 2026] 127.0.0.1:38198 Accepted
+[Sat Oct 31 15:57:39 2026] 127.0.0.1:38182 [200]: GET /api.php?r=searches
+[Sat Oct 31 15:57:39 2026] 127.0.0.1:38182 Closing
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38198 [200]: POST /api.php?r=explore
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38198 Closing
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38212 Accepted
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38228 Accepted
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38212 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38212 Closing
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38228 [200]: GET /verify-email.html
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38228 Closing
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38238 Accepted
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38250 Accepted
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38238 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38256 Accepted
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38250 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38268 Accepted
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38256 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38238 Closing
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38268 [200]: GET /assets/auth-pages.js?v=202610301418
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38250 Closing
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38256 Closing
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38268 Closing
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38280 Accepted
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38280 [200]: POST /api.php?r=auth%2Fverify-email
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38280 Closing
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38292 Accepted
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38292 [200]: POST /api.php?r=auth%2Flogout
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38292 Closing
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38304 Accepted
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38304 [200]: GET /recover.html
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38304 Closing
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38320 Accepted
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38322 Accepted
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38326 Accepted
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38342 Accepted
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38320 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38322 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38320 Closing
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38326 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38322 Closing
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38326 Closing
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38342 [200]: GET /assets/auth-pages.js?v=202610301418
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38342 Closing
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38344 Accepted
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38344 [200]: POST /api.php?r=auth%2Frecover
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38344 Closing
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38358 Accepted
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38358 [200]: GET /reset.html
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38358 Closing
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38370 Accepted
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38372 Accepted
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38386 Accepted
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38394 Accepted
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38370 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38370 Closing
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38372 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38372 Closing
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38386 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38386 Closing
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38394 [200]: GET /assets/auth-pages.js?v=202610301418
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38394 Closing
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38398 Accepted
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38398 [200]: POST /api.php?r=auth%2Freset
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38398 Closing
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38412 Accepted
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38412 [200]: GET /login.html
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38412 Closing
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38418 Accepted
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38426 Accepted
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38432 Accepted
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38434 Accepted
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38418 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38418 Closing
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38426 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38426 Closing
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38432 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38432 Closing
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38434 [200]: GET /assets/auth-pages.js?v=202610301418
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38434 Closing
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38446 Accepted
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38446 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38446 Closing
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38452 Accepted
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38452 [200]: POST /api.php?r=auth%2Flogin
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38452 Closing
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38458 Accepted
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38458 [200]: GET /index.html
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38458 Closing
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38460 Accepted
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38472 Accepted
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38480 Accepted
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38482 Accepted
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38494 Accepted
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38496 Accepted
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38460 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38472 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38460 Closing
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38472 Closing
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38480 [200]: GET /assets/etf.js?v=202610301418
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38482 [200]: GET /assets/explorer-menu.js?v=202610301418
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38494 [200]: GET /assets/multiselect.js?v=202610301418
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38480 Closing
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38482 Closing
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38494 Closing
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38496 [200]: GET /assets/explorer.js?v=202610301418
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38496 Closing
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38498 Accepted
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38502 Accepted
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38498 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38498 Closing
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38502 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38502 Closing
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38518 Accepted
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38530 Accepted
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38546 Accepted
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38518 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:57:40 2026] 127.0.0.1:38518 Closing
+[Sat Oct 31 15:57:41 2026] 127.0.0.1:38530 [200]: GET /api.php?r=strategy%2Fpresets
+[Sat Oct 31 15:57:41 2026] 127.0.0.1:38530 Closing
+[Sat Oct 31 15:57:41 2026] 127.0.0.1:38546 [200]: GET /api.php?r=data%2Foverview
+[Sat Oct 31 15:57:41 2026] 127.0.0.1:38546 Closing
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54328 Accepted
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54328 [200]: GET /login.html
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54328 Closing
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54334 Accepted
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54338 Accepted
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54344 Accepted
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54354 Accepted
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54334 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54338 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54334 Closing
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54338 Closing
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54344 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54354 [200]: GET /assets/auth-pages.js?v=202610301418
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54344 Closing
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54354 Closing
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54368 Accepted
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54368 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54368 Closing
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54378 Accepted
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54378 [200]: POST /api.php?r=auth%2Flogin
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54378 Closing
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54392 Accepted
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54392 [200]: GET /index.html
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54392 Closing
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54406 Accepted
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54410 Accepted
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54416 Accepted
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54426 Accepted
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54438 Accepted
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54442 Accepted
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54406 [200]: GET /assets/app.css?v=202610301418
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54406 Closing
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54410 [200]: GET /assets/etf.js?v=202610301418
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54410 Closing
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54416 [200]: GET /assets/explorer-menu.js?v=202610301418
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54426 [200]: GET /assets/multiselect.js?v=202610301418
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54438 [200]: GET /assets/explorer.js?v=202610301418
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54416 Closing
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54426 Closing
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54438 Closing
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54442 [200]: GET /assets/app.js?v=202610301418
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54442 Closing
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54450 Accepted
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54450 [200]: GET /assets/passwords.js?v=202610301418
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54450 Closing
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54460 Accepted
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54460 [200]: GET /api.php?r=auth%2Fme
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54460 Closing
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54462 Accepted
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54462 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54462 Closing
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54474 Accepted
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54478 Accepted
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54474 [200]: GET /api.php?r=strategy%2Fpresets
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54474 Closing
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54478 [200]: GET /api.php?r=data%2Foverview
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54478 Closing
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54486 Accepted
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54486 [200]: GET /api.php?r=searches
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54486 Closing
+[Sat Oct 31 15:57:57 2026] 127.0.0.1:54492 Accepted
+[Sat Oct 31 15:57:58 2026] 127.0.0.1:54492 [200]: POST /api.php?r=explore
+[Sat Oct 31 15:57:58 2026] 127.0.0.1:54492 Closing
+[Sat Oct 31 15:57:58 2026] 127.0.0.1:54496 Accepted
+[Sat Oct 31 15:57:58 2026] 127.0.0.1:54502 Accepted
+[Sat Oct 31 15:57:58 2026] 127.0.0.1:54496 [200]: GET /api.php?r=portfolios
+[Sat Oct 31 15:57:58 2026] 127.0.0.1:54496 Closing
+[Sat Oct 31 15:57:58 2026] 127.0.0.1:54502 [200]: POST /api.php?r=explore
+[Sat Oct 31 15:57:58 2026] 127.0.0.1:54502 Closing
