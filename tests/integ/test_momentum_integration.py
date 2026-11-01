@@ -154,7 +154,7 @@ def test_tracking_records_both_strategies_at_21_and_63_sessions():
     with conn.cursor() as cur:
         cur.execute("SELECT preset, COUNT(*) n FROM ranking_snapshots WHERE snap_date=%s GROUP BY preset", (day,))
         by_preset = {r['preset']: r['n'] for r in cur.fetchall()}
-    assert by_preset.get('momentum', 0) >= 1 and by_preset.get('momentum12', 0) >= 1
+    assert by_preset.get('momentum', 0) >= 1 and by_preset.get('momentum12', 0) >= 1 and by_preset.get('momentum_risk', 0) >= 1
     assert tracking.backfill(conn, sessions=70) > 0
     assert tracking.update_outcomes(conn) > 0
     with conn.cursor() as cur:

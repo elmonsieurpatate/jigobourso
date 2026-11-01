@@ -12,7 +12,7 @@ const BASE='http://127.0.0.1:18089';
   await page.evaluate(()=>{localStorage.clear();sessionStorage.clear()});await page.goto(BASE+'/index.html');
   await page.locator('#strats .strat').first().waitFor();await page.locator('.rtable tbody tr').first().waitFor();
   const keys=await page.locator('#strats .strat-grid .strat').evaluateAll(l=>l.map(e=>e.dataset.k));
-  ok('six_cartes_dans_l_ordre',JSON.stringify(keys)===JSON.stringify(['regular','fast','recovery','low_volatility','momentum','momentum12']),keys);
+  ok('sept_cartes_dans_l_ordre',JSON.stringify(keys)===JSON.stringify(['regular','fast','recovery','low_volatility','momentum','momentum12','momentum_risk']),keys);
   ok('cartes_libelles',(await page.locator('#strats').innerText()).includes('Momentum 6 mois')&&(await page.locator('#strats').innerText()).includes('252 → 21 séances'));
   await page.click('.strat[data-k="momentum12"]');await page.waitForTimeout(1200);
   ok('momentum12_actif',await page.locator('.strat.on[data-k="momentum12"]').count()===1);

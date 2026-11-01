@@ -1,7 +1,7 @@
 import math
 
 import pytest
-from engine.analytics.measures import window_metrics, technical_state
+from engine.analytics.measures import window_metrics, technical_state, dated_technical_state
 from engine.analytics.series import usable_closes, find_breaks, clean_window
 
 
@@ -58,6 +58,16 @@ def test_technical_state():
     assert t['ma20'] == sum(range(41, 61)) / 20
     assert t['ma50'] > t['ma50_prev']
     assert math.isclose(t['daily_change'], 100 * (60 / 59 - 1))
+
+
+def test_dated_technical_state_uses_complete_200_session_windows():
+    dates = [f'd{i:03}' for i in range(205)]
+    prices = {d: float(i + 1) for i, d in enumerate(dates)}
+    t = dated_technical_state(dates, prices)
+    assert t['ma200'] == sum(range(6, 206)) / 200
+    assert t['ma200_prev'] == sum(range(1, 201)) / 200
+    del prices[dates[-1]]
+    assert dated_technical_state(dates, prices)['ma200'] is None
 
 
 def test_adjusted_used_only_if_complete():

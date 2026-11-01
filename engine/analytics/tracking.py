@@ -117,7 +117,17 @@ def record_snapshot(conn):
         return None, 0
     total = 0
     for name in strategy.PRESETS:
-        total += _store(conn, day.isoformat(), name, _top_picks(service.judge_universe(conn, strategy.preset(name))), 'live')
+        config = strategy.preset(name)
+        # Les colonnes de risque de Momentum ajusté du risque n'existent pas avant le déploiement de sa migration.
+        if name == 'momentum_risk':
+            try:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT ma200, ma200_prev FROM series_state LIMIT 0")
+            except Exception as exc:
+                if getattr(exc, 'args', [None])[0] not in (1054,):
+                    raise
+                continue
+        total += _store(conn, day.isoformat(), name, _top_picks(service.judge_universe(conn, config)), 'live')
     return day.isoformat(), total
 
 
@@ -126,6 +136,13 @@ def backfill(conn, sessions=30, log=lambda *_: None, batch=300):
 
     Lecture par lots de cotations ; seuls les verdicts retenus restent en mémoire, car le rang ne dépend que d'eux."""
     configs = {name: strategy.validate(strategy.preset(name)) for name in strategy.PRESETS}
+    # Si la migration n'est pas encore appliquée, autorise les anciens modes de suivi et ignore seulement le nouveau profil.
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT ma200, ma200_prev FROM series_state LIMIT 0")
+    except Exception as exc:
+        if getattr(exc, 'args', [None])[0] != 1054: raise
+        configs.pop('momentum_risk', None)
     days = reference_calendar(conn)[-sessions:]
     with conn.cursor() as cur:
         cur.execute('SELECT listing_id FROM v_recommendable ORDER BY listing_id')

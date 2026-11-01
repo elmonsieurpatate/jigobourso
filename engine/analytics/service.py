@@ -74,7 +74,7 @@ def _load_universe(conn, windows, ids=None):
     with conn.cursor() as cur:
         cur.execute("""SELECT l.id, l.symbol, l.mic, l.currency, i.name, i.isin, i.kind, i.country, i.category,
                               p.price, p.price_time, p.quote_at, p.source AS price_source, p.currency AS price_currency, p.avg_volume_3m,
-                       s.last_close_date, s.closes_count, s.close_px, s.ma20, s.ma50, s.ma50_prev, s.daily_change, s.gap_to_ma20, s.quality, s.break_age, s.break_dates,
+                              s.last_close_date, s.closes_count, s.close_px, s.ma20, s.ma50, s.ma50_prev, s.ma200, s.ma200_prev, s.daily_change, s.gap_to_ma20, s.quality, s.break_age, s.break_dates,
                        s.coverage_252, s.expected_252, s.momentum_6m, s.momentum_12m
                        FROM v_recommendable r JOIN listings l ON l.id=r.listing_id JOIN instruments i ON i.id=l.instrument_id
                        LEFT JOIN latest_prices p ON p.listing_id=l.id LEFT JOIN series_state s ON s.listing_id=l.id""" + only, list(ids or []))
@@ -149,7 +149,7 @@ def judge_universe(conn, config, ids=None):
             stored_metric = stored.get(u['id'], {}).get(n)
             if stored_metric and stored_metric.get('coverage') is None and n not in live.get(u['id'], {}):
                 missing[n] = _missing_reason(count, n, None, u.get('break_age'))             # historique trop court, rupture dans la fenêtre ou calendrier : le vrai motif
-        tech = {k: (None if u[k] is None else float(u[k])) for k in ('close_px', 'ma20', 'ma50', 'ma50_prev', 'daily_change', 'gap_to_ma20')}
+        tech = {k: (None if u[k] is None else float(u[k])) for k in ('close_px', 'ma20', 'ma50', 'ma50_prev', 'ma200', 'ma200_prev', 'daily_change', 'gap_to_ma20')}
         tech['close'] = tech.pop('close_px')
         last = u['last_close_date'].isoformat() if u['last_close_date'] else None
         expected = max(expected_close(conn, u['mic']), str(latest_by_mic.get(u['mic']) or ''))
@@ -161,8 +161,10 @@ def judge_universe(conn, config, ids=None):
             u['quality'] = 'incomplete'
         elif u['quality'] not in ('break', 'insufficient') and any(n in missing and missing[n] == 'calendar' for n in windows):
             u['quality'] = 'calendar_unknown'
-        saved_momentum = u.get('momentum_12m') if config['ranking']['mode'] == 'momentum12' else u.get('momentum_6m')
-        v = strategy.judge(config, measures, tech, missing, last, expected or None, momentum=None if saved_momentum is None else float(saved_momentum))
+        saved_momentum = ({'6m': u.get('momentum_6m'), '12m': u.get('momentum_12m')} if config['ranking']['mode'] == strategy.RISK_MOMENTUM
+                          else u.get('momentum_12m') if config['ranking']['mode'] == 'momentum12' else u.get('momentum_6m'))
+        momentum_arg = saved_momentum if isinstance(saved_momentum, dict) else (None if saved_momentum is None else float(saved_momentum))
+        v = strategy.judge(config, measures, tech, missing, last, expected or None, momentum=momentum_arg)
         if u['quality'] == 'incomplete' and v['status'] == 'unknown':
             v['status_label'] = 'Historique incomplet'
         v.update(key=u['id'], group='etf' if u['kind'] == 'etf' else 'equity', symbol=u['symbol'], row=u)
@@ -183,7 +185,7 @@ def _row(v, rates, conn=None):
             'quality': u['quality'], 'price_stale': hours.price_is_stale(u['mic'], u['price_time'], hours.utcnow(), expected_close(conn, u['mic']) if conn is not None else None, last_collection(conn, u['mic']) if conn is not None else None), 'measures': {str(n): m for n, m in v['measures'].items()}, 'reasons': v['reasons']}
 
 
-CACHE_FORMAT = 4
+CACHE_FORMAT = 5
 MAX_NEW_CONFIGS_PER_HOUR = 60       # calculs d'univers complets (réglages jamais vus ou données changées) acceptés par heure, tous utilisateurs confondus
 ENTRY_FIELDS = ('id', 'symbol', 'name', 'isin', 'kind', 'mic', 'country', 'status', 'group', 'rank', 'score', 'category', 'fails')
 
@@ -606,7 +608,7 @@ def instrument_sheet(conn, request):
         from . import etf
         sheet['etf_analysis'] = etf.load(conn, [lid]).get(lid)
         sheet['etf_compare'] = etf.compare(conn, lid)
-    sheet['strategy'] = {'name': config.get('name'), 'ranking': config['ranking']['mode'], 'source': request.get('source') or None, 'experimental': config.get('name') in strategy.EXPERIMENTAL or config['ranking']['mode'] in strategy.MOMENTUM_WINDOWS,
+    sheet['strategy'] = {'name': config.get('name'), 'ranking': config['ranking']['mode'], 'source': request.get('source') or None, 'experimental': config.get('name') in strategy.EXPERIMENTAL or config['ranking']['mode'] in strategy.MOMENTUM_WINDOWS or config['ranking']['mode'] == strategy.RISK_MOMENTUM,
                          'technical': {k: v for k, v in config['technical'].items() if v},
                          'periods': [{'id': p['id'], 'label': strategy.LABELS[p['id']], 'sessions': p['sessions'], 'criteria': {f: p[f] for f, _, _ in strategy.CRITERIA if p[f] is not None}} for p in config['periods'] if p['enabled']]}
     sheet['config_periods'] = [{'id': p['id'], 'label': strategy.LABELS[p['id']], 'sessions': p['sessions'], 'enabled': p['enabled']} for p in config['periods']]

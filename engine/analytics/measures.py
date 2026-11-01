@@ -129,6 +129,7 @@ def technical_state(closes):
     ma20 = moving_average(closes, 20)
     return {'close': closes[-1], 'ma20': ma20, 'ma50': moving_average(closes, 50),
             'ma50_prev': moving_average(closes[:-5], 50) if len(closes) > 5 else None,
+            'ma200': moving_average(closes, 200), 'ma200_prev': moving_average(closes[:-5], 200) if len(closes) > 205 else None,
             'daily_change': 100 * (closes[-1] / closes[-2] - 1) if len(closes) >= 2 else None,
             'gap_to_ma20': 100 * (closes[-1] / ma20 - 1) if ma20 else None}
 
@@ -143,11 +144,15 @@ def dated_technical_state(expected_dates, observations):
     close = observations.get(dates[-1]) if dates else None
     last20, last50 = values(dates[-20:]), values(dates[-50:])
     prev50 = values(dates[-55:-5]) if len(dates) >= 55 else None
+    last200 = values(dates[-200:])
+    prev200 = values(dates[-205:-5]) if len(dates) >= 205 else None
     last2 = values(dates[-2:])
     ma20 = sum(last20) / 20 if last20 else None
     ma50 = sum(last50) / 50 if last50 else None
     ma50_prev = sum(prev50) / 50 if prev50 else None
+    ma200 = sum(last200) / 200 if last200 else None
+    ma200_prev = sum(prev200) / 200 if prev200 else None
     daily = 100 * (last2[-1] / last2[0] - 1) if last2 else None
     return {'close': float(close) if close is not None else None, 'ma20': ma20, 'ma50': ma50,
-            'ma50_prev': ma50_prev, 'daily_change': daily,
+            'ma50_prev': ma50_prev, 'ma200': ma200, 'ma200_prev': ma200_prev, 'daily_change': daily,
             'gap_to_ma20': 100 * (float(close) / ma20 - 1) if close is not None and ma20 else None}

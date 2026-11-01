@@ -20,6 +20,20 @@ def test_presets_validate():
         assert S.validate(S.preset(name))['name'] == name
 
 
+def test_momentum_risk_profile_filters_long_trend_and_ranks_by_risk_adjusted_composite():
+    cfg = S.validate(S.preset('momentum_risk'))
+    assert cfg['ranking']['mode'] == 'momentum_risk'
+    assert [p['id'] for p in cfg['periods'] if p['enabled']] == ['half', 'year']
+    assert cfg['technical']['above_ma200'] and cfg['technical']['ma200_rising']
+    # Les rangs par composante sont normalisés au sein du groupe ; les risques faibles améliorent le score.
+    vals = [
+        {'key': 1, 'group': 'equity', 'symbol': 'A', 'status': 'retained', 'momentum': {'6m': 30, '12m': 40}, 'measures': {252: {'volatility': 2, 'drawdown': 10}}},
+        {'key': 2, 'group': 'equity', 'symbol': 'B', 'status': 'retained', 'momentum': {'6m': 25, '12m': 35}, 'measures': {252: {'volatility': 1, 'drawdown': 5}}},
+    ]
+    ranked = S.rank(cfg, vals)
+    assert ranked[0]['score'] > ranked[1]['score']  # les performances pèsent 80 %, les pénalités de risque 20 %
+
+
 def test_validate_rejects_bad_config():
     c = S.preset('regular')
     c['periods'][2]['sessions'] = 300

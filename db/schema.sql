@@ -148,6 +148,8 @@ CREATE TABLE series_state (                                     -- état de la s
   ma20            DECIMAL(16,6) NULL,
   ma50            DECIMAL(16,6) NULL,
   ma50_prev       DECIMAL(16,6) NULL,                           -- MA50 cinq séances plus tôt
+  ma200           DECIMAL(16,6) NULL,
+  ma200_prev      DECIMAL(16,6) NULL,                           -- MA200 cinq séances plus tôt
   daily_change    DECIMAL(10,4) NULL,                           -- % dernière séance
   gap_to_ma20     DECIMAL(10,4) NULL,                           -- % écart au MA20
   break_age       SMALLINT UNSIGNED NULL,                       -- séances écoulées depuis la dernière rupture de cours inexpliquée
@@ -293,11 +295,12 @@ CREATE TABLE etf_profiles (                                     -- fiche pédago
 -- ───────────── SUIVI DES CLASSEMENTS ET CACHE ─────────────
 CREATE TABLE ranking_snapshots (                                -- meilleurs titres de chaque stratégie, chaque soir (preuve datée)
   snap_date  DATE NOT NULL,                                     -- dernière séance connue au moment du calcul
-  preset     VARCHAR(20) CHARACTER SET ascii NOT NULL,
+  preset     VARCHAR(40) CHARACTER SET ascii NOT NULL,
   listing_id INT UNSIGNED NOT NULL,
   grp        ENUM('equity','etf') NOT NULL,
   rank_pos   SMALLINT UNSIGNED NOT NULL,
   score      DECIMAL(6,2) NULL,
+  momentum_risk_profile TINYINT UNSIGNED NULL,
   origin     ENUM('live','rebuilt') NOT NULL DEFAULT 'live',    -- rebuilt = reconstitué après coup (biais de survie : univers actuel)
   PRIMARY KEY (snap_date, preset, listing_id),
   CONSTRAINT fk_snap_listing FOREIGN KEY (listing_id) REFERENCES listings(id)
@@ -305,10 +308,11 @@ CREATE TABLE ranking_snapshots (                                -- meilleurs tit
 
 CREATE TABLE ranking_outcomes (                                 -- rendement (%) d'un titre classé, N séances après le classement
   snap_date  DATE NOT NULL,
-  preset     VARCHAR(20) CHARACTER SET ascii NOT NULL,
+  preset     VARCHAR(40) CHARACTER SET ascii NOT NULL,
   listing_id INT UNSIGNED NOT NULL,
   horizon    TINYINT UNSIGNED NOT NULL,
   ret        DECIMAL(9,4) NOT NULL,
+  momentum_risk_profile TINYINT UNSIGNED NULL,
   PRIMARY KEY (snap_date, preset, listing_id, horizon)
 ) ENGINE=InnoDB;
 

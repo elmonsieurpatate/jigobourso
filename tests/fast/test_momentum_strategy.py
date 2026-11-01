@@ -34,8 +34,8 @@ FINGERPRINTS = {   # empreintes calculées sur le code AVANT l'ajout du cinquiè
 def test_the_four_existing_strategies_are_byte_for_byte_unchanged():
     for name, expected in FINGERPRINTS.items():
         assert hashlib.sha256(json.dumps(S.preset(name), sort_keys=True).encode()).hexdigest() == expected, name
-    assert S.PRESETS[:4] == ('regular', 'fast', 'recovery', 'low_volatility') and S.PRESETS[4:] == ('momentum', 'momentum12')
-    assert S.EXPERIMENTAL == ('momentum', 'momentum12') and S.RANK_MODES[:4] == ('trend', 'performance', 'regularity', 'stability')
+    assert S.PRESETS[:4] == ('regular', 'fast', 'recovery', 'low_volatility') and S.PRESETS[4:] == ('momentum', 'momentum12', 'momentum_risk')
+    assert S.EXPERIMENTAL == ('momentum', 'momentum12', 'momentum_risk') and S.RANK_MODES[:4] == ('trend', 'performance', 'regularity', 'stability')
 
 
 def test_momentum_preset_is_valid_and_has_no_threshold():

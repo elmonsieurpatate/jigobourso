@@ -8,7 +8,8 @@
     recovery: ['Rebond', 'Repère les titres qui repartent après une période faible.'],
     low_volatility: ['Hausse calme', 'Repère les hausses avec des variations plus modérées.'],
     momentum: ['Momentum 6 mois', 'Classement de la progression passée sur six mois.'],
-    momentum12: ['Momentum 12 mois', 'Classement de la progression passée sur douze mois.']
+    momentum12: ['Momentum 12 mois', 'Classement de la progression passée sur douze mois.'],
+    momentum_risk: ['Momentum ajusté du risque', 'Tendance au-dessus d’une moyenne 200 jours ascendante, momentum 6/12 mois pénalisé selon volatilité et repli. Essai.']
   };
   const icons = ['📈', '⚡', '🔎', '🛡️', '🌱', '📊', '💼', '⭐'];
   let currentState = {};

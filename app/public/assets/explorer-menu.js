@@ -9,6 +9,7 @@
     low_volatility: SVG(`<path d="M5 27 C13 25 16 19 24 19 S36 14 40 12 S45 9 47 8" stroke="#2f80ed" stroke-width="3"/>${arrow(47, 8, '#2f80ed', -7, 3)}`),
     momentum: SVG(`<polyline points="5,29 12,21 18,25 27,12 33,16 46,5" stroke="#4f46e5" stroke-width="3"/><polyline points="5,33 14,28 22,30" stroke="#4f46e5" stroke-width="1.6" opacity=".35"/>${arrow(46, 5, '#4f46e5', -7, 3)}`),
     momentum12: SVG(`<polyline points="3,31 9,24 15,27 22,17 28,21 36,9 46,4" stroke="#4f46e5" stroke-width="3"/><polyline points="3,35 14,31 26,33" stroke="#4f46e5" stroke-width="1.6" opacity=".35"/>${arrow(46, 4, '#4f46e5', -7, 3)}`),
+    momentum_risk: SVG(`<polyline points="4,30 12,24 18,25 26,15 33,18 43,7" stroke="#4f46e5" stroke-width="3"/>${arrow(43, 7, '#4f46e5', -7, 3)}<line x1="5" y1="34" x2="47" y2="34" stroke="#2f80ed" stroke-width="2"/>`),
     free: SVG(`<circle cx="22" cy="18" r="9" stroke="#64748b" stroke-width="2.6"/><path d="M29 25 L38 33" stroke="#64748b" stroke-width="3"/>`),
     custom: SVG(`<path d="M8 12h24M40 12h6M8 26h6M22 26h24" stroke="#64748b" stroke-width="2.6"/><circle cx="36" cy="12" r="4" stroke="#64748b" stroke-width="2.4"/><circle cx="18" cy="26" r="4" stroke="#64748b" stroke-width="2.4"/>`)
   };
