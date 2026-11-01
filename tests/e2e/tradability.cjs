@@ -23,7 +23,7 @@ const BASE='http://127.0.0.1:18089';
   ok('visibles_presentes',['TEST09.PA','TEST13.PA'].every(x=>on.includes(x)),on.length);
   const note=await page.locator('#tradable-note').innerText();
   ok('note_masques',/masqué/.test(note),note);
-  ok('rang_original_affiche',await page.locator('.rtable tbody tr .rk .sub').first().innerText().then(t=>/^rang \d+/.test(t),()=>false));
+  ok('rang_original_affiche',await page.locator('.rtable tbody tr .rk').first().innerText().then(t=>/^\d+$/.test(t))&&/Des titres sont masqués/.test(await page.locator('.rank-note').innerText()));
   // un clic : tout le catalogue
   await page.locator('#tradable').uncheck();
   ok('tout_affiche',await retry(async()=>{const all=await symbols();return limited.every(s=>all.includes(s))&&all.includes('ETF1001.PA')}));

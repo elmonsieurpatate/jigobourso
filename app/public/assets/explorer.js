@@ -253,17 +253,14 @@
     const n = FILTERS.filter(k => el(k).value.trim()).length + CHECKS.filter(k => el(k).checked).length;
     el('filters-count').hidden = !n; el('filters-count').textContent = n;
   }
-  const COLS = [['rank', '#', 'rk'], ['name', 'Titre'], ['price', 'Prix (€)', 'num'], [null, 'Tendance', 'hide-s'], ['slope', 'Pente', 'num'], ['r2', 'R²', 'num'], ['perf', 'Perf.', 'num'], ['volatility', 'Volat.', 'num'], ['drawdown', 'Repli', 'num'], ['volume', 'Volume moy.', 'num'], ['score', 'Score', 'num'], [null, 'Analystes', 'hide-s'], ['fresh', 'Données', 'num'], [null, 'Verdict', '']];
+  const COLS = [['rank', 'Rang', 'rk'], ['name', 'Titre'], ['price', 'Prix (€)', 'num'], [null, 'Tendance', 'hide-s'], ['slope', 'Pente', 'num'], ['r2', 'R²', 'num'], ['perf', 'Perf.', 'num'], ['volatility', 'Volat.', 'num'], ['drawdown', 'Repli', 'num'], ['volume', 'Volume moy.', 'num'], ['score', 'Score', 'num'], [null, 'Analystes', 'hide-s'], ['fresh', 'Données', 'num'], [null, 'Verdict', '']];
   function header(ref) {
     const tip = { slope: '%/séance', r2: 'régularité', perf: 'performance', volatility: '%/séance', drawdown: 'repli maximal' };
     return '<thead><tr>' + COLS.map(([k, l, c]) => k ? `<th class="sortable ${c || ''} ${S.sort === k ? 'sorted' : ''}" data-k="${k}" title="${tip[k] ? tip[k] + ' sur ' + ref + ' séances' : 'Trier'}">${l}${S.sort === k ? (S.dir === 'asc' ? ' ▲' : ' ▼') : ''}</th>` : `<th class="${c || ''}">${l}</th>`).join('') + '</tr></thead>';
   }
   function sheetHref(id) { return 'titre.html?src=explorer&id=' + encodeURIComponent(id) + '#explore=' + encodeURIComponent(JSON.stringify({config:S.config,view:view(),preset:S.preset,label:S.label})); }
-  /* Filtre actif : « # » = position dans la liste affichée, et le rang d'origine du catalogue complet reste visible dessous (jamais recalculé). */
-  function rankCell(r) {
-    const filtered = lastRes && lastRes.tradable && lastRes.tradable.on && S.sort === 'rank' && r.position;
-    return filtered ? `${r.position}<span class="sub" style="display:block" title="Rang dans le catalogue complet, sans filtre">rang ${r.rank || '·'}</span>` : (r.rank || '·');
-  }
+  /* Une seule valeur : le rang du titre, sans le numéro de ligne qui prêtait à confusion. */
+  function rankCell(r) { return `<span title="Rang dans les titres retenus de son type">${r.rank || '–'}</span>`; }
   /* ETF « presque identiques » (Groupe A, B…) : le mieux classé reste visible, les autres se déplient sous lui avec « + ». Rangs, scores et ordre ne changent pas. */
   const openGroups = new Set();
   const famWhy = i => i && !i.leader ? `<span class="fam-why"><b>Rapproche :</b> ${(i.why || []).map(J.esc).join(' · ')}.${(i.diff || []).length ? ` <b>Diffère :</b> ${i.diff.map(J.esc).join(' · ')}.` : ' <b>Aucune différence relevée</b> dans le nom, la devise et les frais connus.'}</span>` : '';
@@ -317,7 +314,9 @@
     lastRes = res; const lm = (res.level_filters || {}).masked || 0; el('level-note').textContent = lm ? `${J.num(lm, 0)} titre${lm > 1 ? 's' : ''} masqué${lm > 1 ? 's' : ''} par vos filtres de régularité, volatilité ou négociabilité (rang et score inchangés).` : '';
     el('tradable-note').textContent = res.tradable.on ? (res.tradable.masked ? `${J.num(res.tradable.masked, 0)} titre${res.tradable.masked > 1 ? 's' : ''} masqué${res.tradable.masked > 1 ? 's' : ''} : valeur échangée estimée trop faible. Décochez pour tout voir.` : 'Aucun titre masqué dans cette vue.') : 'Tous les titres du catalogue sont affichés.';
     drawTabs(res); drawWhy(res); fillFacets(res);
-    el('results').innerHTML = res.rows.length ? JEtf.concentration(res.etf_concentration) + `<div class="small muted explorer-legend">${JEtf.LEGEND}</div><div class="table-wrap"><table class="rtable">${header(res.ref_sessions)}<tbody>${groupedRows(res.rows)}</tbody></table></div>` : `<div class="empty">${v.q ? 'Aucun titre ne correspond à cette recherche.' : 'Aucun titre dans cette vue avec ces critères et ces filtres.'}</div>`;
+    const ranksMasked = (res.tradable?.masked || 0) + (res.level_filters?.masked || 0);
+    const rankNote = ranksMasked ? 'Des titres sont masqués par vos filtres : leurs rangs restent comptés, donc certains numéros sautent. Actions et ETF ont des classements séparés.' : 'Actions et ETF ont des classements séparés.';
+    el('results').innerHTML = res.rows.length ? JEtf.concentration(res.etf_concentration) + `<div class="small muted rank-note">${rankNote}</div><div class="small muted explorer-legend">${JEtf.LEGEND}</div><div class="table-wrap"><table class="rtable">${header(res.ref_sessions)}<tbody>${groupedRows(res.rows)}</tbody></table></div>` : `<div class="empty">${v.q ? 'Aucun titre ne correspond à cette recherche.' : 'Aucun titre dans cette vue avec ces critères et ces filtres.'}</div>`;
     if (!window.jigoScrollRestored) { window.jigoScrollRestored = true; try { requestAnimationFrame(() => scrollTo(0, +(sessionStorage.getItem('jigo_explorer_scroll') || 0))); } catch (e) {} }
     J.$$('#results tbody tr').forEach(tr => { const a = tr.querySelector('a[data-sheet]'); a.addEventListener('click', () => { persist(); sessionStorage.setItem('jigo_explorer_scroll', String(scrollY)); }); tr.onclick = e => { if (e.target.closest('a,button,input')) return; persist(); window.open(a.href, '_blank', 'noopener'); }; });
     J.$$('#results .fam-toggle').forEach(b => b.onclick = () => { const g = b.dataset.g, on = !openGroups.has(g); on ? openGroups.add(g) : openGroups.delete(g); b.setAttribute('aria-expanded', on); b.querySelector('.fam-sign').textContent = on ? '−' : '+'; J.$$('#results tr[data-child-of]').forEach(tr => { if (tr.dataset.childOf === g) tr.hidden = !on; }); });

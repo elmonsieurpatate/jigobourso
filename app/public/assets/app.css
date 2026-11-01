@@ -376,6 +376,7 @@ tr[hidden] { display: none; }
 
 .portfolio-kpis { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
 .tax-estimate-note { margin:10px 2px 14px; max-width:110ch; line-height:1.45; }
+.rank-note { margin:4px 14px 8px; line-height:1.35; }
 @media (max-width:640px) {
   body.strategy-editing #menu .menu-bar { display:none; }
   body.strategy-editing #sliders { display:grid !important; grid-template-columns:1fr; }
