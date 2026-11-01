@@ -309,6 +309,13 @@ def _num(view, key):
     return None if v in (None, '') else float(v)
 
 
+def _aum_eur(entry, rates):
+    if entry.get('kind') != 'etf' or not entry.get('net_assets'):
+        return None
+    factor = to_eur_factor(entry.get('price_currency') or entry.get('currency'), rates)
+    return float(entry['net_assets']) * factor if factor is not None else None
+
+
 def scoped_entries(conn, config, view, rates=None, aux=None, now=None):
     """Étapes 1 à 3 de la recherche : univers complet des titres éligibles → filtres de l'utilisateur → évaluation et classement DANS cette sélection.
     Renvoie (entrées de l'univers, entrées examinées avec statut, rang et score recalculés dans la sélection, fenêtre de référence, données de filtre).
@@ -337,20 +344,21 @@ def scoped_entries(conn, config, view, rates=None, aux=None, now=None):
                         etf_data[p['listing_id']] = {}
     # Encours Yahoo, converti dans une devise commune. Chaque instrument n'est compté
     # qu'une fois même si plusieurs cotations subsistent dans l'univers.
-    aum_by_instrument = {}
     aum_listing_values = {}
-    for e in entries if requested_kind == 'large_etf' else ():
-        if e['kind'] != 'etf':
-            continue
-        iid = e.get('instrument_id', e['id'])
-        if not e.get('net_assets'):
-            continue
-        factor = to_eur_factor(e.get('price_currency') or e.get('currency'), rates)
-        if factor is None:
-            continue
-        amount = float(e['net_assets']) * factor
-        aum_listing_values[e['id']] = amount
-        aum_by_instrument[iid] = max(amount, aum_by_instrument.get(iid, 0))
+    aum_by_instrument = {}
+    if requested_kind == 'large_etf':
+        for e in entries:
+            if e['kind'] != 'etf':
+                continue
+            iid = e.get('instrument_id', e['id'])
+            if not e.get('net_assets'):
+                continue
+            factor = to_eur_factor(e.get('price_currency') or e.get('currency'), rates)
+            if factor is None:
+                continue
+            amount = float(e['net_assets']) * factor
+            aum_listing_values[e['id']] = amount
+            aum_by_instrument[iid] = max(amount, aum_by_instrument.get(iid, 0))
     large_instruments = set()
     if aum_by_instrument:
         ordered_aum = sorted(aum_by_instrument.values(), reverse=True)
@@ -491,7 +499,7 @@ def explore(conn, request):
         r.update({'position': position, 'volume': a.get('volume'), 'last_close': a['last_close'].isoformat() if a.get('last_close') else None,
                   'analyst': analyst_view(a.get('analyst')) if e['kind'] == 'equity' else None, 'ref': {k: a.get(k) for k in REF_FIELDS}, 'open': e['mic'] in hours.HOURS and hours.is_open(e['mic'], now),
                   'signals': signals.row_signals(a, e['kind'], ref, prefilter_cfg, a.get('quote_age_days')), 'etf_group': group_of.get(e['id']), 'etf_group_info': group_info.get(e['id']),
-                  'aum_eur': aum_listing_values.get(e['id'])})
+                  'aum_eur': aum_listing_values.get(e['id']) if requested_kind == 'large_etf' else _aum_eur(e, rates)})
         if e['kind'] == 'etf':
             r['fund_nature'] = fund_natures.get(e['id'])
         out.append(r)
