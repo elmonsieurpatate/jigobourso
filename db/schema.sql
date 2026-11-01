@@ -157,6 +157,8 @@ CREATE TABLE series_state (                                     -- état de la s
   expected_252    SMALLINT UNSIGNED NULL,
   risk_score      TINYINT UNSIGNED NULL,                        -- RÉSERVÉ : jamais calculé (toujours NULL)
   quality         ENUM('ok','insufficient','inconsistent_adjustments','stale','break','incomplete','calendar_unknown') NOT NULL DEFAULT 'ok',
+  momentum_6m     DECIMAL(12,6) NULL,                           -- EXPÉRIMENTAL : variation du cours (%) entre J−126 et J−21 séances ; NULL = non évaluable
+  momentum_12m    DECIMAL(12,6) NULL,                           -- EXPÉRIMENTAL : variation du cours (%) entre J−252 et J−21 séances ; NULL = non évaluable
   PRIMARY KEY (listing_id),
   CONSTRAINT fk_state_listing FOREIGN KEY (listing_id) REFERENCES listings(id)
 ) ENGINE=InnoDB;
@@ -366,6 +368,17 @@ CREATE TABLE IF NOT EXISTS saved_searches (
   UNIQUE KEY uq_search_name (user_id, name),
   CONSTRAINT fk_search_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Réglage personnel d'une stratégie de départ (critères + filtres), remplaçable et réinitialisable (ajout du 01/11/2026, additif)
+CREATE TABLE IF NOT EXISTS saved_presets (
+  user_id    INT UNSIGNED NOT NULL,
+  preset     VARCHAR(40) NOT NULL,
+  config     JSON NOT NULL,
+  view       JSON NOT NULL,
+  updated_at DATETIME NOT NULL,
+  PRIMARY KEY (user_id, preset),
+  CONSTRAINT fk_preset_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- ───────────── Pilotage de la chaîne FinanceDatabase → Yahoo → filtrage (ajout du 28/10/2026, additif) ─────────────
 CREATE TABLE IF NOT EXISTS catalogue_raw (                       -- données brutes du dernier import FinanceDatabase : permet de réappliquer les règles sans retélécharger

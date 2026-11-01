@@ -61,7 +61,7 @@ def serve(cmd):
         request = json.load(sys.stdin)
         if cmd == 'presets':
             result = {'presets': {name: strategy.preset(name) for name in strategy.PRESETS}, 'labels': strategy.LABELS,
-                      'slope_levels': strategy.SLOPE_LEVELS, 'r2_levels': strategy.R2_LEVELS, 'rank_modes': list(strategy.RANK_MODES)}
+                      'slope_levels': strategy.SLOPE_LEVELS, 'r2_levels': strategy.R2_LEVELS, 'rank_modes': list(strategy.RANK_MODES), 'experimental': list(strategy.EXPERIMENTAL)}
         elif cmd == 'intraday':
             from engine.market import intraday
             from engine.market.yahoo import YahooClient
@@ -110,7 +110,7 @@ def main(argv=None):
         sub.add_parser(name, help='administration (JSON sur stdin)')
     for name, text in (('explore', 'Explorer : classement et recherche (JSON sur stdin)'), ('sheet', 'fiche d’un titre (JSON sur stdin)'),
                        ('validate-config', 'valider une configuration de stratégie (JSON sur stdin)'),
-                       ('etf-portfolio', 'Expositions connues et similarité du portefeuille'), ('presets', 'les quatre stratégies de départ'), ('suivi', 'statistiques de la page Suivi'), ('overview', 'vue d’ensemble des données (sources, fraîcheur, couverture)'), ('intraday', 'deux dernières séances en barres de 15 minutes (JSON sur stdin)')):
+                       ('etf-portfolio', 'Expositions connues et similarité du portefeuille'), ('presets', 'les stratégies de départ (dont l’expérimentale Momentum 6 mois)'), ('suivi', 'statistiques de la page Suivi'), ('overview', 'vue d’ensemble des données (sources, fraîcheur, couverture)'), ('intraday', 'deux dernières séances en barres de 15 minutes (JSON sur stdin)')):
         sub.add_parser(name, help=text)
     args = ap.parse_args(argv)
     if args.cmd in ('fdb-state', 'yahoo-state', 'titles', 'rules-save', 'rules-reset', 'funnel', 'funnel-items', 'funnel-explain', 'schedule-get', 'schedule-save', 'job-check', 'jobs-list', 'job-detail', 'explore', 'sheet', 'validate-config', 'presets', 'suivi', 'intraday', 'overview', 'etf-portfolio'):

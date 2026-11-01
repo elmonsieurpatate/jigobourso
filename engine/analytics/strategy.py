@@ -16,14 +16,14 @@ import math
 from collections import defaultdict
 
 from .measures import window_metrics, technical_state
-from .series import usable_closes, find_breaks, clean_window, analyze_series
+from .series import usable_closes, find_breaks, clean_window, analyze_series, momentum_6_1, momentum_12_1
 
 VERSION = 3
 PERIOD_IDS = ('day', 'week', 'month', 'quarter', 'half', 'year')
 DEFAULT_SESSIONS = {'day': 1, 'week': 5, 'month': 21, 'quarter': 63, 'half': 126, 'year': 252}
 LABELS = {'day': 'Dernier jour', 'week': 'Dernière semaine', 'month': 'Dernier mois',
           'quarter': 'Trois mois', 'half': 'Six mois', 'year': 'Un an'}
-RANK_MODES = ('trend', 'performance', 'regularity', 'stability')
+RANK_MODES = ('trend', 'performance', 'regularity', 'stability', 'momentum', 'momentum12')
 
 # Pente minimale définie par le temps qu'il faudrait pour doubler à ce rythme (en % par séance, 252 séances/an).
 SLOPE_LEVELS = {name: 100 * math.expm1(math.log(2) / (years * 252))
@@ -36,6 +36,8 @@ CRITERIA = (  # (champ de config, mesure, sens)  sens : '>=' seuil minimal, '<='
     ('min_return', 'perf', '>='), ('max_return', 'perf', '<='),
     ('max_volatility', 'volatility', '<='), ('max_drawdown', 'drawdown', '<='))
 TECHNICAL = ('above_ma50', 'ma50_rising', 'max_daily_change', 'max_gap_ma20')
+MOMENTUM_WINDOWS = {'momentum': 126, 'momentum12': 252}       # mode de classement -> fenêtre de séances (127 ou 253 séances attendues, la dernière étant J)
+MOMENTUM_WINDOW = MOMENTUM_WINDOWS['momentum']
 
 
 def _period(pid, enabled=False, **thresholds):
@@ -68,6 +70,12 @@ def preset(name):
         for pid in ('month', 'quarter'):
             periods[pid].update(enabled=True, min_slope=SLOPE_LEVELS['gentle'], min_r2=R2_LEVELS['flexible'],
                                 max_volatility=1.5, max_drawdown=20.0)
+    elif name == 'momentum':    # EXPÉRIMENTAL : classe selon la progression du cours entre J−126 et J−21 séances (aucun seuil : seul le rang compte)
+        periods['half'].update(enabled=True)         # exige les 127 clôtures nécessaires ; aucun critère n'est posé sur cette fenêtre
+        rank = 'momentum'
+    elif name == 'momentum12':  # EXPÉRIMENTAL : classe selon la progression du cours entre J−252 et J−21 séances (aucun seuil : seul le rang compte)
+        periods['year'].update(enabled=True)         # exige les 253 clôtures nécessaires ; aucun critère n'est posé sur cette fenêtre
+        rank = 'momentum12'
     else:
         raise ValueError('Stratégie inconnue : ' + str(name))
     return {'version': VERSION, 'name': name,
@@ -76,7 +84,8 @@ def preset(name):
             'ranking': {'mode': rank, 'weights': {}}}
 
 
-PRESETS = ('regular', 'fast', 'recovery', 'low_volatility')
+PRESETS = ('regular', 'fast', 'recovery', 'low_volatility', 'momentum', 'momentum12')
+EXPERIMENTAL = ('momentum', 'momentum12')       # profils proposés à titre d'essai : l'interface les signale et ne leur attribue aucune supériorité démontrée
 
 
 def _number(v, lo, hi, what):
@@ -150,12 +159,17 @@ def evaluate_one(config, candidate):
     dates, closes, basis, breaks, measures, missing, tech = analyze_series(
         candidate.get('bars') or [], windows, candidate.get('split_dates') or (),
         candidate.get('session_windows'), candidate.get('technical_sessions'))
-    verdict = judge(config, measures, tech, missing, dates[-1] if dates else None, candidate.get('expected_last_date'))
+    mode = config['ranking']['mode']
+    momentum = None
+    if mode in MOMENTUM_WINDOWS:
+        measure = momentum_12_1 if mode == 'momentum12' else momentum_6_1
+        momentum = measure(dates, closes, breaks, (candidate.get('session_windows') or {}).get(MOMENTUM_WINDOWS[mode]))
+    verdict = judge(config, measures, tech, missing, dates[-1] if dates else None, candidate.get('expected_last_date'), momentum)
     verdict.update(basis=basis, breaks=[dates[i] for i in breaks])
     return verdict
 
 
-def judge(config, measures, tech, missing, last_close_date=None, expected_last_date=None):
+def judge(config, measures, tech, missing, last_close_date=None, expected_last_date=None, momentum=None):
     """Applique les critères à des mesures déjà calculées (fenêtres absentes : `missing` {séances: 'history'|'break'|'invalid'}).
     Même jugement que les mesures viennent du calcul direct ou de strategy_metrics."""
     reasons = []
@@ -188,9 +202,11 @@ def judge(config, measures, tech, missing, last_close_date=None, expected_last_d
             continue
         result = 'missing' if value is None or threshold is None else ('pass' if ok(value, threshold) else 'fail')
         reasons.append({'period': 'technical', 'criterion': name, 'metric': metric, 'value': value, 'threshold': threshold, 'result': result})
+    if config['ranking']['mode'] in MOMENTUM_WINDOWS and momentum is None:
+        reasons.append({'period': None, 'criterion': 'data', 'metric': 'momentum', 'value': None, 'threshold': MOMENTUM_WINDOWS[config['ranking']['mode']] + 1, 'result': 'missing'})
     results = {r['result'] for r in reasons}
     status = 'rejected' if 'fail' in results else ('unknown' if 'missing' in results else 'retained')
-    return {'status': status, 'reasons': reasons, 'measures': measures, 'technical': tech}
+    return {'status': status, 'reasons': reasons, 'measures': measures, 'technical': tech, 'momentum': momentum}
 
 
 def rank(config, verdicts):
@@ -199,6 +215,17 @@ def rank(config, verdicts):
     active = [p for p in config['periods'] if p['enabled']]
     retained = [v for v in verdicts if v['status'] == 'retained']
     pct = defaultdict(dict)
+    if mode in MOMENTUM_WINDOWS:        # un seul score : le rang centile du momentum (6 ou 12 mois selon le profil) parmi les titres retenus du même groupe
+        for v in verdicts:
+            v['score'] = v['rank'] = None
+        for group in {v['group'] for v in retained}:
+            members = [v for v in retained if v['group'] == group]
+            ranks = _percentiles({v['key']: v['momentum'] for v in members if v.get('momentum') is not None})
+            for v in members:
+                v['score'] = ranks.get(v['key'])
+            for i, v in enumerate(sorted((v for v in members if v['score'] is not None), key=lambda v: (-v['score'], v['symbol'], str(v['key']))), 1):
+                v['rank'] = i
+        return verdicts
     for group in {v['group'] for v in retained}:
         members = [v for v in retained if v['group'] == group]
         for p in active:

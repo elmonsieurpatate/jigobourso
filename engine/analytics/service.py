@@ -75,7 +75,7 @@ def _load_universe(conn, windows, ids=None):
         cur.execute("""SELECT l.id, l.symbol, l.mic, l.currency, i.name, i.isin, i.kind, i.country, i.category,
                               p.price, p.price_time, p.source AS price_source, p.currency AS price_currency, p.avg_volume_3m,
                        s.last_close_date, s.closes_count, s.close_px, s.ma20, s.ma50, s.ma50_prev, s.daily_change, s.gap_to_ma20, s.quality, s.break_dates,
-                       s.coverage_252, s.expected_252
+                       s.coverage_252, s.expected_252, s.momentum_6m, s.momentum_12m
                        FROM v_recommendable r JOIN listings l ON l.id=r.listing_id JOIN instruments i ON i.id=l.instrument_id
                        LEFT JOIN latest_prices p ON p.listing_id=l.id LEFT JOIN series_state s ON s.listing_id=l.id""" + only, list(ids or []))
         universe = cur.fetchall()
@@ -151,7 +151,8 @@ def judge_universe(conn, config, ids=None):
             u['quality'] = 'incomplete'
         elif u['quality'] not in ('break', 'insufficient') and any(n in missing and missing[n] == 'calendar' for n in windows):
             u['quality'] = 'calendar_unknown'
-        v = strategy.judge(config, measures, tech, missing, last, expected or None)
+        saved_momentum = u.get('momentum_12m') if config['ranking']['mode'] == 'momentum12' else u.get('momentum_6m')
+        v = strategy.judge(config, measures, tech, missing, last, expected or None, momentum=None if saved_momentum is None else float(saved_momentum))
         if u['quality'] == 'incomplete' and v['status'] == 'unknown':
             v['status_label'] = 'Historique incomplet'
         v.update(key=u['id'], group='etf' if u['kind'] == 'etf' else 'equity', symbol=u['symbol'], row=u)
@@ -168,7 +169,7 @@ def _row(v, rates, conn=None):
             'kind': u['kind'], 'category': u['category'], 'country': u['country'], 'pea': pea_status(u['kind'], u['country'], u['mic']) == 'probable',
             'currency': cur, 'price': price, 'price_eur': price * factor if price is not None and factor else None,
             'price_time': u['price_time'].isoformat(sep=' ') if u['price_time'] else None, 'price_source': u['price_source'],
-            'status': v['status'], 'status_label': STATUS_LABELS[v['status']], 'score': v['score'], 'rank': v['rank'],
+            'status': v['status'], 'status_label': STATUS_LABELS[v['status']], 'score': v['score'], 'rank': v['rank'], 'momentum': v.get('momentum'),
             'quality': u['quality'], 'price_stale': hours.price_is_stale(u['mic'], u['price_time'], hours.utcnow(), expected_close(conn, u['mic']) if conn is not None else None, last_collection(conn, u['mic']) if conn is not None else None), 'measures': {str(n): m for n, m in v['measures'].items()}, 'reasons': v['reasons']}
 
 
@@ -261,14 +262,14 @@ def _daily_eur(a):
 def _aux(conn, ref, rates):
     """Données de filtre et de tri pour tout l'univers : prix, volume, fraîcheur et mesures de la fenêtre de référence `ref`."""
     with conn.cursor() as cur:
-        cur.execute("""SELECT p.listing_id id, p.price, COALESCE(p.currency, l.currency) cur, p.avg_volume_3m volume, p.avg_volume_10d volume_10d, p.analyst_rating analyst, p.quote_at, l.mic, s.last_close_date, s.quality
+        cur.execute("""SELECT p.listing_id id, p.price, COALESCE(p.currency, l.currency) cur, p.avg_volume_3m volume, p.avg_volume_10d volume_10d, p.analyst_rating analyst, p.market_cap, p.quote_at, l.mic, s.last_close_date, s.quality
                        FROM latest_prices p JOIN listings l ON l.id=p.listing_id LEFT JOIN series_state s ON s.listing_id=l.id""")
         out = {}
         for r in cur.fetchall():
             price = None if r['price'] is None else float(r['price'])
             f = to_eur_factor(r['cur'], rates)
             age = None if r['quote_at'] is None else max(0.0, (hours.utcnow().replace(tzinfo=None) - r['quote_at']).total_seconds() / 86400)
-            out[r['id']] = {'price': price, 'price_eur': price * f if price is not None and f else None, 'volume': r['volume'], 'volume_10d': r['volume_10d'], 'analyst': r['analyst'], 'quote_age_days': age,
+            out[r['id']] = {'price': price, 'price_eur': price * f if price is not None and f else None, 'cap': _size_key(r['market_cap'], r['cur'], rates), 'volume': r['volume'], 'volume_10d': r['volume_10d'], 'analyst': r['analyst'], 'quote_age_days': age,
                             'last_close': r['last_close_date'], 'quality': 'stale' if r['last_close_date'] and str(r['last_close_date']) < expected_close(conn, r['mic']) else r['quality']}
         cur.execute('SELECT listing_id, slope, r2, perf, volatility, drawdown FROM strategy_metrics WHERE sessions=%s', (ref,))
         for r in cur.fetchall():
@@ -305,6 +306,7 @@ def scoped_entries(conn, config, view, rates=None, aux=None, now=None):
     aux = aux if aux is not None else _aux(conn, ref, rates)
     kind, market = view.get('kind') or '', view.get('market') or ''
     countries, categories = _choices(view.get('country')), {c.casefold() for c in _choices(view.get('category'))}         # plusieurs choix possibles, séparés par « | »
+    caps = {c for c in _choices(view.get('cap')) if c in ('micro', 'small', 'mid', 'large', 'mega')}
     owned = set(view.get('owned_ids') or [])
     base = [e for e in entries if (not kind or e['kind'] == kind) and (not market or e['mic'] == market)
             and (not countries or e['country'] in countries) and (not categories or (e['category'] or '').casefold() in categories)]
@@ -326,6 +328,8 @@ def scoped_entries(conn, config, view, rates=None, aux=None, now=None):
         if max_dd is not None and (a.get('drawdown') is None or a['drawdown'] > max_dd):
             return False
         if min_volume is not None and (a.get('volume') is None or a['volume'] < min_volume):
+            return False
+        if caps and (e['kind'] != 'equity' or a.get('cap') not in caps):       # la taille ne concerne que les actions : un ETF n'a pas de capitalisation boursière
             return False
         return not (view.get('fresh_only') and a.get('quality') != 'ok')
     base = [e for e in base if keep(e)]
@@ -516,7 +520,7 @@ def instrument_sheet(conn, request):
         daily_volume = [None if r['volume'] is None else int(r['volume']) for r in rows]
         cur.execute("""SELECT l.id, l.mic, l.symbol, l.currency, l.status, l.is_primary FROM listings l WHERE l.instrument_id=%s AND l.id<>%s ORDER BY l.is_primary DESC, l.mic""", (u['instrument_id'], lid))
         siblings = cur.fetchall()
-        cur.execute('SELECT quality, closes_count, last_close_date, ma20, ma50, ma50_prev, daily_change, gap_to_ma20, break_dates, coverage_252, observed_252, expected_252 FROM series_state WHERE listing_id=%s', (lid,))
+        cur.execute('SELECT quality, closes_count, last_close_date, ma20, ma50, ma50_prev, daily_change, gap_to_ma20, break_dates, coverage_252, observed_252, expected_252, momentum_6m, momentum_12m FROM series_state WHERE listing_id=%s', (lid,))
         state = cur.fetchone() or {}
     price = float(u['price']) if u['price'] is not None else None
     factor = to_eur_factor(u['price_currency'] or u['currency'], rates)
@@ -582,7 +586,7 @@ def instrument_sheet(conn, request):
         from . import etf
         sheet['etf_analysis'] = etf.load(conn, [lid]).get(lid)
         sheet['etf_compare'] = etf.compare(conn, lid)
-    sheet['strategy'] = {'name': config.get('name'), 'ranking': config['ranking']['mode'], 'source': request.get('source') or None,
+    sheet['strategy'] = {'name': config.get('name'), 'ranking': config['ranking']['mode'], 'source': request.get('source') or None, 'experimental': config.get('name') in strategy.EXPERIMENTAL or config['ranking']['mode'] in strategy.MOMENTUM_WINDOWS,
                          'technical': {k: v for k, v in config['technical'].items() if v},
                          'periods': [{'id': p['id'], 'label': strategy.LABELS[p['id']], 'sessions': p['sessions'], 'criteria': {f: p[f] for f, _, _ in strategy.CRITERIA if p[f] is not None}} for p in config['periods'] if p['enabled']]}
     sheet['config_periods'] = [{'id': p['id'], 'label': strategy.LABELS[p['id']], 'sessions': p['sessions'], 'enabled': p['enabled']} for p in config['periods']]
@@ -635,6 +639,7 @@ def analyst_view(raw):
     return {'score': score, 'label': fr, 'raw': raw, 'text': ('%s (%s)' % (fr, ('%.1f' % score).replace('.', ','))) if fr else 'Note ' + ('%.1f' % score).replace('.', ',')}
 
 
+_SIZE_KEYS = ((300e6, 'micro'), (2e9, 'small'), (10e9, 'mid'), (200e9, 'large'), (float('inf'), 'mega'))     # clés du filtre « Capitalisation » de l'Explorer (mêmes seuils que les libellés ci-dessous)
 _SIZE_CLASSES = ((300e6, 'micro-capitalisation'), (2e9, 'petite capitalisation'), (10e9, 'capitalisation moyenne'), (200e9, 'grande capitalisation'), (float('inf'), 'très grande capitalisation'))
 
 
@@ -647,6 +652,17 @@ def _size_class(market_cap, currency, rates):
         return None
     eur = float(market_cap) * f
     return next(label for limit, label in _SIZE_CLASSES if eur < limit)
+
+
+def _size_key(market_cap, currency, rates):
+    """Clé de taille (micro, small, mid, large, mega) en euros ; None si inconnue (ETF, devise non ordinaire, capitalisation absente)."""
+    if not market_cap or currency in (None, 'GBp', 'ZAc', 'ILA'):
+        return None
+    f = to_eur_factor(currency, rates)
+    if not f:
+        return None
+    eur = float(market_cap) * f
+    return next(key for limit, key in _SIZE_KEYS if eur < limit)
 
 
 def _activity_note(u):

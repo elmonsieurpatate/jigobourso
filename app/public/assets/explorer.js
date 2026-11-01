@@ -1,25 +1,32 @@
 /* Page Explorer : stratégie réglable, filtres avancés, tableau triable, comparaison actions / ETF, statistiques d'exclusion, export CSV. */
 (async () => {
   const user = await J.init('explorer'); if (!user) return;
-  const [P, ov] = await Promise.all([J.api('strategy/presets'), J.api('data/overview').catch(() => null)]);
+  const [P, ov, mine0] = await Promise.all([J.api('strategy/presets'), J.api('data/overview').catch(() => null), J.api('presets/mine').catch(() => ({ presets: {} }))]);
+  let MINE = mine0.presets && !Array.isArray(mine0.presets) ? mine0.presets : {};           // réglages personnels des stratégies de départ : { clé: { config, view, updated_at } }
   const NAMES = { regular: ['Croissance régulière', 'Une hausse soutenue et bien alignée, sur un mois et trois mois.'], fast: ['Croissance rapide', 'Une hausse marquée sur la semaine et le mois, même irrégulière.'],
-    recovery: ['Rebond', 'Repart à la hausse après six mois sans progrès notable.'], low_volatility: ['Hausse calme', 'Une hausse douce avec peu de variations et de replis.'] };
+    recovery: ['Rebond', 'Repart à la hausse après six mois sans progrès notable.'], low_volatility: ['Hausse calme', 'Une hausse douce avec peu de variations et de replis.'],
+    momentum: ['Momentum 6 mois', 'Les titres qui ont le plus progressé entre il y a 6 mois et il y a 1 mois (le dernier mois est ignoré). Décrit le passé.'],
+    momentum12: ['Momentum 12 mois', 'Les titres qui ont le plus progressé entre il y a 12 mois et il y a 1 mois (le dernier mois est ignoré). Décrit le passé.'] };
+  const EXP = new Set(P.experimental || []);
+  const MOM_WIN = { momentum: '6 mois', momentum12: '12 mois' };
+  const EXP_NOTE = k => 'Stratégie à titre d’essai : elle classe les titres selon leur progression passée entre il y a ' + (MOM_WIN[k] || '6 mois') + ' et il y a 1 mois (le dernier mois est ignoré). Elle décrit le passé et ne prédit pas la suite. Dans l’historique étudié, ce type de classement a connu des mois à plus de −25 % et des baisses de plus de 50 % depuis un sommet ; ses meilleurs titres sont souvent très volatils et l’avantage observé diminue quand on exige des titres très négociables. Aucune performance n’est garantie.';
   const CRIT = { min_slope: 'pente insuffisante', min_r2: 'régularité insuffisante', min_er: 'efficacité insuffisante', min_return: 'performance trop faible', max_return: 'performance trop forte',
     max_volatility: 'volatilité trop forte', max_drawdown: 'repli trop fort', data: 'historique insuffisant ou rupture de cours', freshness: 'cours non à jour',
     above_ma50: 'cours sous la moyenne 50 j', ma50_rising: 'moyenne 50 j orientée à la baisse', max_daily_change: 'variation du jour trop forte', max_gap_ma20: 'écart à la moyenne 20 j trop grand' };
   const LEVELS = { regularity: [['ok', 'Régulière'], ['warn', 'Moyennement régulière'], ['bad', 'Irrégulière'], ['unknown', 'Inconnue']],
     risk: [['ok', 'Volatilité faible'], ['warn', 'Volatilité modérée'], ['bad', 'Volatilité forte'], ['unknown', 'Inconnue']],
     liquidity: [['ok', 'Facilement négociable'], ['warn', 'À surveiller'], ['bad', 'Limitée'], ['unknown', 'Non déterminée']] };
-  const FILTERS = ['country', 'category', 'regularity', 'risk', 'liquidity', 'budget', 'min_price', 'min_score', 'max_volatility', 'max_drawdown', 'min_volume'];
+  const FILTERS = ['country', 'category', 'regularity', 'risk', 'liquidity', 'budget', 'min_price', 'min_score', 'max_volatility', 'max_drawdown', 'min_volume', 'cap'];
   const CHECKS = ['pea', 'mine', 'open_now', 'fresh_only'];
   const MARKETS = { XETR: 'Xetra', XPAR: 'Paris', XAMS: 'Amsterdam', XLON: 'Londres', XMIL: 'Milan', XMAD: 'Madrid', XSTO: 'Stockholm', XOSL: 'Oslo', XSWX: 'Zurich', XNAS: 'Nasdaq', XNYS: 'NYSE', XASE: 'NYSE American', ARCX: 'NYSE Arca', BATS: 'Cboe' };
   const url = new URLSearchParams(location.search);
   const saved = (() => { try { return JSON.parse(sessionStorage.getItem('jigo_explorer2')) || JSON.parse(localStorage.getItem('jigo_explorer2')) || {}; } catch (e) { return {}; } })();
-  const S = { preset: saved.preset || 'regular', label: saved.label || null, config: saved.config || P.presets[saved.preset || 'regular'], status: saved.status || 'retained', page: saved.page || 1, sort: saved.sort || 'rank', dir: saved.dir || 'asc', size: saved.size || 20, level: saved.level || 'guided', compare: !!saved.compare };
+  const S = { preset: saved.preset || 'regular', label: saved.label || null, config: saved.config || P.presets[saved.preset || 'regular'], status: saved.status || 'retained', page: saved.page || 1, sort: saved.sort || 'rank', dir: saved.dir || 'asc', size: saved.size || 20, level: saved.level || 'guided', compare: !!saved.compare, base: saved.base || null };
   const el = id => J.$('#' + id);
   const text = ['q', 'kind', 'market', ...FILTERS];
   text.forEach(k => { const v = k === 'q' ? (url.has('q') && saved.pageKey !== location.pathname + location.search ? url.get('q') : (saved.view || {}).q) : (saved.view || {})[k]; if (v !== undefined && v !== null && el(k)) el(k).value = v; });
   CHECKS.forEach(k => { if (el(k) && (saved.view || {})[k]) el(k).checked = true; });
+  if ((saved.view || {}).market_ui === '__pea') el('market').value = '__pea';
   if ((saved.view || {}).tradable === false) el('tradable').checked = false;         // activé par défaut ; seul un choix explicite de le désactiver est conservé
   const MS = { country: JMulti(el('country')), category: JMulti(el('category')), regularity: JMulti(el('regularity')), risk: JMulti(el('risk')), liquidity: JMulti(el('liquidity')) };
   Object.keys(LEVELS).forEach(k => MS[k].set(LEVELS[k].map(([v, l]) => [v, l, ''])));
@@ -35,23 +42,29 @@
   }
 
   function freeConfig() { const c = JSON.parse(JSON.stringify(P.presets.regular)); c.name = 'free'; c.periods.forEach(p => { p.enabled = p.id === 'month'; ['min_slope', 'min_r2', 'min_er', 'min_return', 'max_return', 'max_volatility', 'max_drawdown'].forEach(f => p[f] = null); }); c.ranking.mode = 'trend'; return c; }
+  const SUB = { regular: 'Hausse stable', fast: 'Hausse marquée', recovery: 'Après une baisse', low_volatility: 'Peu de variations', momentum: '126 → 21 séances', momentum12: '252 → 21 séances' };
+  const helpHtml = k => `<b>${J.esc(NAMES[k][0])}</b><p>${J.esc(NAMES[k][1])}</p>${EXP.has(k) ? `<p class="helpwarn">${J.esc(EXP_NOTE(k))}</p>` : ''}`;
   function drawStrategies() {
-    el('strats').innerHTML = Object.keys(P.presets).map(k => `<button class="strat ${S.preset === k ? 'on' : ''}" data-k="${k}"><b>${NAMES[k][0]}</b><span>${NAMES[k][1]}</span></button>`).join('') +
-      `<button class="strat ${S.preset === 'free' ? 'on' : ''}" data-k="free"><b>Recherche libre</b><span>Aucun critère de départ : seuls vos filtres et vos réglages décident.</span></button>` +
-      (S.preset === 'custom' ? `<button class="strat on"><b>Vos réglages${S.label ? ' · ' + J.esc(S.label) : ''}</b><span>Les critères ci-dessous sont appliqués tels quels, sans passer par un profil.</span></button>` : '');
-    J.$$('#strats .strat[data-k]').forEach(b => b.onclick = () => { S.label = null; S.preset = b.dataset.k; S.config = S.preset === 'free' ? freeConfig() : JSON.parse(JSON.stringify(P.presets[S.preset])); S.page = 1; persist(); drawStrategies(); drawEditor(); load(); });
+    el('strats').innerHTML = '<div class="strat-grid">' + Object.keys(P.presets).map(k => `<div class="strat ${S.preset === k ? 'on' : ''} ${EXP.has(k) ? 'exp' : ''}" role="button" tabindex="0" aria-pressed="${S.preset === k}" data-k="${k}"><span class="ico">${JMenu.icon(k)}</span><span class="tx"><b>${NAMES[k][0]}${MINE[k] ? ' <i class="mod" title="Vous avez enregistré votre propre réglage pour cette stratégie">modifiée</i>' : ''}</b><span>${SUB[k] || ''}</span></span><button type="button" class="q" data-help="${k}" aria-label="Explication : ${J.esc(NAMES[k][0])}" aria-expanded="false">?</button></div>`).join('') + '</div>' +
+      '<div class="strat-extra">' + `<button class="strat slim ${S.preset === 'free' ? 'on' : ''}" data-k="free"><span class="ico">${JMenu.icon('free')}</span><span class="tx"><b>Recherche libre</b><span>Aucun critère de départ</span></span></button>` +
+      (S.preset === 'custom' ? `<button class="strat slim on"><span class="ico">${JMenu.icon('custom')}</span><span class="tx"><b>Vos réglages${S.label ? ' · ' + J.esc(S.label) : ''}</b><span>Critères appliqués tels quels</span></span></button>` : '') + '</div>';
+    J.$$('#strats .strat[data-k]').forEach(b => { b.onclick = e => { if (e.target.closest('.q')) return; choose(b.dataset.k); }; b.onkeydown = e => { if ((e.key === 'Enter' || e.key === ' ') && e.target === b) { e.preventDefault(); choose(b.dataset.k); } }; });
+    syncReset();
+    J.$$('#strats .q').forEach(q => q.onclick = e => { e.stopPropagation(); JMenu.pop(q, helpHtml(q.dataset.help)); });
     const act = S.config.periods.filter(p => p.enabled).map(p => J.PERIODS[p.id].toLowerCase() + ' (' + p.sessions + ' séances)');
-    el('strategy-summary').textContent = 'Périodes : ' + act.join(', ') + ' · classement par ' + ({ trend: 'pente', performance: 'performance', regularity: 'régularité', stability: 'stabilité' }[S.config.ranking.mode]);
+    el('strategy-summary').textContent = 'Périodes : ' + act.join(', ') + ' · classement par ' + ({ trend: 'pente', performance: 'performance', regularity: 'régularité', stability: 'stabilité', momentum: 'momentum 6 mois (J−126 → J−21 séances)', momentum12: 'momentum 12 mois (J−252 → J−21 séances)' }[S.config.ranking.mode]) + (MOM_WIN[S.config.ranking.mode] ? ' · ' + EXP_NOTE(S.config.ranking.mode) : (EXP.has(S.preset) ? ' · ' + EXP_NOTE(S.preset) : ''));
+    drawSliders();
   }
   function view() {
-    const v = { q: el('q').value.trim(), kind: el('kind').value, market: el('market').value };
+    const v = { q: el('q').value.trim(), kind: el('kind').value, market: el('market').value === '__pea' ? '' : el('market').value };
     FILTERS.forEach(k => { v[k] = el(k).value.trim(); });
     CHECKS.forEach(k => { v[k === 'mine' ? 'owned_only' : k] = el(k).checked; });
+    if (el('market').value === '__pea') v.pea = true;
     v.tradable = el('tradable').checked;
     return v;
   }
   addEventListener('pagehide', () => { persist(); try { sessionStorage.setItem('jigo_explorer_scroll', String(scrollY)); } catch (e) {} });
-  function persist() { try { localStorage.setItem('jigo_explorer2', JSON.stringify({ pageKey: location.pathname + location.search, preset: S.preset, config: S.config, status: S.status, page: S.page, level: S.level, compare: S.compare, sort: S.sort, dir: S.dir, size: S.size, view: { ...view(), mine: el('mine').checked }, label: S.label || null })); sessionStorage.setItem('jigo_explorer2', localStorage.getItem('jigo_explorer2')); } catch (e) { } }
+  function persist() { try { localStorage.setItem('jigo_explorer2', JSON.stringify({ pageKey: location.pathname + location.search, preset: S.preset, base: S.base || null, config: S.config, status: S.status, page: S.page, level: S.level, compare: S.compare, sort: S.sort, dir: S.dir, size: S.size, view: { ...view(), mine: el('mine').checked, market_ui: el('market').value }, label: S.label || null })); sessionStorage.setItem('jigo_explorer2', localStorage.getItem('jigo_explorer2')); } catch (e) { } }
 
   /* éditeur : réglages guidés + détaillé */
   const levelOpts = (obj, labels, cur) => Object.entries(labels).map(([k, l]) => `<option value="${k}" ${k === cur ? 'selected' : ''}>${l}</option>`).join('');
@@ -67,7 +80,7 @@
       <label>Pente exigée<select id="g-slope"><option value="none">Aucune</option>${Object.entries({ gentle: 'Douce (doublement en ~8 ans)', moderate: 'Modérée (~4 ans)', strong: 'Forte (~2 ans)', very_strong: 'Très forte (~1 an)' }).map(([k, l]) => `<option value="${k}" ${k === sl ? 'selected' : ''}>${l}</option>`).join('')}${sl === 'custom' ? '<option value="custom" selected>Personnalisée</option>' : ''}</select></label>
       <label>Régularité exigée<select id="g-r2"><option value="none">Aucune</option>${Object.entries({ flexible: 'Souple (R² ≥ 0,56)', balanced: 'Équilibrée (R² ≥ 0,75)', strict: 'Stricte (R² ≥ 0,89)' }).map(([k, l]) => `<option value="${k}" ${k === rl ? 'selected' : ''}>${l}</option>`).join('')}${rl === 'custom' ? '<option value="custom" selected>Personnalisée</option>' : ''}</select></label>
       <label>Tolérance aux corrections<select id="g-dd">${[['', 'Aucune limite'], ['5', 'Repli max. 5 %'], ['10', 'Repli max. 10 %'], ['20', 'Repli max. 20 %']].map(([v, l]) => `<option value="${v}" ${v === dd ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
-      <label>Classer par<select id="r-mode">${[['trend', 'Pente'], ['performance', 'Performance'], ['regularity', 'Régularité'], ['stability', 'Stabilité (faible volatilité)']].map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select></label></div>
+      <label>Classer par<select id="r-mode">${[['trend', 'Pente'], ['performance', 'Performance'], ['regularity', 'Régularité'], ['stability', 'Stabilité (faible volatilité)'], ['momentum', 'Momentum 6 mois (essai)'], ['momentum12', 'Momentum 12 mois (essai)']].map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select></label></div>
       <p class="muted small" style="margin:8px 0 0">Ces réglages s’appliquent à chaque période cochée. Pour un réglage différent par période, passez au réglage détaillé.</p></div>
     <div id="detail" ${S.level === 'detail' ? '' : 'hidden'}><div class="table-wrap"><table><thead><tr><th>Période</th><th class="num">Pente min. (%/séance)</th><th class="num">R² min.</th><th class="num">ER min.</th><th class="num">Perf. min. (%)</th><th class="num">Perf. max. (%)</th><th class="num">Volat. max.</th><th class="num">Repli max. (%)</th><th class="num">Poids</th></tr></thead><tbody>
     ${c.periods.map(p => `<tr><td>${J.PERIODS[p.id]}</td><td class="num">${num(p, 'min_slope', .01)}</td><td class="num">${num(p, 'min_r2', .01)}</td><td class="num">${num(p, 'min_er', .01)}</td><td class="num">${num(p, 'min_return', 1)}</td><td class="num">${num(p, 'max_return', 1)}</td><td class="num">${num(p, 'max_volatility', .1)}</td><td class="num">${num(p, 'max_drawdown', 1)}</td><td class="num"><input type="number" min="0" step=".5" data-w="${p.id}" value="${(c.ranking.weights || {})[p.id] ?? 1}" style="width:64px"></td></tr>`).join('')}</tbody></table></div>
@@ -75,7 +88,7 @@
       <label class="row gap-s small"><input type="checkbox" id="t-ma50r" ${c.technical.ma50_rising ? 'checked' : ''}> Moyenne 50 j en hausse</label>
       <label class="row gap-s small">Variation du jour max. (%) <input type="number" id="t-day" value="${c.technical.max_daily_change ?? ''}" style="width:70px"></label>
       <label class="row gap-s small">Écart moy. 20 j max. (%) <input type="number" id="t-gap" value="${c.technical.max_gap_ma20 ?? ''}" style="width:70px"></label>
-      <label class="row gap-s small">Classer par <select id="r-mode2">${[['trend', 'Pente'], ['performance', 'Performance'], ['regularity', 'Régularité'], ['stability', 'Stabilité']].map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select></label></div></div>
+      <label class="row gap-s small">Classer par <select id="r-mode2">${[['trend', 'Pente'], ['performance', 'Performance'], ['regularity', 'Régularité'], ['stability', 'Stabilité'], ['momentum', 'Momentum 6 mois'], ['momentum12', 'Momentum 12 mois']].map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select></label></div></div>
     <div id="editor-msg" class="notice err" hidden style="margin-top:10px"></div>
     <div class="row" style="margin-top:12px"><button class="btn primary" id="apply">Appliquer</button><select id="save-to" aria-label="Portefeuille"><option value="">Enregistrer pour un portefeuille…</option></select><button class="btn" id="save-btn">Enregistrer</button></div>`;
     J.$('#r-mode', box).value = c.ranking.mode; J.$('#r-mode2', box).value = c.ranking.mode;
@@ -99,22 +112,129 @@
     }
     const m = J.$('#editor-msg', box);
     try { S.config = (await J.post('strategy/validate', c)).config; m.hidden = true; } catch (e) { m.textContent = e.message; m.hidden = false; return false; }
-    S.config.name = 'custom'; S.preset = 'custom'; S.page = 1; persist(); drawStrategies(); load(); return true;
+    if (P.presets[S.preset]) S.base = S.preset; S.config.name = 'custom'; S.preset = 'custom'; S.page = 1; persist(); drawStrategies(); load(); return true;
   }
+
+  /* curseurs de critères : ils lisent et modifient la configuration de la stratégie (période concernée), comme le réglage guidé */
+  const yearly = s => 100 * (Math.pow(1 + s / 100, 252) - 1), perSession = a => Number((100 * (Math.pow(1 + a / 100, 1 / 252) - 1)).toFixed(5));
+  const SPAN = n => ({ 1: '1 jour', 5: '1 semaine', 21: '1 mois', 63: '3 mois', 126: '6 mois', 252: '12 mois' }[n] || n + ' séances');
+  /* Pente et volatilité se règlent sur la période la plus longue de la stratégie (6 mois pour Momentum 6 mois, 12 mois pour Momentum 12 mois, 3 mois pour Croissance régulière…). */
+  const SLIDERS = [
+    { id: 'r2', title: () => 'Régularité (R²)', field: 'min_r2', scope: 'all', min: 0, max: 1, step: .01, dec: 2, side: 'low', chart: 'r2', help: () => 'Le R² mesure la régularité de la hausse : 1 = ligne droite parfaite, 0 = hausse très irrégulière. Ce curseur fixe le R² minimum exigé pour chaque période utilisée par la stratégie.' },
+    { id: 'slope', title: n => `Pente (${SPAN(n)})`, field: 'min_slope', scope: 'longest', min: 0, max: 100, step: 1, dec: 0, side: 'low', unit: '% /an', chart: 'slope3', to: yearly, from: perSession, help: n => `La pente est la hausse moyenne du cours sur ${SPAN(n)} (la période la plus longue de la stratégie), exprimée en rythme annuel. Un titre dont la pente est inférieure au minimum choisi n’est pas retenu.` },
+    { id: 'vol', title: n => `Volatilité (${SPAN(n)})`, field: 'max_volatility', scope: 'longest', min: 0, max: 10, step: .1, dec: 1, side: 'high', unit: '% /séance', chart: 'wave', help: n => `La volatilité mesure l’amplitude des variations quotidiennes sur ${SPAN(n)} (la période la plus longue de la stratégie). Ce curseur fixe le maximum accepté : plus il est bas, plus les titres retenus varient calmement.` }
+  ];
+  function drawSliders() {
+    const box = el('sliders'); if (!box) return;
+    const enabled = S.config.periods.filter(p => p.enabled), longest = enabled.reduce((m, p) => p.sessions > (m ? m.sessions : 0) ? p : m, null);
+    const spanN = longest ? longest.sessions : 63;
+    box.innerHTML = SLIDERS.map(d => `<div class="sl" data-s="${d.id}"><div class="sl-head"><b>${d.title(spanN)}</b><button type="button" class="q" data-sh="${d.id}" aria-label="Explication : ${J.esc(d.title(spanN))}" aria-expanded="false">?</button><span class="sl-chart"></span></div><div class="sl-body"></div></div>`).join('');
+    SLIDERS.forEach(d => {
+      const host = J.$(`.sl[data-s="${d.id}"]`, box), targets = d.scope === 'all' ? enabled.filter(p => p.sessions >= 3) : (longest ? [longest] : []);
+      const raw = targets.length ? targets[0][d.field] : null, ui = raw === null || raw === undefined ? null : (d.to ? d.to(raw) : raw);
+      const low = d.side === 'low' ? Math.max(d.min, Math.min(d.max, ui === null ? d.min : ui)) : d.min, high = d.side === 'high' ? Math.max(d.min, Math.min(d.max, ui === null ? d.max : ui)) : d.max;
+      const draw = (l, h) => { J.$('.sl-chart', host).innerHTML = JMenu.chart(d.chart, ((d.side === 'low' ? l : h) - d.min) / (d.max - d.min)); };
+      host.querySelector('.q').onclick = e => { e.stopPropagation(); JMenu.pop(e.currentTarget, `<b>${J.esc(d.title(spanN))}</b><p>${J.esc(d.help(spanN))}</p><p class="muted small">Le réglage s’applique quand vous cliquez sur « Appliquer ».</p>`); };
+      JMenu.dualRange(J.$('.sl-body', host), { label: d.title(spanN), min: d.min, max: d.max, step: d.step, dec: d.dec, unit: d.unit, low, high, lockLow: d.side === 'high', lockHigh: d.side === 'low', disabled: !targets.length, onInput: draw,
+        onChange: (l, h) => {
+          const u = d.side === 'low' ? l : h, none = d.side === 'low' ? u <= d.min : u >= d.max, val = none ? null : (d.from ? d.from(u) : u);
+          if ((raw ?? null) === val || (ui !== null && Math.abs(ui - u) < 1e-9)) return;
+          S.config.periods.forEach(p => { if (targets.some(x => x.id === p.id)) p[d.field] = val; });
+          if (P.presets[S.preset]) S.base = S.preset; S.config.name = 'custom'; S.preset = 'custom'; S.label = null; persist(); drawStrategies(); if (!el('editor').hidden) drawEditor(); markDirty();
+        } });
+    });
+  }
+  /* raccourcis Prix et Volume : ils écrivent dans les champs du tiroir « Filtres avancés » (une seule source de vérité) */
+  const bands = { 'f-price': [['min_price', 'budget'], v => v.split('|')], 'f-volume': [['min_volume'], v => [v]] };
+  function syncMenu() {
+    Object.entries(bands).forEach(([id, [fields, split]]) => {
+      const sel = el(id), cur = fields.map(f => el(f).value.trim()).join('|'), match = [...sel.options].find(o => o.value !== 'custom' && split(o.value).join('|') === (fields.length === 1 ? cur : cur));
+      [...sel.querySelectorAll('option[value="custom"]')].forEach(o => o.remove());
+      if (!cur.replace(/\|/g, '')) sel.value = '';
+      else if (match) sel.value = match.value;
+      else { sel.insertAdjacentHTML('beforeend', '<option value="custom">Personnalisé</option>'); sel.value = 'custom'; }
+    });
+    el('market-flag').innerHTML = el('market').value === '__pea' ? EU_FLAG : GLOBE;
+  }
+  const EU_FLAG = '<svg viewBox="0 0 28 20" width="28" height="20" aria-hidden="true"><rect width="28" height="20" rx="3" fill="#0b4ea2"/>' + Array.from({ length: 12 }, (_, i) => `<circle cx="${14 + 6.5 * Math.sin(i * Math.PI / 6)}" cy="${10 - 6.5 * Math.cos(i * Math.PI / 6)}" r="1.05" fill="#ffd400"/>`).join('') + '</svg>';
+  const GLOBE = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></svg>';
+  Object.entries(bands).forEach(([id, [fields, split]]) => el(id).addEventListener('change', () => {
+    const v = el(id).value; if (v === 'custom') return;
+    const parts = split(v); fields.forEach((f, i) => { el(f).value = parts[i] || ''; });
+    el(fields[0]).dispatchEvent(new Event('input', { bubbles: true }));
+  }));
+  el('market').addEventListener('change', syncMenu);
   /* recherches enregistrées : critères + filtres + tri */
   let searches = [];
+  /* réglages personnels : choisir, remplacer, remettre par défaut */
+  function setView(v) {
+    v = v || {};
+    [...FILTERS, 'kind', 'market'].forEach(k => { el(k).value = v[k] ?? ''; }); el('pea').checked = !!v.pea; el('mine').checked = !!v.owned_only; el('open_now').checked = !!v.open_now; el('fresh_only').checked = !!v.fresh_only; el('tradable').checked = v.tradable !== false;
+    S.sort = v.sort || 'rank'; S.dir = v.dir || 'asc'; el('filters').hidden = !(FILTERS.some(k => el(k).value) || CHECKS.some(k => el(k).checked)); syncMenu();
+  }
+  function presetConfig(k) { const c = JSON.parse(JSON.stringify(MINE[k] ? MINE[k].config : P.presets[k])); c.name = k; return c; }
+  function choose(k) {
+    S.label = null; S.preset = k; S.base = P.presets[k] ? k : null; S.page = 1;
+    if (k === 'free') S.config = freeConfig(); else { S.config = presetConfig(k); if (MINE[k]) setView(MINE[k].view); }
+    persist(); drawStrategies(); drawEditor(); load();
+  }
+  const baseKey = () => P.presets[S.preset] ? S.preset : (S.base && P.presets[S.base] ? S.base : null);
+  function syncReset() { const b = el('reset-default'); if (!b) return; const k = baseKey(); b.hidden = !(k && MINE[k]); if (k) b.textContent = 'Remettre « ' + NAMES[k][0] + ' » par défaut'; }
+  async function resetPreset(k) {
+    if (!await J.confirm('Remettre par défaut', 'Le réglage de « ' + NAMES[k][0] + ' » redeviendra celui de départ : les critères et filtres que vous aviez enregistrés pour cette stratégie seront supprimés.', 'Remettre par défaut')) return false;
+    await J.post('preset/reset', { preset: k }); delete MINE[k];
+    if (baseKey() === k) choose(k); else drawStrategies();
+    J.toast('« ' + NAMES[k][0] + ' » : réglage de départ rétabli'); return true;
+  }
+  const savedView = () => ({ ...view(), sort: S.sort, dir: S.dir });
+  function openManage() {
+    const body = () => {
+      const dflt = Object.keys(P.presets).map(k => `<tr><td><b>${J.esc(NAMES[k][0])}</b><div class="small muted">${J.esc(SUB[k] || '')}</div></td><td>${MINE[k] ? `<span class="badge info">Modifiée · ${J.date(MINE[k].updated_at)}</span>` : '<span class="badge">Réglage de départ</span>'}</td><td class="num nowrap"><button type="button" class="btn small" data-use="${k}">Utiliser</button> <button type="button" class="btn small" data-reset="${k}" ${MINE[k] ? '' : 'disabled'}>Remettre par défaut</button></td></tr>`).join('');
+      const own = searches.map(x => `<tr><td><b>${J.esc(x.name)}</b></td><td class="small muted">${J.date(x.updated_at)}</td><td class="num nowrap"><button type="button" class="btn small" data-suse="${x.id}">Utiliser</button> <button type="button" class="btn small" data-sren="${x.id}">Renommer</button> <button type="button" class="btn small danger" data-sdel="${x.id}">Supprimer</button></td></tr>`).join('');
+      return `<h3 style="margin:0 0 6px">Stratégies de départ</h3><table class="dense"><tbody>${dflt}</tbody></table>
+        <h3 style="margin:16px 0 6px">Mes recherches enregistrées</h3>${searches.length ? `<table class="dense"><tbody>${own}</tbody></table>` : '<p class="small muted" style="margin:0">Aucune pour l’instant : réglez vos critères et filtres, puis « Enregistrer ».</p>'}
+        <p class="small muted" style="margin:14px 0 0">Pour modifier une stratégie : choisissez-la, changez ses critères et filtres, puis « Enregistrer » et choisissez de remplacer son réglage. « Remettre par défaut » rétablit le réglage de départ.</p>`;
+    };
+    const d = J.dialog({ title: 'Gérer mes stratégies', body: body(), actions: [{ label: 'Fermer', run: () => { } }] });
+    const redraw = () => { J.$('.body', d).innerHTML = body(); };
+    d.addEventListener('click', async e => {
+      const t = e.target.closest('button[data-use],button[data-reset],button[data-suse],button[data-sren],button[data-sdel]'); if (!t || t.disabled) return;
+      const ds = t.dataset, x = ds.suse || ds.sren || ds.sdel ? searches.find(y => y.id == (ds.suse || ds.sren || ds.sdel)) : null;
+      try {
+        if (ds.use) { d.close(); choose(ds.use); }
+        else if (ds.reset) { if (await resetPreset(ds.reset)) redraw(); }
+        else if (ds.suse && x) { d.close(); applySearch(x); }
+        else if (ds.sdel && x) { if (await J.confirm('Supprimer la recherche', '« ' + x.name + ' » sera supprimée.', 'Supprimer')) { await J.post('search/delete', { id: +x.id }); await drawSaved(); redraw(); } }
+        else if (ds.sren && x) J.dialog({ title: 'Renommer la recherche', body: J.field('Nouveau nom', `<input id="rn-name" maxlength="80" value="${J.esc(x.name)}" autofocus>`),
+          actions: [{ label: 'Annuler', run: () => { } }, { label: 'Renommer', cls: 'primary', run: async dd => { const name = J.$('#rn-name', dd).value.trim(); if (!name || name === x.name) return false; if (searches.some(y => y.name === name)) { J.formError(dd, 'Ce nom existe déjà.'); return true; } await J.post('search/save', { name, config: x.config, view: x.view }); await J.post('search/delete', { id: +x.id }); await drawSaved(); redraw(); } }] });
+      } catch (err) { J.toast(err.message); }
+    });
+  }
   async function drawSaved() {
     searches = (await J.api('searches')).searches;
-    el('saved').innerHTML = `<select id="saved-sel" aria-label="Mes recherches"><option value="">Mes recherches (${searches.length})</option>${searches.map(x => `<option value="${x.id}">${J.esc(x.name)}</option>`).join('')}</select><button class="btn small" id="saved-save">Enregistrer cette recherche</button><button class="btn small danger" id="saved-del" hidden>Supprimer</button>`;
+    el('saved').innerHTML = `<select id="saved-sel" aria-label="Mes recherches"><option value="">Mes recherches (${searches.length})</option>${searches.map(x => `<option value="${x.id}">${J.esc(x.name)}</option>`).join('')}</select><button class="btn small danger" id="saved-del" hidden>Supprimer</button>`;
     el('saved-sel').onchange = () => { const x = searches.find(y => y.id == el('saved-sel').value); el('saved-del').hidden = !x; if (!x) return; applySearch(x); };
     el('saved-del').onclick = async () => { const x = searches.find(y => y.id == el('saved-sel').value); if (x && await J.confirm('Supprimer la recherche', '« ' + x.name + ' » sera supprimée.', 'Supprimer')) { await J.post('search/delete', { id: +x.id }); drawSaved(); } };
-    el('saved-save').onclick = () => J.dialog({ title: 'Enregistrer cette recherche', body: J.field('Nom', `<input id="sv-name" maxlength="80" value="${J.esc(S.label || '')}" autofocus>`) + '<p class="small muted">Enregistre vos critères, périodes, filtres et tri. Un nom existant est remplacé.</p>',
-      actions: [{ label: 'Annuler', run: () => { } }, { label: 'Enregistrer', cls: 'primary', run: async d => { const name = J.$('#sv-name', d).value.trim(); if (!name) return true; try { await J.post('search/save', { name, config: S.config, view: { ...view(), sort: S.sort, dir: S.dir } }); } catch (e) { J.formError(d, e.message); return true; } S.label = name; persist(); await drawSaved(); drawStrategies(); J.toast('Recherche enregistrée'); } }] });
+    el('saved-manage').onclick = openManage; el('reset-default').onclick = () => { const k = baseKey(); if (k) resetPreset(k); }; syncReset();
+    el('saved-save').onclick = () => {
+      const base = baseKey();
+      J.dialog({ title: 'Enregistrer vos réglages', onopen: d => { const t = J.$('#sv-target', d); if (t) t.onchange = () => { J.$('#sv-namebox', d).hidden = t.value === 'preset'; }; },
+        body: (base ? J.field('Où enregistrer ?', `<select id="sv-target"><option value="new">Une recherche à part, avec un nom</option><option value="preset">Le réglage de « ${J.esc(NAMES[base][0])} » (remplace son réglage de départ)</option></select>`) : '') + `<div id="sv-namebox">${J.field('Nom', `<input id="sv-name" maxlength="80" value="${J.esc(S.label || '')}" autofocus>`)}</div><p class="small muted">Enregistre vos critères, périodes, filtres et tri. Un nom existant est remplacé. Vous pourrez toujours remettre une stratégie de départ par défaut (« Gérer… »).</p>`,
+        actions: [{ label: 'Annuler', run: () => { } }, { label: 'Enregistrer', cls: 'primary', run: async d => {
+          const target = (J.$('#sv-target', d) || {}).value || 'new';
+          if (target === 'preset' && base) {
+            const v = savedView(); try { await J.post('preset/save', { preset: base, config: S.config, view: v }); } catch (e) { J.formError(d, e.message); return true; }
+            MINE[base] = { config: JSON.parse(JSON.stringify(S.config)), view: v, updated_at: new Date().toISOString().slice(0, 19).replace('T', ' ') };
+            S.preset = base; S.config.name = base; S.label = null; persist(); drawStrategies(); J.toast('Réglage de « ' + NAMES[base][0] + ' » enregistré'); return false;
+          }
+          const name = J.$('#sv-name', d).value.trim(); if (!name) return true;
+          try { await J.post('search/save', { name, config: S.config, view: savedView() }); } catch (e) { J.formError(d, e.message); return true; }
+          S.label = name; persist(); await drawSaved(); drawStrategies(); J.toast('Recherche « ' + name + ' » enregistrée'); return false;
+        } }] });
+    };
   }
   function applySearch(x) {
-    S.config = x.config; S.preset = 'custom'; S.label = x.name; S.page = 1; const v = x.view || {};
-    [...FILTERS, 'kind', 'market'].forEach(k => { el(k).value = v[k] ?? ''; }); el('pea').checked = !!v.pea; el('mine').checked = !!v.owned_only; el('open_now').checked = !!v.open_now; el('fresh_only').checked = !!v.fresh_only; el('tradable').checked = v.tradable !== false;
-    S.sort = v.sort || 'rank'; S.dir = v.dir || 'asc'; el('filters').hidden = !(FILTERS.some(k => el(k).value) || CHECKS.some(k => el(k).checked));
+    S.config = x.config; S.preset = 'custom'; S.base = null; S.label = x.name; S.page = 1; setView(x.view);
     persist(); drawStrategies(); if (!el('editor').hidden) drawEditor(); load();
   }
   el('edit-btn').onclick = () => { const e = el('editor'); e.hidden = !e.hidden; if (!e.hidden) drawEditor(); };
@@ -166,7 +286,7 @@
       <td class="hide-s" title="Clôtures sur ${J.esc((lastRes || {}).curve_label || '3 mois')} : la période la plus longue de la stratégie">${J.spark(r.curve)}</td>
       <td class="num ${J.cls(m.slope)}">${m.slope !== null && m.slope !== undefined ? J.num(m.slope, 3) : '–'}</td><td class="num">${J.num(m.r2, 2)}</td><td class="num ${J.cls(m.perf)}">${J.pct(m.perf, 1)}</td>
       <td class="num">${m.volatility !== null && m.volatility !== undefined ? J.num(m.volatility, 2) : '–'}</td><td class="num">${m.drawdown !== null && m.drawdown !== undefined ? J.num(m.drawdown, 1) + ' %' : '–'}</td>
-      <td class="num">${r.volume ? J.num(r.volume, 0) : '–'}</td><td class="num">${r.score !== null && r.score !== undefined ? `<b>${J.num(r.score, 0)}</b><div class="score-bar"><i style="width:${r.score}%"></i></div>` : '–'}</td>
+      <td class="num">${r.volume ? J.num(r.volume, 0) : '–'}</td><td class="num">${r.score !== null && r.score !== undefined ? `<b>${J.num(r.score, 0)}</b><div class="score-bar"><i style="width:${r.score}%"></i></div>` : '–'}${(S.config.ranking.mode === 'momentum' || S.config.ranking.mode === 'momentum12') && r.momentum !== null && r.momentum !== undefined ? `<span class="sub ${J.cls(r.momentum)}" style="display:block" title="Variation du cours entre il y a ${S.config.ranking.mode === 'momentum12' ? '252' : '126'} et il y a 21 séances">mom. ${J.pct(r.momentum, 1)}</span>` : ''}</td>
       <td class="hide-s small">${analystCell(r.analyst)}</td>
       <td class="num small ${r.quality && r.quality !== 'ok' ? 'warn' : ''}" title="${{ ok: 'À jour', stale: 'Clôture en retard', insufficient: 'Historique court', incomplete: 'Historique incomplet : des séances de marché sont absentes', calendar_unknown: 'Calendrier de séances indisponible pour cette place', break: 'Rupture de cours' }[r.quality] || ''}">${fresh}${r.quality && r.quality !== 'ok' ? ' ⚠' : ''}</td><td>${badge}</td></tr>`;
   }
@@ -178,7 +298,7 @@
       Object.entries(groups).map(([per, list]) => `<h3 style="margin:10px 0 6px;font-size:.95rem">${J.esc(label(per))}</h3>` + list.sort((a, b) => b[1] - a[1]).map(([crit, n]) => `<div class="row between small" style="gap:10px"><span style="min-width:230px">${J.esc(CRIT[crit] || crit)}</span><div class="bar" style="flex:1"><i style="width:${Math.min(100, 100 * n / total)}%"></i></div><span class="muted" style="min-width:90px;text-align:right">${J.num(n, 0)} · ${J.num(100 * n / total, 0)} %</span></div>`).join('')).join('') : '<p class="muted">Aucun titre écarté avec ces filtres.</p>';
   }
   async function load() {
-    const my = ++seq; el('results').innerHTML = '<div class="empty"><span class="spinner"></span></div>';
+    const my = ++seq; el('apply-menu').classList.remove('pending'); el('results').innerHTML = '<div class="empty"><span class="spinner"></span></div>';
     persist();
     if (S.compare) return loadCompare(my);
     const v = { ...view(), status: S.status, sort: S.sort, dir: S.dir, page: S.page, page_size: S.size };
@@ -213,8 +333,8 @@
     Object.keys(LEVELS).forEach(k => MS[k].set(LEVELS[k].map(([v, l]) => [v, l, (((res.level_filters || {}).counts || {})[k] || {})[v] || 0])));
     if (!MS.country.loaded) { MS.country.loaded = 1; MS.country.set(Object.entries(res.facets.countries).map(([c, n]) => [c, c, n])); }
     if (!MS.category.loaded) { MS.category.loaded = 1; MS.category.set(Object.entries(res.facets.categories || {}).sort((a, b) => a[0].localeCompare(b[0], 'fr')).map(([c, n]) => [c, c, n])); }
-    if (el('market').options.length === 1) Object.entries(res.facets.markets).sort((a, b) => b[1] - a[1]).forEach(([m, n]) => el('market').insertAdjacentHTML('beforeend', `<option value="${J.esc(m)}">${J.esc(MARKETS[m] || m)} (${n})</option>`));
-    ['market'].forEach(k => { const v = (saved.view || {})[k]; if (v && !el(k).dataset.restored) { el(k).value = v; el(k).dataset.restored = 1; } });
+    if (!el('market').dataset.filled && (el('market').dataset.filled = 1)) Object.entries(res.facets.markets).sort((a, b) => b[1] - a[1]).forEach(([m, n]) => el('market').insertAdjacentHTML('beforeend', `<option value="${J.esc(m)}">${J.esc(MARKETS[m] || m)} (${n})</option>`));
+    ['market'].forEach(k => { const v = (saved.view || {})[k]; if (v && !el(k).dataset.restored) { el(k).value = v; el(k).dataset.restored = 1; } }); syncMenu();
     el('filters-note').textContent = 'Les filtres numériques utilisent les mesures sur ' + res.ref_sessions + ' séances (la plus longue période active).';
   }
   el('compare-btn').onclick = () => { S.compare = !S.compare; el('compare-btn').classList.toggle('primary', S.compare); el('compare-btn').textContent = S.compare ? 'Retour au tableau' : 'Comparer actions / ETF'; S.page = 1; load(); };
@@ -226,14 +346,20 @@
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + [head.join(';'), ...lines].join('\r\n')], { type: 'text/csv;charset=utf-8' })); a.download = 'jigobourso-explorer-' + new Date().toISOString().slice(0, 10) + '.csv'; a.click();
     J.toast(res.rows.length + ' lignes exportées' + (res.total > res.rows.length ? ' (limite de 3 000)' : ''));
   };
-  el('reset-filters').onclick = () => { FILTERS.forEach(k => el(k).value = ''); CHECKS.forEach(k => el(k).checked = false); el('kind').value = ''; el('market').value = ''; el('tradable').checked = true; S.page = 1; load(); };
+  el('reset-filters').onclick = () => { FILTERS.forEach(k => el(k).value = ''); CHECKS.forEach(k => el(k).checked = false); el('kind').value = ''; el('market').value = ''; syncMenu(); el('tradable').checked = true; S.page = 1; load(); };
   el('tradable').onchange = () => { S.page = 1; load(); };
-  [...text, ...CHECKS].forEach(k => el(k).addEventListener(el(k).type === 'search' || el(k).type === 'number' || el(k).placeholder ? 'input' : 'change', () => { clearTimeout(timer); timer = setTimeout(() => { S.page = 1; if (el('q').value.trim()) S.status = 'all'; load(); }, 350); }));
+  /* Les réglages et filtres ne lancent plus la recherche à chaque geste (trop lent) : un bouton « Appliquer » (ou la touche Entrée) la déclenche. */
+  function applyMenu() { clearTimeout(timer); S.page = 1; if (el('q').value.trim()) S.status = 'all'; load(); }
+  function markDirty() { el('apply-menu').classList.add('pending'); }
+  [...text, ...CHECKS].forEach(k => el(k).addEventListener(el(k).type === 'search' || el(k).type === 'number' || el(k).placeholder ? 'input' : 'change', markDirty));
+  el('apply-menu').onclick = applyMenu;
+  ['q', 'min_price', 'budget', 'min_score', 'max_volatility', 'max_drawdown', 'min_volume'].forEach(k => el(k).addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); applyMenu(); } }));
   /* liens du menu latéral : ?kind=, ?compare=1, ?preset= */
   if (url.get('kind')) el('kind').value = url.get('kind');
-  if (url.get('preset') === 'free') { S.preset = 'free'; S.label = null; S.config = freeConfig(); } else if (P.presets[url.get('preset')]) { S.preset = url.get('preset'); S.label = null; S.config = JSON.parse(JSON.stringify(P.presets[S.preset])); }
-  drawSources(); drawStrategies(); drawSaved(); if (el('q').value) S.status = 'all';
+  if (url.get('preset') === 'free') { S.preset = 'free'; S.label = null; S.config = freeConfig(); } else if (P.presets[url.get('preset')]) { S.preset = url.get('preset'); S.base = S.preset; S.label = null; S.config = presetConfig(S.preset); if (MINE[S.preset]) setView(MINE[S.preset].view); }
+  drawSources(); drawStrategies(); syncMenu(); drawSaved(); if (el('q').value) S.status = 'all';
   if (url.get('compare')) { S.compare = true; el('compare-btn').classList.add('primary'); el('compare-btn').textContent = 'Retour au tableau'; }
   if (FILTERS.some(k => el(k).value) || CHECKS.some(k => el(k).checked)) el('filters').hidden = false;
   load();
+  if (url.get('manage')) drawSaved().then(openManage);
 })();

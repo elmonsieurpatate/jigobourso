@@ -12,3 +12,4 @@ cron.key
 *.tgz
 *.sql.gz
 node_modules/
+audit-results/
