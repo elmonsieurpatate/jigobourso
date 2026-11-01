@@ -45,7 +45,8 @@ const BASE='http://127.0.0.1:18089';
   ok('raccourcis_ecrivent_dans_le_tiroir',(await page.inputValue('#min_price'))==='10'&&(await page.inputValue('#budget'))==='50'&&(await page.inputValue('#min_volume'))==='100000');
   ok('drapeau_europe',(await page.locator('#market-flag svg circle').count())>=12);
   await page.reload();await page.locator('#strats .strat').first().waitFor();await page.waitForTimeout(1200);
-  ok('choix_conserves_au_rechargement',(await page.inputValue('#f-price'))==='10|50'&&(await page.inputValue('#market'))==='__pea'&&(await page.inputValue('#cap'))==='mid');
+  ok('choix_reinitialises_au_rechargement',(await page.inputValue('#f-price'))===''&&(await page.inputValue('#market'))===''&&(await page.inputValue('#cap'))===''&&(await page.inputValue('#kind'))===''&&await page.locator('.strat.on[data-k="regular"]').count()===1);
+  await page.click('#filters-btn');
   await page.click('#reset-filters');await page.waitForTimeout(800);
   ok('reinitialisation',(await page.inputValue('#f-price'))===''&&(await page.inputValue('#market'))===''&&(await page.inputValue('#cap'))==='');
   for(const width of [375,390,1280]){await page.setViewportSize({width,height:900});await page.waitForTimeout(400);ok('pas_de_debordement_'+width,!(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)));const kindWidth=await page.locator('#kind').evaluate(e=>e.getBoundingClientRect().width);ok('type_visible_'+width,kindWidth>=(width<640?180:120),kindWidth)}
