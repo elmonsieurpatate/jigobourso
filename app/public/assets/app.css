@@ -351,3 +351,21 @@ tr[hidden] { display: none; }
 
 .strategy-manage-card .strategy-detail { display:block; font-size:.75rem; line-height:1.3; margin-top:3px; }
 @media (max-width: 640px) { .strategy-manage-card { padding:12px; gap:8px; } .strategy-manage-card .filter-actions { gap:6px; } .strategy-manage-card .filter-actions .btn { padding:7px 9px; font-size:.8rem; } .strategy-manage-card h3 { font-size:.92rem; } .strategy-manage-card .badge { font-size:.7rem; padding:2px 7px; } .strategy-manage-card .strategy-detail { display:none; } .manage-grid { grid-template-columns:1fr; gap:8px; } }
+
+/* Explorer mobile : les filtres restent complets, avec des contrôles plus denses. */
+@media (max-width: 640px) {
+  .menu { margin-top:8px; }
+  .menu-bar { padding:8px; gap:6px; }
+  .mi { height:38px; padding:0 10px; gap:8px; border-radius:11px; }
+  .mi svg { width:19px; height:19px; }
+  .mi.search, .mi.market, .kind-filter { grid-column:auto; }
+  .mf { gap:2px; font-size:.82rem; }
+  .mf select, .mf .ms-btn { height:36px; font-size:.88rem; border-radius:10px; }
+  .mact { grid-column:1 / -1; flex-wrap:nowrap; gap:6px; margin-top:2px; }
+  .mact .btn { flex:1 1 0; min-width:0; height:36px; padding:0 6px; font-size:.8rem; }
+  .strat-extra { margin-top:2px; }
+  .strat-extra > .strat { min-height:42px; padding:5px 9px; }
+  .explorer-actions { gap:6px; margin-top:7px !important; }
+  .explorer-actions .btn { min-height:38px; padding:6px 9px; font-size:.84rem; }
+  #strategy-summary { display:none; }
+}
