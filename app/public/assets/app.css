@@ -329,3 +329,5 @@ tr[hidden] { display: none; }
 .ms-acts { display: flex; gap: 6px; flex-wrap: wrap; }
 .ms-foot { align-items: center; flex-wrap: wrap; }
 .fam-why { display: block; margin-top: 4px; max-width: 420px; white-space: normal; font-size: .76rem; line-height: 1.35; color: var(--muted); font-weight: 400; } .fam-why b { color: var(--text); font-weight: 600; }
+.notice.warn.etf-concentration-banner { border-left: 0; border-radius: 0; padding: 12px 16px; }
+.etf-concentration-note { margin: 6px 14px 10px; padding-left: 4px; }

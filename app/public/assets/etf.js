@@ -73,8 +73,8 @@ window.JEtf = {
     const groups = c?.groups || [];
     if (!groups.length) return '';
     const missing = c.sample - (c.analysed || 0);
-    return groups.map(g => `<div class="notice warn"><span class="tag grp">Groupe ${J.esc(g.id)}</span> <b>${g.size} des ${c.sample} premiers ETF de cette vue</b> évoluent presque comme un seul${g.label ? ' (' + J.esc(g.label) + ')' : ''} : ${g.symbols.map(J.esc).join(', ')}. Ils portent l’étiquette « Groupe ${J.esc(g.id)} » dans le tableau. Corrélation hebdomadaire en EUR ≥ ${J.num(0.97, 2)} sur 52 semaines, lien direct avec le premier du groupe (la plus faible : ${J.num(g.min_coefficient, 2)})${g.unstable ? ' · <span class="sig warn"><i></i>résultat instable</span>' : ''}.</div>`).join('') +
-      `<p class="small muted" style="margin:6px 0 10px">Information seulement : scores et ordre inchangés. Une corrélation ne prouve pas des participations communes.${missing > 0 ? ` ${missing} ETF de la sélection sans analyse récente.` : ''}</p>`;
+    return groups.map(g => `<div class="notice warn etf-concentration-banner"><span class="tag grp">Groupe ${J.esc(g.id)}</span> <b>${g.size} des ${c.sample} premiers ETF de cette vue</b> évoluent presque comme un seul${g.label ? ' (' + J.esc(g.label) + ')' : ''} : ${g.symbols.map(J.esc).join(', ')}. Ils portent l’étiquette « Groupe ${J.esc(g.id)} » dans le tableau. Corrélation hebdomadaire en EUR ≥ ${J.num(0.97, 2)} sur 52 semaines, lien direct avec le premier du groupe (la plus faible : ${J.num(g.min_coefficient, 2)})${g.unstable ? ' · <span class="sig warn"><i></i>résultat instable</span>' : ''}.</div>`).join('') +
+      `<p class="small muted etf-concentration-note">Information seulement : scores et ordre inchangés. Une corrélation ne prouve pas des participations communes.${missing > 0 ? ` ${missing} ETF de la sélection sans analyse récente.` : ''}</p>`;
   },
   portfolio(a) {
     if (!a) return '';
