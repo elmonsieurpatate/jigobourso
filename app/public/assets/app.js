@@ -135,8 +135,6 @@ J.NAV = (admin) => [
   { sec: 'Marchés' },
   { id: 'explorer', label: 'Explorer', icon: 'compass', file: ['index.html', 'titre.html', 'mes-filtres.html'], children: [
     { label: 'Classement', href: 'index.html', on: q => !q.has('kind') && !q.has('compare') && !q.has('preset') && !q.has('manage') && !q.has('edit') },
-    { label: 'Actions', href: 'index.html?kind=equity', on: q => q.get('kind') === 'equity' && !q.has('compare') },
-    { label: 'ETF', href: 'index.html?kind=etf', on: q => q.get('kind') === 'etf' && !q.has('compare') },
     { label: 'Comparer actions / ETF', href: 'index.html?compare=1', on: q => q.has('compare') },
     { label: 'Recherche libre', href: 'index.html?preset=free', on: q => q.get('preset') === 'free' },
     { label: 'Mes filtres', href: 'mes-filtres.html', on: () => true }] },

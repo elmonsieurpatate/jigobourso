@@ -11,6 +11,8 @@
     momentum12: ['Momentum 12 mois', 'Classement de la progression passée sur douze mois.']
   };
   const icons = ['📈', '⚡', '🔎', '🛡️', '🌱', '📊', '💼', '⭐'];
+  let currentState = {};
+  try { currentState = JSON.parse(sessionStorage.getItem('jigo_explorer2') || localStorage.getItem('jigo_explorer2') || '{}'); } catch (_) {}
   const safeState = (config, view, label, preset = 'custom', base = null) => {
     const state = { preset, base, label, config, status: view.status || 'retained', page: 1, level: 'guided', compare: false,
       sort: view.sort || 'rank', dir: view.dir || 'asc', size: 20, view };
@@ -54,14 +56,15 @@
     const presets = Object.keys(P.presets || {}).map(k => {
       const info = labels[k] || [k, 'Réglage de stratégie']; const custom = mine[k];
       const config = custom ? custom.config : P.presets[k], view = custom ? custom.view : {};
-      return `<article class="card filter-card"><div class="row between"><h3>${J.esc(info[0])}</h3><span class="badge ${custom ? 'info' : ''}">${custom ? 'Personnalisée' : 'Réglage de départ'}</span></div>
+      const active = (currentState.preset === k || (currentState.preset === 'custom' && currentState.base === k)) && !currentState.label;
+      return `<article class="card filter-card"><div class="row between"><h3>${J.esc(info[0])}</h3><span class="badge ${active ? 'ok' : 'info'}">Disponible dans le classement · ${active ? 'Active' : 'Inactive'}</span></div>
         <p class="small muted">${J.esc(info[1])}</p><p class="small"><b>Périodes :</b> ${J.esc(periodSummary(config))}</p>
         <p class="small muted">${custom ? `Modifiée le ${J.dateTime(custom.updated_at)}${view && Object.keys(view).length ? ' · ' + J.esc(viewSummary(view)) : ''}` : 'Utilise les critères initiaux de Jigobourso.'}</p>
         <div class="filter-actions"><a class="btn small primary" href="index.html?preset=${encodeURIComponent(k)}">Utiliser</a><a class="btn small" href="index.html?preset=${encodeURIComponent(k)}&edit=1">Modifier</a><button class="btn small" data-reset-preset="${J.esc(k)}" ${custom ? '' : 'disabled'}>Réinitialiser</button></div></article>`;
     }).join('');
-    const own = searches.map(s => `<article class="card filter-card"><div class="row between"><div class="filter-title"><span class="filter-icon" aria-hidden="true">${J.esc(s.view?.icon || '🔎')}</span><h3>${J.esc(s.name)}</h3></div><span class="badge">Filtre enregistré</span></div>
+    const own = searches.map(s => { const active = currentState.preset === 'custom' && currentState.label === s.name; return `<article class="card filter-card"><div class="row between"><div class="filter-title"><span class="filter-icon" aria-hidden="true">${J.esc(s.view?.icon || '🔎')}</span><h3>${J.esc(s.name)}</h3></div><span class="badge ${active ? 'ok' : 'info'}">Disponible dans le classement · ${active ? 'Active' : 'Inactive'}</span></div>
       <p class="small muted">Enregistré le ${J.dateTime(s.updated_at)}</p><p class="small">${J.esc(s.view?.description || 'Pas encore de note. Ajoutez-en une pour vous rappeler la stratégie associée.')}</p><p class="small muted">${J.esc(viewSummary(s.view || {}))}</p>
-      <div class="filter-actions"><button class="btn small primary" data-use-search="${+s.id}">Utiliser dans le classement</button><button class="btn small" data-edit-search="${+s.id}">Modifier le filtre</button><button class="btn small" data-edit-note="${+s.id}">Icône et note</button><button class="btn small" data-rename-search="${+s.id}">Renommer</button><button class="btn small danger" data-delete-search="${+s.id}">Supprimer</button></div></article>`).join('');
+      <div class="filter-actions"><button class="btn small primary" data-use-search="${+s.id}">Utiliser dans le classement</button><button class="btn small" data-edit-search="${+s.id}">Modifier le filtre</button><button class="btn small" data-edit-note="${+s.id}">Icône et note</button><button class="btn small" data-rename-search="${+s.id}">Renommer</button><button class="btn small danger" data-delete-search="${+s.id}">Supprimer</button></div></article>`; }).join('');
     page.innerHTML = `<div class="page-head"><div><h1>Mes filtres</h1><p>Retrouvez vos réglages de stratégie et vos filtres enregistrés. Les modifier change les critères de recherche, pas les données ni les scores financiers.</p></div><a class="btn" href="index.html">← Retour au classement</a></div>
       <section class="card" style="padding:18px"><div class="row between"><div><h2 style="margin:0">Mes stratégies</h2><p class="small muted" style="margin:4px 0 0">Personnalisez un profil de départ ou restaurez son réglage initial.</p></div></div><div class="manage-grid" style="margin-top:14px">${presets}</div></section>
       <section class="card" style="padding:18px;margin-top:14px"><div class="row between"><div><h2 style="margin:0">Filtres enregistrés</h2><p class="small muted" style="margin:4px 0 0">Une recherche sauvegarde aussi le texte saisi, les cases, la visibilité, le tri et le statut affiché.</p></div><a class="btn small" href="index.html">Créer depuis l’Explorer</a></div>
