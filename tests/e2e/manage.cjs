@@ -21,9 +21,9 @@ const BASE='http://127.0.0.1:18089';
   await page.goto(BASE+'/mes-filtres.html');await page.locator('.filter-card').first().waitFor();
   ok('titre_mes_filtres',await page.locator('h1').innerText()==='Mes filtres');
   ok('six_profils_sur_page',await page.locator('.filter-card').count()===6);
-  ok('reglage_personnel_visible',/Personnalisée/.test(await page.locator('.filter-card:has([data-reset-preset="fast"])').innerText()));
+  ok('reglage_personnel_visible',/Modifiée le/.test(await page.locator('.filter-card:has([data-reset-preset="fast"])').innerText()));
   await page.click('[data-reset-preset="fast"]');await dialog().getByRole('button',{name:'Réinitialiser'}).click();await page.waitForTimeout(700);
-  ok('profil_reinitialise_sur_page',/Réglage de départ/.test(await page.locator('.filter-card:has([data-reset-preset="fast"])').innerText()));
+  ok('profil_reinitialise_sur_page',/Utilise les critères initiaux/.test(await page.locator('.filter-card:has([data-reset-preset="fast"])').innerText()));
   // Modifier une recherche, conserver VOO + négociabilité désactivée + statut Tous.
   await page.goto(BASE+'/index.html');await page.locator('#strats .strat').first().waitFor();
   await page.fill('#q','VOO');await page.locator('#status-tabs button[data-s="all"]').click();await page.waitForTimeout(500);await page.uncheck('#tradable');await page.waitForTimeout(300);
