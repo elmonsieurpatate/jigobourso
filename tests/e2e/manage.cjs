@@ -51,6 +51,10 @@ const BASE='http://127.0.0.1:18089';
   await page.locator('dialog[open]').first().getByText('Fermer',{exact:true}).click();
   // 5. aucun débordement sur téléphone
   await page.setViewportSize({width:375,height:900});await page.waitForTimeout(400);ok('pas_de_debordement_375',!(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)));
+  // 6. entrée « Mes stratégies » du menu de gauche
+  await page.setViewportSize({width:1280,height:900});await page.goto(BASE+'/index.html');await page.locator('#strats .strat').first().waitFor();
+  const lk=page.locator('a[href="index.html?manage=1"]').first();ok('entree_menu_gauche',await lk.count()>0);
+  await lk.click();await page.locator('dialog[open] [data-use]').first().waitFor();ok('entree_ouvre_la_gestion',await page.locator('dialog[open] [data-use]').count()===6);
  }catch(e){out.errors.push('exception '+e.message)}
  console.log(JSON.stringify(out));await browser.close();process.exit(out.errors.length?1:0);
 })();

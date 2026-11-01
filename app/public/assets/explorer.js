@@ -361,4 +361,5 @@
   if (url.get('compare')) { S.compare = true; el('compare-btn').classList.add('primary'); el('compare-btn').textContent = 'Retour au tableau'; }
   if (FILTERS.some(k => el(k).value) || CHECKS.some(k => el(k).checked)) el('filters').hidden = false;
   load();
+  if (url.get('manage')) drawSaved().then(openManage);
 })();
