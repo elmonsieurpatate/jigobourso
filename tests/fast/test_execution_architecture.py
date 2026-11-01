@@ -60,7 +60,7 @@ def test_database_socket_replaces_host_for_isolated_tests(monkeypatch):
         db.connect()
 
 
-STEPS = ('backup', 'quotes', 'fx', 'fx_history', 'gaps', 'detect', 'verify', 'compute', 'warm', 'etf', 'snapshot', 'outcomes', 'prune', 'housekeeping')
+STEPS = ('backup', 'quotes', 'fx', 'fx_history', 'gaps', 'detect', 'verify', 'recheck', 'compute', 'warm', 'etf', 'snapshot', 'outcomes', 'prune', 'housekeeping')
 
 
 @pytest.fixture
@@ -83,6 +83,7 @@ def plan(monkeypatch):
     monkeypatch.setattr(tasks.collect, 'fill_gaps_batch', step('gaps', {'added': 2, 'examined': 1, 'remaining': 0, 'rate_limited': False}))
     monkeypatch.setattr(tasks.splits, 'detect', step('detect', 0))
     monkeypatch.setattr(tasks.splits, 'verify', step('verify', {'confirmed': 0, 'real_move': 0, 'unanswered': 0}))
+    monkeypatch.setattr(tasks.splits, 'recheck', step('recheck', {'rechecked': 0, 'confirmed': 0, 'unanswered': 0, 'waiting': 0}))
     monkeypatch.setattr(tasks.compute, 'compute_all', step('compute', (9612, 57672)))
     monkeypatch.setattr(tasks.etf, 'warm_profiles', step('warm', {'wanted': 1, 'to_refresh': 0, 'fetched': 0, 'unavailable': 0, 'limit': 40}))
     monkeypatch.setattr(tasks.etf, 'build', step('etf', {'etfs': 4677, 'with_minimum_history': 4000}))
@@ -99,7 +100,7 @@ def plan(monkeypatch):
 def test_maintenance_runs_everything_and_the_backup_comes_first(plan):
     calls, fail, pending, logs, log = plan
     ok, errors, summary = tasks.maintenance(Conn(), object(), None, log)
-    assert calls[0] == 'backup' and calls == ['backup', 'quotes', 'fx', 'fx_history', 'gaps', 'detect', 'verify', 'compute', 'warm', 'etf', 'snapshot', 'outcomes', 'prune', 'housekeeping']
+    assert calls[0] == 'backup' and calls == ['backup', 'quotes', 'fx', 'fx_history', 'gaps', 'detect', 'verify', 'recheck', 'compute', 'warm', 'etf', 'snapshot', 'outcomes', 'prune', 'housekeeping']
     assert errors == 0 and pending['maintenance_pending'] is False and 'séries 9612' in summary and 'en échec' not in summary
 
 

@@ -47,7 +47,10 @@ J.explain = function (r) {
   let text;
   if (r.criterion === 'freshness') text = `Données non à jour : dernière clôture ${J.date(r.value)} (attendue ${J.date(r.threshold)}).`;
   else if (r.criterion === 'coverage') text = `${per} : historique incomplet, ${J.num(r.value, 0)} clôtures disponibles sur ${J.num(r.threshold, 0)} séances attendues. Les indicateurs de chemin (volatilité, repli, ER) ne sont pas reconstruits à travers les séances absentes.`;
-  else if (r.criterion === 'data') text = `${per} : ${{ history: 'historique trop court', break: 'rupture de cours dans la période', invalid: 'données inexploitables', coverage: 'historique insuffisant ou incomplet', calendar: 'calendrier de séances indisponible pour cette place' }[r.metric] || 'donnée absente'}${r.metric === 'calendar' ? '.' : ` (${r.threshold} clôtures nécessaires).`}`;
+  else if (r.criterion === 'data') {
+    const why = { history: 'historique trop court', break: 'saut de cours inhabituel dans la période (variation de plus de ×1,6 ou de moins de ÷1,6 en une séance) : mesure suspendue par prudence, l’origine du saut (split non ajusté, erreur de données ou vrai mouvement) n’étant pas établie', invalid: 'données inexploitables', coverage: 'historique insuffisant ou incomplet', calendar: 'calendrier de séances indisponible pour cette place', momentum: 'momentum non calculable (historique trop court ou clôture manquante à l’une des deux dates)' }[r.metric] || 'donnée absente';
+    text = `${r.period ? per : 'Momentum'} : ${why}${['history', 'coverage', 'invalid'].includes(r.metric) || !r.metric ? ` (${r.threshold} clôtures nécessaires).` : '.'}`;
+  }
   else if (r.period === 'technical') text = `${J.TECH[r.criterion] || r.criterion} : ${r.result === 'missing' ? 'non évaluable' : r.result === 'pass' ? 'respecté' : 'non respecté'}.`;
   else {
     const [label, unit] = J.CRITERIA[r.criterion] || [r.criterion, ''];

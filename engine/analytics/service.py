@@ -74,7 +74,7 @@ def _load_universe(conn, windows, ids=None):
     with conn.cursor() as cur:
         cur.execute("""SELECT l.id, l.symbol, l.mic, l.currency, i.name, i.isin, i.kind, i.country, i.category,
                               p.price, p.price_time, p.quote_at, p.source AS price_source, p.currency AS price_currency, p.avg_volume_3m,
-                       s.last_close_date, s.closes_count, s.close_px, s.ma20, s.ma50, s.ma50_prev, s.daily_change, s.gap_to_ma20, s.quality, s.break_dates,
+                       s.last_close_date, s.closes_count, s.close_px, s.ma20, s.ma50, s.ma50_prev, s.daily_change, s.gap_to_ma20, s.quality, s.break_age, s.break_dates,
                        s.coverage_252, s.expected_252, s.momentum_6m, s.momentum_12m
                        FROM v_recommendable r JOIN listings l ON l.id=r.listing_id JOIN instruments i ON i.id=l.instrument_id
                        LEFT JOIN latest_prices p ON p.listing_id=l.id LEFT JOIN series_state s ON s.listing_id=l.id""" + only, list(ids or []))
@@ -121,6 +121,16 @@ def _live_measures(conn, ids, windows):
     return out
 
 
+def _missing_reason(count, window, measure, break_age):
+    """Motif d'une fenêtre non mesurée : historique trop court, saut de cours (rupture) dans la fenêtre, calendrier ou couverture.
+    La dernière rupture (break_age = séances écoulées depuis elle) traverse une fenêtre de n séances si elle est plus récente que n ; les plus anciennes ne la traversent alors pas non plus."""
+    if count < window + 1:
+        return 'history'
+    if measure is None:
+        return 'break' if break_age is not None and break_age < window else 'calendar'
+    return 'coverage'
+
+
 def judge_universe(conn, config, ids=None):
     """Verdicts de l'univers recommandable (ou d'un sous-ensemble `ids` : rang et score n'y ont alors pas de sens)."""
     windows = strategy.required_sessions(config)
@@ -134,11 +144,11 @@ def judge_universe(conn, config, ids=None):
                         else stored.get(u['id'], {}).get(n)) or live.get(u['id'], {}).get(n)
                     for n in windows}
         count = u['closes_count'] or 0
-        missing = {n: ('history' if count < n + 1 else 'calendar' if m is None else 'coverage') for n, m in measures.items() if m is None}
+        missing = {n: _missing_reason(count, n, m, u.get('break_age')) for n, m in measures.items() if m is None}
         for n in windows:
             stored_metric = stored.get(u['id'], {}).get(n)
             if stored_metric and stored_metric.get('coverage') is None and n not in live.get(u['id'], {}):
-                missing[n] = 'calendar'
+                missing[n] = 'break' if count >= n + 1 and u.get('break_age') is not None and u['break_age'] < n else 'calendar'
         tech = {k: (None if u[k] is None else float(u[k])) for k in ('close_px', 'ma20', 'ma50', 'ma50_prev', 'daily_change', 'gap_to_ma20')}
         tech['close'] = tech.pop('close_px')
         last = u['last_close_date'].isoformat() if u['last_close_date'] else None

@@ -8,7 +8,10 @@ est donc corrigé.
 1. `detect` repère les sauts de cours qui ressemblent à un ratio usuel (×2, ÷2, ÷10, ×3/2…) et les note dans `split_log` (statut « detected »).
 2. `verify` interroge Yahoo (`events.splits`) : un split déclaré à la même date (± 5 jours) dont le ratio explique le saut (± 15 %) devient « confirmed » et est écrit
    dans `corporate_events` (ratio = parts nouvelles / anciennes) ; le calcul des séries (`analytics/series.prepare_series`) ajuste alors les clôtures antérieures.
-   Sinon le saut est « real_move » : rien n'est corrigé et le titre reste « non évaluable » sur les fenêtres qui le traversent.
+   Sinon le saut passe en « real_move » : rien n'est corrigé et le titre reste « non évaluable » sur les fenêtres qui le traversent. Ce statut veut dire « Yahoo n'a pas déclaré de split qui
+   explique ce saut AU MOMENT de la vérification » ; ce n'est ni une preuve que le mouvement est réel, ni une preuve qu'aucun split n'existe (Yahoo peut déclarer un split avec retard).
+3. `recheck` interroge de nouveau Yahoo, de façon bornée (au plus RECHECK_MAX_CHECKS réponses par saut, espacées de plusieurs jours, sur RECHECK_WINDOW_DAYS jours après le saut, RECHECK_LIMIT titres
+   par passage), pour les sauts « real_move » : une déclaration tardive les fait passer en « confirmed » ; une réponse absente ou illisible n'est jamais comptée comme une vérification.
 Une chute réelle de 50 % n'est donc jamais « corrigée » : il faut une déclaration du fournisseur.
 """
 import datetime
@@ -60,6 +63,24 @@ def available(conn):
         return False
 
 
+def has_recheck(conn):
+    """Les colonnes de revérification (migration 20261102) sont-elles présentes ? Sans elles, le code se comporte comme avant (aucune revérification)."""
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SHOW COLUMNS FROM split_log LIKE 'recheck_after'")
+            return cur.fetchone() is not None
+    except pymysql.err.ProgrammingError:
+        conn.rollback()
+        return False
+
+
+def next_recheck(checks, today):
+    """Date de la prochaine revérification après `checks` réponses de Yahoo ; None quand le nombre maximal est atteint."""
+    if checks >= RECHECK_MAX_CHECKS:
+        return None
+    return today + datetime.timedelta(days=RECHECK_DELAYS.get(checks, RECHECK_DELAYS[max(RECHECK_DELAYS)]))
+
+
 def _stamp(now):
     return now.replace(microsecond=0, tzinfo=None) if isinstance(now, datetime.datetime) else datetime.datetime.combine(now, datetime.time())
 
@@ -92,6 +113,12 @@ def detect(conn, now):
     return new
 
 
+RECHECK_MAX_CHECKS = 3       # réponses de Yahoo au total pour un saut : la vérification initiale et deux revérifications
+RECHECK_DELAYS = {1: 7, 2: 14}   # jours à attendre avant la 2e réponse (après la 1re), puis avant la 3e (après la 2e)
+RECHECK_WINDOW_DAYS = 60     # au-delà de 60 jours après le saut, une déclaration tardive est improbable : plus de revérification
+RECHECK_LIMIT = 30           # titres interrogés au plus par passage de maintenance (en plus de la vérification initiale)
+RECHECK_RETRY_DAYS = 3       # délai avant un nouvel essai quand Yahoo n'a pas répondu (la tentative n'est pas comptée)
+
 DATE_TOLERANCE_DAYS = 5      # écart toléré entre la date du saut dans nos données et la date déclarée par Yahoo
 RATIO_TOLERANCE = 0.15       # le ratio déclaré doit expliquer le saut observé à 15 % près (le cours bouge aussi le jour du split)
 
@@ -115,10 +142,12 @@ def match_declared(declared, event_date, price_ratio):
 
 def verify(conn, client, now, limit=150):
     """Interroge Yahoo pour les sauts « detected » (au plus `limit` titres par passage) : split déclaré cohérent = « confirmed » (écrit dans corporate_events),
-    sinon « real_move ». Un titre dont Yahoo ne répond pas reste « detected » pour le passage suivant. Renvoie {'confirmed': n, 'real_move': n, 'unanswered': n}."""
+    sinon « real_move » (= non déclaré par Yahoo à cet instant ; une revérification est alors planifiée, voir `recheck`). Un titre dont Yahoo ne répond pas reste « detected » pour le passage suivant.
+    Renvoie {'confirmed': n, 'real_move': n, 'unanswered': n}."""
     out = {'confirmed': 0, 'real_move': 0, 'unanswered': 0}
     if not available(conn):
         return out
+    recheck_cols = has_recheck(conn)
     stamp = _stamp(now)
     with conn.cursor() as cur:
         cur.execute("""SELECT s.listing_id, s.event_date, s.price_ratio, l.symbol FROM split_log s JOIN listings l ON l.id=s.listing_id
@@ -145,8 +174,64 @@ def verify(conn, client, now, limit=150):
                                 (lid, r['event_date'], 'split' if ratio > 1 else 'reverse_split', round(ratio, 8)))
                     cur.execute("UPDATE split_log SET status='confirmed', ratio=%s, checked_at=%s WHERE listing_id=%s AND event_date=%s", (round(ratio, 8), stamp, lid, r['event_date']))
                     out['confirmed'] += 1
+                elif recheck_cols:
+                    cur.execute("UPDATE split_log SET status='real_move', checked_at=%s, checks=1, recheck_after=%s WHERE listing_id=%s AND event_date=%s",
+                                (stamp, next_recheck(1, stamp.date()), lid, r['event_date']))
+                    out['real_move'] += 1
                 else:
                     cur.execute("UPDATE split_log SET status='real_move', checked_at=%s WHERE listing_id=%s AND event_date=%s", (stamp, lid, r['event_date']))
                     out['real_move'] += 1
+        conn.commit()
+    return out
+
+
+def recheck(conn, client, now, limit=RECHECK_LIMIT):
+    """Revérification BORNÉE des sauts « real_move » : Yahoo peut déclarer un split avec retard, et une réponse négative à un instant donné ne prouve rien.
+    Concerne les sauts datant de moins de RECHECK_WINDOW_DAYS jours, déjà vérifiés moins de RECHECK_MAX_CHECKS fois, dont la date de revérification est arrivée. Au plus `limit` titres par passage.
+    Déclaration cohérente trouvée : « confirmed » (écrit dans corporate_events, comme à la vérification initiale ; le calcul suivant ajuste les clôtures). Sinon la réponse est comptée et la suivante
+    planifiée ; réponse absente ou illisible : rien n'est compté, nouvel essai dans RECHECK_RETRY_DAYS jours. Renvoie {'rechecked', 'confirmed', 'unanswered', 'waiting'}."""
+    out = {'rechecked': 0, 'confirmed': 0, 'unanswered': 0, 'waiting': 0}
+    if not available(conn) or not has_recheck(conn):
+        return out
+    stamp = _stamp(now)
+    today = stamp.date()
+    with conn.cursor() as cur:
+        cur.execute("""SELECT s.listing_id, s.event_date, s.price_ratio, s.checks, l.symbol FROM split_log s JOIN listings l ON l.id=s.listing_id
+                       WHERE s.status='real_move' AND s.checks < %s AND s.event_date >= %s AND (s.recheck_after IS NULL OR s.recheck_after <= %s)
+                       ORDER BY s.listing_id, s.event_date""", (RECHECK_MAX_CHECKS, today - datetime.timedelta(days=RECHECK_WINDOW_DAYS), today))
+        rows = cur.fetchall()
+    by_listing = {}
+    for r in rows:
+        by_listing.setdefault(r['listing_id'], []).append(r)
+    todo = list(by_listing)[:max(0, limit)]
+    out['waiting'] = sum(len(v) for k, v in by_listing.items() if k not in todo)
+    for lid in todo:
+        events = by_listing[lid]
+        try:
+            declared = client.splits(events[0]['symbol'])
+        except RateLimited:
+            raise
+        except Exception:                                                      # noqa: BLE001 : réponse absente ou illisible : ni confirmation ni vérification comptée
+            with conn.cursor() as cur:
+                cur.executemany('UPDATE split_log SET recheck_after=%s WHERE listing_id=%s AND event_date=%s',
+                                [(today + datetime.timedelta(days=RECHECK_RETRY_DAYS), lid, r['event_date']) for r in events])
+            conn.commit()
+            out['unanswered'] += len(events)
+            continue
+        for r in events:
+            hit = match_declared(declared, r['event_date'], float(r['price_ratio']))
+            with conn.cursor() as cur:
+                if hit:
+                    ratio, _ = hit
+                    cur.execute('INSERT INTO corporate_events(listing_id,event_date,kind,ratio) VALUES (%s,%s,%s,%s) ON DUPLICATE KEY UPDATE ratio=VALUES(ratio)',
+                                (lid, r['event_date'], 'split' if ratio > 1 else 'reverse_split', round(ratio, 8)))
+                    cur.execute("UPDATE split_log SET status='confirmed', ratio=%s, checked_at=%s, checks=checks+1, recheck_after=NULL WHERE listing_id=%s AND event_date=%s",
+                                (round(ratio, 8), stamp, lid, r['event_date']))
+                    out['confirmed'] += 1
+                else:
+                    checks = r['checks'] + 1
+                    cur.execute('UPDATE split_log SET checked_at=%s, checks=%s, recheck_after=%s WHERE listing_id=%s AND event_date=%s',
+                                (stamp, checks, next_recheck(checks, today), lid, r['event_date']))
+                    out['rechecked'] += 1
         conn.commit()
     return out

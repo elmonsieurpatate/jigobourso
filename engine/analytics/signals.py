@@ -292,7 +292,7 @@ def data_quality(quality, corrections, price_stale, break_dates=None, coverage=N
     if quality == 'insufficient':
         return sig('data', 'unknown', 'Historique court', 'Moins de 22 clôtures : les mesures sont peu fiables ou absentes.', tip)
     if quality == 'break':
-        return sig('data', 'bad', 'Rupture de cours', 'Un saut de cours inexpliqué dans l\'année rend certaines périodes non évaluables' + (f' (dates : {break_dates}).' if break_dates else '.'), tip)
+        return sig('data', 'bad', 'Rupture de cours', 'Un saut de cours inhabituel (variation de plus de ×1,6 ou de moins de ÷1,6 en une séance) dans l\'année rend certaines périodes non évaluables par prudence : son origine (split non ajusté, erreur de données ou vrai mouvement) n\'est pas établie' + (f' (dates : {break_dates}).' if break_dates else '.'), tip)
     if quality == 'stale' or price_stale:
         return sig('data', 'warn', 'Cours ancien', 'La dernière clôture ou le dernier cours est plus ancien que prévu pour cette place.', tip)
     if quality == 'incomplete':

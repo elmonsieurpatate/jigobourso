@@ -233,7 +233,8 @@ def history(conn, client, now, log):
     i = _step(log, 'Barres de 15 minutes (deux dernières séances)', lambda: fetch_intraday(conn, client, rows, now, _progress(log, 'Barres de 15 minutes', total)),
               lambda r: f'{r["asked"]} titres interrogés, {r["up_to_date"]} déjà complets, {r["added"]} barres ajoutées, {r["errors"]} sans réponse' + (f', {r["unknown_hours"]} sans horaires connus' if r['unknown_hours'] else ''))
     _step(log, 'Détection des sauts de cours', lambda: splits.detect(conn, now), lambda r: f'{r} nouveaux sauts ressemblant à un split')
-    _step(log, 'Splits déclarés par Yahoo', lambda: splits.verify(conn, client, now), lambda r: f'{r["confirmed"]} confirmés (cours corrigés), {r["real_move"]} vrais mouvements, {r["unanswered"]} sans réponse')
+    _step(log, 'Splits déclarés par Yahoo', lambda: splits.verify(conn, client, now), lambda r: f'{r["confirmed"]} confirmés (cours corrigés), {r["real_move"]} non déclarés par Yahoo (revérifiés plus tard), {r["unanswered"]} sans réponse')
+    _step(log, 'Revérification des sauts non déclarés', lambda: splits.recheck(conn, client, now), lambda r: f'{r["rechecked"]} revérifiés, {r["confirmed"]} confirmés tardivement (cours corrigés), {r["unanswered"]} sans réponse, {r["waiting"]} en attente du prochain passage')
     _step(log, 'Indicateurs et classements', lambda: compute.compute_all(conn, now), lambda r: f'{r[0]} séries, {r[1]} lignes de mesures')
     cov = history_coverage(conn)
     save_stats(conn, 'history', now, daily=d, intraday=i, coverage=cov, titles=total)
@@ -330,7 +331,8 @@ def maintenance(conn, client, now, log):
     attempt('Clôtures manquantes', lambda: collect.fill_gaps_batch(conn, client, rows, now),
             lambda r: f'{r["added"]} clôtures ajoutées sur {r["examined"]} titres examinés, {r["remaining"]} restent à examiner' + (' (limitation Yahoo : reprise au prochain passage)' if r['rate_limited'] else ''))
     attempt('Détection des sauts de cours', lambda: splits.detect(conn, now), lambda r: f'{r} nouveaux sauts ressemblant à un split')
-    attempt('Splits déclarés par Yahoo', lambda: splits.verify(conn, client, now), lambda r: f'{r["confirmed"]} confirmés (cours corrigés), {r["real_move"]} vrais mouvements, {r["unanswered"]} sans réponse')
+    attempt('Splits déclarés par Yahoo', lambda: splits.verify(conn, client, now), lambda r: f'{r["confirmed"]} confirmés (cours corrigés), {r["real_move"]} non déclarés par Yahoo (revérifiés plus tard), {r["unanswered"]} sans réponse')
+    attempt('Revérification des sauts non déclarés', lambda: splits.recheck(conn, client, now), lambda r: f'{r["rechecked"]} revérifiés, {r["confirmed"]} confirmés tardivement (cours corrigés), {r["unanswered"]} sans réponse, {r["waiting"]} en attente du prochain passage')
     # 3. Calculs dérivés : les indicateurs, puis les ETF (indépendants l'un de l'autre).
     computed = attempt('Indicateurs et classements', lambda: compute.compute_all(conn, now), lambda r: f'{r[0]} séries, {r[1]} lignes de mesures')
     attempt('Profils des ETF suivis', lambda: etf.warm_profiles(conn, client, now),

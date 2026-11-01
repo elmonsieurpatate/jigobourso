@@ -49,7 +49,9 @@ def _period(pid, enabled=False, **thresholds):
 
 def preset(name):
     """Les quatre profils de départ. Ce sont des propositions de réglage, pas des vérités : tout est modifiable.
-    Calibrés le 28/10/2026 sur ~9 700 titres réels pour retenir environ 4 à 8 % de l'univers (voir docs/METHODE.md)."""
+    Calibrés le 28/10/2026 sur ~9 700 titres réels (voir docs/METHODE.md) : « regular » retient environ 4 % de l'univers (191 actions, 67 ETF), « fast » environ 8 % (389 actions, 11 ETF),
+    « recovery » environ 7 % (196 actions, 497 ETF) ; « low_volatility » (Hausse calme) est volontairement très sélective, environ 1 % (38 actions, 45 ETF), car son plafond de volatilité
+    (1,5 %/séance) n'est respecté que par une minorité de titres, surtout quand le marché est agité. Les deux Momentum n'ont aucun seuil : ils retiennent presque tout l'univers."""
     slope, reg = SLOPE_LEVELS['moderate'], R2_LEVELS['flexible']
     periods = {pid: _period(pid) for pid in PERIOD_IDS}
     rank = 'regularity'
@@ -203,7 +205,8 @@ def judge(config, measures, tech, missing, last_close_date=None, expected_last_d
         result = 'missing' if value is None or threshold is None else ('pass' if ok(value, threshold) else 'fail')
         reasons.append({'period': 'technical', 'criterion': name, 'metric': metric, 'value': value, 'threshold': threshold, 'result': result})
     if config['ranking']['mode'] in MOMENTUM_WINDOWS and momentum is None:
-        reasons.append({'period': None, 'criterion': 'data', 'metric': 'momentum', 'value': None, 'threshold': MOMENTUM_WINDOWS[config['ranking']['mode']] + 1, 'result': 'missing'})
+        window = MOMENTUM_WINDOWS[config['ranking']['mode']]
+        reasons.append({'period': None, 'criterion': 'data', 'metric': 'break' if missing.get(window) == 'break' else 'momentum', 'value': None, 'threshold': window + 1, 'result': 'missing'})
     results = {r['result'] for r in reasons}
     status = 'rejected' if 'fail' in results else ('unknown' if 'missing' in results else 'retained')
     return {'status': status, 'reasons': reasons, 'measures': measures, 'technical': tech, 'momentum': momentum}

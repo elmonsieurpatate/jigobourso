@@ -456,9 +456,11 @@ CREATE TABLE IF NOT EXISTS split_log (
   event_date  DATE NOT NULL,                                    -- séance qui suit le saut
   price_ratio DECIMAL(18,8) NOT NULL,                           -- cours après / cours avant, observé à la détection
   ratio       DECIMAL(18,8) NOT NULL,                           -- parts nouvelles / anciennes (2 = deux pour un ; 0,1 = regroupement 1 pour 10)
-  status      ENUM('detected','confirmed','real_move') NOT NULL DEFAULT 'detected',   -- confirmed : Yahoo a ajusté l'historique ; real_move : le saut persiste
+  status      ENUM('detected','confirmed','real_move') NOT NULL DEFAULT 'detected',   -- confirmed : split déclaré par Yahoo, historique ajusté ; real_move : aucun split déclaré à la dernière vérification (pas une preuve de mouvement réel)
   detected_at DATETIME NOT NULL,
   checked_at  DATETIME NULL,
+  checks      TINYINT UNSIGNED NOT NULL DEFAULT 1,              -- réponses de Yahoo obtenues pour ce saut (vérification initiale + revérifications)
+  recheck_after DATE NULL,                                      -- prochaine revérification d'un saut « real_move » (NULL = due maintenant s'il reste des essais, ou plus aucune)
   PRIMARY KEY (listing_id, event_date),
   CONSTRAINT fk_split_listing FOREIGN KEY (listing_id) REFERENCES listings(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
