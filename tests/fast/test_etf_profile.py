@@ -11,6 +11,7 @@ def test_real_response_parsed():
     assert p['holdings'][0]['symbol'] == 'NVDA' and 0 < p['holdings'][0]['weight'] < 20
     assert 'Technologie' in p['sectors'] and abs(sum(p['sectors'].values()) - 100) < 3
     assert p['top10_weight'] == round(sum(h['weight'] for h in p['holdings']), 1)
+    assert p['geography_region'] is None  # IWDA est mondial, même si les États-Unis dominent ses dix premières lignes.
 
 
 def test_not_a_fund_returns_none():

@@ -7,7 +7,7 @@ import datetime
 import hashlib
 import json
 import re
-from collections import defaultdict
+from collections import Counter, defaultdict
 
 from engine.catalogue.rules import MARKETS, is_leveraged_name
 from engine.shared import settings as settings_mod
@@ -15,6 +15,7 @@ from engine.market import hours
 from engine.market.collect import effective_expected_close, latest_rates, to_eur_factor
 from engine.market.calendar import window_calendars, session_dates
 from . import signals, strategy
+from . import geography
 from .measures import window_metrics
 from .series import usable_closes, find_breaks, clean_window, analyze_series, prepare_series, data_corrections
 
@@ -72,8 +73,8 @@ def _config(request):
 def _load_universe(conn, windows, ids=None):
     only = f' WHERE l.id IN ({",".join(["%s"] * len(ids))})' if ids else ''
     with conn.cursor() as cur:
-        cur.execute("""SELECT l.id, l.symbol, l.mic, l.currency, i.name, i.isin, i.kind, i.country, i.category,
-                              p.price, p.price_time, p.quote_at, p.source AS price_source, p.currency AS price_currency, p.avg_volume_3m,
+        cur.execute("""SELECT l.id, l.instrument_id, l.symbol, l.mic, l.currency, i.name, i.isin, i.kind, i.country, i.category,
+                              p.price, p.price_time, p.quote_at, p.source AS price_source, p.currency AS price_currency, p.avg_volume_3m, p.net_assets,
                               s.last_close_date, s.closes_count, s.close_px, s.ma20, s.ma50, s.ma50_prev, s.ma200, s.ma200_prev, s.daily_change, s.gap_to_ma20, s.quality, s.break_age, s.break_dates,
                        s.coverage_252, s.expected_252, s.momentum_6m, s.momentum_12m
                        FROM v_recommendable r JOIN listings l ON l.id=r.listing_id JOIN instruments i ON i.id=l.instrument_id
@@ -167,6 +168,7 @@ def judge_universe(conn, config, ids=None):
         v = strategy.judge(config, measures, tech, missing, last, expected or None, momentum=momentum_arg)
         if u['quality'] == 'incomplete' and v['status'] == 'unknown':
             v['status_label'] = 'Historique incomplet'
+        u['instrument_id'] = u.get('instrument_id', u['id'])
         v.update(key=u['id'], group='etf' if u['kind'] == 'etf' else 'equity', symbol=u['symbol'], row=u)
         verdicts.append(v)
     return strategy.rank(config, verdicts)
@@ -185,9 +187,9 @@ def _row(v, rates, conn=None):
             'quality': u['quality'], 'price_stale': hours.price_is_stale(u['mic'], u['price_time'], hours.utcnow(), expected_close(conn, u['mic']) if conn is not None else None, last_collection(conn, u['mic']) if conn is not None else None), 'measures': {str(n): m for n, m in v['measures'].items()}, 'reasons': v['reasons']}
 
 
-CACHE_FORMAT = 5
+CACHE_FORMAT = 6
 MAX_NEW_CONFIGS_PER_HOUR = 60       # calculs d'univers complets (réglages jamais vus ou données changées) acceptés par heure, tous utilisateurs confondus
-ENTRY_FIELDS = ('id', 'symbol', 'name', 'isin', 'kind', 'mic', 'country', 'status', 'group', 'rank', 'score', 'category', 'fails')
+ENTRY_FIELDS = ('id', 'symbol', 'name', 'isin', 'kind', 'mic', 'country', 'status', 'group', 'rank', 'score', 'category', 'fails', 'instrument_id', 'currency', 'price_currency', 'net_assets')
 
 
 def _fails(v):
@@ -220,7 +222,7 @@ def cached_verdicts(conn, config):
         if cur.fetchone()['n'] >= MAX_NEW_CONFIGS_PER_HOUR:
             raise ValueError('Trop de réglages différents ont été calculés depuis une heure : réessayez un peu plus tard, ou utilisez un des quatre profils de départ.')
     entries = [[v['key'], v['symbol'], v['row']['name'], v['row']['isin'], v['row']['kind'], v['row']['mic'], v['row']['country'], v['status'], v['group'], v['rank'],
-                None if v['score'] is None else round(v['score'], 4), v['row']['category'], _fails(v)] for v in judge_universe(conn, config)]
+                None if v['score'] is None else round(v['score'], 4), v['row']['category'], _fails(v), v['row'].get('instrument_id'), v['row'].get('currency'), v['row'].get('price_currency'), v['row'].get('net_assets')] for v in judge_universe(conn, config)]
     with conn.cursor() as cur:
         cur.execute('REPLACE INTO result_cache(cache_key, data_version, built_at, payload) VALUES (%s,%s,%s,%s)',
                     (key, version, datetime.datetime.utcnow().replace(microsecond=0), json.dumps(entries, ensure_ascii=False, separators=(',', ':'))))
@@ -317,10 +319,49 @@ def scoped_entries(conn, config, view, rates=None, aux=None, now=None):
     ref = _reference_window(config)
     aux = aux if aux is not None else _aux(conn, ref, rates)
     kind, market = view.get('kind') or '', view.get('market') or ''
+    requested_kind = kind
+    if requested_kind == 'large_etf':
+        kind = 'etf'
+    region = view.get('geo_region') or ''
+    etf_data = {}
+    etf_ids = [e['id'] for e in entries if e['kind'] == 'etf']
+    if etf_ids and (region or requested_kind == 'large_etf'):
+        with conn.cursor() as cur:
+            for offset in range(0, len(etf_ids), 1000):
+                part = etf_ids[offset:offset + 1000]
+                cur.execute("SELECT listing_id,data_json FROM etf_profiles WHERE state='ok' AND listing_id IN (%s)" % ','.join(['%s'] * len(part)), part)
+                for p in cur.fetchall():
+                    try:
+                        etf_data[p['listing_id']] = json.loads(p['data_json']) if isinstance(p['data_json'], str) else p['data_json']
+                    except (TypeError, ValueError):
+                        etf_data[p['listing_id']] = {}
+    # Encours Yahoo, converti dans une devise commune. Chaque instrument n'est compté
+    # qu'une fois même si plusieurs cotations subsistent dans l'univers.
+    aum_by_instrument = {}
+    aum_listing_values = {}
+    for e in entries:
+        if e['kind'] != 'etf':
+            continue
+        iid = e.get('instrument_id', e['id'])
+        if not e.get('net_assets'):
+            continue
+        factor = to_eur_factor(e.get('currency'), rates)
+        if factor is None:
+            continue
+        amount = float(e['net_assets']) * factor
+        aum_listing_values[e['id']] = amount
+        aum_by_instrument[iid] = max(amount, aum_by_instrument.get(iid, 0))
+    large_instruments = set()
+    if aum_by_instrument:
+        ordered_aum = sorted(aum_by_instrument.values(), reverse=True)
+        cutoff = ordered_aum[max(0, (len(ordered_aum) * 9) // 10)]
+        large_instruments = {iid for iid, amount in aum_by_instrument.items() if amount >= cutoff}
     countries, categories = _choices(view.get('country')), {c.casefold() for c in _choices(view.get('category'))}         # plusieurs choix possibles, séparés par « | »
     caps = {c for c in _choices(view.get('cap')) if c in ('micro', 'small', 'mid', 'large', 'mega')}
     owned = set(view.get('owned_ids') or [])
-    base = [e for e in entries if (not kind or e['kind'] == kind) and (not market or e['mic'] == market)
+    base = [e for e in entries if (not kind or e['kind'] == kind) and (requested_kind != 'large_etf' or e['kind'] == 'etf' and e.get('instrument_id', e['id']) in large_instruments)
+            and (not region or (geography.equity_region(e.get('country')) if e['kind'] == 'equity' else (etf_data.get(e['id'], {}).get('geography_region') or geography.etf_region(etf_data.get(e['id'], {}).get('category')))) == region)
+            and (not market or e['mic'] == market)
             and (not countries or e['country'] in countries) and (not categories or (e['category'] or '').casefold() in categories)]
     if view.get('pea'):
         base = [e for e in base if pea_status(e['kind'], e['country'], e['mic']) == 'probable']
@@ -367,6 +408,8 @@ def explore(conn, request):
     now = hours.utcnow()
     entries, base, ref, aux = scoped_entries(conn, config, view, rates, None, now)
     kind, market = view.get('kind') or '', view.get('market') or ''
+    if kind == 'large_etf':
+        kind = 'etf'
     min_score = _num(view, 'min_score')
     if min_score is not None:
         base = [e for e in base if e['score'] is not None and e['score'] >= min_score]
@@ -447,7 +490,8 @@ def explore(conn, request):
         a = aux.get(e['id'], {})
         r.update({'position': position, 'volume': a.get('volume'), 'last_close': a['last_close'].isoformat() if a.get('last_close') else None,
                   'analyst': analyst_view(a.get('analyst')) if e['kind'] == 'equity' else None, 'ref': {k: a.get(k) for k in REF_FIELDS}, 'open': e['mic'] in hours.HOURS and hours.is_open(e['mic'], now),
-                  'signals': signals.row_signals(a, e['kind'], ref, prefilter_cfg, a.get('quote_age_days')), 'etf_group': group_of.get(e['id']), 'etf_group_info': group_info.get(e['id'])})
+                  'signals': signals.row_signals(a, e['kind'], ref, prefilter_cfg, a.get('quote_age_days')), 'etf_group': group_of.get(e['id']), 'etf_group_info': group_info.get(e['id']),
+                  'aum_eur': aum_listing_values.get(e['id'])})
         if e['kind'] == 'etf':
             r['fund_nature'] = fund_natures.get(e['id'])
         out.append(r)
@@ -469,6 +513,43 @@ def explore(conn, request):
             'universe': len(entries), 'examined': len(base), 'tradable': {'on': bool(view.get('tradable', True)), 'masked': masked}, 'level_filters': {'masked': level_masked, 'counts': level_counts},
             'counts': {g: dict(c) for g, c in counts.items()}, 'scope_counts': scope_counts, 'populations': {g: sum(c.values()) for g, c in counts.items()},
             'reasons': dict(reasons), 'facets': {'markets': dict(markets), 'countries': dict(sorted(countries.items())), 'categories': dict(sorted(categories.items()))}}
+
+
+def filter_metadata_coverage(conn):
+    """Couverture AUM et région sur les instruments recommandables; compte sans double compte des cotations."""
+    from . import etf
+    profiles = etf.read_profiles(conn)
+    rates = latest_rates(conn)
+    with conn.cursor() as cur:
+        cur.execute("""SELECT l.id,l.instrument_id,i.kind,i.country,p.net_assets,p.currency
+                       FROM v_recommendable r JOIN listings l ON l.id=r.listing_id
+                       JOIN instruments i ON i.id=l.instrument_id
+                       LEFT JOIN latest_prices p ON p.listing_id=l.id""")
+        rows = cur.fetchall()
+    instruments = {}
+    aum_values = {}
+    for r in rows:
+        item = instruments.setdefault(r['instrument_id'], {'kind': r['kind'], 'country': r['country'], 'aum': False, 'region': None})
+        if r['kind'] == 'equity':
+            item['region'] = item['region'] or geography.equity_region(r['country'])
+        else:
+            profile = profiles.get(r['id'])
+            data = etf.profile_data(etf.decode(profile['data_json'])) if profile and profile.get('state') == 'ok' else {}
+            region = data.get('geography_region') or geography.etf_region(data.get('category'))
+            if region:
+                item['region'] = region
+            fx = to_eur_factor(r.get('currency'), rates)
+            item['aum'] = item['aum'] or bool(r.get('net_assets') and float(r['net_assets']) > 0 and fx is not None)
+            if r.get('net_assets') and float(r['net_assets']) > 0 and fx is not None:
+                aum_values[r['instrument_id']] = max(aum_values.get(r['instrument_id'], 0), float(r['net_assets']) * fx)
+    ordered = sorted(aum_values.values(), reverse=True)
+    cutoff = ordered[max(0, (len(ordered) * 9) // 10)] if ordered else None
+    groups = Counter((v['kind'], 'known' if v['region'] else 'unknown') for v in instruments.values())
+    etfs = [v for v in instruments.values() if v['kind'] == 'etf']
+    equities = [v for v in instruments.values() if v['kind'] == 'equity']
+    return {'instruments': len(instruments), 'etfs': {'total': len(etfs), 'aum_known': sum(v['aum'] for v in etfs), 'large_by_aum': sum(a >= cutoff for a in aum_values.values()) if cutoff is not None else 0, 'aum_decile_cutoff_eur': cutoff,
+            'region_known': groups[('etf', 'known')], 'region_unknown': groups[('etf', 'unknown')]},
+            'equities': {'total': len(equities), 'region_known': groups[('equity', 'known')], 'region_unknown': groups[('equity', 'unknown')]}}
 
 
 def _choices(value):

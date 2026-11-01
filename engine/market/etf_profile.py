@@ -2,7 +2,7 @@
 import json
 import urllib.parse
 
-VERSION = 3
+VERSION = 4
 MODULES = 'fundProfile,topHoldings,summaryDetail,defaultKeyStatistics'
 SECTOR_NAMES = {'realestate': 'Immobilier', 'consumer_cyclical': 'Consommation cyclique', 'basic_materials': 'Matériaux', 'consumer_defensive': 'Consommation de base',
                 'technology': 'Technologie', 'communication_services': 'Communication', 'financial_services': 'Finance', 'utilities': 'Services publics',
@@ -20,7 +20,7 @@ def parse_profile(payload):
     except (KeyError, IndexError, TypeError):
         return None
     fund, top, summary, stats = r.get('fundProfile') or {}, r.get('topHoldings') or {}, r.get('summaryDetail') or {}, r.get('defaultKeyStatistics') or {}
-    if not fund and not top:
+    if not fund and not top and not summary and not stats:
         return None
     fees = fund.get('feesExpensesInvestment') or {}
     sectors = {}
@@ -35,13 +35,16 @@ def parse_profile(payload):
            'yield': None if _raw(summary.get('yield')) is None else round(_raw(summary['yield']) * 100, 2),
            'total_assets': _raw(summary.get('totalAssets')) if _raw(summary.get('totalAssets')) is not None else _raw(stats.get('totalAssets')),
            'total_assets_currency': summary.get('currency') if isinstance(summary.get('currency'), str) else None,
+           'geography_region': None,
            'holdings': holdings, 'sectors': dict(sorted(sectors.items(), key=lambda kv: -kv[1])),
            'top10_weight': round(sum(h['weight'] for h in holdings), 1) if len(holdings) == 10 and all(h['weight'] is not None for h in holdings) else None,
            'stock_position': None if _raw(top.get('stockPosition')) is None else round(_raw(top['stockPosition']) * 100, 1),
            'bond_position': None if _raw(top.get('bondPosition')) is None else round(_raw(top['bondPosition']) * 100, 1)}
     from engine.analytics.etf import profile_data
     out = profile_data(out)
-    return out if any(out[k] for k in ('holdings', 'sectors', 'expense_ratio', 'family', 'total_assets')) else None
+    from engine.analytics.geography import etf_region
+    out['geography_region'] = etf_region(out.get('category'))
+    return out if any(out[k] for k in ('holdings', 'sectors', 'expense_ratio', 'family', 'total_assets', 'category')) else None
 
 
 def fetch_profile(transport, symbol):
