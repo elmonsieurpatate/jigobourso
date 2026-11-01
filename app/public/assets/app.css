@@ -354,7 +354,8 @@ tr[hidden] { display: none; }
 
 /* Explorer mobile : les filtres restent complets, avec des contrôles plus denses. */
 @media (max-width: 640px) {
-  #menu:not(.filters-open) { display:none; }
+  #menu:not(.filters-open) .menu-bar > .mf:not(.kind-filter):not(.mact) { display:none; }
+  #menu:not(.filters-open) .menu-bar > .mact { display:none; }
   .menu { margin-top:8px; }
   .menu-bar { padding:8px; gap:6px; }
   .mi { height:38px; padding:0 10px; gap:8px; border-radius:11px; }
