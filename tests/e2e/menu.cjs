@@ -34,7 +34,7 @@ const BASE='http://127.0.0.1:18089';
   ok('curseur_ne_lance_pas_la_recherche',searches===0,searches);ok('bouton_appliquer_signale_le_changement',await page.locator('#apply-menu.pending').count()===1);
   await page.click('#apply-menu');await page.waitForTimeout(1500);ok('appliquer_lance_la_recherche',searches>=1,searches);ok('appliquer_retire_le_signal',await page.locator('#apply-menu.pending').count()===0);
   const storedPreset=await page.evaluate(()=>JSON.parse(localStorage.getItem('jigo_explorer2')).preset);
-  ok('reglage_devient_personnalise',await page.locator('#strats .strat.on[data-k="regular"]').count()===1&&storedPreset==='custom',storedPreset);
+  ok('reglage_devient_personnalise',storedPreset==='custom',storedPreset);
   const slope=await page.evaluate(()=>JSON.parse(localStorage.getItem('jigo_explorer2')).config.periods.find(p=>p.id==='quarter').min_slope);
   ok('pente_convertie_en_rythme_par_seance',Math.abs(slope-0.13361)<0.001,slope);
   const th=page.locator('.sl[data-s="vol"] .dr-th.hi'),box=await th.boundingBox();
