@@ -13,6 +13,9 @@
   const icons = ['📈', '⚡', '🔎', '🛡️', '🌱', '📊', '💼', '⭐'];
   let currentState = {};
   try { currentState = JSON.parse(sessionStorage.getItem('jigo_explorer2') || localStorage.getItem('jigo_explorer2') || '{}'); } catch (_) {}
+  const availability = (() => { try { return JSON.parse(localStorage.getItem('jigo_strategy_availability') || '{}'); } catch (_) { return {}; } })();
+  const enabled = key => availability[key] !== false;
+  const storeAvailability = () => localStorage.setItem('jigo_strategy_availability', JSON.stringify(availability));
   const safeState = (config, view, label, preset = 'custom', base = null) => {
     const state = { preset, base, label, config, status: view.status || 'retained', page: 1, level: 'guided', compare: false,
       sort: view.sort || 'rank', dir: view.dir || 'asc', size: 20, view };
@@ -57,22 +60,25 @@
       const info = labels[k] || [k, 'Réglage de stratégie']; const custom = mine[k];
       const config = custom ? custom.config : P.presets[k], view = custom ? custom.view : {};
       const active = (currentState.preset === k || (currentState.preset === 'custom' && currentState.base === k)) && !currentState.label;
-      return `<article class="card filter-card"><div class="row between"><h3>${J.esc(info[0])}</h3><span class="badge ${active ? 'ok' : 'info'}">Disponible dans le classement · ${active ? 'Active' : 'Inactive'}</span></div>
-        <p class="small muted">${J.esc(info[1])}</p><p class="small"><b>Périodes :</b> ${J.esc(periodSummary(config))}</p>
-        <p class="small muted">${custom ? `Modifiée le ${J.dateTime(custom.updated_at)}${view && Object.keys(view).length ? ' · ' + J.esc(viewSummary(view)) : ''}` : 'Utilise les critères initiaux de Jigobourso.'}</p>
-        <div class="filter-actions"><a class="btn small primary" href="index.html?preset=${encodeURIComponent(k)}">Utiliser</a><a class="btn small" href="index.html?preset=${encodeURIComponent(k)}&edit=1">Modifier</a><button class="btn small" data-reset-preset="${J.esc(k)}" ${custom ? '' : 'disabled'}>Réinitialiser</button></div></article>`;
+      return `<article class="card filter-card strategy-manage-card"><div class="row between"><div><h3>${J.esc(info[0])}</h3><span class="small muted">${J.esc(periodSummary(config))}${custom ? ' · Personnalisée' : ''}</span></div><span class="badge ${enabled('preset:' + k) ? 'ok' : 'info'}">${enabled('preset:' + k) ? 'Disponible · Active' : 'Indisponible'}</span></div>
+        <div class="filter-actions"><button class="btn small ${enabled('preset:' + k) ? '' : 'primary'}" data-toggle-strategy="preset:${J.esc(k)}">${enabled('preset:' + k) ? 'Désactiver' : 'Activer'}</button><a class="btn small" href="index.html?preset=${encodeURIComponent(k)}&edit=1">Modifier</a><button class="btn small" data-reset-preset="${J.esc(k)}" ${custom ? '' : 'disabled'}>Réinitialiser</button></div></article>`;
     }).join('');
-    const own = searches.map(s => { const active = currentState.preset === 'custom' && currentState.label === s.name; return `<article class="card filter-card"><div class="row between"><div class="filter-title"><span class="filter-icon" aria-hidden="true">${J.esc(s.view?.icon || '🔎')}</span><h3>${J.esc(s.name)}</h3></div><span class="badge ${active ? 'ok' : 'info'}">Disponible dans le classement · ${active ? 'Active' : 'Inactive'}</span></div>
-      <p class="small muted">Enregistré le ${J.dateTime(s.updated_at)}</p><p class="small">${J.esc(s.view?.description || 'Pas encore de note. Ajoutez-en une pour vous rappeler la stratégie associée.')}</p><p class="small muted">${J.esc(viewSummary(s.view || {}))}</p>
-      <div class="filter-actions"><button class="btn small primary" data-use-search="${+s.id}">Utiliser dans le classement</button><button class="btn small" data-edit-search="${+s.id}">Modifier le filtre</button><button class="btn small" data-edit-note="${+s.id}">Icône et note</button><button class="btn small" data-rename-search="${+s.id}">Renommer</button><button class="btn small danger" data-delete-search="${+s.id}">Supprimer</button></div></article>`; }).join('');
+    const own = searches.map(s => { const key = 'search:' + s.id; return `<article class="card filter-card strategy-manage-card"><div class="row between"><div class="filter-title"><span class="filter-icon" aria-hidden="true">${J.esc(s.view?.icon || '🔎')}</span><div><h3>${J.esc(s.name)}</h3><span class="small muted">${J.esc(s.view?.description || 'Filtre personnel')}</span></div></div><span class="badge ${enabled(key) ? 'ok' : 'info'}">${enabled(key) ? 'Disponible · Active' : 'Indisponible'}</span></div>
+      <div class="filter-actions"><button class="btn small ${enabled(key) ? '' : 'primary'}" data-toggle-strategy="${key}">${enabled(key) ? 'Désactiver' : 'Activer'}</button><button class="btn small" data-use-search="${+s.id}">Utiliser</button><button class="btn small" data-edit-search="${+s.id}" aria-label="Modifier ${J.esc(s.name)}">Modifier</button><button class="btn small" data-edit-note="${+s.id}" aria-label="Icône et note de ${J.esc(s.name)}">Icône/note</button><button class="btn small" data-rename-search="${+s.id}" aria-label="Renommer ${J.esc(s.name)}">Renommer</button><button class="btn small danger" data-delete-search="${+s.id}" aria-label="Supprimer ${J.esc(s.name)}">Supprimer</button></div></article>`; }).join('');
     page.innerHTML = `<div class="page-head"><div><h1>Mes filtres</h1><p>Retrouvez vos réglages de stratégie et vos filtres enregistrés. Les modifier change les critères de recherche, pas les données ni les scores financiers.</p></div><a class="btn" href="index.html">← Retour au classement</a></div>
       <section class="card" style="padding:18px"><div class="row between"><div><h2 style="margin:0">Mes stratégies</h2><p class="small muted" style="margin:4px 0 0">Personnalisez un profil de départ ou restaurez son réglage initial.</p></div></div><div class="manage-grid" style="margin-top:14px">${presets}</div></section>
       <section class="card" style="padding:18px;margin-top:14px"><div class="row between"><div><h2 style="margin:0">Filtres enregistrés</h2><p class="small muted" style="margin:4px 0 0">Une recherche sauvegarde aussi le texte saisi, les cases, la visibilité, le tri et le statut affiché.</p></div><a class="btn small" href="index.html">Créer depuis l’Explorer</a></div>
         <div class="manage-grid" style="margin-top:14px">${own || '<div class="empty" style="grid-column:1/-1">Aucun filtre enregistré. Dans l’Explorer, réglez vos critères et filtres, puis sélectionnez « Enregistrer ».</div>'}</div></section>`;
     page.onclick = async e => {
-      const b = e.target.closest('button[data-reset-preset],button[data-use-search],button[data-edit-search],button[data-edit-note],button[data-rename-search],button[data-delete-search]'); if (!b) return;
+      const b = e.target.closest('button[data-toggle-strategy],button[data-reset-preset],button[data-use-search],button[data-edit-search],button[data-edit-note],button[data-rename-search],button[data-delete-search]'); if (!b) return;
       try {
-        if (b.dataset.resetPreset) {
+        if (b.dataset.toggleStrategy) {
+          const key = b.dataset.toggleStrategy; availability[key] = !enabled(key); storeAvailability();
+          if (!availability[key] && ((key.startsWith('preset:') && (currentState.preset === key.slice(7) || currentState.base === key.slice(7))) || (key.startsWith('search:') && currentState.label === searches.find(s => +s.id === +key.slice(7))?.name))) {
+            const fallback = P.presets.regular; safeState(fallback, {}, null, 'regular', 'regular'); currentState = JSON.parse(localStorage.getItem('jigo_explorer2') || '{}');
+          }
+          await render();
+        } else if (b.dataset.resetPreset) {
           const k = b.dataset.resetPreset, name = labels[k]?.[0] || k;
           if (await J.confirm('Réinitialiser la stratégie', `Le réglage personnalisé de « ${name} » sera supprimé.`, 'Réinitialiser')) { await J.post('preset/reset', { preset: k }); await render(); }
         } else {

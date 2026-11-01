@@ -45,15 +45,17 @@
   function freeConfig() { const c = JSON.parse(JSON.stringify(P.presets.regular)); c.name = 'free'; c.periods.forEach(p => { p.enabled = p.id === 'month'; ['min_slope', 'min_r2', 'min_er', 'min_return', 'max_return', 'max_volatility', 'max_drawdown'].forEach(f => p[f] = null); }); c.ranking.mode = 'trend'; return c; }
   const SUB = { regular: 'Hausse stable', fast: 'Hausse marquée', recovery: 'Après une baisse', low_volatility: 'Peu de variations', momentum: '126 → 21 séances', momentum12: '252 → 21 séances' };
   const CURRENT_SAVED = () => S.preset === 'custom' ? searches.find(x => x.name === S.label) : null;
+  const strategyEnabled = key => { try { return JSON.parse(localStorage.getItem('jigo_strategy_availability') || '{}')['preset:' + key] !== false; } catch (_) { return true; } };
+  const searchEnabled = id => { try { return JSON.parse(localStorage.getItem('jigo_strategy_availability') || '{}')['search:' + id] !== false; } catch (_) { return true; } };
   function appendSavedStrategies() {
     const current = el('strats').querySelector('.strat-grid'); if (!current) return;
     const active = CURRENT_SAVED();
-    current.insertAdjacentHTML('beforeend', searches.map(x => `<button type="button" class="strat slim saved-strategy ${active && active.id == x.id ? 'on' : ''}" data-k="saved" data-saved-id="${+x.id}" title="${J.esc(x.view?.description || x.name)}"><span class="ico" aria-hidden="true">${J.esc(x.view?.icon || '🔎')}</span><span class="tx"><b>${J.esc(x.name)}</b><span>${J.esc(x.view?.description || 'Filtre personnel · disponible')}</span></span></button>`).join(''));
+    current.insertAdjacentHTML('beforeend', searches.filter(x => searchEnabled(x.id)).map(x => `<button type="button" class="strat slim saved-strategy ${active && active.id == x.id ? 'on' : ''}" data-k="saved" data-saved-id="${+x.id}" title="${J.esc(x.view?.description || x.name)}"><span class="ico" aria-hidden="true">${J.esc(x.view?.icon || '🔎')}</span><span class="tx"><b>${J.esc(x.name)}</b><span>${J.esc(x.view?.description || 'Filtre personnel · disponible')}</span></span></button>`).join(''));
     J.$$('#strats .saved-strategy').forEach(b => b.onclick = () => { const x = searches.find(y => +y.id === +b.dataset.savedId); if (x) applySearch(x); });
   }
   const helpHtml = k => `<b>${J.esc(NAMES[k][0])}</b><p>${J.esc(NAMES[k][1])}</p>${EXP.has(k) ? `<p class="helpwarn">${J.esc(EXP_NOTE(k))}</p>` : ''}`;
   function drawStrategies() {
-    el('strats').innerHTML = '<div class="strat-grid">' + Object.keys(P.presets).map(k => `<div class="strat ${S.preset === k ? 'on' : ''} ${EXP.has(k) ? 'exp' : ''}" role="button" tabindex="0" aria-pressed="${S.preset === k}" data-k="${k}"><span class="ico">${JMenu.icon(k)}</span><span class="tx"><b>${NAMES[k][0]}${MINE[k] ? ' <i class="mod" title="Vous avez enregistré votre propre réglage pour cette stratégie">modifiée</i>' : ''}</b><span>${SUB[k] || ''}</span></span><button type="button" class="q" data-help="${k}" aria-label="Explication : ${J.esc(NAMES[k][0])}" aria-expanded="false">?</button></div>`).join('') + '</div>' +
+    el('strats').innerHTML = '<div class="strat-grid">' + Object.keys(P.presets).filter(strategyEnabled).map(k => `<div class="strat ${S.preset === k ? 'on' : ''} ${EXP.has(k) ? 'exp' : ''}" role="button" tabindex="0" aria-pressed="${S.preset === k}" data-k="${k}"><span class="ico">${JMenu.icon(k)}</span><span class="tx"><b>${NAMES[k][0]}${MINE[k] ? ' <i class="mod" title="Vous avez enregistré votre propre réglage pour cette stratégie">modifiée</i>' : ''}</b><span>${SUB[k] || ''}</span></span><button type="button" class="q" data-help="${k}" aria-label="Explication : ${J.esc(NAMES[k][0])}" aria-expanded="false">?</button></div>`).join('') + '</div>' +
       '<div class="strat-extra">' + `<button class="strat slim ${S.preset === 'free' ? 'on' : ''}" data-k="free"><span class="ico">${JMenu.icon('free')}</span><span class="tx"><b>Recherche libre</b><span>Aucun critère de départ</span></span></button>` +
       '</div>';
     J.$$('#strats .strat[data-k]').forEach(b => { b.onclick = e => { if (e.target.closest('.q')) return; choose(b.dataset.k); }; b.onkeydown = e => { if ((e.key === 'Enter' || e.key === ' ') && e.target === b) { e.preventDefault(); choose(b.dataset.k); } }; });
@@ -201,6 +203,14 @@
   };
   async function drawSaved() {
     searches = (await J.api('searches')).searches;
+    const availability = (() => { try { return JSON.parse(localStorage.getItem('jigo_strategy_availability') || '{}'); } catch (_) { return {}; } })();
+    if (S.preset !== 'custom' && P.presets[S.preset] && availability['preset:' + S.preset] === false) {
+      const fallback = Object.keys(P.presets).find(strategyEnabled) || 'regular';
+      S.preset = fallback; S.base = fallback; S.label = null; S.config = presetConfig(fallback); persist();
+    } else if (S.preset === 'custom' && S.label) {
+      const activeSearch = searches.find(x => x.name === S.label);
+      if (activeSearch && availability['search:' + activeSearch.id] === false) { const fallback = Object.keys(P.presets).find(strategyEnabled) || 'regular'; S.preset = fallback; S.base = fallback; S.label = null; S.config = presetConfig(fallback); persist(); }
+    }
     appendSavedStrategies();
     el('saved').innerHTML = '';
     el('reset-default').onclick = () => { const k = baseKey(); if (k) resetPreset(k); }; syncReset();
