@@ -198,7 +198,9 @@
   function presetConfig(k) { const c = JSON.parse(JSON.stringify(MINE[k] ? MINE[k].config : P.presets[k])); c.name = k; return c; }
   function choose(k) {
     S.label = null; S.preset = k; S.base = P.presets[k] ? k : null; S.page = 1;
-    if (k === 'free') S.config = freeConfig(); else { S.config = presetConfig(k); if (MINE[k]) setView(MINE[k].view); }
+    // Chaque stratégie repart avec une vue claire : les filtres cochés d'une précédente stratégie ne s'appliquent pas à la suivante.
+    setView({ status: 'retained', sort: 'rank', dir: 'asc', tradable: true });
+    if (k === 'free') S.config = freeConfig(); else S.config = presetConfig(k);
     persist(); drawStrategies(); drawEditor(); load();
   }
   const baseKey = () => P.presets[S.preset] ? S.preset : (S.base && P.presets[S.base] ? S.base : null);

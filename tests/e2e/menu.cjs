@@ -49,6 +49,9 @@ const BASE='http://127.0.0.1:18089';
   await page.click('#filters-btn');
   await page.click('#reset-filters');await page.waitForTimeout(800);
   ok('reinitialisation',(await page.inputValue('#f-price'))===''&&(await page.inputValue('#market'))===''&&(await page.inputValue('#cap'))==='');
+  await page.selectOption('#f-price','10|50');await page.selectOption('#kind','equity');await page.check('#pea');await page.check('#mine');await page.check('#fresh_only');await page.click('#status-tabs button[data-s="all"]');await page.waitForTimeout(300);
+  await page.click('.strat[data-k="fast"]');await page.waitForTimeout(800);
+  ok('changement_strategie_efface_les_filtres_et_cases',(await page.inputValue('#f-price'))===''&&(await page.inputValue('#kind'))===''&&(await page.inputValue('#market'))===''&&!(await page.isChecked('#pea'))&&!(await page.isChecked('#mine'))&&!(await page.isChecked('#fresh_only'))&&await page.locator('#status-tabs button.on[data-s="retained"]').count()===1);
   for(const width of [375,390,1280]){await page.setViewportSize({width,height:900});await page.waitForTimeout(400);ok('pas_de_debordement_'+width,!(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)));const kindWidth=await page.locator('#kind').evaluate(e=>e.getBoundingClientRect().width);ok('type_visible_'+width,kindWidth>=(width<640?180:120),kindWidth)}
  }catch(e){out.errors.push('exception '+e.message)}
  console.log(JSON.stringify(out));await browser.close();process.exit(out.errors.length?1:0);
