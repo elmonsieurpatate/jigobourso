@@ -10,6 +10,7 @@
     momentum: ['Momentum 6 mois', 'Classement de la progression passée sur six mois.'],
     momentum12: ['Momentum 12 mois', 'Classement de la progression passée sur douze mois.']
   };
+  const icons = ['📈', '⚡', '🔎', '🛡️', '🌱', '📊', '💼', '⭐'];
   const safeState = (config, view, label, preset = 'custom', base = null) => {
     const state = { preset, base, label, config, status: view.status || 'retained', page: 1, level: 'guided', compare: false,
       sort: view.sort || 'rank', dir: view.dir || 'asc', size: 20, view };
@@ -40,6 +41,10 @@
       await render(); return false;
     } }
   ] });
+  const editNote = s => J.dialog({ title: 'Icône et note du filtre', body: `<label class="field">Icône<select id="filter-icon">${icons.map(i => `<option value="${J.esc(i)}" ${(s.view || {}).icon === i ? 'selected' : ''}>${J.esc(i)}</option>`).join('')}</select></label><label class="field">Note · à quoi sert ce filtre ?<textarea id="filter-description" maxlength="300" rows="3" placeholder="Ex. Repérer les ETF énergie qui progressent sur plusieurs périodes.">${J.esc((s.view || {}).description || '')}</textarea></label><p class="small muted">La note vous aide à vous rappeler l’objectif du filtre. Elle ne change aucun critère ni aucun classement.</p>`, actions: [
+    { label: 'Annuler', run: () => {} },
+    { label: 'Enregistrer', cls: 'primary', run: async () => { const view = { ...(s.view || {}), icon: J.$('#filter-icon').value, description: J.$('#filter-description').value.trim() }; await J.post('search/save', { name: s.name, config: s.config, view }); await render(); } }
+  ] });
   let P, mine = {}, searches = [];
   async function render() {
     [P, mine, searches] = await Promise.all([
@@ -54,22 +59,23 @@
         <p class="small muted">${custom ? `Modifiée le ${J.dateTime(custom.updated_at)}${view && Object.keys(view).length ? ' · ' + J.esc(viewSummary(view)) : ''}` : 'Utilise les critères initiaux de Jigobourso.'}</p>
         <div class="filter-actions"><a class="btn small primary" href="index.html?preset=${encodeURIComponent(k)}">Utiliser</a><a class="btn small" href="index.html?preset=${encodeURIComponent(k)}&edit=1">Modifier</a><button class="btn small" data-reset-preset="${J.esc(k)}" ${custom ? '' : 'disabled'}>Réinitialiser</button></div></article>`;
     }).join('');
-    const own = searches.map(s => `<article class="card filter-card"><div class="row between"><h3>${J.esc(s.name)}</h3><span class="badge">Filtre enregistré</span></div>
-      <p class="small muted">Enregistré le ${J.dateTime(s.updated_at)}</p><p class="small">${J.esc(viewSummary(s.view || {}))}</p>
-      <div class="filter-actions"><button class="btn small primary" data-use-search="${+s.id}">Utiliser</button><button class="btn small" data-edit-search="${+s.id}">Modifier</button><button class="btn small" data-rename-search="${+s.id}">Renommer</button><button class="btn small danger" data-delete-search="${+s.id}">Supprimer</button></div></article>`).join('');
+    const own = searches.map(s => `<article class="card filter-card"><div class="row between"><div class="filter-title"><span class="filter-icon" aria-hidden="true">${J.esc(s.view?.icon || '🔎')}</span><h3>${J.esc(s.name)}</h3></div><span class="badge">Filtre enregistré</span></div>
+      <p class="small muted">Enregistré le ${J.dateTime(s.updated_at)}</p><p class="small">${J.esc(s.view?.description || 'Pas encore de note. Ajoutez-en une pour vous rappeler la stratégie associée.')}</p><p class="small muted">${J.esc(viewSummary(s.view || {}))}</p>
+      <div class="filter-actions"><button class="btn small primary" data-use-search="${+s.id}">Utiliser dans le classement</button><button class="btn small" data-edit-search="${+s.id}">Modifier le filtre</button><button class="btn small" data-edit-note="${+s.id}">Icône et note</button><button class="btn small" data-rename-search="${+s.id}">Renommer</button><button class="btn small danger" data-delete-search="${+s.id}">Supprimer</button></div></article>`).join('');
     page.innerHTML = `<div class="page-head"><div><h1>Mes filtres</h1><p>Retrouvez vos réglages de stratégie et vos filtres enregistrés. Les modifier change les critères de recherche, pas les données ni les scores financiers.</p></div><a class="btn" href="index.html">← Retour au classement</a></div>
       <section class="card" style="padding:18px"><div class="row between"><div><h2 style="margin:0">Mes stratégies</h2><p class="small muted" style="margin:4px 0 0">Personnalisez un profil de départ ou restaurez son réglage initial.</p></div></div><div class="manage-grid" style="margin-top:14px">${presets}</div></section>
       <section class="card" style="padding:18px;margin-top:14px"><div class="row between"><div><h2 style="margin:0">Filtres enregistrés</h2><p class="small muted" style="margin:4px 0 0">Une recherche sauvegarde aussi le texte saisi, les cases, la visibilité, le tri et le statut affiché.</p></div><a class="btn small" href="index.html">Créer depuis l’Explorer</a></div>
         <div class="manage-grid" style="margin-top:14px">${own || '<div class="empty" style="grid-column:1/-1">Aucun filtre enregistré. Dans l’Explorer, réglez vos critères et filtres, puis sélectionnez « Enregistrer ».</div>'}</div></section>`;
     page.onclick = async e => {
-      const b = e.target.closest('button[data-reset-preset],button[data-use-search],button[data-edit-search],button[data-rename-search],button[data-delete-search]'); if (!b) return;
+      const b = e.target.closest('button[data-reset-preset],button[data-use-search],button[data-edit-search],button[data-edit-note],button[data-rename-search],button[data-delete-search]'); if (!b) return;
       try {
         if (b.dataset.resetPreset) {
           const k = b.dataset.resetPreset, name = labels[k]?.[0] || k;
           if (await J.confirm('Réinitialiser la stratégie', `Le réglage personnalisé de « ${name} » sera supprimé.`, 'Réinitialiser')) { await J.post('preset/reset', { preset: k }); await render(); }
         } else {
-          const s = searches.find(x => +x.id === +(b.dataset.useSearch || b.dataset.editSearch || b.dataset.renameSearch || b.dataset.deleteSearch)); if (!s) return;
-          if (b.dataset.renameSearch) setName(s.name, s.config, s.view || {});
+          const s = searches.find(x => +x.id === +(b.dataset.useSearch || b.dataset.editSearch || b.dataset.editNote || b.dataset.renameSearch || b.dataset.deleteSearch)); if (!s) return;
+          if (b.dataset.editNote) editNote(s);
+          else if (b.dataset.renameSearch) setName(s.name, s.config, s.view || {});
           else if (b.dataset.deleteSearch && await J.confirm('Supprimer ce filtre', `« ${s.name} » sera supprimé.`, 'Supprimer')) { await J.post('search/delete', { id: +s.id }); await render(); }
           else if (b.dataset.useSearch || b.dataset.editSearch) {
             const edit = !!b.dataset.editSearch;

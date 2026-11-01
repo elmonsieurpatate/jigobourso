@@ -188,12 +188,18 @@
     if (baseKey() === k) choose(k); else drawStrategies();
     J.toast('« ' + NAMES[k][0] + ' » : réglage de départ rétabli'); return true;
   }
-  const savedView = () => ({ ...view(), status: S.status, sort: S.sort, dir: S.dir });
+  const savedView = () => {
+    const metadata = S.preset === 'custom' ? searches.find(x => x.name === S.label)?.view || {} : {};
+    return { ...view(), status: S.status, sort: S.sort, dir: S.dir, ...(metadata.icon ? { icon: metadata.icon } : {}), ...(metadata.description ? { description: metadata.description } : {}) };
+  };
   async function drawSaved() {
     searches = (await J.api('searches')).searches;
-    el('saved').innerHTML = `<select id="saved-sel" aria-label="Mes recherches"><option value="">Mes recherches (${searches.length})</option>${searches.map(x => `<option value="${x.id}">${J.esc(x.name)}</option>`).join('')}</select><button class="btn small danger" id="saved-del" hidden>Supprimer</button>`;
-    el('saved-sel').onchange = () => { const x = searches.find(y => y.id == el('saved-sel').value); el('saved-del').hidden = !x; if (!x) return; applySearch(x); };
-    el('saved-del').onclick = async () => { const x = searches.find(y => y.id == el('saved-sel').value); if (x && await J.confirm('Supprimer la recherche', '« ' + x.name + ' » sera supprimée.', 'Supprimer')) { await J.post('search/delete', { id: +x.id }); drawSaved(); } };
+    const active = S.preset === 'custom' ? searches.find(x => x.name === S.label) : null;
+    el('saved').innerHTML = `<div class="saved-filter-heading"><b>Filtres enregistrés</b><span class="small muted">${searches.length ? searches.length + ' disponible' + (searches.length > 1 ? 's' : '') : 'Aucun pour l’instant'}</span></div>${searches.length ? `<div class="saved-filter-list">${searches.map(x => `<button type="button" class="saved-filter-pill ${active && active.id == x.id ? 'on' : ''}" data-saved-id="${+x.id}" title="${J.esc(x.view?.description || x.name)}"><span aria-hidden="true">${J.esc(x.view?.icon || '🔎')}</span> ${J.esc(x.name)}</button>`).join('')}</div>` : '<span class="small muted">Enregistrez vos critères depuis le bouton « Enregistrer ».</span>'}<a class="btn small" href="mes-filtres.html">Gérer mes filtres</a><button class="btn small danger" id="saved-del" ${active ? '' : 'hidden'}>Supprimer le filtre actif</button><div id="saved-active" class="saved-filter-current" ${active ? '' : 'hidden'}></div>`;
+    const updateActive = x => { const box = el('saved-active'); if (!box) return; box.hidden = !x; if (x) box.innerHTML = `<span class="saved-filter-icon" aria-hidden="true">${J.esc(x.view?.icon || '🔎')}</span><span><b>Filtre actif : ${J.esc(x.name)}</b><span class="small muted">${J.esc(x.view?.description || 'Ajoutez une note dans « Mes filtres » pour expliquer ce filtre.')}</span></span>`; };
+    updateActive(active);
+    J.$$('#saved .saved-filter-pill').forEach(b => b.onclick = () => { const x = searches.find(y => +y.id === +b.dataset.savedId); if (x) { applySearch(x); drawSaved(); } });
+    el('saved-del').onclick = async () => { const x = active; if (x && await J.confirm('Supprimer la recherche', '« ' + x.name + ' » sera supprimée.', 'Supprimer')) { await J.post('search/delete', { id: +x.id }); drawSaved(); } };
     el('reset-default').onclick = () => { const k = baseKey(); if (k) resetPreset(k); }; syncReset();
     el('saved-save').onclick = () => {
       const base = baseKey();

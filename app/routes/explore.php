@@ -31,6 +31,8 @@ function clean_view($in): array {
     if (isset($in['q']) && is_scalar($in['q'])) $view['q'] = mb_substr(trim((string)$in['q']), 0, 100);
     if (array_key_exists('tradable', $in) && is_bool($in['tradable'])) $view['tradable'] = $in['tradable'];
     if (isset($in['status']) && in_array($in['status'], ['retained', 'rejected', 'unknown', 'all'], true)) $view['status'] = $in['status'];
+    if (isset($in['description']) && is_scalar($in['description'])) $view['description'] = mb_substr(trim((string)$in['description']), 0, 300);
+    if (isset($in['icon']) && in_array($in['icon'], ['📈', '⚡', '🔎', '🛡️', '🌱', '📊', '💼', '⭐'], true)) $view['icon'] = $in['icon'];
     return $view;
 }
 

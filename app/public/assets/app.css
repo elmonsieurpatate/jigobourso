@@ -287,6 +287,21 @@ table.cmp th, table.cmp td { text-align: left; vertical-align: top; } table.cmp 
 .filter-card h3 { margin:0; }
 .filter-card p { margin:0; }
 .filter-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:2px; }
+.filter-title { display:flex; align-items:center; gap:10px; min-width:0; }
+.filter-icon { display:grid; place-items:center; flex:none; width:38px; height:38px; border-radius:11px; background:var(--accent-soft); font-size:1.35rem; }
+.saved-filter-bar { display:grid; grid-template-columns:minmax(0,1fr) auto auto; align-items:center; gap:10px 14px; width:100%; margin-top:8px; padding:12px 14px; border:1px solid var(--line); border-radius:12px; background:var(--surface); }
+.saved-filter-heading { display:flex; align-items:baseline; flex-wrap:wrap; gap:4px 9px; }
+.saved-filter-list { grid-column:1/-1; display:flex; flex-wrap:wrap; gap:7px; max-height:112px; overflow-y:auto; }
+.saved-filter-pill { display:inline-flex; align-items:center; gap:6px; max-width:100%; padding:6px 10px; border:1px solid var(--line); border-radius:9px; background:var(--surface); color:var(--text); font:inherit; cursor:pointer; }
+.saved-filter-pill:hover { border-color:var(--accent); }
+.saved-filter-pill.on { border-color:var(--accent); background:var(--accent-soft); color:var(--accent); font-weight:700; }
+.saved-filter-current { display:flex; align-items:center; gap:9px; min-width:0; color:var(--text); }
+.saved-filter-current[hidden] { display:none; }
+.saved-filter-current { grid-column:1/-1; }
+.saved-filter-current > span:last-child { display:grid; gap:2px; min-width:0; }
+.saved-filter-current .small { overflow-wrap:anywhere; }
+.saved-filter-current .saved-filter-icon { display:grid; place-items:center; flex:none; width:32px; height:32px; border-radius:9px; background:var(--accent-soft); font-size:1.1rem; }
+@media (max-width:640px) { .saved-filter-bar { grid-template-columns:minmax(0,1fr) auto; align-items:center; } .saved-filter-heading { grid-column:1/-1; } .saved-filter-bar > a { justify-self:start; } .saved-filter-current { align-items:flex-start; } }
 @media (max-width:640px) { .explorer-legend { padding:10px 14px 12px; line-height:1.5; } .data-freshness { min-width:0; } }
 .switch-label { display: inline-flex; align-items: center; gap: 12px; cursor: pointer; font-weight: 700; font-size: .92rem; color: var(--text); }
 .switch-label input.switch { -webkit-appearance: none; appearance: none; position: relative; flex: none; width: 44px; height: 26px; margin: 0; border-radius: 999px; background: var(--line); border: 0; cursor: pointer; transition: background .15s; }
