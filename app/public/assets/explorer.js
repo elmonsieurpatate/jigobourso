@@ -45,6 +45,12 @@
   function freeConfig() { const c = JSON.parse(JSON.stringify(P.presets.regular)); c.name = 'free'; c.periods.forEach(p => { p.enabled = p.id === 'month'; ['min_slope', 'min_r2', 'min_er', 'min_return', 'max_return', 'max_volatility', 'max_drawdown'].forEach(f => p[f] = null); }); c.ranking.mode = 'trend'; return c; }
   const SUB = { regular: 'Hausse stable', fast: 'Hausse marquée', recovery: 'Après une baisse', low_volatility: 'Peu de variations', momentum: '126 → 21 séances', momentum12: '252 → 21 séances' };
   const CURRENT_SAVED = () => S.preset === 'custom' ? searches.find(x => x.name === S.label) : null;
+  function appendSavedStrategies() {
+    const current = el('strats').querySelector('.strat-grid'); if (!current) return;
+    const active = CURRENT_SAVED();
+    current.innerHTML += searches.map(x => `<button type="button" class="strat slim saved-strategy ${active && active.id == x.id ? 'on' : ''}" data-k="saved" data-saved-id="${+x.id}" title="${J.esc(x.view?.description || x.name)}"><span class="ico" aria-hidden="true">${J.esc(x.view?.icon || '🔎')}</span><span class="tx"><b>${J.esc(x.name)}</b><span>${J.esc(x.view?.description || 'Filtre personnel · disponible')}</span></span></button>`).join('');
+    J.$$('#strats .saved-strategy').forEach(b => b.onclick = () => { const x = searches.find(y => +y.id === +b.dataset.savedId); if (x) applySearch(x); });
+  }
   const helpHtml = k => `<b>${J.esc(NAMES[k][0])}</b><p>${J.esc(NAMES[k][1])}</p>${EXP.has(k) ? `<p class="helpwarn">${J.esc(EXP_NOTE(k))}</p>` : ''}`;
   function drawStrategies() {
     el('strats').innerHTML = '<div class="strat-grid">' + Object.keys(P.presets).map(k => `<div class="strat ${S.preset === k ? 'on' : ''} ${EXP.has(k) ? 'exp' : ''}" role="button" tabindex="0" aria-pressed="${S.preset === k}" data-k="${k}"><span class="ico">${JMenu.icon(k)}</span><span class="tx"><b>${NAMES[k][0]}${MINE[k] ? ' <i class="mod" title="Vous avez enregistré votre propre réglage pour cette stratégie">modifiée</i>' : ''}</b><span>${SUB[k] || ''}</span></span><button type="button" class="q" data-help="${k}" aria-label="Explication : ${J.esc(NAMES[k][0])}" aria-expanded="false">?</button></div>`).join('') + '</div>' +
@@ -55,7 +61,7 @@
     J.$$('#strats .q').forEach(q => q.onclick = e => { e.stopPropagation(); JMenu.pop(q, helpHtml(q.dataset.help)); });
     const act = S.config.periods.filter(p => p.enabled).map(p => J.PERIODS[p.id].toLowerCase() + ' (' + p.sessions + ' séances)');
     el('strategy-summary').textContent = 'Périodes : ' + act.join(', ') + ' · classement par ' + ({ trend: 'pente', performance: 'performance', regularity: 'régularité', stability: 'stabilité', momentum: 'momentum 6 mois (J−126 → J−21 séances)', momentum12: 'momentum 12 mois (J−252 → J−21 séances)' }[S.config.ranking.mode]) + (MOM_WIN[S.config.ranking.mode] ? ' · ' + EXP_NOTE(S.config.ranking.mode) : (EXP.has(S.preset) ? ' · ' + EXP_NOTE(S.preset) : ''));
-    drawSliders();
+    drawSliders(); appendSavedStrategies();
   }
   function view() {
     const v = { q: el('q').value.trim(), kind: el('kind').value, market: el('market').value === '__pea' ? '' : el('market').value };
@@ -195,16 +201,8 @@
   };
   async function drawSaved() {
     searches = (await J.api('searches')).searches;
-    const active = S.preset === 'custom' ? searches.find(x => x.name === S.label) : null;
-    el('saved').innerHTML = searches.map(x => `<button type="button" class="strat slim saved-strategy ${active && active.id == x.id ? 'on' : ''}" data-saved-id="${+x.id}" title="${J.esc(x.view?.description || x.name)}"><span class="ico" aria-hidden="true">${J.esc(x.view?.icon || '🔎')}</span><span class="tx"><b>${J.esc(x.name)}</b><span>${J.esc(x.view?.description || 'Filtre enregistré')}</span></span></button>`).join('');
-    J.$$('#saved .saved-strategy').forEach(b => b.onclick = () => { const x = searches.find(y => +y.id === +b.dataset.savedId); if (x) applySearch(x); });
-    if (active) {
-      const current = el('strats').querySelector('.strat-grid');
-      const pill = document.createElement('button');
-      pill.type = 'button'; pill.className = 'strat slim custom-saved on'; pill.title = active.view?.description || 'Critères appliqués tels quels';
-      pill.innerHTML = `<span class="ico" aria-hidden="true">${J.esc(active.view?.icon || '🔎')}</span><span class="tx"><b>${J.esc(active.name)}</b><span>${J.esc(active.view?.description || 'Critères appliqués tels quels')}</span></span>`;
-      pill.onclick = () => applySearch(active); current.appendChild(pill);
-    }
+    appendSavedStrategies();
+    el('saved').innerHTML = '';
     el('reset-default').onclick = () => { const k = baseKey(); if (k) resetPreset(k); }; syncReset();
     el('saved-save').onclick = () => {
       const base = baseKey();
@@ -274,7 +272,7 @@
     const freshClass = r.price_stale === true || (r.quality && r.quality !== 'ok') ? 'warn' : (r.price_stale === false ? 'freshness-ok' : 'muted');
     const freshTitle = `Dernière clôture quotidienne : ${fresh}. Dernier cours horodaté par la source : ${J.dateTime(r.price_time)}. Dernière collecte Yahoo : ${J.dateTime(r.quote_at)}. ${freshState}${r.quality && r.quality !== 'ok' ? ' · qualité de l’historique : ' + r.quality : ''}.`;
     return `<tr data-id="${r.id}"${r.etf_group ? ` class="in-family" data-group="${J.esc(r.etf_group)}"` : ''}><td class="rk">${rankCell(r)}</td>
-      <td class="name"><span class="nm">${`<a data-sheet href="${J.esc(sheetHref(r.id))}" target="_blank" rel="noopener" aria-label="Ouvrir ${J.esc(r.symbol)} dans un nouvel onglet">${J.esc(r.name)}</a>`}</span><span class="sub">${J.esc(r.symbol)} · ${J.esc(r.market)} <span class="tag ${r.kind === 'etf' ? 'etf' : ''}">${r.kind === 'etf' ? 'ETF' : 'ACTION'}</span>${r.pea ? ' <span class="tag pea">PEA</span>' : ''}${r.held ? ' <span class="tag held">DÉTENU</span>' : ''}${r.open ? ' <span class="tag open">OUVERT</span>' : ''}${r.etf_group ? ` <span class="tag grp" title="Cet ETF évolue presque comme les autres ETF du groupe ${J.esc(r.etf_group)} (voir le bandeau au-dessus du tableau). Information seulement : son rang n’est pas modifié.">Groupe ${J.esc(r.etf_group)}</span>` : ''}</span>${r.kind === 'etf' && r.fund_nature ? `<span class="fund-nature">${J.esc(r.fund_nature)}</span>` : ''}${(r.signals || []).length ? `<span class="sigs">${JEtf.rowSignals(r.signals)}</span>` : ''}${r.status === 'excluded' ? `<span class="sub warn">${J.esc(r.excluded_reason || '')}</span>` : ''}</td>
+      <td class="name"><span class="nm">${`<a data-sheet href="${J.esc(sheetHref(r.id))}" target="_blank" rel="noopener" aria-label="Ouvrir ${J.esc(r.symbol)} dans un nouvel onglet">${J.esc(r.name)}</a>`}</span><span class="sub">${J.esc(r.symbol)} · ${J.esc(r.market)} <span class="tag ${r.kind === 'etf' ? 'etf' : ''}">${r.kind === 'etf' ? 'ETF' : 'ACTION'}</span>${r.pea ? ' <span class="tag pea">PEA</span>' : ''}${r.held ? ' <span class="tag held">DÉTENU</span>' : ''}${r.open ? ' <span class="tag open">OUVERT</span>' : ''}${r.etf_group ? ` <span class="tag grp" title="Cet ETF évolue presque comme les autres ETF du groupe ${J.esc(r.etf_group)} (voir le bandeau au-dessus du tableau). Information seulement : son rang n’est pas modifié.">Groupe ${J.esc(r.etf_group)}</span>` : ''}</span>${r.category ? `<span class="fund-nature">${J.esc(r.category)}</span>` : ''}${r.kind === 'etf' && r.fund_nature ? `<span class="fund-nature">${J.esc(r.fund_nature)}</span>` : ''}${(r.signals || []).length ? `<span class="sigs">${JEtf.rowSignals(r.signals)}</span>` : ''}${r.status === 'excluded' ? `<span class="sub warn">${J.esc(r.excluded_reason || '')}</span>` : ''}</td>
       <td class="num">${r.price_eur !== null && r.price_eur !== undefined ? J.eur(r.price_eur) : J.money(r.price, r.currency)}<span class="sub" style="display:block">${r.currency !== 'EUR' && r.price !== null ? J.money(r.price, r.currency) : (r.price ? J.priceLabel(r) : '')}</span>${r.price_stale ? '<span class="sub warn">Cours ancien</span>' : ''}</td>
       <td class="hide-s" title="Clôtures sur ${J.esc((lastRes || {}).curve_label || '3 mois')} : la période la plus longue de la stratégie">${J.spark(r.curve)}</td>
       <td class="num ${J.cls(m.slope)}">${m.slope !== null && m.slope !== undefined ? J.num(m.slope, 3) : '–'}</td><td class="num">${J.num(m.r2, 2)}</td><td class="num ${J.cls(m.perf)}">${J.pct(m.perf, 1)}</td>
