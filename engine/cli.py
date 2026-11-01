@@ -72,6 +72,8 @@ def serve(cmd):
         elif cmd == 'overview':
             from .analytics import overview
             result = overview.data_overview(connect())
+        elif cmd == 'filter-metadata-coverage':
+            result = service.filter_metadata_coverage(connect())
         elif cmd == 'suivi':
             result = tracking.summary(connect())
         elif cmd in ADMIN:
@@ -110,7 +112,7 @@ def main(argv=None):
         sub.add_parser(name, help='administration (JSON sur stdin)')
     for name, text in (('explore', 'Explorer : classement et recherche (JSON sur stdin)'), ('sheet', 'fiche d’un titre (JSON sur stdin)'),
                        ('validate-config', 'valider une configuration de stratégie (JSON sur stdin)'),
-                       ('etf-portfolio', 'Expositions connues et similarité du portefeuille'), ('presets', 'les stratégies de départ (dont l’expérimentale Momentum 6 mois)'), ('suivi', 'statistiques de la page Suivi'), ('overview', 'vue d’ensemble des données (sources, fraîcheur, couverture)'), ('intraday', 'deux dernières séances en barres de 15 minutes (JSON sur stdin)')):
+                       ('etf-portfolio', 'Expositions connues et similarité du portefeuille'), ('presets', 'les stratégies de départ (dont l’expérimentale Momentum 6 mois)'), ('suivi', 'statistiques de la page Suivi'), ('overview', 'vue d’ensemble des données (sources, fraîcheur, couverture)'), ('intraday', 'deux dernières séances en barres de 15 minutes (JSON sur stdin)'), ('filter-metadata-coverage', 'couverture des métadonnées de filtre ETF')):
         sub.add_parser(name, help=text)
     args = ap.parse_args(argv)
     if args.cmd in ('fdb-state', 'yahoo-state', 'titles', 'rules-save', 'rules-reset', 'funnel', 'funnel-items', 'funnel-explain', 'schedule-get', 'schedule-save', 'job-check', 'jobs-list', 'job-detail', 'explore', 'sheet', 'validate-config', 'presets', 'suivi', 'intraday', 'overview', 'etf-portfolio'):

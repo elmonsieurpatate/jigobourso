@@ -34,9 +34,9 @@ def test_parse_spark_both_shapes_and_nulls():
 
 
 def test_parse_quotes():
-    q = yahoo.parse_quotes({'quoteResponse': {'result': [{'symbol': 'DVDG.DE', 'regularMarketPrice': 42.1, 'averageDailyVolume3Month': 131, 'currency': 'EUR'},
+    q = yahoo.parse_quotes({'quoteResponse': {'result': [{'symbol': 'DVDG.DE', 'regularMarketPrice': 42.1, 'averageDailyVolume3Month': 131, 'currency': 'EUR', 'netAssets': 123456789},
                                                          {'symbol': 'X', 'regularMarketPrice': None}]}})
-    assert list(q) == ['DVDG.DE'] and q['DVDG.DE']['avg_volume_3m'] == 131
+    assert list(q) == ['DVDG.DE'] and q['DVDG.DE']['avg_volume_3m'] == 131 and q['DVDG.DE']['net_assets'] == 123456789
 
 
 # ── « Cours ancien » : absence d'échange récent ≠ donnée ancienne ──
