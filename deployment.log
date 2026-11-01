@@ -7,3 +7,7 @@ moteur importable
 == Contrôle d'intégrité financière
 PHP valide
 == Vérification des calculs financiers avec les calendriers de séance
+== Vérification ETF
+== Vérification publique
+site OK : accueil 200, version 202611011344 servie, API répond (200)
+Déploiement terminé : 2821f5e6cf8c2d169d710c92afe3254241fdbbb1
