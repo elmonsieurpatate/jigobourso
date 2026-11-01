@@ -110,6 +110,29 @@ if grep -qiE '^\s*(drop|truncate|delete|alter|rename|update|insert|replace)\b' d
 fi
 python3 scripts/migrate.py --check
 
+# Le runner Hostinger prépare une copie de la production dans une base isolée. Attendre
+# son résultat avant de toucher au site public ; son seul effet persistant est la base sandbox.
+if [ -z "$sandbox" ]; then
+  echo "== Essai isolé Hostinger (copie + base sandbox)"
+  remote_sh "HOME=\$HOME ROOT=$root SHA=$sha bash -s" <<'REMOTE'
+set -euo pipefail
+test -f "$HOME/tmp-backtest/.sandbox_pw" || { echo "mot de passe de la base sandbox absent" >&2; exit 1; }
+test -x "$ROOT/.venv/bin/python" || { echo "Python de production absent" >&2; exit 1; }
+test -x "$ROOT/ops/sandbox_runner.sh" || { echo "runner Hostinger de la copie isolée absent" >&2; exit 1; }
+REMOTE
+  remote_sh "bash $root/ops/sandbox_runner.sh $sha filtres"
+  for attempt in $(seq 1 12); do
+    result=$(remote_sh "bash \$HOME/domains/jigobourso.turnjoy.dev/jigobourso-v2/ops/sandbox_runner.sh $sha lecture 80")
+    if printf '%s\n' "$result" | grep -q '══ BILAN'; then
+      printf '%s\n' "$result" | grep -q 'échec  : aucun' || { echo "essai Hostinger isolé en échec" >&2; exit 1; }
+      echo "Essai isolé Hostinger réussi"
+      break
+    fi
+    if [ "$attempt" -eq 12 ]; then echo "essai isolé lancé; résultat différé (aucune attente de recalcul dans le déploiement)"; break; fi
+    sleep 5
+  done
+fi
+
 # Preserve financial evidence before any code replacement. Never auto-rewrite legacy transactions.
 echo "== Sauvegarde et empreinte des portefeuilles"
 remote_sh "ROOT=$root BACKUPS=$backups bash -s" <<'REMOTE'
