@@ -20,7 +20,7 @@ const BASE='http://127.0.0.1:18089';
   ok('carte_marquee_modifiee',await page.locator('.strat[data-k="fast"] .mod').count()===1);
   await page.goto(BASE+'/mes-filtres.html');await page.locator('.filter-card').first().waitFor();
   ok('titre_mes_filtres',await page.locator('h1').innerText()==='Mes filtres');
-  ok('six_profils_sur_page',await page.locator('.filter-card').count()===6);
+  ok('sept_profils_sur_page',await page.locator('.filter-card').count()===7);
   ok('reglage_personnel_visible',/Modifiée le/.test(await page.locator('.filter-card:has([data-reset-preset="fast"])').innerText()));
   await page.click('[data-reset-preset="fast"]');await dialog().getByRole('button',{name:'Réinitialiser'}).click();await page.waitForTimeout(700);
   ok('profil_reinitialise_sur_page',/Utilise les critères initiaux/.test(await page.locator('.filter-card:has([data-reset-preset="fast"])').innerText()));
