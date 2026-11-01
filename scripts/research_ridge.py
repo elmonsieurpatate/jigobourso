@@ -122,7 +122,7 @@ def build(directory, min_titles, sample):
         a2_ev = [e[0] for e in evs if e[1] == 'A2']
         lr, lc = [math.log(x) for x in a], [math.log(x) for x in ac]
         ti = len(D.titles)
-        D.titles.append((u['symbol'], u.get('currency', '')))
+        D.titles.append((u['symbol'], u.get('currency', ''), u['key']))
         usd = 1 if u.get('currency') == 'USD' else 0
         for kk, k in enumerate(D.dec):
             d = D.cal[k]
@@ -399,7 +399,7 @@ def summarize(res, h):
     for pos, k in enumerate(keys):
         ch = pos % m if m > 1 else 0
         prev = chain_prev.get(ch)
-        t = 1.0 if prev is None else 1 - len(prev & res[k]['sel']) / TOP
+        t = 1.0 if prev is None else 1 - len(prev & res[k]['sel']) / max(1, len(res[k]['sel']))
         chain_prev[ch] = res[k]['sel']
         turn[k] = t
         for c in COSTS:
@@ -408,7 +408,10 @@ def summarize(res, h):
             absr[c].append(100 * res[k]['top'] - 100 * t * 2 * c / 10000)
     lo, hi, lo2, hi2 = boot(gross)
     worst = sorted(absr[60])[:max(1, len(absr[60]) // 20)]
-    dec = [statistics.mean(res[k]['dec'][q] for k in keys if fin(res[k]['dec'][q])) * 100 for q in range(10)] if keys else []
+    dec = []
+    for q in range(10):
+        vals = [res[k]['dec'][q] for k in keys if fin(res[k]['dec'][q])]
+        dec.append(statistics.mean(vals) * 100 if vals else NAN)
     return {'dates': len(keys), 'ic': statistics.mean(ics) if ics else NAN, 'ic_pos': 100 * sum(1 for x in ics if x > 0) / len(ics) if ics else NAN,
             'gross': statistics.mean(gross) if gross else NAN, 'ci': (lo, hi), 'ci2': (lo2, hi2), 'net': {c: statistics.mean(net[c]) for c in COSTS} if keys else {},
             'turn': statistics.mean(turn.values()) if turn else NAN, 'cvar': statistics.mean(worst) if worst else NAN, 'dec': dec, 'series': dict(zip(keys, gross)),
