@@ -1,5 +1,6 @@
 /* Page Explorer : stratégie réglable, filtres avancés, tableau triable, comparaison actions / ETF, statistiques d'exclusion, export CSV. */
 (async () => {
+  if (new URLSearchParams(location.search).has('manage')) { location.replace('mes-filtres.html'); return; }
   const user = await J.init('explorer'); if (!user) return;
   const [P, ov, mine0] = await Promise.all([J.api('strategy/presets'), J.api('data/overview').catch(() => null), J.api('presets/mine').catch(() => ({ presets: {} }))]);
   let MINE = mine0.presets && !Array.isArray(mine0.presets) ? mine0.presets : {};           // réglages personnels des stratégies de départ : { clé: { config, view, updated_at } }
@@ -169,7 +170,8 @@
   /* réglages personnels : choisir, remplacer, remettre par défaut */
   function setView(v) {
     v = v || {};
-    [...FILTERS, 'kind', 'market'].forEach(k => { el(k).value = v[k] ?? ''; }); el('pea').checked = !!v.pea; el('mine').checked = !!v.owned_only; el('open_now').checked = !!v.open_now; el('fresh_only').checked = !!v.fresh_only; el('tradable').checked = v.tradable !== false;
+    [...FILTERS, 'kind', 'market'].forEach(k => { el(k).value = v[k] ?? ''; }); el('q').value = v.q || ''; el('pea').checked = !!v.pea; el('mine').checked = !!v.owned_only; el('open_now').checked = !!v.open_now; el('fresh_only').checked = !!v.fresh_only; el('tradable').checked = v.tradable !== false;
+    S.status = ['retained', 'rejected', 'unknown', 'all'].includes(v.status) ? v.status : S.status;
     S.sort = v.sort || 'rank'; S.dir = v.dir || 'asc'; el('filters').hidden = !(FILTERS.some(k => el(k).value) || CHECKS.some(k => el(k).checked)); syncMenu();
   }
   function presetConfig(k) { const c = JSON.parse(JSON.stringify(MINE[k] ? MINE[k].config : P.presets[k])); c.name = k; return c; }
@@ -186,40 +188,17 @@
     if (baseKey() === k) choose(k); else drawStrategies();
     J.toast('« ' + NAMES[k][0] + ' » : réglage de départ rétabli'); return true;
   }
-  const savedView = () => ({ ...view(), sort: S.sort, dir: S.dir });
-  function openManage() {
-    const body = () => {
-      const dflt = Object.keys(P.presets).map(k => `<tr><td><b>${J.esc(NAMES[k][0])}</b><div class="small muted">${J.esc(SUB[k] || '')}</div></td><td>${MINE[k] ? `<span class="badge info">Modifiée · ${J.date(MINE[k].updated_at)}</span>` : '<span class="badge">Réglage de départ</span>'}</td><td class="num nowrap"><button type="button" class="btn small" data-use="${k}">Utiliser</button> <button type="button" class="btn small" data-reset="${k}" ${MINE[k] ? '' : 'disabled'}>Remettre par défaut</button></td></tr>`).join('');
-      const own = searches.map(x => `<tr><td><b>${J.esc(x.name)}</b></td><td class="small muted">${J.date(x.updated_at)}</td><td class="num nowrap"><button type="button" class="btn small" data-suse="${x.id}">Utiliser</button> <button type="button" class="btn small" data-sren="${x.id}">Renommer</button> <button type="button" class="btn small danger" data-sdel="${x.id}">Supprimer</button></td></tr>`).join('');
-      return `<h3 style="margin:0 0 6px">Stratégies de départ</h3><table class="dense"><tbody>${dflt}</tbody></table>
-        <h3 style="margin:16px 0 6px">Mes recherches enregistrées</h3>${searches.length ? `<table class="dense"><tbody>${own}</tbody></table>` : '<p class="small muted" style="margin:0">Aucune pour l’instant : réglez vos critères et filtres, puis « Enregistrer ».</p>'}
-        <p class="small muted" style="margin:14px 0 0">Pour modifier une stratégie : choisissez-la, changez ses critères et filtres, puis « Enregistrer » et choisissez de remplacer son réglage. « Remettre par défaut » rétablit le réglage de départ.</p>`;
-    };
-    const d = J.dialog({ title: 'Gérer mes stratégies', body: body(), actions: [{ label: 'Fermer', run: () => { } }] });
-    const redraw = () => { J.$('.body', d).innerHTML = body(); };
-    d.addEventListener('click', async e => {
-      const t = e.target.closest('button[data-use],button[data-reset],button[data-suse],button[data-sren],button[data-sdel]'); if (!t || t.disabled) return;
-      const ds = t.dataset, x = ds.suse || ds.sren || ds.sdel ? searches.find(y => y.id == (ds.suse || ds.sren || ds.sdel)) : null;
-      try {
-        if (ds.use) { d.close(); choose(ds.use); }
-        else if (ds.reset) { if (await resetPreset(ds.reset)) redraw(); }
-        else if (ds.suse && x) { d.close(); applySearch(x); }
-        else if (ds.sdel && x) { if (await J.confirm('Supprimer la recherche', '« ' + x.name + ' » sera supprimée.', 'Supprimer')) { await J.post('search/delete', { id: +x.id }); await drawSaved(); redraw(); } }
-        else if (ds.sren && x) J.dialog({ title: 'Renommer la recherche', body: J.field('Nouveau nom', `<input id="rn-name" maxlength="80" value="${J.esc(x.name)}" autofocus>`),
-          actions: [{ label: 'Annuler', run: () => { } }, { label: 'Renommer', cls: 'primary', run: async dd => { const name = J.$('#rn-name', dd).value.trim(); if (!name || name === x.name) return false; if (searches.some(y => y.name === name)) { J.formError(dd, 'Ce nom existe déjà.'); return true; } await J.post('search/save', { name, config: x.config, view: x.view }); await J.post('search/delete', { id: +x.id }); await drawSaved(); redraw(); } }] });
-      } catch (err) { J.toast(err.message); }
-    });
-  }
+  const savedView = () => ({ ...view(), status: S.status, sort: S.sort, dir: S.dir });
   async function drawSaved() {
     searches = (await J.api('searches')).searches;
     el('saved').innerHTML = `<select id="saved-sel" aria-label="Mes recherches"><option value="">Mes recherches (${searches.length})</option>${searches.map(x => `<option value="${x.id}">${J.esc(x.name)}</option>`).join('')}</select><button class="btn small danger" id="saved-del" hidden>Supprimer</button>`;
     el('saved-sel').onchange = () => { const x = searches.find(y => y.id == el('saved-sel').value); el('saved-del').hidden = !x; if (!x) return; applySearch(x); };
     el('saved-del').onclick = async () => { const x = searches.find(y => y.id == el('saved-sel').value); if (x && await J.confirm('Supprimer la recherche', '« ' + x.name + ' » sera supprimée.', 'Supprimer')) { await J.post('search/delete', { id: +x.id }); drawSaved(); } };
-    el('saved-manage').onclick = openManage; el('reset-default').onclick = () => { const k = baseKey(); if (k) resetPreset(k); }; syncReset();
+    el('reset-default').onclick = () => { const k = baseKey(); if (k) resetPreset(k); }; syncReset();
     el('saved-save').onclick = () => {
       const base = baseKey();
       J.dialog({ title: 'Enregistrer vos réglages', onopen: d => { const t = J.$('#sv-target', d); if (t) t.onchange = () => { J.$('#sv-namebox', d).hidden = t.value === 'preset'; }; },
-        body: (base ? J.field('Où enregistrer ?', `<select id="sv-target"><option value="new">Une recherche à part, avec un nom</option><option value="preset">Le réglage de « ${J.esc(NAMES[base][0])} » (remplace son réglage de départ)</option></select>`) : '') + `<div id="sv-namebox">${J.field('Nom', `<input id="sv-name" maxlength="80" value="${J.esc(S.label || '')}" autofocus>`)}</div><p class="small muted">Enregistre vos critères, périodes, filtres et tri. Un nom existant est remplacé. Vous pourrez toujours remettre une stratégie de départ par défaut (« Gérer… »).</p>`,
+        body: (base ? J.field('Où enregistrer ?', `<select id="sv-target"><option value="new">Un filtre à part, avec un nom</option><option value="preset">Le réglage de « ${J.esc(NAMES[base][0])} » (remplace son réglage de départ)</option></select>`) : '') + `<div id="sv-namebox">${J.field('Nom', `<input id="sv-name" maxlength="80" value="${J.esc(S.label || '')}" autofocus>`)}</div><p class="small muted">Enregistre vos critères, périodes, recherche, filtres et tri. Un nom existant est remplacé. Gérez vos filtres depuis « Mes filtres ».</p>`,
         actions: [{ label: 'Annuler', run: () => { } }, { label: 'Enregistrer', cls: 'primary', run: async d => {
           const target = (J.$('#sv-target', d) || {}).value || 'new';
           if (target === 'preset' && base) {
@@ -280,6 +259,9 @@
     const m = r.ref || {};
     const badge = r.status === 'excluded' ? `<span class="badge ko help" title="${J.esc(r.excluded_reason || '')}">Exclu</span>` : J.statusBadge(r.status, r.status_label);
     const fresh = r.last_close ? J.date(r.last_close) : '–';
+    const freshState = typeof r.price_stale !== 'boolean' ? 'Fraîcheur inconnue' : (r.price_stale ? 'Cours en retard' : (r.quality === 'stale' ? 'Clôture en retard' : 'Cours à jour'));
+    const freshClass = r.price_stale === true || (r.quality && r.quality !== 'ok') ? 'warn' : (r.price_stale === false ? 'freshness-ok' : 'muted');
+    const freshTitle = `Dernière clôture quotidienne : ${fresh}. Dernier cours horodaté par la source : ${J.dateTime(r.price_time)}. Dernière collecte Yahoo : ${J.dateTime(r.quote_at)}. ${freshState}${r.quality && r.quality !== 'ok' ? ' · qualité de l’historique : ' + r.quality : ''}.`;
     return `<tr data-id="${r.id}"${r.etf_group ? ` class="in-family" data-group="${J.esc(r.etf_group)}"` : ''}><td class="rk">${rankCell(r)}</td>
       <td class="name"><span class="nm">${`<a data-sheet href="${J.esc(sheetHref(r.id))}" target="_blank" rel="noopener" aria-label="Ouvrir ${J.esc(r.symbol)} dans un nouvel onglet">${J.esc(r.name)}</a>`}</span><span class="sub">${J.esc(r.symbol)} · ${J.esc(r.market)} <span class="tag ${r.kind === 'etf' ? 'etf' : ''}">${r.kind === 'etf' ? 'ETF' : 'ACTION'}</span>${r.pea ? ' <span class="tag pea">PEA</span>' : ''}${r.held ? ' <span class="tag held">DÉTENU</span>' : ''}${r.open ? ' <span class="tag open">OUVERT</span>' : ''}${r.etf_group ? ` <span class="tag grp" title="Cet ETF évolue presque comme les autres ETF du groupe ${J.esc(r.etf_group)} (voir le bandeau au-dessus du tableau). Information seulement : son rang n’est pas modifié.">Groupe ${J.esc(r.etf_group)}</span>` : ''}</span>${(r.signals || []).length ? `<span class="sigs">${JEtf.rowSignals(r.signals)}</span>` : ''}${r.status === 'excluded' ? `<span class="sub warn">${J.esc(r.excluded_reason || '')}</span>` : ''}</td>
       <td class="num">${r.price_eur !== null && r.price_eur !== undefined ? J.eur(r.price_eur) : J.money(r.price, r.currency)}<span class="sub" style="display:block">${r.currency !== 'EUR' && r.price !== null ? J.money(r.price, r.currency) : (r.price ? J.priceLabel(r) : '')}</span>${r.price_stale ? '<span class="sub warn">Cours ancien</span>' : ''}</td>
@@ -288,7 +270,7 @@
       <td class="num">${m.volatility !== null && m.volatility !== undefined ? J.num(m.volatility, 2) : '–'}</td><td class="num">${m.drawdown !== null && m.drawdown !== undefined ? J.num(m.drawdown, 1) + ' %' : '–'}</td>
       <td class="num">${r.volume ? J.num(r.volume, 0) : '–'}</td><td class="num">${r.score !== null && r.score !== undefined ? `<b>${J.num(r.score, 0)}</b><div class="score-bar"><i style="width:${r.score}%"></i></div>` : '–'}${(S.config.ranking.mode === 'momentum' || S.config.ranking.mode === 'momentum12') && r.momentum !== null && r.momentum !== undefined ? `<span class="sub ${J.cls(r.momentum)}" style="display:block" title="Variation du cours entre il y a ${S.config.ranking.mode === 'momentum12' ? '252' : '126'} et il y a 21 séances">mom. ${J.pct(r.momentum, 1)}</span>` : ''}</td>
       <td class="hide-s small">${analystCell(r.analyst)}</td>
-      <td class="num small ${r.quality && r.quality !== 'ok' ? 'warn' : ''}" title="${{ ok: 'À jour', stale: 'Clôture en retard', insufficient: 'Historique court', incomplete: 'Historique incomplet : des séances de marché sont absentes', calendar_unknown: 'Calendrier de séances indisponible pour cette place', break: 'Rupture de cours' }[r.quality] || ''}">${fresh}${r.quality && r.quality !== 'ok' ? ' ⚠' : ''}</td><td>${badge}</td></tr>`;
+      <td class="num small ${freshClass}" title="${J.esc(freshTitle)}"><div class="data-freshness"><span>${fresh}${r.quality && r.quality !== 'ok' ? ' ⚠' : ''}</span><span class="fresh-time">${r.price_time ? 'Cours · ' + J.dateTime(r.price_time) : 'Heure inconnue'}</span><span class="fresh-time">${freshState}</span></div></td><td>${badge}</td></tr>`;
   }
   function drawWhy(res) {
     const total = (res.scope_counts.rejected || 0) + (res.scope_counts.unknown || 0), groups = {};
@@ -308,7 +290,7 @@
     lastRes = res; const lm = (res.level_filters || {}).masked || 0; el('level-note').textContent = lm ? `${J.num(lm, 0)} titre${lm > 1 ? 's' : ''} masqué${lm > 1 ? 's' : ''} par vos filtres de régularité, volatilité ou négociabilité (rang et score inchangés).` : '';
     el('tradable-note').textContent = res.tradable.on ? (res.tradable.masked ? `${J.num(res.tradable.masked, 0)} titre${res.tradable.masked > 1 ? 's' : ''} masqué${res.tradable.masked > 1 ? 's' : ''} : valeur échangée estimée trop faible. Décochez pour tout voir.` : 'Aucun titre masqué dans cette vue.') : 'Tous les titres du catalogue sont affichés.';
     drawTabs(res); drawWhy(res); fillFacets(res);
-    el('results').innerHTML = res.rows.length ? JEtf.concentration(res.etf_concentration) + `<p class="small muted" style="margin:0 0 8px">${JEtf.LEGEND}</p><div class="table-wrap"><table class="rtable">${header(res.ref_sessions)}<tbody>${groupedRows(res.rows)}</tbody></table></div>` : `<div class="empty">${v.q ? 'Aucun titre ne correspond à cette recherche.' : 'Aucun titre dans cette vue avec ces critères et ces filtres.'}</div>`;
+    el('results').innerHTML = res.rows.length ? JEtf.concentration(res.etf_concentration) + `<div class="small muted explorer-legend">${JEtf.LEGEND}</div><div class="table-wrap"><table class="rtable">${header(res.ref_sessions)}<tbody>${groupedRows(res.rows)}</tbody></table></div>` : `<div class="empty">${v.q ? 'Aucun titre ne correspond à cette recherche.' : 'Aucun titre dans cette vue avec ces critères et ces filtres.'}</div>`;
     if (!window.jigoScrollRestored) { window.jigoScrollRestored = true; try { requestAnimationFrame(() => scrollTo(0, +(sessionStorage.getItem('jigo_explorer_scroll') || 0))); } catch (e) {} }
     J.$$('#results tbody tr').forEach(tr => { const a = tr.querySelector('a[data-sheet]'); a.addEventListener('click', () => { persist(); sessionStorage.setItem('jigo_explorer_scroll', String(scrollY)); }); tr.onclick = e => { if (e.target.closest('a,button,input')) return; persist(); window.open(a.href, '_blank', 'noopener'); }; });
     J.$$('#results .fam-toggle').forEach(b => b.onclick = () => { const g = b.dataset.g, on = !openGroups.has(g); on ? openGroups.add(g) : openGroups.delete(g); b.setAttribute('aria-expanded', on); b.querySelector('.fam-sign').textContent = on ? '−' : '+'; J.$$('#results tr[data-child-of]').forEach(tr => { if (tr.dataset.childOf === g) tr.hidden = !on; }); });
@@ -361,5 +343,5 @@
   if (url.get('compare')) { S.compare = true; el('compare-btn').classList.add('primary'); el('compare-btn').textContent = 'Retour au tableau'; }
   if (FILTERS.some(k => el(k).value) || CHECKS.some(k => el(k).checked)) el('filters').hidden = false;
   load();
-  if (url.get('manage')) drawSaved().then(openManage);
+  if (url.get('edit') === '1') { el('editor').hidden = false; drawEditor(); }
 })();

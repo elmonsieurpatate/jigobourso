@@ -133,13 +133,13 @@ J.ICONS = {
 J.icon = (n, cls = 'ic') => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">${J.ICONS[n]}</svg>`;
 J.NAV = (admin) => [
   { sec: 'Marchés' },
-  { id: 'explorer', label: 'Explorer', icon: 'compass', file: ['index.html', 'titre.html'], children: [
-    { label: 'Classement', href: 'index.html', on: q => !q.has('kind') && !q.has('compare') && !q.has('preset') && !q.has('manage') },
+  { id: 'explorer', label: 'Explorer', icon: 'compass', file: ['index.html', 'titre.html', 'mes-filtres.html'], children: [
+    { label: 'Classement', href: 'index.html', on: q => !q.has('kind') && !q.has('compare') && !q.has('preset') && !q.has('manage') && !q.has('edit') },
     { label: 'Actions', href: 'index.html?kind=equity', on: q => q.get('kind') === 'equity' && !q.has('compare') },
     { label: 'ETF', href: 'index.html?kind=etf', on: q => q.get('kind') === 'etf' && !q.has('compare') },
     { label: 'Comparer actions / ETF', href: 'index.html?compare=1', on: q => q.has('compare') },
     { label: 'Recherche libre', href: 'index.html?preset=free', on: q => q.get('preset') === 'free' },
-    { label: 'Mes stratégies', href: 'index.html?manage=1', on: q => q.has('manage') }] },
+    { label: 'Mes filtres', href: 'mes-filtres.html', on: () => true }] },
   { sec: 'Mon patrimoine' },
   { id: 'portefeuilles', label: 'Portefeuilles', icon: 'wallet', file: ['portefeuilles.html'], dynamic: 'portfolios', children: [{ label: 'Vue d’ensemble', href: 'portefeuilles.html', on: q => !q.has('id') }] },
   { id: 'bilan', label: 'Bilans', icon: 'chart', file: ['bilan.html'], children: [{ label: 'Bilan global', href: 'bilan.html', on: () => true }] },

@@ -28,6 +28,9 @@ function clean_view($in): array {
     if (!is_array($in)) return $view;
     foreach (['kind', 'market', 'country', 'category', 'budget', 'min_price', 'max_price', 'min_score', 'max_volatility', 'max_drawdown', 'min_volume', 'cap', 'regularity', 'risk', 'liquidity', 'pea', 'owned_only', 'open_now', 'fresh_only', 'sort', 'dir'] as $k)
         if (isset($in[$k]) && is_scalar($in[$k]) && $in[$k] !== '' && $in[$k] !== false) $view[$k] = $in[$k];
+    if (isset($in['q']) && is_scalar($in['q'])) $view['q'] = mb_substr(trim((string)$in['q']), 0, 100);
+    if (array_key_exists('tradable', $in) && is_bool($in['tradable'])) $view['tradable'] = $in['tradable'];
+    if (isset($in['status']) && in_array($in['status'], ['retained', 'rejected', 'unknown', 'all'], true)) $view['status'] = $in['status'];
     return $view;
 }
 

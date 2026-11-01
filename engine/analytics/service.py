@@ -73,7 +73,7 @@ def _load_universe(conn, windows, ids=None):
     only = f' WHERE l.id IN ({",".join(["%s"] * len(ids))})' if ids else ''
     with conn.cursor() as cur:
         cur.execute("""SELECT l.id, l.symbol, l.mic, l.currency, i.name, i.isin, i.kind, i.country, i.category,
-                              p.price, p.price_time, p.source AS price_source, p.currency AS price_currency, p.avg_volume_3m,
+                              p.price, p.price_time, p.quote_at, p.source AS price_source, p.currency AS price_currency, p.avg_volume_3m,
                        s.last_close_date, s.closes_count, s.close_px, s.ma20, s.ma50, s.ma50_prev, s.daily_change, s.gap_to_ma20, s.quality, s.break_dates,
                        s.coverage_252, s.expected_252, s.momentum_6m, s.momentum_12m
                        FROM v_recommendable r JOIN listings l ON l.id=r.listing_id JOIN instruments i ON i.id=l.instrument_id
@@ -168,7 +168,7 @@ def _row(v, rates, conn=None):
     return {'id': u['id'], 'symbol': u['symbol'], 'name': u['name'], 'isin': u['isin'], 'mic': u['mic'], 'market': MARKETS.get(u['mic'], u['mic']),
             'kind': u['kind'], 'category': u['category'], 'country': u['country'], 'pea': pea_status(u['kind'], u['country'], u['mic']) == 'probable',
             'currency': cur, 'price': price, 'price_eur': price * factor if price is not None and factor else None,
-            'price_time': u['price_time'].isoformat(sep=' ') if u['price_time'] else None, 'price_source': u['price_source'],
+            'price_time': u['price_time'].isoformat(sep=' ') if u['price_time'] else None, 'quote_at': u['quote_at'].isoformat(sep=' ') if u.get('quote_at') else None, 'price_source': u['price_source'],
             'status': v['status'], 'status_label': STATUS_LABELS[v['status']], 'score': v['score'], 'rank': v['rank'], 'momentum': v.get('momentum'),
             'quality': u['quality'], 'price_stale': hours.price_is_stale(u['mic'], u['price_time'], hours.utcnow(), expected_close(conn, u['mic']) if conn is not None else None, last_collection(conn, u['mic']) if conn is not None else None), 'measures': {str(n): m for n, m in v['measures'].items()}, 'reasons': v['reasons']}
 
@@ -459,7 +459,7 @@ def _choices(value):
 def _search_excluded(conn, query, kind, market):
     """Cotations exclues correspondant à une recherche : étiquetées, avec leur motif, sans verdict de stratégie."""
     like = '%' + query.replace('%', '') + '%'
-    sql = """SELECT l.id, l.symbol, l.mic, l.currency, l.status, l.excluded_reason, i.name, i.isin, i.kind, i.country, i.category, p.price, p.price_time, p.source AS price_source, p.currency AS price_currency
+    sql = """SELECT l.id, l.symbol, l.mic, l.currency, l.status, l.excluded_reason, i.name, i.isin, i.kind, i.country, i.category, p.price, p.price_time, p.quote_at, p.source AS price_source, p.currency AS price_currency
              FROM listings l JOIN instruments i ON i.id=l.instrument_id LEFT JOIN latest_prices p ON p.listing_id=l.id
              WHERE (l.status='excluded' OR (l.status='candidate' AND l.is_primary=1)) AND (LOWER(i.name) LIKE %s OR LOWER(l.symbol) LIKE %s OR LOWER(i.isin) LIKE %s)"""
     args = [like, like, like]
@@ -473,6 +473,7 @@ def _search_excluded(conn, query, kind, market):
     return [{'id': r['id'], 'symbol': r['symbol'], 'name': r['name'], 'isin': r['isin'], 'mic': r['mic'], 'market': MARKETS.get(r['mic'], r['mic']), 'kind': r['kind'],
              'category': r['category'], 'country': r['country'], 'pea': False, 'currency': r['price_currency'] or r['currency'],
              'price': float(r['price']) if r['price'] is not None else None, 'price_eur': None, 'price_time': r['price_time'].isoformat(sep=' ') if r['price_time'] else None,
+             'quote_at': r['quote_at'].isoformat(sep=' ') if r['quote_at'] else None,
              'price_source': r['price_source'], 'status': 'excluded' if r['status'] == 'excluded' else 'unknown',
              'status_label': 'Exclu' if r['status'] == 'excluded' else 'En attente d’analyse', 'excluded_reason': r['excluded_reason'], 'score': None, 'rank': None,
              'quality': None, 'measures': {}, 'reasons': []} for r in rows]

@@ -1,4 +1,4 @@
-/* Réglages personnels dans un vrai Chrome : modifier une stratégie de départ, l'enregistrer, la remettre par défaut ; enregistrer, renommer et supprimer une recherche ; menu « Gérer… ». */
+/* Réglages personnels et filtres enregistrés dans un vrai Chrome ; vérifie aussi que les filtres persistent entre Explorer et la page dédiée. */
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
 const BASE='http://127.0.0.1:18089';
 (async()=>{
@@ -7,54 +7,41 @@ const BASE='http://127.0.0.1:18089';
  page.setDefaultTimeout(20000);page.on('pageerror',e=>out.errors.push(e.message));page.on('console',m=>{if(m.type()==='error'&&!/favicon/.test(m.location().url||''))out.errors.push(m.text())});
  const ok=(name,cond,detail)=>{out.checks[name]=!!cond;if(!cond)out.errors.push('KO '+name+(detail===undefined?'':' : '+JSON.stringify(detail)))};
  const slope=()=>page.inputValue('.sl[data-s="slope"] input.lo');
- const setSlope=async v=>{await page.fill('.sl[data-s="slope"] input.lo',String(v));await page.keyboard.press('Enter');await page.waitForTimeout(500)};
- const top=()=>page.locator('dialog[open]').last();
+ const setSlope=async v=>{await page.fill('.sl[data-s="slope"] input.lo',String(v));await page.keyboard.press('Enter');await page.waitForTimeout(400)};
+ const dialog=()=>page.locator('dialog[open]').last();
  try{
   await page.goto(BASE+'/login.html');await page.fill('#u','review_user');await page.fill('#p','review-local-password');await page.click('#auth-form button.primary');await page.waitForURL('**/index.html');
   await page.evaluate(()=>{localStorage.clear();sessionStorage.clear()});await page.goto(BASE+'/index.html');
   await page.locator('#strats .strat').first().waitFor();await page.locator('#saved-manage').waitFor();
-  // 1. modifier « Croissance rapide » puis remplacer son réglage de départ
-  await page.click('.strat[data-k="fast"]');await page.waitForTimeout(1000);
-  ok('reglage_de_depart_rapide',(await slope())==='100',await slope());
-  await setSlope(30);await page.click('#apply-menu');await page.waitForTimeout(1200);
-  await page.click('#saved-save');await page.locator('#sv-target').waitFor();
-  ok('choix_remplacer_le_reglage_propose',(await page.locator('#sv-target option').allInnerTexts()).some(t=>/Croissance rapide/.test(t)));
-  await page.selectOption('#sv-target','preset');ok('nom_masque_pour_un_reglage',await page.locator('#sv-namebox').isHidden());
-  await top().getByRole('button',{name:'Enregistrer'}).click();await page.waitForTimeout(1200);
+  // Modifier le réglage personnel de croissance rapide.
+  await page.click('.strat[data-k="fast"]');await page.waitForTimeout(700);ok('reglage_depart_rapide',(await slope())==='100',await slope());
+  await setSlope(30);await page.click('#apply-menu');await page.waitForTimeout(800);await page.click('#saved-save');await page.locator('#sv-target').waitFor();
+  await page.selectOption('#sv-target','preset');await dialog().getByRole('button',{name:'Enregistrer'}).click();await page.waitForTimeout(700);
   ok('carte_marquee_modifiee',await page.locator('.strat[data-k="fast"] .mod').count()===1);
-  // 2. le réglage est retrouvé après rechargement et en revenant sur la carte
-  await page.reload();await page.locator('#strats .strat').first().waitFor();await page.waitForTimeout(800);
-  ok('marque_conservee_apres_rechargement',await page.locator('.strat[data-k="fast"] .mod').count()===1);
-  await page.click('.strat[data-k="regular"]');await page.waitForTimeout(800);await page.click('.strat[data-k="fast"]');await page.waitForTimeout(1200);
-  ok('reglage_personnel_reapplique',(await slope())==='30',await slope());
-  ok('bouton_remettre_par_defaut_visible',await page.locator('#reset-default').isVisible()&&/Croissance rapide/.test(await page.locator('#reset-default').innerText()));
-  // 3. menu Gérer : remettre par défaut
-  await page.click('#saved-manage');await page.locator('dialog[open] [data-reset="fast"]').waitFor();
-  ok('menu_liste_les_six_strategies',await page.locator('dialog[open] [data-use]').count()===6);
-  ok('menu_signale_la_modification',/Modifiée/.test(await page.locator('dialog[open] tr:has([data-use="fast"])').innerText()));
-  await page.click('dialog[open] [data-reset="fast"]');await page.waitForTimeout(400);
-  await top().getByRole('button',{name:'Remettre par défaut'}).click();await page.waitForTimeout(1500);
-  ok('menu_signale_le_retour_au_depart',/Réglage de départ/.test(await page.locator('dialog[open] tr:has([data-use="fast"])').innerText()));
-  ok('carte_sans_marque',await page.locator('.strat[data-k="fast"] .mod').count()===0);
-  await page.locator('dialog[open]').first().getByText('Fermer',{exact:true}).click();await page.waitForTimeout(500);
-  ok('curseur_revenu_au_depart',(await slope())==='100',await slope());
-  // 4. recherche enregistrée : créer, renommer, supprimer
-  await setSlope(20);await page.click('#apply-menu');await page.waitForTimeout(1000);
-  await page.click('#saved-save');await page.locator('#sv-name').waitFor();ok('cible_libre_par_defaut_apres_reglage',await page.locator('#sv-target').inputValue()==='new');
-  await page.fill('#sv-name','e2e test');await top().getByRole('button',{name:'Enregistrer'}).click();await page.waitForTimeout(1200);
-  ok('recherche_dans_la_liste',(await page.locator('#saved-sel option').allInnerTexts()).some(t=>/e2e test/.test(t)));
-  await page.click('#saved-manage');await page.locator('dialog[open] [data-sren]').waitFor();
-  await page.click('dialog[open] [data-sren]');await page.locator('#rn-name').waitFor();await page.fill('#rn-name','e2e renommée');await top().getByRole('button',{name:'Renommer'}).click();await page.waitForTimeout(1200);
-  ok('recherche_renommee',/e2e renommée/.test(await page.locator('dialog[open]').first().innerText())&&!/e2e test/.test(await page.locator('dialog[open]').first().innerText()));
-  await page.click('dialog[open] [data-sdel]');await page.waitForTimeout(400);await top().getByRole('button',{name:'Supprimer'}).click();await page.waitForTimeout(1200);
-  ok('recherche_supprimee',/Aucune pour l’instant/.test(await page.locator('dialog[open]').first().innerText()));
-  await page.locator('dialog[open]').first().getByText('Fermer',{exact:true}).click();
-  // 5. aucun débordement sur téléphone
-  await page.setViewportSize({width:375,height:900});await page.waitForTimeout(400);ok('pas_de_debordement_375',!(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)));
-  // 6. entrée « Mes stratégies » du menu de gauche
-  await page.setViewportSize({width:1280,height:900});await page.goto(BASE+'/index.html');await page.locator('#strats .strat').first().waitFor();
-  const lk=page.locator('a[href="index.html?manage=1"]').first();ok('entree_menu_gauche',await lk.count()>0);
-  await lk.click();await page.locator('dialog[open] [data-use]').first().waitFor();ok('entree_ouvre_la_gestion',await page.locator('dialog[open] [data-use]').count()===6);
+  await page.goto(BASE+'/mes-filtres.html');await page.locator('.filter-card').first().waitFor();
+  ok('titre_mes_filtres',await page.locator('h1').innerText()==='Mes filtres');
+  ok('six_profils_sur_page',await page.locator('.filter-card').count()===6);
+  ok('reglage_personnel_visible',/Personnalisée/.test(await page.locator('.filter-card:has([data-reset-preset="fast"])').innerText()));
+  await page.click('[data-reset-preset="fast"]');await dialog().getByRole('button',{name:'Réinitialiser'}).click();await page.waitForTimeout(700);
+  ok('profil_reinitialise_sur_page',/Réglage de départ/.test(await page.locator('.filter-card:has([data-reset-preset="fast"])').innerText()));
+  // Modifier une recherche, conserver VOO + négociabilité désactivée + statut Tous.
+  await page.goto(BASE+'/index.html');await page.locator('#strats .strat').first().waitFor();
+  await page.fill('#q','VOO');await page.locator('#status-tabs button[data-s="all"]').click();await page.waitForTimeout(500);await page.uncheck('#tradable');await page.waitForTimeout(300);
+  await page.click('#saved-save');await page.fill('#sv-name','e2e filtres');await dialog().getByRole('button',{name:'Enregistrer'}).click();await page.waitForTimeout(500);
+  await page.goto(BASE+'/mes-filtres.html');await page.locator('[data-edit-search]').waitFor();
+  ok('filtre_enregistre_resume',/VOO/.test(await page.locator('.filter-card:has([data-edit-search])').innerText()));
+  await page.click('[data-edit-search]');await page.waitForURL('**/index.html?edit=1');await page.waitForFunction(()=>document.querySelector('#q')?.value==='VOO'&&!document.querySelector('#editor')?.hidden);
+  ok('recherche_restaurée',await page.inputValue('#q')==='VOO');
+  ok('case_négociabilité_restaurée',await page.isChecked('#tradable')===false);
+  ok('statut_tous_restauré',await page.locator('#status-tabs button.on').getAttribute('data-s')==='all');
+  // Renommer puis supprimer depuis la page (les confirmations seules restent modales).
+  await page.goto(BASE+'/mes-filtres.html');await page.locator('[data-rename-search]').waitFor();await page.click('[data-rename-search]');
+  await page.fill('#rename-filter','e2e renommé');await dialog().getByRole('button',{name:'Enregistrer'}).click();await page.waitForTimeout(400);
+  ok('filtre_renommé',await page.getByText('e2e renommé',{exact:true}).count()===1);
+  await page.click('[data-delete-search]');await dialog().getByRole('button',{name:'Supprimer'}).click();await page.waitForTimeout(400);
+  ok('filtre_supprimé',await page.locator('[data-delete-search]').count()===0);
+  for(const width of [375,390,1280]){await page.setViewportSize({width,height:900});await page.waitForTimeout(250);ok('pas_de_debordement_'+width,!(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)))}
+  await page.goto(BASE+'/index.html?manage=1');await page.waitForURL('**/mes-filtres.html');ok('ancienne_entree_redirige_vers_page',true);
  }catch(e){out.errors.push('exception '+e.message)}
  console.log(JSON.stringify(out));await browser.close();process.exit(out.errors.length?1:0);
 })();

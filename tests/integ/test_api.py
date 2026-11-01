@@ -137,6 +137,18 @@ def test_held_excluded_listing_stays_visible_but_is_never_ranked(world):
     assert all(r['id'] != 2 for r in allrows)                                # absent de tout classement sans recherche explicite
 
 
+def test_saved_filter_preserves_search_visibility_and_status(world):
+    a = login(world, 'alice', 'alice-secret-1234')
+    config = a.call('strategy/presets')[1]['presets']['regular']
+    view = {'q': '  VOO  ', 'tradable': False, 'status': 'all', 'kind': 'etf', 'sort': 'perf', 'dir': 'desc'}
+    assert a.call('search/save', {'name': 'ETF complets', 'config': config, 'view': view})[0] == 200
+    stored = a.call('searches')[1]['searches'][0]['view']
+    assert stored == {'q': 'VOO', 'tradable': False, 'status': 'all', 'kind': 'etf', 'sort': 'perf', 'dir': 'desc'}
+    assert a.call('preset/save', {'preset': 'regular', 'config': config, 'view': view})[0] == 200
+    preset = a.call('presets/mine')[1]['presets']['regular']['view']
+    assert preset == stored
+
+
 def test_delete_portfolio_needs_confirmation(world):
     a = login(world, 'alice', 'alice-secret-1234')
     pf = a.call('portfolio/create', {'name': 'Gros'})[1]['id']

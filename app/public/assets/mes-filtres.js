@@ -1,0 +1,84 @@
+/* Gestion des réglages de départ personnalisés et des filtres enregistrés. */
+(async () => {
+  const user = await J.init('explorer'); if (!user) return;
+  const page = J.$('#page');
+  const labels = {
+    regular: ['Croissance régulière', 'Repère les hausses soutenues sur plusieurs périodes.'],
+    fast: ['Hausse rapide', 'Repère les progressions marquées sur les périodes courtes.'],
+    recovery: ['Rebond', 'Repère les titres qui repartent après une période faible.'],
+    low_volatility: ['Hausse calme', 'Repère les hausses avec des variations plus modérées.'],
+    momentum: ['Momentum 6 mois', 'Classement de la progression passée sur six mois.'],
+    momentum12: ['Momentum 12 mois', 'Classement de la progression passée sur douze mois.']
+  };
+  const safeState = (config, view, label, preset = 'custom', base = null) => {
+    const state = { preset, base, label, config, status: view.status || 'retained', page: 1, level: 'guided', compare: false,
+      sort: view.sort || 'rank', dir: view.dir || 'asc', size: 20, view };
+    try { localStorage.setItem('jigo_explorer2', JSON.stringify(state)); sessionStorage.setItem('jigo_explorer2', JSON.stringify(state)); } catch (_) { }
+  };
+  const viewSummary = v => {
+    const bits = [];
+    if (v.q) bits.push('Recherche : ' + v.q);
+    if (v.kind) bits.push(v.kind === 'etf' ? 'ETF' : 'Actions');
+    if (v.market) bits.push('Place : ' + v.market);
+    if (v.tradable === false) bits.push('Tous les niveaux de négociabilité');
+    if (v.owned_only) bits.push('Titres détenus uniquement');
+    const status = { retained: 'Retenus', rejected: 'Écartés', unknown: 'Non évaluables', all: 'Tous' }[v.status];
+    if (status && status !== 'Retenus') bits.push('Affichage : ' + status.toLowerCase());
+    const extra = ['budget', 'min_price', 'min_score', 'max_volatility', 'max_drawdown', 'min_volume'].filter(k => v[k] !== undefined && v[k] !== '');
+    if (extra.length) bits.push(extra.length + ' filtre' + (extra.length > 1 ? 's' : '') + ' avancé' + (extra.length > 1 ? 's' : ''));
+    return bits.length ? bits.join(' · ') : 'Aucun filtre pratique : le classement complet est affiché.';
+  };
+  const periodSummary = c => (c.periods || []).filter(p => p.enabled).map(p => J.PERIODS[p.id] || p.id).join(' + ') || 'Aucune période activée';
+  const setName = (name, config, view) => J.dialog({ title: 'Renommer ce filtre', body: J.field('Nom du filtre', `<input id="rename-filter" maxlength="80" value="${J.esc(name)}" autofocus>`), actions: [
+    { label: 'Annuler', run: () => {} },
+    { label: 'Enregistrer', cls: 'primary', run: async d => {
+      const next = J.$('#rename-filter', d).value.trim();
+      if (!next) { J.formError(d, 'Donnez un nom à ce filtre.'); return true; }
+      if (next !== name && searches.some(s => s.name.toLocaleLowerCase() === next.toLocaleLowerCase())) { J.formError(d, 'Un filtre porte déjà ce nom.'); return true; }
+      await J.post('search/save', { name: next, config, view });
+      if (next !== name) { const old = searches.find(s => s.name === name); if (old) await J.post('search/delete', { id: +old.id }); }
+      await render(); return false;
+    } }
+  ] });
+  let P, mine = {}, searches = [];
+  async function render() {
+    [P, mine, searches] = await Promise.all([
+      J.api('strategy/presets'), J.api('presets/mine').then(r => r.presets || {}).catch(() => ({})),
+      J.api('searches').then(r => r.searches || []).catch(() => [])
+    ]);
+    const presets = Object.keys(P.presets || {}).map(k => {
+      const info = labels[k] || [k, 'Réglage de stratégie']; const custom = mine[k];
+      const config = custom ? custom.config : P.presets[k], view = custom ? custom.view : {};
+      return `<article class="card filter-card"><div class="row between"><h3>${J.esc(info[0])}</h3><span class="badge ${custom ? 'info' : ''}">${custom ? 'Personnalisée' : 'Réglage de départ'}</span></div>
+        <p class="small muted">${J.esc(info[1])}</p><p class="small"><b>Périodes :</b> ${J.esc(periodSummary(config))}</p>
+        <p class="small muted">${custom ? `Modifiée le ${J.dateTime(custom.updated_at)}${view && Object.keys(view).length ? ' · ' + J.esc(viewSummary(view)) : ''}` : 'Utilise les critères initiaux de Jigobourso.'}</p>
+        <div class="filter-actions"><a class="btn small primary" href="index.html?preset=${encodeURIComponent(k)}">Utiliser</a><a class="btn small" href="index.html?preset=${encodeURIComponent(k)}&edit=1">Modifier</a><button class="btn small" data-reset-preset="${J.esc(k)}" ${custom ? '' : 'disabled'}>Réinitialiser</button></div></article>`;
+    }).join('');
+    const own = searches.map(s => `<article class="card filter-card"><div class="row between"><h3>${J.esc(s.name)}</h3><span class="badge">Filtre enregistré</span></div>
+      <p class="small muted">Enregistré le ${J.dateTime(s.updated_at)}</p><p class="small">${J.esc(viewSummary(s.view || {}))}</p>
+      <div class="filter-actions"><button class="btn small primary" data-use-search="${+s.id}">Utiliser</button><button class="btn small" data-edit-search="${+s.id}">Modifier</button><button class="btn small" data-rename-search="${+s.id}">Renommer</button><button class="btn small danger" data-delete-search="${+s.id}">Supprimer</button></div></article>`).join('');
+    page.innerHTML = `<div class="page-head"><div><h1>Mes filtres</h1><p>Retrouvez vos réglages de stratégie et vos filtres enregistrés. Les modifier change les critères de recherche, pas les données ni les scores financiers.</p></div><a class="btn" href="index.html">← Retour au classement</a></div>
+      <section class="card" style="padding:18px"><div class="row between"><div><h2 style="margin:0">Mes stratégies</h2><p class="small muted" style="margin:4px 0 0">Personnalisez un profil de départ ou restaurez son réglage initial.</p></div></div><div class="manage-grid" style="margin-top:14px">${presets}</div></section>
+      <section class="card" style="padding:18px;margin-top:14px"><div class="row between"><div><h2 style="margin:0">Filtres enregistrés</h2><p class="small muted" style="margin:4px 0 0">Une recherche sauvegarde aussi le texte saisi, les cases, la visibilité, le tri et le statut affiché.</p></div><a class="btn small" href="index.html">Créer depuis l’Explorer</a></div>
+        <div class="manage-grid" style="margin-top:14px">${own || '<div class="empty" style="grid-column:1/-1">Aucun filtre enregistré. Dans l’Explorer, réglez vos critères et filtres, puis sélectionnez « Enregistrer ».</div>'}</div></section>`;
+    page.onclick = async e => {
+      const b = e.target.closest('button[data-reset-preset],button[data-use-search],button[data-edit-search],button[data-rename-search],button[data-delete-search]'); if (!b) return;
+      try {
+        if (b.dataset.resetPreset) {
+          const k = b.dataset.resetPreset, name = labels[k]?.[0] || k;
+          if (await J.confirm('Réinitialiser la stratégie', `Le réglage personnalisé de « ${name} » sera supprimé.`, 'Réinitialiser')) { await J.post('preset/reset', { preset: k }); await render(); }
+        } else {
+          const s = searches.find(x => +x.id === +(b.dataset.useSearch || b.dataset.editSearch || b.dataset.renameSearch || b.dataset.deleteSearch)); if (!s) return;
+          if (b.dataset.renameSearch) setName(s.name, s.config, s.view || {});
+          else if (b.dataset.deleteSearch && await J.confirm('Supprimer ce filtre', `« ${s.name} » sera supprimé.`, 'Supprimer')) { await J.post('search/delete', { id: +s.id }); await render(); }
+          else if (b.dataset.useSearch || b.dataset.editSearch) {
+            const edit = !!b.dataset.editSearch;
+            safeState(s.config, s.view || {}, s.name);
+            location.href = edit ? 'index.html?edit=1' : 'index.html';
+          }
+        }
+      } catch (err) { J.toast(err.message || 'Une erreur est survenue.'); }
+    };
+  }
+  try { await render(); } catch (e) { page.innerHTML = `<div class="notice err">${J.esc(e.message)}</div>`; }
+})();

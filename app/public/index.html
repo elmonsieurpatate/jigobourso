@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Explorer — Jigobourso</title><link rel="stylesheet" href="assets/app.css?v=202610301418"></head>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Explorer — Jigobourso</title><link rel="stylesheet" href="assets/app.css?v=2026110101"></head>
 <body><main class="wrap">
 <div class="page-head"><div><h1>Explorer</h1><p>Actions et ETF classés selon votre stratégie : réglez les critères, filtrez, triez, comparez, puis ouvrez la fiche d’un titre.</p></div>
   <div class="row"><button class="btn" id="compare-btn">Comparer actions / ETF</button><button class="btn" id="export-btn">Exporter en CSV</button></div></div>
@@ -11,12 +11,12 @@
   <div class="menu-bar">
     <label class="mi search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="q" type="search" placeholder="Rechercher un titre, un symbole…" aria-label="Nom, symbole ou ISIN"></label>
     <label class="mi market"><span class="flag" id="market-flag" aria-hidden="true"></span><select id="market" aria-label="Place"><option value="">Toutes les places</option><option value="__pea">Europe (PEA)</option></select></label>
-    <div class="mf"><span>Type</span><select id="kind" aria-label="Type"><option value="">Actions et ETF</option><option value="equity">Actions</option><option value="etf">ETF</option></select></div>
+    <div class="mf kind-filter"><span>Type</span><select id="kind" aria-label="Type"><option value="">Actions et ETF</option><option value="equity">Actions</option><option value="etf">ETF</option></select></div>
     <div class="mf"><span>Prix</span><select id="f-price" aria-label="Prix d’une part"><option value="">Tout</option><option value="|10">≤ 10 €</option><option value="10|50">10 à 50 €</option><option value="50|200">50 à 200 €</option><option value="200|">&gt; 200 €</option></select></div>
     <div class="mf"><span>Volume</span><select id="f-volume" aria-label="Volume moyen par jour"><option value="">Tout</option><option value="10000">≥ 10 000 titres/j</option><option value="100000">≥ 100 000 titres/j</option><option value="1000000">≥ 1 million de titres/j</option></select></div>
     <div class="mf"><span>Capitalisation</span><select id="cap" aria-label="Capitalisation boursière"><option value="">Tout</option><option value="micro">Micro (&lt; 300 M€)</option><option value="small">Petite (0,3 à 2 Md€)</option><option value="mid">Moyenne (2 à 10 Md€)</option><option value="large">Grande (10 à 200 Md€)</option><option value="mega">Très grande (&gt; 200 Md€)</option></select></div>
     <div class="mf fld"><span>Secteur</span><input type="hidden" id="category"></div>
-    <div class="mf mact"><button type="button" class="btn primary" id="apply-menu" title="Lancer la recherche avec les réglages ci-dessus">Appliquer</button><button type="button" class="btn" id="saved-save" title="Enregistrer ces critères et filtres : remplacer le réglage d’une stratégie de départ, ou créer une recherche à part">Enregistrer</button><button type="button" class="btn" id="saved-manage" title="Modifier, remettre par défaut, renommer ou supprimer vos stratégies et recherches">Gérer mes stratégies</button></div>
+    <div class="mf mact"><button type="button" class="btn primary" id="apply-menu" title="Lancer la recherche avec les réglages ci-dessus">Appliquer</button><button type="button" class="btn" id="saved-save" title="Enregistrer ces critères et filtres : remplacer le réglage d’une stratégie de départ, ou créer une recherche à part">Enregistrer</button><a class="btn" id="saved-manage" href="mes-filtres.html" title="Consulter et gérer vos filtres enregistrés">Mes filtres</a></div>
   </div>
   <div class="sliders" id="sliders"></div>
 </section>
@@ -51,4 +51,4 @@
 <details class="card" id="why" style="margin-top:14px"><summary style="cursor:pointer;font-weight:700">Pourquoi des titres sont écartés ? <span class="muted small" style="font-weight:400">statistiques par critère</span></summary><div id="why-body" style="margin-top:12px"></div></details>
 <p class="muted small" style="margin-top:14px">Analyse descriptive des cours passés, sans conseil ni promesse de performance. Un titre « retenu » remplit vos critères ; ce n’est pas une recommandation d’achat. Catalogue : FinanceDatabase · Cours : Yahoo Finance.</p>
 </main>
-<script src="assets/app.js?v=202610301418"></script><script src="assets/etf.js?v=202610301418"></script><script src="assets/explorer-menu.js?v=202610301418"></script><script src="assets/multiselect.js?v=202610301418"></script><script src="assets/explorer.js?v=202610301418"></script></body></html>
+<script src="assets/app.js?v=2026110101"></script><script src="assets/etf.js?v=2026110101"></script><script src="assets/explorer-menu.js?v=2026110101"></script><script src="assets/multiselect.js?v=2026110101"></script><script src="assets/explorer.js?v=2026110101"></script></body></html>

@@ -47,7 +47,7 @@ const BASE='http://127.0.0.1:18089';
   ok('choix_conserves_au_rechargement',(await page.inputValue('#f-price'))==='10|50'&&(await page.inputValue('#market'))==='__pea'&&(await page.inputValue('#cap'))==='mid');
   await page.click('#reset-filters');await page.waitForTimeout(800);
   ok('reinitialisation',(await page.inputValue('#f-price'))===''&&(await page.inputValue('#market'))===''&&(await page.inputValue('#cap'))==='');
-  for(const width of [375,390,1280]){await page.setViewportSize({width,height:900});await page.waitForTimeout(400);ok('pas_de_debordement_'+width,!(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)))}
+  for(const width of [375,390,1280]){await page.setViewportSize({width,height:900});await page.waitForTimeout(400);ok('pas_de_debordement_'+width,!(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)));const kindWidth=await page.locator('#kind').evaluate(e=>e.getBoundingClientRect().width);ok('type_visible_'+width,kindWidth>=(width<640?180:120),kindWidth)}
  }catch(e){out.errors.push('exception '+e.message)}
  console.log(JSON.stringify(out));await browser.close();process.exit(out.errors.length?1:0);
 })();
