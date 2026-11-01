@@ -1,12 +1,15 @@
 """Justification du nettoyage : montre, sur les vraies données, CE QUE la règle fait (lecture seule, actions uniquement, aucun entraînement).
 
-Pour une règle v1 (celle du diagnostic déjà publié) et une règle v2 plus STRICTE (proposée), liste les cas A1 (tous), A2 (échantillon tiré avec une graine fixe) et B (échantillon), avec les
-preuves utilisées (précision du rapport de prix, évolution du volume, séance du saut) et les cours AVANT / APRÈS correction autour de l'événement. Une matrice de transition v1 -> v2 montre combien
+Pour une règle v1 (celle du diagnostic déjà publié) et une règle v3 plus STRICTE (proposée), liste les cas A1 (tous), A2 (échantillon tiré avec une graine fixe) et B (échantillon), avec les
+preuves utilisées (précision du rapport de prix, évolution du volume, séance du saut) et les cours AVANT / APRÈS correction autour de l'événement. Une matrice de transition v1 -> v3 montre combien
 d'événements changent de classe. Rien ne regarde un rendement futur d'exemple d'apprentissage.
 
-RÈGLE v2 (stricte ; ce qui n'est pas certain devient C = conservé et signalé, jamais corrigé) :
-  A1 : saut = 1/k ou k à 1,5 % près ; niveau persistant (médiane des 10 séances suivantes à 15 % du niveau du saut) ; volume médian des 10 séances suivantes en sens inverse du prix à 50 % près ;
-       ET volume de la séance du saut à l'échelle du split (produit volume × prix à 2 près), pas un pic démesuré. Rapport entre 1,5 % et 3 % de 1/k ou k, ou volume qui ne confirme pas : C.
+RÈGLE v3 (stricte ; ce qui n'est pas certain devient C = conservé et signalé, jamais corrigé) :
+  A1 (niveau persistant : médiane des 10 séances suivantes à 15 % du niveau du saut ; saut = 1/k ou k) :
+       - HAUSSE (regroupement) : rapport à 3 % près, volume médian des 10 séances suivantes ET volume du jour en BAISSE par rapport à avant. Une vraie envolée a un volume en hausse.
+       - BAISSE (division) : rapport à 1,5 % près, volume médian des 10 séances suivantes en sens inverse du prix (produit volume × prix entre 0,7 et 2) ET volume du jour à l'échelle du split
+         (produit volume × prix du jour <= 2). Un krach réel a un pic de volume de 8 à 50 fois la médiane : il sort en B.
+       Sinon : volume continu ou rapport entre 1,5 % et 3 % : C ; le reste : B.
   A2 : retour du cours en 1 ou 2 séances à moins de 5 % de son niveau d'avant, sens opposé au saut, ET volume des séances du saut <= 3 fois la médiane des 20 séances précédentes. Retour avec gros
        volume : B (vraie envolée). Retour sans volume exploitable, ou en 3 séances, ou à 5-10 % : C.
   B  : tout le reste ; C : incertain.
@@ -30,7 +33,7 @@ def split_err(p):
     return min(min(abs(p - 1 / k) / (1 / k), abs(p - k) / k) for k in KS)
 
 
-def classify_v2(a, c, v):
+def classify_v3(a, c, v):
     n, events, i = len(a), [], 1
     while i < n:
         p = a[i] / a[i - 1]
@@ -58,7 +61,10 @@ def classify_v2(a, c, v):
             av = [x for x in v[i:i + 10] if x]
             if len(bv) >= 5 and len(av) >= 5 and v[i]:
                 vq, vd = med(av) / med(bv), v[i] / med(bv)
-                ok = err < 0.015 and abs(math.log(vq * p)) < math.log(1.5) and abs(math.log(vd * p)) < math.log(2)
+                if p > 1:        # hausse (regroupement d'actions) : une vraie envolée s'accompagne d'un volume en HAUSSE ; un regroupement, d'un volume en BAISSE
+                    ok = vq < 1 and vd < 1
+                else:            # baisse (division d'actions) : le volume du jour doit rester à l'échelle du split ; un krach s'accompagne d'un pic bien supérieur
+                    ok = err < 0.015 and 0.7 <= vq * p <= 2 and vd * p <= 2
                 cls = 'A1' if ok else ('C' if abs(math.log(vq)) < 0.4 or err >= 0.015 else 'B')
             else:
                 cls = 'C'
@@ -92,7 +98,7 @@ def main(argv=None):
     with open(os.path.join(d, 'universe.csv'), encoding='utf-8', newline='') as fh:
         universe = [u for u in csv.DictReader(fh) if u['kind'] == 'equity']
     rnd = random.Random(args.seed)
-    trans, cases = Counter(), {'A1': [], 'A2': [], 'B': []}
+    trans, cases = Counter(), {'A1': [], 'A2': [], 'B': [], 'C': []}
     for u in universe:
         path = os.path.join(d, 'history', f"{u['key']}.csv.gz")
         if not os.path.exists(path):
@@ -103,24 +109,34 @@ def main(argv=None):
         dates, c, a, v = [r[0] for r in rows], [r[1] for r in rows], [r[2] for r in rows], [r[3] for r in rows]
         if title_flag(a, c):
             continue
-        e1, e2 = classify(a, c, v), {i: cls for i, cls, _, _ in classify_v2(a, c, v)}
+        e1, e2 = classify(a, c, v), {i: cls for i, cls, _, _ in classify_v3(a, c, v)}
         for i, cls, p, end in e1:
             trans[(cls, e2.get(i, 'absent'))] += 1
             if cls in cases:
                 cases[cls].append((u['symbol'], dates, c, a, v, i, p, end, e2.get(i, 'absent'), e1))
     L, w = [], None
     w = L.append
-    w('# Justification du nettoyage : règle v1 (publiée) et v2 (stricte proposée)\n')
-    w('## 1. Matrice de transition v1 -> v2 (nombre d\'événements)\n')
+    w('# Justification du nettoyage : règle v1 (publiée) et v3 (stricte proposée)\n')
+    w('## 1. Matrice de transition v1 -> v3 (nombre d\'événements)\n')
     names = ('A1', 'A2', 'B', 'C', 'absent')
-    w('| v1 \\ v2 | ' + ' | '.join(names) + ' |')
+    w('| v1 \\ v3 | ' + ' | '.join(names) + ' |')
     w('|---|' + '---|' * len(names))
     for r in ('A1', 'A2', 'B', 'C'):
         w(f'| {r} | ' + ' | '.join(str(trans[(r, x)]) for x in names) + ' |')
-    w('\n« absent » : l\'événement a été absorbé par un autre dans la règle v2 (séquences de sauts rapprochés).\n')
+    w('\n« absent » : l\'événement a été absorbé par un autre dans la règle v3 (séquences de sauts rapprochés).\n')
+    dec = {}
+    for cls0 in ('A1', 'A2', 'B', 'C'):
+        for sym, dates, c, a, v, i, p, end, v3, e1 in cases[cls0]:
+            dec.setdefault(dates[i][:3] + '0', Counter())[v3] += 1
+    w('## 1b. Événements v1 par décennie, selon leur classe v3\n')
+    w('| Décennie | A1 | A2 | B | C |')
+    w('|---|---|---|---|---|')
+    for k2 in sorted(dec):
+        w(f'| {k2} | ' + ' | '.join(str(dec[k2][x]) for x in ('A1', 'A2', 'B', 'C')) + ' |')
+    w('')
     picks = [('A1', cases['A1']), ('A2', rnd.sample(cases['A2'], min(args.a2, len(cases['A2'])))), ('B', rnd.sample(cases['B'], min(args.b, len(cases['B']))))]
     w('## 2. Cas (cours AVANT -> APRÈS correction v1, 3 séances de chaque côté ; [crochets] = séance du saut)\n')
-    w('| Classe v1 | Classe v2 | Titre | Date | Saut | Preuves |')
+    w('| Classe v1 | Classe v3 | Titre | Date | Saut | Preuves |')
     w('|---|---|---|---|---|---|')
     for cls, lst in picks:
         for sym, dates, c, a, v, i, p, end, v2, e1 in lst:
@@ -130,13 +146,13 @@ def main(argv=None):
     for cls, lst in picks:
         for sym, dates, c, a, v, i, p, end, v2, e1 in lst:
             one = clean_series(a, [(i, cls, p, end)]) if cls in ('A1', 'A2') else a
-            w(f'**{cls} (v2 : {v2}) · {sym} · {dates[i]} · ×{p:.3g}**')
+            w(f'**{cls} (v3 : {v2}) · {sym} · {dates[i]} · ×{p:.3g}**')
             w(f'- clôture ajustée avant correction : {fmt(None, a, i)}')
             w(f'- clôture ajustée après correction  : {fmt(None, one, i)}')
             w(f'- volume brut                        : {fmt(None, [x or 0 for x in v], i)}')
             w('')
     w('## 4. Lecture\n')
-    w('- A1 : après correction, le rendement de la séance du saut est fixé à 0 (le rendement réel de cette séance est inconnu), et tous les cours d\'avant sont multipliés par le rapport du saut. Un vrai krach classé A1 par erreur verrait sa perte effacée : c\'est le risque que la règle v2 réduit.')
+    w('- A1 : après correction, le rendement de la séance du saut est fixé à 0 (le rendement réel de cette séance est inconnu), et tous les cours d\'avant sont multipliés par le rapport du saut. Un vrai krach classé A1 par erreur verrait sa perte effacée : c\'est le risque que la règle v3 réduit.')
     w('- A2 : les barres du saut sont remplacées par le dernier cours valide. Un aller-retour réel (envolée sans volume anormal) serait masqué : le critère de volume et le retour sous 5 % en 2 séances limitent ce risque ; le reste passe en C.')
     text = '\n'.join(L)
     print(text)
