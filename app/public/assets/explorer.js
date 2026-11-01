@@ -65,6 +65,7 @@
   }
   const helpHtml = k => `<b>${J.esc(NAMES[k][0])}</b><p>${J.esc(NAMES[k][1])}</p>${EXP.has(k) ? `<p class="helpwarn">${J.esc(EXP_NOTE(k))}</p>` : ''}`;
   function drawStrategies() {
+    const previousGrid = el('strats').querySelector('.strat-grid'), scrollLeft = previousGrid ? previousGrid.scrollLeft : 0;
     el('strats').innerHTML = '<div class="strat-grid">' + Object.keys(P.presets).filter(strategyEnabled).map(k => `<div class="strat ${S.preset === k ? 'on' : ''} ${EXP.has(k) ? 'exp' : ''}" role="button" tabindex="0" aria-pressed="${S.preset === k}" data-k="${k}"><span class="ico">${JMenu.icon(k)}</span><span class="tx"><b>${NAMES[k][0]}${MINE[k] ? ' <i class="mod" title="Vous avez enregistré votre propre réglage pour cette stratégie">modifiée</i>' : ''}</b><span>${SUB[k] || ''}</span></span><button type="button" class="q" data-help="${k}" aria-label="Explication : ${J.esc(NAMES[k][0])}" aria-expanded="false">?</button></div>`).join('') + '</div>' +
       '<div class="strat-extra">' + `<button class="strat slim ${S.preset === 'free' ? 'on' : ''}" data-k="free"><span class="ico">${JMenu.icon('free')}</span><span class="tx"><b>Recherche libre</b><span>Aucun critère de départ</span></span></button>` +
       '</div>';
@@ -74,6 +75,7 @@
     const act = S.config.periods.filter(p => p.enabled).map(p => J.PERIODS[p.id].toLowerCase() + ' (' + p.sessions + ' séances)');
     el('strategy-summary').textContent = 'Périodes : ' + act.join(', ') + ' · classement par ' + ({ trend: 'pente', performance: 'performance', regularity: 'régularité', stability: 'stabilité', momentum: 'momentum 6 mois (J−126 → J−21 séances)', momentum12: 'momentum 12 mois (J−252 → J−21 séances)', momentum_risk: 'momentum ajusté du risque' }[S.config.ranking.mode]) + (MOM_WIN[S.config.ranking.mode] || S.config.ranking.mode === 'momentum_risk' ? ' · ' + EXP_NOTE(S.config.ranking.mode) : (EXP.has(S.preset) ? ' · ' + EXP_NOTE(S.preset) : ''));
     drawSliders(); appendSavedStrategies();
+    if (previousGrid) el('strats').querySelector('.strat-grid').scrollLeft = scrollLeft;
   }
   function view() {
     const v = { q: el('q').value.trim(), kind: el('kind').value, market: el('market').value === '__pea' ? '' : el('market').value };
