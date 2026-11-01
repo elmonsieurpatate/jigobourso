@@ -10,3 +10,7 @@ Chaque exécution est notée ici, y compris les échecs.
 - Six analyses exécutées (risk, horizons, candidates, deciles, ic, rank). Aucune hypothèse retirée ; les six candidates ont été écartées.
 - Famille principale (10 tests, seuil p < 0,005) : seul le Momentum 6-1 est significatif (21 et 63 séances).
 - Rapport : research/RAPPORT.md. Graphiques non produits à ce stade.
+
+## 2026-11-01 · score appris (apprentissage automatique)
+- Protocole figé avant tout résultat : research/PROTOCOLE_APPRENTISSAGE.md (2 modèles ridge sur rangs, fenêtre croissante, écart de 2 dates, réapprentissage tous les 12 dates, Bonferroni sur 2).
+- Programme : scripts/research_ml.py ; tâche : research/jobs/apprentissage.sh.
