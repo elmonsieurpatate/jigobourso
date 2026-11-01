@@ -124,6 +124,11 @@ def test_explorer_ranks_by_momentum_and_keeps_the_tradability_filter():
     assert [r['rank'] for r in res['rows']] == [2, 3, 4, 5]                                               # rang d'origine du catalogue conservé : le titre masqué (ILLIQ.DE) reste n° 1, rien n'est recalculé
     assert abs(res['rows'][0]['momentum'] - expected_momentum(UNIVERSE[0][4])) < 1e-4
     assert 'YOUNG.DE' not in symbols                                                                       # historique trop court : pas « retenu »
+    with conn.cursor() as cur:
+        cur.execute("INSERT INTO etf_profiles(listing_id,fetched_at,version,state,data_json) VALUES (7,NOW(),3,'ok',%s)", ('{"category":"Real Estate","family":"Vanguard"}',))
+    conn.commit()
+    etf_rows = service.explore(conn, {'config': 'momentum', 'view': {'status': 'retained', 'kind': 'etf', 'page_size': 50}})['rows']
+    assert etf_rows[0]['fund_nature'] == 'Real Estate'
     unfiltered = service.explore(conn, {'config': 'momentum', 'view': {'status': 'retained', 'kind': 'equity', 'tradable': False, 'page_size': 50}})
     assert [r['symbol'] for r in unfiltered['rows']][0] == 'ILLIQ.DE'                                      # sans filtre, le plus fort momentum passe devant
     unknown = service.explore(conn, {'config': 'momentum', 'view': {'status': 'unknown', 'kind': 'equity', 'page_size': 50}})

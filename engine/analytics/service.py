@@ -402,6 +402,13 @@ def explore(conn, request):
     etf_top = [e['id'] for e in rows if e.get('group') == 'etf'][:10]          # dix premiers ETF de la vue, avant pagination, dans l'ordre déjà déterminé
     etf_concentration = etf.concentration(conn, etf_top)
     page_etf = [e['id'] for e in page_rows if e not in excluded_hits and e.get('group') == 'etf']
+    fund_natures = {}
+    if page_etf:
+        with conn.cursor() as cur:
+            cur.execute("SELECT listing_id,data_json FROM etf_profiles WHERE state='ok' AND listing_id IN (%s)" % ','.join(['%s'] * len(page_etf)), page_etf)
+            for profile in cur.fetchall():
+                data = etf.decode(profile['data_json'])
+                fund_natures[profile['listing_id']] = next((str(data.get(k)).strip() for k in ('category', 'family', 'legal_type') if data.get(k)), None)
     cache = etf.load(conn, set(page_etf) | set(etf_top))
     pgroups = etf.page_groups(cache, page_etf) if len(page_etf) > 1 else []          # toute la page, depuis les liens précalculés : aucune corrélation recalculée ici
     group_of, group_info = {}, {}
@@ -429,6 +436,8 @@ def explore(conn, request):
         r.update({'position': position, 'volume': a.get('volume'), 'last_close': a['last_close'].isoformat() if a.get('last_close') else None,
                   'analyst': analyst_view(a.get('analyst')) if e['kind'] == 'equity' else None, 'ref': {k: a.get(k) for k in REF_FIELDS}, 'open': e['mic'] in hours.HOURS and hours.is_open(e['mic'], now),
                   'signals': signals.row_signals(a, e['kind'], ref, prefilter_cfg, a.get('quote_age_days')), 'etf_group': group_of.get(e['id']), 'etf_group_info': group_info.get(e['id'])})
+        if e['kind'] == 'etf':
+            r['fund_nature'] = fund_natures.get(e['id'])
         out.append(r)
     if not export:
         _attach_curves(conn, out, ref)

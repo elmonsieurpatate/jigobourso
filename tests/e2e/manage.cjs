@@ -38,11 +38,10 @@ const BASE='http://127.0.0.1:18089';
   ok('recherche_restaurée',await page.inputValue('#q')==='VOO');
   ok('case_négociabilité_restaurée',await page.isChecked('#tradable')===false);
   ok('statut_tous_restauré',await page.locator('#status-tabs button.on').getAttribute('data-s')==='all');
-  const rankingPill=page.locator('#saved .saved-filter-pill').filter({hasText:'e2e filtres'});
-  ok('filtre_visible_dans_le_classement',await rankingPill.count()===1&&await rankingPill.getAttribute('class').then(x=>x.includes('on')));
-  ok('note_visible_dans_le_classement',/Trouver les ETF qui bougent vite/.test(await page.locator('#saved-active').innerText()));
-  await rankingPill.click();await page.waitForTimeout(350);
-  ok('filtre_recharge_depuis_le_classement',await page.locator('#saved-active').isVisible());
+  const rankingPill=page.locator('#saved .saved-strategy').filter({hasText:'e2e filtres'});
+  ok('filtre_visible_avec_strategies',await rankingPill.count()===1&&await rankingPill.getAttribute('class').then(x=>x.includes('on')));
+  ok('note_visible_sur_carte_strategie',/Trouver les ETF qui bougent vite/.test(await rankingPill.innerText()));
+  ok('icone_visible_sur_carte_strategie',/⚡/.test(await rankingPill.innerText()));
   // Renommer puis supprimer depuis la page (les confirmations seules restent modales).
   await page.goto(BASE+'/mes-filtres.html');await page.locator('[data-rename-search]').waitFor();await page.click('[data-rename-search]');
   await page.fill('#rename-filter','e2e renommé');await dialog().getByRole('button',{name:'Enregistrer'}).click();await page.waitForTimeout(400);
