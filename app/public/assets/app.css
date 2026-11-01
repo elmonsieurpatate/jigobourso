@@ -349,4 +349,5 @@ tr[hidden] { display: none; }
 .notice.warn.etf-concentration-banner { border-left: 0; border-radius: 0; padding: 12px 16px; }
 .etf-concentration-note { margin: 6px 14px 10px; padding-left: 4px; }
 
-@media (max-width: 640px) { .strategy-manage-card { padding:12px; gap:8px; } .strategy-manage-card .filter-actions { gap:6px; } .strategy-manage-card .filter-actions .btn { padding:7px 9px; font-size:.8rem; } .strategy-manage-card h3 { font-size:.92rem; } .strategy-manage-card .badge { font-size:.7rem; padding:2px 7px; } .manage-grid { grid-template-columns:1fr; gap:8px; } }
+.strategy-manage-card .strategy-detail { display:block; font-size:.75rem; line-height:1.3; margin-top:3px; }
+@media (max-width: 640px) { .strategy-manage-card { padding:12px; gap:8px; } .strategy-manage-card .filter-actions { gap:6px; } .strategy-manage-card .filter-actions .btn { padding:7px 9px; font-size:.8rem; } .strategy-manage-card h3 { font-size:.92rem; } .strategy-manage-card .badge { font-size:.7rem; padding:2px 7px; } .strategy-manage-card .strategy-detail { display:none; } .manage-grid { grid-template-columns:1fr; gap:8px; } }
