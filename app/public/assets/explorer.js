@@ -48,7 +48,7 @@
   function appendSavedStrategies() {
     const current = el('strats').querySelector('.strat-grid'); if (!current) return;
     const active = CURRENT_SAVED();
-    current.innerHTML += searches.map(x => `<button type="button" class="strat slim saved-strategy ${active && active.id == x.id ? 'on' : ''}" data-k="saved" data-saved-id="${+x.id}" title="${J.esc(x.view?.description || x.name)}"><span class="ico" aria-hidden="true">${J.esc(x.view?.icon || '🔎')}</span><span class="tx"><b>${J.esc(x.name)}</b><span>${J.esc(x.view?.description || 'Filtre personnel · disponible')}</span></span></button>`).join('');
+    current.insertAdjacentHTML('beforeend', searches.map(x => `<button type="button" class="strat slim saved-strategy ${active && active.id == x.id ? 'on' : ''}" data-k="saved" data-saved-id="${+x.id}" title="${J.esc(x.view?.description || x.name)}"><span class="ico" aria-hidden="true">${J.esc(x.view?.icon || '🔎')}</span><span class="tx"><b>${J.esc(x.name)}</b><span>${J.esc(x.view?.description || 'Filtre personnel · disponible')}</span></span></button>`).join(''));
     J.$$('#strats .saved-strategy').forEach(b => b.onclick = () => { const x = searches.find(y => +y.id === +b.dataset.savedId); if (x) applySearch(x); });
   }
   const helpHtml = k => `<b>${J.esc(NAMES[k][0])}</b><p>${J.esc(NAMES[k][1])}</p>${EXP.has(k) ? `<p class="helpwarn">${J.esc(EXP_NOTE(k))}</p>` : ''}`;
