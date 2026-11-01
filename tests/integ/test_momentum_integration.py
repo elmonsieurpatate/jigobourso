@@ -187,6 +187,18 @@ def test_explorer_ranks_by_momentum_12_and_keeps_the_tradability_filter():
     assert abs(six['rows'][0]['momentum'] - res['rows'][0]['momentum']) > 1e-3                              # deux stratégies distinctes, deux mesures
 
 
+def test_risk_adjusted_momentum_shows_eligible_trending_titles():
+    conn = connect()
+    seed(conn)
+    with conn.cursor() as cur:
+        cur.execute('SELECT COUNT(*) n FROM series_state WHERE ma200 IS NOT NULL AND ma200_prev IS NOT NULL')
+        assert cur.fetchone()['n'] >= 5
+    res = service.explore(conn, {'config': 'momentum_risk', 'view': {'status': 'retained', 'kind': 'equity', 'tradable': False, 'page_size': 50}})
+    assert res['rows'], res.get('counts')
+    assert res['config']['ranking']['mode'] == 'momentum_risk'
+    assert res['rows'][0]['momentum']['6m'] is not None and res['rows'][0]['momentum']['12m'] is not None
+
+
 def test_fiche_exposes_both_momentums_and_the_flag():
     conn = connect()
     seed(conn)

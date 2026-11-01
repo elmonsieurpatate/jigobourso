@@ -334,7 +334,15 @@ def maintenance(conn, client, now, log):
     attempt('Splits déclarés par Yahoo', lambda: splits.verify(conn, client, now), lambda r: f'{r["confirmed"]} confirmés (cours corrigés), {r["real_move"]} non déclarés par Yahoo (revérifiés plus tard), {r["unanswered"]} sans réponse')
     attempt('Revérification des sauts non déclarés', lambda: splits.recheck(conn, client, now), lambda r: f'{r["rechecked"]} revérifiés, {r["confirmed"]} confirmés tardivement (cours corrigés), {r["unanswered"]} sans réponse, {r["waiting"]} en attente du prochain passage')
     # 3. Calculs dérivés : les indicateurs, puis les ETF (indépendants l'un de l'autre).
-    computed = attempt('Indicateurs et classements', lambda: compute.compute_all(conn, now), lambda r: f'{r[0]} séries, {r[1]} lignes de mesures')
+    def recalculate_indicators():
+        result = compute.compute_all(conn, now)
+        if hasattr(log, 'step'):
+            with conn.cursor() as cur:
+                cur.execute('SELECT COUNT(*) n, SUM(ma200 IS NOT NULL AND ma200_prev IS NOT NULL) ready FROM series_state')
+                ma = cur.fetchone()
+            log('info', f'Moyennes mobiles 200 séances disponibles : {int(ma["ready"] or 0)} sur {int(ma["n"] or 0)} séries')
+        return result
+    computed = attempt('Indicateurs et classements', recalculate_indicators, lambda r: f'{r[0]} séries, {r[1]} lignes de mesures')
     attempt('Profils des ETF suivis', lambda: etf.warm_profiles(conn, client, now),
             lambda r: f'{r["fetched"]} récupérés, {r["unavailable"]} indisponibles, {r["to_refresh"]} à rafraîchir sur {r["wanted"]} suivis (au plus {r["limit"]} par passage)')
     attempt('Similarité des ETF', lambda: etf.build(conn, now), lambda r: f'{r["etfs"]} ETF, {r["with_minimum_history"]} avec un historique suffisant')
