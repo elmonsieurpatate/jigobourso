@@ -354,6 +354,7 @@ tr[hidden] { display: none; }
 
 /* Explorer mobile : les filtres restent complets, avec des contrôles plus denses. */
 @media (max-width: 640px) {
+  #menu:not(.filters-open) { display:none; }
   .menu { margin-top:8px; }
   .menu-bar { padding:8px; gap:6px; }
   .mi { height:38px; padding:0 10px; gap:8px; border-radius:11px; }
@@ -368,5 +369,6 @@ tr[hidden] { display: none; }
   .strat-extra > .strat { min-height:42px; padding:5px 9px; }
   .explorer-actions { gap:6px; margin-top:7px !important; }
   .explorer-actions .btn { min-height:38px; padding:6px 9px; font-size:.84rem; }
+  .explorer-actions > .drawer-toggle { flex:1 1 0; min-width:0; white-space:nowrap; justify-content:center; padding:6px 7px; font-size:.78rem; gap:5px; }
   #strategy-summary { display:none; }
 }

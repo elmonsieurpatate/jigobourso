@@ -235,8 +235,16 @@
     S.config = x.config; S.preset = 'custom'; S.base = null; S.label = x.name; S.page = 1; setView(x.view);
     persist(); drawStrategies(); if (!el('editor').hidden) drawEditor(); load();
   }
-  el('edit-btn').onclick = () => { const e = el('editor'); e.hidden = !e.hidden; if (!e.hidden) drawEditor(); };
-  el('filters-btn').onclick = () => { el('filters').hidden = !el('filters').hidden; };
+  el('edit-btn').onclick = () => { const e = el('editor'); e.hidden = !e.hidden; el('edit-btn').setAttribute('aria-expanded', String(!e.hidden)); if (!e.hidden) drawEditor(); };
+  el('filters-btn').onclick = () => {
+    const mobile = matchMedia('(max-width: 640px)').matches, menu = el('menu'), advanced = el('filters'), button = el('filters-btn');
+    if (mobile) {
+      const open = !menu.classList.contains('filters-open'); menu.classList.toggle('filters-open', open); advanced.hidden = !open;
+      button.setAttribute('aria-expanded', String(open)); el('filters-toggle-label').textContent = open ? 'Masquer les filtres' : 'Filtres avancés';
+    } else {
+      advanced.hidden = !advanced.hidden; button.setAttribute('aria-expanded', String(!advanced.hidden));
+    }
+  };
 
   function drawTabs(res) {
     const sc = res.scope_counts, tabs = [['retained', 'Retenus', sc.retained], ['rejected', 'Écartés', sc.rejected], ['unknown', 'Non évaluables', sc.unknown], ['all', 'Tous', sc.retained + sc.rejected + sc.unknown]];
@@ -360,7 +368,10 @@
   if (url.get('preset') === 'free') { S.preset = 'free'; S.label = null; S.config = freeConfig(); } else if (P.presets[url.get('preset')]) { S.preset = url.get('preset'); S.base = S.preset; S.label = null; S.config = presetConfig(S.preset); if (MINE[S.preset]) setView(MINE[S.preset].view); }
   drawSources(); drawStrategies(); syncMenu(); drawSaved(); if (el('q').value) S.status = 'all';
   if (url.get('compare')) { S.compare = true; el('compare-btn').classList.add('primary'); el('compare-btn').textContent = 'Retour au tableau'; }
-  if (FILTERS.some(k => el(k).value) || CHECKS.some(k => el(k).checked)) el('filters').hidden = false;
+  if (FILTERS.some(k => el(k).value) || CHECKS.some(k => el(k).checked)) {
+    el('filters').hidden = false;
+    if (matchMedia('(max-width: 640px)').matches) { el('menu').classList.add('filters-open'); el('filters-btn').setAttribute('aria-expanded', 'true'); el('filters-toggle-label').textContent = 'Masquer les filtres'; }
+  }
   load();
   if (url.get('edit') === '1') { el('editor').hidden = false; drawEditor(); }
 })();
