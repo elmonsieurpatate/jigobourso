@@ -26,6 +26,7 @@ fi
 
 # Smoke isolé des filtres Explorer demandés. Lecture seule après migration de la copie sandbox.
 if [ "${JIGO_FILTERS_SMOKE:-0}" = 1 ]; then
+  export PY
   step "filtres ETF / géographie et couverture des métadonnées" bash -c 'JIGO_DB_HOST="$JIGO_DB_HOST" JIGO_DB_PORT="$JIGO_DB_PORT" JIGO_DB_NAME="$JIGO_DB_NAME" JIGO_DB_USER="$JIGO_DB_USER" JIGO_DB_PASSWORD="$JIGO_DB_PASSWORD" PYTHONPATH="$PWD" "$PY" - <<"PY"
 from engine.shared.db import connect
 from engine.analytics import service
