@@ -87,8 +87,8 @@
     <p class="muted small" style="margin:6px 0 12px">Un titre est retenu s’il respecte tous les critères de toutes les périodes cochées. Case vide = pas de critère. Pente = hausse moyenne par séance ; R² = régularité de la hausse (1 = droite parfaite).</p>
     <div class="row" style="gap:18px;margin-bottom:10px">${c.periods.map(p => `<label class="row gap-s small"><input type="checkbox" ${p.enabled ? 'checked' : ''} data-p="${p.id}" data-f="enabled"> ${J.PERIODS[p.id]} <input type="number" min="2" max="252" value="${p.sessions}" data-p="${p.id}" data-f="sessions" style="width:60px" ${p.id === 'day' ? 'disabled' : ''}> <span class="muted">séances</span></label>`).join('')}</div>
     <div id="guided" ${S.level === 'guided' ? '' : 'hidden'}><div class="filters" style="border:0;background:none;padding:0">
-      <label>Pente exigée<select id="g-slope"><option value="none">Aucune</option>${Object.entries({ gentle: 'Douce (doublement en ~8 ans)', moderate: 'Modérée (~4 ans)', strong: 'Forte (~2 ans)', very_strong: 'Très forte (~1 an)' }).map(([k, l]) => `<option value="${k}" ${k === sl ? 'selected' : ''}>${l}</option>`).join('')}${sl === 'custom' ? '<option value="custom" selected>Personnalisée</option>' : ''}</select></label>
-      <label>Régularité exigée<select id="g-r2"><option value="none">Aucune</option>${Object.entries({ flexible: 'Souple (R² ≥ 0,56)', balanced: 'Équilibrée (R² ≥ 0,75)', strict: 'Stricte (R² ≥ 0,89)' }).map(([k, l]) => `<option value="${k}" ${k === rl ? 'selected' : ''}>${l}</option>`).join('')}${rl === 'custom' ? '<option value="custom" selected>Personnalisée</option>' : ''}</select></label>
+      <label class="guided-slope">Pente exigée<select id="g-slope"><option value="none">Aucune</option>${Object.entries({ gentle: 'Douce (doublement en ~8 ans)', moderate: 'Modérée (~4 ans)', strong: 'Forte (~2 ans)', very_strong: 'Très forte (~1 an)' }).map(([k, l]) => `<option value="${k}" ${k === sl ? 'selected' : ''}>${l}</option>`).join('')}${sl === 'custom' ? '<option value="custom" selected>Personnalisée</option>' : ''}</select></label>
+      <label class="guided-r2">Régularité exigée<select id="g-r2"><option value="none">Aucune</option>${Object.entries({ flexible: 'Souple (R² ≥ 0,56)', balanced: 'Équilibrée (R² ≥ 0,75)', strict: 'Stricte (R² ≥ 0,89)' }).map(([k, l]) => `<option value="${k}" ${k === rl ? 'selected' : ''}>${l}</option>`).join('')}${rl === 'custom' ? '<option value="custom" selected>Personnalisée</option>' : ''}</select></label>
       <label>Tolérance aux corrections<select id="g-dd">${[['', 'Aucune limite'], ['5', 'Repli max. 5 %'], ['10', 'Repli max. 10 %'], ['20', 'Repli max. 20 %']].map(([v, l]) => `<option value="${v}" ${v === dd ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
       <label>Classer par<select id="r-mode">${[['trend', 'Pente'], ['performance', 'Performance'], ['regularity', 'Régularité'], ['stability', 'Stabilité (faible volatilité)'], ['momentum', 'Momentum 6 mois (essai)'], ['momentum12', 'Momentum 12 mois (essai)']].map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select></label></div>
       <p class="muted small" style="margin:8px 0 0">Ces réglages s’appliquent à chaque période cochée. Pour un réglage différent par période, passez au réglage détaillé.</p></div>
@@ -235,7 +235,7 @@
     S.config = x.config; S.preset = 'custom'; S.base = null; S.label = x.name; S.page = 1; setView(x.view);
     persist(); drawStrategies(); if (!el('editor').hidden) drawEditor(); load();
   }
-  el('edit-btn').onclick = () => { const e = el('editor'); e.hidden = !e.hidden; el('edit-btn').setAttribute('aria-expanded', String(!e.hidden)); if (!e.hidden) drawEditor(); };
+  el('edit-btn').onclick = () => { const e = el('editor'); e.hidden = !e.hidden; el('edit-btn').setAttribute('aria-expanded', String(!e.hidden)); document.body.classList.toggle('strategy-editing', !e.hidden); if (!e.hidden) drawEditor(); };
   el('filters-btn').onclick = () => {
     const mobile = matchMedia('(max-width: 640px)').matches, menu = el('menu'), advanced = el('filters'), button = el('filters-btn');
     if (mobile) {
@@ -373,5 +373,5 @@
     if (matchMedia('(max-width: 640px)').matches) { el('menu').classList.add('filters-open'); el('filters-btn').setAttribute('aria-expanded', 'true'); el('filters-toggle-label').textContent = 'Masquer les filtres'; }
   }
   load();
-  if (url.get('edit') === '1') { el('editor').hidden = false; drawEditor(); }
+  if (url.get('edit') === '1') { el('editor').hidden = false; document.body.classList.add('strategy-editing'); el('edit-btn').setAttribute('aria-expanded', 'true'); drawEditor(); }
 })();
