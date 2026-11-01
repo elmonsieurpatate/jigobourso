@@ -35,7 +35,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE),fs=require('fs');
  try{
   await page.goto('http://127.0.0.1:18089/login.html');await page.fill('#u','review_user');await page.fill('#p','review-local-password');await page.click('#auth-form button.primary');await page.waitForURL('**/index.html');
   step='profile';console.log('account stage',step);await page.click('#user-btn');await page.fill('#account-name','review_renamed');await page.fill('#account-email','new-review@example.test');await page.fill('#pw0','review-local-password');await page.getByRole('button',{name:'Enregistrer mes coordonnées',exact:true}).click();
-  await page.waitForTimeout(300);const change=messages().find(m=>m.to==='new-review@example.test');if(!change)throw Error();
+  let change;for(let i=0;i<20&&!change;i++){change=messages().find(m=>m.to==='new-review@example.test');if(!change)await page.waitForTimeout(150);}if(!change)throw Error();
   step='verify-email';console.log('account stage',step);await page.goto(localLink(change));await page.click('#auth-form button[type=submit]');await page.locator('#msg').filter({hasText:'confirmée'}).waitFor();
   await page.evaluate(()=>J.post('auth/logout'));
   step='recover';await page.goto('http://127.0.0.1:18089/recover.html');await page.fill('#email','new-review@example.test');await page.click('#auth-form button[type=submit]');await page.locator('#msg').filter({hasText:'lien'}).waitFor();
