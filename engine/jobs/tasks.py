@@ -340,7 +340,7 @@ def maintenance(conn, client, now, log):
             with conn.cursor() as cur:
                 cur.execute('SELECT COUNT(*) n, SUM(ma200 IS NOT NULL AND ma200_prev IS NOT NULL) ready FROM series_state')
                 ma = cur.fetchone()
-            log('info', f'Moyennes mobiles 200 séances disponibles : {int(ma["ready"] or 0)} sur {int(ma["n"] or 0)} séries')
+            log.progress(f'Moyennes mobiles 200 séances disponibles : {int(ma["ready"] or 0)} sur {int(ma["n"] or 0)} séries')
         return result
     computed = attempt('Indicateurs et classements', recalculate_indicators, lambda r: f'{r[0]} séries, {r[1]} lignes de mesures')
     attempt('Profils des ETF suivis', lambda: etf.warm_profiles(conn, client, now),
