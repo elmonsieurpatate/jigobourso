@@ -24,6 +24,23 @@ if [ "${JIGO_ONLY_BRIDGE:-0}" = 1 ]; then        # relance rapide du seul contr�
   JIGO_ENGINE_ROOT="$PWD" JIGO_PYTHON="$PY" php scripts/verify_php_bridge.php; exit $?
 fi
 
+# Smoke isolé des filtres Explorer demandés. Lecture seule après migration de la copie sandbox.
+if [ "${JIGO_FILTERS_SMOKE:-0}" = 1 ]; then
+  step "filtres ETF / géographie et couverture des métadonnées" bash -c 'JIGO_DB_HOST="$JIGO_DB_HOST" JIGO_DB_PORT="$JIGO_DB_PORT" JIGO_DB_NAME="$JIGO_DB_NAME" JIGO_DB_USER="$JIGO_DB_USER" JIGO_DB_PASSWORD="$JIGO_DB_PASSWORD" PYTHONPATH="$PWD" "$PY" - <<"PY"
+from engine.shared.db import connect
+from engine.analytics import service
+c = connect()
+try:
+    report = service.filter_metadata_coverage(c)
+    assert set(report) >= {"etf", "equity"}, report
+    assert report["etf"]["total"] >= report["etf"]["aum_known"]
+    print("couverture ETF et actions mesurée; filtres servis sans collecte Yahoo")
+finally:
+    c.close()
+PY'
+  exit $?
+fi
+
 tables=$(SQL -N -e 'SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE()') || { echo "Connexion à la base d'essai impossible."; exit 2; }
 
 # ── 1. contenu de la base d'essai
