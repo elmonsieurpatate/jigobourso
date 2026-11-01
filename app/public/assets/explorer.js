@@ -212,7 +212,7 @@
   }
   async function drawSaved() {
     searches = (await J.api('searches')).searches;
-    el('saved').innerHTML = `<select id="saved-sel" aria-label="Mes recherches"><option value="">Mes recherches (${searches.length})</option>${searches.map(x => `<option value="${x.id}">${J.esc(x.name)}</option>`).join('')}</select><button class="btn small" id="saved-save">Enregistrer</button><button class="btn small" id="saved-manage">Gérer…</button><button class="btn small" id="reset-default" hidden></button><button class="btn small danger" id="saved-del" hidden>Supprimer</button>`;
+    el('saved').innerHTML = `<select id="saved-sel" aria-label="Mes recherches"><option value="">Mes recherches (${searches.length})</option>${searches.map(x => `<option value="${x.id}">${J.esc(x.name)}</option>`).join('')}</select><button class="btn small danger" id="saved-del" hidden>Supprimer</button>`;
     el('saved-sel').onchange = () => { const x = searches.find(y => y.id == el('saved-sel').value); el('saved-del').hidden = !x; if (!x) return; applySearch(x); };
     el('saved-del').onclick = async () => { const x = searches.find(y => y.id == el('saved-sel').value); if (x && await J.confirm('Supprimer la recherche', '« ' + x.name + ' » sera supprimée.', 'Supprimer')) { await J.post('search/delete', { id: +x.id }); drawSaved(); } };
     el('saved-manage').onclick = openManage; el('reset-default').onclick = () => { const k = baseKey(); if (k) resetPreset(k); }; syncReset();
