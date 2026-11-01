@@ -124,6 +124,14 @@ def test_the_interface_exposes_the_three_multi_choice_filters_and_the_summary():
     assert 's.period' in (ROOT / 'app/public/assets/etf.js').read_text()
 
 
+def test_explorer_clears_saved_filters_on_full_reload():
+    js = (ROOT / 'app/public/assets/explorer.js').read_text()
+    assert "nav.type === 'reload'" in js
+    assert "localStorage.removeItem('jigo_explorer2')" in js
+    assert "sessionStorage.removeItem('jigo_explorer2')" in js
+    assert "sessionStorage.removeItem('jigo_explorer_scroll')" in js
+
+
 def test_downsample_keeps_first_and_last_values_and_the_shape():
     values = list(range(253))
     out = service.downsample(values, 66)

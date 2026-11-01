@@ -22,6 +22,15 @@
   const CHECKS = ['pea', 'mine', 'open_now', 'fresh_only'];
   const MARKETS = { XETR: 'Xetra', XPAR: 'Paris', XAMS: 'Amsterdam', XLON: 'Londres', XMIL: 'Milan', XMAD: 'Madrid', XSTO: 'Stockholm', XOSL: 'Oslo', XSWX: 'Zurich', XNAS: 'Nasdaq', XNYS: 'NYSE', XASE: 'NYSE American', ARCX: 'NYSE Arca', BATS: 'Cboe' };
   const url = new URLSearchParams(location.search);
+  // Un rechargement complet repart des réglages par défaut ; les changements restent mémorisés pendant la navigation normale.
+  try {
+    const nav = performance.getEntriesByType('navigation')[0];
+    if (nav && nav.type === 'reload') {
+      localStorage.removeItem('jigo_explorer2');
+      sessionStorage.removeItem('jigo_explorer2');
+      sessionStorage.removeItem('jigo_explorer_scroll');
+    }
+  } catch (_) { }
   const saved = (() => { try { return JSON.parse(sessionStorage.getItem('jigo_explorer2')) || JSON.parse(localStorage.getItem('jigo_explorer2')) || {}; } catch (e) { return {}; } })();
   const S = { preset: saved.preset || 'regular', label: saved.label || null, config: saved.config || P.presets[saved.preset || 'regular'], status: saved.status || 'retained', page: saved.page || 1, sort: saved.sort || 'rank', dir: saved.dir || 'asc', size: saved.size || 20, level: saved.level || 'guided', compare: !!saved.compare, base: saved.base || null };
   const el = id => J.$('#' + id);
