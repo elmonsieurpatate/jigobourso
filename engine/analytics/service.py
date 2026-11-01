@@ -148,7 +148,7 @@ def judge_universe(conn, config, ids=None):
         for n in windows:
             stored_metric = stored.get(u['id'], {}).get(n)
             if stored_metric and stored_metric.get('coverage') is None and n not in live.get(u['id'], {}):
-                missing[n] = 'break' if count >= n + 1 and u.get('break_age') is not None and u['break_age'] < n else 'calendar'
+                missing[n] = _missing_reason(count, n, None, u.get('break_age'))             # historique trop court, rupture dans la fenêtre ou calendrier : le vrai motif
         tech = {k: (None if u[k] is None else float(u[k])) for k in ('close_px', 'ma20', 'ma50', 'ma50_prev', 'daily_change', 'gap_to_ma20')}
         tech['close'] = tech.pop('close_px')
         last = u['last_close_date'].isoformat() if u['last_close_date'] else None

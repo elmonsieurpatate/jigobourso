@@ -39,6 +39,7 @@ UNIVERSE = (   # id, symbole, nombre de séances, cours
     (2, 'RECENT.DE', 360, path(360, 0.0010, 330)),        # saut de ÷2 il y a 29 séances : traverse les fenêtres de 63, 126 et 252 séances, pas celle de 21
     (3, 'OLD.DE', 360, path(360, 0.0010, 150)),           # saut il y a 209 séances : traverse la seule fenêtre de 252 séances
     (4, 'YOUNG.DE', 100, path(100, 0.0010)),               # historique trop court pour 126 et 252 séances
+    (5, 'IPO.DE', 100, path(100, 0.0010, 60)),             # historique trop court ET saut récent (introduction en bourse agitée) : le motif est l'historique, pas le calendrier ni la rupture
 )
 
 
@@ -99,8 +100,8 @@ def test_filtering_profiles_name_the_break_only_for_the_window_it_crosses(conn):
 
 
 def test_status_rank_and_score_are_untouched_by_the_new_reasons(conn):
-    expected = {'momentum': {'CALM.DE': 'retained', 'RECENT.DE': 'unknown', 'OLD.DE': 'retained', 'YOUNG.DE': 'unknown'},
-                'momentum12': {'CALM.DE': 'retained', 'RECENT.DE': 'unknown', 'OLD.DE': 'unknown', 'YOUNG.DE': 'unknown'}}
+    expected = {'momentum': {'CALM.DE': 'retained', 'RECENT.DE': 'unknown', 'OLD.DE': 'retained', 'YOUNG.DE': 'unknown', 'IPO.DE': 'unknown'},
+                'momentum12': {'CALM.DE': 'retained', 'RECENT.DE': 'unknown', 'OLD.DE': 'unknown', 'YOUNG.DE': 'unknown', 'IPO.DE': 'unknown'}}
     for name, statuses in expected.items():
         v = verdicts(conn, name)
         assert {s: x['status'] for s, x in v.items()} == statuses
@@ -109,3 +110,11 @@ def test_status_rank_and_score_are_untouched_by_the_new_reasons(conn):
     by = {r['symbol']: r for r in res['rows']}
     assert by['RECENT.DE']['quality'] == 'break' and 'RECENT.DE' in by and 'CALM.DE' not in by
     assert any(r['metric'] == 'break' for r in by['RECENT.DE']['reasons'])
+
+
+def test_a_short_history_is_never_explained_as_calendar_or_break(conn):
+    for name in ('momentum', 'momentum12'):
+        ipo = verdicts(conn, name)['IPO.DE']
+        assert ipo['status'] == 'unknown'
+        metrics = {metric for _, metric in data_reasons(ipo)}
+        assert 'calendar' not in metrics and 'break' not in metrics, (name, metrics)           # « momentum » (mesure absente) ou « history », jamais « calendrier »
