@@ -22,14 +22,21 @@
     if (!list.length) { page.innerHTML = `<h1>Portefeuilles</h1><div class="card empty"><p>Vous n’avez pas encore de portefeuille.</p><button class="btn primary" id="first">Créer mon premier portefeuille</button></div>`; J.$('#first').onclick = createPf; return; }
     if (!list.find(p => p.id === current)) current = list[0].id;
     const d = await J.api('portfolio', { params: { id: current } }), t = d.totals;
+    // Estimation indicative CTO/PFU : les gains latents sont taxés comme si les titres ouverts étaient vendus aujourd'hui.
+    const realizedTaxBase = Object.values(d.realized_by_year || {}).reduce((sum, gain) => sum + Math.max(0, Number(gain) || 0), 0);
+    const latentTaxBase = Math.max(0, Number(t.unrealized) || 0), taxBase = realizedTaxBase + latentTaxBase;
+    const estimatedIncomeTax = taxBase * .128, estimatedSocialTax = taxBase * .172;
+    const estimatedNetGain = t.total_gain === null || t.total_gain === undefined ? null : t.total_gain - estimatedIncomeTax - estimatedSocialTax;
     history.replaceState(null, '', '?id=' + current);
     page.innerHTML = `${d.integrity && !d.integrity.ok ? `<div class="notice err">${d.integrity.issues.map(x => 'Transaction n° ' + x.transaction_id + ' : ' + J.esc(x.message)).join('<br>')}</div>` : ''}<div class="row between"><h1>Portefeuilles</h1><div class="row"><button class="btn" id="new-pf">Nouveau portefeuille</button></div></div>
     <div class="tabs" id="pf-tabs">${list.map(p => `<button data-id="${p.id}" class="${p.id === current ? 'on' : ''}">${J.esc(p.name)}${p.is_default ? ' ★' : ''}</button>`).join('')}</div>
-    <div class="grid cols-4">
+    <div class="grid portfolio-kpis">
       <div class="card kpi"><span class="l">Valeur actuelle</span><span class="v">${J.eur(t.value, 0)}</span></div>
       <div class="card kpi"><span class="l">Plus-value latente</span><span class="v ${J.cls(t.unrealized)}">${J.eur(t.unrealized, 0)}</span><span class="small ${J.cls(t.unrealized)}">${J.pct(t.unrealized_pct)}</span></div>
       <div class="card kpi"><span class="l">Plus-value réalisée</span><span class="v ${J.cls(t.realized)}">${J.eur(t.realized, 0)}</span></div>
-      <div class="card kpi"><span class="l">Investi (positions ouvertes)</span><span class="v">${J.eur(t.cost, 0)}</span><span class="small muted">frais cumulés ${J.eur(t.fees)}</span></div></div>
+      <div class="card kpi"><span class="l">Investi (positions ouvertes)</span><span class="v">${J.eur(t.cost, 0)}</span><span class="small muted">frais cumulés ${J.eur(t.fees)}</span></div>
+      <div class="card kpi"><span class="l">Gain net estimé · si vente aujourd’hui</span><span class="v ${J.cls(estimatedNetGain)}">${J.eur(estimatedNetGain, 0)}</span><span class="small muted">Brut ${J.eur(t.total_gain, 0)} · impôt ${J.eur(estimatedIncomeTax, 0)} · sociaux ${J.eur(estimatedSocialTax, 0)}</span></div></div>
+    <p class="small muted tax-estimate-note">Estimation indicative pour un compte-titres au PFU supposé de 30 % (12,8 % d’impôt sur le revenu + 17,2 % de prélèvements sociaux) : gains réalisés positifs par année et plus-value latente positive comme si les titres étaient vendus aujourd’hui. Hors PEA, reports de pertes, dividendes et situation fiscale personnelle ; les gains réalisés ont pu être imposés auparavant. Ce n’est pas un calcul déclaratif.${t.partial ? ' Estimation partielle : certaines positions sont exclues du calcul des gains.' : ''}</p>
     ${t.unpriced ? `<div class="notice warn" style="margin-top:14px">${t.unpriced} position${t.unpriced > 1 ? 's' : ''} sans cours disponible : la valeur totale est sous-estimée.</div>` : ''}
     ${splitNotice(d.positions)}
     ${JEtf.portfolio(d.etf_analysis)}

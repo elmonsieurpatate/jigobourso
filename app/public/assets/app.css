@@ -373,3 +373,6 @@ tr[hidden] { display: none; }
   .explorer-actions > .drawer-toggle { flex:1 1 0; min-width:0; white-space:nowrap; justify-content:center; padding:6px 7px; font-size:.78rem; gap:5px; }
   #strategy-summary { display:none; }
 }
+
+.portfolio-kpis { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+.tax-estimate-note { margin:10px 2px 14px; max-width:110ch; line-height:1.45; }
