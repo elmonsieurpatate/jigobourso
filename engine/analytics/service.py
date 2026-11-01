@@ -339,13 +339,13 @@ def scoped_entries(conn, config, view, rates=None, aux=None, now=None):
     # qu'une fois même si plusieurs cotations subsistent dans l'univers.
     aum_by_instrument = {}
     aum_listing_values = {}
-    for e in entries:
+    for e in entries if requested_kind == 'large_etf' else ():
         if e['kind'] != 'etf':
             continue
         iid = e.get('instrument_id', e['id'])
         if not e.get('net_assets'):
             continue
-        factor = to_eur_factor(e.get('currency'), rates)
+        factor = to_eur_factor(e.get('price_currency') or e.get('currency'), rates)
         if factor is None:
             continue
         amount = float(e['net_assets']) * factor
@@ -521,7 +521,7 @@ def filter_metadata_coverage(conn):
     profiles = etf.read_profiles(conn)
     rates = latest_rates(conn)
     with conn.cursor() as cur:
-        cur.execute("""SELECT l.id,l.instrument_id,i.kind,i.country,p.net_assets,p.currency
+        cur.execute("""SELECT l.id,l.instrument_id,i.kind,i.country,p.net_assets,p.currency AS price_currency,l.currency
                        FROM v_recommendable r JOIN listings l ON l.id=r.listing_id
                        JOIN instruments i ON i.id=l.instrument_id
                        LEFT JOIN latest_prices p ON p.listing_id=l.id""")
@@ -538,7 +538,7 @@ def filter_metadata_coverage(conn):
             region = data.get('geography_region') or geography.etf_region(data.get('category'))
             if region:
                 item['region'] = region
-            fx = to_eur_factor(r.get('currency'), rates)
+            fx = to_eur_factor(r.get('price_currency') or r.get('currency'), rates)
             item['aum'] = item['aum'] or bool(r.get('net_assets') and float(r['net_assets']) > 0 and fx is not None)
             if r.get('net_assets') and float(r['net_assets']) > 0 and fx is not None:
                 aum_values[r['instrument_id']] = max(aum_values.get(r['instrument_id'], 0), float(r['net_assets']) * fx)
