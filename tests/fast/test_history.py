@@ -20,6 +20,7 @@ def test_value_net_in_and_gain_survive_a_sale():
     assert r['net_in'] == [101.0, 101.0, -18.0, -18.0, -18.0]
     assert r['gain'] == [-1.0, 9.0, 18.0, 18.0, 18.0]                       # gain réalisé conservé après la vente : 120 − 1 − 101
     assert r['lines'][0]['values'] == [100.0, 110.0, 0.0, 0.0, 0.0]
+    assert r['lines'][0]['gain'] == r['gain'] and r['lines'][0]['net_in'] == r['net_in']                 # un seul titre : son gain est celui du portefeuille
 
 
 def test_split_converts_quantities_and_ignores_manual_free_buy():

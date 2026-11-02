@@ -20,36 +20,50 @@
   /* ── Évolution du portefeuille (ventes comprises), historique des ventes, blocs repliables ── */
   const PAL = ['#4f46e5', '#0d9488', '#d97706', '#db2777', '#2563eb', '#65a30d', '#9333ea', '#dc2626', '#0891b2', '#ca8a04', '#475569', '#16a34a'];
   const store = (k, v) => { try { if (v === undefined) return JSON.parse(localStorage.getItem('jigo_pf_' + k)); localStorage.setItem('jigo_pf_' + k, JSON.stringify(v)); } catch (e) { return null; } };
-  const EVO = { mode: store('evo_mode') || 'value', per: store('evo_per') || 'all' };
-  const PERIODS = [['1m', '1 M', 31], ['3m', '3 M', 92], ['6m', '6 M', 183], ['1y', '1 an', 366], ['all', 'Tout', 0]];
+  const EVO = { mode: store('evo_mode') || 'contrib', per: store('evo_per') || 'all' };
+  const PERIODS = [['1w', '1 S', 8], ['1m', '1 M', 31], ['3m', '3 M', 92], ['6m', '6 M', 183], ['1y', '1 an', 366], ['all', 'Tout', 0]];
   function evoCard() {
     const seg = (id, items, cur) => `<span class="seg" id="${id}">${items.map(([k, l]) => `<button type="button" data-v="${k}" class="${k === cur ? 'on' : ''}">${l}</button>`).join('')}</span>`;
     return `<div class="card" data-fold="evo" id="evo" style="margin-top:16px"><div class="row between"><h2 style="margin:0">Évolution du portefeuille</h2></div>
-      <div class="seg-row">${seg('evo-mode', [['value', 'Valeur et apports'], ['gain', 'Gain ou perte'], ['titles', 'Par titre']], EVO.mode)}${seg('evo-per', PERIODS.map(p => [p[0], p[1]]), EVO.per)}</div>
-      <div id="evo-chart"><div class="empty"><span class="spinner"></span></div></div><p class="small muted" id="evo-note"></p></div>`;
+      <div class="seg-row">${seg('evo-mode', [['contrib', 'Qui fait monter ou baisser'], ['gain', 'Gain total'], ['value', 'Valeur'], ['titles', 'Valeur par titre']], EVO.mode)}${seg('evo-per', PERIODS.map(p => [p[0], p[1]]), EVO.per)}</div>
+      <div id="evo-sum" class="evo-sum"></div><div id="evo-chart"><div class="empty"><span class="spinner"></span></div></div><p class="small muted" id="evo-note"></p></div>`;
   }
   function drawEvo(h) {
     const host = J.$('#evo-chart'); if (!host) return;
     if (!h || !h.dates || !h.dates.length) { host.innerHTML = '<div class="empty">Aucune transaction : rien à tracer.</div>'; return; }
-    const per = PERIODS.find(p => p[0] === EVO.per) || PERIODS[4], since = per[2] ? new Date(Date.now() - per[2] * 864e5).toISOString().slice(0, 10) : '';
-    const i0 = Math.max(0, h.dates.findIndex(d => d >= since)), cut = a => a.slice(i0 === -1 ? 0 : i0), dates = cut(h.dates);
+    const per = PERIODS.find(p => p[0] === EVO.per) || PERIODS[PERIODS.length - 1], since = per[2] ? new Date(Date.now() - per[2] * 864e5).toISOString().slice(0, 10) : '';
+    let i0 = h.dates.findIndex(d => d >= since); if (i0 < 0) i0 = 0;
+    if (i0 > 0) i0 -= 1;                                     // point de départ : la dernière valeur connue AVANT la période
+    const cut = a => a.slice(i0), dates = cut(h.dates), last = h.dates.length - 1, eur = v => J.eur(v, 0), sgn = v => (v > 0 ? '+' : '') + J.eur(v, 0);
+    const from = i0 === 0 ? 0 : h.gain[i0];                  // sur « Tout », on part de zéro (avant le premier achat)
+    const moves = h.lines.map((l, k) => ({ l, k, d: l.gain[last] - (i0 === 0 ? 0 : l.gain[i0]) })).filter(m => Math.abs(m.d) >= 0.5).sort((a, b) => b.d - a.d);
+    const total = h.gain[last] - from, up = moves.filter(m => m.d > 0), down = moves.filter(m => m.d < 0).reverse();
+    const periodTxt = per[0] === 'all' ? 'depuis ton premier achat' : `depuis le ${J.date(h.dates[i0])}`;
+    J.$('#evo-sum').innerHTML = `<p>${periodTxt[0].toUpperCase() + periodTxt.slice(1)}, ton portefeuille a <b class="${J.cls(total)}">${total >= 0 ? 'gagné' : 'perdu'} ${eur(Math.abs(total))}</b>, ventes comprises.
+      Il vaut aujourd’hui <b>${eur(h.value[last])}</b>${per[0] === 'all' ? ` pour <b>${eur(h.net_in[last])}</b> investis au total (achats + frais − ventes)` : ''}.</p>
+      <p>${up.length ? `Ce qui l’a fait monter : ${up.slice(0, 3).map(m => `<b>${J.esc(m.l.symbol)}</b> <span class="pos">${sgn(m.d)}</span>`).join(', ')}. ` : ''}${down.length ? `Ce qui l’a fait baisser : ${down.slice(0, 3).map(m => `<b>${J.esc(m.l.symbol)}</b> <span class="neg">${sgn(m.d)}</span>`).join(', ')}.` : ''}</p>`;
     const trades = (h.trades || []).filter(t => t.date >= dates[0] && !t.note).map(t => ({ date: t.date, label: (t.side === 'buy' ? 'Achat ' : 'Vente ') + t.symbol, cls: t.side }));
-    const eur = v => J.eur(v, 0);
-    let series, note;
-    if (EVO.mode === 'gain') {
-      const g = cut(h.gain), up = g[g.length - 1] >= 0;
-      series = [{ label: 'Gain ou perte cumulé (latent + réalisé)', values: g, color: up ? 'var(--up)' : 'var(--down)', area: true }];
-      note = 'Gain ou perte = valeur du portefeuille − argent investi net (achats + frais − produit des ventes). Les ventes ne font pas disparaître le gain : il reste dans la courbe.';
+    let series, note, bars = '';
+    if (EVO.mode === 'contrib') {
+      series = [{ label: 'Portefeuille entier', values: cut(h.gain).map(v => v - from), color: 'var(--text)', width: 3 }]
+        .concat(h.lines.map((l, k) => ({ label: l.symbol, values: cut(l.gain).map(v => v - (i0 === 0 ? 0 : l.gain[i0])), color: PAL[k % PAL.length], width: 1.6 })));
+      const m = Math.max(1, ...moves.map(x => Math.abs(x.d)));
+      bars = `<div class="contrib">${moves.map(x => `<div class="crow"><span class="cl">${J.esc(x.l.symbol)}</span><span class="cb"><i class="${x.d >= 0 ? 'up' : 'down'}" style="width:${(100 * Math.abs(x.d) / m).toFixed(1)}%"></i></span><span class="cv ${J.cls(x.d)}">${sgn(x.d)}</span></div>`).join('')}</div>`;
+      note = 'Chaque courbe montre ce qu’un titre a fait gagner (au-dessus de 0) ou perdre (en dessous) sur la période ; la courbe épaisse est la somme de tous. Les barres classent les titres du plus gros apport à la plus grosse perte.';
+    } else if (EVO.mode === 'gain') {
+      const g = cut(h.gain), pos = g[g.length - 1] >= 0;
+      series = [{ label: 'Gain ou perte total', values: g, color: pos ? 'var(--up)' : 'var(--down)', area: true }];
+      note = 'Au-dessus de 0 : tu gagnes de l’argent ; en dessous : tu en perds. Une vente ne fait pas disparaître le gain, il reste compté.';
     } else if (EVO.mode === 'titles') {
       series = h.lines.map((l, k) => ({ label: l.symbol, values: cut(l.values), color: PAL[k % PAL.length], width: 1.6 }));
-      note = 'Valeur de chaque titre en euros (0 quand il n’est plus détenu).';
+      note = 'Ce que vaut chaque titre détenu, en euros (0 quand il est vendu).';
     } else {
-      series = [{ label: 'Valeur du portefeuille', values: cut(h.value), color: 'var(--accent)', area: true }, { label: 'Argent investi net', values: cut(h.net_in), color: 'var(--muted)', dash: '6 4' }];
-      note = 'Valeur = titres détenus au cours de clôture du jour. Argent investi net = achats + frais − produit des ventes. L’écart entre les deux courbes est votre gain ou perte.';
+      series = [{ label: 'Valeur du portefeuille', values: cut(h.value), color: 'var(--accent)', area: true }, { label: 'Argent investi (achats + frais − ventes)', values: cut(h.net_in), color: 'var(--muted)', dash: '6 4' }];
+      note = 'Quand la courbe bleue est au-dessus des pointillés, tu gagnes de l’argent ; en dessous, tu en perds.';
     }
-    J.lineChart(host, dates, series, { format: eur, zeroLine: EVO.mode === 'gain', marks: EVO.mode === 'titles' ? [] : trades });
-    const last = h.dates.length - 1;
-    J.$('#evo-note').innerHTML = `${note} Aujourd’hui : valeur <b>${eur(h.value[last])}</b>, investi net <b>${eur(h.net_in[last])}</b>, gain ou perte <b class="${J.cls(h.gain[last])}">${eur(h.gain[last])}</b>.${(h.notes || []).length ? ' ' + h.notes.map(J.esc).join(' ') : ''} Barres verticales : achats (bleu) et ventes (rouge).`;
+    J.lineChart(host, dates, series, { format: eur, zeroLine: EVO.mode === 'gain' || EVO.mode === 'contrib', marks: EVO.mode === 'value' || EVO.mode === 'gain' ? trades : [] });
+    host.insertAdjacentHTML('beforeend', bars);
+    J.$('#evo-note').innerHTML = note + (EVO.mode === 'value' || EVO.mode === 'gain' ? ' Barres verticales : achats (bleu) et ventes (rouge).' : '') + ((h.notes || []).length ? ' ' + h.notes.map(J.esc).join(' ') : '');
   }
   function salesCard(d) {
     const s = d.sales || [];
@@ -143,13 +157,14 @@
     history.replaceState(null, '', '?id=' + current);
     page.innerHTML = `${d.integrity && !d.integrity.ok ? `<div class="notice err">${d.integrity.issues.map(x => 'Transaction n° ' + x.transaction_id + ' : ' + J.esc(x.message)).join('<br>')}</div>` : ''}<div class="row between"><h1>Portefeuilles</h1><div class="row"><button class="btn" id="new-pf">Nouveau portefeuille</button></div></div>
     <div class="tabs" id="pf-tabs">${list.map(p => `<button data-id="${p.id}" class="${p.id === current ? 'on' : ''}">${J.esc(p.name)}${p.is_default ? ' ★' : ''}</button>`).join('')}</div>
+    <div class="card" data-fold="summary" style="margin-top:12px"><h2 style="margin:0 0 10px">Résumé</h2>
     <div class="grid portfolio-kpis">
       <div class="card kpi"><span class="l">Valeur actuelle</span><span class="v">${J.eur(t.value, 0)}</span></div>
       <div class="card kpi"><span class="l">Plus-value latente</span><span class="v ${J.cls(t.unrealized)}">${J.eur(t.unrealized, 0)}</span><span class="small ${J.cls(t.unrealized)}">${J.pct(t.unrealized_pct)}</span></div>
       <div class="card kpi"><span class="l">Plus-value réalisée</span><span class="v ${J.cls(t.realized)}">${J.eur(t.realized, 0)}</span></div>
       <div class="card kpi"><span class="l">Investi (positions ouvertes)</span><span class="v">${J.eur(t.cost, 0)}</span><span class="small muted">frais cumulés ${J.eur(t.fees)}</span></div>
       <div class="card kpi"><span class="l">Gain net estimé · si vente aujourd’hui</span><span class="v ${J.cls(estimatedNetGain)}">${J.eur(estimatedNetGain, 0)}</span><span class="small ${J.cls(estimatedNetPct)}">${J.pct(estimatedNetPct, 1)} du coût cumulé des achats</span><span class="small muted">Brut ${J.eur(t.total_gain, 0)} · impôt ${J.eur(estimatedIncomeTax, 0)} · sociaux ${J.eur(estimatedSocialTax, 0)}</span></div></div>
-    <details class="help tax-estimate-note"><summary>Comment est estimé le gain net ?</summary><p class="small muted">Estimation indicative pour un compte-titres au PFU supposé de 30 % (12,8 % d’impôt sur le revenu + 17,2 % de prélèvements sociaux) : gains réalisés positifs par année et plus-value latente positive comme si les titres étaient vendus aujourd’hui. Hors PEA, reports de pertes, dividendes et situation fiscale personnelle ; les gains réalisés ont pu être imposés auparavant. Ce n’est pas un calcul déclaratif.${t.partial ? ' Estimation partielle : certaines positions sont exclues du calcul des gains.' : ''}</p></details>
+    <details class="help tax-estimate-note"><summary>Comment est estimé le gain net ?</summary><p class="small muted">Estimation indicative pour un compte-titres au PFU supposé de 30 % (12,8 % d’impôt sur le revenu + 17,2 % de prélèvements sociaux) : gains réalisés positifs par année et plus-value latente positive comme si les titres étaient vendus aujourd’hui. Hors PEA, reports de pertes, dividendes et situation fiscale personnelle ; les gains réalisés ont pu être imposés auparavant. Ce n’est pas un calcul déclaratif.${t.partial ? ' Estimation partielle : certaines positions sont exclues du calcul des gains.' : ''}</p></details></div>
     ${t.unpriced ? `<div class="notice warn" style="margin-top:14px">${t.unpriced} position${t.unpriced > 1 ? 's' : ''} sans cours disponible : la valeur totale est sous-estimée.</div>` : ''}
     ${splitNotice(d.positions)}
     ${evoCard()}
@@ -166,7 +181,7 @@
       <div class="table-wrap"><table><thead><tr><th>Date</th><th>Sens</th><th>Titre</th><th class="num">Quantité</th><th class="num">Prix</th><th class="num">Frais</th><th></th></tr></thead><tbody>
       ${d.transactions_list.map(x => `<tr><td>${J.date(x.trade_at)}</td><td><span class="badge ${x.side === 'buy' ? 'ok' : 'wait'}">${x.side === 'buy' ? 'Achat' : 'Vente'}</span></td><td>${J.esc(x.name || x.symbol)} <span class="muted small">${J.esc(x.symbol)}</span></td><td class="num">${J.num(+x.quantity, 4)}</td><td class="num">${J.money(+x.unit_price, x.currency)}</td><td class="num">${x.fees ? J.eur(+x.fees) : '–'}</td>
         <td class="num"><button class="btn small" data-edit="${x.id}">Modifier</button> <button class="btn small danger" data-del="${x.id}" aria-label="Supprimer">✕</button></td></tr>`).join('') || '<tr><td colspan="7" class="empty">Aucune transaction.</td></tr>'}</tbody></table></div></div>
-    <div class="card"><h2>Réglages du portefeuille</h2><div class="row">
+    <div class="card" data-fold="settings"><h2>Réglages du portefeuille</h2><div class="row">
       <button class="btn small" id="rename">Renommer</button>${d.portfolio.is_default ? '' : '<button class="btn small" id="mk-default">Définir par défaut</button>'}<button class="btn small danger" id="del-pf">Supprimer</button></div>
       <p class="small muted" style="margin-bottom:0">Stratégie enregistrée : <b>${d.portfolio.strategy ? (NAMES[d.portfolio.strategy.name] || 'Personnalisée') : 'aucune (Croissance régulière par défaut)'}</b>. Elle se règle depuis l’Explorer (affichage avancé).</p></div>`;
     J.$$('#pf-tabs button').forEach(b => b.onclick = () => { current = +b.dataset.id; render(); });
@@ -184,7 +199,7 @@
         actions: [{ label: 'Annuler', run: () => { } }, { label: 'Enregistrer', cls: 'primary', run: async dlg => { const n = i => J.$(i, dlg).value.trim().replace(',', '.'); try { await J.post('position/levels', { portfolio_id: current, listing_id: p.listing_id, stop: n('#lv-stop'), target: n('#lv-target') }); } catch (e) { J.formError(dlg, e.message); return true; } render(); } }] }); });
     J.$$('[data-chart]').forEach(b => b.onclick = async () => { const p = d.positions.find(x => x.listing_id == b.dataset.chart), s = await J.api('sheet', { params: { id: p.listing_id } }), since = (p.first_buy || '').slice(0, 10);
       const dly = s.daily.map((x, i) => [x[0], x[1], s.daily_volume[i]]), from = Math.max(0, dly.findIndex(x => x[0] >= since) - 1), n = dly.length - from;
-      const GR = [['buy', 'Depuis l’achat'], ['1m', '1 M'], ['3m', '3 M'], ['6m', '6 M'], ['1y', '1 an'], ['all', 'Tout'], ['15m', '15 min']], SESS = { '1m': 21, '3m': 63, '6m': 126, '1y': 252, all: 0 };
+      const GR = [['1d', '1 J'], ['1w', '1 S'], ['buy', 'Depuis l’achat'], ['1m', '1 M'], ['3m', '3 M'], ['6m', '6 M'], ['1y', '1 an'], ['all', 'Tout']], SESS = { '1m': 21, '3m': 63, '6m': 126, '1y': 252, all: 0 };
       let gr = store('chart_gr') || 'buy';
       const dlg = J.dialog({ title: (p.name_catalogue || p.name || p.symbol), body: `<div class="seg-row"><span class="seg" id="pc-gr">${GR.map(([k, l]) => `<button type="button" data-v="${k}">${l}</button>`).join('')}</span></div><div id="pc"></div><p class="small muted" id="pc-n"></p>`, actions: [{ label: 'Fermer', run: () => { } }] });
       const buys = d.transactions_list.filter(x => x.side === 'buy' && x.listing_id == p.listing_id).map(x => ({ date: x.trade_at.slice(0, 10), label: 'Achat ' + J.date(x.trade_at) }));
@@ -193,7 +208,10 @@
       if (first && first.alert.rules && first.alert.rules.drop && !first.alert.rules.off) lv.push({ value: first.alert.measures.high * (1 - first.alert.rules.drop / 100), label: `Alerte −${J.num(first.alert.rules.drop, 0)} % du plus haut` }, { value: first.alert.measures.high, label: 'Plus haut depuis l’achat', cls: 'high' });
       const draw = () => {
         J.$$('#pc-gr button', dlg).forEach(x => x.classList.toggle('on', x.dataset.v === gr));
-        if (gr === '15m') { J.$('#pc-n', dlg).textContent = 'Barres de 15 minutes des deux dernières séances.'; J.intradayPanel(J.$('#pc', dlg), p.listing_id); return; }
+        if (gr === '1d' || gr === '15m') { J.$('#pc-n', dlg).textContent = 'Les deux dernières séances, barre par barre (15 minutes).'; J.intradayPanel(J.$('#pc', dlg), p.listing_id); return; }
+        if (gr === '1w') { J.$('#pc', dlg).innerHTML = '<div class="empty"><span class="spinner"></span></div>'; J.api('bars15', { params: { id: p.listing_id } }).then(w => { if (gr !== '1w') return;
+            const r = w.bars.length > 1 ? J.priceChart(J.$('#pc', dlg), w.bars, { sessions: 0, intraday: true, ma20: false, ma50: false, volume: false, unit: s.currency, levels: lv }) : (J.$('#pc', dlg).innerHTML = '<div class="empty">Pas de barres de 15 minutes enregistrées pour ce titre cette semaine.</div>', null);
+            J.$('#pc-n', dlg).textContent = r ? `${J.pct(r.perf, 1)} sur la semaine (barres de 15 minutes).` : ''; }).catch(e => { J.$('#pc', dlg).innerHTML = `<div class="notice err">${J.esc(e.message)}</div>`; }); return; }
         const r = J.priceChart(J.$('#pc', dlg), dly, { sessions: gr === 'buy' ? Math.max(5, n) : SESS[gr], ma20: false, ma50: false, volume: false, unit: s.currency, marks: buys, levels: lv });
         J.$('#pc-n', dlg).textContent = r ? (gr === 'buy' ? `Premier achat le ${J.date(since)} · ${J.pct(r.perf, 1)} depuis cette date (cours du titre, hors frais et change).` : `${J.pct(r.perf, 1)} du ${J.date(r.from)} au ${J.date(r.to)} (cours du titre).`) : 'Historique insuffisant.';
       };

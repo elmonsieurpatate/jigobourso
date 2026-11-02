@@ -234,3 +234,13 @@ def test_history_and_sales_survive_a_full_sale(world):
     d = a.call('portfolio', params=f'&id={pf}')[1]
     assert d['positions'] == [] and [(round(s['gain'], 2), s['quantity']) for s in d['sales']] == [(198.0, 10.0)]
     assert login(world, 'bob', 'bob-secret-12345').call('portfolio/history', params=f'&id={pf}')[0] == 404
+
+
+def test_week_bars_of_15_minutes(world):
+    a = login(world, 'alice', 'alice-secret-1234')
+    conn = connect()
+    with conn.cursor() as cur:
+        cur.executemany('INSERT INTO intraday_prices(listing_id,slot_start,close_px,is_final) VALUES (1,%s,%s,1)',
+                        [('2026-10-01 09:00:00', 1), ('2026-10-20 09:00:00', 2), ('2026-10-27 09:00:00', 3), ('2026-10-27 09:15:00', 4)])
+    conn.commit(); conn.close()
+    assert a.call('bars15', params='&id=1')[1]['bars'] == [['2026-10-20T09:00:00', 2.0], ['2026-10-27T09:00:00', 3.0], ['2026-10-27T09:15:00', 4.0]]

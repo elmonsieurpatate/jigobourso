@@ -408,3 +408,8 @@ tr[hidden] { display: none; }
 .card[data-fold].folded>.fold-head h2::before,.card[data-fold].folded>h2.fold-head::before{transform:rotate(-90deg)}.card[data-fold].folded>:not(.fold-head){display:none!important}
 .card[data-fold].folded{padding-bottom:14px}
 details.help>summary{cursor:pointer;color:var(--muted);font-size:.82rem}
+
+.evo-sum{background:var(--surface-2);border-radius:12px;padding:10px 14px;margin:0 0 10px}.evo-sum p{margin:4px 0}
+.contrib{display:grid;gap:6px;margin-top:12px}.contrib .crow{display:grid;grid-template-columns:90px 1fr 90px;gap:10px;align-items:center;font-size:.86rem}
+.contrib .cb{background:var(--surface-2);border-radius:6px;height:12px;overflow:hidden}.contrib .cb i{display:block;height:100%;border-radius:6px}.contrib .cb i.up{background:var(--up)}.contrib .cb i.down{background:var(--down)}
+.contrib .cv{text-align:right;font-weight:600}.pos{color:var(--up)}.neg{color:var(--down)}

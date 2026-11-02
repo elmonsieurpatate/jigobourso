@@ -59,6 +59,12 @@ return [
     },
     'data/overview' => function () { require_user(); return engine_call('overview', []); },
     'suivi' => function () { require_user(); return engine_call('suivi', []); },
+    'bars15' => function () {                   // barres de 15 min stockées des 7 derniers jours (vue « 1 semaine » d'un graphique)
+        require_user();
+        $id = (int)($_GET['id'] ?? 0);
+        $rows = q('SELECT slot_start, close_px FROM intraday_prices WHERE listing_id = ? AND slot_start >= (SELECT DATE_SUB(DATE(MAX(slot_start)), INTERVAL 7 DAY) FROM intraday_prices WHERE listing_id = ?) ORDER BY slot_start', [$id, $id])->fetchAll();
+        return ['bars' => array_map(function ($r) { return [str_replace(' ', 'T', $r['slot_start']), (float)$r['close_px']]; }, $rows)];
+    },
     'intraday' => function () {
         require_user();
         return engine_call('intraday', ['listing_id' => (int)($_GET['id'] ?? 0), 'fetch' => ($_GET['fetch'] ?? '1') !== '0']);

@@ -132,7 +132,8 @@ def build(transactions, bars, splits, unit, fx, meta, today=None):
                 net_in -= gross - fees
             if price > 0:
                 fallback[key] = price * rate / factor
-            lines.setdefault(key, {'key': str(key), 'symbol': t['symbol'], 'name': (meta.get(key) or {}).get('name') or t.get('name') or t['symbol'], 'values': []})
+            lines.setdefault(key, {'key': str(key), 'symbol': t['symbol'], 'name': (meta.get(key) or {}).get('name') or t.get('name') or t['symbol'], 'values': [], 'net_in': [], '_in': 0.0})
+            lines[key]['_in'] += (gross + fees) if t['side'] == 'buy' else -(gross - fees)
             trades.append({'date': str(t['trade_at'])[:10], 'side': t['side'], 'symbol': t['symbol']})
         total = 0.0
         for key, line in lines.items():
@@ -143,15 +144,21 @@ def build(transactions, bars, splits, unit, fx, meta, today=None):
                 f = to_eur(key, day) if c is not None else None
                 v = q * c * f if c is not None and f is not None else q * fallback.get(key, 0.0)
             line['values'].append(round(v, 2))
+            line['net_in'].append(round(line['_in'], 2))
             total += v
         # titres apparus après le début : leurs valeurs antérieures valent 0
         for line in lines.values():
             if len(line['values']) < len(out['dates']) + 1:
-                line['values'][:0] = [0.0] * (len(out['dates']) + 1 - len(line['values']))
+                pad = len(out['dates']) + 1 - len(line['values'])
+                line['values'][:0] = [0.0] * pad
+                line['net_in'][:0] = [0.0] * pad
         out['dates'].append(day)
         out['value'].append(round(total, 2))
         out['net_in'].append(round(net_in, 2))
         out['gain'].append(round(total - net_in, 2))
+    for line in lines.values():
+        line.pop('_in', None)
+        line['gain'] = [round(v - i, 2) for v, i in zip(line['values'], line['net_in'])]      # gain ou perte cumulé du titre (latent + réalisé)
     out['lines'] = sorted(lines.values(), key=lambda l: -max(l['values'] or [0]))
     out['trades'] = trades
     out['notes'] = notes
