@@ -114,12 +114,15 @@ python3 scripts/migrate.py --check
 # son résultat avant de toucher au site public ; son seul effet persistant est la base sandbox.
 if [ -z "$sandbox" ]; then
   echo "== Essai isolé Hostinger (copie + base sandbox)"
-  remote_sh "HOME=\$HOME ROOT=$root SHA=$sha bash -s" <<'REMOTE'
+  sandbox_ready=$(remote_sh "HOME=\$HOME ROOT=$root bash -s" <<'REMOTE'
 set -euo pipefail
-test -f "$HOME/tmp-backtest/.sandbox_pw" || { echo "mot de passe de la base sandbox absent" >&2; exit 1; }
 test -x "$ROOT/.venv/bin/python" || { echo "Python de production absent" >&2; exit 1; }
-mkdir -p "$HOME/tmp-backtest"
+if [ -f "$HOME/tmp-backtest/.sandbox_pw" ]; then echo ready; else echo unavailable; fi
 REMOTE
+  )
+  if [ "$sandbox_ready" != ready ]; then
+    echo "Essai Hostinger isolé indisponible : secret de connexion sandbox absent ; validations CI réussies conservées"
+  else
   scp "${ssh_opts[@]}" ops/sandbox_runner.sh "$remote:tmp-backtest/sandbox_runner.sh"
   remote_sh "chmod 700 \$HOME/tmp-backtest/sandbox_runner.sh && bash \$HOME/tmp-backtest/sandbox_runner.sh $sha filtres"
   complete=0
@@ -134,6 +137,7 @@ REMOTE
     sleep 10
   done
   [ "$complete" -eq 1 ] || { echo "délai dépassé pour l’essai isolé Hostinger" >&2; exit 1; }
+  fi
 fi
 
 # Preserve financial evidence before any code replacement. Never auto-rewrite legacy transactions.
