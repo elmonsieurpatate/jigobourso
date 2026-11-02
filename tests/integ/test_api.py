@@ -217,3 +217,20 @@ def test_lot_alerts_follow_each_purchase(world):
     assert a.call('portfolio', params=f'&id={pf}')[1]['lots'][0]['alert']['alerts'] == []
     assert a.call('lot/settings', {'tx_id': second})[0] == 200                                        # tout vide : retour aux réglages par défaut
     assert a.call('portfolio', params=f'&id={pf}')[1]['lots'][0]['settings'] is None
+
+
+def test_history_and_sales_survive_a_full_sale(world):
+    a = login(world, 'alice', 'alice-secret-1234')
+    pf = a.call('portfolio/create', {'name': 'Histo'})[1]['id']
+    add = lambda side, q, p, d: a.call('tx/add', {'portfolio_id': pf, 'listing_id': 1, 'side': side, 'quantity': q, 'unit_price': p, 'trade_at': d, 'fees': 1})
+    assert add('buy', 10, 100, '2026-05-04')[0] == 200 and add('sell', 10, 120, '2026-05-06')[0] == 200
+    conn = connect()
+    with conn.cursor() as cur:
+        cur.executemany('INSERT INTO daily_prices(listing_id,price_date,close_px) VALUES (1,%s,%s)', [('2026-05-04', 100), ('2026-05-05', 110), ('2026-05-06', 120), ('2026-05-07', 90)])
+    conn.commit(); conn.close()
+    h = a.call('portfolio/history', params=f'&id={pf}')[1]
+    assert h['dates'][:4] == ['2026-05-04', '2026-05-05', '2026-05-06', '2026-05-07']
+    assert h['value'][:4] == [1000.0, 1100.0, 0.0, 0.0] and h['gain'][1] == 1099.0 - 1000 and h['gain'][-1] == 198.0       # 1 199 − 1 001
+    d = a.call('portfolio', params=f'&id={pf}')[1]
+    assert d['positions'] == [] and [(round(s['gain'], 2), s['quantity']) for s in d['sales']] == [(198.0, 10.0)]
+    assert login(world, 'bob', 'bob-secret-12345').call('portfolio/history', params=f'&id={pf}')[0] == 404

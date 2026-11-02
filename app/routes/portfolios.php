@@ -70,6 +70,12 @@ return [
         $v['allocation'] = engine_call('allocation', ['target' => $target, 'positions' => array_map(function ($x) { return array_intersect_key($x, array_flip(['listing_id', 'kind', 'value'])); }, $v['positions'])]);
         return $v + ['portfolio' => ['id' => (int)$p['id'], 'name' => $p['name'], 'is_default' => (bool)$p['is_default'], 'strategy' => $p['strategy_config'] ? json_decode($p['strategy_config'], true) : null], 'transactions_list' => $tx];
     },
+    'portfolio/history' => function () {
+        $u = require_user();
+        $p = own_portfolio((int)($_GET['id'] ?? 0), $u);
+        $tx = q('SELECT id, listing_id, symbol, name, side, quantity, unit_price, currency, fx_to_eur, fees, trade_at FROM portfolio_transactions WHERE portfolio_id = ? ORDER BY trade_at, id', [$p['id']])->fetchAll();
+        return engine_call('portfolio-history', ['transactions' => $tx]);
+    },
     'position/levels' => function () {
         need_post(); $u = require_user(); $b = body();
         $p = own_portfolio((int)($b['portfolio_id'] ?? 0), $u);

@@ -398,3 +398,13 @@ tr[hidden] { display: none; }
 .pos-curve svg{width:170px;height:46px}.pos-curve .ln{fill:none;stroke:currentColor;stroke-width:1.8;stroke-linejoin:round}
 .pos-curve .area{fill:currentColor;opacity:.1;stroke:none}.pos-curve .base{stroke:var(--muted);stroke-width:1;stroke-dasharray:3 3}
 .pos-curve .buy{stroke:var(--accent);stroke-width:1.5;stroke-dasharray:3 2}
+
+/* Évolution du portefeuille */
+.chart-legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:.8rem;color:var(--muted);margin-top:6px}.chart-legend i,.chart-tip i.dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.price-svg .zeroline{stroke:var(--muted);stroke-width:1}.price-svg .markline.sell{stroke:var(--down)}
+.seg-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:4px 0 10px}
+/* Blocs repliables */
+.card[data-fold]>.fold-head{cursor:pointer;user-select:none}.card[data-fold]>.fold-head h2::before,.card[data-fold]>h2.fold-head::before{content:'▾';display:inline-block;width:1.1em;color:var(--muted);transition:transform .15s}
+.card[data-fold].folded>.fold-head h2::before,.card[data-fold].folded>h2.fold-head::before{transform:rotate(-90deg)}.card[data-fold].folded>:not(.fold-head){display:none!important}
+.card[data-fold].folded{padding-bottom:14px}
+details.help>summary{cursor:pointer;color:var(--muted);font-size:.82rem}

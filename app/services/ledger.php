@@ -61,7 +61,7 @@ function portfolio_valuation(int $portfolioId): array {
     $freeBuys = free_buy_dates($tx);
     $pos = [];
     $feesTotal = 0.0;
-    $issues = []; $uncertain = [];
+    $issues = []; $uncertain = []; $sales = [];
     foreach ($tx as $t) {
         $key = $t['listing_id'] ? 'L' . $t['listing_id'] : 'S' . strtoupper($t['symbol']);
         if (!isset($pos[$key])) $pos[$key] = ['key' => $key, 'listing_id' => $t['listing_id'] ? (int)$t['listing_id'] : null, 'symbol' => $t['symbol'], 'name' => $t['name'],
@@ -95,6 +95,8 @@ function portfolio_valuation(int $portfolioId): array {
             $p['qty'] -= $sold; $p['cost'] -= $out; $p['realized'] += $gain; $p['proceeds'] += $net;
             $year = substr($t['trade_at'], 0, 4);
             $p['by_year'][$year] = ($p['by_year'][$year] ?? 0.0) + $gain;
+            $sales[] = ['tx_id' => (int)$t['id'], 'key' => $key, 'listing_id' => $p['listing_id'], 'symbol' => $p['symbol'], 'name' => $p['name'], 'trade_at' => $t['trade_at'],
+                        'quantity' => $sold, 'proceeds' => $net, 'cost' => $out, 'gain' => $gain, 'gain_pct' => $out > 0 ? 100 * $gain / $out : null];   // historique des ventes (prix de revient moyen)
             if ($p['qty'] < 1e-9) { $p['qty'] = 0.0; $p['cost'] = 0.0; }
         }
         unset($p);
@@ -159,5 +161,6 @@ function portfolio_valuation(int $portfolioId): array {
                          'realized' => $computable ? $realizedTotal : null, 'fees' => $feesTotal, 'invested_total' => $computable ? $investedTotal : null, 'proceeds_total' => $computable ? $proceedsTotal : null,
                          'total_gain' => $computable ? $unrealized + $realizedTotal : null, 'unpriced' => count(array_filter($open, function ($o) { return $o['value'] === null; })),
                          'partial' => (bool)$uncertain, 'excluded' => $excluded],
-            'realized_by_year' => $computable ? $byYear : [], 'transactions' => count($tx)];
+            'realized_by_year' => $computable ? $byYear : [], 'transactions' => count($tx),
+            'sales' => array_values(array_filter(array_reverse($sales), function ($s) use ($uncertain) { return !isset($uncertain[$s['key']]); }))];
 }

@@ -7,6 +7,46 @@
   const sma = (vals, n) => vals.map((_, i) => (i + 1 < n ? null : vals.slice(i + 1 - n, i + 1).reduce((a, b) => a + b, 0) / n));
   const ticks = (lo, hi, n = 5) => { const span = hi - lo || 1, raw = span / n, mag = Math.pow(10, Math.floor(Math.log10(raw))), step = [1, 2, 2.5, 5, 10].map(m => m * mag).find(s => s >= raw) || mag * 10, out = []; for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) out.push(+v.toFixed(8)); return out; };
 
+  /* Plusieurs courbes sur les mêmes dates (évolution du portefeuille, titre par titre).
+     series : [{ label, values: [nombre|null], color, dash, area, zero }] ; opts : { unit, format(v) , zeroLine, marks: [{date, label}] }. */
+  J.lineChart = function (host, dates, series, opts = {}) {
+    host.innerHTML = '';
+    const n = dates.length, shown = series.filter(s => s.values.some(v => v !== null && v !== undefined));
+    if (n < 2 || !shown.length) { host.innerHTML = '<div class="empty">Pas assez de données pour tracer la courbe.</div>'; return; }
+    const W = 1000, H = 340, L = 8, R = 78, T = 14, PH = 296, all = [];
+    shown.forEach(s => s.values.forEach(v => { if (v !== null && v !== undefined && isFinite(v)) all.push(v); }));
+    if (opts.zeroLine) all.push(0);
+    const hi = Math.max(...all), lo = Math.min(...all), pad = (hi - lo || Math.abs(hi) || 1) * .07, y0 = lo - pad, y1 = hi + pad;
+    const X = i => L + i * (W - L - R) / (n - 1), Y = v => T + PH * (1 - (v - y0) / (y1 - y0)), fmt = opts.format || (v => J.num(v, 0));
+    const svg = el('svg', { viewBox: `0 0 ${W} ${H}`, class: 'price-svg multi-svg', role: 'img', 'aria-label': opts.label || 'Évolution' });
+    ticks(y0, y1).forEach(v => { svg.append(el('line', { x1: L, x2: W - R, y1: Y(v), y2: Y(v), class: 'hgrid' }), el('text', { x: W - R + 8, y: Y(v) + 4, class: 'axis' }, fmt(v))); });
+    for (let k = 0; k <= 5; k++) { const i = Math.round(k * (n - 1) / 5); svg.append(el('text', { x: X(i), y: H - 6, class: 'axis', 'text-anchor': k === 0 ? 'start' : k === 5 ? 'end' : 'middle' }, J.date(dates[i]))); }
+    if (opts.zeroLine && y0 < 0 && y1 > 0) svg.append(el('line', { x1: L, x2: W - R, y1: Y(0), y2: Y(0), class: 'zeroline' }));
+    (opts.marks || []).forEach(m => { const i = dates.findIndex(d => d >= m.date); if (i >= 0) svg.append(el('line', { x1: X(i), x2: X(i), y1: T, y2: T + PH, class: 'markline ' + (m.cls || ''), title: m.label })); });
+    shown.forEach(s => {
+      let d = '', pen = false;
+      s.values.forEach((v, i) => { if (v === null || v === undefined) { pen = false; return; } d += (pen ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(v).toFixed(1); pen = true; });
+      if (s.area) svg.append(el('path', { d: `${d}L${X(n - 1)} ${Y(Math.max(y0, Math.min(0, y1)))}L${L} ${Y(Math.max(y0, Math.min(0, y1)))}Z`, fill: s.color, opacity: .1 }));
+      svg.append(el('path', { d, fill: 'none', stroke: s.color, 'stroke-width': s.width || 2, 'stroke-dasharray': s.dash || '', 'stroke-linejoin': 'round' }));
+    });
+    const cross = el('line', { y1: T, y2: T + PH, class: 'cross', visibility: 'hidden' }); svg.append(cross);
+    const tip = document.createElement('div'); tip.className = 'chart-tip'; tip.hidden = true;
+    const wrap = document.createElement('div'); wrap.className = 'chart-wrap'; wrap.append(svg, tip);
+    const legend = document.createElement('div'); legend.className = 'chart-legend';
+    legend.innerHTML = shown.map(s => `<span><i style="background:${s.color}${s.dash ? ';opacity:.6' : ''}"></i>${J.esc(s.label)}</span>`).join('');
+    host.append(wrap, legend);
+    const move = ev => {
+      const r = svg.getBoundingClientRect(), px = ((ev.touches ? ev.touches[0].clientX : ev.clientX) - r.left) * W / r.width, i = Math.max(0, Math.min(n - 1, Math.round((px - L) / ((W - L - R) / (n - 1)))));
+      cross.setAttribute('x1', X(i)); cross.setAttribute('x2', X(i)); cross.setAttribute('visibility', 'visible');
+      const rows = shown.map(s => [s, s.values[i]]).filter(([, v]) => v !== null && v !== undefined).sort((a, b) => b[1] - a[1]).slice(0, 12);
+      tip.innerHTML = `<b>${J.date(dates[i])}</b><div class="tip-grid">${rows.map(([s, v]) => `<span><i class="dot" style="background:${s.color}"></i>${J.esc(s.label)}</span><b>${fmt(v)}</b>`).join('')}</div>`;
+      tip.hidden = false; const wr = wrap.getBoundingClientRect(), left = X(i) * r.width / W + (r.left - wr.left);
+      tip.style.left = Math.min(Math.max(8, left + 14), wr.width - tip.offsetWidth - 8) + 'px'; tip.style.top = '8px';
+    };
+    const leave = () => { cross.setAttribute('visibility', 'hidden'); tip.hidden = true; };
+    svg.addEventListener('mousemove', move); svg.addEventListener('mouseleave', leave); svg.addEventListener('touchmove', move, { passive: true }); svg.addEventListener('touchend', leave);
+  };
+
   /* rows : [[date ISO, clôture, volume|null]] (toute la série) ; opts : { sessions: nombre de séances affichées (0 = tout), ma20, ma50, volume, unit } */
   J.priceChart = function (host, rows, opts = {}) {
     host.innerHTML = '';
