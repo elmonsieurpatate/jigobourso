@@ -24,6 +24,16 @@
     const order = ['info', 'watch', 'act'];
     return (lots || []).filter(l => l.listing_id == listingId && l.alert && l.alert.level).map(l => l.alert).sort((a, b) => order.indexOf(b.level) - order.indexOf(a.level))[0] || null;
   }
+  /* Courbe de la position depuis son plus ancien achat encore détenu : une barre par achat, couleur selon la hausse ou la baisse depuis ce premier achat. */
+  function posCurve(c, listingId) {
+    if (!c || !c.points || c.points.length < 2) return '<span class="muted small">–</span>';
+    const w = 170, h = 46, v = c.points.map(p => p[1]), min = Math.min(...v), max = Math.max(...v), span = max - min || 1, n = v.length;
+    const X = i => i * w / (n - 1), Y = x => h - 3 - (x - min) / span * (h - 6), up = v[n - 1] >= v[0];
+    const d = v.map((x, i) => (i ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(x).toFixed(1)).join('');
+    const marks = c.buys.map(b => { const i = c.points.findIndex(p => p[0] >= b); return i < 0 ? '' : `<line x1="${X(i).toFixed(1)}" x2="${X(i).toFixed(1)}" y1="0" y2="${h}" class="buy"/>`; }).join('');
+    const pct = 100 * (v[n - 1] / v[0] - 1);
+    return `<button type="button" class="pos-curve" data-chart="${listingId}" title="Agrandir la courbe depuis l’achat"><svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="color:var(--${up ? 'up' : 'down'})"><line x1="0" x2="${w}" y1="${Y(v[0]).toFixed(1)}" y2="${Y(v[0]).toFixed(1)}" class="base"/>${marks}<path class="area" d="${d}L${w} ${h}L0 ${h}Z"/><path d="${d}" class="ln"/></svg><span class="small ${J.cls(pct)}">${J.pct(pct, 1)} depuis le ${J.date(c.buys[0])}</span></button>`;
+  }
   function lotsCard(d) {
     const lots = d.lots || [];
     if (!lots.length) return '';
@@ -92,10 +102,10 @@
     ${JEtf.portfolio(d.etf_analysis)}
     ${allocationCard(d.allocation)}
     <div class="card" style="margin-top:16px"><div class="row between"><h2 style="margin:0">Positions</h2><div class="row"><button class="btn primary small" id="add-tx">Ajouter une transaction</button></div></div>
-      <div class="table-wrap"><table><thead><tr><th>Titre</th><th class="num">Quantité</th><th class="num">Prix de revient</th><th class="num">Cours</th><th class="num">Valeur</th><th class="num">+/− value</th><th class="num">Poids</th><th>Garde-fous</th></tr></thead><tbody>
+      <div class="table-wrap"><table><thead><tr><th>Titre</th><th class="num">Quantité</th><th class="num">Prix de revient</th><th class="num">Cours</th><th class="num">Valeur</th><th class="num">+/− value</th><th class="num">Poids</th><th>Depuis l’achat</th><th>Garde-fous</th></tr></thead><tbody>
       ${d.positions.map(p => `<tr><td>${p.linked ? `<a href="titre.html?id=${p.listing_id}"><b>${J.esc(p.name_catalogue || p.name || p.symbol)}</b></a>` : `<b>${J.esc(p.name || p.symbol)}</b>`}<div class="small muted">${J.esc(p.symbol)} ${p.catalogue_status === 'excluded' ? `<span class="badge ko help" title="${J.esc(p.excluded_reason || '')}">Hors sélection</span>` : ''}${!p.linked ? '<span class="badge wait help" title="Titre saisi à la main, sans cours">Sans cours</span>' : ''} ${lotBadge(worstFor(d.lots, p.listing_id))}</div></td>
         <td class="num">${J.num(p.qty, 4)}</td><td class="num">${J.eur(p.avg_cost)}</td><td class="num">${p.price_eur !== null ? J.eur(p.price_eur) + `<div class="small muted">${J.priceLabel(p)} · ${J.ago(p.price_time)}</div>` : '–'}</td>
-        <td class="num"><b>${J.eur(p.value)}</b></td><td class="num ${J.cls(p.unrealized)}">${p.unrealized !== null ? J.eur(p.unrealized) + `<div class="small">${J.pct(p.unrealized_pct, 1)}</div>` : '–'}</td><td class="num">${p.weight !== null ? J.pct(p.weight, 1, false) : '–'}</td><td>${levelCell(p)}</td></tr>`).join('') || '<tr><td colspan="7" class="empty">Aucune position ouverte.</td></tr>'}</tbody></table></div></div>
+        <td class="num"><b>${J.eur(p.value)}</b></td><td class="num ${J.cls(p.unrealized)}">${p.unrealized !== null ? J.eur(p.unrealized) + `<div class="small">${J.pct(p.unrealized_pct, 1)}</div>` : '–'}</td><td class="num">${p.weight !== null ? J.pct(p.weight, 1, false) : '–'}</td><td>${p.listing_id ? posCurve((d.curves || {})[p.listing_id], p.listing_id) : '–'}</td><td>${levelCell(p)}</td></tr>`).join('') || '<tr><td colspan="9" class="empty">Aucune position ouverte.</td></tr>'}</tbody></table></div></div>
     ${lotsCard(d)}
     <div class="card"><div class="row between"><h2 style="margin:0">Transactions <span class="muted small">(${d.transactions_list.length})</span></h2><a class="btn small" href="api.php?r=export&id=${current}">Exporter en CSV</a></div>
       <div class="table-wrap"><table><thead><tr><th>Date</th><th>Sens</th><th>Titre</th><th class="num">Quantité</th><th class="num">Prix</th><th class="num">Frais</th><th></th></tr></thead><tbody>

@@ -198,6 +198,8 @@ def test_lot_alerts_follow_each_purchase(world):
     conn.commit(); conn.close()
     d = a.call('portfolio', params=f'&id={pf}')[1]
     assert [(l['tx_id'], round(l['remaining'], 6)) for l in d['lots']] == [(second, 3.0)]          # FIFO : la vente de 12 solde le 1er achat et entame le 2e
+    curve = d['curves']['1']
+    assert curve['buys'] == ['2026-06-01'] and curve['points'][0][0] == '2026-06-01' and curve['points'][-1][1] == 110.0 and len(curve['points']) <= 90
     lot = d['lots'][0]['alert']
     assert lot['strategy'] == 'regular' and round(lot['measures']['drop_pct'], 1) == 26.7
     kinds = {x['kind'] for x in lot['alerts']}

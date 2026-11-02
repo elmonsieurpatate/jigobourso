@@ -50,3 +50,11 @@ def test_alerts_fire_on_duration_drop_momentum_ma50_and_rank():
     assert kinds(rec) == ['ma50', 'rank'] and 'plus retenu' in rec[1]['message']
     fast = al.evaluate({'trade_date': '2026-10-01'}, al.rules_for('fast', None), {'drop_pct': 25.0}, None, False, TODAY)
     assert [(x['kind'], x['action'], x['level']) for x in fast] == [('drop', 'alléger', 'act')]           # rang inconnu (False) : pas d'alerte de classement
+
+
+def test_curves_start_at_the_oldest_open_purchase():
+    series = {7: (['2026-01-02', '2026-01-05', '2026-01-06', '2026-01-07'], [10.0, 11.0, 12.0, 13.0], None)}
+    lots = [{'listing_id': 7, 'trade_date': '2026-01-04'}, {'listing_id': 7, 'trade_date': '2026-01-06'}]
+    c = al.curves(lots, series)['7']
+    assert c['buys'] == ['2026-01-04', '2026-01-06'] and c['points'][0] == ['2026-01-02', 10.0]      # achat un dimanche : départ de la clôture précédente
+    assert al.curves([{'listing_id': 8, 'trade_date': '2026-01-04'}], {})['8']['points'] == []

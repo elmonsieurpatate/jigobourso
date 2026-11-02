@@ -392,3 +392,9 @@ tr[hidden] { display: none; }
 .price-svg .levelline.high{stroke:var(--muted);stroke-dasharray:2 4}
 .price-svg .levellabel{fill:#c2410c}.price-svg .levellabel.high{fill:var(--muted)}
 .lot-alerts .badge{margin:0 4px 4px 0}
+
+/* Courbe de chaque position dans le tableau du portefeuille */
+.pos-curve{display:flex;flex-direction:column;gap:2px;width:170px;background:none;border:0;padding:0;cursor:pointer;text-align:left;font:inherit;color:inherit}
+.pos-curve svg{width:170px;height:46px}.pos-curve .ln{fill:none;stroke:currentColor;stroke-width:1.8;stroke-linejoin:round}
+.pos-curve .area{fill:currentColor;opacity:.1;stroke:none}.pos-curve .base{stroke:var(--muted);stroke-width:1;stroke-dasharray:3 3}
+.pos-curve .buy{stroke:var(--accent);stroke-width:1.5;stroke-dasharray:3 2}

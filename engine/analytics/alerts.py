@@ -143,4 +143,19 @@ def lot_alerts(conn, request, today=None):
                                   'rules': {k: rules.get(k) for k in ('days', 'drop', 'drop_action', 'days_action', 'exit', 'off', 'personal')},
                                   'measures': m, 'rank': rank if rank is not False else None, 'alerts': alerts,
                                   'level': max((a['level'] for a in alerts), key=('info', 'watch', 'act').index, default=None)}
-    return {'lots': out, 'rank_limit': RANK_LIMIT, 'strategies': {k: NAMES[k] for k in STRATEGIES}}
+    return {'lots': out, 'rank_limit': RANK_LIMIT, 'strategies': {k: NAMES[k] for k in STRATEGIES}, 'curves': curves(lots, series)}
+
+
+def curves(lots, series, points=90):
+    """Courbe de chaque titre détenu depuis son plus ancien achat encore détenu (série corrigée des splits, au plus `points` valeurs) et dates de ses achats."""
+    from .service import downsample
+    out = {}
+    for lid in sorted({int(l['listing_id']) for l in lots}):
+        buys = sorted(l['trade_date'] for l in lots if int(l['listing_id']) == lid)
+        dates, closes, _ = series.get(lid, ([], [], None))
+        start = next((i for i, d in enumerate(dates) if d >= buys[0]), None)
+        if start is not None and start > 0 and dates[start] > buys[0]:
+            start -= 1                                   # achat un jour sans cotation : on part de la dernière clôture connue avant
+        pts = [[d, c] for d, c in zip(dates[start:], closes[start:])] if start is not None else []
+        out[str(lid)] = {'points': downsample(pts, points), 'buys': buys}
+    return out
