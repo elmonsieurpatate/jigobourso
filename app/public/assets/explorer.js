@@ -384,6 +384,7 @@
   function markDirty() { el('apply-menu').classList.add('pending'); }
   [...text, ...CHECKS].forEach(k => el(k).addEventListener(el(k).type === 'search' || el(k).type === 'number' || el(k).placeholder ? 'input' : 'change', markDirty));
   el('apply-menu').onclick = applyMenu;
+  ['kind', 'geo_region'].forEach(k => el(k).addEventListener('change', applyMenu));
   ['q', 'min_price', 'budget', 'min_score', 'max_volatility', 'max_drawdown', 'min_volume'].forEach(k => el(k).addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); applyMenu(); } }));
   /* liens du menu latéral : ?kind=, ?compare=1, ?preset= */
   if (url.get('kind')) el('kind').value = url.get('kind');
