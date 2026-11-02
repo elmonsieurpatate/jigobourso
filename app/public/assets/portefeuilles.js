@@ -7,7 +7,7 @@
   const NAMES = { regular: 'Croissance régulière', fast: 'Croissance rapide', recovery: 'Rebond', low_volatility: 'Hausse calme', momentum: 'Momentum 6 mois (essai)', momentum12: 'Momentum 12 mois (essai)', momentum_risk: 'Momentum ajusté du risque (essai)' };
   const PAL = ['#6366f1', '#14b8a6', '#f59e0b', '#ec4899', '#3b82f6', '#84cc16', '#a855f7', '#ef4444', '#06b6d4', '#eab308', '#64748b', '#22c55e'];
   const store = (k, v) => { try { if (v === undefined) return JSON.parse(localStorage.getItem('jigo_pf_' + k)); localStorage.setItem('jigo_pf_' + k, JSON.stringify(v)); } catch (e) { return null; } };
-  const EVO = { mode: ['value', 'gain', 'titles'].includes(store('evo_mode')) ? store('evo_mode') : 'value', per: store('evo_per') || 'all', hidden: new Set(store('evo_hidden') || []) };
+  const EVO = { mode: ['value', 'gain', 'titles'].includes(store('evo_mode2')) ? store('evo_mode2') : 'titles', per: store('evo_per') || '1m', unit: store('evo_unit') === 'pct' ? 'pct' : 'eur', hidden: new Set(store('evo_hidden') || []) };
   const PERIODS = [['1d', '1 J', 0], ['1w', '1 S', 8], ['1m', '1 M', 31], ['3m', '3 M', 92], ['6m', '6 M', 183], ['1y', '1 A', 366], ['all', 'Tout', 0]];
   const px = (v, c) => v === null || v === undefined ? '–' : J.money(v, c || 'EUR');
   const eur0 = v => J.eur(v, 0), sgn = v => (v > 0 ? '+' : v < 0 ? '−' : '') + J.eur(Math.abs(v), 0);
@@ -42,7 +42,7 @@
           <span class="hero-day" id="hero-day"></span></div>
         <div class="hero-stats">${stat('Plus-value latente', J.eur(t.unrealized, 0), J.cls(t.unrealized), 'Sur les titres encore détenus')}${stat('Réalisé (ventes)', J.eur(t.realized, 0), J.cls(t.realized))}${stat('Investi', eur0(t.cost), '', 'Prix de revient des titres encore détenus')}${stat('Net d’impôt estimé', J.eur(net, 0), J.cls(net), 'Si tout était vendu aujourd’hui, compte-titres au taux forfaitaire de 30 % (12,8 % impôt + 17,2 % prélèvements sociaux). Indicatif : hors PEA, pertes reportables et dividendes.')}</div>
         <span class="chev" aria-hidden="true"></span></header>
-      <div class="fold-b"><div class="hero-tools">${pills('evo-mode', [['value', 'Valeur'], ['gain', 'Gain'], ['titles', 'Par titre']], EVO.mode)}${pills('evo-per', PERIODS.map(p => [p[0], p[1]]), EVO.per)}</div>
+      <div class="fold-b"><div class="hero-tools"><div class="row" style="gap:8px">${pills('evo-mode', [['titles', 'Comparer les titres'], ['gain', 'Gain'], ['value', 'Valeur']], EVO.mode)}${pills('evo-unit', [['eur', '€'], ['pct', '%']], EVO.unit)}</div>${pills('evo-per', PERIODS.map(p => [p[0], p[1]]), EVO.per)}</div>
         <div class="hero-grid"><div id="evo-chart"><div class="lc-empty"><span class="spinner"></span></div></div><aside class="movers" id="movers"></aside></div></div></section>`;
   }
   function periodStart(h) {
@@ -52,65 +52,89 @@
     const i = h.dates.findIndex(d => d >= since);
     return i <= 0 ? 0 : i - 1;                                   // départ : la dernière valeur connue avant la période
   }
+  /* Gain d'un titre (ou du portefeuille) sur la période, en € et en % du capital engagé (valeur au début + achats nets pendant la période). */
+  function perf(gain, values, netIn, i0, i) {
+    const g = gain[i] - (i0 === 0 ? 0 : gain[i0]), base = (i0 === 0 ? 0 : values[i0]) + netIn[i] - (i0 === 0 ? 0 : netIn[i0]);
+    return { eur: g, pct: base > 0.5 ? 100 * g / base : null };
+  }
+  const PER_LABEL = { '1w': 'la semaine', '1m': 'le mois', '3m': '3 mois', '6m': '6 mois', '1y': 'un an', all: 'depuis le début' };
   function drawEvo() {
     const host = J.$('#evo-chart'), mv = J.$('#movers'), h = H; if (!host || !h) return;
     if (!h.dates || !h.dates.length) { host.innerHTML = '<div class="lc-empty">Ajoutez une transaction pour voir l’évolution.</div>'; mv.innerHTML = ''; return; }
     const last = h.dates.length - 1, toggle = id => { EVO.hidden.has(id) ? EVO.hidden.delete(id) : EVO.hidden.add(id); store('evo_hidden', [...EVO.hidden]); drawEvo(); };
-    const height = innerWidth < 700 ? 190 : 230;
-    // Jour : valeur du portefeuille actuel barre par barre (15 min)
+    const height = innerWidth < 700 ? 190 : 230, pct = EVO.unit === 'pct', fmtV = pct ? (v => J.pct(v, 1)) : eur0;
+    J.$$('#evo-unit button').forEach(b => { b.disabled = EVO.mode === 'value' && b.dataset.v === 'pct'; });
     if (EVO.per === '1d') {
       const it = h.intraday || { t: [], value: [] };
       J.lineChart(host, it.t, [{ id: 'v', label: 'Valeur', values: it.value, color: '#6366f1', area: true }], { height, format: eur0, time: true });
       if (it.t.length < 2) host.querySelector('.lc-empty').textContent = 'Pas de cotations de 15 minutes enregistrées aujourd’hui pour vos titres.';
       const d0 = it.value[0], d1 = it.value[it.value.length - 1];
       mv.innerHTML = it.t.length > 1 ? `<h3>Aujourd’hui</h3><p class="mv-big ${J.cls(d1 - d0)}">${sgn(d1 - d0)}</p><p class="small muted">Valeur des titres détenus aujourd’hui, de ${J.dateTime(it.t[0])} à ${J.dateTime(it.t[it.t.length - 1])}.</p>` : '';
-      return;
+      fillPeriodCells(null); return;
     }
-    const i0 = periodStart(h), cut = a => a.slice(i0), xs = cut(h.dates), from = i0 === 0 ? 0 : h.gain[i0];
+    const i0 = periodStart(h), xs = h.dates.slice(i0), idx = xs.map((_, k) => i0 + k);
     const markers = (h.trades || []).filter(t => t.date >= xs[0] && !t.note).map(t => ({ x: t.date, kind: t.side, label: (t.side === 'buy' ? 'Achat ' : 'Vente ') + t.symbol }));
+    const pfSeries = i => perf(h.gain, h.value, h.net_in, i0, i), lineSeries = (l, i) => perf(l.gain, l.values, l.net_in, i0, i);
     let series;
-    if (EVO.mode === 'gain') {
-      const g = cut(h.gain).map(v => v - from);
-      series = [{ id: 'gain', label: 'Gain sur la période', values: g, color: g[g.length - 1] >= 0 ? '#16a34a' : '#dc2626', area: true }]
-        .concat(h.lines.map((l, k) => ({ id: 't:' + l.key, label: l.symbol, values: cut(l.gain).map(v => v - (i0 === 0 ? 0 : l.gain[i0])), color: PAL[k % PAL.length], width: 1.4 })));
-      if (!store('evo_hidden_init')) { h.lines.forEach(l => EVO.hidden.add('t:' + l.key)); store('evo_hidden_init', 1); store('evo_hidden', [...EVO.hidden]); }
-    } else if (EVO.mode === 'titles') {
-      series = h.lines.map((l, k) => ({ id: 'v:' + l.key, label: l.symbol, values: cut(l.values), color: PAL[k % PAL.length], width: 1.8 }));
+    if (EVO.mode === 'value') {
+      series = [{ id: 'value', label: 'Valeur', values: idx.map(i => h.value[i]), color: '#6366f1', area: true }, { id: 'net', label: 'Argent investi', values: idx.map(i => h.net_in[i]), color: '#94a3b8', dash: '5 5', width: 1.6 }];
     } else {
-      series = [{ id: 'value', label: 'Valeur', values: cut(h.value), color: '#6366f1', area: true }, { id: 'net', label: 'Argent investi', values: cut(h.net_in), color: '#94a3b8', dash: '5 5', width: 1.6 }];
+      const tot = idx.map(i => pfSeries(i)[EVO.unit]), up = (tot[tot.length - 1] || 0) >= 0;
+      const titles = h.lines.map((l, k) => ({ id: 't:' + l.key, label: l.symbol, values: idx.map(i => { const v = lineSeries(l, i); return l.values[i] > 0 || l.net_in[i] !== 0 ? v[EVO.unit] : null; }), color: PAL[k % PAL.length], width: 1.8 })).filter(x => x.values.some(v => v !== null));
+      series = EVO.mode === 'gain' ? [{ id: 'gain', label: 'Portefeuille', values: tot, color: up ? '#16a34a' : '#dc2626', area: true }].concat(titles)
+        : [{ id: 'gain', label: 'Portefeuille', values: tot, color: '#0f172a', width: 2.6, dash: '6 4' }].concat(titles);
+      if (EVO.mode === 'gain' && !store('evo_hidden_init')) { h.lines.forEach(l => EVO.hidden.add('t:' + l.key)); store('evo_hidden_init', 1); store('evo_hidden', [...EVO.hidden]); }
     }
-    J.lineChart(host, xs, series, { height, format: eur0, zeroLine: EVO.mode === 'gain', markers: EVO.mode === 'titles' ? [] : markers, hidden: EVO.hidden, onToggle: toggle });
-    // Ce qui fait bouger le portefeuille sur la période
-    const moves = h.lines.map(l => ({ l, d: l.gain[last] - (i0 === 0 ? 0 : l.gain[i0]) })).filter(m => Math.abs(m.d) >= .5).sort((a, b) => b.d - a.d);
-    const total = h.gain[last] - from, m = Math.max(1, ...moves.map(x => Math.abs(x.d)));
-    const per = PERIODS.find(p => p[0] === EVO.per) || PERIODS[PERIODS.length - 1];
-    mv.innerHTML = `<h3>${per[0] === 'all' ? 'Depuis le début' : 'Sur ' + ({ '1w': 'la semaine', '1m': 'le mois', '3m': '3 mois', '6m': '6 mois', '1y': 'un an' })[per[0]]}</h3>
-      <p class="mv-big ${J.cls(total)}">${sgn(total)}</p><p class="small muted mv-sub">Ce qui a fait monter ou baisser votre portefeuille :</p>
-      <div class="mv-list">${moves.map(x => `<div class="mv-row" title="${J.esc(x.l.name)}"><span class="mv-s">${J.esc(x.l.symbol)}</span><span class="mv-bar"><i class="${x.d >= 0 ? 'up' : 'down'}" style="width:${Math.max(3, 100 * Math.abs(x.d) / m).toFixed(0)}%"></i></span><span class="mv-v ${J.cls(x.d)}">${sgn(x.d)}</span></div>`).join('') || '<p class="small muted">Rien n’a bougé.</p>'}</div>`;
+    J.lineChart(host, xs, series, { height, format: EVO.mode === 'value' ? eur0 : fmtV, zeroLine: EVO.mode !== 'value', markers: EVO.mode === 'value' ? markers : [], hidden: EVO.mode === 'titles' ? CMP : EVO.hidden, onToggle: EVO.mode === 'titles' ? (id => { CMP.has(id) ? CMP.delete(id) : CMP.add(id); store('cmp_hidden', [...CMP]); drawEvo(); }) : toggle });
+    // Barres divergentes : à gauche (rouge) ce qui fait baisser, à droite (vert) ce qui fait monter, sur la période choisie
+    const rows = h.lines.map(l => ({ l, ...lineSeries(l, last) })).filter(r => r.l.values.slice(i0).some(v => v > 0) || Math.abs(r.eur) >= .5);
+    rows.sort((a, b) => (b[EVO.unit] ?? -1e9) - (a[EVO.unit] ?? -1e9));
+    const tot = pfSeries(last), m = Math.max(1e-9, ...rows.map(r => Math.abs(r[EVO.unit] || 0)));
+    const val = r => r[EVO.unit] === null || r[EVO.unit] === undefined ? '–' : pct ? J.pct(r[EVO.unit], 1) : sgn(r[EVO.unit]);
+    mv.innerHTML = `<h3>Sur ${PER_LABEL[EVO.per] === 'depuis le début' ? 'toute la période' : PER_LABEL[EVO.per]}</h3>
+      <p class="mv-big ${J.cls(tot.eur)}">${sgn(tot.eur)}${tot.pct !== null ? ` <small>${J.pct(tot.pct, 1)}</small>` : ''}</p>
+      <div class="dv-head"><span class="down">fait baisser</span><span class="up">fait monter</span></div>
+      <div class="dv">${rows.map(r => { const v = r[EVO.unit] || 0, w = (50 * Math.abs(v) / m).toFixed(1); return `<div class="dv-row" title="${J.esc(r.l.name)} : ${sgn(r.eur)}${r.pct !== null ? ' (' + J.pct(r.pct, 1) + ')' : ''} sur la période"><span class="dv-s">${J.esc(r.l.symbol)}</span><span class="dv-track"><i class="${v >= 0 ? 'up' : 'down'}" style="${v >= 0 ? 'left:50%' : 'right:50%'};width:${w}%"></i></span><span class="dv-v ${J.cls(v)}">${val(r)}</span></div>`; }).join('') || '<p class="small muted">Rien n’a bougé.</p>'}</div>
+      <p class="small muted" style="margin-top:8px">${pct ? '% = gain sur la période ÷ argent engagé (valeur au début + achats pendant la période).' : 'Gain ou perte en euros sur la période, frais compris.'}</p>`;
+    fillPeriodCells(new Map(h.lines.map(l => [l.key, lineSeries(l, last)])));
     const dd = h.dates.length > 1 ? h.value[last] - h.value[last - 1] - (h.net_in[last] - h.net_in[last - 1]) : null;
     const hd = J.$('#hero-day'); if (hd && dd !== null) hd.innerHTML = `<span class="${J.cls(dd)}">${sgn(dd)}</span> depuis la clôture du ${J.date(h.dates[last - 1])}`;
   }
-
+  const CMP = new Set(store('cmp_hidden') || []);
+  /* Colonne « Sur la période » du tableau des positions, remplie quand l'évolution est chargée. */
+  function fillPeriodCells(map) {
+    const lab = (PERIODS.find(p => p[0] === EVO.per) || [, 'Tout'])[1];
+    J.$$('.per-h').forEach(e => { e.textContent = EVO.per === '1d' ? 'Sur 1 J' : 'Sur ' + (EVO.per === 'all' ? 'tout' : lab); });
+    J.$$('[data-per]').forEach(td => { const r = map && map.get(td.dataset.per); td.className = 'num per ' + (r ? J.cls(r.eur) : '');
+      td.innerHTML = r ? `<b>${sgn(r.eur)}</b><div class="ps">${r.pct !== null ? J.pct(r.pct, 1) : ''}</div>` : '<span class="muted">–</span>'; });
+  }
   /* ── Positions : une ligne lisible par titre ── */
-  function spark(c, up) {
-    if (!c || !c.points || c.points.length < 2) return '';
-    const w = 120, hh = 34, v = c.points.map(p => p[1]), min = Math.min(...v), max = Math.max(...v), span = max - min || 1, n = v.length;
+  function spark(c) {
+    if (!c) return '';
+    let pts = c.points || [], recent = false;
+    if (pts.length < 5 && (c.daily || []).length > 1) { pts = c.daily.slice(-22); recent = true; }      // achat trop récent : le dernier mois, avec la date d'achat marquée
+    if (pts.length < 2) return '';
+    const w = 120, hh = 34, v = pts.map(p => p[1]), min = Math.min(...v), max = Math.max(...v), span = max - min || 1, n = v.length, up = v[n - 1] >= v[0];
     const X = i => i * w / (n - 1), Y = x => hh - 2 - (x - min) / span * (hh - 4), d = v.map((x, i) => (i ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(x).toFixed(1)).join('');
-    return `<svg class="sp" viewBox="0 0 ${w} ${hh}" preserveAspectRatio="none" style="color:var(--${up ? 'up' : 'down'})"><path class="a" d="${d}L${w} ${hh}L0 ${hh}Z"/><path class="l" d="${d}"/></svg>`;
+    const bi = recent && c.buys && c.buys.length ? pts.findIndex(p => p[0] >= c.buys[0]) : -1;
+    return `<svg class="sp" viewBox="0 0 ${w} ${hh}" preserveAspectRatio="none" style="color:var(--${up ? 'up' : 'down'})"><path class="a" d="${d}L${w} ${hh}L0 ${hh}Z"/><path class="l" d="${d}"/>${bi >= 0 ? `<line x1="${X(bi).toFixed(1)}" x2="${X(bi).toFixed(1)}" y1="0" y2="${hh}" class="b"/>` : ''}</svg>${recent ? '<span class="sp-n">dernier mois</span>' : ''}`;
   }
   function positionsTable(d) {
     const rows = d.positions.map(p => {
       const c = (d.curves || {})[p.listing_id], w = worstFor(d.lots, p.listing_id), name = J.esc(p.name_catalogue || p.name || p.symbol), L = p.levels || {};
-      const sinceBuy = c && c.points && c.points.length > 1 ? 100 * (c.points[c.points.length - 1][1] / c.points[0][1] - 1) : null;
+      const strats = [...new Set((d.lots || []).filter(l => l.listing_id == p.listing_id && l.alert).map(l => l.alert.strategy_label))];
       const filet = p.price !== null && L.stop && p.price <= L.stop ? '<span class="badge ko">Filet atteint</span>' : p.price !== null && L.target && p.price >= L.target ? '<span class="badge ok">Objectif atteint</span>' : '';
+      const held = p.first_buy ? Math.floor((Date.now() - new Date(p.first_buy.replace(' ', 'T') + 'Z')) / 864e5) : null;
       return `<tr class="pos-row" data-open="${p.listing_id || ''}">
         <td class="pt">${p.linked ? `<a href="titre.html?id=${p.listing_id}" target="_blank" rel="noopener" class="pn">${name}</a>` : `<span class="pn">${name}</span>`}
-          <div class="ps">${J.esc(p.symbol)} · ${J.num(p.qty, p.qty % 1 ? 4 : 0)} × ${p.price !== null ? px(p.price, p.price_currency) : '–'} ${w ? `<span class="badge ${LEVEL[w.level][0]}" title="${J.esc(w.alerts.map(x => x.message).join(' '))}">${LEVEL[w.level][1]}</span>` : ''}${filet}${p.catalogue_status === 'excluded' ? ` <span class="badge ko" title="${J.esc(p.excluded_reason || '')}">Hors sélection</span>` : ''}${!p.linked ? ' <span class="badge wait">Sans cours</span>' : ''}</div></td>
-        <td class="pc hide-s">${p.listing_id ? `<button type="button" class="sp-btn" data-chart="${p.listing_id}" title="Ouvrir la courbe">${spark(c, (sinceBuy || 0) >= 0)}</button>` : ''}</td>
+          <div class="ps">${J.esc(p.symbol)} · ${J.num(p.qty, p.qty % 1 ? 4 : 0)} × ${p.price !== null ? px(p.price, p.price_currency) : '–'}${held !== null ? ` · acheté il y a ${held} j` : ''}</div>
+          <div class="ps">${strats.map(x => `<span class="chip-s" title="Stratégie de l’achat (modifiable dans « Alertes »)">${J.esc(x)}</span>`).join('')}${w && w.level !== 'info' ? `<span class="badge ${LEVEL[w.level][0]}" title="${J.esc(w.alerts.map(x => x.message).join(' '))}">${LEVEL[w.level][1]}</span>` : ''}${filet}${p.catalogue_status === 'excluded' ? ` <span class="badge ko" title="${J.esc(p.excluded_reason || '')}">Hors sélection</span>` : ''}${!p.linked ? ' <span class="badge wait">Sans cours</span>' : ''}</div></td>
+        <td class="pc hide-s">${p.listing_id ? `<button type="button" class="sp-btn" data-chart="${p.listing_id}" title="Ouvrir la courbe">${spark(c)}</button>` : ''}</td>
         <td class="num"><b>${J.eur(p.value, 0)}</b><div class="ps">${p.weight !== null ? J.pct(p.weight, 0, false) + ' du total' : ''}</div></td>
+        <td class="num per" data-per="${p.listing_id || ''}"><span class="muted">…</span></td>
         <td class="num ${J.cls(p.unrealized)}"><b>${p.unrealized !== null ? sgn(p.unrealized) : '–'}</b><div class="ps">${J.pct(p.unrealized_pct, 1)}</div></td>
         <td class="num act hide-s"><button type="button" class="ib" data-chart="${p.listing_id || ''}" title="Courbe" ${p.listing_id ? '' : 'disabled'}>📈</button><button type="button" class="ib" data-lv="${p.listing_id || ''}" title="Filet de sécurité et objectif" ${p.linked ? '' : 'disabled'}>🛡️</button></td></tr>`; }).join('');
-    return `<div class="table-wrap"><table class="pos-t"><thead><tr><th>Titre</th><th class="hide-s">Depuis l’achat</th><th class="num">Valeur</th><th class="num">Gain</th><th class="hide-s"></th></tr></thead><tbody>${rows || '<tr><td colspan="5" class="empty">Aucune position ouverte.</td></tr>'}</tbody></table></div>`;
+    return `<div class="table-wrap"><table class="pos-t"><thead><tr><th>Titre</th><th class="hide-s">Courbe</th><th class="num">Valeur</th><th class="num per-h" title="Gain ou perte sur la période choisie au-dessus du graphique">Sur la période</th><th class="num" title="Plus-value latente : depuis vos achats, frais compris">Depuis l’achat</th><th class="hide-s"></th></tr></thead><tbody>${rows || '<tr><td colspan="6" class="empty">Aucune position ouverte.</td></tr>'}</tbody></table></div>`;
   }
 
   /* ── Alertes, ventes, répartition, transactions : repliés par défaut ── */
@@ -167,7 +191,7 @@
     folds();
     J.$$('#pf-tabs button[data-id]').forEach(b => b.onclick = () => { current = +b.dataset.id; render(); });
     J.$('#new-pf').onclick = createPf;
-    J.$$('#evo-mode button, #evo-per button').forEach(b => b.onclick = e => { e.stopPropagation(); const k = b.parentElement.id === 'evo-mode' ? 'mode' : 'per'; EVO[k] = b.dataset.v; store('evo_' + k, EVO[k]); J.$$('#' + b.parentElement.id + ' button').forEach(x => x.classList.toggle('on', x === b)); drawEvo(); });
+    J.$$('#evo-mode button, #evo-per button, #evo-unit button').forEach(b => b.onclick = e => { e.stopPropagation(); if (b.disabled) return; const k = { 'evo-mode': 'mode', 'evo-per': 'per', 'evo-unit': 'unit' }[b.parentElement.id]; EVO[k] = b.dataset.v; store(k === 'mode' ? 'evo_mode2' : 'evo_' + k, EVO[k]); J.$$('#' + b.parentElement.id + ' button').forEach(x => x.classList.toggle('on', x === b)); drawEvo(); });
     const pid = current;
     J.api('portfolio/history', { params: { id: pid } }).then(h => { if (pid !== current) return; H = h; drawEvo(); }).catch(e => { const c = J.$('#evo-chart'); if (c) c.innerHTML = `<div class="notice err">${J.esc(e.message)}</div>`; });
     J.$$('[data-lot]').forEach(b => b.onclick = () => lotDialog(d, d.lots.find(x => x.tx_id == b.dataset.lot)));
