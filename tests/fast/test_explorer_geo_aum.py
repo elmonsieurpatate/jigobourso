@@ -31,7 +31,7 @@ def test_filters_scope_full_universe_by_region_and_aum_decile(monkeypatch):
     conn = Conn({1: 'United States Stock', 2: 'Europe Stock', 3: 'World Stock', 6: 'Europe Stock'})
     all_entries, largest, _, _ = service.scoped_entries(conn, {}, {'kind': 'large_etf'}, rates={'USD': 0.9}, aux={})
     assert len(all_entries) == 6
-    assert [x['symbol'] for x in largest] == ['A', 'B', 'B.US']  # égalité au seuil conservée et doublon d'instrument dédupliqué pour le seuil
+    assert [x['symbol'] for x in largest] == ['A']  # 2 instruments (doublon B / B.US compté une fois) : le premier dixième n'en garde qu'un
     _, us, _, _ = service.scoped_entries(conn, {}, {'kind': 'etf', 'geo_region': 'us'}, rates={'USD': 0.9}, aux={})
     assert [x['symbol'] for x in us] == ['A']  # place Paris sans effet sur zone du fonds
     _, europe, _, _ = service.scoped_entries(conn, {}, {'kind': 'etf', 'geo_region': 'eu'}, rates={'USD': 0.9}, aux={})
@@ -52,3 +52,26 @@ def test_currency_unknown_does_not_enter_aum_decile(monkeypatch):
     monkeypatch.setattr(service, 'judge_universe', lambda conn, config, ids: [dict(key=i, rank=i, score=i) for i in ids])
     _, selected, _, _ = service.scoped_entries(Conn({}), {}, {'kind': 'large_etf'}, rates={}, aux={})
     assert [x['symbol'] for x in selected] == ['Known']
+
+
+def _etfs(amounts):
+    return [dict(id=i, instrument_id=1000 + i, kind='etf', mic='XETR', country=None, category=None, status='retained', score=1, net_assets=a, currency='EUR', price_currency='EUR',
+                 symbol=f'E{i}', name=f'ETF {i}', isin=None, group='etf', fails=[]) for i, a in enumerate(amounts, 1)]
+
+
+def test_large_etf_keeps_only_the_top_tenth_by_aum(monkeypatch):
+    entries = _etfs([float(a) for a in range(1, 101)])           # encours 1 … 100
+    monkeypatch.setattr(service, 'cached_verdicts', lambda *args: entries)
+    monkeypatch.setattr(service, '_reference_window', lambda *args: 21)
+    monkeypatch.setattr(service, 'judge_universe', lambda conn, config, ids: [dict(key=i, rank=i, score=i) for i in ids])
+    _, selected, _, _ = service.scoped_entries(Conn({}), {}, {'kind': 'large_etf'}, rates={}, aux={})
+    assert sorted(x['net_assets'] for x in selected) == [float(a) for a in range(91, 101)]
+
+
+def test_large_etf_rounds_the_tenth_up_and_keeps_ties(monkeypatch):
+    entries = _etfs([5.0, 50.0, 50.0] + [1.0] * 12)               # 15 ETF : 2 au premier dixième, égalité au seuil conservée
+    monkeypatch.setattr(service, 'cached_verdicts', lambda *args: entries)
+    monkeypatch.setattr(service, '_reference_window', lambda *args: 21)
+    monkeypatch.setattr(service, 'judge_universe', lambda conn, config, ids: [dict(key=i, rank=i, score=i) for i in ids])
+    _, selected, _, _ = service.scoped_entries(Conn({}), {}, {'kind': 'large_etf'}, rates={}, aux={})
+    assert sorted(x['net_assets'] for x in selected) == [50.0, 50.0]

@@ -362,7 +362,7 @@ def scoped_entries(conn, config, view, rates=None, aux=None, now=None):
     large_instruments = set()
     if aum_by_instrument:
         ordered_aum = sorted(aum_by_instrument.values(), reverse=True)
-        cutoff = ordered_aum[max(0, (len(ordered_aum) * 9) // 10)]
+        cutoff = ordered_aum[max(0, -(-len(ordered_aum) // 10) - 1)]        # tri décroissant : le seuil est la valeur du dernier ETF du premier dixième
         large_instruments = {iid for iid, amount in aum_by_instrument.items() if amount >= cutoff}
     countries, categories = _choices(view.get('country')), {c.casefold() for c in _choices(view.get('category'))}         # plusieurs choix possibles, séparés par « | »
     caps = {c for c in _choices(view.get('cap')) if c in ('micro', 'small', 'mid', 'large', 'mega')}
@@ -551,7 +551,7 @@ def filter_metadata_coverage(conn):
             if r.get('net_assets') and float(r['net_assets']) > 0 and fx is not None:
                 aum_values[r['instrument_id']] = max(aum_values.get(r['instrument_id'], 0), float(r['net_assets']) * fx)
     ordered = sorted(aum_values.values(), reverse=True)
-    cutoff = ordered[max(0, (len(ordered) * 9) // 10)] if ordered else None
+    cutoff = ordered[max(0, -(-len(ordered) // 10) - 1)] if ordered else None
     groups = Counter((v['kind'], 'known' if v['region'] else 'unknown') for v in instruments.values())
     etfs = [v for v in instruments.values() if v['kind'] == 'etf']
     equities = [v for v in instruments.values() if v['kind'] == 'equity']
