@@ -17,7 +17,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE),fs=require('fs');
    await page.getByText('Participations disponibles (1)',{exact:true}).click();await page.getByText('Poids inconnu',{exact:true}).waitFor();
    await page.getByRole('heading',{name:'ETF aux mouvements similaires'}).waitFor();
    r.etf_content=true;r.etf_overflow=await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth);if(r.etf_overflow)r.etf_wide=await page.evaluate(()=>[...document.querySelectorAll('body *')].map(e=>[e,e.getBoundingClientRect()]).filter(([e,b])=>b.width>0&&b.width>=innerWidth-2).filter(([e])=>![...e.children].some(c=>c.getBoundingClientRect().width>=innerWidth-2)).slice(0,8).map(([e,b])=>e.tagName+'.'+e.className+':w'+Math.round(b.width)+':'+(e.textContent||'').slice(0,50)));await page.screenshot({path:`audit-results/etf-${width}.png`});
-   await page.goto('http://127.0.0.1:18089/portefeuilles.html');await page.getByRole('heading',{name:'Diversification des ETF'}).waitFor();r.etf_portfolio=true;
+   await page.goto('http://127.0.0.1:18089/portefeuilles.html');await page.getByRole('heading',{name:'Secteurs de vos ETF'}).waitFor();await page.getByRole('heading',{name:'Secteurs de vos ETF'}).click();await page.locator('[data-fold="etf"] .fold-b').waitFor();r.etf_portfolio=true;
    await page.goto('http://127.0.0.1:18089/admin.html');await page.locator('#page').waitFor();await page.waitForTimeout(1500);r.admin_navigation=await page.locator('#side').count()>0;
    r.errors=errors;r.completed=true;
   }catch(e){r.error=e.message;await page.screenshot({path:`audit-results/error-${width}.png`}).catch(()=>{});r.errors=errors;}
