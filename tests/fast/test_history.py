@@ -50,3 +50,10 @@ def test_today_uses_the_latest_quote_when_newer_than_the_last_close():
     meta = {1: {'price': 13.0, 'price_time': datetime.datetime(2026, 1, 9, 15, 0)}}
     r = h.build([tx(1, '2026-01-05', 'buy', 10, 10)], BARS, {}, {1: 'EUR'}, {}, meta, TODAY)
     assert r['dates'][-1] == '2026-01-09' and r['value'][-1] == 130.0 and r['value'][-2] == 90.0
+
+
+def test_intraday_value_of_current_holdings():
+    bars15 = {1: [('2026-01-08T14:30:00', 9.5), ('2026-01-09T14:30:00', 12.0), ('2026-01-09T14:45:00', 12.5)]}
+    r = h.build([tx(1, '2026-01-05', 'buy', 10, 10)], BARS, {}, {1: 'EUR'}, {}, {}, TODAY, bars15=bars15)
+    assert r['intraday'] == {'t': ['2026-01-09T14:30:00', '2026-01-09T14:45:00'], 'value': [120.0, 125.0]}
+    assert h.build([tx(1, '2026-01-05', 'buy', 10, 10)], BARS, {}, {1: 'EUR'}, {}, {}, TODAY)['intraday'] == {'t': [], 'value': []}

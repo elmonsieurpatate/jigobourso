@@ -63,12 +63,12 @@ class _Carry:
         return self.last
 
 
-def build(transactions, bars, splits, unit, fx, meta, today=None):
+def build(transactions, bars, splits, unit, fx, meta, today=None, bars15=None):
     """Calcul pur (testable sans base). transactions : lignes du registre (trade_at, side, quantity, unit_price, fx_to_eur, fees, listing_id, symbol, name, currency)."""
     today = (today or datetime.date.today()).isoformat()
     txs = sorted(transactions, key=lambda t: (str(t['trade_at']), int(t.get('id') or 0)))
     if not txs:
-        return {'dates': [], 'value': [], 'net_in': [], 'gain': [], 'lines': [], 'trades': [], 'notes': []}
+        return {'dates': [], 'value': [], 'net_in': [], 'gain': [], 'lines': [], 'trades': [], 'notes': [], 'intraday': {'t': [], 'value': []}}
     notes = []
     series, applied = {}, {}
     for lid in {int(t['listing_id']) for t in txs if t.get('listing_id')}:
@@ -160,8 +160,37 @@ def build(transactions, bars, splits, unit, fx, meta, today=None):
         line.pop('_in', None)
         line['gain'] = [round(v - i, 2) for v, i in zip(line['values'], line['net_in'])]      # gain ou perte cumulé du titre (latent + réalisé)
     out['lines'] = sorted(lines.values(), key=lambda l: -max(l['values'] or [0]))
+    out['intraday'] = intraday_value(holdings, bars15 or {}, {k: (closes[k].last if k in closes else None) for k in holdings if isinstance(k, int)}, to_eur, today, fallback)
     out['trades'] = trades
     out['notes'] = notes
+    return out
+
+
+def intraday_value(holdings, bars15, last_close, to_eur, today, fallback):
+    """Valeur du portefeuille ACTUEL barre par barre (15 min) sur la dernière journée de cotation connue : quantités d'aujourd'hui,
+    chaque titre au dernier prix de 15 min connu (sinon sa dernière clôture), change du jour. Sans barre : rien."""
+    held = {k: q for k, q in holdings.items() if q > 1e-12}
+    days = sorted({t[:10] for k in held if isinstance(k, int) for t, _ in bars15.get(k, [])})
+    if not days:
+        return {'t': [], 'value': []}
+    day = days[-1]
+    slots = sorted({t for k in held if isinstance(k, int) for t, _ in bars15.get(k, []) if t[:10] == day})
+    cur = {k: last_close.get(k) for k in held if isinstance(k, int)}
+    series = {k: [(t, c) for t, c in bars15.get(k, []) if t[:10] == day] for k in cur}
+    idx = {k: 0 for k in cur}
+    out = {'t': [], 'value': []}
+    for s in slots:
+        total = 0.0
+        for k, q in held.items():
+            if not isinstance(k, int):
+                total += q * fallback.get(k, 0.0)
+                continue
+            while idx[k] < len(series[k]) and series[k][idx[k]][0] <= s:
+                cur[k] = series[k][idx[k]][1]; idx[k] += 1
+            f = to_eur(k, today)
+            total += q * cur[k] * f if cur[k] is not None and f is not None else q * fallback.get(k, 0.0)
+        out['t'].append(s)
+        out['value'].append(round(total, 2))
     return out
 
 
@@ -172,4 +201,10 @@ def portfolio_history(conn, request):
     start = datetime.date.fromisoformat(min(str(t['trade_at'])[:10] for t in txs))
     ids = sorted({int(t['listing_id']) for t in txs if t.get('listing_id')})
     bars, splits, unit, (fx, meta) = _load(conn, ids, start)
-    return build(txs, bars, splits, unit, fx, meta)
+    bars15 = {}
+    if ids:
+        with conn.cursor() as cur:
+            cur.execute(f"SELECT listing_id, slot_start, close_px FROM intraday_prices WHERE listing_id IN ({','.join(['%s'] * len(ids))}) AND slot_start >= NOW() - INTERVAL 6 DAY ORDER BY listing_id, slot_start", ids)
+            for r in cur.fetchall():
+                bars15.setdefault(r['listing_id'], []).append((r['slot_start'].isoformat(), float(r['close_px'])))
+    return build(txs, bars, splits, unit, fx, meta, bars15=bars15)

@@ -157,5 +157,5 @@ def curves(lots, series, points=90):
         if start is not None and start > 0 and dates[start] > buys[0]:
             start -= 1                                   # achat un jour sans cotation : on part de la dernière clôture connue avant
         pts = [[d, c] for d, c in zip(dates[start:], closes[start:])] if start is not None else []
-        out[str(lid)] = {'points': downsample(pts, points), 'buys': buys}
+        out[str(lid)] = {'points': downsample(pts, points), 'buys': buys, 'daily': [[d, round(c, 6)] for d, c in zip(dates[-400:], closes[-400:])]}   # série complète : graphique sans autre appel
     return out
