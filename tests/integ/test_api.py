@@ -1,4 +1,5 @@
 """API PHP de bout en bout : serveur PHP réel + base jetable. Authentification, cloisonnement, registre, droits, garantie « exclu »."""
+import datetime
 import http.cookiejar
 import json
 import os
@@ -180,3 +181,37 @@ def test_target_allocation_by_zone(world):
     assert bob.call('portfolio/target', {'id': pf, 'target': None})[0] == 404
     assert a.call('portfolio/target', {'id': pf, 'target': None})[0] == 200
     assert a.call('portfolio', params=f'&id={pf}')[1]['allocation']['target'] is None
+
+
+def test_lot_alerts_follow_each_purchase(world):
+    a = login(world, 'alice', 'alice-secret-1234')
+    pf = a.call('portfolio/create', {'name': 'Alertes'})[1]['id']
+    add = lambda side, q, p, d: a.call('tx/add', {'portfolio_id': pf, 'listing_id': 1, 'side': side, 'quantity': q, 'unit_price': p, 'trade_at': d})
+    first = add('buy', 10, 100, '2026-03-02')[1]['id']
+    second = add('buy', 5, 140, '2026-06-01')[1]['id']
+    sale = add('sell', 12, 130, '2026-07-01')[1]['id']
+    conn = connect()
+    with conn.cursor() as cur:
+        days = [datetime.date(2026, 5, 1) + datetime.timedelta(days=i) for i in range(120)]
+        closes = [150.0 if d == datetime.date(2026, 6, 10) else 110.0 if d >= datetime.date(2026, 8, 1) else 130.0 for d in days]
+        cur.executemany('INSERT INTO daily_prices(listing_id,price_date,close_px) VALUES (1,%s,%s)', list(zip(days, closes)))
+    conn.commit(); conn.close()
+    d = a.call('portfolio', params=f'&id={pf}')[1]
+    assert [(l['tx_id'], round(l['remaining'], 6)) for l in d['lots']] == [(second, 3.0)]          # FIFO : la vente de 12 solde le 1er achat et entame le 2e
+    lot = d['lots'][0]['alert']
+    assert lot['strategy'] == 'regular' and round(lot['measures']['drop_pct'], 1) == 26.7
+    kinds = {x['kind'] for x in lot['alerts']}
+    assert 'drop' in kinds and ('duration' in kinds) == ((datetime.date.today() - datetime.date(2026, 6, 1)).days >= 182) and lot['level'] == 'watch'
+    assert 'momentum' in d['lot_strategies'] and d['lot_strategies']['prudent'].startswith('Prudente')
+    assert a.call('lot/settings', {'tx_id': second, 'strategy': 'nope'})[0] == 422
+    assert a.call('lot/settings', {'tx_id': second, 'alert_drop_pct': 120})[0] == 422
+    assert a.call('lot/settings', {'tx_id': sale, 'strategy': 'momentum'})[0] == 404                 # une vente n'a pas de réglages d'achat
+    assert login(world, 'bob', 'bob-secret-12345').call('lot/settings', {'tx_id': second, 'strategy': 'momentum'})[0] == 404
+    assert a.call('lot/settings', {'tx_id': second, 'strategy': 'momentum', 'alert_drop_pct': '30', 'alert_days': ''})[0] == 200
+    lot = a.call('portfolio', params=f'&id={pf}')[1]['lots'][0]
+    assert lot['settings'] == {'strategy': 'momentum', 'alert_days': None, 'alert_drop_pct': 30.0, 'alerts_off': False}
+    assert lot['alert']['strategy'] == 'momentum' and lot['alert']['own_strategy'] and 'drop' not in {x['kind'] for x in lot['alert']['alerts']}
+    assert a.call('lot/settings', {'tx_id': second, 'alerts_off': True})[0] == 200
+    assert a.call('portfolio', params=f'&id={pf}')[1]['lots'][0]['alert']['alerts'] == []
+    assert a.call('lot/settings', {'tx_id': second})[0] == 200                                        # tout vide : retour aux réglages par défaut
+    assert a.call('portfolio', params=f'&id={pf}')[1]['lots'][0]['settings'] is None

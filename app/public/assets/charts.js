@@ -14,7 +14,7 @@
     const closes = rows.map(r => r[1]), m20 = sma(closes, 20), m50 = sma(closes, 50);
     const from = opts.sessions ? Math.max(0, rows.length - opts.sessions) : 0, view = rows.slice(from), n = view.length;
     const W = 1000, H = 400, L = 8, R = 66, T = 14, PH = opts.volume ? 270 : 330, VT = T + PH + 10, VH = 56, B = H - 24;
-    const vals = closes.slice(from), extra = [...(opts.ma20 ? m20.slice(from) : []), ...(opts.ma50 ? m50.slice(from) : [])].filter(v => v !== null);
+    const vals = closes.slice(from), extra = [...(opts.ma20 ? m20.slice(from) : []), ...(opts.ma50 ? m50.slice(from) : []), ...(opts.levels || []).map(l => l.value)].filter(v => v !== null && v !== undefined && isFinite(v));
     const all = vals.concat(extra), hi = Math.max(...all), lo = Math.min(...all), pad = (hi - lo || hi * .01) * .07, y0 = lo - pad, y1 = hi + pad;
     const X = i => L + i * (W - L - R) / (n - 1), Y = v => T + PH * (1 - (v - y0) / (y1 - y0)), dp = dec(hi), f = v => J.num(v, dp);
     const svg = el('svg', { viewBox: `0 0 ${W} ${H}`, class: 'price-svg', role: 'img', 'aria-label': 'Cours de clôture quotidiens' });
@@ -25,6 +25,9 @@
     const path = (arr, cls) => { let d = '', pen = false; arr.slice(from).forEach((v, i) => { if (v === null) { pen = false; return; } d += (pen ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(v).toFixed(1); pen = true; }); if (d) svg.append(el('path', { d, class: cls })); };
     if (opts.ma50) path(m50, 'ma50'); if (opts.ma20) path(m20, 'ma20');
     svg.append(el('path', { d: line, class: 'pline ' + (up ? 'up' : 'down') }));
+    // Repères facultatifs : lignes verticales datées (achats) et lignes horizontales de niveau (filet de sécurité, plus haut depuis l'achat…).
+    (opts.levels || []).forEach(l => { if (l.value === null || l.value === undefined || !isFinite(l.value)) return; svg.append(el('line', { x1: L, x2: W - R, y1: Y(l.value), y2: Y(l.value), class: 'levelline ' + (l.cls || '') }), el('text', { x: W - R - 6, y: Y(l.value) - 5, 'text-anchor': 'end', class: 'axis levellabel ' + (l.cls || '') }, l.label + ' ' + f(l.value))); });
+    (opts.marks || []).forEach(m => { const i = view.findIndex(r => r[0] >= m.date); if (i < 0) return; svg.append(el('line', { x1: X(i), x2: X(i), y1: T, y2: T + PH, class: 'markline' }), el('text', { x: Math.min(X(i) + 4, W - R - 60), y: T + 12, class: 'axis marklabel' }, m.label)); });
     if (opts.volume) {
       const vols = view.map(r => r[2]), vmax = Math.max(1, ...vols.filter(v => v !== null)), bw = Math.max(1, (W - L - R) / n * .7);
       vols.forEach((v, i) => { if (v !== null) svg.append(el('rect', { x: X(i) - bw / 2, y: VT + VH * (1 - v / vmax), width: bw, height: Math.max(.5, VH * v / vmax), class: 'vol ' + (i && vals[i] < vals[i - 1] ? 'down' : 'up') })); });

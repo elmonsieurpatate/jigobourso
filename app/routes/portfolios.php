@@ -3,6 +3,8 @@ require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/engine.php';
 require_once __DIR__ . '/../services/transactions.php';
 
+const LOT_STRATEGIES = ['regular', 'fast', 'recovery', 'low_volatility', 'momentum', 'momentum12', 'momentum_risk', 'prudent'];   // engine/analytics/alerts.py STRATEGIES
+
 function own_portfolio(int $id, array $user): array {
     $p = q('SELECT * FROM portfolios WHERE id = ? AND user_id = ?', [$id, $user['id']])->fetch();
     if (!$p) throw new ApiError('Portefeuille introuvable', 404);
@@ -43,6 +45,27 @@ return [
         $v['etf_analysis'] = engine_call('etf-portfolio', ['positions' => array_map(function ($x) { return array_intersect_key($x, array_flip(['listing_id', 'kind', 'symbol', 'value'])); }, $v['positions'])]);
         $t = q('SELECT us_pct, eu_pct, emerging_pct FROM portfolio_targets WHERE portfolio_id = ?', [$p['id']])->fetch();
         $target = $t ? ['us' => (float)$t['us_pct'], 'eu' => (float)$t['eu_pct'], 'emerging' => (float)$t['emerging_pct']] : null;
+        $lots = open_lots(q('SELECT * FROM portfolio_transactions WHERE portfolio_id = ?', [$p['id']])->fetchAll());
+        $settings = [];
+        foreach (q('SELECT s.* FROM lot_settings s JOIN portfolio_transactions t ON t.id = s.transaction_id WHERE t.portfolio_id = ?', [$p['id']])->fetchAll() as $r) $settings[(int)$r['transaction_id']] = $r;
+        $pfCfg = $p['strategy_config'] ? json_decode($p['strategy_config'], true) : null;
+        $req = ['portfolio_strategy' => $pfCfg ? ['name' => $pfCfg['name'] ?? null, 'config' => $pfCfg] : null, 'lots' => []];
+        foreach ($lots as $l) {
+            $t = $l['tx']; $s = $settings[(int)$t['id']] ?? [];
+            $req['lots'][] = ['tx_id' => (int)$t['id'], 'listing_id' => $t['listing_id'] ? (int)$t['listing_id'] : null, 'trade_date' => substr($t['trade_at'], 0, 10),
+                'strategy' => $s['strategy'] ?? null, 'alert_days' => isset($s['alert_days']) ? (int)$s['alert_days'] : null,
+                'alert_drop_pct' => isset($s['alert_drop_pct']) ? (float)$s['alert_drop_pct'] : null, 'alerts_off' => !empty($s['alerts_off'])];
+        }
+        $alerts = $req['lots'] ? engine_call('lot-alerts', $req) : ['lots' => [], 'strategies' => null];
+        $v['lots'] = array_map(function ($l) use ($alerts, $settings) {
+            $t = $l['tx']; $s = $settings[(int)$t['id']] ?? null;
+            return ['tx_id' => (int)$t['id'], 'listing_id' => $t['listing_id'] ? (int)$t['listing_id'] : null, 'symbol' => $t['symbol'], 'name' => $t['name'], 'trade_at' => $t['trade_at'],
+                    'quantity' => (float)$t['quantity'], 'remaining' => $l['remaining'], 'unit_price' => (float)$t['unit_price'], 'currency' => $t['currency'],
+                    'settings' => $s ? ['strategy' => $s['strategy'], 'alert_days' => $s['alert_days'] !== null ? (int)$s['alert_days'] : null,
+                                        'alert_drop_pct' => $s['alert_drop_pct'] !== null ? (float)$s['alert_drop_pct'] : null, 'alerts_off' => (bool)$s['alerts_off']] : null,
+                    'alert' => $alerts['lots'][(string)$t['id']] ?? null];
+        }, $lots);
+        $v['lot_strategies'] = $alerts['strategies'] ?? null;
         $v['allocation'] = engine_call('allocation', ['target' => $target, 'positions' => array_map(function ($x) { return array_intersect_key($x, array_flip(['listing_id', 'kind', 'value'])); }, $v['positions'])]);
         return $v + ['portfolio' => ['id' => (int)$p['id'], 'name' => $p['name'], 'is_default' => (bool)$p['is_default'], 'strategy' => $p['strategy_config'] ? json_decode($p['strategy_config'], true) : null], 'transactions_list' => $tx];
     },
@@ -79,6 +102,23 @@ return [
         q('INSERT INTO portfolio_targets(portfolio_id, us_pct, eu_pct, emerging_pct, updated_at) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE us_pct = VALUES(us_pct), eu_pct = VALUES(eu_pct), emerging_pct = VALUES(emerging_pct), updated_at = VALUES(updated_at)',
           [$p['id'], $v['us'], $v['eu'], $v['emerging'], now_utc()]);
         return ['target' => $v];
+    },
+    'lot/settings' => function () {
+        need_post(); $u = require_user(); $b = body();
+        $t = q("SELECT t.id FROM portfolio_transactions t JOIN portfolios p ON p.id = t.portfolio_id WHERE t.id = ? AND p.user_id = ? AND t.side = 'buy'", [(int)($b['tx_id'] ?? 0), $u['id']])->fetch();
+        if (!$t) throw new ApiError('Achat introuvable', 404);
+        $strategy = $b['strategy'] ?? null;
+        if ($strategy === '' ) $strategy = null;
+        if ($strategy !== null && !in_array($strategy, LOT_STRATEGIES, true)) throw new ApiError('Stratégie inconnue', 422);
+        $days = $b['alert_days'] ?? null; $drop = $b['alert_drop_pct'] ?? null;
+        if ($days === '') $days = null; if ($drop === '') $drop = null;
+        if ($days !== null && (!is_numeric($days) || (int)$days < 1 || (int)$days > 3650)) throw new ApiError('Durée invalide (1 à 3 650 jours)', 422);
+        if ($drop !== null && (!is_numeric($drop) || $drop <= 0 || $drop >= 100)) throw new ApiError('Seuil de chute invalide (entre 0 et 100 %)', 422);
+        $off = !empty($b['alerts_off']) ? 1 : 0;
+        if ($strategy === null && $days === null && $drop === null && !$off) q('DELETE FROM lot_settings WHERE transaction_id = ?', [$t['id']]);
+        else q('INSERT INTO lot_settings(transaction_id, strategy, alert_days, alert_drop_pct, alerts_off, updated_at) VALUES (?,?,?,?,?,?) ON DUPLICATE KEY UPDATE strategy = VALUES(strategy), alert_days = VALUES(alert_days), alert_drop_pct = VALUES(alert_drop_pct), alerts_off = VALUES(alerts_off), updated_at = VALUES(updated_at)',
+               [$t['id'], $strategy, $days === null ? null : (int)$days, $drop === null ? null : round((float)$drop, 2), $off, now_utc()]);
+        return ['ok' => true];
     },
     'portfolio/create' => function () {
         need_post(); $u = require_user();

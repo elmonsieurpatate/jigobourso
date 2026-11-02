@@ -17,6 +17,36 @@
     if (price !== null && L.stop && L.target) { const pos = Math.max(0, Math.min(100, 100 * (price - L.stop) / (L.target - L.stop))); gauge = `<div class="bar" style="width:120px;margin:4px 0" title="Cours entre le filet de sécurité et l’objectif"><i style="width:${pos}%"></i></div>`; }
     return `<div class="small">${L.stop || L.target ? `Filet ${px(L.stop, cur)}<br>Objectif ${px(L.target, cur)}` : '<span class="muted">non défini</span>'}</div>${gauge}${state}<div style="margin-top:4px"><button class="btn small" data-lv="${p.listing_id}">Régler</button> <button class="btn small" data-chart="${p.listing_id}">Graphique</button></div>`;
   }
+  /* Alertes de vente achat par achat (rien n'est vendu automatiquement). Niveaux : info < watch (surveiller, réexaminer) < act (alléger, vente à envisager). */
+  const LEVEL = { info: ['info', 'Info'], watch: ['wait', 'À surveiller'], act: ['ko', 'À examiner'] };
+  const lotBadge = a => a && a.level ? `<span class="badge ${LEVEL[a.level][0]}" title="${J.esc(a.alerts.map(x => x.message).join(' '))}">${LEVEL[a.level][1]}</span>` : '';
+  function worstFor(lots, listingId) {
+    const order = ['info', 'watch', 'act'];
+    return (lots || []).filter(l => l.listing_id == listingId && l.alert && l.alert.level).map(l => l.alert).sort((a, b) => order.indexOf(b.level) - order.indexOf(a.level))[0] || null;
+  }
+  function lotsCard(d) {
+    const lots = d.lots || [];
+    if (!lots.length) return '';
+    const rule = a => { const r = a.rules || {}; if (r.off) return '<span class="muted">alertes désactivées</span>';
+      return [r.days ? `${r.days} j → ${J.esc(r.days_action)}` : '', r.drop ? `−${J.num(r.drop, 0)} % du plus haut → ${J.esc(r.drop_action)}` : '', r.exit === 'momentum_negative' ? 'momentum 6 mois négatif → vente à envisager' : r.exit === 'below_ma50' ? 'sous la moyenne 50 j → vente à envisager' : ''].filter(Boolean).join('<br>') + (r.personal ? ' <span class="badge accent">perso</span>' : ''); };
+    const rows = lots.map(l => { const a = l.alert || {}; const m = a.measures || {}; const held = Math.floor((Date.now() - new Date(l.trade_at.replace(' ', 'T') + 'Z')) / 864e5);
+      return `<tr><td>${J.date(l.trade_at)}<div class="small muted">${held} j</div></td><td><b>${J.esc(l.name || l.symbol)}</b><div class="small muted">${J.esc(l.symbol)} · ${J.num(l.remaining, 4)} détenu${l.remaining < l.quantity - 1e-9 ? ` sur ${J.num(l.quantity, 4)}` : ''}</div></td>
+        <td>${J.esc(a.strategy_label || '–')}${a.own_strategy ? ' <span class="badge accent">choisie</span>' : ''}</td><td class="small">${a.rules ? rule(a) : '–'}</td>
+        <td class="num">${m.drop_pct !== undefined && m.drop_pct !== null ? `<span class="${m.drop_pct > 0 ? 'neg' : ''}">−${J.num(m.drop_pct, 1)} %</span><div class="small muted">du plus haut</div>` : '–'}</td>
+        <td class="lot-alerts">${(a.alerts || []).map(x => `<span class="badge ${LEVEL[x.level][0]}" title="${J.esc(x.message)}">${J.esc(x.action)}</span>`).join('') || '<span class="muted small">aucune</span>'}${(a.alerts || []).length ? `<div class="small muted">${(a.alerts || []).map(x => J.esc(x.message)).join('<br>')}</div>` : ''}</td>
+        <td class="num"><button class="btn small" data-lot="${l.tx_id}">Régler</button></td></tr>`; }).join('');
+    return `<div class="card" id="lots"><div class="row between"><h2 style="margin:0">Mes achats et alertes</h2></div>
+      <p class="small muted">Chaque achat garde sa stratégie (celle du portefeuille, sauf si vous en choisissez une autre) et ses alertes. Ce sont des repères, rien n’est vendu automatiquement. Réglages par défaut tirés du test historique des règles de sortie : conserver plus longtemps a rapporté plus, d’où un rappel vers 6 mois ; un recul de 20 % depuis le plus haut signale les pires cas ; pour le Momentum, la meilleure sortie testée est un momentum 6 mois devenu négatif.</p>
+      <div class="table-wrap"><table><thead><tr><th>Achat</th><th>Titre</th><th>Stratégie</th><th>Alertes prévues</th><th class="num">Recul</th><th>Alertes</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+  }
+  function lotDialog(d, l) {
+    const s = l.settings || {}, a = l.alert || {}, strategies = d.lot_strategies || {};
+    const opts = `<option value="">Celle du portefeuille</option>` + Object.entries(strategies).map(([k, v]) => `<option value="${k}" ${s.strategy === k ? 'selected' : ''}>${J.esc(v)}</option>`).join('');
+    J.dialog({ title: 'Achat du ' + J.date(l.trade_at) + ' · ' + (l.name || l.symbol), body: `<p class="small muted">Laissez un champ vide pour garder la valeur par défaut de la stratégie${a.rules ? ` (actuellement : ${a.rules.days ? a.rules.days + ' jours' : 'pas de durée'}, ${a.rules.drop ? '−' + a.rules.drop + ' %' : 'pas de seuil de recul'})` : ''}.</p>
+      ${J.field('Stratégie de cet achat', `<select id="lt-st">${opts}</select>`)}${J.field('Rappel après (jours de détention)', `<input id="lt-days" inputmode="numeric" value="${s.alert_days ?? ''}" placeholder="défaut de la stratégie">`)}${J.field('Alerte si recul depuis le plus haut (%)', `<input id="lt-drop" inputmode="decimal" value="${s.alert_drop_pct ?? ''}" placeholder="défaut de la stratégie">`)}
+      <label class="check"><input type="checkbox" id="lt-off" ${s.alerts_off ? 'checked' : ''}> Désactiver les alertes de cet achat</label>`,
+      actions: [{ label: 'Annuler', run: () => { } }, { label: 'Enregistrer', cls: 'primary', run: async dlg => { const v = i => J.$(i, dlg).value.trim().replace(',', '.'); try { await J.post('lot/settings', { tx_id: l.tx_id, strategy: v('#lt-st'), alert_days: v('#lt-days'), alert_drop_pct: v('#lt-drop'), alerts_off: J.$('#lt-off', dlg).checked }); } catch (e) { J.formError(dlg, e.message); return true; } render(); } }] });
+  }
   /* Répartition par zone (stratégie prudente) : valeur actuelle par zone, cible, montant à acheter (+) ou vendre (−) pour revenir à la cible. Rien n'est exécuté. */
   function allocationCard(a) {
     if (!a || !a.rows) return '';
@@ -63,9 +93,10 @@
     ${allocationCard(d.allocation)}
     <div class="card" style="margin-top:16px"><div class="row between"><h2 style="margin:0">Positions</h2><div class="row"><button class="btn primary small" id="add-tx">Ajouter une transaction</button></div></div>
       <div class="table-wrap"><table><thead><tr><th>Titre</th><th class="num">Quantité</th><th class="num">Prix de revient</th><th class="num">Cours</th><th class="num">Valeur</th><th class="num">+/− value</th><th class="num">Poids</th><th>Garde-fous</th></tr></thead><tbody>
-      ${d.positions.map(p => `<tr><td>${p.linked ? `<a href="titre.html?id=${p.listing_id}"><b>${J.esc(p.name_catalogue || p.name || p.symbol)}</b></a>` : `<b>${J.esc(p.name || p.symbol)}</b>`}<div class="small muted">${J.esc(p.symbol)} ${p.catalogue_status === 'excluded' ? `<span class="badge ko help" title="${J.esc(p.excluded_reason || '')}">Hors sélection</span>` : ''}${!p.linked ? '<span class="badge wait help" title="Titre saisi à la main, sans cours">Sans cours</span>' : ''}</div></td>
+      ${d.positions.map(p => `<tr><td>${p.linked ? `<a href="titre.html?id=${p.listing_id}"><b>${J.esc(p.name_catalogue || p.name || p.symbol)}</b></a>` : `<b>${J.esc(p.name || p.symbol)}</b>`}<div class="small muted">${J.esc(p.symbol)} ${p.catalogue_status === 'excluded' ? `<span class="badge ko help" title="${J.esc(p.excluded_reason || '')}">Hors sélection</span>` : ''}${!p.linked ? '<span class="badge wait help" title="Titre saisi à la main, sans cours">Sans cours</span>' : ''} ${lotBadge(worstFor(d.lots, p.listing_id))}</div></td>
         <td class="num">${J.num(p.qty, 4)}</td><td class="num">${J.eur(p.avg_cost)}</td><td class="num">${p.price_eur !== null ? J.eur(p.price_eur) + `<div class="small muted">${J.priceLabel(p)} · ${J.ago(p.price_time)}</div>` : '–'}</td>
         <td class="num"><b>${J.eur(p.value)}</b></td><td class="num ${J.cls(p.unrealized)}">${p.unrealized !== null ? J.eur(p.unrealized) + `<div class="small">${J.pct(p.unrealized_pct, 1)}</div>` : '–'}</td><td class="num">${p.weight !== null ? J.pct(p.weight, 1, false) : '–'}</td><td>${levelCell(p)}</td></tr>`).join('') || '<tr><td colspan="7" class="empty">Aucune position ouverte.</td></tr>'}</tbody></table></div></div>
+    ${lotsCard(d)}
     <div class="card"><div class="row between"><h2 style="margin:0">Transactions <span class="muted small">(${d.transactions_list.length})</span></h2><a class="btn small" href="api.php?r=export&id=${current}">Exporter en CSV</a></div>
       <div class="table-wrap"><table><thead><tr><th>Date</th><th>Sens</th><th>Titre</th><th class="num">Quantité</th><th class="num">Prix</th><th class="num">Frais</th><th></th></tr></thead><tbody>
       ${d.transactions_list.map(x => `<tr><td>${J.date(x.trade_at)}</td><td><span class="badge ${x.side === 'buy' ? 'ok' : 'wait'}">${x.side === 'buy' ? 'Achat' : 'Vente'}</span></td><td>${J.esc(x.name || x.symbol)} <span class="muted small">${J.esc(x.symbol)}</span></td><td class="num">${J.num(+x.quantity, 4)}</td><td class="num">${J.money(+x.unit_price, x.currency)}</td><td class="num">${x.fees ? J.eur(+x.fees) : '–'}</td>
@@ -75,6 +106,7 @@
       <p class="small muted" style="margin-bottom:0">Stratégie enregistrée : <b>${d.portfolio.strategy ? (NAMES[d.portfolio.strategy.name] || 'Personnalisée') : 'aucune (Croissance régulière par défaut)'}</b>. Elle se règle depuis l’Explorer (affichage avancé).</p></div>`;
     J.$$('#pf-tabs button').forEach(b => b.onclick = () => { current = +b.dataset.id; render(); });
     J.$('#new-pf').onclick = createPf;
+    J.$$('[data-lot]').forEach(b => b.onclick = () => lotDialog(d, d.lots.find(x => x.tx_id == b.dataset.lot)));
     const ap = J.$('#alloc-prudent'); if (ap) ap.onclick = async () => { await J.post('portfolio/target', { id: current, target: { us: 50, eu: 25, emerging: 25 } }); render(); };
     const ae = J.$('#alloc-edit'); if (ae) ae.onclick = () => allocationDialog(d.allocation);
     const ao = J.$('#alloc-off'); if (ao) ao.onclick = async () => { await J.post('portfolio/target', { id: current, target: null }); render(); };
@@ -84,7 +116,11 @@
     J.$$('[data-chart]').forEach(b => b.onclick = async () => { const p = d.positions.find(x => x.listing_id == b.dataset.chart), s = await J.api('sheet', { params: { id: p.listing_id } }), since = (p.first_buy || '').slice(0, 10);
       const dly = s.daily.map((x, i) => [x[0], x[1], s.daily_volume[i]]), from = Math.max(0, dly.findIndex(x => x[0] >= since) - 1), n = dly.length - from;
       const dlg = J.dialog({ title: (p.name_catalogue || p.name || p.symbol) + ' · depuis l’achat', body: '<div id="pc"></div><p class="small muted" id="pc-n"></p>', actions: [{ label: 'Fermer', run: () => { } }] });
-      const r = J.priceChart(J.$('#pc', dlg), dly, { sessions: Math.max(5, n), ma20: false, ma50: false, volume: false, unit: s.currency });
+      const buys = d.transactions_list.filter(x => x.side === 'buy' && x.listing_id == p.listing_id).map(x => ({ date: x.trade_at.slice(0, 10), label: 'Achat ' + J.date(x.trade_at) }));
+      const open = (d.lots || []).filter(l => l.listing_id == p.listing_id && l.alert && l.alert.measures), first = open[0], lv = [];
+      if (p.levels && p.levels.stop) lv.push({ value: +p.levels.stop, label: 'Filet de sécurité' });
+      if (first && first.alert.rules && first.alert.rules.drop && !first.alert.rules.off) lv.push({ value: first.alert.measures.high * (1 - first.alert.rules.drop / 100), label: `Alerte −${J.num(first.alert.rules.drop, 0)} % du plus haut` }, { value: first.alert.measures.high, label: 'Plus haut depuis l’achat', cls: 'high' });
+      const r = J.priceChart(J.$('#pc', dlg), dly, { sessions: Math.max(5, n), ma20: false, ma50: false, volume: false, unit: s.currency, marks: buys, levels: lv });
       J.$('#pc-n', dlg).textContent = r ? `Premier achat le ${J.date(since)} · ${J.pct(r.perf, 1)} depuis cette date (cours du titre, hors frais et change).` : 'Historique insuffisant.'; });
     J.$('#add-tx').onclick = () => J.txDialog({ portfolios: list, portfolioId: current, onDone: render });
     J.$$('[data-edit]').forEach(b => b.onclick = () => J.txDialog({ portfolios: list, portfolioId: current, tx: d.transactions_list.find(x => x.id == b.dataset.edit), onDone: render }));

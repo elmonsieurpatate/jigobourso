@@ -63,3 +63,33 @@ function write_transaction(int $userId, int $portfolioId, callable $change): arr
         $db->commit(); return $result;
     } catch (Throwable $e) { if ($db->inTransaction()) $db->rollBack(); throw $e; }
 }
+// Achats encore (au moins en partie) détenus : les ventes consomment les achats les plus anciens d'abord (FIFO), quantités suivies à travers les splits
+// confirmés comme dans validate_transaction_history. Renvoie [{tx (ligne d'achat), remaining}] dans l'ordre chronologique. Sert aux alertes, pas au prix de revient.
+function open_lots(array $rows): array {
+    usort($rows, function ($a, $b) { return [$a['trade_at'], (int)$a['id']] <=> [$b['trade_at'], (int)$b['id']]; });
+    $events = split_events(array_map(function ($t) { return $t['listing_id'] ?? null; }, $rows));
+    $freeBuys = free_buy_dates($rows);
+    $lots = []; $cursor = [];
+    foreach ($rows as $t) {
+        $k = transaction_key($t); $qty = (float)$t['quantity'];
+        $lid = !empty($t['listing_id']) ? (int)$t['listing_id'] : 0;
+        if ($lid && isset($events[$lid]) && !empty($lots[$k])) {
+            $c = $cursor[$k] ?? '';
+            $f = pending_split_ratio($events[$lid], $freeBuys[$lid] ?? [], $c, substr($t['trade_at'], 0, 10));
+            $cursor[$k] = $c;
+            foreach ($lots[$k] as &$l) $l['remaining'] *= $f;
+            unset($l);
+        } elseif ($lid) $cursor[$k] = max($cursor[$k] ?? '', substr($t['trade_at'], 0, 10));
+        if ($t['side'] === 'buy') { $lots[$k][] = ['tx' => $t, 'remaining' => $qty]; continue; }
+        if (empty($lots[$k])) continue;                  // vente sans achat connu : refusée ailleurs par validate_transaction_history
+        foreach ($lots[$k] as &$l) {
+            if ($qty <= 1e-12) break;
+            $take = min($l['remaining'], $qty); $l['remaining'] -= $take; $qty -= $take;
+        }
+        unset($l);
+    }
+    $out = [];
+    foreach ($lots as $list) foreach ($list as $l) if ($l['remaining'] > 1e-9) $out[] = $l;
+    usort($out, function ($a, $b) { return [$a['tx']['trade_at'], (int)$a['tx']['id']] <=> [$b['tx']['trade_at'], (int)$b['tx']['id']]; });
+    return $out;
+}

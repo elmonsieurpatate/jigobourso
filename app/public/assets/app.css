@@ -384,3 +384,11 @@ tr[hidden] { display: none; }
   body.strategy-editing #guided .guided-slope,
   body.strategy-editing #guided .guided-r2 { display:none; }
 }
+
+/* Repères des courbes du portefeuille : dates d'achat et niveaux d'alerte */
+.price-svg .markline{stroke:var(--accent);stroke-width:1.5;stroke-dasharray:4 4}
+.price-svg .marklabel{fill:var(--accent);font-weight:600}
+.price-svg .levelline{stroke:#c2410c;stroke-width:1.5;stroke-dasharray:6 4}
+.price-svg .levelline.high{stroke:var(--muted);stroke-dasharray:2 4}
+.price-svg .levellabel{fill:#c2410c}.price-svg .levellabel.high{fill:var(--muted)}
+.lot-alerts .badge{margin:0 4px 4px 0}
