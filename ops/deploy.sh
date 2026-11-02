@@ -118,19 +118,22 @@ if [ -z "$sandbox" ]; then
 set -euo pipefail
 test -f "$HOME/tmp-backtest/.sandbox_pw" || { echo "mot de passe de la base sandbox absent" >&2; exit 1; }
 test -x "$ROOT/.venv/bin/python" || { echo "Python de production absent" >&2; exit 1; }
-test -x "$ROOT/ops/sandbox_runner.sh" || { echo "runner Hostinger de la copie isolée absent" >&2; exit 1; }
+mkdir -p "$HOME/tmp-backtest"
 REMOTE
-  remote_sh "bash $root/ops/sandbox_runner.sh $sha filtres"
-  for attempt in $(seq 1 12); do
-    result=$(remote_sh "bash \$HOME/domains/jigobourso.turnjoy.dev/jigobourso-v2/ops/sandbox_runner.sh $sha lecture 80")
+  scp "${ssh_opts[@]}" ops/sandbox_runner.sh "$remote:tmp-backtest/sandbox_runner.sh"
+  remote_sh "chmod 700 \$HOME/tmp-backtest/sandbox_runner.sh && bash \$HOME/tmp-backtest/sandbox_runner.sh $sha filtres"
+  complete=0
+  for attempt in $(seq 1 60); do
+    result=$(remote_sh "bash \$HOME/tmp-backtest/sandbox_runner.sh $sha lecture 80")
     if printf '%s\n' "$result" | grep -q '══ BILAN'; then
       printf '%s\n' "$result" | grep -q 'échec  : aucun' || { echo "essai Hostinger isolé en échec" >&2; exit 1; }
       echo "Essai isolé Hostinger réussi"
+      complete=1
       break
     fi
-    if [ "$attempt" -eq 12 ]; then echo "essai isolé lancé; résultat différé (aucune attente de recalcul dans le déploiement)"; break; fi
-    sleep 5
+    sleep 10
   done
+  [ "$complete" -eq 1 ] || { echo "délai dépassé pour l’essai isolé Hostinger" >&2; exit 1; }
 fi
 
 # Preserve financial evidence before any code replacement. Never auto-rewrite legacy transactions.
