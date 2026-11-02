@@ -499,7 +499,7 @@ def explore(conn, request):
         r.update({'position': position, 'volume': a.get('volume'), 'last_close': a['last_close'].isoformat() if a.get('last_close') else None,
                   'analyst': analyst_view(a.get('analyst')) if e['kind'] == 'equity' else None, 'ref': {k: a.get(k) for k in REF_FIELDS}, 'open': e['mic'] in hours.HOURS and hours.is_open(e['mic'], now),
                   'signals': signals.row_signals(a, e['kind'], ref, prefilter_cfg, a.get('quote_age_days')), 'etf_group': group_of.get(e['id']), 'etf_group_info': group_info.get(e['id']),
-                  'aum_eur': aum_listing_values.get(e['id']) if requested_kind == 'large_etf' else _aum_eur(e, rates)})
+                  'aum_eur': _aum_eur(e, rates)})
         if e['kind'] == 'etf':
             r['fund_nature'] = fund_natures.get(e['id'])
         out.append(r)
