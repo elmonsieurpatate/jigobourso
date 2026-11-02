@@ -162,3 +162,21 @@ def test_invalid_strategy_config_is_rejected(world):
     cfg = a.call('strategy/presets')[1]['presets']['regular']
     cfg['periods'][2]['sessions'] = 999
     assert a.call('strategy/validate', cfg)[0] == 422
+
+
+def test_target_allocation_by_zone(world):
+    a = login(world, 'alice', 'alice-secret-1234')
+    pf = a.call('portfolio/create', {'name': 'Prudent'})[1]['id']
+    assert a.call('tx/add', {'portfolio_id': pf, 'listing_id': 1, 'side': 'buy', 'quantity': 10, 'unit_price': 100, 'trade_at': '2026-10-01'})[0] == 200
+    alloc = a.call('portfolio', params=f'&id={pf}')[1]['allocation']
+    assert alloc['target'] is None and {r['zone']: r['current_pct'] for r in alloc['rows']}['eu'] == 100      # Alpha SE : société allemande
+    assert a.call('portfolio/target', {'id': pf, 'target': {'us': 50, 'eu': 25, 'emerging': 30}})[0] == 422
+    assert a.call('portfolio/target', {'id': pf, 'target': {'us': 50, 'eu': 25, 'emerging': 25}})[0] == 200
+    alloc = a.call('portfolio', params=f'&id={pf}')[1]['allocation']
+    rows = {r['zone']: r for r in alloc['rows']}
+    assert alloc['target'] == {'us': 50.0, 'eu': 25.0, 'emerging': 25.0} and alloc['rebalance_suggested']
+    assert round(rows['us']['gap_eur']) == 600 and round(rows['eu']['gap_eur']) == -900                    # valeur 1 200 € (cours 120)
+    bob = login(world, 'bob', 'bob-secret-12345')
+    assert bob.call('portfolio/target', {'id': pf, 'target': None})[0] == 404
+    assert a.call('portfolio/target', {'id': pf, 'target': None})[0] == 200
+    assert a.call('portfolio', params=f'&id={pf}')[1]['allocation']['target'] is None

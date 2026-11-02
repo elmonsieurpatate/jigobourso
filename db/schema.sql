@@ -476,3 +476,27 @@ CREATE TABLE IF NOT EXISTS etf_analysis (
  PRIMARY KEY (listing_id),
  CONSTRAINT fk_etf_analysis_listing FOREIGN KEY (listing_id) REFERENCES listings(id)
 ) ENGINE=InnoDB ROW_FORMAT=COMPRESSED KEY_BLOCK_SIZE=8;
+
+-- Répartition cible d'un portefeuille par zone (stratégie prudente, ex. 50 / 25 / 25), en % (ajout du 02/11/2026, additif)
+CREATE TABLE IF NOT EXISTS portfolio_targets (
+  portfolio_id  BIGINT UNSIGNED NOT NULL,
+  us_pct        DECIMAL(5,2) NOT NULL,
+  eu_pct        DECIMAL(5,2) NOT NULL,
+  emerging_pct  DECIMAL(5,2) NOT NULL,
+  updated_at    DATETIME NOT NULL,
+  PRIMARY KEY (portfolio_id),
+  CONSTRAINT fk_targets_portfolio FOREIGN KEY (portfolio_id) REFERENCES portfolios(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- Réglages propres à un ACHAT (ajout du 02/11/2026, additif) : stratégie de l'achat (NULL = celle du portefeuille) et alertes personnelles
+-- (NULL = valeur par défaut de la stratégie). Une ligne absente = tout par défaut.
+CREATE TABLE IF NOT EXISTS lot_settings (
+  transaction_id BIGINT UNSIGNED NOT NULL,
+  strategy       VARCHAR(32) CHARACTER SET ascii NULL,
+  alert_days     SMALLINT UNSIGNED NULL,                        -- rappel « réexaminer » après N jours calendaires de détention
+  alert_drop_pct DECIMAL(5,2) NULL,                             -- alerte quand le cours a perdu X % depuis son plus haut depuis l'achat
+  alerts_off     TINYINT(1) NOT NULL DEFAULT 0,
+  updated_at     DATETIME NOT NULL,
+  PRIMARY KEY (transaction_id),
+  CONSTRAINT fk_lot_tx FOREIGN KEY (transaction_id) REFERENCES portfolio_transactions(id) ON DELETE CASCADE
+) ENGINE=InnoDB;

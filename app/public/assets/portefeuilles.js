@@ -17,6 +17,25 @@
     if (price !== null && L.stop && L.target) { const pos = Math.max(0, Math.min(100, 100 * (price - L.stop) / (L.target - L.stop))); gauge = `<div class="bar" style="width:120px;margin:4px 0" title="Cours entre le filet de sécurité et l’objectif"><i style="width:${pos}%"></i></div>`; }
     return `<div class="small">${L.stop || L.target ? `Filet ${px(L.stop, cur)}<br>Objectif ${px(L.target, cur)}` : '<span class="muted">non défini</span>'}</div>${gauge}${state}<div style="margin-top:4px"><button class="btn small" data-lv="${p.listing_id}">Régler</button> <button class="btn small" data-chart="${p.listing_id}">Graphique</button></div>`;
   }
+  /* Répartition par zone (stratégie prudente) : valeur actuelle par zone, cible, montant à acheter (+) ou vendre (−) pour revenir à la cible. Rien n'est exécuté. */
+  function allocationCard(a) {
+    if (!a || !a.rows) return '';
+    const head = a.target ? `<p class="small muted">Cible enregistrée : ${a.rows.filter(r => r.zone !== 'other').map(r => `${J.esc(r.label)} ${J.num(r.target_pct, 0)} %`).join(' · ')}. Rééquilibrage conseillé une fois par an, ou quand une zone s’écarte d’au moins ${J.num(a.tolerance, 0)} points.</p>`
+      : '<p class="small muted">Aucune répartition cible. La stratégie prudente répartit des ETF larges et peu chers : 50 % États-Unis, 25 % Europe, 25 % émergents, rééquilibrés une fois par an.</p>';
+    const rows = a.rows.filter(r => r.value_eur > 0 || (a.target && r.zone !== 'other')).map(r => `<tr><td>${J.esc(r.label)}</td><td class="num">${J.eur(r.value_eur, 0)}</td><td class="num">${r.current_pct === null ? '–' : J.pct(r.current_pct, 1, false)}</td>
+      ${a.target ? `<td class="num">${r.target_pct === null ? '–' : J.pct(r.target_pct, 0, false)}</td><td class="num ${r.off_target ? 'neg' : ''}">${r.gap_eur === null ? '–' : (r.gap_eur >= 0 ? 'acheter ' : 'vendre ') + J.eur(Math.abs(r.gap_eur), 0)}</td>` : ''}</tr>`).join('');
+    const links = ['us', 'eu', 'emerging'].map(z => `<a class="btn small" href="index.html?kind=large_etf&geo_region=${z}&max_fee=0.3">Gros ETF ${z === 'us' ? 'États-Unis' : z === 'eu' ? 'Europe' : 'émergents'}</a>`).join(' ');
+    return `<div class="card" id="alloc" style="margin-top:16px"><div class="row between"><h2 style="margin:0">Répartition par zone</h2><div class="row">${a.target ? '<button class="btn small" id="alloc-edit">Modifier la cible</button><button class="btn small" id="alloc-off">Retirer la cible</button>' : '<button class="btn small primary" id="alloc-prudent">Utiliser la répartition prudente 50 / 25 / 25</button><button class="btn small" id="alloc-edit">Autre répartition…</button>'}</div></div>
+      ${head}${a.rebalance_suggested ? '<div class="notice warn">Une zone s’écarte de la cible : un rééquilibrage peut être envisagé.</div>' : ''}
+      ${rows ? `<div class="table-wrap"><table><thead><tr><th>Zone</th><th class="num">Valeur</th><th class="num">Part</th>${a.target ? '<th class="num">Cible</th><th class="num">Pour revenir à la cible</th>' : ''}</tr></thead><tbody>${rows}</tbody></table></div>` : ''}
+      <p class="small muted">Zone d’une action : pays de l’entreprise. Zone d’un ETF : sa catégorie géographique ; un ETF « Monde » ou sans catégorie compte dans « Autre ou inconnue ».${a.unpriced ? ` ${a.unpriced} position(s) sans cours ne sont pas comptées.` : ''}</p>
+      <div class="row">${links}</div></div>`;
+  }
+  function allocationDialog(a) {
+    const t = (a && a.target) || { us: 50, eu: 25, emerging: 25 };
+    J.dialog({ title: 'Répartition cible par zone', body: `<p class="small muted">Trois parts en %, total 100.</p>${J.field('États-Unis (%)', `<input id="al-us" inputmode="decimal" value="${t.us}">`)}${J.field('Europe (%)', `<input id="al-eu" inputmode="decimal" value="${t.eu}">`)}${J.field('Émergents (%)', `<input id="al-em" inputmode="decimal" value="${t.emerging}">`)}`,
+      actions: [{ label: 'Annuler', run: () => { } }, { label: 'Enregistrer', cls: 'primary', run: async dlg => { const n = i => J.$(i, dlg).value.trim().replace(',', '.'); try { await J.post('portfolio/target', { id: current, target: { us: n('#al-us'), eu: n('#al-eu'), emerging: n('#al-em') } }); } catch (e) { J.formError(dlg, e.message); return true; } render(); } }] });
+  }
   async function render() {
     list = (await J.api('portfolios')).portfolios;
     if (!list.length) { page.innerHTML = `<h1>Portefeuilles</h1><div class="card empty"><p>Vous n’avez pas encore de portefeuille.</p><button class="btn primary" id="first">Créer mon premier portefeuille</button></div>`; J.$('#first').onclick = createPf; return; }
@@ -41,6 +60,7 @@
     ${t.unpriced ? `<div class="notice warn" style="margin-top:14px">${t.unpriced} position${t.unpriced > 1 ? 's' : ''} sans cours disponible : la valeur totale est sous-estimée.</div>` : ''}
     ${splitNotice(d.positions)}
     ${JEtf.portfolio(d.etf_analysis)}
+    ${allocationCard(d.allocation)}
     <div class="card" style="margin-top:16px"><div class="row between"><h2 style="margin:0">Positions</h2><div class="row"><button class="btn primary small" id="add-tx">Ajouter une transaction</button></div></div>
       <div class="table-wrap"><table><thead><tr><th>Titre</th><th class="num">Quantité</th><th class="num">Prix de revient</th><th class="num">Cours</th><th class="num">Valeur</th><th class="num">+/− value</th><th class="num">Poids</th><th>Garde-fous</th></tr></thead><tbody>
       ${d.positions.map(p => `<tr><td>${p.linked ? `<a href="titre.html?id=${p.listing_id}"><b>${J.esc(p.name_catalogue || p.name || p.symbol)}</b></a>` : `<b>${J.esc(p.name || p.symbol)}</b>`}<div class="small muted">${J.esc(p.symbol)} ${p.catalogue_status === 'excluded' ? `<span class="badge ko help" title="${J.esc(p.excluded_reason || '')}">Hors sélection</span>` : ''}${!p.linked ? '<span class="badge wait help" title="Titre saisi à la main, sans cours">Sans cours</span>' : ''}</div></td>
@@ -55,6 +75,9 @@
       <p class="small muted" style="margin-bottom:0">Stratégie enregistrée : <b>${d.portfolio.strategy ? (NAMES[d.portfolio.strategy.name] || 'Personnalisée') : 'aucune (Croissance régulière par défaut)'}</b>. Elle se règle depuis l’Explorer (affichage avancé).</p></div>`;
     J.$$('#pf-tabs button').forEach(b => b.onclick = () => { current = +b.dataset.id; render(); });
     J.$('#new-pf').onclick = createPf;
+    const ap = J.$('#alloc-prudent'); if (ap) ap.onclick = async () => { await J.post('portfolio/target', { id: current, target: { us: 50, eu: 25, emerging: 25 } }); render(); };
+    const ae = J.$('#alloc-edit'); if (ae) ae.onclick = () => allocationDialog(d.allocation);
+    const ao = J.$('#alloc-off'); if (ao) ao.onclick = async () => { await J.post('portfolio/target', { id: current, target: null }); render(); };
     J.$$('[data-lv]').forEach(b => b.onclick = () => { const p = d.positions.find(x => x.listing_id == b.dataset.lv), L = p.levels || {}, cur = p.price_currency || p.currency;
       J.dialog({ title: 'Garde-fous · ' + (p.name_catalogue || p.name || p.symbol), body: `<p class="small muted">Prix dans la devise de la cotation (${J.esc(cur || '')}). Ce sont des repères personnels : rien n’est vendu automatiquement. Cours actuel : ${px(p.price, cur)} · prix de revient moyen : ${J.eur(p.avg_cost)}.</p>${J.field('Filet de sécurité (stop)', `<input id="lv-stop" inputmode="decimal" value="${L.stop ?? ''}">`)}${J.field('Objectif', `<input id="lv-target" inputmode="decimal" value="${L.target ?? ''}">`)}`,
         actions: [{ label: 'Annuler', run: () => { } }, { label: 'Enregistrer', cls: 'primary', run: async dlg => { const n = i => J.$(i, dlg).value.trim().replace(',', '.'); try { await J.post('position/levels', { portfolio_id: current, listing_id: p.listing_id, stop: n('#lv-stop'), target: n('#lv-target') }); } catch (e) { J.formError(dlg, e.message); return true; } render(); } }] }); });

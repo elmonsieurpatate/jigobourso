@@ -75,3 +75,14 @@ def test_large_etf_rounds_the_tenth_up_and_keeps_ties(monkeypatch):
     monkeypatch.setattr(service, 'judge_universe', lambda conn, config, ids: [dict(key=i, rank=i, score=i) for i in ids])
     _, selected, _, _ = service.scoped_entries(Conn({}), {}, {'kind': 'large_etf'}, rates={}, aux={})
     assert sorted(x['net_assets'] for x in selected) == [50.0, 50.0]
+
+
+def test_max_fee_keeps_cheap_etfs_and_ignores_equities(monkeypatch):
+    entries = _etfs([10.0, 20.0, 30.0]) + [dict(id=9, instrument_id=9, kind='equity', mic='XPAR', country='France', category=None, status='retained', score=1, net_assets=None, currency='EUR',
+                                                 price_currency='EUR', symbol='EQ', name='Action', isin=None, group='equity', fails=[])]
+    aux = {1: {'fee': 0.07}, 2: {'fee': 0.45}, 3: {}, 9: {}}                     # ETF 3 : frais inconnus
+    monkeypatch.setattr(service, 'cached_verdicts', lambda *args: entries)
+    monkeypatch.setattr(service, '_reference_window', lambda *args: 21)
+    monkeypatch.setattr(service, 'judge_universe', lambda conn, config, ids: [dict(key=i, rank=i, score=i) for i in ids])
+    _, selected, _, _ = service.scoped_entries(Conn({}), {}, {'max_fee': '0.3'}, rates={}, aux=aux)
+    assert [x['symbol'] for x in selected] == ['E1', 'EQ']

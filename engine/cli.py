@@ -69,6 +69,9 @@ def serve(cmd):
         elif cmd == 'etf-portfolio':
             from .analytics import etf
             result = etf.portfolio(connect(), request.get('positions', []))
+        elif cmd == 'allocation':
+            from .analytics import allocation
+            result = allocation.portfolio_allocation(connect(), request)
         elif cmd == 'overview':
             from .analytics import overview
             result = overview.data_overview(connect())
@@ -112,10 +115,10 @@ def main(argv=None):
         sub.add_parser(name, help='administration (JSON sur stdin)')
     for name, text in (('explore', 'Explorer : classement et recherche (JSON sur stdin)'), ('sheet', 'fiche d’un titre (JSON sur stdin)'),
                        ('validate-config', 'valider une configuration de stratégie (JSON sur stdin)'),
-                       ('etf-portfolio', 'Expositions connues et similarité du portefeuille'), ('presets', 'les stratégies de départ (dont l’expérimentale Momentum 6 mois)'), ('suivi', 'statistiques de la page Suivi'), ('overview', 'vue d’ensemble des données (sources, fraîcheur, couverture)'), ('intraday', 'deux dernières séances en barres de 15 minutes (JSON sur stdin)'), ('filter-metadata-coverage', 'couverture des métadonnées de filtre ETF')):
+                       ('etf-portfolio', 'Expositions connues et similarité du portefeuille'), ('allocation', 'répartition du portefeuille par zone et écart à la cible (JSON sur stdin)'), ('presets', 'les stratégies de départ (dont l’expérimentale Momentum 6 mois)'), ('suivi', 'statistiques de la page Suivi'), ('overview', 'vue d’ensemble des données (sources, fraîcheur, couverture)'), ('intraday', 'deux dernières séances en barres de 15 minutes (JSON sur stdin)'), ('filter-metadata-coverage', 'couverture des métadonnées de filtre ETF')):
         sub.add_parser(name, help=text)
     args = ap.parse_args(argv)
-    if args.cmd in ('fdb-state', 'yahoo-state', 'titles', 'rules-save', 'rules-reset', 'funnel', 'funnel-items', 'funnel-explain', 'schedule-get', 'schedule-save', 'job-check', 'jobs-list', 'job-detail', 'explore', 'sheet', 'validate-config', 'presets', 'suivi', 'intraday', 'overview', 'etf-portfolio'):
+    if args.cmd in ('fdb-state', 'yahoo-state', 'titles', 'rules-save', 'rules-reset', 'funnel', 'funnel-items', 'funnel-explain', 'schedule-get', 'schedule-save', 'job-check', 'jobs-list', 'job-detail', 'explore', 'sheet', 'validate-config', 'presets', 'suivi', 'intraday', 'overview', 'etf-portfolio', 'allocation'):
         return serve(args.cmd)
     if args.cmd == 'catalogue':
         from engine.catalogue.loader import load

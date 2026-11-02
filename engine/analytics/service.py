@@ -276,14 +276,14 @@ def _daily_eur(a):
 def _aux(conn, ref, rates):
     """Données de filtre et de tri pour tout l'univers : prix, volume, fraîcheur et mesures de la fenêtre de référence `ref`."""
     with conn.cursor() as cur:
-        cur.execute("""SELECT p.listing_id id, p.price, COALESCE(p.currency, l.currency) cur, p.avg_volume_3m volume, p.avg_volume_10d volume_10d, p.analyst_rating analyst, p.market_cap, p.quote_at, l.mic, s.last_close_date, s.quality
+        cur.execute("""SELECT p.listing_id id, p.price, COALESCE(p.currency, l.currency) cur, p.avg_volume_3m volume, p.avg_volume_10d volume_10d, p.expense_ratio fee, p.analyst_rating analyst, p.market_cap, p.quote_at, l.mic, s.last_close_date, s.quality
                        FROM latest_prices p JOIN listings l ON l.id=p.listing_id LEFT JOIN series_state s ON s.listing_id=l.id""")
         out = {}
         for r in cur.fetchall():
             price = None if r['price'] is None else float(r['price'])
             f = to_eur_factor(r['cur'], rates)
             age = None if r['quote_at'] is None else max(0.0, (hours.utcnow().replace(tzinfo=None) - r['quote_at']).total_seconds() / 86400)
-            out[r['id']] = {'price': price, 'price_eur': price * f if price is not None and f else None, 'cap': _size_key(r['market_cap'], r['cur'], rates), 'volume': r['volume'], 'volume_10d': r['volume_10d'], 'analyst': r['analyst'], 'quote_age_days': age,
+            out[r['id']] = {'price': price, 'price_eur': price * f if price is not None and f else None, 'cap': _size_key(r['market_cap'], r['cur'], rates), 'volume': r['volume'], 'volume_10d': r['volume_10d'], 'fee': None if r['fee'] is None else float(r['fee']), 'analyst': r['analyst'], 'quote_age_days': age,
                             'last_close': r['last_close_date'], 'quality': 'stale' if r['last_close_date'] and str(r['last_close_date']) < expected_close(conn, r['mic']) else r['quality']}
         cur.execute('SELECT listing_id, slope, r2, perf, volatility, drawdown FROM strategy_metrics WHERE sessions=%s', (ref,))
         for r in cur.fetchall():
@@ -378,6 +378,7 @@ def scoped_entries(conn, config, view, rates=None, aux=None, now=None):
     if view.get('open_now'):
         base = [e for e in base if e['mic'] in hours.HOURS and hours.is_open(e['mic'], now)]
     budget, min_price, max_price, max_vol, max_dd, min_volume = (_num(view, k) for k in ('budget', 'min_price', 'max_price', 'max_volatility', 'max_drawdown', 'min_volume'))
+    max_fee = _num(view, 'max_fee')                 # frais courants maximaux d'un ETF, en % par an ; sans effet sur les actions
 
     def keep(e):
         a = aux.get(e['id'], {})
@@ -389,6 +390,8 @@ def scoped_entries(conn, config, view, rates=None, aux=None, now=None):
         if max_dd is not None and (a.get('drawdown') is None or a['drawdown'] > max_dd):
             return False
         if min_volume is not None and (a.get('volume') is None or a['volume'] < min_volume):
+            return False
+        if max_fee is not None and e['kind'] == 'etf' and (a.get('fee') is None or a['fee'] > max_fee):     # frais inconnus : l'ETF n'est pas retenu
             return False
         if caps and (e['kind'] != 'equity' or a.get('cap') not in caps):       # la taille ne concerne que les actions : un ETF n'a pas de capitalisation boursière
             return False
@@ -499,7 +502,7 @@ def explore(conn, request):
         r.update({'position': position, 'volume': a.get('volume'), 'last_close': a['last_close'].isoformat() if a.get('last_close') else None,
                   'analyst': analyst_view(a.get('analyst')) if e['kind'] == 'equity' else None, 'ref': {k: a.get(k) for k in REF_FIELDS}, 'open': e['mic'] in hours.HOURS and hours.is_open(e['mic'], now),
                   'signals': signals.row_signals(a, e['kind'], ref, prefilter_cfg, a.get('quote_age_days')), 'etf_group': group_of.get(e['id']), 'etf_group_info': group_info.get(e['id']),
-                  'aum_eur': _aum_eur(e, rates)})
+                  'aum_eur': _aum_eur(e, rates), 'fee': a.get('fee') if e['kind'] == 'etf' else None})
         if e['kind'] == 'etf':
             r['fund_nature'] = fund_natures.get(e['id'])
         out.append(r)

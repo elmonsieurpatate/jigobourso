@@ -41,6 +41,9 @@ return [
         unset($pos);
         $tx = q('SELECT id, listing_id, symbol, name, isin, side, quantity, unit_price, currency, fx_to_eur, fees, trade_at, note FROM portfolio_transactions WHERE portfolio_id = ? ORDER BY trade_at DESC, id DESC', [$p['id']])->fetchAll();
         $v['etf_analysis'] = engine_call('etf-portfolio', ['positions' => array_map(function ($x) { return array_intersect_key($x, array_flip(['listing_id', 'kind', 'symbol', 'value'])); }, $v['positions'])]);
+        $t = q('SELECT us_pct, eu_pct, emerging_pct FROM portfolio_targets WHERE portfolio_id = ?', [$p['id']])->fetch();
+        $target = $t ? ['us' => (float)$t['us_pct'], 'eu' => (float)$t['eu_pct'], 'emerging' => (float)$t['emerging_pct']] : null;
+        $v['allocation'] = engine_call('allocation', ['target' => $target, 'positions' => array_map(function ($x) { return array_intersect_key($x, array_flip(['listing_id', 'kind', 'value'])); }, $v['positions'])]);
         return $v + ['portfolio' => ['id' => (int)$p['id'], 'name' => $p['name'], 'is_default' => (bool)$p['is_default'], 'strategy' => $p['strategy_config'] ? json_decode($p['strategy_config'], true) : null], 'transactions_list' => $tx];
     },
     'position/levels' => function () {
@@ -59,6 +62,23 @@ return [
         if ($v['stop'] === null && $v['target'] === null) q('DELETE FROM position_levels WHERE portfolio_id = ? AND listing_id = ?', [$p['id'], $lid]);
         else q('INSERT INTO position_levels(portfolio_id, listing_id, stop_px, target_px, updated_at) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE stop_px = VALUES(stop_px), target_px = VALUES(target_px), updated_at = VALUES(updated_at)', [$p['id'], $lid, $v['stop'], $v['target'], now_utc()]);
         return ['ok' => true];
+    },
+    'portfolio/target' => function () {
+        need_post(); $u = require_user(); $b = body();
+        $p = own_portfolio((int)($b['id'] ?? 0), $u);
+        if (empty($b['target'])) { q('DELETE FROM portfolio_targets WHERE portfolio_id = ?', [$p['id']]); return ['target' => null]; }
+        $t = $b['target'];
+        if (!is_array($t)) throw new ApiError('Répartition invalide', 422);
+        $v = [];
+        foreach (['us', 'eu', 'emerging'] as $k) {
+            $x = $t[$k] ?? null;
+            if (!is_numeric($x) || $x < 0 || $x > 100) throw new ApiError('Chaque part doit être comprise entre 0 et 100 %', 422);
+            $v[$k] = round((float)$x, 2);
+        }
+        if (abs(array_sum($v) - 100) > 0.01) throw new ApiError('Les trois parts doivent faire 100 %', 422);
+        q('INSERT INTO portfolio_targets(portfolio_id, us_pct, eu_pct, emerging_pct, updated_at) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE us_pct = VALUES(us_pct), eu_pct = VALUES(eu_pct), emerging_pct = VALUES(emerging_pct), updated_at = VALUES(updated_at)',
+          [$p['id'], $v['us'], $v['eu'], $v['emerging'], now_utc()]);
+        return ['target' => $v];
     },
     'portfolio/create' => function () {
         need_post(); $u = require_user();
