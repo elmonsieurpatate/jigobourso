@@ -24,7 +24,7 @@
       const defs = el('defs'); svg.append(defs);
       ticks(y0, y1, 3).forEach(v => { svg.append(el('line', { x1: L, x2: W - R, y1: Y(v), y2: Y(v), class: 'lc-grid' })); });
       if (opts.zeroLine && y0 < 0 && y1 > 0) svg.append(el('line', { x1: L, x2: W - R, y1: Y(0), y2: Y(0), class: 'lc-zero' }));
-      vis.forEach((s, k) => {
+      [...vis].sort((a,b)=>(a.id===opts.selected)-(b.id===opts.selected)).forEach((s, k) => {
         let d = '', pen = false; s.values.forEach((v, i) => { if (v === null || v === undefined) { pen = false; return; } d += (pen ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(v).toFixed(1); pen = true; });
         if (s.area) { const g = el('linearGradient', { id: 'lcg' + k + '-' + (host.id || ''), x1: 0, x2: 0, y1: 0, y2: 1 }); g.append(el('stop', { offset: '0%', 'stop-color': s.color, 'stop-opacity': .28 }), el('stop', { offset: '100%', 'stop-color': s.color, 'stop-opacity': 0 })); defs.append(g);
           const base = Y(opts.zeroLine ? Math.max(y0, Math.min(0, y1)) : y0); svg.append(el('path', { d: `${d}L${X(n - 1)} ${base}L${L} ${base}Z`, fill: `url(#lcg${k}-${host.id || ''})` })); }
@@ -81,7 +81,7 @@
     }
     if (series.length > 1 && opts.onToggle) {
       const lg = document.createElement('div'); lg.className = 'lc-legend';
-      lg.innerHTML = series.map(s => `<button type="button" class="lc-chip ${hidden.has(s.id) ? 'off' : ''}" data-id="${J.esc(s.id)}" aria-pressed="${!hidden.has(s.id)}"><i style="background:${s.color}"></i>${J.esc(s.label)}</button>`).join('');
+      lg.innerHTML = series.map(s => `<button type="button" class="lc-chip ${hidden.has(s.id) ? 'off' : ''} ${opts.focusLegend && opts.selected===s.id?'selected':''}" data-id="${J.esc(s.id)}" aria-pressed="${opts.focusLegend ? !opts.selected || opts.selected===s.id : !hidden.has(s.id)}"><i style="background:${s.color}"></i>${J.esc(s.label)}</button>`).join('');
       lg.querySelectorAll('button').forEach(b => b.onclick = () => opts.onToggle(b.dataset.id));
       host.append(lg);
     }

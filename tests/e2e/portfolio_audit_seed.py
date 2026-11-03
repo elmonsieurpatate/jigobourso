@@ -52,4 +52,18 @@ with c.cursor() as q:
  q.execute("INSERT INTO lot_settings(transaction_id,strategy,alert_days,alert_drop_pct,updated_at) VALUES (%s,'momentum',30,20,NOW()),(%s,'fast',30,10,NOW())",(a,b))
  t=tx(8,1,'buy',1,100,today.isoformat(),1)
  q.execute('UPDATE portfolio_transactions SET trade_at=%s WHERE id=%s',(dt.datetime.combine(today,dt.time(9,15)),t))
-c.commit();c.close();print('8 portefeuilles synthétiques, 5 titres, base isolée prête')
+ # Six held positions, two pairs of identical market paths: six legends, four geometries.
+ q.execute("INSERT INTO portfolios(id,user_id,name,is_default,created_at,updated_at) VALUES (9,%s,'Six positions superposées',0,NOW(),NOW())",(user_id,))
+ for lid,sym,end in [(11,'TTAN',110),(12,'ASO',105),(13,'BOX',110),(14,'FIGS',105),(15,'VFC',120),(16,'DXC',80)]:
+  q.execute("INSERT INTO instruments(id,group_key,kind,name,country) VALUES (%s,%s,'equity',%s,'France')",(lid,'six:'+sym,'Six '+sym))
+  q.execute("INSERT INTO listings(id,instrument_id,mic,symbol,currency,status,is_primary) VALUES (%s,%s,'XPAR',%s,'EUR','selected',1)",(lid,lid,sym))
+  q.execute("INSERT INTO latest_prices(listing_id,price,price_time,source,currency) VALUES (%s,%s,NOW(),'quote','EUR')",(lid,end))
+  prices=[(lid,day,100+(end-100)*max(0,min(1,(day-dt.date(2026,10,20)).days/max(1,(today-dt.date(2026,10,20)).days)))) for day in days+[today]]
+  q.executemany('INSERT INTO daily_prices(listing_id,price_date,close_px) VALUES (%s,%s,%s)',prices)
+  q.execute("INSERT INTO series_state(listing_id,computed_at,last_close_date,closes_count,close_px,ma50,momentum_6m,quality) VALUES (%s,NOW(),%s,420,%s,100,%s,'ok')",(lid,today,end,-.1 if sym=='DXC' else .1))
+  for window in (5,21,63,126,252):
+   q.execute('INSERT INTO strategy_metrics(listing_id,sessions,slope,perf,volatility) VALUES (%s,%s,.1,%s,.5)',(lid,window,end-100))
+  for date,qty,price,fee in [('2026-10-20',1,100,1)]+([('2026-10-28',.2,105,.1)] if sym in ('TTAN','BOX') else []):
+   q.execute("INSERT INTO portfolio_transactions(portfolio_id,listing_id,symbol,name,side,quantity,unit_price,currency,fx_to_eur,fees,trade_at,created_at) VALUES (9,%s,%s,%s,'buy',%s,%s,'EUR',1,%s,%s,NOW())",(lid,sym,'Six '+sym,qty,price,fee,date+' 12:00:00'))
+   if sym=='DXC':q.execute("INSERT INTO lot_settings(transaction_id,strategy,alert_drop_pct,updated_at) VALUES (%s,'regular',10,NOW())",(q.lastrowid,))
+c.commit();c.close();print('9 portefeuilles synthétiques, 11 titres, base isolée prête')

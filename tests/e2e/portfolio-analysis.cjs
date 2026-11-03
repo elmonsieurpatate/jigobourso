@@ -13,7 +13,7 @@ await page.goto(BASE+'/portefeuilles.html?id=1');await page.waitForFunction(()=>
 const hist=await(await ctx.request.get(BASE+'/api.php?r=portfolio/history&id=1')).json();
 assert.ok(hist.market.dates[0]<hist.dates[0]);assert.equal(hist.trades.filter(t=>t.side==='buy'&&t.date==='2026-09-01').length,2);
 await page.evaluate(()=>{const original=J.lineChart;J.lineChart=(host,xs,series,options)=>{if(host.id==='evo-chart')window.chart={xs,series,options:{time:!!options.time,markers:options.markers||[]}};return original(host,xs,series,options)}});
-await page.locator('[data-view="analysis"]').click();
+await page.locator('[data-view="analysis"]').click();await page.locator('#clear-focus').click();await page.locator('#analysis-domain [data-v="market"]').click();
 for(const period of ['1w','1m','3m','6m','1y','all','1d']){
  await page.locator(`#evo-per [data-v="${period}"]`).click();
  for(const scale of ['index','price']){
@@ -33,7 +33,7 @@ assert.equal(await page.getByRole('button',{name:'2026-09-01 · Achat DOLLAR, PE
 await page.keyboard.press('Escape');assert.equal(await page.locator('#evo-chart .lc-tip').isVisible(),false);
 if(width<600){await marker.scrollIntoViewIfNeeded();const rect=await marker.locator('rect').first().boundingBox();await page.touchscreen.tap(rect.x+rect.width/2,rect.y+rect.height/2);assert.equal(await page.locator('#evo-chart .lc-tip').isVisible(),true);assert.match(await page.locator('#evo-chart .lc-tip').innerText(),/prix/)}
 await page.locator('#purchase-markers').uncheck();assert.equal(await page.locator('.lc-purchase-marker').count(),0);await page.locator('#purchase-markers').check();
-await page.locator('#evo-per [data-v="1w"]').click();assert.equal(await page.locator('.lc-purchase-marker').count(),0);assert.match(await page.locator('#analysis-purchases').innerText(),/2025/);
+await page.locator('#evo-per [data-v="1w"]').click();assert.equal(await page.locator('.lc-purchase-marker').count(),0);await page.locator('#all-purchases>summary').click();assert.match(await page.locator('#analysis-purchases').innerText(),/2025/);
 await page.locator('#analysis-purchases details').first().locator('summary').click();assert.match(await page.locator('#analysis-purchases').innerText(),/2026/);
 await page.locator('#evo-chart .lc-chip[data-id="market:1"]').click();assert.equal(await page.locator('#evo-chart path[data-series="market:1"]').count(),0);await page.locator('#analysis-purchases [data-focus="1"]').click();assert.equal(await page.locator('#evo-chart path[data-series="market:1"]').count(),1);assert.equal(await page.locator('#clear-focus').isVisible(),true);let c=await page.evaluate(()=>window.chart);assert.equal(c.series.find(s=>s.id==='market:1').opacity,1);assert.equal(c.series.find(s=>s.id==='market:2').opacity,.2);
 await page.locator('#clear-focus').click();assert.equal(await page.locator('#clear-focus').isVisible(),false);

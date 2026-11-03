@@ -61,3 +61,21 @@ def test_purchase_markers_never_clamp_outside_window_and_keep_recorded_time():
     assert 'complémentaire A' in daily[0]['label']
     assert 'USD' in daily[0]['detail'] and 'frais 1' in daily[0]['detail']
     assert hidden==[]
+
+
+@pytest.mark.parametrize('gains,first,current,gap', [
+    ([-1,2,-3,-4],'2026-01-01','2026-01-03',False),
+    ([-1,2,0,4],'2026-01-01',None,False),
+    ([None,None,-2,-3],'2026-01-03','2026-01-03',True),
+    ([0,1,2,3],None,None,False),
+    ([-1,-2,None,-4],'2026-01-01','2026-01-04',True),
+    ([-1,-2,None,None],'2026-01-01',None,False),
+])
+def test_loss_dates_are_observed_sequences_not_invented_crossings(gains,first,current,gap):
+    source=(Path(__file__).resolve().parents[2]/'app/public/assets/portefeuilles.js').read_text()
+    function=source[source.index('  function lossHistory('):source.index('  function miniCurve(')]
+    code=function+'\nconsole.log(JSON.stringify(lossHistory(["2026-01-01","2026-01-02","2026-01-03","2026-01-04"],JSON.parse(process.argv[1]))));'
+    out=subprocess.run(['node','-e',code,json.dumps(gains)],capture_output=True,text=True,check=True)
+    result=json.loads(out.stdout)
+    assert result['first']==first and result['current']==current
+    assert result.get('gap',False)==gap
