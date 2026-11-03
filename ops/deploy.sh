@@ -240,7 +240,7 @@ REMOTE
 
   phase="vérification des calculs financiers"
   echo "== Vérification des calculs financiers avec les calendriers de séance"
-  remote_sh "cd $root && set -a && . ./private/env && set +a && PYTHONPATH=$root .venv/bin/python scripts/verify_financial_release.py"
+  remote_sh "cd $root && set -a && . ./private/env && set +a && PYTHONPATH=$root .venv/bin/python scripts/prepare_financial_release.py"
 
   phase="vérification ETF, comptes et intégrité financière"
   echo "== Vérification ETF"

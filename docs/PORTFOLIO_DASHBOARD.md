@@ -99,3 +99,7 @@ Les barres doivent exister : pas de remplissage par la dernière clôture ou par
 - `portfolio-cockpit.cjs` : résumé/tableau synchronisés, gestion/CSV, lots et réglages préservant les coûts, cours approfondis, positions soldées, données partielles et portefeuille vide.
 
 Les tests rapides ont des oracles indépendants pour le FX daté, les variations intraday, les transactions/splits invalidants, le dénominateur commun et une vue avant acquisition. Les tests API réels vérifient la séance et les protections de la récupération ciblée sans appel fournisseur. Le smoke financier de GitHub Actions conserve Explorer, ETF, comptes, deux espaces et absence de débordement. Aucune fixture ne touche à la production.
+
+## Préparation des indicateurs lors d’une livraison
+
+Le contrôle strict de livraison compare les mesures mémorisées aux calculs actuels des titres de référence. Si ce cache ne correspond plus aux cours enregistrés, la préparation invoque une fois le traitement **metrics** existant, sous ses verrous habituels, puis exige à nouveau la même validation en lecture seule, avec la même tolérance. Aucun cours, compte ou enregistrement de transaction n’est réécrit ; aucun fournisseur n’est appelé par ce recalcul. Un échec persistant bloque toujours la livraison et conserve le retour arrière automatique. Les diagnostics publics ne contiennent que le symbole de référence, la fenêtre et le champ en défaut.

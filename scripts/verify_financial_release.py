@@ -19,47 +19,50 @@ def require_calculation(ok, symbol, window, field):
 
 def run():
     conn = connect()
-    now = hours.utcnow()
-    with conn.cursor() as c:
-        c.execute('SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ')
-        c.execute('START TRANSACTION READ ONLY')
-        c.execute("""SELECT l.mic, MAX(d.price_date) last_date
-                     FROM daily_prices d JOIN v_collect_set s ON s.listing_id=d.listing_id
-                     JOIN listings l ON l.id=d.listing_id GROUP BY l.mic""")
-        latest_by_mic = {r['mic']: r['last_date'].isoformat() for r in c.fetchall() if r['last_date']}
-    with conn.cursor() as c:
-        c.execute("SELECT l.id,l.symbol,l.mic FROM listings l WHERE l.symbol IN ('BOX','BBSI','VOO','UBU5.DE') AND l.is_primary=1")
-        listings=c.fetchall()
-    checks=[]
-    for listing in listings:
+    try:
+        now = hours.utcnow()
         with conn.cursor() as c:
-            c.execute('SELECT price_date,close_px,adj_close_px FROM daily_prices WHERE listing_id=%s ORDER BY price_date',(listing['id'],))
-            bars=[(r['price_date'].isoformat(),float(r['close_px']),None if r['adj_close_px'] is None else float(r['adj_close_px'])) for r in c.fetchall()]
-            c.execute("SELECT event_date,ratio FROM corporate_events WHERE listing_id=%s AND kind IN ('split','reverse_split')",(listing['id'],))
-            splits=[(r['event_date'].isoformat(),float(r['ratio']) if r['ratio'] else None) for r in c.fetchall()]
-            c.execute('SELECT * FROM strategy_metrics WHERE listing_id=%s',(listing['id'],))
-            stored={r['sessions']:r for r in c.fetchall()}
-        windows=[1,5,21,63,126,252]
-        cutoff=max(effective_expected_close(conn, listing['mic'], now) or '', latest_by_mic.get(listing['mic'], ''))
-        calendars=window_calendars(listing['mic'], cutoff, windows)
-        tech_dates=session_dates(listing['mic'], cutoff, 55)
-        dates,closes,basis,breaks,metrics,missing,tech=analyze_series(bars,windows,splits,calendars,tech_dates)
-        compared=0
-        for n,m in metrics.items():
-            if m is None:
-                require_calculation(n not in stored or stored[n]['perf'] is None,listing['symbol'],n,'unsafe_cache')
-                continue
-            require_calculation(n in stored,listing['symbol'],n,'missing_cache')
-            for key in ('slope','r2','perf','volatility','drawdown','er'):
-                if m[key] is None:
-                    require_calculation(stored[n][key] is None,listing['symbol'],n,key)
-                else:
-                    require_calculation(stored[n][key] is not None and abs(float(stored[n][key])-m[key])<=.000051,listing['symbol'],n,key)
-            compared+=1
-        checks.append({'symbol':listing['symbol'],'daily_closes':len(bars),'last_close':dates[-1] if dates else None,'basis':basis,'windows_verified':compared,'expected_close':hours.expected_last_close(listing['mic'],dt.datetime.now(dt.timezone.utc))})
-    assert {x['symbol'] for x in checks}=={'BOX','BBSI','VOO','UBU5.DE'}
-    conn.rollback();conn.close()
-    assert abs(to_eur_factor('GBX',{'GBP':1.2})-.012)<1e-12
-    print(json.dumps({'ok':True,'at_utc':dt.datetime.now(dt.timezone.utc).isoformat(),'actual_series_checks':checks},ensure_ascii=False))
+            c.execute('SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ')
+            c.execute('START TRANSACTION READ ONLY')
+            c.execute("""SELECT l.mic, MAX(d.price_date) last_date
+                         FROM daily_prices d JOIN v_collect_set s ON s.listing_id=d.listing_id
+                         JOIN listings l ON l.id=d.listing_id GROUP BY l.mic""")
+            latest_by_mic = {r['mic']: r['last_date'].isoformat() for r in c.fetchall() if r['last_date']}
+        with conn.cursor() as c:
+            c.execute("SELECT l.id,l.symbol,l.mic FROM listings l WHERE l.symbol IN ('BOX','BBSI','VOO','UBU5.DE') AND l.is_primary=1")
+            listings=c.fetchall()
+        checks=[]
+        for listing in listings:
+            with conn.cursor() as c:
+                c.execute('SELECT price_date,close_px,adj_close_px FROM daily_prices WHERE listing_id=%s ORDER BY price_date',(listing['id'],))
+                bars=[(r['price_date'].isoformat(),float(r['close_px']),None if r['adj_close_px'] is None else float(r['adj_close_px'])) for r in c.fetchall()]
+                c.execute("SELECT event_date,ratio FROM corporate_events WHERE listing_id=%s AND kind IN ('split','reverse_split')",(listing['id'],))
+                splits=[(r['event_date'].isoformat(),float(r['ratio']) if r['ratio'] else None) for r in c.fetchall()]
+                c.execute('SELECT * FROM strategy_metrics WHERE listing_id=%s',(listing['id'],))
+                stored={r['sessions']:r for r in c.fetchall()}
+            windows=[1,5,21,63,126,252]
+            cutoff=max(effective_expected_close(conn, listing['mic'], now) or '', latest_by_mic.get(listing['mic'], ''))
+            calendars=window_calendars(listing['mic'], cutoff, windows)
+            tech_dates=session_dates(listing['mic'], cutoff, 55)
+            dates,closes,basis,breaks,metrics,missing,tech=analyze_series(bars,windows,splits,calendars,tech_dates)
+            compared=0
+            for n,m in metrics.items():
+                if m is None:
+                    require_calculation(n not in stored or stored[n]['perf'] is None,listing['symbol'],n,'unsafe_cache')
+                    continue
+                require_calculation(n in stored,listing['symbol'],n,'missing_cache')
+                for key in ('slope','r2','perf','volatility','drawdown','er'):
+                    if m[key] is None:
+                        require_calculation(stored[n][key] is None,listing['symbol'],n,key)
+                    else:
+                        require_calculation(stored[n][key] is not None and abs(float(stored[n][key])-m[key])<=.000051,listing['symbol'],n,key)
+                compared+=1
+            checks.append({'symbol':listing['symbol'],'daily_closes':len(bars),'last_close':dates[-1] if dates else None,'basis':basis,'windows_verified':compared,'expected_close':hours.expected_last_close(listing['mic'],dt.datetime.now(dt.timezone.utc))})
+        assert {x['symbol'] for x in checks}=={'BOX','BBSI','VOO','UBU5.DE'}
+        assert abs(to_eur_factor('GBX',{'GBP':1.2})-.012)<1e-12
+        print(json.dumps({'ok':True,'at_utc':dt.datetime.now(dt.timezone.utc).isoformat(),'actual_series_checks':checks},ensure_ascii=False))
+    finally:
+        try:conn.rollback()
+        finally:conn.close()
 
 if __name__=='__main__':run()

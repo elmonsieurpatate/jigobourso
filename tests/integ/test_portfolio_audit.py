@@ -236,3 +236,21 @@ def test_targeted_history_refresh_checks_ownership_and_cooldown_without_network(
     assert a.call('portfolio/history-refresh',{'id':pf,'listing_id':2})[0]==404
     bob=login(world,'bob','bob-secret-12345')
     assert bob.call('portfolio/history-refresh',{'id':pf,'listing_id':1})[0]==404
+
+
+def test_normal_metric_refresh_preserves_transactions_and_prices(world):
+    from scripts.prepare_financial_release import refresh_metrics
+    a,pf=account(world);add(a,pf)
+    conn=connect()
+    with conn.cursor() as q:
+        q.execute('SELECT COUNT(*) n FROM portfolio_transactions');before=q.fetchone()['n']
+        q.execute("INSERT INTO strategy_metrics(listing_id,sessions,slope) VALUES (1,1,999)")
+    conn.commit();conn.close()
+    refresh_metrics()
+    conn=connect()
+    with conn.cursor() as q:
+        q.execute('SELECT COUNT(*) n FROM portfolio_transactions');assert q.fetchone()['n']==before
+        q.execute('SELECT price FROM latest_prices WHERE listing_id=1');assert float(q.fetchone()['price'])==120
+        q.execute('SELECT slope FROM strategy_metrics WHERE listing_id=1 AND sessions=1');assert q.fetchone()['slope'] is None
+        q.execute("SELECT status FROM jobs WHERE job_type='metrics' ORDER BY id DESC LIMIT 1");assert q.fetchone()['status']=='completed'
+    conn.close()
