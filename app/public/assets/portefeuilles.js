@@ -13,6 +13,7 @@
   const eur0 = v => J.eur(v, 0), sgn = v => v === null || v === undefined ? '–' : (v > 0 ? '+' : v < 0 ? '−' : '') + J.eur(Math.abs(v), 0);
   const pills = (id, items, cur) => `<div class="pills" id="${id}">${items.map(([k, l]) => `<button type="button" data-v="${k}" class="${k === cur ? 'on' : ''}">${l}</button>`).join('')}</div>`;
   const splitNotice = positions => positions.filter(p => p.splits_applied && p.splits_applied.length).map(p => `<div class="notice" style="margin-top:12px"><b>${J.esc(p.name_catalogue || p.name || p.symbol)}</b> : ${p.splits_applied.map(a => a.ratio >= 1 ? `split ${J.num(a.ratio, 2)} pour 1` : `regroupement ${J.num(1 / a.ratio, 2)} pour 1`).join(', ')} pris en compte automatiquement : la quantité affichée est celle d’aujourd’hui, le prix de revient total est inchangé.</div>`).join('');
+  const ANALYSIS = { domain: 'market', scale: 'index', markers: true, focus: null, reference: 'purchase' };
   let VIEW = 'overview';
   let SORT = 'attention';
   let D = null, H = null;                       // données du portefeuille affiché, et son évolution (chargée à part)
@@ -44,9 +45,11 @@
       <details class="pf-explain"><summary>Comprendre ces chiffres</summary><p>Le gain total additionne réalisé et latent. Le pourcentage utilise les achats cumulés, pas le capital restant. Le net suppose une taxation forfaitaire de 30 % des gains annuels positifs réalisés et du latent positif : hors PEA, pertes reportables et fiscalité personnelle. Liquidités et dividendes ne sont pas gérés.</p></details></section>`;
   }
   function analysis(d) {
-    return `<section class="card hero2" aria-label="Évolution et analyse"><div class="fold-b"><div class="hero-tools"><div class="row" style="gap:8px">${pills('evo-mode', [['titles', 'Comparer les titres'], ['gain', 'Gain'], ['value', 'Valeur']], EVO.mode)}${pills('evo-unit', [['eur', '€'], ['pct', '%']], EVO.unit)}</div>${pills('evo-per', PERIODS.map(p => [p[0], p[1]]), EVO.per)}</div>
-      <p class="small muted" id="period-reference"></p><p id="evo-note" class="small muted"></p><div class="hero-grid"><div id="evo-chart"><div class="lc-empty"><span class="spinner"></span></div></div><aside class="movers" id="movers"></aside></div>
-      <details class="pf-explain"><summary>Résultat personnel ou variation du cours ?</summary><p>Le gain de la période inclut les frais, le change et les ventes. Son pourcentage rapporte ce gain à la valeur de départ + achats de la période. Le graphique individuel du titre décrit son cours, hors frais et change. Les contributions en euros s’additionnent ; les rendements des titres en % ne s’additionnent pas.</p></details></div></section>`;
+    return `<section class="card analysis-chart" aria-label="Évolution et analyse"><div class="analysis-heading"><h2>Évolution des titres</h2>${pills('analysis-domain', [['market','Cours du titre'],['personal','Mon investissement']],ANALYSIS.domain)}${pills('evo-per', PERIODS.map(p => [p[0], p[1]]), EVO.per)}</div>
+      <div class="analysis-controls"><div id="market-controls">${pills('market-scale',[['index','Base 100'],['price','Cours réels']],ANALYSIS.scale)}</div><div id="personal-controls">${pills('evo-mode', [['titles', 'Comparer les titres'], ['gain', 'Gain'], ['value', 'Valeur']], EVO.mode)}${pills('evo-unit', [['eur', '€'], ['pct', '%']], EVO.unit)}<label>Référence <select id="personal-reference"><option value="purchase">Depuis vos achats</option><option value="period">Sur la période</option></select></label></div><label class="purchase-toggle"><input type="checkbox" id="purchase-markers" checked> Repères d’achat</label><button class="btn small" id="clear-focus" hidden>Tous les titres</button></div>
+      <p class="small muted" id="period-reference"></p><p id="evo-note" class="small muted" role="status"></p><div id="evo-chart"><div class="lc-empty"><span class="spinner"></span></div></div>
+      <details class="pf-explain"><summary>Cours du titre ou résultat personnel ?</summary><p>Cours du titre : observations de marché dans la devise du titre, corrigées des splits selon la série disponible, sans frais ni change personnel, y compris avant les achats. Base 100 : comparaison à une même date ; si le cours de départ manque, la comparaison reste indisponible. Aucun portefeuille fictif n’est reconstitué avant vos achats.</p><p>Mon investissement : transactions, frais et conversions historiques en euros. Depuis vos achats : gain cumulé ÷ achats cumulés ; sur la période : gain de la période ÷ (valeur de départ + achats). Les gains réalisés restent inclus. Les pourcentages des titres ne s’additionnent pas.</p></details></section>
+      <div class="analysis-bottom"><section class="card analysis-losses"><h2>Ce qui fait baisser mon portefeuille</h2><p class="small muted">Classement par perte réelle en euros sur la période, frais et change compris.</p><div id="analysis-losses"></div><details><summary>Toutes les contributions</summary><div id="movers" class="movers"></div></details></section><section class="card analysis-purchases"><h2>Mes achats</h2><p class="small muted">Premiers achats et compléments réels. Sélectionnez un titre pour mettre sa courbe en évidence.</p><div id="analysis-purchases"></div></section></div>`;
   }
   const STATUS = { normal: ['ok', 'Normal'], watch: ['wait', 'À surveiller'], act: ['ko', 'À examiner'], unknown: ['', 'Données insuffisantes'] };
   const positionLots = (d,p) => d.lots.filter(l => p.listing_id ? l.listing_id === p.listing_id : !l.listing_id && l.symbol === p.symbol);
@@ -120,9 +123,49 @@
     return { eur: g, pct: base > 0 ? 100 * g / base : null };
   }
   const PER_LABEL = { '1w': 'la semaine', '1m': 'le mois', '3m': '3 mois', '6m': '6 mois', '1y': 'un an', all: 'depuis le début' };
+  const tradePrice = t => J.num(t.unit_price,4)+' '+(t.currency || 'devise inconnue');
+  function purchaseMarkers(xs, time = false) {
+    if (!ANALYSIS.markers || !xs.length) return [];
+    return (H.trades || []).filter(t=>t.side==='buy' && !t.note && (!ANALYSIS.focus || t.key===ANALYSIS.focus) && t.date>=xs[0].slice(0,10) && t.date<=xs[xs.length-1].slice(0,10) && (!time || (t.trade_at.replace(' ','T')>=xs[0] && t.trade_at.replace(' ','T')<=xs[xs.length-1]))).map(t=>({x:time?t.trade_at.replace(' ','T'):t.date,kind:'buy',symbol:t.symbol,label:(t.first_buy?'Premier achat ':'Achat complémentaire ')+t.symbol,detail:`${J.num(t.quantity,4)} titre(s) · prix ${tradePrice(t)} · frais ${J.eur(t.fees_eur)} · change ${J.num(t.fx_to_eur,6)} €/unité · ${t.trade_at}`}));
+  }
+  function focusAnalysis(key) { ANALYSIS.focus=ANALYSIS.focus===key?null:key; if(ANALYSIS.focus){CMP.delete('market:'+key);CMP.delete('t:'+key);EVO.hidden.delete('t:'+key);if(ANALYSIS.domain==='market'&&!(H.market?.lines||[]).some(l=>l.key===key))ANALYSIS.domain='personal';if(ANALYSIS.domain==='personal'&&EVO.mode==='value')EVO.mode='titles';} drawEvo(); }
+  function analysisPurchases() {
+    const opened=new Set(J.$$('#analysis-purchases details[open]').map(e=>e.dataset.key));
+    const groups=new Map();
+    (H.trades||[]).filter(t=>t.side==='buy'&&!t.note).forEach(t=>{if(!groups.has(t.key))groups.set(t.key,[]);groups.get(t.key).push(t)});
+    J.$('#analysis-purchases').innerHTML=[...groups].map(([key,trades])=>`<div class="purchase-group ${ANALYSIS.focus===key?'selected':''}"><button type="button" class="purchase-title" data-focus="${J.esc(key)}" aria-pressed="${ANALYSIS.focus===key}"><b>${J.esc(trades[0].symbol)}</b><span>${trades.length} achat(s)</span></button><div class="purchase-first"><time>${J.date(trades[0].date)}</time><span>Premier achat · ${J.num(trades[0].quantity,4)} titre(s) à ${tradePrice(trades[0])}</span></div>${trades.length>1?`<details data-key="${J.esc(key)}" ${opened.has(key)?'open':''}><summary>${trades.length-1} achat(s) complémentaire(s)</summary>${trades.slice(1).map(t=>`<p><time>${J.date(t.date)}</time> · ${J.num(t.quantity,4)} titre(s) à ${tradePrice(t)}<br><small>Frais ${J.eur(t.fees_eur)} · change ${J.num(t.fx_to_eur,6)} €/unité</small></p>`).join('')}</details>`:''}<small>Frais du premier achat ${J.eur(trades[0].fees_eur)} · change ${J.num(trades[0].fx_to_eur,6)} €/unité</small></div>`).join('')||'<p class="small muted">Aucun achat enregistré.</p>';
+    J.$$('#analysis-purchases [data-focus]').forEach(b=>b.onclick=()=>focusAnalysis(b.dataset.focus));
+    J.$('#clear-focus').hidden=!ANALYSIS.focus;
+  }
+  function analysisLosses(rows, total) {
+    const host=J.$('#analysis-losses'), missing=rows.filter(r=>r.eur===null).length;
+    const negatives=rows.filter(r=>r.eur!==null&&r.eur<0).sort((a,b)=>a.eur-b.eur);
+    host.innerHTML=(missing?`<p class="notice warn">Contributions partielles : ${missing} titre(s) non calculable(s). Aucun gain total complet n’est déduit des seules lignes connues.</p>`:'')+(negatives.length?`<div class="loss-table"><div class="loss-head"><span>Titre</span><span>Impact période</span><span>Rendement période</span><span>Résultat personnel</span><span>Poids actuel</span><span>Recul après achat</span></div>${negatives.map(r=>{const p=D.positions.find(p=>(p.listing_id?String(p.listing_id):'S'+p.symbol.toUpperCase())===r.l.key),g=p?insight(p).protection:null;return `<article class="loss-row" data-loss="${J.esc(r.l.key)}"><div><button class="purchase-title" data-focus="${J.esc(r.l.key)}"><b>${J.esc(r.l.symbol)}</b></button><small>${J.esc(r.l.name)}</small></div><div data-label="Impact période" class="down"><b>${J.eur(r.eur)}</b></div><div data-label="Rendement période">${J.pct(r.pct,1)}</div><div data-label="Résultat personnel">${J.eur(r.l.gain[r.l.gain.length-1])}<small>depuis les achats · ventes comprises</small></div><div data-label="Poids actuel">${p?J.pct(p.weight,1,false):'0 % · soldée'}</div><div data-label="Recul après achat">${g?.available?'−'+J.num(g.drop_pct,2)+' %':'Indisponible'}</div><p class="loss-reason">${J.esc(p?insight(p).personal_text||'':'Position soldée. ')} Contribution négative de ${J.eur(Math.abs(r.eur))} sur la période. ${g?.available?'Recul du cours depuis le sommet observé après le dernier achat encore ouvert.':'Le recul après achat n’est pas calculable avec les données disponibles.'} Une baisse seule ne constitue pas un signal de vente.</p></article>`}).join('')}</div>`:'<p class="small muted">Aucune contribution négative calculable sur cette période.</p>')+`<p class="small">Résultat total de la période : <b class="${J.cls(total.eur)}">${sgn(total.eur)}</b>. Les contributions complètes en euros incluent gains et pertes, réalisés et latents.</p>`;
+    host.querySelectorAll('[data-focus]').forEach(b=>b.onclick=()=>focusAnalysis(b.dataset.focus));
+  }
+  function drawMarket() {
+    const host=J.$('#evo-chart'), market=H.market||{dates:[],lines:[]}, h=EVO.per==='1d'?(market.intraday||{dates:[],lines:[]}):market;
+    const i0=periodStart(h),xs=h.dates.slice(i0),index=ANALYSIS.scale==='index',focused=ANALYSIS.focus;
+    const notes=[];
+    const series=h.lines.map((l,k)=>{
+      const values=l.prices.slice(i0),base=values[0],bad=(l.break_dates||[]).some(d=>d>xs[0]&&d<=xs[xs.length-1]);
+      if(index && (!(base>0)||bad))notes.push(l.symbol+': base 100 indisponible (cours initial absent ou rupture non résolue).');
+      if(values.some(v=>v===null))notes.push(l.symbol+': observations manquantes ; les trous ne sont pas remplacés.');
+      if(l.last_date && H.dates.length && l.last_date<H.dates[H.dates.length-1])notes.push(l.symbol+': dernière clôture du '+J.date(l.last_date)+'.');
+      return {id:'market:'+l.key,label:l.symbol+(index?'':' · '+(l.currency||'devise inconnue')),values:index?values.map(v=>v!==null&&base>0&&!bad?100*v/base:null):values,color:PAL[k%PAL.length],width:focused===l.key?3:1.8,opacity: focused && focused!==l.key ? .2 : 1,format:index?v=>J.num(v,2):v=>px(v,l.currency)};
+    });
+    const when=xs.length?J.date(xs[0].slice(0,10))+' → '+J.date(xs[xs.length-1].slice(0,10)):'';
+    J.$('#period-reference').textContent=(EVO.per==='1d'?'Dernière séance intrajournalière enregistrée · ':'Cours observés · ')+when+' · '+(index?'base 100 à la même date, hors frais et change personnel.':'cours dans chaque devise d’origine, sans conversion en euros.');
+    J.$('#evo-note').textContent=(H.notes||[]).concat(notes).join(' ')+' '+(EVO.per==='all'?'Tout = historique de marché disponible, qui peut commencer avant vos achats.':'')+' Les données conservées peuvent limiter la période demandée.';
+    J.lineChart(host,xs,series,{height:innerWidth<700?280:320,label:'Cours des titres détenus',format:v=>J.num(v,2),time:EVO.per==='1d',markers:purchaseMarkers(xs,EVO.per==='1d'),verticalMarkers:true,hidden:CMP,onToggle:id=>{CMP.has(id)?CMP.delete(id):CMP.add(id);store('cmp_hidden',[...CMP]);drawEvo()}});
+    if(EVO.per==='1d'&&ANALYSIS.markers)J.$('#evo-note').textContent+=' Seuls les achats dont l’heure enregistrée est dans la séance visible portent un repère ; tous restent consultables dans Mes achats.';
+  }
   function drawEvo() {
     const host = J.$('#evo-chart'), mv = J.$('#movers'), h = H; if (!host || !h) return;
     updateOverview();
+    J.$('#market-controls').hidden=ANALYSIS.domain!=='market'; J.$('#personal-controls').hidden=ANALYSIS.domain!=='personal';
+    J.$$('#analysis-domain button').forEach(b=>{b.classList.toggle('on',b.dataset.v===ANALYSIS.domain);b.setAttribute('aria-pressed',String(b.dataset.v===ANALYSIS.domain))});
+    analysisPurchases();
     const reference = J.$('#period-reference');
     if (reference) reference.textContent = EVO.per === 'all' ? 'Tout : depuis la première transaction. Les gains réalisés restent inclus.' : 'Période affichée : ' + (PERIODS.find(p=>p[0]===EVO.per)?.[1] || '') + '. La colonne depuis vos achats conserve sa propre référence.';
     const last = h.dates.length - 1, toggle = id => { EVO.hidden.has(id) ? EVO.hidden.delete(id) : EVO.hidden.add(id); store('evo_hidden', [...EVO.hidden]); drawEvo(); };
@@ -130,23 +173,23 @@
     J.$$('#evo-mode button').forEach(b => { b.disabled = intraday && b.dataset.v !== 'value'; b.classList.toggle('on', b.dataset.v === mode); b.title = b.disabled ? 'En 1 J, seule la valeur des quantités actuelles est disponible.' : ''; });
     const note = J.$('#evo-note');
     if (note) note.textContent = intraday ? '1 J : valeur en euros des quantités actuelles sur la dernière séance disponible. Comparaison et gain intraday indisponibles : les mouvements de la séance ne sont pas reconstitués.' : (h.notes || []).join(' ');
-    const height = innerWidth < 700 ? 190 : 230, pct = unit === 'pct', fmtV = pct ? (v => J.pct(v, 1)) : eur0;
+    const height = innerWidth < 700 ? 280 : 320, pct = unit === 'pct', fmtV = pct ? (v => J.pct(v, 1)) : eur0;
     J.$$('#evo-unit button').forEach(b => { b.disabled = mode === 'value' && b.dataset.v === 'pct'; b.classList.toggle('on', b.dataset.v === unit); b.title = b.disabled ? 'La valeur est exprimée en euros.' : ''; });
-    if (!h.dates || !h.dates.length) { host.innerHTML = '<div class="lc-empty">Ajoutez une transaction pour voir l’évolution.</div>'; mv.innerHTML = ''; return; }
+    if (!h.dates || !h.dates.length) { host.innerHTML = '<div class="lc-empty">Ajoutez une transaction pour voir l’évolution.</div>'; mv.innerHTML = ''; J.$('#analysis-losses').innerHTML='<p>Aucune transaction.</p>'; return; }
     const dd = h.dates.length > 1 && h.value[last] !== null && h.value[last - 1] !== null ? h.value[last] - h.value[last - 1] - (h.net_in[last] - h.net_in[last - 1]) : null;
     const hd = J.$('#hero-day'); if (hd && dd !== null) hd.innerHTML = `<span class="${J.cls(dd)}">${sgn(dd)}</span> depuis la clôture du ${J.date(h.dates[last - 1])}`;
     if (EVO.per === '1d') {
       const it = h.intraday || { t: [], value: [] };
-      J.lineChart(host, it.t, [{ id: 'v', label: 'Valeur', values: it.value, color: '#6366f1', area: true }], { height, format: eur0, time: true });
+      J.lineChart(host, it.t, [{ id: 'v', label: 'Valeur', values: it.value, color: '#6366f1', area: true }], { height, format: eur0, time: true, markers:purchaseMarkers(it.t,true), verticalMarkers:true });
       if (it.t.length < 2) host.querySelector('.lc-empty').textContent = 'Pas de cotations de 15 minutes enregistrées aujourd’hui pour vos titres.';
       const d0 = it.value[0], d1 = it.value[it.value.length - 1];
       mv.innerHTML = it.t.length > 1 ? `<h3>Aujourd’hui</h3><p class="mv-big ${J.cls(d1 - d0)}">${sgn(d0 === null || d1 === null ? null : d1 - d0)}</p><p class="small muted">Valeur des titres détenus aujourd’hui, de ${J.dateTime(it.t[0])} à ${J.dateTime(it.t[it.t.length - 1])}.</p>` : '';
-      fillPeriodCells(null); return;
+      fillPeriodCells(null); J.$('#analysis-losses').innerHTML='<p class="small muted">Contributions personnelles indisponibles en 1 J : les transactions intrajournalières ne sont pas reconstituées. Choisissez une période plus longue.</p>'; if(ANALYSIS.domain==='market')drawMarket(); return;
     }
     const i0 = periodStart(h), xs = h.dates.slice(i0), idx = xs.map((_, k) => i0 + k);
-    if(reference) reference.textContent = `Période affichée : ${J.date(xs[0])} → ${J.date(xs[xs.length-1])}. Base du pourcentage : valeur au départ + achats pendant la période. La performance depuis vos achats garde sa propre référence.`;
-    const markers = (h.trades || []).filter(t => t.date >= xs[0] && !t.note).map(t => ({ x: t.date, kind: t.side, label: (t.side === 'buy' ? 'Achat ' : 'Vente ') + t.symbol }));
-    const pfSeries = i => perf(h.gain, h.value, h.purchases, i0, i), lineSeries = (l, i) => perf(l.gain, l.values, l.purchases, i0, i);
+    if(reference) reference.textContent = `Période visible : ${J.date(xs[0])} → ${J.date(xs[xs.length-1])}. `+(mode==='value'?'Valeur des titres et apports nets en euros.':ANALYSIS.reference==='purchase'?'Courbes personnelles : résultat cumulé depuis vos achats ; % = gain cumulé ÷ achats cumulés, frais compris.':'Courbes personnelles : gain sur la période ; % = gain de la période ÷ (valeur au départ + achats de la période).');
+    const chartStart=ANALYSIS.reference==='purchase'?0:i0;
+    const pfSeries = i => perf(h.gain, h.value, h.purchases, chartStart, i), lineSeries = (l, i) => perf(l.gain, l.values, l.purchases, chartStart, i);
     let series;
     if (mode === 'value') {
       series = [{ id: 'value', label: 'Valeur', values: idx.map(i => h.value[i]), color: '#6366f1', area: true }, { id: 'net', label: 'Apports nets', values: idx.map(i => h.net_in[i]), color: '#94a3b8', dash: '5 5', width: 1.6 }];
@@ -157,18 +200,24 @@
         : [{ id: 'gain', label: 'Portefeuille', values: tot, color: '#0f172a', width: 2.6, dash: '6 4' }].concat(titles);
       if (mode === 'gain' && !store('evo_hidden_init')) { h.lines.forEach(l => EVO.hidden.add('t:' + l.key)); store('evo_hidden_init', 1); store('evo_hidden', [...EVO.hidden]); }
     }
-    J.lineChart(host, xs, series, { height, format: mode === 'value' ? eur0 : fmtV, zeroLine: mode !== 'value', markers: mode === 'value' ? markers : [], hidden: mode === 'titles' ? CMP : EVO.hidden, onToggle: mode === 'titles' ? (id => { CMP.has(id) ? CMP.delete(id) : CMP.add(id); store('cmp_hidden', [...CMP]); drawEvo(); }) : toggle });
+    if(ANALYSIS.focus && mode!=='value')series=series.map(s=>({...s,opacity:s.id==='t:'+ANALYSIS.focus?1:.2,width:s.id==='t:'+ANALYSIS.focus?3:s.width}));
+    J.lineChart(host, xs, series, { height, format: mode === 'value' ? eur0 : fmtV, zeroLine: mode !== 'value', markers: purchaseMarkers(xs), verticalMarkers: true, hidden: mode === 'titles' ? CMP : EVO.hidden, onToggle: mode === 'titles' ? (id => { CMP.has(id) ? CMP.delete(id) : CMP.add(id); store('cmp_hidden', [...CMP]); drawEvo(); }) : toggle });
     // Barres divergentes : à gauche (rouge) ce qui fait baisser, à droite (vert) ce qui fait monter, sur la période choisie
-    const rows = h.lines.map(l => ({ l, ...lineSeries(l, last) })).filter(r => r.l.values.slice(i0).some(v => v > 0) || r.eur !== null && Math.abs(r.eur) >= .5);
+    const periodLine=(l,i)=>perf(l.gain,l.values,l.purchases,i0,i);
+    const allRows=h.lines.map(l=>({l,...periodLine(l,last)}));
+    const periodTotal=perf(h.gain,h.value,h.purchases,i0,last);
+    analysisLosses(allRows,periodTotal);
+    const rows = allRows.filter(r => r.l.values.slice(i0).some(v => v > 0) || r.eur !== null && Math.abs(r.eur) >= .5);
     rows.sort((a, b) => (b[unit] ?? -1e9) - (a[unit] ?? -1e9));
-    const tot = pfSeries(last), m = Math.max(1e-9, ...rows.map(r => Math.abs(r[unit] || 0)));
+    const tot = periodTotal, m = Math.max(1e-9, ...rows.map(r => Math.abs(r[unit] || 0)));
     const val = r => r[unit] === null || r[unit] === undefined ? '–' : pct ? J.pct(r[unit], 1) : sgn(r[unit]);
     mv.innerHTML = `<h3>Sur ${PER_LABEL[EVO.per] === 'depuis le début' ? 'toute la période' : PER_LABEL[EVO.per]}</h3>
       <p class="mv-big ${J.cls(tot.eur)}">${sgn(tot.eur)}${tot.pct !== null ? ` <small>${J.pct(tot.pct, 1)}</small>` : ''}</p>
       <div class="dv-head"><span class="down">fait baisser</span><span class="up">fait monter</span></div>
       <div class="dv">${rows.map(r => { const v = r[unit] || 0, w = (50 * Math.abs(v) / m).toFixed(1); return `<div class="dv-row" title="${J.esc(r.l.name)} : ${sgn(r.eur)}${r.pct !== null ? ' (' + J.pct(r.pct, 1) + ')' : ''} sur la période"><span class="dv-s">${J.esc(r.l.symbol)}</span><span class="dv-track"><i class="${v >= 0 ? 'up' : 'down'}" style="${v >= 0 ? 'left:50%' : 'right:50%'};width:${w}%"></i></span><span class="dv-v ${J.cls(v)}">${val(r)}</span></div>`; }).join('') || (tot.eur === null ? '<p class="small muted">Valorisation indisponible.</p>' : '<p class="small muted">Rien n’a bougé.</p>')}</div>
       <p class="small muted" style="margin-top:8px">${pct ? '% = gain sur la période ÷ argent engagé (valeur au début + achats pendant la période).' : 'Gain ou perte en euros sur la période, frais compris. Le pourcentage rapporte ce gain à la valeur au départ + achats de la période ; ce n’est pas un rendement annualisé ni pondéré dans le temps.'}</p>`;
-    fillPeriodCells(new Map(h.lines.map(l => [l.key, lineSeries(l, last)])));
+    fillPeriodCells(new Map(h.lines.map(l => [l.key, periodLine(l, last)])));
+    if(ANALYSIS.domain==='market')drawMarket();
   }
   const CMP = new Set(store('cmp_hidden') || []);
   /* Colonne « Sur la période » du tableau des positions, remplie quand l'évolution est chargée. */
@@ -207,7 +256,7 @@
     if (!list.length) { page.innerHTML = `<h1>Portefeuilles</h1><div class="card empty"><p>Vous n’avez pas encore de portefeuille.</p><button class="btn primary" id="first">Créer mon premier portefeuille</button></div>`; J.$('#first').onclick = createPf; return; }
     if (!list.find(p => p.id === current)) current = list[0].id;
     const d = D = await J.api('portfolio', { params: { id: current } });
-    H = null;
+    H = null; ANALYSIS.focus=null;
     history.replaceState(null, '', '?id=' + current);
     const nAlerts = (d.lots || []).filter(l => l.alert && (l.alert.level === 'act' || l.alert.level === 'watch')).length;
     const etfHtml = JEtf.portfolio(d.etf_analysis);
@@ -242,6 +291,10 @@
     switchView(VIEW);
     J.$('#new-pf').onclick = createPf;
     J.$$('#evo-mode button, #evo-per button, #evo-unit button').forEach(b => b.onclick = e => { e.stopPropagation(); if (b.disabled) return; const k = { 'evo-mode': 'mode', 'evo-per': 'per', 'evo-unit': 'unit' }[b.parentElement.id]; EVO[k] = b.dataset.v; store(k === 'mode' ? 'evo_mode2' : 'evo_' + k, EVO[k]); J.$$('#' + b.parentElement.id + ' button').forEach(x => x.classList.toggle('on', x === b)); drawEvo(); });
+    J.$$('#analysis-domain button, #market-scale button').forEach(b=>b.onclick=()=>{ANALYSIS[b.parentElement.id==='analysis-domain'?'domain':'scale']=b.dataset.v;J.$$('#'+b.parentElement.id+' button').forEach(x=>x.classList.toggle('on',x===b));drawEvo()});
+    J.$('#purchase-markers').checked=ANALYSIS.markers;J.$('#purchase-markers').onchange=e=>{ANALYSIS.markers=e.target.checked;drawEvo()};
+    J.$('#personal-reference').value=ANALYSIS.reference;J.$('#personal-reference').onchange=e=>{ANALYSIS.reference=e.target.value;drawEvo()};
+    J.$('#clear-focus').onclick=()=>{ANALYSIS.focus=null;drawEvo()};
     const pid = current;
     J.api('portfolio/history', { params: { id: pid } }).then(h => { if (pid !== current) return; H = h; drawEvo(); }).catch(e => { const c = J.$('#evo-chart'); if (c) c.innerHTML = `<div class="notice err">${J.esc(e.message)}</div>`; });
     J.$$('[data-lot]').forEach(b => b.onclick = () => lotDialog(d, d.lots.find(x => x.tx_id == b.dataset.lot)));

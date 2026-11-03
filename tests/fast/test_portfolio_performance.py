@@ -40,3 +40,24 @@ def test_period_reference_is_calendar_based_and_clamps_month_end():
                                   ('all',['2026-01-01','2026-11-03'],0)]:
         out=subprocess.run(['node','-e',code,period,json.dumps(dates)],capture_output=True,text=True,check=True)
         assert int(out.stdout)==expected
+
+
+def test_purchase_markers_never_clamp_outside_window_and_keep_recorded_time():
+    source=(Path(__file__).resolve().parents[2]/'app/public/assets/portefeuilles.js').read_text()
+    functions=source[source.index('  const tradePrice ='):source.index('  function focusAnalysis(')]
+    trades=[dict(key='1',side='buy',date='2026-01-01',trade_at='2026-01-01 12:00:00',symbol='A'),
+            dict(key='1',side='buy',date='2026-01-07',trade_at='2026-01-07 09:15:00',symbol='A',quantity=2,unit_price=50,currency='USD',fees_eur=1,fx_to_eur=.9,first_buy=False),
+            dict(key='2',side='buy',date='2026-01-07',trade_at='2026-01-07 12:00:00',symbol='B'),
+            dict(key='1',side='buy',date='2026-02-01',trade_at='2026-02-01 12:00:00',symbol='A')]
+    prelude='const J={num:String,eur:String};const ANALYSIS={markers:true,focus:"1"};const H={trades:JSON.parse(process.argv[1])};'
+    code=prelude+functions+'''\nconst daily=purchaseMarkers(['2026-01-05','2026-01-09']);
+    const intraday=purchaseMarkers(['2026-01-07T09:00:00','2026-01-07T09:30:00'],true);
+    ANALYSIS.markers=false;
+    console.log(JSON.stringify([daily,intraday,purchaseMarkers(['2026-01-05','2026-01-09'])]));'''
+    out=subprocess.run(['node','-e',code,json.dumps(trades)],capture_output=True,text=True,check=True)
+    daily,intraday,hidden=json.loads(out.stdout)
+    assert [m['x'] for m in daily]==['2026-01-07']
+    assert [m['x'] for m in intraday]==['2026-01-07T09:15:00']
+    assert 'complémentaire A' in daily[0]['label']
+    assert 'USD' in daily[0]['detail'] and 'frais 1' in daily[0]['detail']
+    assert hidden==[]

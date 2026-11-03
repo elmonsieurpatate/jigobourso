@@ -135,7 +135,9 @@ def build(transactions, bars, splits, unit, fx, meta, today=None, bars15=None):
             if t['side'] == 'buy':
                 lines[key]['_purchases'] += gross + fees
             lines[key]['_in'] += (gross + fees) if t['side'] == 'buy' else -(gross - fees)
-            trades.append({'date': str(t['trade_at'])[:10], 'side': t['side'], 'symbol': t['symbol']})
+            trades.append({'id': t.get('id'), 'key': str(key), 'date': str(t['trade_at'])[:10], 'trade_at': str(t['trade_at']), 'side': t['side'], 'symbol': t['symbol'],
+                           'quantity': qty, 'unit_price': price, 'currency': t.get('currency'), 'fees_eur': fees, 'fx_to_eur': rate,
+                           'first_buy': t['side'] == 'buy' and not any(x.get('key') == str(key) and x['side'] == 'buy' for x in trades)})
         total, unpriced = 0.0, 0
         for key, line in lines.items():
             q = holdings.get(key, 0.0)
@@ -170,11 +172,45 @@ def build(transactions, bars, splits, unit, fx, meta, today=None, bars15=None):
         line['gain'] = [None if v is None else round(v - i, 2) for v, i in zip(line['values'], line['net_in'])]      # gain ou perte cumulé du titre (latent + réalisé)
     out['lines'] = sorted(lines.values(), key=lambda l: -max((v for v in l['values'] if v is not None), default=0))
     out['intraday'] = intraday_value(holdings, bars15 or {}, {k: (closes[k].last if k in closes else None) for k in holdings if isinstance(k, int)}, to_eur, today)
+    out['market'] = market_history(holdings, bars, splits, unit, {k: {**{'symbol': l['symbol'], 'name': l['name']}, **meta.get(k, {})} for k, l in lines.items()}, today, bars15 or {})
     out['trades'] = trades
     if any(out['unpriced']):
         notes.append('Valorisation indisponible aux dates sans cours ou change : aucune estimation au prix d’achat.')
     out['notes'] = notes
     return out
+
+
+def market_history(holdings, bars, splits, unit, meta, today, bars15):
+    """Observed split-adjusted native prices of CURRENT holdings, independent of acquisition.
+
+    No cash-flow/FX/portfolio return is inferred from this comparison. Missing observations
+    stay null; last observations keep their real dates. Intraday is the last stored session,
+    never a fabricated replay of holdings or transactions during the session.
+    """
+    lines, intraday = [], []
+    for lid, qty in holdings.items():
+        if qty <= 1e-12:
+            continue
+        m = meta.get(lid, {})
+        dates, closes, _, quality = prepare_series(bars.get(lid, []), sorted(splits.get(lid, [])))
+        observed = {d: c for d, c in zip(dates, closes) if d <= today}
+        when = m.get('price_time')
+        day = str(when)[:10] if when else None
+        live = _num(m.get('price'))
+        if live is not None and live > 0 and day and day <= today and (not observed or day >= max(observed)):
+            observed[day] = live
+        info = {'key': str(lid), 'symbol': m.get('symbol') or str(lid).removeprefix('S'),
+                'name': m.get('name') or str(lid), 'currency': unit.get(lid),
+                'break_dates': [dates[i] for i in quality], 'last_date': max(observed) if observed else None}
+        lines.append(dict(info, observations=observed))
+        intraday.append(dict(info, observations={t: c for t, c in bars15.get(lid, []) if t[:10] <= today}))
+    def aligned(items, session=False):
+        dates = sorted({d for l in items for d in l['observations']})
+        if session and dates:
+            dates = [d for d in dates if d[:10] == dates[-1][:10]]
+        return {'dates': dates, 'lines': [{**{k: v for k, v in l.items() if k != 'observations'},
+                                         'prices': [l['observations'].get(d) for d in dates]} for l in items]}
+    return dict(aligned(lines), intraday=aligned(intraday, True))
 
 
 def intraday_value(holdings, bars15, last_close, to_eur, today):

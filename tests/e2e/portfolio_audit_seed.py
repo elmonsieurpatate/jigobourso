@@ -37,7 +37,7 @@ with c.cursor() as q:
   q.execute("INSERT INTO fx_rates(currency,rate_date,to_eur) VALUES ('USD',%s,.85),('GBP',%s,1.2)",(day,day))
  q.execute("INSERT INTO corporate_events VALUES (3,'2026-10-01','split',2)")
  q.execute("INSERT INTO split_log(listing_id,event_date,price_ratio,ratio,status,detected_at,checked_at) VALUES (3,'2026-10-01',.5,2,'confirmed',NOW(),NOW())")
- for pid,name in [(1,'Multi-achats et devises'),(2,'Split sans vente'),(3,'Position soldée'),(4,'Sans cours'),(5,'Portefeuille vide'),(6,'Arrondis'),(7,'Partiellement valorisable')]:
+ for pid,name in [(1,'Multi-achats et devises'),(2,'Split sans vente'),(3,'Position soldée'),(4,'Sans cours'),(5,'Portefeuille vide'),(6,'Arrondis'),(7,'Partiellement valorisable'),(8,'Repères intraday')]:
   q.execute('INSERT INTO portfolios(id,user_id,name,is_default,created_at,updated_at) VALUES (%s,%s,%s,%s,NOW(),NOW())',(pid,user_id,name,pid==1))
  def tx(p,l,side,qty,price,day,fee=0,fx=1):
   sym,cur={1:('ALPHA','EUR'),2:('DOLLAR','USD'),3:('SPLIT','EUR'),4:('PENCE','GBp'),5:('NOQUOTE','EUR')}[l]
@@ -50,4 +50,6 @@ with c.cursor() as q:
  tx(7,1,'buy',1,100,'2026-09-01');tx(7,5,'buy',2,10,'2026-09-01')
  tx(4,5,'buy',2,10,'2026-09-01');tx(6,1,'buy',.12345678,123.456789,'2026-09-01',.013)
  q.execute("INSERT INTO lot_settings(transaction_id,strategy,alert_days,alert_drop_pct,updated_at) VALUES (%s,'momentum',30,20,NOW()),(%s,'fast',30,10,NOW())",(a,b))
-c.commit();c.close();print('7 portefeuilles synthétiques, 5 titres, base isolée prête')
+ t=tx(8,1,'buy',1,100,today.isoformat(),1)
+ q.execute('UPDATE portfolio_transactions SET trade_at=%s WHERE id=%s',(dt.datetime.combine(today,dt.time(9,15)),t))
+c.commit();c.close();print('8 portefeuilles synthétiques, 5 titres, base isolée prête')

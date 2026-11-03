@@ -35,7 +35,7 @@ fs.mkdirSync(OUT, { recursive: true });
         });
       };
       await open(1);
-      await page.locator('[data-view="analysis"]').click();
+      await page.locator('[data-view="analysis"]').click(); await page.locator('#analysis-domain [data-v="personal"]').click(); await page.locator('#personal-reference').selectOption('period'); await page.locator('.analysis-losses > details').evaluate(e=>e.open=true);
       for (const period of ['1w', '1m', '3m', '6m', '1y', 'all']) {
         await page.locator(`#evo-per [data-v="${period}"]`).click();
         for (const mode of ['titles', 'gain', 'value']) {
@@ -83,7 +83,7 @@ fs.mkdirSync(OUT, { recursive: true });
         await section.locator('.fold-h').click();
       }
       await page.screenshot({ path: `${OUT}/portfolio-${width}.png`, fullPage: true });
-      await open(3); await page.locator('[data-view="analysis"]').click(); await page.locator('#evo-per [data-v="all"]').click(); await page.locator('#evo-mode [data-v="titles"]').click(); await page.locator('#evo-unit [data-v="pct"]').click();
+      await open(3); await page.locator('[data-view="analysis"]').click(); await page.locator('#analysis-domain [data-v="personal"]').click(); await page.locator('#personal-reference').selectOption('period'); await page.locator('.analysis-losses > details').evaluate(e=>e.open=true); await page.locator('#evo-per [data-v="all"]').click(); await page.locator('#evo-mode [data-v="titles"]').click(); await page.locator('#evo-unit [data-v="pct"]').click();
       assert.equal((await page.evaluate(() => window.lastPortfolioChart)).series[0].values.at(-1), 20, 'A2: fully sold gain must remain');
       assert.match(await page.locator('#movers').innerText(), /20,0/);
       const split = await get('portfolio', 2);

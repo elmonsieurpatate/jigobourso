@@ -13,14 +13,14 @@
   J.lineChart = function (host, xs, series, opts = {}) {
     host.innerHTML = '';
     const hidden = opts.hidden || new Set(), n = xs.length, vis = series.filter(s => !hidden.has(s.id) && s.values.some(v => v !== null && v !== undefined));
-    const W = Math.max(300, Math.round(host.clientWidth || 1000)), H = opts.height || 240, L = 4, R = 64, T = 10, B = 26, PH = H - T - B, fmt = opts.format || (v => J.num(v, 0)), dl = opts.time ? J.dateTime : J.date;
+    const W = Math.max(300, Math.round(host.clientWidth || 1000)), H = opts.height || 240, L = 4, R = 64, T = opts.verticalMarkers ? 44 : 10, B = 26, PH = H - T - B, fmt = opts.format || (v => J.num(v, 0)), dl = opts.time ? J.dateTime : J.date;
     const wrap = document.createElement('div'); wrap.className = 'lc';
     if (n < 2 || !vis.length) { wrap.innerHTML = `<div class="lc-empty">${n < 2 ? 'Pas encore assez de données sur cette période.' : series.some(s => s.values.some(v => v !== null && v !== undefined)) ? 'Toutes les courbes sont masquées.' : 'Valorisation indisponible sur cette période.'}</div>`; host.append(wrap); }
     else {
       const all = []; vis.forEach(s => s.values.forEach(v => { if (v !== null && v !== undefined && isFinite(v)) all.push(v); })); if (opts.zeroLine) all.push(0);
       let hi = Math.max(...all), lo = Math.min(...all); if (hi === lo) { hi += Math.abs(hi) * .01 || 1; lo -= Math.abs(lo) * .01 || 1; }
       const pad = (hi - lo) * .08, y0 = lo - pad, y1 = hi + pad, X = i => L + i * (W - L - R) / (n - 1), Y = v => T + PH * (1 - (v - y0) / (y1 - y0));
-      const svg = el('svg', { viewBox: `0 0 ${W} ${H}`, class: 'lc-svg', width: W, height: H, role: 'img', 'aria-label': opts.label || 'Évolution' });
+      const svg = el('svg', { viewBox: `0 0 ${W} ${H}`, class: 'lc-svg', width: W, height: H, role: opts.verticalMarkers ? 'group' : 'img', 'aria-label': opts.label || 'Évolution' });
       const defs = el('defs'); svg.append(defs);
       ticks(y0, y1, 3).forEach(v => { svg.append(el('line', { x1: L, x2: W - R, y1: Y(v), y2: Y(v), class: 'lc-grid' })); });
       if (opts.zeroLine && y0 < 0 && y1 > 0) svg.append(el('line', { x1: L, x2: W - R, y1: Y(0), y2: Y(0), class: 'lc-zero' }));
@@ -28,9 +28,25 @@
         let d = '', pen = false; s.values.forEach((v, i) => { if (v === null || v === undefined) { pen = false; return; } d += (pen ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(v).toFixed(1); pen = true; });
         if (s.area) { const g = el('linearGradient', { id: 'lcg' + k + '-' + (host.id || ''), x1: 0, x2: 0, y1: 0, y2: 1 }); g.append(el('stop', { offset: '0%', 'stop-color': s.color, 'stop-opacity': .28 }), el('stop', { offset: '100%', 'stop-color': s.color, 'stop-opacity': 0 })); defs.append(g);
           const base = Y(opts.zeroLine ? Math.max(y0, Math.min(0, y1)) : y0); svg.append(el('path', { d: `${d}L${X(n - 1)} ${base}L${L} ${base}Z`, fill: `url(#lcg${k}-${host.id || ''})` })); }
-        svg.append(el('path', { d, fill: 'none', stroke: s.color, 'stroke-width': s.width || 2.2, 'stroke-dasharray': s.dash || '', 'stroke-linejoin': 'round', 'stroke-linecap': 'round', 'vector-effect': 'non-scaling-stroke' }));
+        svg.append(el('path', { d, fill: 'none', stroke: s.color, 'stroke-width': s.width || 2.2, 'stroke-dasharray': s.dash || '', 'stroke-linejoin': 'round', 'stroke-linecap': 'round', 'vector-effect': 'non-scaling-stroke', opacity: s.opacity ?? 1, 'data-series': s.id }));
       });
-      (opts.markers || []).forEach(m => { const i = xs.findIndex(x => x >= m.x); if (i >= 0) svg.append(el('circle', { cx: X(i), cy: T + PH + 6, r: 4, class: 'lc-mk ' + m.kind })); });
+      const groups = new Map();
+      (opts.markers || []).filter(m => m.x >= (opts.time?String(xs[0]):String(xs[0]).slice(0,10)) && m.x <= (opts.time?String(xs[n-1]):String(xs[n-1]).slice(0,10))).forEach(m => {
+        if (!groups.has(m.x)) groups.set(m.x, []); groups.get(m.x).push(m);
+      });
+      const markerTargets = [];
+      groups.forEach((items, date) => {
+        const i = xs.findIndex(x => x >= date), before = Math.max(0, i-1);
+        const a = Date.parse(xs[before]), b = Date.parse(xs[i]), at = Date.parse(date);
+        const x = i <= 0 || !Number.isFinite(a+b+at) || a === b ? X(Math.max(i,0)) : X(before)+(X(i)-X(before))*(at-a)/(b-a);
+        if (!opts.verticalMarkers) { svg.append(el('circle',{cx:x,cy:T+PH+6,r:4,class:'lc-mk '+items[0].kind})); return; }
+        const label = items.every(m=>m.symbol) ? 'Achat '+[...new Set(items.map(m=>m.symbol))].join(', ') : [...new Set(items.map(m=>m.label))].join(' · '), g = el('g', {class:'lc-purchase-marker',tabindex:0,role:'button','aria-label':date+' · '+label,'data-date':date});
+        g.append(el('line',{x1:x,x2:x,y1:T-4,y2:T+PH,class:'lc-purchase-line'}),el('circle',{cx:x,cy:T+PH,r:4,fill:'var(--accent)'}));
+        // One label per date, alternate lanes; complete tickers/details remain keyboard/touch accessible.
+        const text = label.length>25 ? label.slice(0,22)+'…' : label, w = Math.min(W-L-R, Math.max(64,text.length*6+12)), lx=Math.max(L,Math.min(x-w/2,W-R-w)), y=markerTargets.length%2?22:2;
+        g.append(el('rect',{x:lx,y,width:w,height:18,rx:6,class:'lc-purchase-tag'}),el('text',{x:lx+w/2,y:y+13,'text-anchor':'middle',class:'lc-purchase-text'},text),el('rect',{x:x-12,y:T-4,width:24,height:PH+12,fill:'transparent'}));
+        svg.append(g); markerTargets.push({g,x,date,items});
+      });
       const cross = el('line', { y1: T, y2: T + PH, class: 'lc-cross', visibility: 'hidden' }), dots = vis.map(s => el('circle', { r: 4.5, fill: s.color, class: 'lc-dot', visibility: 'hidden' }));
       svg.append(cross, ...dots);
       const axis = document.createElement('div'); axis.className = 'lc-y';
@@ -39,17 +55,27 @@
       xa.innerHTML = (W < 520 ? [0, 1] : [0, .33, .66, 1]).map(f => Math.round(f * (n - 1))).map((i, k, a) => `<span style="left:${(100 * X(i) / W).toFixed(2)}%" class="${k === 0 ? 'first' : k === a.length - 1 ? 'last' : ''}">${dl(xs[i])}</span>`).join('');
       const tip = document.createElement('div'); tip.className = 'lc-tip'; tip.hidden = true;
       const box = document.createElement('div'); box.className = 'lc-box'; box.style.height = H + 'px'; box.append(svg, axis, xa, tip); wrap.append(box);
+      let pinned=false;
       const move = ev => {
+        if(pinned)return;
         const r = svg.getBoundingClientRect(), px = ((ev.touches ? ev.touches[0].clientX : ev.clientX) - r.left) * W / r.width, i = Math.max(0, Math.min(n - 1, Math.round((px - L) / ((W - L - R) / (n - 1)))));
         cross.setAttribute('x1', X(i)); cross.setAttribute('x2', X(i)); cross.setAttribute('visibility', 'visible');
         vis.forEach((s, k) => { const v = s.values[i]; if (v === null || v === undefined) { dots[k].setAttribute('visibility', 'hidden'); return; } dots[k].setAttribute('cx', X(i)); dots[k].setAttribute('cy', Y(v)); dots[k].setAttribute('visibility', 'visible'); });
         const rows = vis.map(s => [s, s.values[i]]).filter(([, v]) => v !== null && v !== undefined).sort((a, b) => b[1] - a[1]).slice(0, 10);
         const mk = (opts.markers || []).filter(m => m.x.slice(0, 10) === String(xs[i]).slice(0, 10));
-        tip.innerHTML = `<div class="lc-tip-d">${dl(xs[i])}</div>${rows.map(([s, v]) => `<div class="lc-tip-r"><i style="background:${s.color}"></i><span>${J.esc(s.label)}</span><b>${fmt(v)}</b></div>`).join('')}${mk.map(m => `<div class="lc-tip-m ${m.kind}">${J.esc(m.label)}</div>`).join('')}`;
+        tip.innerHTML = `<div class="lc-tip-d">${dl(xs[i])}</div>${rows.map(([s, v]) => `<div class="lc-tip-r"><i style="background:${s.color}"></i><span>${J.esc(s.label)}</span><b>${s.format ? s.format(v) : fmt(v)}</b></div>`).join('')}${mk.map(m => `<div class="lc-tip-m ${m.kind}">${J.esc(m.label)}${m.detail ? ' · '+J.esc(m.detail) : ''}</div>`).join('')}`;
         tip.hidden = false; const bx = box.getBoundingClientRect(), left = X(i) * r.width / W;
-        tip.style.left = (left > bx.width / 2 ? left - tip.offsetWidth - 14 : left + 14) + 'px';
+        tip.style.left = Math.max(0,Math.min(bx.width-tip.offsetWidth,left > bx.width / 2 ? left-tip.offsetWidth-14 : left+14))+'px';
       };
-      const leave = () => { cross.setAttribute('visibility', 'hidden'); dots.forEach(d => d.setAttribute('visibility', 'hidden')); tip.hidden = true; };
+      const leave = () => { if(pinned)return; cross.setAttribute('visibility', 'hidden'); dots.forEach(d => d.setAttribute('visibility', 'hidden')); tip.hidden = true; };
+      markerTargets.forEach(({g,x,date,items}) => {
+        const show = ev => { ev.stopPropagation(); if(['touchstart','click'].includes(ev.type))pinned=true; tip.innerHTML='<div class="lc-tip-d">'+J.date(date)+'</div>'+items.map(m=>'<div class="lc-tip-m">'+J.esc(m.label)+'</div><div>'+J.esc(m.detail || '')+'</div>').join(''); tip.hidden=false; const width=box.getBoundingClientRect().width; tip.style.left=Math.max(0,Math.min(width-tip.offsetWidth,x*width/W))+'px'; };
+        g.addEventListener('mouseenter',show);g.addEventListener('focus',show);g.addEventListener('click',show);g.addEventListener('touchstart',show,{passive:true});g.addEventListener('touchend',ev=>ev.stopPropagation());
+        g.addEventListener('keydown',ev=>{if(['Enter',' '].includes(ev.key)){ev.preventDefault();show(ev)}if(ev.key==='Escape'){pinned=false;leave()}});g.addEventListener('blur',leave);
+      });
+      box.addEventListener('pointerdown',ev=>{if(!ev.target.closest('.lc-purchase-marker,.lc-tip')){pinned=false;leave()}});
+      box.addEventListener('keydown',ev=>{if(ev.key==='Escape'){pinned=false;leave()}});
+      svg.addEventListener('touchstart',move,{passive:true});
       svg.addEventListener('mousemove', move); svg.addEventListener('mouseleave', leave); svg.addEventListener('touchmove', move, { passive: true }); svg.addEventListener('touchend', leave);
       host.append(wrap);
     }

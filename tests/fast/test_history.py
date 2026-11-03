@@ -84,3 +84,50 @@ def test_quote_without_daily_history_and_sold_unpriced_position():
     assert r['value'][-1] == 24 and r['gain'][-1] == 4
     r = h.build([tx(1, '2026-01-05', 'buy', 2, 10), tx(2, '2026-01-06', 'sell', 2, 12)], {}, {}, {1: 'EUR'}, {}, {}, TODAY)
     assert r['value'][-1] == 0 and r['gain'][-1] == 4
+
+
+def test_market_history_precedes_purchase_and_keeps_true_trade_details():
+    r = h.build([tx(1, '2026-01-07', 'buy', 2, 12, fees=1), tx(2, '2026-01-08', 'buy', 1, 9, fees=.5), tx(3, '2026-01-09', 'sell', 1, 10)], BARS, {}, {1:'EUR'}, {}, {}, TODAY)
+    assert r['market']['dates'][0] == '2026-01-05'
+    assert r['dates'][0] == '2026-01-07'
+    assert r['market']['lines'][0]['prices'] == [10,11,12,9]
+    assert r['trades'][0]['first_buy'] is True
+    assert r['trades'][1]['first_buy'] is False
+    assert r['trades'][0]['quantity'] == 2
+    assert r['trades'][0]['fees_eur'] == 1
+    assert r['trades'][0]['unit_price'] == 12
+    assert r['trades'][0]['key'] == '1'
+    assert r['lines'][0]['gain'][-1] == -6.5  # 18 value - 24.5 net flows
+
+
+def test_market_split_and_partial_sale_do_not_change_price_series():
+    bars={1:[('2026-01-05',100,None),('2026-01-06',50,None),('2026-01-07',52,None)]}
+    r=h.build([tx(1,'2026-01-05','buy',2,100),tx(2,'2026-01-07','sell',1,52)],bars,{1:[('2026-01-06',2)]},{1:'EUR'},{},{},datetime.date(2026,1,7))
+    assert r['market']['lines'][0]['prices']==[50,50,52]
+    assert r['market']['lines'][0]['break_dates']==[]
+    assert r['value'][-1]==156
+    assert r['gain'][-1]==8
+    assert r['trades'][0]['quantity']==2  # historical unadjusted transaction
+    assert r['trades'][0]['unit_price']==100
+
+
+def test_market_keeps_currency_missing_observations_and_actual_quote_date():
+    m={1:{'price':12,'price_time':'2026-01-08 13:00:00'},2:{}}
+    r=h.build([tx(1,'2026-01-07','buy',1,12,cur='USD',fx=.9),tx(2,'2026-01-07','buy',1,10,lid=2,sym='B')],
+        {1:BARS[1],2:[('2026-01-05',10,None)]},{},{1:'USD',2:'EUR'},{'USD':[('2026-01-05',.8)]},m,TODAY)
+    a,b=r['market']['lines']
+    assert a['currency']=='USD' and a['prices'][0]==10
+    assert a['last_date']=='2026-01-08' and '2026-01-09' not in r['market']['dates']
+    assert b['prices']==[10,None,None,None]
+    assert r['trades'][0]['fx_to_eur']==.9
+    assert r['lines'][0]['gain'][-1] is not None
+
+
+def test_market_excludes_sold_holdings_and_uses_only_latest_intraday_session():
+    r=h.build([tx(1,'2026-01-05','buy',1,10),tx(2,'2026-01-07','sell',1,12)],BARS,{},{1:'EUR'},{},{},TODAY)
+    assert r['market']['lines']==[]
+    assert r['gain'][-1]==2
+    r=h.build([tx(1,'2026-01-07','buy',1,12)],BARS,{},{1:'EUR'},{},{},TODAY,
+        bars15={1:[('2026-01-08T09:00:00',9),('2026-01-09T09:00:00',10),('2026-01-09T09:15:00',11)]})
+    assert r['market']['intraday']['dates']==['2026-01-09T09:00:00','2026-01-09T09:15:00']
+    assert r['market']['intraday']['lines'][0]['prices']==[10,11]

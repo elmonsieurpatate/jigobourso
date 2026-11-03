@@ -166,3 +166,38 @@ def test_gain_protection_uses_real_acquisition_cost_and_split_units(world, ratio
         assert not unreliable['insights']['L1']['protection']['available']
         assert unreliable['insights']['L1']['status']=='unknown'
         assert unreliable['totals']['value']==d['totals']['value']
+
+
+@pytest.mark.parametrize('ratio,currency,fx', [(1,'EUR',1), (2,'USD',.9)])
+def test_analysis_market_precedes_purchase_and_markers_keep_transaction_units(world, ratio, currency, fx):
+    a,pf=account(world)
+    conn=connect()
+    with conn.cursor() as q:
+        q.execute('UPDATE listings SET currency=%s WHERE id=1',(currency,))
+        q.execute('UPDATE latest_prices SET currency=%s WHERE listing_id=1',(currency,))
+        q.executemany('INSERT INTO daily_prices(listing_id,price_date,close_px) VALUES (1,%s,%s)',
+                      [('2026-04-01',100),('2026-05-01',110),('2026-06-01',120/ratio)])
+        if ratio!=1:
+            q.execute("INSERT INTO corporate_events VALUES (1,'2026-06-01','split',%s)",(ratio,))
+            q.execute("INSERT INTO split_log(listing_id,event_date,price_ratio,ratio,status,detected_at) VALUES (1,'2026-06-01',%s,%s,'confirmed',NOW())",(1/ratio,ratio))
+        if currency!='EUR':
+            q.execute("INSERT INTO fx_rates VALUES ('USD','2026-04-01',.9),('USD',CURDATE(),.8)")
+    conn.commit();conn.close()
+    buy=add(a,pf,qty=2,price=110,date='2026-05-01',fees=2,currency=currency,fx_to_eur=fx)
+    add(a,pf,qty=1,price=120/ratio,date='2026-06-01',fees=1,currency=currency,fx_to_eur=fx)
+    add(a,pf,side='sell',qty=1,price=120/ratio,date='2026-06-02',fees=1,currency=currency,fx_to_eur=fx)
+    status,r=a.call('portfolio/history',params=f'&id={pf}')
+    assert status==200,r
+    assert r['market']['dates'][0]=='2026-04-01'
+    assert r['dates'][0]=='2026-05-01'
+    line=r['market']['lines'][0]
+    assert line['currency']==currency
+    assert line['prices'][0]==pytest.approx(100/ratio)
+    assert r['trades'][0]['id']==buy
+    assert r['trades'][0]['first_buy'] is True
+    assert r['trades'][1]['first_buy'] is False
+    assert r['trades'][0]['quantity']==2
+    assert r['trades'][0]['unit_price']==110
+    assert r['trades'][0]['fees_eur']==2
+    assert r['trades'][0]['fx_to_eur']==fx
+    assert sum(l['gain'][-1] for l in r['lines'])==pytest.approx(r['gain'][-1])

@@ -47,7 +47,7 @@ try{for(const width of [1280,390,375]){
  await view('positions');assert.match(await page.locator('#position-cards').innerText(),/Non calculé en 1 J/);
  await view('analysis');await page.locator('#evo-per [data-v="1m"]').click();await view('overview');r.checks.push('intraday-meaning-explicit');
  await page.locator('#pf-select').selectOption('4');await page.waitForFunction(()=>document.querySelector('.hero-v')?.textContent==='–');assert.match(await page.locator('#page').innerText(),/valorisation et gain total indisponibles/);
- await page.locator('#pf-select').selectOption('7');await page.getByText('Contributions partielles :', {exact:false}).waitFor();assert.equal(await page.locator('.hero-v').innerText(),'–');r.checks.push('partial-contributions-explicit');
+ await page.locator('#pf-select').selectOption('7');await page.locator('#overview-movers').getByText('Contributions partielles :', {exact:false}).waitFor();assert.equal(await page.locator('.hero-v').innerText(),'–');r.checks.push('partial-contributions-explicit');
  await page.locator('#pf-select').selectOption('5');await page.waitForFunction(()=>document.querySelector('.hero-v')?.textContent.replace(/\s/g,'')==='0€');assert.equal(await page.locator('#pf-nav').count(),1);r.checks.push('missing-price','empty-portfolio');
  r.errors=errors;assert.deepEqual(errors,[]);report.push(r);fs.writeFileSync(`${OUT}/results.json`,JSON.stringify(report,null,2));await ctx.close();
 }}finally{await browser.close()}console.log(JSON.stringify(report));})().catch(e=>{console.error(e);process.exitCode=1});
