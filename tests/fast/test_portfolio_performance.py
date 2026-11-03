@@ -8,7 +8,7 @@ import pytest
 
 def perf(gain, values, purchases, start, end):
     source = (Path(__file__).resolve().parents[2] / 'app/public/assets/portefeuilles.js').read_text()
-    function = source[source.index('  function perf('):source.index('  const PER_LABEL')]
+    function = source[source.index('  function perf('):source.index('  const tradePrice')]
     code = function + '\nconsole.log(JSON.stringify(perf(...JSON.parse(process.argv[1]))));'
     out = subprocess.run(['node', '-e', code, json.dumps([gain, values, purchases, start, end])],
                          capture_output=True, text=True, check=True)
@@ -79,3 +79,29 @@ def test_loss_dates_are_observed_sequences_not_invented_crossings(gains,first,cu
     result=json.loads(out.stdout)
     assert result['first']==first and result['current']==current
     assert result.get('gap',False)==gap
+
+
+@pytest.mark.parametrize('period,start,expected', [('all',0,19),('1w',1,10),('1d',0,None)])
+def test_shared_snapshot_keeps_total_and_contributions_on_same_period(period,start,expected):
+    source=(Path(__file__).resolve().parents[2]/'app/public/assets/portefeuilles.js').read_text()
+    performance=source[source.index('  function perf('):source.index('  const tradePrice')]
+    snapshot=source[source.index('  function snapshot('):source.index('  function focusAnalysis(')]
+    history={'dates':['2026-01-01','2026-01-08','2026-01-15'],'gain':[-1,9,19],
+             'value':[100,150,0],'purchases':[101,151,151],
+             'lines':[{'key':'1','gain':[-1,9,19],'values':[100,150,0],'purchases':[101,151,151]}]}
+    code='const H=JSON.parse(process.argv[1]),EVO={per:process.argv[2]},PAL=["red"];function periodStart(){return Number(process.argv[3])};'+performance+snapshot+'\nconsole.log(JSON.stringify(snapshot()));'
+    out=subprocess.run(['node','-e',code,json.dumps(history),period,str(start)],capture_output=True,text=True,check=True)
+    result=json.loads(out.stdout)
+    assert result['total']['eur']==expected
+    assert result['rows'][0]['eur']==expected
+    if period=='1w':assert result['total']['pct']==pytest.approx(100*10/150)
+
+
+def test_personal_curves_do_not_assign_market_performance_between_holding_intervals():
+    source=(Path(__file__).resolve().parents[2]/'app/public/assets/portefeuilles.js').read_text()
+    performance=source[source.index('  function perf('):source.index('  const tradePrice')]
+    held=source[source.index('  function heldPerformance('):source.index('  function positionTable(')]
+    code=performance+held+'''\nconst l={quantities:[1,0,0,1,1],purchases:[10,10,10,19,19],values:[10,0,0,9,9],gain:[0,1,1,1,1]};
+    console.log(JSON.stringify(l.gain.map((_,i)=>heldPerformance(l,0,i,'eur'))));'''
+    out=subprocess.run(['node','-e',code],capture_output=True,text=True,check=True)
+    assert json.loads(out.stdout)==[0,1,None,1,1]

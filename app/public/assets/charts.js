@@ -13,7 +13,7 @@
   J.lineChart = function (host, xs, series, opts = {}) {
     host.innerHTML = '';
     const hidden = opts.hidden || new Set(), n = xs.length, vis = series.filter(s => !hidden.has(s.id) && s.values.some(v => v !== null && v !== undefined));
-    const W = Math.max(300, Math.round(host.clientWidth || 1000)), H = opts.height || 240, L = 4, R = 64, T = opts.verticalMarkers ? 44 : 10, B = 26, PH = H - T - B, fmt = opts.format || (v => J.num(v, 0)), dl = opts.time ? J.dateTime : J.date;
+    const W = Math.max(300, Math.round(host.clientWidth || 1000)), H = opts.height || 240, L = 4, R = opts.endLabels ? 120 : 64, T = opts.verticalMarkers ? 44 : 10, B = 26, PH = H - T - B, fmt = opts.format || (v => J.num(v, 0)), dl = opts.time ? J.dateTime : J.date;
     const wrap = document.createElement('div'); wrap.className = 'lc';
     if (n < 2 || !vis.length) { wrap.innerHTML = `<div class="lc-empty">${n < 2 ? 'Pas encore assez de données sur cette période.' : series.some(s => s.values.some(v => v !== null && v !== undefined)) ? 'Toutes les courbes sont masquées.' : 'Valorisation indisponible sur cette période.'}</div>`; host.append(wrap); }
     else {
@@ -30,6 +30,13 @@
           const base = Y(opts.zeroLine ? Math.max(y0, Math.min(0, y1)) : y0); svg.append(el('path', { d: `${d}L${X(n - 1)} ${base}L${L} ${base}Z`, fill: `url(#lcg${k}-${host.id || ''})` })); }
         svg.append(el('path', { d, fill: 'none', stroke: s.color, 'stroke-width': s.width || 2.2, 'stroke-dasharray': s.dash || '', 'stroke-linejoin': 'round', 'stroke-linecap': 'round', 'vector-effect': 'non-scaling-stroke', opacity: s.opacity ?? 1, 'data-series': s.id }));
       });
+      if(opts.endLabels){
+        const labels=vis.map(s=>{let i=s.values.length-1;while(i>=0&&(s.values[i]===null||s.values[i]===undefined))i--;return i>=0?{s,i,y:Y(s.values[i]),target:Y(s.values[i])}:null}).filter(Boolean).sort((a,b)=>a.y-b.y);
+        const gap=Math.min(14,(PH-12)/Math.max(1,labels.length-1));
+        labels.forEach((l,k)=>l.y=Math.max(T+6,l.y,k?labels[k-1].y+gap:T+6));
+        if(labels.length){labels[labels.length-1].y=Math.min(T+PH-4,labels[labels.length-1].y);for(let k=labels.length-2;k>=0;k--)labels[k].y=Math.min(labels[k].y,labels[k+1].y-gap);}
+        labels.forEach(l=>{svg.append(el('line',{x1:X(l.i),y1:l.target,x2:W-R+5,y2:l.y,stroke:l.s.color,'stroke-width':.6,opacity:.65}),el('text',{x:W-R+8,y:l.y+3,fill:l.s.color,class:'lc-end-label','font-weight':l.s.id===opts.selected?800:600},l.s.label));});
+      }
       const groups = new Map();
       (opts.markers || []).filter(m => m.x >= (opts.time?String(xs[0]):String(xs[0]).slice(0,10)) && m.x <= (opts.time?String(xs[n-1]):String(xs[n-1]).slice(0,10))).forEach(m => {
         if (!groups.has(m.x)) groups.set(m.x, []); groups.get(m.x).push(m);

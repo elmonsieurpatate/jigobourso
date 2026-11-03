@@ -131,7 +131,7 @@ def build(transactions, bars, splits, unit, fx, meta, today=None, bars15=None):
             else:
                 holdings[key] = max(0.0, holdings.get(key, 0.0) - qty * factor)
                 net_in -= gross - fees
-            lines.setdefault(key, {'key': str(key), 'symbol': t['symbol'], 'name': (meta.get(key) or {}).get('name') or t.get('name') or t['symbol'], 'values': [], 'net_in': [], 'purchases': [], '_in': 0.0, '_purchases': 0.0})
+            lines.setdefault(key, {'key': str(key), 'symbol': t['symbol'], 'name': (meta.get(key) or {}).get('name') or t.get('name') or t['symbol'], 'values': [], 'net_in': [], 'purchases': [], 'quantities': [], '_in': 0.0, '_purchases': 0.0})
             if t['side'] == 'buy':
                 lines[key]['_purchases'] += gross + fees
             lines[key]['_in'] += (gross + fees) if t['side'] == 'buy' else -(gross - fees)
@@ -146,6 +146,7 @@ def build(transactions, bars, splits, unit, fx, meta, today=None, bars15=None):
                 c = closes[key].at(day) if isinstance(key, int) and key in closes else None
                 f = to_eur(key, day) if c is not None else None
                 v = q * c * f if c is not None and f is not None else None
+            line['quantities'].append(q)
             line['values'].append(None if v is None else round(v, 2))
             line['purchases'].append(round(line['_purchases'], 2))
             line['net_in'].append(round(line['_in'], 2))
@@ -157,6 +158,7 @@ def build(transactions, bars, splits, unit, fx, meta, today=None, bars15=None):
         for line in lines.values():
             if len(line['values']) < len(out['dates']) + 1:
                 pad = len(out['dates']) + 1 - len(line['values'])
+                line['quantities'][:0] = [0.0] * pad
                 line['values'][:0] = [0.0] * pad
                 line['net_in'][:0] = [0.0] * pad
                 line['purchases'][:0] = [0.0] * pad

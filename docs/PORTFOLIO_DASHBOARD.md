@@ -1,13 +1,10 @@
-# Portefeuilles V3 — suivi des investissements
+# Portefeuilles V3 — pilotage et conventions financières
 
-## Quatre espaces
+## Deux espaces, une période commune
 
-- **Vue d'ensemble** : valeur, gain total brut et net indicatif, capital défini, principaux contributeurs et positions à examiner. Pas de grand graphique avant le résultat.
-- **Mes positions** : résultat personnel, poids, prix de revient, résultat sur la période, statut et explications à la demande. Tris par surveillance, pertes, gains, recul et poids.
-- **Évolution et analyse** : réutilise les courbes, unités et contributions existantes. La période affichée porte ses dates ; le gain latent depuis les achats garde une référence distincte.
-- **Historique et gestion** : transactions/CSV, ventes, réglages regroupés des achats, allocations et secteurs des ETF seulement lorsqu'ils sont détenus. L'ajout de transaction reste accessible indépendamment de l'espace.
+**Mon portefeuille** présente dans cet ordre : portefeuille et période globale, résumé financier, graphique et classement interactif des contributions, tableau compact des positions, détail unique de la sélection. **Historique et gestion** conserve transactions/CSV, ventes, lots et alertes, valeur et mouvements d’argent, allocation géographique, ETF pertinents et paramètres. Le bouton Transaction reste accessible. Il n’y a plus de cartes de positions ni d’onglets d’analyse séparés.
 
-Les onglets s'utilisent au clavier (flèches), les détails natifs au clavier/toucher, et les anciens panneaux de gestion avec Entrée/Espace. Les raisons ne dépendent pas d'une couleur ou d'une infobulle de survol.
+La période démarre à **Depuis le début** à chaque ouverture. Elle pilote un unique instantané (`snapshot`) : résumé de période, graphique, contributions et tableau. La valeur actuelle et le résultat cumulé restent fixes. Les préférences d’unité, de mode de graphique et de tri sont conservées ; un ancien sélecteur de période ne remplace pas ce défaut.
 
 ## Résultat personnel et état du titre
 
@@ -15,7 +12,7 @@ La valorisation et les gains restent calculés par `ledger.php`, au **prix moyen
 
 L'état du titre décrit séparément les mesures réellement disponibles : tendance sur un mois, momentum 6 mois, moyennes 50/200 séances et volatilité quotidienne sur trois mois. Une plus-value personnelle n'efface pas une tendance défavorable ; une perte ne prouve pas que le marché continue de se dégrader.
 
-Les contributions en euros incluent réalisé et latent et s'additionnent au résultat quand les données sont complètes. La part relative affichée = valeur absolue d'une contribution / somme des valeurs absolues des contributions de tous les titres. Elle distingue l'impact monétaire du rendement propre et du poids du portefeuille. Les trois principaux contributeurs de chaque signe sont mis en avant ; la vue Analyse conserve la liste complète. Les pourcentages de rendement propres aux titres ne s'additionnent pas.
+Les contributions en euros incluent réalisé et latent et s’additionnent au résultat quand les données sont complètes. Le classement principal utilise les euros, jamais le pourcentage propre au titre. Toutes les contributions, y compris stables, inconnues et titres soldés, restent accessibles à côté du graphique. Les pourcentages de rendement propres aux titres ne s’additionnent pas.
 
 Le gain net indicatif conserve l'hypothèse précédente : gain brut moins 30 % des gains réalisés positifs par année et du latent positif. Son pourcentage utilise les mêmes achats cumulés. Hors PEA, pertes reportables, dividendes et fiscalité personnelle ; ce n'est pas un montant fiscal personnalisé. Aucune liquidité ni aucun dividende n'est inventé.
 
@@ -59,45 +56,37 @@ Les raisons identiques sont regroupées en conservant la sévérité la plus for
 
 La fraîcheur reprend `service.expected_close` et `last_collection`, y compris le cas d'un titre peu échangé dont la collecte est à jour. Une quote récente ne rend pas des indicateurs historiques anciens fiables. Aucune règle n'envoie d'ordre.
 
-## Périodes et corrections conservées
+## Dates et résultat sur la période
 
-1S = sept jours calendaires ; 1M/3M/6M/1A retranchent le nombre de mois correspondant, avec ajustement au dernier jour du mois lorsque nécessaire. La borne retenue est la dernière observation au plus tard à cette date. Tout part de la première transaction. Les dates réelles sont affichées. En mode Mon investissement, en 1J seule la valeur en euros des quantités actuelles sur la dernière séance disponible est proposée : les autres modes restent explicitement indisponibles, sans rejouer des transactions intrajournalières inexistantes.
+1 semaine = sept jours calendaires ; 1/3/6 mois et 1 an retranchent le nombre de mois, avec ajustement au dernier jour du mois. La borne est la dernière observation disponible au plus tard à cette date. Tous les éléments principaux utilisent **les mêmes indices et dates de `portfolio/history`**. Si le portefeuille est plus récent, la première transaction borne l’historique ; la couverture réelle est affichée. Aucun prix ni gain antérieur à l’acquisition n’est créé. L’historique expose les quantités détenues, dans les unités ajustées des splits déjà employées par le moteur. Les courbes des positions s’interrompent entre une vente totale et un rachat ; le point de sortie et le résultat réalisé restent conservés. Cela n’affecte ni les contributions, ni le registre, ni les rendements calculés.
 
-Les six régressions de `4b07314` restent couvertes : largeur effective mobile, pourcentages après ventes, unité du Momentum, lots après split, valeurs nulles sans cours et sélecteurs 1J. Les profils, seuils et scores d'Explorer ne sont pas modifiés.
+À la borne de départ, le gain et la valeur sont les états après les transactions datées du jour ; les transactions suivantes contribuent au résultat de la fenêtre. Quand la fenêtre comprend le premier jour enregistré, le calcul inclut les transactions et frais de ce premier jour depuis un portefeuille vide, comme le moteur existant. Les achats pendant la période ne constituent pas un gain ; les ventes ne constituent pas une perte : le résultat cumulé = valeur − achats + ventes nettes de frais. Le dénominateur reste valeur initiale + achats, ou achats cumulés depuis le début, sans déduire les ventes.
+
+En **1 jour**, les données existantes ne reconstituent pas les mouvements intrajournaliers. Le résultat personnel et les contributions de période restent donc indisponibles, la comparaison personnelle et le % sont désactivés. La seule série proposée est la valeur en euros des quantités actuelles sur la dernière séance enregistrée, explicitement nommée ; le résumé cumulé et les positions restent visibles. Le graphique de valeur en gestion suit aussi la même période. Aucun calcul journalier fictif ne remplace une série manquante.
+
+## Graphique, contributions et sélection
+
+Deux modes seulement : **Mon portefeuille** trace le résultat de période, corrigé des achats/ventes hors frais ; **Comparer mes positions** trace le résultat personnel de chaque titre détenu, en € ou en %. Le pourcentage utilise les conventions de période ci-dessus, pas une normalisation des cours à 100. Les séries des titres soldés ne sont ajoutées à la comparaison que lorsqu’ils sont sélectionnés dans les contributions ; leurs gains réalisés restent toujours dans le total.
+
+Le classement adjacent affiche toutes les lignes, pertes décroissantes en euros, gains, stabilité et données insuffisantes. Les deux principales pertes sont identifiées ; la première est sélectionnée automatiquement tant que l’utilisateur n’a pas choisi autrement. Une contribution connue ne permet pas d’inventer le total d’un portefeuille partiellement valorisable. Les étiquettes des courbes portent les tickers à leur extrémité, avec évitement des collisions pour les six positions usuelles. La sélection épaissit le tracé, atténue les autres et le dessine en dernier. Une légende ou un clic sur contribution/tableau sélectionne le titre sans le masquer arbitrairement.
+
+L’option **Courbes séparées** donne une série distincte par position avec échelle propre explicitement indiquée : les superpositions et une position très volatile ne peuvent plus rendre les autres illisibles. Les montants de contribution, toujours en euros, restent comparables et synchronisés. Le même unique tableau sert sur ordinateur et mobile ; sept tris utilisent les valeurs de la période (pertes/gains/impact/%, poids, recul, surveillance).
+
+Le résumé lié à la sélection donne résultat de période, résultat cumulé depuis les achats (ventes comprises), poids et premier achat. La fiche approfondie reste fermée initialement, puis accessible depuis contribution, tableau, alerte ou bouton Détails. Elle réutilise les diagnostics existants, les lots, stratégies et réglages, le suivi des sommets et la fiche du titre. Le tableau prend le **premier achat chronologique**, pas la transaction la plus récente de la liste de gestion triée à l’envers.
+
+Les prix de marché historiques restent dans l’analyse approfondie du titre, y compris avant l’achat, dans leur devise et sans frais/change personnel. Son sélecteur propre ne pilote que cette fiche de marché ; il ne change jamais la période globale ni les montants du portefeuille. Aucun nouveau moteur ni seuil de surveillance n’est ajouté.
+
+## Repères et dates de perte
+
+Les achats viennent du registre authentifié : date/heure, ticker, quantité, prix et devise d’origine, frais en euros, conversion historique. Les unités de la transaction ne sont pas réécrites après un split. Les corrections manuelles de split reconnues ne deviennent pas de faux achats économiques. Les achats à la même date sont regroupés ; sélectionner un titre filtre ses repères. Les repères sont masquables, accessibles au clavier et au toucher. Les achats hors période restent consultables dans la fiche sans être rabattus au début du graphique.
+
+Le détail distingue premier achat et compléments, première perte observée et séquence de perte observée actuelle. Les frais peuvent expliquer une perte dès le premier achat. Une lacune interrompt la séquence ; une dernière valeur inconnue ne permet pas d’affirmer une perte actuelle. Aucun franchissement exact entre deux observations n’est inventé. Le recul garde la référence distincte aux quantités actuellement détenues, depuis le dernier achat encore ouvert.
 
 ## Validation reproductible
 
-`make fast`, `make integ` exclusivement en base locale jetable, puis `tests/e2e/portfolio-audit.cjs` (93 combinaisons disponibles) et `tests/e2e/portfolio-dashboard.cjs` (navigation, tris, diagnostics, formulaires, clavier/tactile). Les deux scripts utilisent les fixtures locales de `portfolio_audit_seed.py` et les mêmes variables BASE / JIGO_TEST_DATABASE / JIGO_CHROMIUM / PLAYWRIGHT_MODULE / AUDIT_OUT décrites dans METHODE.md. Le smoke financier de CI vérifie aussi les nouveaux onglets et l'absence de débordement des positions.
+`make fast`, `make integ` en base locale jetable, puis la fixture `tests/e2e/portfolio_audit_seed.py` avec `JIGO_TEST_DATABASE=1`, `JIGO_DB_HOST=127.0.0.1` et la base locale autorisée. Aucune de ces fixtures ne cible une base de production.
 
-## Évolution et analyse : cours et investissements
-
-`portfolio/history` fournit désormais deux jeux de données séparés. Les tableaux existants (`dates`, `gain`, `value`, `lines`) gardent leur calcul financier. `market` contient les observations des titres **encore détenus**, depuis le début de l’historique enregistré, même avant leur premier achat. Les ventes totales restent présentes dans le résultat personnel et les contributions, mais ne créent pas une courbe de titre encore détenu.
-
-- **Cours du titre / Base 100** : `100 × cours observé / cours à la date initiale commune`. Aucun changement de quantité, frais ou taux de change personnel n’intervient. Si le prix initial manque, ou si une rupture de série non résolue traverse la fenêtre, la comparaison de ce titre est indisponible. Les cours réels restent consultables dans leur devise ; l’axe numérique ne représente pas un montant global en euros. Les clôtures utilisent `prepare_series`, comme les fiches existantes : corrections de splits et éventuels cours ajustés du fournisseur.
-- **Mon investissement / Depuis vos achats** : gain cumulé, réalisé et latent, depuis les transactions initiales ; en %, dénominateur = achats cumulés, frais compris. La période ne fait que découper la partie visible de cette série cumulative.
-- **Mon investissement / Sur la période** : conventions de période déjà définies plus haut. Les deux références sont explicitement sélectionnables. Valeur et apports nets conservent leurs montants historiques ; aucune variation de prix n’est présentée comme le rendement personnel.
-- **Classement des pertes** : toujours la contribution personnelle **sur la période**, quel que soit le mode du graphique, par euros croissants. Affiche les résultats négatifs calculables, y compris ceux des titres soldés. Le résultat personnel cumulé, le poids actuel et le recul de la position encore ouverte gardent leurs références séparées. Le détail de toutes les contributions conserve les titres positifs et indisponibles. Les données partielles sont signalées ; les rendements propres aux titres ne sont pas additionnés.
-
-Les prix de marché ne sont jamais remplacés par des prix d’achat. Les dates proviennent de vraies observations : le dernier cours conserve sa date réelle, les observations manquantes restent nulles, et une période plus longue que l’historique disponible n’invente pas de séances. Les différentes devises et les dates effectivement affichées sont explicites. En 1J, les cours peuvent être comparés en base 100 ou affichés en devise sur la dernière séance enregistrée. Le résultat personnel intraday conserve la seule vue Valeur/€ et les autres calculs restent explicitement indisponibles.
-
-### Repères et achats
-
-Les repères sont issus des transactions du propriétaire authentifié : identifiant, date/heure enregistrée, quantité et prix **dans les unités de la transaction**, devise, frais en euros et taux de conversion historique. Les splits ne réécrivent pas ces libellés. Les achats gratuits reconnus comme corrections manuelles de split ne deviennent pas de faux achats économiques. Le premier achat et les compléments sont identifiés, même si un premier lot a été vendu.
-
-Un repère hors de la fenêtre ne se rabat jamais sur son premier point. En quotidien, les achats à une même date partagent une verticale et une infobulle détaillant les titres ; une date sans observation est située entre les dates voisines, sans inventer de cours ce jour-là. En 1J, seul un achat dont l’heure enregistrée se trouve dans la séance visible est tracé ; aucune heure n’est attribuée à un achat hors séance. Les heures restent celles du registre et des barres existants. Les repères sont masquables, accessibles au clavier (Échap pour fermer) et consultables au toucher. Un toucher conserve l’infobulle ; toucher le fond du graphique la ferme.
-
-Le récapitulatif regroupe les achats par titre, conserve les premiers achats hors période et replie les compléments. Sélectionner un titre renforce sa courbe et filtre les repères ; « Tous les titres » rétablit l’ensemble. Les compléments ouverts restent ouverts lors d’un changement de période. Les modifications et toutes les ventes restent dans le tableau de gestion existant.
-
-Validation supplémentaire : `tests/e2e/portfolio-analysis.cjs`, après la fixture locale, contrôle les sept périodes, les deux échelles de cours, les repères groupés/hors période/intraday, le clavier/toucher, la mise en évidence, les contributions en euros, les références personnelles, les séries incomplètes et les ventes totales à 1280, 390 et 375 px. Les tests Python contrôlent indépendamment les séries avant acquisition, les frais, devises, splits et ventes partielles, et l’API PHP réelle.
-
-## Lisibilité des positions et priorité aux pertes
-
-La vue Analyse s’ouvre maintenant sur **Mon investissement / Comparer les titres / Depuis vos achats**, indépendamment d’un ancien choix « Gain » ou de courbes mémorisées comme masquées. Les unités €/% restent disponibles. Les résultats cumulatifs incluent les transactions, frais, change et ventes selon les mêmes conventions ; le bloc de contributions reste toujours sur la période sélectionnée. Le cours boursier est secondaire et porte son propre titre. Trois libellés visibles séparent cours, résultat personnel et contribution.
-
-La reproduction locale sous `39cde3f` utilise six positions (TTAN, ASO, BOX, FIGS, VFC, DXC), dont deux paires de séries identiques. À 1280, 390 et 375 px : six légendes et six chemins SVG, mais **quatre géométries distinctes**. Une légende complète ne suffisait donc pas à garantir la lisibilité. `tests/e2e/portfolio-focus.cjs` conserve ce scénario et vérifie la correction : une mini-courbe distincte par position, y compris pour les deux paires superposées. Les échelles propres des mini-courbes sont explicites ; ce sont les montants et le classement des contributions qui permettent de comparer les impacts. Une série insuffisante garde sa position visible avec une mention d’indisponibilité.
-
-Dans la comparaison personnelle, la légende sélectionne une position au lieu de la masquer. La sélection épaissit sa courbe, atténue les autres, la dessine **en dernier** pour qu’une courbe identique ne la recouvre pas, filtre les repères d’achat et affiche son détail. Les six mini-courbes restent identifiables. « Tous les titres » annule le focus. Le graphique commun est plus compact.
-
-Le principal contributeur négatif **en euros sur la période**, sans seuil inventé, apparaît avant le graphique. Il est sélectionné par défaut et actualisé avec la période tant que l’utilisateur ne choisit pas un autre focus. Le bloc des pertes conserve le même classement financier, les noms, résultats cumulés, poids, recul calculable et statuts du moteur. Une contribution partielle est signalée comme telle. La courbe sélectionnée en perte personnelle est rouge ; une position bénéficiaire qui pénalise uniquement la période garde les deux résultats distincts.
-
-Sélectionner une perte relie sa courbe à son premier achat, ses achats complémentaires, quantités, prix, frais et change. Le détail affiche la **première perte observée** et, si le résultat reste négatif, le début de sa **séquence de perte observée**. Les frais peuvent expliquer une perte dès le premier achat. Une lacune interrompt la séquence : aucun franchissement exact ni aucune perte intrajournalière n’est déduit de clôtures discontinues. Le récapitulatif de tous les achats est repliable pour éviter de répéter en permanence le détail de la sélection. Le moteur, ses seuils et ses conventions de calcul restent inchangés.
+- `tests/e2e/portfolio-cockpit.cjs` vérifie les deux espaces, le défaut Depuis le début, le cas six positions dont deux paires superposées, l’unicité et la synchronisation de la semaine, les dates des achats, le tableau et ses sept tris, les clics/clavier/toucher, les cours approfondis, les réglages par lot et les données partielles/ventes totales à 1280, 390 et 375 px. Il remplace les anciennes suites liées aux quatre onglets (`portfolio-dashboard`, `portfolio-analysis`, `portfolio-focus`).
+- `tests/e2e/portfolio-audit.cjs` conserve les six régressions financières : géométrie mobile, dénominateurs après ventes, Momentum, FIFO après split, absence de cours et 1J explicite. La matrice actuelle comporte 75 combinaisons (deux modes × deux unités × six périodes, plus 1J, sur trois largeurs), avec oracles indépendants sur les séries et sommes des contributions.
+- `tests/e2e/financial.cjs` vérifie les deux espaces dans le smoke de CI, avec les autres parcours Explorer/ETF/comptes existants.
+- Les tests rapides et d’intégration des moteurs PMP/FIFO, frais/devises, splits, données absentes et suivi des sommets restent applicables. Les algorithmes et seuils d’Explorer ne changent pas.

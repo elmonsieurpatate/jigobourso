@@ -198,6 +198,7 @@ def test_analysis_market_precedes_purchase_and_markers_keep_transaction_units(wo
     assert r['trades'][1]['first_buy'] is False
     assert r['trades'][0]['quantity']==2
     assert r['trades'][0]['unit_price']==110
+    assert r['lines'][0]['quantities'][-1]==pytest.approx(2*ratio)
     assert r['trades'][0]['fees_eur']==2
     assert r['trades'][0]['fx_to_eur']==fx
     assert sum(l['gain'][-1] for l in r['lines'])==pytest.approx(r['gain'][-1])

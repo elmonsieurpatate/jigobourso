@@ -66,4 +66,14 @@ with c.cursor() as q:
   for date,qty,price,fee in [('2026-10-20',1,100,1)]+([('2026-10-28',.2,105,.1)] if sym in ('TTAN','BOX') else []):
    q.execute("INSERT INTO portfolio_transactions(portfolio_id,listing_id,symbol,name,side,quantity,unit_price,currency,fx_to_eur,fees,trade_at,created_at) VALUES (9,%s,%s,%s,'buy',%s,%s,'EUR',1,%s,%s,NOW())",(lid,sym,'Six '+sym,qty,price,fee,date+' 12:00:00'))
    if sym=='DXC':q.execute("INSERT INTO lot_settings(transaction_id,strategy,alert_drop_pct,updated_at) VALUES (%s,'regular',10,NOW())",(q.lastrowid,))
-c.commit();c.close();print('9 portefeuilles synthétiques, 11 titres, base isolée prête')
+ # Ranking oracle: a small 47.5% loss must rank behind the much larger 20% loss.
+ q.execute("INSERT INTO portfolios(id,user_id,name,is_default,created_at,updated_at) VALUES (10,%s,'Euros et volatilité',0,NOW(),NOW())",(user_id,))
+ q.execute("INSERT INTO instruments(id,group_key,kind,name,country) VALUES (17,'stress:VOLT','equity','Volatile synthétique','France')")
+ q.execute("INSERT INTO listings(id,instrument_id,mic,symbol,currency,status,is_primary) VALUES (17,17,'XPAR','VOLT','EUR','selected',1)")
+ q.execute("INSERT INTO latest_prices(listing_id,price,price_time,source,currency) VALUES (17,200,NOW(),'quote','EUR')")
+ for day in days+[today]:
+  q.execute('INSERT INTO daily_prices(listing_id,price_date,close_px) VALUES (17,%s,%s)',(day,1 if day<=dt.date(2026,10,20) else 50 if day<dt.date(2026,10,28) else 200))
+ q.execute("INSERT INTO series_state(listing_id,computed_at,last_close_date,closes_count,close_px,quality) VALUES (17,NOW(),CURDATE(),420,200,'break')")
+ for lid,sym,qty,price in [(11,'TTAN',1,100),(12,'ASO',.1,200),(13,'BOX',1,110),(14,'FIGS',1,100),(16,'DXC',20,100),(17,'VOLT',1,1)]:
+  q.execute("INSERT INTO portfolio_transactions(portfolio_id,listing_id,symbol,name,side,quantity,unit_price,currency,fx_to_eur,fees,trade_at,created_at) VALUES (10,%s,%s,%s,'buy',%s,%s,'EUR',1,0,'2026-10-20 12:00:00',NOW())",(lid,sym,'Stress '+sym,qty,price))
+c.commit();c.close();print('10 portefeuilles synthétiques, 12 titres, base isolée prête')

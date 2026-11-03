@@ -131,3 +131,10 @@ def test_market_excludes_sold_holdings_and_uses_only_latest_intraday_session():
         bars15={1:[('2026-01-08T09:00:00',9),('2026-01-09T09:00:00',10),('2026-01-09T09:15:00',11)]})
     assert r['market']['intraday']['dates']==['2026-01-09T09:00:00','2026-01-09T09:15:00']
     assert r['market']['intraday']['lines'][0]['prices']==[10,11]
+
+
+def test_holding_intervals_are_exposed_without_changing_realised_results():
+    r=h.build([tx(1,'2026-01-05','buy',1,10),tx(2,'2026-01-06','sell',1,11),tx(3,'2026-01-08','buy',1,9)],BARS,{},{1:'EUR'},{},{},TODAY)
+    line=r['lines'][0]
+    assert line['quantities']==[1,0,0,1,1]
+    assert line['gain']==[0,1,1,1,1]
