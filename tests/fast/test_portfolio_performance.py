@@ -42,21 +42,24 @@ def test_period_reference_is_calendar_based_and_clamps_month_end():
         assert int(out.stdout)==expected
 
 
-def test_purchase_markers_never_clamp_outside_window_and_keep_recorded_time():
+def test_transaction_markers_keep_recorded_time_and_sale_result_without_clamping():
     source=(Path(__file__).resolve().parents[2]/'app/public/assets/portefeuilles.js').read_text()
     functions=source[source.index('  const tradePrice ='):source.index('  function focusAnalysis(')]
     trades=[dict(key='1',side='buy',date='2026-01-01',trade_at='2026-01-01 12:00:00',symbol='A'),
             dict(key='1',side='buy',date='2026-01-07',trade_at='2026-01-07 09:15:00',symbol='A',quantity=2,unit_price=50,currency='USD',fees_eur=1,fx_to_eur=.9,first_buy=False),
+            dict(id=42,key='1',side='sell',date='2026-01-08',trade_at='2026-01-08 09:15:00',symbol='A',quantity=1,unit_price=60,currency='USD',fees_eur=2,fx_to_eur=.9),
             dict(key='2',side='buy',date='2026-01-07',trade_at='2026-01-07 12:00:00',symbol='B'),
             dict(key='1',side='buy',date='2026-02-01',trade_at='2026-02-01 12:00:00',symbol='A')]
-    prelude='const J={num:String,eur:String};const ANALYSIS={markers:true,focus:"1"};const H={trades:JSON.parse(process.argv[1])};'
-    code=prelude+functions+'''\nconst daily=purchaseMarkers(['2026-01-05','2026-01-09']);
-    const intraday=purchaseMarkers(['2026-01-07T09:00:00','2026-01-07T09:30:00'],true);
+    prelude='const D={sales:[{tx_id:42,gain:7}]};const J={num:String,eur:String};const ANALYSIS={markers:true,focus:"1"};const H={trades:JSON.parse(process.argv[1])};'
+    code=prelude+functions+'''\nconst daily=transactionMarkers(['2026-01-05','2026-01-09']);
+    const intraday=transactionMarkers(['2026-01-07T09:00:00','2026-01-07T09:30:00'],true);
     ANALYSIS.markers=false;
-    console.log(JSON.stringify([daily,intraday,purchaseMarkers(['2026-01-05','2026-01-09'])]));'''
+    console.log(JSON.stringify([daily,intraday,transactionMarkers(['2026-01-05','2026-01-09'])]));'''
     out=subprocess.run(['node','-e',code,json.dumps(trades)],capture_output=True,text=True,check=True)
     daily,intraday,hidden=json.loads(out.stdout)
-    assert [m['x'] for m in daily]==['2026-01-07']
+    assert [m['x'] for m in daily]==['2026-01-07','2026-01-08']
+    assert daily[1]['kind']=='sell' and daily[1]['id']==42
+    assert daily[1]['label']=='Vente A' and 'réalisé 7' in daily[1]['detail']
     assert [m['x'] for m in intraday]==['2026-01-07T09:15:00']
     assert 'complémentaire A' in daily[0]['label']
     assert 'USD' in daily[0]['detail'] and 'frais 1' in daily[0]['detail']
@@ -97,14 +100,14 @@ def test_shared_snapshot_keeps_total_and_contributions_on_same_period(period,sta
     if period=='1w':assert result['total']['pct']==pytest.approx(100*10/150)
 
 
-def test_personal_curves_do_not_assign_market_performance_between_holding_intervals():
+def test_personal_curves_keep_flat_realized_result_between_holding_intervals():
     source=(Path(__file__).resolve().parents[2]/'app/public/assets/portefeuilles.js').read_text()
     performance=source[source.index('  function perf('):source.index('  const tradePrice')]
     held=source[source.index('  function heldPerformance('):source.index('  function positionTable(')]
     code=performance+held+'''\nconst l={quantities:[1,0,0,1,1],purchases:[10,10,10,19,19],values:[10,0,0,9,9],gain:[0,1,1,1,1]};
     console.log(JSON.stringify(l.gain.map((_,i)=>heldPerformance(l,0,i,'eur'))));'''
     out=subprocess.run(['node','-e',code],capture_output=True,text=True,check=True)
-    assert json.loads(out.stdout)==[0,1,None,1,1]
+    assert json.loads(out.stdout)==[0,1,1,1,1]
 
 
 def test_contribution_percent_uses_common_portfolio_capital_not_stock_return():

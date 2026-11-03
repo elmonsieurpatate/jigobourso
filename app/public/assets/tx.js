@@ -1,39 +1,47 @@
 /* Dialogue d'ajout / modification d'une transaction (partagé par la fiche titre et la page Portefeuilles). */
-J.txDialog = function ({ portfolios, portfolioId, listing, tx, onDone }) {
+J.txDialog = function ({ portfolios, portfolioId, listing, tx, side: initialSide = 'buy', quantity = '', onDone }) {
   const editing = !!tx, today = new Date().toISOString().slice(0, 10);
   const opts = portfolios.map(p => `<option value="${p.id}" ${p.id === portfolioId ? 'selected' : ''}>${J.esc(p.name)}</option>`).join('');
   const body = `${editing ? '' : J.field('Portefeuille', `<select id="tx-pf">${opts}</select>`)}
     ${listing ? `<div class="notice">${J.esc(listing.name)} · ${J.esc(listing.symbol)} <span class="muted">(${J.esc(listing.currency || '')})</span></div>` :
       editing ? `<div class="notice">${J.esc(tx.name || tx.symbol)}</div>` : `<div id="pick">${J.field('Titre (nom, symbole ou ISIN)', '<input id="tx-q" autocomplete="off" placeholder="Rechercher dans le catalogue">')}<div id="tx-hits" class="small"></div></div>`}
     <div class="row"><span class="seg" id="tx-side"><button type="button" data-v="buy" class="on">Achat</button><button type="button" data-v="sell">Vente</button></span></div>
-    <div class="grid cols-2">${J.field('Quantité', `<input id="tx-qty" inputmode="decimal" value="${tx ? tx.quantity.replace(/\.?0+$/, '') : ''}">`)}${J.field('Prix unitaire (devise du titre)', `<input id="tx-price" inputmode="decimal" value="${tx ? tx.unit_price.replace(/\.?0+$/, '') : (listing && listing.price ? +listing.price : '')}">`)}
+    <div class="grid cols-2">${J.field('Quantité', `<input id="tx-qty" inputmode="decimal" value="${tx ? String(+tx.quantity) : quantity}">`)}${J.field('Prix unitaire (devise du titre)', `<input id="tx-price" inputmode="decimal" value="${tx ? String(+tx.unit_price) : (listing && listing.price ? +listing.price : '')}">`)}
     <div class="small muted" id="tx-hint" style="grid-column:1/-1;margin-top:-6px"></div>
-    ${J.field('Frais (€)', `<input id="tx-fees" inputmode="decimal" value="${tx && tx.fees ? tx.fees.replace(/\.?0+$/, '') : ''}" placeholder="0">`)}${J.field('Date', `<input id="tx-date" type="date" max="${today}" value="${tx ? tx.trade_at.slice(0, 10) : today}">`)}
-    ${J.field('Unité du prix (EUR, USD, GBP ou GBX = pence)', `<input id="tx-cur" maxlength="3" value="${J.esc(tx ? (tx.currency === 'GBp' ? 'GBX' : tx.currency || '') : listing ? (listing.currency === 'GBp' ? 'GBX' : listing.currency || '') : 'EUR')}">`)}${J.field('Taux historique : euros pour 1 unité du prix', `<input id="tx-fx" inputmode="decimal" value="${tx && tx.fx_to_eur ? tx.fx_to_eur.replace(/\.?0+$/, '') : ''}" placeholder="taux disponible à cette date">`)}</div>
-    ${J.field('Note', `<input id="tx-note" maxlength="500" value="${J.esc(tx ? tx.note || '' : '')}">`)}`;
-  let side = tx ? tx.side : 'buy', chosen = listing || null;
+    ${J.field('Frais (€)', `<input id="tx-fees" inputmode="decimal" value="${tx && tx.fees ? String(+tx.fees) : ''}" placeholder="0">`)}${J.field('Date', `<input id="tx-date" type="date" max="${today}" value="${tx ? tx.trade_at.slice(0, 10) : today}">`)}
+    ${J.field('Unité du prix (EUR, USD, GBP ou GBX = pence)', `<input id="tx-cur" maxlength="3" value="${J.esc(tx ? (tx.currency === 'GBp' ? 'GBX' : tx.currency || '') : listing ? (listing.currency === 'GBp' ? 'GBX' : listing.currency || '') : 'EUR')}">`)}${J.field('Taux historique : euros pour 1 unité du prix', `<input id="tx-fx" inputmode="decimal" value="${tx && tx.fx_to_eur ? String(+tx.fx_to_eur) : ''}" placeholder="taux disponible à cette date">`)}</div>
+    <div id="tx-preview" class="notice" role="status" hidden></div><p class="small muted">Enregistrement dans Jigobourso ; aucun ordre transmis à un courtier. Frais saisis en euros.</p>${J.field('Note', `<input id="tx-note" maxlength="500" value="${J.esc(tx ? tx.note || '' : '')}">`)}`;
+  let side = tx ? tx.side : initialSide, chosen = listing || null;
   J.dialog({
     title: editing ? 'Modifier la transaction' : 'Nouvelle transaction', body,
     actions: [{ label: 'Annuler', run: () => { } }, {
       label: 'Enregistrer', cls: 'primary', run: async d => {
         const v = id => J.$('#' + id, d)?.value ?? '';
         const common = { side, quantity: v('tx-qty'), unit_price: v('tx-price'), fees: v('tx-fees'), fx_to_eur: v('tx-fx'), currency: v('tx-cur'), trade_at: v('tx-date'), note: v('tx-note') };
+        if (side === 'sell') await J.post('tx/preview', {portfolio_id: editing ? portfolioId : +v('tx-pf'), listing_id: chosen?.id, symbol: chosen?.symbol || v('tx-q'), id: tx?.id, ...common});
         if (editing) await J.post('tx/update', { id: tx.id, ...common });
         else {
           const pf = +v('tx-pf');
-          if (chosen) await J.post('tx/add', { portfolio_id: pf, listing_id: chosen.id, ...common });
+          if (chosen) await J.post('tx/add', { portfolio_id: pf, listing_id: chosen.id, symbol: chosen.symbol, name: chosen.name, ...common });
           else { const sym = v('tx-q').trim(); if (!sym) throw new Error('Choisissez un titre'); await J.post('tx/add', { portfolio_id: pf, symbol: sym, ...common }); }
         }
         J.toast('Transaction enregistrée'); if (onDone) onDone();
       },
     }],
     onopen: d => {
-      J.$$('#tx-side button', d).forEach(b => { b.classList.toggle('on', b.dataset.v === side); b.onclick = () => { side = b.dataset.v; J.$$('#tx-side button', d).forEach(x => x.classList.toggle('on', x === b)); }; });
+      let previewTimer, revision=0;
+      const preview=()=>{const version=++revision;clearTimeout(previewTimer);const host=J.$('#tx-preview',d);host.hidden=side!=='sell';if(side!=='sell')return;host.textContent='Calcul de l’aperçu…';previewTimer=setTimeout(async()=>{const v=id=>J.$('#'+id,d)?.value||'';try{const r=await J.post('tx/preview',{portfolio_id:editing?portfolioId:+v('tx-pf'),id:tx?.id,listing_id:chosen?.id,symbol:chosen?.symbol||v('tx-q'),side,quantity:v('tx-qty'),unit_price:v('tx-price'),fees:v('tx-fees'),currency:v('tx-cur'),fx_to_eur:v('tx-fx'),trade_at:v('tx-date')});if(version!==revision||!d.isConnected)return;host.innerHTML=`<b>Aperçu de la vente · PMP</b><div>Détenu à cette date : ${J.num(r.before_qty,4)} · Restant : ${J.num(r.remaining_qty,4)}</div><div>Produit net : ${J.eur(r.proceeds)} · Coût attribué : ${J.eur(r.cost)}</div><div>Résultat réalisé estimé : <b>${J.eur(r.gain)} · ${J.pct(r.gain_pct,2)}</b></div><small>Change : ${J.num(r.fx_to_eur,6)} €/unité. Recalcul et contrôle du registre à l’enregistrement.</small>`}catch(e){if(version===revision)host.textContent=e.message}},180)};
+      d.addEventListener('close',()=>{revision++;clearTimeout(previewTimer)});
+      d.addEventListener('input',preview);
+      J.$('#tx-pf',d)?.addEventListener('change',preview);
+
+      J.$$('#tx-side button', d).forEach(b => { b.classList.toggle('on', b.dataset.v === side); b.onclick = () => { side = b.dataset.v; J.$$('#tx-side button', d).forEach(x => x.classList.toggle('on', x === b)); preview(); }; });
       const hint = () => { const h = J.$('#tx-hint', d), p = +J.$('#tx-price', d).value.replace(',', '.'), n = +J.$('#tx-qty', d).value.replace(',', '.'), last = chosen && chosen.price ? +chosen.price : null;
         h.innerHTML = (last ? `Dernier cours connu : <b>${J.num(last, 2)}</b> ${J.esc(chosen.price_currency || chosen.currency || '')} <a href="#" id="tx-last">utiliser ce cours</a> · ` : 'Prix payé (ou que vous paierez) pour <b>une</b> part, dans la devise du titre. ') + (p > 0 && n > 0 ? `Total ≈ <b>${J.num(p * n, 2)}</b> ${J.esc(J.$('#tx-cur', d).value || '')} hors frais` : 'Saisissez la quantité pour voir le total.');
-        const a = J.$('#tx-last', d); if (a) a.onclick = e => { e.preventDefault(); J.$('#tx-price', d).value = +chosen.price; hint(); }; };
+        const a = J.$('#tx-last', d); if (a) a.onclick = e => { e.preventDefault(); J.$('#tx-price', d).value = +chosen.price; hint(); preview(); }; };
       ['tx-date', 'tx-cur'].forEach(i => J.$('#' + i, d).addEventListener('input', () => { J.$('#tx-fx', d).value = ''; }));
       ['tx-qty', 'tx-price'].forEach(i => J.$('#' + i, d).addEventListener('input', hint)); hint();
+      preview();
       const q = J.$('#tx-q', d); if (!q) return; let t;
       q.oninput = () => { clearTimeout(t); chosen = null; t = setTimeout(async () => {
         const r = await J.api('listings/search', { params: { q: q.value } });

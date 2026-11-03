@@ -54,13 +54,14 @@ function pending_split_ratio(array $events, array $freeDates, string &$cursor, s
     return $f;
 }
 
-function portfolio_valuation(int $portfolioId): array {
+function portfolio_valuation(int $portfolioId, ?array $transactions = null, ?string $asOf = null): array {
     $rates = fx_rates();
-    $tx = q('SELECT * FROM portfolio_transactions WHERE portfolio_id = ? ORDER BY trade_at, id', [$portfolioId])->fetchAll();
+    $tx = $transactions ?? q('SELECT * FROM portfolio_transactions WHERE portfolio_id = ? ORDER BY trade_at, id', [$portfolioId])->fetchAll();
+    usort($tx, fn($a, $b) => [$a['trade_at'], (int)$a['id']] <=> [$b['trade_at'], (int)$b['id']]);
     $events = split_events(array_map(function ($t) { return $t['listing_id']; }, $tx));
     $freeBuys = free_buy_dates($tx);
     $pos = [];
-    $feesTotal = 0.0;
+    $feesTotal = 0.0; $periods = []; $active = [];
     $issues = []; $uncertain = []; $sales = [];
     foreach ($tx as $t) {
         $key = $t['listing_id'] ? 'L' . $t['listing_id'] : 'S' . strtoupper($t['symbol']);
@@ -81,6 +82,8 @@ function portfolio_valuation(int $portfolioId): array {
         $qty = (float)$t['quantity']; $gross = $qty * (float)$t['unit_price'] * $fx; $fees = (float)($t['fees'] ?? 0);
         $feesTotal += $fees; $p['fees'] += $fees; $p['last_trade'] = $t['trade_at'];
         if ($t['side'] === 'buy') {
+            if ($p['qty'] <= 1e-9) $active[$key] = ['start' => $t['trade_at'], 'end' => null, 'invested' => 0.0, 'proceeds' => 0.0, 'fees' => 0.0, 'realized' => 0.0];
+            $active[$key]['invested'] += $gross + $fees;
             $p['qty'] += $qty; $p['cost'] += $gross + $fees; $p['invested'] += $gross + $fees;
             if (!$p['first_buy']) $p['first_buy'] = $t['trade_at'];
         } else {
@@ -93,16 +96,21 @@ function portfolio_valuation(int $portfolioId): array {
             $out = $avg * $sold; $net = $gross - $fees;
             $gain = $net - $out;
             $p['qty'] -= $sold; $p['cost'] -= $out; $p['realized'] += $gain; $p['proceeds'] += $net;
+            if (isset($active[$key])) { $active[$key]['proceeds'] += $net; $active[$key]['realized'] += $gain; }
             $year = substr($t['trade_at'], 0, 4);
             $p['by_year'][$year] = ($p['by_year'][$year] ?? 0.0) + $gain;
             $sales[] = ['tx_id' => (int)$t['id'], 'key' => $key, 'listing_id' => $p['listing_id'], 'symbol' => $p['symbol'], 'name' => $p['name'], 'trade_at' => $t['trade_at'],
                         'quantity' => $sold, 'proceeds' => $net, 'cost' => $out, 'gain' => $gain, 'gain_pct' => $out > 0 ? 100 * $gain / $out : null];   // historique des ventes (prix de revient moyen)
             if ($p['qty'] < 1e-9) { $p['qty'] = 0.0; $p['cost'] = 0.0; }
         }
+        if (isset($active[$key])) {
+            $active[$key]['fees'] += $fees;
+            if ($p['qty'] <= 1e-9) { $active[$key]['end'] = $t['trade_at']; $periods[$key][] = $active[$key]; unset($active[$key]); }
+        }
         unset($p);
     }
     // Événements postérieurs à la dernière opération (jusqu'à aujourd'hui) sur les positions encore ouvertes.
-    $today = gmdate('Y-m-d');
+    $today = $asOf ?? gmdate('Y-m-d');
     foreach ($pos as $key => &$p) {
         if ($p['listing_id'] && isset($events[$p['listing_id']]) && $p['qty'] > 0) {
             $r = pending_split_ratio($events[$p['listing_id']], $freeBuys[$p['listing_id']] ?? [], $p['cursor'], $today);
@@ -141,6 +149,8 @@ function portfolio_valuation(int $portfolioId): array {
         $row = $p + ['name_catalogue' => $i['name'] ?? null, 'kind' => $i['kind'] ?? null, 'mic' => $i['mic'] ?? null, 'catalogue_status' => $i['status'] ?? null,
                      'excluded_reason' => $i['excluded_reason'] ?? null, 'price' => null, 'price_eur' => null, 'price_time' => null, 'price_source' => null,
                      'value' => null, 'unrealized' => null, 'unrealized_pct' => null, 'avg_cost' => null, 'linked' => $i !== null, 'price_currency' => $i ? ($i['price_currency'] ?: $i['currency']) : null];
+        $row['holding_periods'] = array_merge($periods[$p['key']] ?? [], isset($active[$p['key']]) ? [$active[$p['key']]] : []);
+        if ($isUncertain) $row['holding_periods'] = [];
         unset($row['cursor'], $row['by_year'], $row['invested'], $row['proceeds']);
         if ($isUncertain) { $row['cost'] = null; $row['realized'] = null; $row['financial_incomplete'] = true; }
         if ($row['qty'] > 0) {

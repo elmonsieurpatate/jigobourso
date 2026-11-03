@@ -180,6 +180,39 @@ return [
         q('UPDATE portfolios SET strategy_config = ?, updated_at = ? WHERE id = ?', [$cfg ? json_encode($cfg) : null, now_utc(), $p['id']]);
         return ['config' => $cfg];
     },
+    // Read-only simulation uses exactly the same ledger and history validation as a write.
+    'tx/preview' => function () {
+        need_post(); $u = require_user(); $b = body();
+        $p = own_portfolio((int)($b['portfolio_id'] ?? 0), $u);
+        list($side, $qty, $price, $fees, $fx, $when) = tx_fields($b);
+        $rows = q('SELECT * FROM portfolio_transactions WHERE portfolio_id = ? ORDER BY trade_at,id', [$p['id']])->fetchAll();
+        $old = null;
+        if (!empty($b['id'])) {
+            foreach ($rows as $r) if ((int)$r['id'] === (int)$b['id']) $old = $r;
+            if (!$old) throw new ApiError('Transaction introuvable', 404);
+            $rows = array_values(array_filter($rows, fn($r) => (int)$r['id'] !== (int)$old['id']));
+        }
+        $lid = $old['listing_id'] ?? ($b['listing_id'] ?? null);
+        $symbol = $old['symbol'] ?? strtoupper(str_in($b, 'symbol', 32, false));
+        $currency = price_unit($b['currency'] ?? ($old['currency'] ?? null));
+        if ($fx === null && $old && substr($when,0,10) === substr($old['trade_at'],0,10) && $currency === price_unit($old['currency'])) $fx = $old['fx_to_eur'] === null ? null : (float)$old['fx_to_eur'];
+        $fx = historical_fx($currency, $when, $fx);
+        $candidate = ['id' => $old['id'] ?? PHP_INT_MAX, 'listing_id' => $lid, 'symbol' => $symbol,
+            'name' => $old['name'] ?? $symbol, 'isin' => $old['isin'] ?? null, 'side' => $side,
+            'quantity' => $qty, 'unit_price' => $price, 'currency' => $currency, 'fx_to_eur' => $fx,
+            'fees' => $fees, 'trade_at' => $when];
+        $all = array_merge($rows, [$candidate]);
+        validate_transaction_history($all); // Includes later transactions and confirmed splits.
+        $before = array_values(array_filter($rows, fn($r) => [$r['trade_at'], (int)$r['id']] < [$when, (int)$candidate['id']]));
+        $valuation = portfolio_valuation((int)$p['id'], array_merge($before, [$candidate]), substr($when,0,10));
+        $sale = null;
+        foreach ($valuation['sales'] as $s) if ($s['tx_id'] === (int)$candidate['id']) $sale = $s;
+        if ($side === 'sell' && !$sale) throw new ApiError('Coût historique incomplet : aperçu de vente indisponible',422);
+        return ['before_qty' => $sale ? $sale['quantity'] + array_sum(array_map(fn($r) => transaction_key($r) === transaction_key($candidate) ? $r['qty'] : 0, array_merge($valuation['positions'], $valuation['closed']))) : null,
+            'remaining_qty' => $sale ? array_sum(array_map(fn($r) => transaction_key($r) === transaction_key($candidate) ? $r['qty'] : 0, array_merge($valuation['positions'], $valuation['closed']))) : null,
+            'proceeds' => $sale['proceeds'] ?? null, 'cost' => $sale['cost'] ?? null, 'gain' => $sale['gain'] ?? null,
+            'gain_pct' => $sale['gain_pct'] ?? null, 'fx_to_eur' => $fx];
+    },
     'tx/add' => function () {
         need_post(); $u = require_user(); $b = body();
         $p = own_portfolio((int)($b['portfolio_id'] ?? 0), $u);

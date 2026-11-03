@@ -254,3 +254,81 @@ def test_normal_metric_refresh_preserves_transactions_and_prices(world):
         q.execute('SELECT slope FROM strategy_metrics WHERE listing_id=1 AND sessions=1');assert q.fetchone()['slope'] is None
         q.execute("SELECT status FROM jobs WHERE job_type='metrics' ORDER BY id DESC LIMIT 1");assert q.fetchone()['status']=='completed'
     conn.close()
+
+
+def preview(client, pf, **changes):
+    fields = dict(portfolio_id=pf, listing_id=1, side='sell', quantity=5,
+                  unit_price=130, currency='EUR', fees=2, trade_at='2026-08-01')
+    fields.update(changes)
+    return client.call('tx/preview', fields)
+
+
+def test_sale_preview_reuses_pmp_not_fifo_and_never_writes(world):
+    a, pf = account(world)
+    add(a, pf, qty=10, price=100, fees=10)
+    add(a, pf, qty=10, price=120, date='2026-07-01', fees=10)
+    before = portfolio(a, pf)
+    status, r = preview(a, pf)
+    assert status == 200, r
+    assert r['before_qty'] == 20 and r['remaining_qty'] == 15
+    assert r['cost'] == pytest.approx(555)
+    assert r['proceeds'] == 648 and r['gain'] == 93
+    assert r['gain_pct'] == pytest.approx(100 * 93 / 555)
+    assert portfolio(a, pf)['transactions_list'] == before['transactions_list']
+    sale = add(a, pf, side='sell', qty=5, price=130, date='2026-08-01', fees=2)
+    d = portfolio(a, pf)
+    actual = next(x for x in d['sales'] if x['tx_id'] == sale)
+    for k in ('cost', 'proceeds', 'gain', 'gain_pct'): assert actual[k] == pytest.approx(r[k])
+    assert sorted(x['remaining'] for x in d['lots']) == [5, 10]
+
+
+def test_preview_rejects_backdated_sale_that_breaks_later_sale(world):
+    a, pf = account(world); add(a, pf)
+    add(a, pf, side='sell', qty=8, date='2026-09-01')
+    status, r = preview(a, pf, quantity=3)
+    assert status == 422 and 'quantité' in str(r)
+    assert portfolio(a, pf)['transactions'] == 2
+
+
+def test_preview_split_quantity_at_sale_date_not_today(world):
+    a, pf = account(world); add(a, pf, qty=10, fees=10)
+    conn = connect()
+    with conn.cursor() as q:
+        q.execute("INSERT INTO split_log(listing_id,event_date,price_ratio,ratio,status,detected_at) VALUES (1,'2026-09-01',.5,2,'confirmed',NOW())")
+    conn.commit(); conn.close()
+    status, r = preview(a, pf, quantity=5)
+    assert status == 200, r
+    assert r['before_qty'] == 10 and r['remaining_qty'] == 5
+    assert r['cost'] == 505
+    status, r = preview(a, pf, quantity=15, trade_at='2026-10-01')
+    assert status == 200 and r['before_qty'] == 20 and r['remaining_qty'] == 5
+    assert r['cost'] == pytest.approx(757.5)
+
+
+def test_closed_and_rebought_holding_periods_preserve_realized(world):
+    a, pf = account(world); add(a, pf, qty=2, price=100, fees=2)
+    add(a, pf, side='sell', qty=2, price=90, fees=1, date='2026-06-01')
+    d = portfolio(a, pf)
+    assert not d['positions'] and len(d['closed']) == 1
+    assert d['totals']['realized'] == -23
+    cycle = d['closed'][0]['holding_periods'][0]
+    assert cycle['end'].startswith('2026-06-01') and cycle['realized'] == -23
+    assert cycle['fees'] == 3 and cycle['proceeds'] == 179
+    add(a, pf, qty=1, price=80, date='2026-07-01')
+    d = portfolio(a, pf)
+    assert len(d['positions']) == 1 and not d['closed']
+    assert len(d['positions'][0]['holding_periods']) == 2
+    assert d['positions'][0]['holding_periods'][1]['end'] is None
+    assert d['totals']['realized'] == -23 and d['positions'][0]['avg_cost'] == 80
+
+
+def test_preview_fx_fees_edit_and_ownership(world):
+    a, pf = account(world); add(a, pf, qty=10, fees=10)
+    status, r = preview(a, pf, currency='USD', fx_to_eur=.8, unit_price=150)
+    assert status == 200 and r['proceeds'] == 598 and r['cost'] == 505
+    sale = add(a, pf, side='sell', qty=5, price=130, date='2026-08-01')
+    status, r = preview(a, pf, id=sale, quantity=10)
+    assert status == 200 and r['before_qty'] == 10 and r['remaining_qty'] == 0
+    bob = login(world, 'bob', 'bob-secret-12345')
+    assert preview(bob, pf)[0] == 404
+    assert preview(a, pf, quantity=11)[0] == 422

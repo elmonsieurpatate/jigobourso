@@ -185,7 +185,7 @@ def build(transactions, bars, splits, unit, fx, meta, today=None, bars15=None):
 
 
 def market_history(holdings, bars, splits, unit, meta, today, bars15, fx=None):
-    """Observed split-adjusted native prices of CURRENT holdings, independent of acquisition.
+    """Observed split-adjusted native prices of traded instruments, including closed holdings.
 
     No cash-flow/FX/portfolio return is inferred from this comparison. Missing observations
     stay null; last observations keep their real dates. Intraday is the last stored session,
@@ -193,8 +193,6 @@ def market_history(holdings, bars, splits, unit, meta, today, bars15, fx=None):
     """
     lines, intraday = [], []
     for lid, qty in holdings.items():
-        if qty <= 1e-12:
-            continue
         m = meta.get(lid, {})
         dates, closes, _, quality = prepare_series(bars.get(lid, []), sorted(splits.get(lid, [])))
         observed = {d: c for d, c in zip(dates, closes) if d <= today}

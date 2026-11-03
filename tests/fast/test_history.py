@@ -123,9 +123,10 @@ def test_market_keeps_currency_missing_observations_and_actual_quote_date():
     assert r['lines'][0]['gain'][-1] is not None
 
 
-def test_market_excludes_sold_holdings_and_uses_only_latest_intraday_session():
+def test_market_retains_closed_instrument_history_and_uses_only_latest_intraday_session():
     r=h.build([tx(1,'2026-01-05','buy',1,10),tx(2,'2026-01-07','sell',1,12)],BARS,{},{1:'EUR'},{},{},TODAY)
-    assert r['market']['lines']==[]
+    assert r['market']['lines'][0]['prices']==[10,11,12,9]
+    assert r['lines'][0]['quantities'][-1]==0
     assert r['gain'][-1]==2
     r=h.build([tx(1,'2026-01-07','buy',1,12)],BARS,{},{1:'EUR'},{},{},TODAY,
         bars15={1:[('2026-01-08T09:00:00',9),('2026-01-09T09:00:00',10),('2026-01-09T09:15:00',11)]})
