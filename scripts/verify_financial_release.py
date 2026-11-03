@@ -8,6 +8,15 @@ from engine.market.calendar import session_dates, window_calendars
 from engine.market.collect import effective_expected_close, to_eur_factor
 
 
+def require_calculation(ok, symbol, window, field):
+    """Fail closed, with a public diagnostic limited to market reference names/fields."""
+    if ok:return
+    safe_symbol=symbol if symbol in ('BOX','BBSI','VOO','UBU5.DE') else 'reference'
+    safe_field=field if field in ('slope','r2','perf','volatility','drawdown','er','unsafe_cache','missing_cache') else 'reference'
+    print(f'Erreur contrôle financier : {safe_symbol} / fenêtre {int(window)} / {safe_field}',flush=True)
+    raise AssertionError('financial reference mismatch')
+
+
 def run():
     conn = connect()
     now = hours.utcnow()
@@ -38,13 +47,14 @@ def run():
         compared=0
         for n,m in metrics.items():
             if m is None:
-                assert n not in stored or stored[n]['perf'] is None,(listing['symbol'],n,'unsafe stored metric')
+                require_calculation(n not in stored or stored[n]['perf'] is None,listing['symbol'],n,'unsafe_cache')
                 continue
+            require_calculation(n in stored,listing['symbol'],n,'missing_cache')
             for key in ('slope','r2','perf','volatility','drawdown','er'):
                 if m[key] is None:
-                    assert stored[n][key] is None
+                    require_calculation(stored[n][key] is None,listing['symbol'],n,key)
                 else:
-                    assert abs(float(stored[n][key])-m[key])<=.000051,(listing['symbol'],n,key)
+                    require_calculation(stored[n][key] is not None and abs(float(stored[n][key])-m[key])<=.000051,listing['symbol'],n,key)
             compared+=1
         checks.append({'symbol':listing['symbol'],'daily_closes':len(bars),'last_close':dates[-1] if dates else None,'basis':basis,'windows_verified':compared,'expected_close':hours.expected_last_close(listing['mic'],dt.datetime.now(dt.timezone.utc))})
     assert {x['symbol'] for x in checks}=={'BOX','BBSI','VOO','UBU5.DE'}
