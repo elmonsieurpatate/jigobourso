@@ -30,11 +30,14 @@ with c.cursor() as q:
    q.executemany('INSERT INTO daily_prices(listing_id,price_date,close_px) VALUES (%s,%s,%s)',vals)
    q.execute("INSERT INTO series_state(listing_id,computed_at,last_close_date,closes_count,close_px,ma50,momentum_6m,quality) VALUES (%s,NOW(),%s,420,%s,%s,%s,'ok')",(i,days[-1],vals[-1][-1],180 if i==1 else vals[-1][-1],-0.1 if i==1 else .1))
    q.executemany("INSERT INTO intraday_prices(listing_id,slot_start,close_px) VALUES (%s,%s,%s)",[(i,dt.datetime.combine(today,dt.time(9,0))+dt.timedelta(minutes=15*k),price*(.98+.01*k)) for k in range(3)])
+   for window in (5,21,63,126,252):
+    perf=-27.27 if i==1 and window in (5,21) else 60 if i==1 else 20 if i==4 else 0
+    q.execute('INSERT INTO strategy_metrics(listing_id,sessions,slope,perf,volatility) VALUES (%s,%s,%s,%s,%s)',(i,window, -.1 if perf<0 else .1,perf,1.5 if i==1 else .4))
  for day in days+[today]:
   q.execute("INSERT INTO fx_rates(currency,rate_date,to_eur) VALUES ('USD',%s,.85),('GBP',%s,1.2)",(day,day))
  q.execute("INSERT INTO corporate_events VALUES (3,'2026-10-01','split',2)")
  q.execute("INSERT INTO split_log(listing_id,event_date,price_ratio,ratio,status,detected_at,checked_at) VALUES (3,'2026-10-01',.5,2,'confirmed',NOW(),NOW())")
- for pid,name in [(1,'Multi-achats et devises'),(2,'Split sans vente'),(3,'Position soldée'),(4,'Sans cours'),(5,'Portefeuille vide'),(6,'Arrondis')]:
+ for pid,name in [(1,'Multi-achats et devises'),(2,'Split sans vente'),(3,'Position soldée'),(4,'Sans cours'),(5,'Portefeuille vide'),(6,'Arrondis'),(7,'Partiellement valorisable')]:
   q.execute('INSERT INTO portfolios(id,user_id,name,is_default,created_at,updated_at) VALUES (%s,%s,%s,%s,NOW(),NOW())',(pid,user_id,name,pid==1))
  def tx(p,l,side,qty,price,day,fee=0,fx=1):
   sym,cur={1:('ALPHA','EUR'),2:('DOLLAR','USD'),3:('SPLIT','EUR'),4:('PENCE','GBp'),5:('NOQUOTE','EUR')}[l]
@@ -44,6 +47,7 @@ with c.cursor() as q:
  tx(1,2,'buy',10,100,'2026-09-01',10,.9);tx(1,2,'sell',4,120,'2026-10-15',4,.8)
  tx(1,4,'buy',10,100,'2026-09-01',0,.012)
  tx(2,3,'buy',10,100,'2026-09-01');tx(3,1,'buy',1,100,'2026-09-01');tx(3,1,'sell',1,120,'2026-10-01')
+ tx(7,1,'buy',1,100,'2026-09-01');tx(7,5,'buy',2,10,'2026-09-01')
  tx(4,5,'buy',2,10,'2026-09-01');tx(6,1,'buy',.12345678,123.456789,'2026-09-01',.013)
  q.execute("INSERT INTO lot_settings(transaction_id,strategy,alert_days,alert_drop_pct,updated_at) VALUES (%s,'momentum',30,20,NOW()),(%s,'fast',30,10,NOW())",(a,b))
-c.commit();c.close();print('6 portefeuilles synthétiques, 5 titres, base isolée prête')
+c.commit();c.close();print('7 portefeuilles synthétiques, 5 titres, base isolée prête')

@@ -49,10 +49,10 @@ return [
         $settings = [];
         foreach (q('SELECT s.* FROM lot_settings s JOIN portfolio_transactions t ON t.id = s.transaction_id WHERE t.portfolio_id = ?', [$p['id']])->fetchAll() as $r) $settings[(int)$r['transaction_id']] = $r;
         $pfCfg = $p['strategy_config'] ? json_decode($p['strategy_config'], true) : null;
-        $req = ['portfolio_strategy' => $pfCfg ? ['name' => $pfCfg['name'] ?? null, 'config' => $pfCfg] : null, 'lots' => []];
+        $req = ['portfolio_strategy' => $pfCfg ? ['name' => $pfCfg['name'] ?? null, 'config' => $pfCfg] : null, 'lots' => [], 'positions' => $v['positions']];
         foreach ($lots as $l) {
             $t = $l['tx']; $s = $settings[(int)$t['id']] ?? [];
-            $req['lots'][] = ['tx_id' => (int)$t['id'], 'listing_id' => $t['listing_id'] ? (int)$t['listing_id'] : null, 'trade_date' => substr($t['trade_at'], 0, 10),
+            $req['lots'][] = ['tx_id' => (int)$t['id'], 'listing_id' => $t['listing_id'] ? (int)$t['listing_id'] : null, 'trade_date' => substr($t['trade_at'], 0, 10), 'remaining' => $l['remaining'], 'remaining_cost' => $l['remaining_cost'], 'manual_split' => $l['manual_split'],
                 'strategy' => $s['strategy'] ?? null, 'alert_days' => isset($s['alert_days']) ? (int)$s['alert_days'] : null,
                 'alert_drop_pct' => isset($s['alert_drop_pct']) ? (float)$s['alert_drop_pct'] : null, 'alerts_off' => !empty($s['alerts_off'])];
         }
@@ -65,6 +65,7 @@ return [
                                         'alert_drop_pct' => $s['alert_drop_pct'] !== null ? (float)$s['alert_drop_pct'] : null, 'alerts_off' => (bool)$s['alerts_off']] : null,
                     'alert' => $alerts['lots'][(string)$t['id']] ?? null];
         }, $lots);
+        $v['insights'] = $alerts['positions'] ?? (object)[];
         $v['lot_strategies'] = $alerts['strategies'] ?? null;
         $v['curves'] = $alerts['curves'] ?? (object)[];
         $v['allocation'] = engine_call('allocation', ['target' => $target, 'positions' => array_map(function ($x) { return array_intersect_key($x, array_flip(['listing_id', 'kind', 'value'])); }, $v['positions'])]);

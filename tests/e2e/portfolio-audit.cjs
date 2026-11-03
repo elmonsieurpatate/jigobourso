@@ -35,6 +35,7 @@ fs.mkdirSync(OUT, { recursive: true });
         });
       };
       await open(1);
+      await page.locator('[data-view="analysis"]').click();
       for (const period of ['1w', '1m', '3m', '6m', '1y', 'all']) {
         await page.locator(`#evo-per [data-v="${period}"]`).click();
         for (const mode of ['titles', 'gain', 'value']) {
@@ -75,13 +76,14 @@ fs.mkdirSync(OUT, { recursive: true });
       const chip = page.locator('#evo-chart .lc-chip').first(), before = await chip.getAttribute('aria-pressed');
       await chip.click(); assert.notEqual(await page.locator('#evo-chart .lc-chip').first().getAttribute('aria-pressed'), before);
       await page.locator('#evo-chart .lc-chip').first().click();
-      for (const fold of ['lots', 'sales', 'alloc', 'tx', 'settings', 'positions', 'hero']) {
+      await page.locator('[data-view="manage"]').click();
+      for (const fold of ['lots', 'sales', 'alloc', 'tx', 'settings']) {
         const section = page.locator(`[data-fold="${fold}"]`), before = await section.getAttribute('class');
         await section.locator('.fold-h').click(); assert.notEqual(await section.getAttribute('class'), before);
         await section.locator('.fold-h').click();
       }
       await page.screenshot({ path: `${OUT}/portfolio-${width}.png`, fullPage: true });
-      await open(3); await page.locator('#evo-per [data-v="all"]').click(); await page.locator('#evo-mode [data-v="titles"]').click(); await page.locator('#evo-unit [data-v="pct"]').click();
+      await open(3); await page.locator('[data-view="analysis"]').click(); await page.locator('#evo-per [data-v="all"]').click(); await page.locator('#evo-mode [data-v="titles"]').click(); await page.locator('#evo-unit [data-v="pct"]').click();
       assert.equal((await page.evaluate(() => window.lastPortfolioChart)).series[0].values.at(-1), 20, 'A2: fully sold gain must remain');
       assert.match(await page.locator('#movers').innerText(), /20,0/);
       const split = await get('portfolio', 2);
@@ -93,6 +95,7 @@ fs.mkdirSync(OUT, { recursive: true });
       assert.equal(missing.positions[0].price, null); assert.equal(history.gain.at(-1), null);
       assert.match(await page.locator('#page').innerText(), /valorisation et gain total indisponibles/);
       assert.equal(await page.locator('.hero-v').innerText(), '–');
+      await page.locator('[data-view="overview"]').click();
       await page.screenshot({ path: `${OUT}/missing-${width}.png`, fullPage: true });
       const lot = (await get('portfolio', 1)).lots.find(l => l.alert.strategy === 'momentum');
       assert.equal(lot.alert.alerts.find(a => a.kind === 'momentum').value, -.1, 'A3: stored percent is not a ratio');

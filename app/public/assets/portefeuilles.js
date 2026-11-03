@@ -13,8 +13,8 @@
   const eur0 = v => J.eur(v, 0), sgn = v => v === null || v === undefined ? '–' : (v > 0 ? '+' : v < 0 ? '−' : '') + J.eur(Math.abs(v), 0);
   const pills = (id, items, cur) => `<div class="pills" id="${id}">${items.map(([k, l]) => `<button type="button" data-v="${k}" class="${k === cur ? 'on' : ''}">${l}</button>`).join('')}</div>`;
   const splitNotice = positions => positions.filter(p => p.splits_applied && p.splits_applied.length).map(p => `<div class="notice" style="margin-top:12px"><b>${J.esc(p.name_catalogue || p.name || p.symbol)}</b> : ${p.splits_applied.map(a => a.ratio >= 1 ? `split ${J.num(a.ratio, 2)} pour 1` : `regroupement ${J.num(1 / a.ratio, 2)} pour 1`).join(', ')} pris en compte automatiquement : la quantité affichée est celle d’aujourd’hui, le prix de revient total est inchangé.</div>`).join('');
-  const LEVEL = { info: ['info', 'Info'], watch: ['wait', 'À surveiller'], act: ['ko', 'À examiner'] };
-  const worstFor = (lots, lid) => (lots || []).filter(l => l.listing_id == lid && l.alert && l.alert.level).map(l => l.alert).sort((a, b) => ['info', 'watch', 'act'].indexOf(b.level) - ['info', 'watch', 'act'].indexOf(a.level))[0] || null;
+  let VIEW = 'overview';
+  let SORT = 'attention';
   let D = null, H = null;                       // données du portefeuille affiché, et son évolution (chargée à part)
 
   /* ── Blocs repliables : un clic sur l'en-tête ; choix mémorisé dans ce navigateur. Par défaut, seuls l'essentiel et les positions sont ouverts. ── */
@@ -25,32 +25,91 @@
     J.$$('#page [data-fold]').forEach(c => {
       c.classList.toggle('folded', !!saved[c.dataset.fold]);
       const h = c.querySelector('.fold-h') || c.firstElementChild; if (!h) return;
-      h.classList.add('fold-h');
-      h.addEventListener('click', e => { if (e.target.closest('button, a, input, select, .pills')) return; c.classList.toggle('folded'); const f = Object.assign({}, FOLD_DEFAULT, store('folds2') || {}); f[c.dataset.fold] = c.classList.contains('folded'); store('folds2', f); if (c.dataset.fold === 'hero' && !c.classList.contains('folded')) drawEvo(); });
+      h.classList.add('fold-h'); h.tabIndex=0; h.setAttribute('role','button'); h.setAttribute('aria-expanded',String(!c.classList.contains('folded')));
+      h.onkeydown=e=>{if(e.target===h && ['Enter',' '].includes(e.key)){e.preventDefault();h.click();}};
+      h.addEventListener('click', e => { if (e.target.closest('button, a, input, select, .pills')) return; c.classList.toggle('folded'); h.setAttribute('aria-expanded',String(!c.classList.contains('folded'))); const f = Object.assign({}, FOLD_DEFAULT, store('folds2') || {}); f[c.dataset.fold] = c.classList.contains('folded'); store('folds2', f); if (c.dataset.fold === 'hero' && !c.classList.contains('folded')) drawEvo(); });
     });
   }
 
   /* ── En-tête : valeur, gain total, variation du jour ── */
   function hero(d) {
     const t = d.totals, gain = t.total_gain, base = t.invested_total || 0;
-    const realizedTaxBase = Object.values(d.realized_by_year || {}).reduce((s, g) => s + Math.max(0, Number(g) || 0), 0), taxBase = realizedTaxBase + Math.max(0, Number(t.unrealized) || 0);
-    const net = gain === null || gain === undefined ? null : gain - taxBase * .3;
-    const stat = (l, v, cls = '', tip = '') => `<div class="hs"${tip ? ` title="${J.esc(tip)}"` : ''}><span>${l}</span><b class="${cls}">${v}</b></div>`;
-    return `<section class="card hero2" data-fold="hero"><header class="fold-h hero-top">
-        <div class="hero-main"><span class="hero-l">Valeur du portefeuille</span><span class="hero-v">${eur0(t.value)}</span>
-          <span class="hero-g ${J.cls(gain)}">${gain === null ? '–' : sgn(gain)}${base > 0 && gain !== null ? ` <small title="Gain total ÷ achats cumulés, frais compris ; ventes non déduites du dénominateur">(${J.pct(100 * gain / base, 1)})</small>` : ''} <em>gain total, ventes comprises</em></span>
-          <span class="hero-day" id="hero-day"></span></div>
-        <div class="hero-stats">${stat('Plus-value latente', J.eur(t.unrealized, 0), J.cls(t.unrealized), 'Sur les titres encore détenus')}${stat('Réalisé (ventes)', J.eur(t.realized, 0), J.cls(t.realized))}${stat('Investi', eur0(t.cost), '', 'Prix de revient des titres encore détenus')}${stat('Net d’impôt estimé', J.eur(net, 0), J.cls(net), 'Si tout était vendu aujourd’hui, compte-titres au taux forfaitaire de 30 % (12,8 % impôt + 17,2 % prélèvements sociaux). Indicatif : hors PEA, pertes reportables et dividendes.')}</div>
-        <span class="chev" aria-hidden="true"></span></header>
-      <div class="fold-b"><div class="hero-tools"><div class="row" style="gap:8px">${pills('evo-mode', [['titles', 'Comparer les titres'], ['gain', 'Gain'], ['value', 'Valeur']], EVO.mode)}${pills('evo-unit', [['eur', '€'], ['pct', '%']], EVO.unit)}</div>${pills('evo-per', PERIODS.map(p => [p[0], p[1]]), EVO.per)}</div>
-        <p id="evo-note" class="small muted"></p><div class="hero-grid"><div id="evo-chart"><div class="lc-empty"><span class="spinner"></span></div></div><aside class="movers" id="movers"></aside></div></div></section>`;
+    const realizedTaxBase = Object.values(d.realized_by_year || {}).reduce((s, g) => s + Math.max(0, Number(g) || 0), 0);
+    const net = gain === null ? null : gain - .3 * (realizedTaxBase + Math.max(0, Number(t.unrealized) || 0));
+    const stat = (label, value, note = '', cls = '') => `<div class="pf-stat"><span>${label}</span><strong class="${cls}">${value}</strong><small>${note}</small></div>`;
+    return `<section class="card pf-summary" aria-label="Résultat personnel du portefeuille">
+      <div class="pf-balance"><span class="eyebrow">Valeur de vos titres</span><strong class="hero-v">${eur0(t.value)}</strong><span class="small muted" id="hero-day"></span></div>
+      <div class="pf-profit"><span class="eyebrow">Votre gain total · ventes comprises</span><strong class="hero-g ${J.cls(gain)}">${sgn(gain)} <small>${base > 0 && gain !== null ? J.pct(100 * gain / base, 1) : ''}</small></strong><small>Gain ÷ achats cumulés, frais compris</small></div>
+      <div class="pf-stats">${stat('Achats cumulés', eur0(base), 'Frais inclus · ventes non déduites')}${stat('Capital encore investi', eur0(t.cost), 'Coût des titres détenus')}${stat('Gain latent', sgn(t.unrealized), 'Sur les positions ouvertes', J.cls(t.unrealized))}${stat('Gain réalisé', sgn(t.realized), 'Sur les ventes, frais déduits', J.cls(t.realized))}${stat('Gain net estimé', sgn(net) + (net !== null && base > 0 ? ' · ' + J.pct(100 * net / base, 1) : ''), 'Hypothèse forfaitaire 30 %, non personnalisée', J.cls(net))}</div>
+      <details class="pf-explain"><summary>Comprendre ces chiffres</summary><p>Le gain total additionne réalisé et latent. Le pourcentage utilise les achats cumulés, pas le capital restant. Le net suppose une taxation forfaitaire de 30 % des gains annuels positifs réalisés et du latent positif : hors PEA, pertes reportables et fiscalité personnelle. Liquidités et dividendes ne sont pas gérés.</p></details></section>`;
+  }
+  function analysis(d) {
+    return `<section class="card hero2" aria-label="Évolution et analyse"><div class="fold-b"><div class="hero-tools"><div class="row" style="gap:8px">${pills('evo-mode', [['titles', 'Comparer les titres'], ['gain', 'Gain'], ['value', 'Valeur']], EVO.mode)}${pills('evo-unit', [['eur', '€'], ['pct', '%']], EVO.unit)}</div>${pills('evo-per', PERIODS.map(p => [p[0], p[1]]), EVO.per)}</div>
+      <p class="small muted" id="period-reference"></p><p id="evo-note" class="small muted"></p><div class="hero-grid"><div id="evo-chart"><div class="lc-empty"><span class="spinner"></span></div></div><aside class="movers" id="movers"></aside></div>
+      <details class="pf-explain"><summary>Résultat personnel ou variation du cours ?</summary><p>Le gain de la période inclut les frais, le change et les ventes. Son pourcentage rapporte ce gain à la valeur de départ + achats de la période. Le graphique individuel du titre décrit son cours, hors frais et change. Les contributions en euros s’additionnent ; les rendements des titres en % ne s’additionnent pas.</p></details></div></section>`;
+  }
+  const STATUS = { normal: ['ok', 'Normal'], watch: ['wait', 'À surveiller'], act: ['ko', 'À examiner'], unknown: ['', 'Données insuffisantes'] };
+  const positionLots = (d,p) => d.lots.filter(l => p.listing_id ? l.listing_id === p.listing_id : !l.listing_id && l.symbol === p.symbol);
+  const insight = p => (D.insights || {})[p.key] || { status: 'unknown', label: 'Données insuffisantes', reasons: [], market: {} };
+  function statusBadge(i) { const c = STATUS[i.status] || STATUS.unknown; return `<span class="badge ${c[0]}">${J.esc(i.label || c[1])}</span>`; }
+  function attention(d) {
+    const ordered = d.positions.map(p => ({ p, i: insight(p) })).filter(x => x.i.status !== 'normal').sort((a, b) => priority(b.i) - priority(a.i));
+    return `<section class="card pf-attention"><div class="pf-section-title"><h2>À regarder aujourd’hui</h2><span class="cnt">${ordered.length}</span></div>${ordered.length ? ordered.slice(0, 4).map(({p, i}) => `<button type="button" class="attention-row" data-inspect="${J.esc(p.key)}"><span><b>${J.esc(p.name_catalogue || p.name || p.symbol)}</b> ${statusBadge(i)}<small>${J.esc(i.personal_text || '')} ${J.esc(i.reasons[0]?.message || i.next_step || '')}</small></span><span aria-hidden="true">→</span></button>`).join('') : '<p class="small muted">Aucun signal notable selon les règles disponibles. Les données ne garantissent pas les évolutions futures.</p>'}<button class="btn small" data-switch="positions">Voir toutes les positions</button></section>`;
+  }
+  function priority(i) { return ({ act: 3, watch: 2, unknown: 1, normal: 0 })[i.status] || 0; }
+  function gainProtection(g, compact = false) {
+    if (!g || !g.available) return `<p class="small muted">${J.esc(g?.reason || 'Sommet depuis l’achat indisponible.')}</p>`;
+    const used = Math.max(0, g.peak_gain_pct), kept = Math.max(0, Math.min(100, used > 0 ? 100 * Math.max(0, g.gain_pct) / used : 0));
+    return `<div class="protection"><div class="protection-values"><span>Meilleur gain observé <b>${J.pct(g.peak_gain_pct, 1)}</b></span><span>Actuel <b class="${J.cls(g.gain_pct)}">${J.pct(g.gain_pct, 1)}</b></span><span>Gain rendu <b>${J.num(g.given_back_pp, 1)} points</b></span></div><div class="protection-track" role="img" aria-label="${J.num(kept, 0)} % du gain positif observé conservé"><i style="width:${kept.toFixed(2)}%"></i></div>${compact ? `<p class="small muted">Position actuelle suivie depuis le ${J.date(g.start)} · sommet ${px(g.high,g.currency)} · recul −${J.num(g.drop_pct,2)} %.</p>` : `<p class="small muted">Recul du cours : −${J.num(g.drop_pct, 2)} % depuis le sommet observé ${px(g.high,g.currency)}. Gains personnels calculés en euros ; le recul du cours utilise la devise du titre. Référence : ${J.date(g.start)} ; dernière valeur du ${J.date(g.value_date)} ; sommet du gain le ${J.date(g.peak_date)}.</p>`}</div>`;
+  }
+  function positionCards(d) {
+    const items = [...d.positions];
+    const metric = p => { const i = insight(p); return SORT === 'loss' ? (p.unrealized === null ? -Infinity : -p.unrealized) : SORT === 'gain' ? (p.unrealized ?? -Infinity) : SORT === 'weight' ? (p.weight ?? -Infinity) : SORT === 'drop' ? (i.protection?.drop_pct ?? -Infinity) : priority(i); };
+    items.sort((a,b) => metric(b) - metric(a) || a.symbol.localeCompare(b.symbol));
+    return items.map(p => {
+      const i = insight(p), strategies = [...new Set(positionLots(d,p).map(l => l.alert?.strategy_label).filter(Boolean))];
+      return `<article class="pf-position" data-position="${J.esc(p.key)}"><div class="pf-position-title"><div><h3>${J.esc(p.name_catalogue || p.name || p.symbol)}</h3><span class="small muted">${J.esc(p.symbol)} · ${J.num(p.qty, 4)} titre(s) · ${J.esc(strategies.join(' / ') || 'stratégie non renseignée')}</span></div>${statusBadge(i)}</div>
+        <div class="position-numbers"><div><span>Valeur actuelle</span><b>${J.eur(p.value)}</b><small>${J.pct(p.weight, 1, false)} du portefeuille</small></div><div><span>Depuis vos achats · latent</span><b class="${J.cls(p.unrealized)}">${sgn(p.unrealized)}</b><small>${J.pct(p.unrealized_pct, 1)} du coût restant</small></div><div><span class="per-h">Sur la période sélectionnée</span><div class="per" data-per="${p.listing_id || ''}">–</div></div><div><span>Prix de revient</span><b>${J.eur(p.avg_cost)}</b><small>par titre · coût total ${J.eur(p.cost)}</small></div></div>
+        ${p.value === null ? '<p class="notice warn">Valorisation indisponible : aucun cours n’est inventé.</p>' : ''}${p.price_time ? `<p class="small muted">${p.price_source === 'daily' ? 'Dernière clôture' : 'Dernier cours connu'} : ${J.dateTime(p.price_time)}</p>` : ''}
+        <div class="position-protection">${gainProtection(i.protection,true)}</div><div class="position-observation"><b>Mon investissement.</b> ${J.esc(i.personal_text || 'Résultat indisponible.')} <b>État du titre.</b> ${J.esc(i.next_step || 'Données insuffisantes.')}</div>
+        <details class="position-details" ${store('inspect') === p.key ? 'open' : ''}><summary>Pourquoi ce statut ? Suivre les gains et les achats</summary>${diagnosticDetails(p, i, d)}
+        <div class="row"><button class="btn small" data-chart="${p.listing_id || ''}" ${p.listing_id ? '' : 'disabled'}>Évolution du cours</button><button class="btn small" data-lv="${p.listing_id || ''}" ${p.linked ? '' : 'disabled'}>Filet et objectif</button></div></details></article>`;
+    }).join('') || '<div class="card empty">Aucune position ouverte. Les résultats des ventes restent dans l’historique et le gain total.</div>';
+  }
+  function diagnosticDetails(p, i, d) {
+    const m = i.market || {}, trend = { strong: 'hausse forte', steady: 'hausse soutenue', gentle: 'hausse douce', flat: 'pas de tendance nette', down: 'baisse' }[m.trend] || 'non mesurée';
+    return `<div class="diagnostic-grid"><section><h4>Mon investissement · protection des gains</h4><p class="small muted">Quantités actuellement détenues, prix de revient moyen actuel. Comparaison depuis le dernier achat encore ouvert. Les détails de chaque achat suivent leur propre date et leur coût FIFO.</p>${gainProtection(i.protection)}</section><section><h4>État actuel du titre</h4>${!m.reliable ? '<p class="small muted">Données anciennes ou incomplètes : ces indicateurs ne permettent pas un diagnostic actuel fiable.</p>' : ''}<p class="small muted">Clôture de référence : ${m.as_of ? J.date(m.as_of) : 'indisponible'}.</p><dl class="market-facts"><dt>Tendance · 1 mois</dt><dd>${trend}</dd><dt>Momentum 6 mois</dt><dd>${J.pct(m.momentum_6m)}</dd><dt>Clôture / moyenne 50 j</dt><dd>${px(m.close, p.price_currency)} / ${px(m.ma50, p.price_currency)}</dd><dt>Moyenne 200 j</dt><dd>${px(m.ma200, p.price_currency)}</dd><dt>Volatilité · 3 mois</dt><dd>${m.volatility === null || m.volatility === undefined ? 'indisponible' : J.num(m.volatility, 2) + ' % par séance'}</dd></dl></section></div>
+      <div class="diagnostic-reasons"><h4>Ce qui mérite votre attention</h4>${i.reasons?.length ? i.reasons.map(r => `<p><b>${J.esc(r.action || 'Observation')}.</b> ${J.esc(r.message)}</p>`).join('') : '<p>Aucun signal notable parmi les indicateurs disponibles.</p>'}<p class="small muted">Les observations ne sont ni une prévision ni un ordre de vente.</p></div>
+      <details><summary>Détail par achat ouvert</summary>${positionLots(d,p).map(l => `<div class="lot-detail"><b>Achat du ${J.date(l.trade_at)}</b> · ${J.num(l.remaining, 4)} titre(s) · ${J.esc(l.alert?.strategy_label || '')}${gainProtection(l.alert?.protection)}<button class="btn small" data-lot="${l.tx_id}">Régler cet achat</button></div>`).join('')}</details>`;
+  }
+  function overviewContributions() { return `<section class="card"><div class="pf-section-title"><h2>Ce qui fait votre résultat</h2><button class="btn small" data-switch="analysis">Analyser l’évolution</button></div><p class="small muted" id="overview-period"></p><div id="overview-movers"><span class="spinner"></span></div></section>`; }
+  function updateOverview() {
+    if (!H) return;
+    const i0 = periodStart(H), last = H.dates.length - 1;
+    const total = last >= 0 ? perf(H.gain, H.value, H.purchases, i0, last) : {eur:null,pct:null};
+    const rows = H.lines.map(l => ({l, ...perf(l.gain,l.values,l.purchases,i0,last)})).filter(x => x.eur !== null && Number.isFinite(x.eur));
+    const missing = H.lines.length - rows.length;
+    const absolute = rows.reduce((s,r) => s + Math.abs(r.eur), 0);
+    rows.sort((a,b) => b.eur-a.eur);
+    const side = (title, items) => `<div><h3>${title}</h3>${items.length ? items.slice(0,3).map(r => `<div class="contribution-row"><b>${J.esc(r.l.symbol)}</b><strong class="${J.cls(r.eur)}">${sgn(r.eur)}</strong><small>${absolute > 0 ? J.num(100*Math.abs(r.eur)/absolute,1) : '0'} % des mouvements en € · ${J.pct(r.pct,1)} de rendement propre</small></div>`).join('') : '<p class="small muted">Aucun titre dans cette catégorie.</p>'}</div>`;
+    const host = J.$('#overview-movers');
+    if (host) host.innerHTML = EVO.per === '1d' ? '<p>En 1 J, seule la valeur intraday des quantités actuelles est disponible. Choisissez une période plus longue pour les contributions.</p>' : `${missing ? `<p class="notice warn">Contributions partielles : ${missing} titre(s) non calculable(s). Les parts relatives portent uniquement sur les contributions connues.</p>` : ''}<div class="pf-contributions">${side('Contribuent aux gains', rows.filter(r=>r.eur>0))}${side('Contribuent aux pertes', [...rows].reverse().filter(r=>r.eur<0))}</div><p class="small">Résultat de la période : <b class="${J.cls(total.eur)}">${sgn(total.eur)}</b>. Part relative = contribution absolue ÷ somme des contributions absolues ; ce n’est pas un poids de portefeuille.</p>`;
+    const text = EVO.per === 'all' ? 'Depuis le début' : 'Période : ' + (PERIODS.find(p=>p[0]===EVO.per)?.[1] || '1 M');
+    if (J.$('#overview-period')) J.$('#overview-period').textContent = text + (H.dates.length && EVO.per !== '1d' ? ' · ' + J.date(H.dates[i0]) + ' → ' + J.date(H.dates[last]) : '') + ' · gains réalisés et latents, frais compris.';
+  }
+  function switchView(view) {
+    VIEW = view;
+    J.$$('#pf-nav [data-view]').forEach(b => { const active=b.dataset.view===view; b.classList.toggle('on',active); b.setAttribute('aria-selected',String(active)); b.tabIndex=active?0:-1; });
+    J.$$('.pf-panel').forEach(p => p.hidden = p.dataset.panel !== view);
+    if (view === 'analysis') drawEvo();
   }
   function periodStart(h) {
-    const per = PERIODS.find(p => p[0] === EVO.per) || PERIODS[PERIODS.length - 1];
-    if (!per[2]) return 0;
-    const since = new Date(Date.now() - per[2] * 864e5).toISOString().slice(0, 10);
-    const i = h.dates.findIndex(d => d >= since);
-    return i <= 0 ? 0 : i - 1;                                   // départ : la dernière valeur connue avant la période
+    if (EVO.per === 'all' || EVO.per === '1d' || !h.dates.length) return 0;
+    const end=new Date(h.dates[h.dates.length-1]+'T12:00:00Z'), target=new Date(end);
+    if(EVO.per==='1w') target.setUTCDate(target.getUTCDate()-7);
+    else {const months={ '1m':1,'3m':3,'6m':6,'1y':12 }[EVO.per]||1, day=target.getUTCDate();target.setUTCDate(1);target.setUTCMonth(target.getUTCMonth()-months);const last=new Date(Date.UTC(target.getUTCFullYear(),target.getUTCMonth()+1,0)).getUTCDate();target.setUTCDate(Math.min(day,last));}
+    const since=target.toISOString().slice(0,10);
+    let index=0; h.dates.forEach((d,i)=>{if(d<=since)index=i;}); return index;
   }
   /* Gain / (valeur initiale + achats, frais compris). Les ventes restent dans le gain,
      jamais dans ce dénominateur. Sur Tout : gain total / achats cumulés, comme le résumé. */
@@ -63,6 +122,9 @@
   const PER_LABEL = { '1w': 'la semaine', '1m': 'le mois', '3m': '3 mois', '6m': '6 mois', '1y': 'un an', all: 'depuis le début' };
   function drawEvo() {
     const host = J.$('#evo-chart'), mv = J.$('#movers'), h = H; if (!host || !h) return;
+    updateOverview();
+    const reference = J.$('#period-reference');
+    if (reference) reference.textContent = EVO.per === 'all' ? 'Tout : depuis la première transaction. Les gains réalisés restent inclus.' : 'Période affichée : ' + (PERIODS.find(p=>p[0]===EVO.per)?.[1] || '') + '. La colonne depuis vos achats conserve sa propre référence.';
     const last = h.dates.length - 1, toggle = id => { EVO.hidden.has(id) ? EVO.hidden.delete(id) : EVO.hidden.add(id); store('evo_hidden', [...EVO.hidden]); drawEvo(); };
     const intraday = EVO.per === '1d', mode = intraday ? 'value' : EVO.mode, unit = mode === 'value' ? 'eur' : EVO.unit;
     J.$$('#evo-mode button').forEach(b => { b.disabled = intraday && b.dataset.v !== 'value'; b.classList.toggle('on', b.dataset.v === mode); b.title = b.disabled ? 'En 1 J, seule la valeur des quantités actuelles est disponible.' : ''; });
@@ -71,6 +133,8 @@
     const height = innerWidth < 700 ? 190 : 230, pct = unit === 'pct', fmtV = pct ? (v => J.pct(v, 1)) : eur0;
     J.$$('#evo-unit button').forEach(b => { b.disabled = mode === 'value' && b.dataset.v === 'pct'; b.classList.toggle('on', b.dataset.v === unit); b.title = b.disabled ? 'La valeur est exprimée en euros.' : ''; });
     if (!h.dates || !h.dates.length) { host.innerHTML = '<div class="lc-empty">Ajoutez une transaction pour voir l’évolution.</div>'; mv.innerHTML = ''; return; }
+    const dd = h.dates.length > 1 && h.value[last] !== null && h.value[last - 1] !== null ? h.value[last] - h.value[last - 1] - (h.net_in[last] - h.net_in[last - 1]) : null;
+    const hd = J.$('#hero-day'); if (hd && dd !== null) hd.innerHTML = `<span class="${J.cls(dd)}">${sgn(dd)}</span> depuis la clôture du ${J.date(h.dates[last - 1])}`;
     if (EVO.per === '1d') {
       const it = h.intraday || { t: [], value: [] };
       J.lineChart(host, it.t, [{ id: 'v', label: 'Valeur', values: it.value, color: '#6366f1', area: true }], { height, format: eur0, time: true });
@@ -80,6 +144,7 @@
       fillPeriodCells(null); return;
     }
     const i0 = periodStart(h), xs = h.dates.slice(i0), idx = xs.map((_, k) => i0 + k);
+    if(reference) reference.textContent = `Période affichée : ${J.date(xs[0])} → ${J.date(xs[xs.length-1])}. Base du pourcentage : valeur au départ + achats pendant la période. La performance depuis vos achats garde sa propre référence.`;
     const markers = (h.trades || []).filter(t => t.date >= xs[0] && !t.note).map(t => ({ x: t.date, kind: t.side, label: (t.side === 'buy' ? 'Achat ' : 'Vente ') + t.symbol }));
     const pfSeries = i => perf(h.gain, h.value, h.purchases, i0, i), lineSeries = (l, i) => perf(l.gain, l.values, l.purchases, i0, i);
     let series;
@@ -104,8 +169,6 @@
       <div class="dv">${rows.map(r => { const v = r[unit] || 0, w = (50 * Math.abs(v) / m).toFixed(1); return `<div class="dv-row" title="${J.esc(r.l.name)} : ${sgn(r.eur)}${r.pct !== null ? ' (' + J.pct(r.pct, 1) + ')' : ''} sur la période"><span class="dv-s">${J.esc(r.l.symbol)}</span><span class="dv-track"><i class="${v >= 0 ? 'up' : 'down'}" style="${v >= 0 ? 'left:50%' : 'right:50%'};width:${w}%"></i></span><span class="dv-v ${J.cls(v)}">${val(r)}</span></div>`; }).join('') || (tot.eur === null ? '<p class="small muted">Valorisation indisponible.</p>' : '<p class="small muted">Rien n’a bougé.</p>')}</div>
       <p class="small muted" style="margin-top:8px">${pct ? '% = gain sur la période ÷ argent engagé (valeur au début + achats pendant la période).' : 'Gain ou perte en euros sur la période, frais compris. Le pourcentage rapporte ce gain à la valeur au départ + achats de la période ; ce n’est pas un rendement annualisé ni pondéré dans le temps.'}</p>`;
     fillPeriodCells(new Map(h.lines.map(l => [l.key, lineSeries(l, last)])));
-    const dd = h.dates.length > 1 && h.value[last] !== null && h.value[last - 1] !== null ? h.value[last] - h.value[last - 1] - (h.net_in[last] - h.net_in[last - 1]) : null;
-    const hd = J.$('#hero-day'); if (hd && dd !== null) hd.innerHTML = `<span class="${J.cls(dd)}">${sgn(dd)}</span> depuis la clôture du ${J.date(h.dates[last - 1])}`;
   }
   const CMP = new Set(store('cmp_hidden') || []);
   /* Colonne « Sur la période » du tableau des positions, remplie quand l'évolution est chargée. */
@@ -113,47 +176,13 @@
     const lab = (PERIODS.find(p => p[0] === EVO.per) || [, 'Tout'])[1];
     J.$$('.per-h').forEach(e => { e.textContent = EVO.per === '1d' ? 'Sur 1 J' : 'Sur ' + (EVO.per === 'all' ? 'tout' : lab); });
     J.$$('[data-per]').forEach(td => { const r = map && map.get(td.dataset.per); td.className = 'num per ' + (r ? J.cls(r.eur) : '');
-      td.innerHTML = r ? `<b>${sgn(r.eur)}</b><div class="ps">${r.pct !== null ? J.pct(r.pct, 1) : ''}</div>` : '<span class="muted">–</span>'; });
+      td.innerHTML = r ? `<b>${sgn(r.eur)}</b><div class="ps">${r.pct !== null ? J.pct(r.pct, 1) : ''}</div>` : (EVO.per === '1d' ? '<span class="muted">Non calculé en 1 J</span>' : '<span class="muted">–</span>'); });
   }
-  /* ── Positions : une ligne lisible par titre ── */
-  function spark(c) {
-    if (!c) return '';
-    let pts = c.points || [], recent = false;
-    if (pts.length < 5 && (c.daily || []).length > 1) { pts = c.daily.slice(-22); recent = true; }      // achat trop récent : le dernier mois, avec la date d'achat marquée
-    if (pts.length < 2) return '';
-    const w = 120, hh = 34, v = pts.map(p => p[1]), min = Math.min(...v), max = Math.max(...v), span = max - min || 1, n = v.length, up = v[n - 1] >= v[0];
-    const X = i => i * w / (n - 1), Y = x => hh - 2 - (x - min) / span * (hh - 4), d = v.map((x, i) => (i ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(x).toFixed(1)).join('');
-    const bi = recent && c.buys && c.buys.length ? pts.findIndex(p => p[0] >= c.buys[0]) : -1;
-    return `<svg class="sp" viewBox="0 0 ${w} ${hh}" preserveAspectRatio="none" style="color:var(--${up ? 'up' : 'down'})"><path class="a" d="${d}L${w} ${hh}L0 ${hh}Z"/><path class="l" d="${d}"/>${bi >= 0 ? `<line x1="${X(bi).toFixed(1)}" x2="${X(bi).toFixed(1)}" y1="0" y2="${hh}" class="b"/>` : ''}</svg>${recent ? '<span class="sp-n">dernier mois</span>' : ''}`;
-  }
-  function positionsTable(d) {
-    const rows = d.positions.map(p => {
-      const c = (d.curves || {})[p.listing_id], w = worstFor(d.lots, p.listing_id), name = J.esc(p.name_catalogue || p.name || p.symbol), L = p.levels || {};
-      const strats = [...new Set((d.lots || []).filter(l => l.listing_id == p.listing_id && l.alert).map(l => l.alert.strategy_label))];
-      const filet = p.price !== null && L.stop && p.price <= L.stop ? '<span class="badge ko">Filet atteint</span>' : p.price !== null && L.target && p.price >= L.target ? '<span class="badge ok">Objectif atteint</span>' : '';
-      const held = p.first_buy ? Math.floor((Date.now() - new Date(p.first_buy.replace(' ', 'T') + 'Z')) / 864e5) : null;
-      return `<tr class="pos-row" data-open="${p.listing_id || ''}">
-        <td class="pt">${p.linked ? `<a href="titre.html?id=${p.listing_id}" target="_blank" rel="noopener" class="pn">${name}</a>` : `<span class="pn">${name}</span>`}
-          <div class="ps">${J.esc(p.symbol)} · ${J.num(p.qty, p.qty % 1 ? 4 : 0)} × ${p.price !== null ? px(p.price, p.price_currency) : '–'}${held !== null ? ` · acheté il y a ${held} j` : ''}</div>
-          <div class="ps">${strats.map(x => `<span class="chip-s" title="Stratégie de l’achat (modifiable dans « Alertes »)">${J.esc(x)}</span>`).join('')}${w && w.level !== 'info' ? `<span class="badge ${LEVEL[w.level][0]}" title="${J.esc(w.alerts.map(x => x.message).join(' '))}">${LEVEL[w.level][1]}</span>` : ''}${filet}${p.catalogue_status === 'excluded' ? ` <span class="badge ko" title="${J.esc(p.excluded_reason || '')}">Hors sélection</span>` : ''}${p.value === null ? ' <span class="badge wait">Valorisation indisponible</span>' : ''}${p.price_source === 'daily' ? ' <span class="badge wait">Clôture du ' + J.date(p.price_time) + '</span>' : ''}</div></td>
-        <td class="pc hide-s">${p.listing_id ? `<button type="button" class="sp-btn" data-chart="${p.listing_id}" title="Ouvrir la courbe">${spark(c)}</button>` : ''}</td>
-        <td class="num"><b>${J.eur(p.value, 0)}</b><div class="ps">${p.weight !== null ? J.pct(p.weight, 0, false) + ' du total' : ''}</div></td>
-        <td class="num per" data-per="${p.listing_id || ''}"><span class="muted">…</span></td>
-        <td class="num ${J.cls(p.unrealized)}"><b>${p.unrealized !== null ? sgn(p.unrealized) : '–'}</b><div class="ps">${J.pct(p.unrealized_pct, 1)}</div></td>
-        <td class="num act hide-s"><button type="button" class="ib" data-chart="${p.listing_id || ''}" title="Courbe" ${p.listing_id ? '' : 'disabled'}>📈</button><button type="button" class="ib" data-lv="${p.listing_id || ''}" title="Filet de sécurité et objectif" ${p.linked ? '' : 'disabled'}>🛡️</button></td></tr>`; }).join('');
-    return `<div class="table-wrap"><table class="pos-t"><thead><tr><th>Titre</th><th class="hide-s">Courbe</th><th class="num">Valeur</th><th class="num per-h" title="Gain ou perte sur la période choisie au-dessus du graphique">Sur la période</th><th class="num" title="Plus-value latente : depuis vos achats, frais compris">Depuis l’achat</th><th class="hide-s"></th></tr></thead><tbody>${rows || '<tr><td colspan="6" class="empty">Aucune position ouverte.</td></tr>'}</tbody></table></div>`;
-  }
-
   /* ── Alertes, ventes, répartition, transactions : repliés par défaut ── */
   function lotsBody(d) {
-    const rule = a => { const r = a.rules || {}; if (r.off) return '<span class="muted">désactivées</span>';
-      return [r.days ? `${r.days} j → ${J.esc(r.days_action)}` : '', r.drop ? `−${J.num(r.drop, 0)} % du plus haut → ${J.esc(r.drop_action)}` : '', r.exit === 'momentum_negative' ? 'momentum 6 mois négatif → vente à envisager' : r.exit === 'below_ma50' ? 'sous la moyenne 50 j → vente à envisager' : ''].filter(Boolean).join('<br>') + (r.personal ? ' <span class="badge accent">perso</span>' : ''); };
-    const rows = d.lots.map(l => { const a = l.alert || {}, held = Math.floor((Date.now() - new Date(l.trade_at.replace(' ', 'T') + 'Z')) / 864e5);
-      return `<tr><td>${J.date(l.trade_at)}<div class="ps">${held} j</div></td><td><b>${J.esc(l.name || l.symbol)}</b><div class="ps">${J.esc(l.symbol)} · ${J.num(l.remaining, 4)} détenu(s) · ${J.esc(a.strategy_label || '–')}${a.own_strategy ? ' <span class="badge accent">choisie</span>' : ''}</div></td>
-        <td class="small hide-s">${a.rules ? rule(a) : '–'}</td><td class="lot-alerts">${(a.alerts || []).map(x => `<span class="badge ${LEVEL[x.level][0]}" title="${J.esc(x.message)}">${J.esc(x.action)}</span>`).join('') || '<span class="muted small">aucune</span>'}</td>
-        <td class="num"><button class="btn small" data-lot="${l.tx_id}">Régler</button></td></tr>`; }).join('');
-    return `<p class="small muted">Rien n’est vendu automatiquement. Par défaut : rappel à 6 mois, alerte si le cours recule de 20 % depuis son plus haut depuis l’achat, et pour le Momentum quand sa hausse sur 6 mois devient négative (meilleure règle du test historique). Survolez une pastille pour le détail.</p>
-      <div class="table-wrap"><table><thead><tr><th>Achat</th><th>Titre</th><th class="hide-s">Alertes prévues</th><th>Alertes</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    const groups = new Map();
+    d.lots.forEach(l => { const label=l.alert?.strategy_label || 'Non renseignée', rule=l.alert?.rules||{}, key=label+JSON.stringify([rule.days,rule.drop,rule.off,rule.exit]); if(!groups.has(key))groups.set(key,{label,rule,lots:[]});groups.get(key).lots.push(l); });
+    return `<p class="small muted">Les règles communes sont regroupées par stratégie et réglages effectifs. Les réglages individuels restent accessibles à la demande. Aucune vente n’est automatique.</p>${[...groups.values()].map(({label,rule,lots})=>`<details><summary>${J.esc(label)} · ${lots.length} achat(s)</summary><p class="small muted">${rule.off?'Alertes désactivées':`Rappel : ${rule.days || 'aucun'} jours · recul : ${rule.drop ? J.num(rule.drop,1)+' %' : 'sans seuil'}${rule.exit==='momentum_negative'?' · momentum 6 mois négatif':rule.exit==='below_ma50'?' · sous la moyenne 50 j':''}`}</p>${lots.map(l=>`<div class="lot-detail"><b>${J.esc(l.name||l.symbol)}</b> · ${J.date(l.trade_at)} · ${J.num(l.remaining,4)} titre(s) ${l.alert?.rules?.personal?'<span class="badge accent">personnalisé</span>':''}<button class="btn small" data-lot="${l.tx_id}">Régler cet achat</button></div>`).join('')}</details>`).join('')}`;
   }
   function salesBody(d) {
     return `<div class="table-wrap"><table><thead><tr><th>Date</th><th>Titre</th><th class="num">Produit net</th><th class="num hide-s">Prix de revient</th><th class="num">Gain</th></tr></thead><tbody>
@@ -182,21 +211,35 @@
     history.replaceState(null, '', '?id=' + current);
     const nAlerts = (d.lots || []).filter(l => l.alert && (l.alert.level === 'act' || l.alert.level === 'watch')).length;
     const etfHtml = JEtf.portfolio(d.etf_analysis);
-    page.innerHTML = `${d.integrity && !d.integrity.ok ? `<div class="notice err">${d.integrity.issues.map(x => 'Transaction n° ' + x.transaction_id + ' : ' + J.esc(x.message)).join('<br>')}</div>` : ''}
-    <div class="pf-bar"><div class="pf-tabs" id="pf-tabs">${list.map(p => `<button data-id="${p.id}" class="${p.id === current ? 'on' : ''}">${J.esc(p.name)}${p.is_default ? ' ★' : ''}</button>`).join('')}<button class="add" id="new-pf" title="Nouveau portefeuille">＋</button></div>
-      <button class="btn primary" id="add-tx">＋ Transaction</button></div>
-    ${d.totals.unpriced ? `<div class="notice warn">${d.totals.unpriced} position(s) sans cours ou change exploitable : valorisation et gain total indisponibles. Aucun prix d’achat n’est utilisé comme cours actuel.</div>` : ''}${splitNotice(d.positions)}
-    ${hero(d)}
-    ${section('positions', `Positions <span class="cnt">${d.positions.length}</span>`, '', positionsTable(d))}
-    ${d.lots && d.lots.length ? section('lots', `Alertes ${nAlerts ? `<span class="cnt warn">${nAlerts}</span>` : '<span class="cnt">0</span>'}`, '', lotsBody(d)) : ''}
-    ${d.sales && d.sales.length ? section('sales', `Ventes réalisées <span class="cnt">${d.sales.length}</span>`, `<span class="${J.cls(d.sales.reduce((a, x) => a + (x.gain || 0), 0))}">${sgn(d.sales.reduce((a, x) => a + (x.gain || 0), 0))}</span>`, salesBody(d)) : ''}
-    ${d.allocation && d.allocation.rows ? section('alloc', 'Répartition par zone', d.allocation.rebalance_suggested ? '<span class="badge wait">à rééquilibrer</span>' : '', allocBody(d.allocation)) : ''}
-    ${etfHtml ? section('etf', 'Secteurs de vos ETF', '', etfHtml.replace(/^<div class="card">\s*<h2>[^<]*<\/h2>/, '<div>')) : ''}
-    ${section('tx', `Transactions <span class="cnt">${d.transactions_list.length}</span>`, '', txBody(d))}
-    ${section('settings', 'Réglages du portefeuille', '', `<div class="row"><button class="btn small" id="rename">Renommer</button>${d.portfolio.is_default ? '' : '<button class="btn small" id="mk-default">Définir par défaut</button>'}<button class="btn small danger" id="del-pf">Supprimer</button></div>
-      <p class="small muted" style="margin-bottom:0">Stratégie : <b>${d.portfolio.strategy ? (NAMES[d.portfolio.strategy.name] || 'Personnalisée') : 'aucune (Croissance régulière par défaut)'}</b>. Elle se règle depuis l’Explorer (affichage avancé).</p>`)}`;
+    page.innerHTML = `${d.integrity && !d.integrity.ok ? `<div class="notice err">${d.integrity.issues.map(x => J.esc(x.message)).join('<br>')}</div>` : ''}
+      <header class="pf-toolbar"><div><h1>Mes portefeuilles</h1><label class="sr-only" for="pf-select">Portefeuille affiché</label><select id="pf-select">${list.map(p=>`<option value="${p.id}" ${p.id===current?'selected':''}>${J.esc(p.name)}${p.is_default?' ★':''}</option>`).join('')}</select><button class="btn small" id="new-pf" aria-label="Créer un portefeuille">＋</button></div><button class="btn primary" id="add-tx">＋ Transaction</button></header>
+      ${d.totals.unpriced ? '<div class="notice warn">Position(s) sans cours ou change exploitable : valorisation et gain total indisponibles. Aucun prix d’achat n’est utilisé comme cours actuel.</div>' : ''}${splitNotice(d.positions)}
+      <nav class="pf-nav" id="pf-nav" role="tablist" aria-label="Espaces du portefeuille">${[['overview','Vue d’ensemble'],['positions','Mes positions'],['analysis','Évolution et analyse'],['manage','Historique et gestion']].map(([k,l])=>`<button type="button" role="tab" data-view="${k}" id="tab-${k}" aria-controls="panel-${k}">${l}</button>`).join('')}</nav>
+      <section class="pf-panel" role="tabpanel" aria-labelledby="tab-overview" id="panel-overview" data-panel="overview">${hero(d)}${attention(d)}${overviewContributions()}</section>
+      <section class="pf-panel" role="tabpanel" aria-labelledby="tab-positions" id="panel-positions" data-panel="positions"><div class="pf-section-title"><h2>Mes positions <span class="cnt">${d.positions.length}</span></h2><label>Trier <select id="position-sort">${[['attention','Priorité de surveillance'],['loss','Plus grosses pertes'],['gain','Plus gros gains'],['drop','Recul depuis le sommet'],['weight','Poids dans le portefeuille']].map(([v,l])=>`<option value="${v}" ${SORT===v?'selected':''}>${l}</option>`).join('')}</select></label></div><p class="small muted">Depuis vos achats = gain latent des titres restants (PMP). Sur la période = résultat du titre, ventes comprises. Choisissez la période dans Évolution et analyse.</p><div id="position-cards">${positionCards(d)}</div></section>
+      <section class="pf-panel" role="tabpanel" aria-labelledby="tab-analysis" id="panel-analysis" data-panel="analysis">${analysis(d)}</section>
+      <section class="pf-panel" role="tabpanel" aria-labelledby="tab-manage" id="panel-manage" data-panel="manage">
+        ${section('tx','Transactions','',txBody(d))}${d.sales.length?section('sales','Ventes réalisées','',salesBody(d)):''}
+        ${d.lots.length?section('lots','Réglages des achats et alertes','',lotsBody(d)):''}
+        ${d.allocation?.rows?section('alloc','Répartition par zone','',allocBody(d.allocation)):''}
+        ${d.positions.some(p=>p.kind==='etf')&&etfHtml?section('etf','Secteurs de vos ETF','',etfHtml.replace(/^<div class="card">\s*<h2>[^<]*<\/h2>/,'<div>')):''}
+        ${section('settings','Réglages du portefeuille','',`<div class="row"><button class="btn small" id="rename">Renommer</button>${d.portfolio.is_default?'':'<button class="btn small" id="mk-default">Définir par défaut</button>'}<button class="btn small danger" id="del-pf">Supprimer</button></div><p class="small muted">Stratégie : ${J.esc(d.portfolio.strategy ? (NAMES[d.portfolio.strategy.name] || 'Personnalisée') : 'Croissance régulière par défaut')}. Réglage depuis l’Explorer.</p>`)}
+      </section>`;
     folds();
-    J.$$('#pf-tabs button[data-id]').forEach(b => b.onclick = () => { current = +b.dataset.id; render(); });
+    J.$('#pf-select').onchange = e => { current=+e.target.value; render(); };
+    J.$$('#pf-nav [data-view]').forEach((b,index,buttons) => {
+      b.onclick=()=>switchView(b.dataset.view);
+      b.onkeydown=e=>{ const delta={ArrowRight:1,ArrowLeft:-1}[e.key]; if(delta){e.preventDefault();const next=buttons[(index+delta+buttons.length)%buttons.length];switchView(next.dataset.view);next.focus();} };
+    });
+    const bindPositions = () => {
+      J.$$('[data-chart]').forEach(b=>b.onclick=()=>chartDialog(d,d.positions.find(p=>p.listing_id==b.dataset.chart)));
+      J.$$('[data-lv]').forEach(b=>b.onclick=()=>levelsDialog(d.positions.find(p=>p.listing_id==b.dataset.lv)));
+      J.$$('[data-lot]').forEach(b=>b.onclick=()=>lotDialog(d,d.lots.find(l=>l.tx_id==b.dataset.lot)));
+    };
+    J.$('#position-sort').onchange=e=>{SORT=e.target.value;J.$('#position-cards').innerHTML=positionCards(d);bindPositions();if(H)drawEvo();};
+    J.$$('[data-switch]').forEach(b=>b.onclick=()=>switchView(b.dataset.switch));
+    J.$$('[data-inspect]').forEach(b=>b.onclick=()=>{store('inspect',b.dataset.inspect);J.$('#position-cards').innerHTML=positionCards(d);bindPositions();switchView('positions');const target=J.$$('[data-position]').find(e=>e.dataset.position===b.dataset.inspect);target?.scrollIntoView({block:'nearest'});if(H)drawEvo();});
+    switchView(VIEW);
     J.$('#new-pf').onclick = createPf;
     J.$$('#evo-mode button, #evo-per button, #evo-unit button').forEach(b => b.onclick = e => { e.stopPropagation(); if (b.disabled) return; const k = { 'evo-mode': 'mode', 'evo-per': 'per', 'evo-unit': 'unit' }[b.parentElement.id]; EVO[k] = b.dataset.v; store(k === 'mode' ? 'evo_mode2' : 'evo_' + k, EVO[k]); J.$$('#' + b.parentElement.id + ' button').forEach(x => x.classList.toggle('on', x === b)); drawEvo(); });
     const pid = current;
@@ -207,7 +250,7 @@
     const ao = J.$('#alloc-off'); if (ao) ao.onclick = async () => { await J.post('portfolio/target', { id: current, target: null }); render(); };
     J.$$('[data-lv]').forEach(b => b.onclick = e => { e.stopPropagation(); levelsDialog(d.positions.find(x => x.listing_id == b.dataset.lv)); });
     J.$$('[data-chart]').forEach(b => b.onclick = e => { e.stopPropagation(); e.preventDefault(); chartDialog(d, d.positions.find(x => x.listing_id == b.dataset.chart)); });
-    J.$$('tr.pos-row').forEach(r => r.onclick = e => { if (e.target.closest('a, button') || !r.dataset.open) return; chartDialog(d, d.positions.find(x => x.listing_id == r.dataset.open)); });
+
     J.$('#add-tx').onclick = () => J.txDialog({ portfolios: list, portfolioId: current, onDone: render });
     J.$$('[data-edit]').forEach(b => b.onclick = () => J.txDialog({ portfolios: list, portfolioId: current, tx: d.transactions_list.find(x => x.id == b.dataset.edit), onDone: render }));
     J.$$('[data-del]').forEach(b => b.onclick = async () => { if (await J.confirm('Supprimer la transaction', 'Cette transaction sera supprimée définitivement.', 'Supprimer')) { await J.post('tx/delete', { id: +b.dataset.del }); render(); } });

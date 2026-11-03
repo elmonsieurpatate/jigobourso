@@ -100,8 +100,9 @@ def _series(conn, ids):
         splits = {}
         for r in cur.fetchall():
             splits.setdefault(r['listing_id'], []).append((r['event_date'].isoformat(), float(r['ratio']) if r['ratio'] else None))
-        cur.execute(f'SELECT listing_id, close_px, ma50, momentum_6m FROM series_state WHERE listing_id IN ({marks})', list(ids))
+        cur.execute(f'SELECT listing_id, close_px, ma50, ma200, momentum_6m, quality, last_close_date FROM series_state WHERE listing_id IN ({marks})', list(ids))
         states = {r['listing_id']: {'close': None if r['close_px'] is None else float(r['close_px']), 'ma50': None if r['ma50'] is None else float(r['ma50']),
+                                    'quality': r['quality'], 'last_close_date': str(r['last_close_date']) if r['last_close_date'] else None, 'ma200': None if r['ma200'] is None else float(r['ma200']),
                                     'momentum_6m': None if r['momentum_6m'] is None else float(r['momentum_6m'])} for r in cur.fetchall()}
     for lid in ids:
         dates, closes, _, _ = prepare_series(bars.get(lid, []), splits.get(lid, ()))
@@ -143,7 +144,9 @@ def lot_alerts(conn, request, today=None):
                                   'rules': {k: rules.get(k) for k in ('days', 'drop', 'drop_action', 'days_action', 'exit', 'off', 'personal')},
                                   'measures': m, 'rank': rank if rank is not False else None, 'alerts': alerts,
                                   'level': max((a['level'] for a in alerts), key=('info', 'watch', 'act').index, default=None)}
-    return {'lots': out, 'rank_limit': RANK_LIMIT, 'strategies': {k: NAMES[k] for k in STRATEGIES}, 'curves': curves(lots, series)}
+    from .portfolio import enrich
+    positions = enrich(conn, request, series, out, today)
+    return {'positions': positions, 'lots': out, 'rank_limit': RANK_LIMIT, 'strategies': {k: NAMES[k] for k in STRATEGIES}, 'curves': curves(lots, series)}
 
 
 def curves(lots, series, points=90):

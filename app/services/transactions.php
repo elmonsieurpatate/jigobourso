@@ -80,11 +80,19 @@ function open_lots(array $rows): array {
             foreach ($lots[$k] as &$l) $l['remaining'] *= $f;
             unset($l);
         } elseif ($lid) $cursor[$k] = max($cursor[$k] ?? '', substr($t['trade_at'], 0, 10));
-        if ($t['side'] === 'buy') { $lots[$k][] = ['tx' => $t, 'remaining' => $qty]; continue; }
+        if ($t['side'] === 'buy') {
+            $fx = $t['fx_to_eur'] !== null ? (float)$t['fx_to_eur'] : (($t['currency'] ?? '') === 'EUR' ? 1.0 : null);
+            $cost = $fx !== null && $fx > 0 ? $qty * (float)$t['unit_price'] * $fx + (float)($t['fees'] ?? 0) : null;
+            $lots[$k][] = ['tx' => $t, 'remaining' => $qty, 'remaining_cost' => $cost,
+                          'manual_split' => $lid && !empty($freeBuys[$lid])];
+            continue;
+        }
         if (empty($lots[$k])) continue;                  // vente sans achat connu : refusée ailleurs par validate_transaction_history
         foreach ($lots[$k] as &$l) {
             if ($qty <= 1e-12) break;
-            $take = min($l['remaining'], $qty); $l['remaining'] -= $take; $qty -= $take;
+            $take = min($l['remaining'], $qty);
+            if ($l['remaining_cost'] !== null && $l['remaining'] > 0) $l['remaining_cost'] *= 1 - $take / $l['remaining'];
+            $l['remaining'] -= $take; $qty -= $take;
         }
         unset($l);
     }

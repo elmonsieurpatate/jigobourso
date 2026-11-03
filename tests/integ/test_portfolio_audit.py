@@ -125,3 +125,44 @@ def test_newer_closing_price_wins_over_an_old_quote_in_summary_and_history(world
     assert d['positions'][0]['price_source'] == 'daily'
     assert d['totals']['value'] == h['value'][-1] == 24
     assert d['totals']['total_gain'] == h['gain'][-1] == 4
+
+
+@pytest.mark.parametrize('ratio,currency', [(1,'EUR'),(2,'EUR'),(1,'USD')])
+def test_gain_protection_uses_real_acquisition_cost_and_split_units(world, ratio, currency):
+    a,pf=account(world)
+    buy=add(a,pf,fees=1 if currency=='USD' else 10, currency=currency, fx_to_eur=.9 if currency=='USD' else 1)
+    conn=connect();now=dt.date.today();days=[];day=dt.date(2026,4,30)
+    while day<now:
+        if day.weekday()<5:days.append(day)
+        day+=dt.timedelta(days=1)
+    with conn.cursor() as q:
+        if ratio!=1:
+            q.execute("INSERT INTO split_log(listing_id,event_date,price_ratio,ratio,status,detected_at) VALUES (1,'2026-06-01',.5,2,'confirmed',NOW())")
+            q.execute("INSERT INTO corporate_events(listing_id,event_date,kind,ratio) VALUES (1,'2026-06-01','split',2)")
+        q.executemany('INSERT INTO daily_prices(listing_id,price_date,close_px) VALUES (1,%s,%s)',[(d,(108 if d==dt.date(2026,5,4) else 100)/(ratio if d>=dt.date(2026,6,1) else 1))for d in days])
+        q.execute('UPDATE latest_prices SET price=%s,currency=%s,price_time=NOW() WHERE listing_id=1',(104/ratio,currency))
+        q.execute("INSERT INTO series_state(listing_id,computed_at,last_close_date,closes_count,close_px,ma50,momentum_6m,quality) VALUES (1,NOW(),%s,%s,%s,%s,.1,'ok')",(days[-1],len(days),100/ratio,99/ratio))
+        q.execute('INSERT INTO strategy_metrics(listing_id,sessions,slope,perf,volatility) VALUES (1,21,.05,4,.5)')
+        if currency=='USD':
+            q.executemany("INSERT INTO fx_rates(currency,rate_date,to_eur) VALUES ('USD',%s,.8)",[(d,)for d in days])
+            q.execute("INSERT INTO fx_rates(currency,rate_date,to_eur) VALUES ('USD',%s,.85)",(now,))
+    conn.commit();conn.close()
+    d=portfolio(a,pf);lot=d['lots'][0]['alert']['protection'];group=d['insights']['L1']['protection']
+    assert lot['available'] and group['available']
+    assert lot['cost_eur']==(901 if currency=='USD' else 1010)
+    assert lot['gain_eur']==pytest.approx(-17 if currency=='USD' else 30)
+    assert lot['drop_pct']==pytest.approx(100*(1-104/108))
+    assert group['gain_eur']==pytest.approx(d['positions'][0]['unrealized'])
+    assert a.call('lot/settings',{'tx_id':buy,'strategy':'recovery'})[0]==200
+    d=portfolio(a,pf)
+    assert d['lots'][0]['alert']['strategy']=='recovery'
+    assert d['lots'][0]['alert']['protection']['cost_eur']==lot['cost_eur']
+
+    if ratio == 1 and currency == 'EUR':
+        conn=connect()
+        with conn.cursor() as q: q.execute("UPDATE series_state SET quality='break' WHERE listing_id=1")
+        conn.commit(); conn.close()
+        unreliable=portfolio(a,pf)
+        assert not unreliable['insights']['L1']['protection']['available']
+        assert unreliable['insights']['L1']['status']=='unknown'
+        assert unreliable['totals']['value']==d['totals']['value']
