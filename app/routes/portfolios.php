@@ -71,6 +71,13 @@ return [
         $v['allocation'] = engine_call('allocation', ['target' => $target, 'positions' => array_map(function ($x) { return array_intersect_key($x, array_flip(['listing_id', 'kind', 'value'])); }, $v['positions'])]);
         return $v + ['portfolio' => ['id' => (int)$p['id'], 'name' => $p['name'], 'is_default' => (bool)$p['is_default'], 'strategy' => $p['strategy_config'] ? json_decode($p['strategy_config'], true) : null], 'transactions_list' => $tx];
     },
+    'portfolio/history-refresh' => function () {
+        need_post(); $u=require_user(); $b=body();
+        $p=own_portfolio((int)($b['id'] ?? 0),$u); $lid=(int)($b['listing_id'] ?? 0);
+        $held=portfolio_valuation((int)$p['id'])['positions'];
+        if (!$lid || !array_filter($held, fn($x) => $x['listing_id'] === $lid)) throw new ApiError('Titre non détenu dans ce portefeuille',404);
+        return engine_call('portfolio-refresh',['listing_id'=>$lid]);
+    },
     'portfolio/history' => function () {
         $u = require_user();
         $p = own_portfolio((int)($_GET['id'] ?? 0), $u);

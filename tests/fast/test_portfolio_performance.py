@@ -105,3 +105,19 @@ def test_personal_curves_do_not_assign_market_performance_between_holding_interv
     console.log(JSON.stringify(l.gain.map((_,i)=>heldPerformance(l,0,i,'eur'))));'''
     out=subprocess.run(['node','-e',code],capture_output=True,text=True,check=True)
     assert json.loads(out.stdout)==[0,1,None,1,1]
+
+
+def test_contribution_percent_uses_common_portfolio_capital_not_stock_return():
+    source=(Path(__file__).resolve().parents[2]/'app/public/assets/portefeuilles.js').read_text()
+    performance=source[source.index('  function perf('):source.index('  const tradePrice')]
+    snapshot=source[source.index('  function snapshot('):source.index('  function focusAnalysis(')]
+    history={'dates':['2026-01-01','2026-01-02','2026-01-03'],'gain':[0,0,-82],'value':[2020,2020,1938],'purchases':[2020,2020,2020],
+      'lines':[{'key':'small','gain':[0,0,-2],'values':[20,20,18],'purchases':[20,20,20]},
+               {'key':'big','gain':[0,0,-80],'values':[2000,2000,1920],'purchases':[2000,2000,2000]}]}
+    code='const H=JSON.parse(process.argv[1]),EVO={per:"1w"},PAL=["red","blue"];function periodStart(){return 1};'+performance+snapshot+'\nconsole.log(JSON.stringify([snapshot(),snapshot({from:Date.parse("2025-01-01")/1000,to:Date.parse("2025-02-01")/1000})]));'
+    out=subprocess.run(['node','-e',code,json.dumps(history)],capture_output=True,text=True,check=True)
+    r,before=json.loads(out.stdout)
+    assert r['rows'][0]['pct']==-10 and r['rows'][1]['pct']==-4
+    assert r['rows'][0]['contribution_pct']==pytest.approx(-2/2020*100)
+    assert sum(l['contribution_pct'] for l in r['rows'])==pytest.approx(r['total']['pct'])
+    assert before['total']['eur']==0 and before['total']['pct'] is None

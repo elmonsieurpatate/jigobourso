@@ -10,6 +10,7 @@ import datetime
 import math
 
 from .series import prepare_series
+from . import session
 
 
 def _num(v):
@@ -45,7 +46,7 @@ def _load(conn, ids, start):
         fx = {}
         if curs:
             cur.execute(f"SELECT currency, rate_date, to_eur FROM fx_rates WHERE currency IN ({','.join(['%s'] * len(curs))}) AND rate_date >= %s ORDER BY currency, rate_date",
-                        curs + [start - datetime.timedelta(days=15)])
+                        curs + [min([start]+[datetime.date.fromisoformat(b[0][0]) for b in bars.values() if b]) - datetime.timedelta(days=15)])
             for r in cur.fetchall():
                 fx.setdefault(r['currency'], []).append((r['rate_date'].isoformat(), float(r['to_eur'])))
     return bars, splits, unit, (fx, meta)
@@ -174,7 +175,8 @@ def build(transactions, bars, splits, unit, fx, meta, today=None, bars15=None):
         line['gain'] = [None if v is None else round(v - i, 2) for v, i in zip(line['values'], line['net_in'])]      # gain ou perte cumulé du titre (latent + réalisé)
     out['lines'] = sorted(lines.values(), key=lambda l: -max((v for v in l['values'] if v is not None), default=0))
     out['intraday'] = intraday_value(holdings, bars15 or {}, {k: (closes[k].last if k in closes else None) for k in holdings if isinstance(k, int)}, to_eur, today)
-    out['market'] = market_history(holdings, bars, splits, unit, {k: {**{'symbol': l['symbol'], 'name': l['name']}, **meta.get(k, {})} for k, l in lines.items()}, today, bars15 or {})
+    out['market'] = market_history(holdings, bars, splits, unit, {k: {**{'symbol': l['symbol'], 'name': l['name']}, **meta.get(k, {})} for k, l in lines.items()}, today, bars15 or {}, fx)
+    out['session'] = session.build(holdings,bars15 or {},unit,fx,txs,applied,meta)
     out['trades'] = trades
     if any(out['unpriced']):
         notes.append('Valorisation indisponible aux dates sans cours ou change : aucune estimation au prix d’achat.')
@@ -182,7 +184,7 @@ def build(transactions, bars, splits, unit, fx, meta, today=None, bars15=None):
     return out
 
 
-def market_history(holdings, bars, splits, unit, meta, today, bars15):
+def market_history(holdings, bars, splits, unit, meta, today, bars15, fx=None):
     """Observed split-adjusted native prices of CURRENT holdings, independent of acquisition.
 
     No cash-flow/FX/portfolio return is inferred from this comparison. Missing observations
@@ -206,11 +208,13 @@ def market_history(holdings, bars, splits, unit, meta, today, bars15):
                 'break_dates': [dates[i] for i in quality], 'last_date': max(observed) if observed else None}
         lines.append(dict(info, observations=observed))
         intraday.append(dict(info, observations={t: c for t, c in bars15.get(lid, []) if t[:10] <= today}))
+    def session_rate(line,day):return session.euro_rate(line['currency'],day[:10],fx or {})
     def aligned(items, session=False):
         dates = sorted({d for l in items for d in l['observations']})
         if session and dates:
             dates = [d for d in dates if d[:10] == dates[-1][:10]]
         return {'dates': dates, 'lines': [{**{k: v for k, v in l.items() if k != 'observations'},
+                                         'prices_eur': [None if l['observations'].get(d) is None or session_rate(l,d) is None else l['observations'][d]*session_rate(l,d) for d in dates],
                                          'prices': [l['observations'].get(d) for d in dates]} for l in items]}
     return dict(aligned(lines), intraday=aligned(intraday, True))
 
@@ -256,7 +260,7 @@ def portfolio_history(conn, request):
     bars15 = {}
     if ids:
         with conn.cursor() as cur:
-            cur.execute(f"SELECT listing_id, slot_start, close_px FROM intraday_prices WHERE listing_id IN ({','.join(['%s'] * len(ids))}) AND slot_start >= NOW() - INTERVAL 6 DAY ORDER BY listing_id, slot_start", ids)
+            cur.execute(f"SELECT listing_id, slot_start, close_px FROM intraday_prices WHERE listing_id IN ({','.join(['%s'] * len(ids))}) AND slot_start >= (SELECT DATE_SUB(DATE(MAX(p.slot_start)), INTERVAL 7 DAY) FROM intraday_prices p WHERE p.listing_id=intraday_prices.listing_id) ORDER BY listing_id, slot_start", ids)
             for r in cur.fetchall():
                 bars15.setdefault(r['listing_id'], []).append((r['slot_start'].isoformat(), float(r['close_px'])))
     return build(txs, bars, splits, unit, fx, meta, bars15=bars15)

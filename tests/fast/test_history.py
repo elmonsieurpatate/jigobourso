@@ -138,3 +138,12 @@ def test_holding_intervals_are_exposed_without_changing_realised_results():
     line=r['lines'][0]
     assert line['quantities']==[1,0,0,1,1]
     assert line['gain']==[0,1,1,1,1]
+
+
+def test_market_euro_prices_use_dated_fx_not_transaction_conversion():
+    r=h.build([tx(1,'2026-01-07','buy',1,12,fx=.9,cur='USD')],BARS,{},{1:'USD'},
+              {'USD':[('2026-01-05',.8)]},{},TODAY)
+    m=r['market']['lines'][0]
+    assert m['prices'][0]==10 and m['prices_eur'][0]==8
+    assert r['trades'][0]['fx_to_eur']==.9
+    assert m['prices_eur'][-1]==7.2

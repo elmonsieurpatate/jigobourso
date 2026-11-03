@@ -1,5 +1,5 @@
 """Synthetic portfolio audit fixtures. Run from repo root, isolated local DB only."""
-import datetime as dt,json,os
+import datetime as dt,json,os,time
 from engine.shared.db import connect
 assert os.environ.get('JIGO_TEST_DATABASE') == '1'
 assert os.environ['JIGO_DB_NAME'] in ('jigobourso_it', 'jigobourso_portfolio_audit')
@@ -76,4 +76,5 @@ with c.cursor() as q:
  q.execute("INSERT INTO series_state(listing_id,computed_at,last_close_date,closes_count,close_px,quality) VALUES (17,NOW(),CURDATE(),420,200,'break')")
  for lid,sym,qty,price in [(11,'TTAN',1,100),(12,'ASO',.1,200),(13,'BOX',1,110),(14,'FIGS',1,100),(16,'DXC',20,100),(17,'VOLT',1,1)]:
   q.execute("INSERT INTO portfolio_transactions(portfolio_id,listing_id,symbol,name,side,quantity,unit_price,currency,fx_to_eur,fees,trade_at,created_at) VALUES (10,%s,%s,%s,'buy',%s,%s,'EUR',1,0,'2026-10-20 12:00:00',NOW())",(lid,sym,'Stress '+sym,qty,price))
+ q.execute("INSERT INTO settings(name,value_json,updated_at) VALUES ('portfolio_refresh_16',%s,NOW())",(json.dumps(time.time()),))
 c.commit();c.close();print('10 portefeuilles synthétiques, 12 titres, base isolée prête')

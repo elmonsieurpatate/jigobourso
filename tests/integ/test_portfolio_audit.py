@@ -202,3 +202,37 @@ def test_analysis_market_precedes_purchase_and_markers_keep_transaction_units(wo
     assert r['trades'][0]['fees_eur']==2
     assert r['trades'][0]['fx_to_eur']==fx
     assert sum(l['gain'][-1] for l in r['lines'])==pytest.approx(r['gain'][-1])
+
+
+@pytest.mark.parametrize('intraday_trade', [False,True])
+def test_stored_fifteen_minute_session_supports_only_reliable_calculations(world,intraday_trade):
+    a,pf=account(world)
+    today=dt.date.today().isoformat()
+    add(a,pf,date=today+' 09:15:00' if intraday_trade else '2026-05-01')
+    conn=connect()
+    with conn.cursor() as q:
+        q.executemany('INSERT INTO intraday_prices(listing_id,slot_start,close_px) VALUES (1,%s,%s)',[(today+' 09:00:00',100),(today+' 09:15:00',101)])
+    conn.commit();conn.close()
+    status,r=a.call('portfolio/history',params=f'&id={pf}')
+    assert status==200,r
+    assert r['session']['day']==today
+    if intraday_trade:
+        assert r['session']['gain'][-1] is None
+        assert 'Transaction' in r['session']['lines'][0]['reason']
+        assert r['market']['intraday']['lines'][0]['prices']==[100,101]
+    else:
+        assert r['session']['gain'][-1]==10
+        assert r['session']['pct'][-1]==1
+        assert r['session']['base']==1000
+
+
+def test_targeted_history_refresh_checks_ownership_and_cooldown_without_network(world):
+    import time
+    from engine.shared import settings
+    a,pf=account(world);add(a,pf)
+    conn=connect();settings.put(conn,'portfolio_refresh_1',time.time());conn.close()
+    status,r=a.call('portfolio/history-refresh',{'id':pf,'listing_id':1})
+    assert status==200 and r['cooldown'] is True
+    assert a.call('portfolio/history-refresh',{'id':pf,'listing_id':2})[0]==404
+    bob=login(world,'bob','bob-secret-12345')
+    assert bob.call('portfolio/history-refresh',{'id':pf,'listing_id':1})[0]==404
