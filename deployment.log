@@ -1,1 +1,17 @@
 == Contrôles du serveur (lecture seule)
+== Contrôle des classements (lecture seule)
+diagnostic Explorer regular: 246 retenus, 100 non évaluables sur 9611
+diagnostic Explorer momentum_risk: 3554 retenus, 1428 non évaluables sur 9611
+== Contrôle des fichiers SQL : ajouts seulement
+== Essai isolé Hostinger (copie + base sandbox)
+== Version des pages : ?v=202611031623
+== Transfert du code
+== Dépendances Python, migrations de schéma, contrôles
+moteur importable
+== Contrôle d'intégrité financière
+PHP valide
+== Vérification des calculs financiers avec les calendriers de séance
+== Vérification ETF
+== Vérification publique
+site OK : accueil 200, version 202611031623 servie, API répond (200)
+Déploiement terminé : d0965af3175354266bd973d2b17d671f9a388d49
