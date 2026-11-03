@@ -74,8 +74,8 @@ def evaluate(lot, rules, measures, state, rank, today):
                     'message': f"Le cours a perdu {fr(measures['drop_pct'])} % depuis son plus haut depuis l'achat (seuil : {fr(rules['drop'], 0) if float(rules['drop']).is_integer() else fr(rules['drop'])} %)."})
     st = state or {}
     if rules.get('exit') == 'momentum_negative' and st.get('momentum_6m') is not None and st['momentum_6m'] < 0:
-        out.append({'kind': 'momentum', 'level': 'act', 'action': 'vente à envisager', 'value': round(100 * st['momentum_6m'], 1), 'threshold': 0,
-                    'message': f"Le momentum 6 mois du titre est devenu négatif ({fr(100 * st['momentum_6m'])} %) : c'est la meilleure règle de sortie testée pour le Momentum."})
+        out.append({'kind': 'momentum', 'level': 'act', 'action': 'vente à envisager', 'value': round(st['momentum_6m'], 1), 'threshold': 0,
+                    'message': f"Le momentum 6 mois du titre est devenu négatif ({fr(st['momentum_6m'])} %) : c'est la meilleure règle de sortie testée pour le Momentum."})
     if rules.get('exit') == 'below_ma50' and st.get('close') and st.get('ma50') and st['close'] < st['ma50']:
         out.append({'kind': 'ma50', 'level': 'act', 'action': 'vente à envisager', 'value': st['close'], 'threshold': st['ma50'],
                     'message': 'Le cours est passé sous sa moyenne 50 jours : fin probable du rebond.'})

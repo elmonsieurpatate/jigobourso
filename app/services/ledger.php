@@ -114,8 +114,17 @@ function portfolio_valuation(int $portfolioId): array {
     $info = [];
     if ($ids) {
         $in = implode(',', array_fill(0, count($ids), '?'));
-        foreach (q("SELECT l.id, l.symbol, l.mic, l.status, l.excluded_reason, l.is_primary, i.name, i.kind, p.price, p.price_time, p.source, p.currency AS price_currency, l.currency
-                    FROM listings l JOIN instruments i ON i.id = l.instrument_id LEFT JOIN latest_prices p ON p.listing_id = l.id WHERE l.id IN ($in)", $ids)->fetchAll() as $r) $info[(int)$r['id']] = $r;
+        // Même observation finale que l'historique : la plus récente entre quote et clôture.
+        $useQuote = "p.price IS NOT NULL AND (d.price_date IS NULL OR DATE(p.price_time) >= d.price_date)";
+        foreach (q("SELECT l.id, l.symbol, l.mic, l.status, l.excluded_reason, l.is_primary, i.name, i.kind,
+                    CASE WHEN $useQuote THEN p.price ELSE d.close_px END AS price,
+                    CASE WHEN $useQuote THEN p.price_time ELSE CAST(d.price_date AS DATETIME) END AS price_time,
+                    CASE WHEN $useQuote THEN p.source ELSE 'daily' END AS source, p.currency AS price_currency, l.currency
+                    FROM listings l JOIN instruments i ON i.id = l.instrument_id
+                    LEFT JOIN latest_prices p ON p.listing_id = l.id
+                    LEFT JOIN daily_prices d ON d.listing_id = l.id AND d.price_date =
+                        (SELECT MAX(last_d.price_date) FROM daily_prices last_d WHERE last_d.listing_id = l.id)
+                    WHERE l.id IN ($in)", $ids)->fetchAll() as $r) $info[(int)$r['id']] = $r;
     }
     // Les totaux ne portent que sur les positions calculables : une transaction incomplète n'efface pas les résultats des autres titres ni des autres portefeuilles.
     $open = []; $closed = []; $value = 0.0; $valueCertain = 0.0; $costCertain = 0.0;
@@ -136,6 +145,7 @@ function portfolio_valuation(int $portfolioId): array {
         if ($isUncertain) { $row['cost'] = null; $row['realized'] = null; $row['financial_incomplete'] = true; }
         if ($row['qty'] > 0) {
             $row['avg_cost'] = $row['cost'] === null ? null : $row['cost'] / $row['qty'];
+            if (!$isUncertain) $costCertain += $row['cost'];
             if ($i && $i['price'] !== null) {
                 $f = eur_factor($i['price_currency'] ?: $i['currency'], $rates);
                 if ($f !== null) {
@@ -143,7 +153,7 @@ function portfolio_valuation(int $portfolioId): array {
                     $row['value'] = $row['qty'] * $row['price_eur']; $row['unrealized'] = $row['cost'] === null ? null : $row['value'] - $row['cost'];
                     $row['unrealized_pct'] = $row['cost'] > 0 ? 100 * $row['unrealized'] / $row['cost'] : null;
                     $value += $row['value'];
-                    if (!$isUncertain) { $valueCertain += $row['value']; $costCertain += $row['cost']; }
+                    if (!$isUncertain) { $valueCertain += $row['value']; }
                 }
             }
             $open[] = $row;
@@ -151,15 +161,16 @@ function portfolio_valuation(int $portfolioId): array {
             $closed[] = $row;
         }
     }
-    foreach ($open as &$o) $o['weight'] = ($value > 0 && $o['value'] !== null) ? 100 * $o['value'] / $value : null;
+    $unpriced = count(array_filter($open, function ($o) { return $o['value'] === null; }));
+    foreach ($open as &$o) $o['weight'] = (!$unpriced && $value > 0 && $o['value'] !== null) ? 100 * $o['value'] / $value : null;
     unset($o);
     usort($open, function ($a, $b) { return ($b['value'] ?? -1) <=> ($a['value'] ?? -1); });
     $computable = !$uncertain || count($pos) > count($uncertain);          // rien de calculable seulement si TOUS les titres sont incomplets
     $unrealized = $valueCertain - $costCertain;
     return ['integrity' => ['ok' => !$issues, 'issues' => $issues], 'positions' => $open, 'closed' => $closed,
-            'totals' => ['value' => $value, 'cost' => $computable ? $costCertain : null, 'unrealized' => $computable ? $unrealized : null, 'unrealized_pct' => $computable && $costCertain > 0 ? 100 * $unrealized / $costCertain : null,
+            'totals' => ['value' => $unpriced ? null : $value, 'cost' => $computable ? $costCertain : null, 'unrealized' => $computable && !$unpriced ? $unrealized : null, 'unrealized_pct' => $computable && !$unpriced && $costCertain > 0 ? 100 * $unrealized / $costCertain : null,
                          'realized' => $computable ? $realizedTotal : null, 'fees' => $feesTotal, 'invested_total' => $computable ? $investedTotal : null, 'proceeds_total' => $computable ? $proceedsTotal : null,
-                         'total_gain' => $computable ? $unrealized + $realizedTotal : null, 'unpriced' => count(array_filter($open, function ($o) { return $o['value'] === null; })),
+                         'total_gain' => $computable && !$unpriced ? $unrealized + $realizedTotal : null, 'unpriced' => $unpriced,
                          'partial' => (bool)$uncertain, 'excluded' => $excluded],
             'realized_by_year' => $computable ? $byYear : [], 'transactions' => count($tx),
             'sales' => array_values(array_filter(array_reverse($sales), function ($s) use ($uncertain) { return !isset($uncertain[$s['key']]); }))];

@@ -15,7 +15,7 @@
     const hidden = opts.hidden || new Set(), n = xs.length, vis = series.filter(s => !hidden.has(s.id) && s.values.some(v => v !== null && v !== undefined));
     const W = Math.max(300, Math.round(host.clientWidth || 1000)), H = opts.height || 240, L = 4, R = 64, T = 10, B = 26, PH = H - T - B, fmt = opts.format || (v => J.num(v, 0)), dl = opts.time ? J.dateTime : J.date;
     const wrap = document.createElement('div'); wrap.className = 'lc';
-    if (n < 2 || !vis.length) { wrap.innerHTML = `<div class="lc-empty">${n < 2 ? 'Pas encore assez de données sur cette période.' : 'Toutes les courbes sont masquées.'}</div>`; host.append(wrap); }
+    if (n < 2 || !vis.length) { wrap.innerHTML = `<div class="lc-empty">${n < 2 ? 'Pas encore assez de données sur cette période.' : series.some(s => s.values.some(v => v !== null && v !== undefined)) ? 'Toutes les courbes sont masquées.' : 'Valorisation indisponible sur cette période.'}</div>`; host.append(wrap); }
     else {
       const all = []; vis.forEach(s => s.values.forEach(v => { if (v !== null && v !== undefined && isFinite(v)) all.push(v); })); if (opts.zeroLine) all.push(0);
       let hi = Math.max(...all), lo = Math.min(...all); if (hi === lo) { hi += Math.abs(hi) * .01 || 1; lo -= Math.abs(lo) * .01 || 1; }

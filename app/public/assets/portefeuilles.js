@@ -10,7 +10,7 @@
   const EVO = { mode: ['value', 'gain', 'titles'].includes(store('evo_mode2')) ? store('evo_mode2') : 'titles', per: store('evo_per') || '1m', unit: store('evo_unit') === 'pct' ? 'pct' : 'eur', hidden: new Set(store('evo_hidden') || []) };
   const PERIODS = [['1d', '1 J', 0], ['1w', '1 S', 8], ['1m', '1 M', 31], ['3m', '3 M', 92], ['6m', '6 M', 183], ['1y', '1 A', 366], ['all', 'Tout', 0]];
   const px = (v, c) => v === null || v === undefined ? '–' : J.money(v, c || 'EUR');
-  const eur0 = v => J.eur(v, 0), sgn = v => (v > 0 ? '+' : v < 0 ? '−' : '') + J.eur(Math.abs(v), 0);
+  const eur0 = v => J.eur(v, 0), sgn = v => v === null || v === undefined ? '–' : (v > 0 ? '+' : v < 0 ? '−' : '') + J.eur(Math.abs(v), 0);
   const pills = (id, items, cur) => `<div class="pills" id="${id}">${items.map(([k, l]) => `<button type="button" data-v="${k}" class="${k === cur ? 'on' : ''}">${l}</button>`).join('')}</div>`;
   const splitNotice = positions => positions.filter(p => p.splits_applied && p.splits_applied.length).map(p => `<div class="notice" style="margin-top:12px"><b>${J.esc(p.name_catalogue || p.name || p.symbol)}</b> : ${p.splits_applied.map(a => a.ratio >= 1 ? `split ${J.num(a.ratio, 2)} pour 1` : `regroupement ${J.num(1 / a.ratio, 2)} pour 1`).join(', ')} pris en compte automatiquement : la quantité affichée est celle d’aujourd’hui, le prix de revient total est inchangé.</div>`).join('');
   const LEVEL = { info: ['info', 'Info'], watch: ['wait', 'À surveiller'], act: ['ko', 'À examiner'] };
@@ -38,12 +38,12 @@
     const stat = (l, v, cls = '', tip = '') => `<div class="hs"${tip ? ` title="${J.esc(tip)}"` : ''}><span>${l}</span><b class="${cls}">${v}</b></div>`;
     return `<section class="card hero2" data-fold="hero"><header class="fold-h hero-top">
         <div class="hero-main"><span class="hero-l">Valeur du portefeuille</span><span class="hero-v">${eur0(t.value)}</span>
-          <span class="hero-g ${J.cls(gain)}">${gain === null ? '–' : sgn(gain)}${base > 0 && gain !== null ? ` <small>(${J.pct(100 * gain / base, 1)})</small>` : ''} <em>gain total, ventes comprises</em></span>
+          <span class="hero-g ${J.cls(gain)}">${gain === null ? '–' : sgn(gain)}${base > 0 && gain !== null ? ` <small title="Gain total ÷ achats cumulés, frais compris ; ventes non déduites du dénominateur">(${J.pct(100 * gain / base, 1)})</small>` : ''} <em>gain total, ventes comprises</em></span>
           <span class="hero-day" id="hero-day"></span></div>
         <div class="hero-stats">${stat('Plus-value latente', J.eur(t.unrealized, 0), J.cls(t.unrealized), 'Sur les titres encore détenus')}${stat('Réalisé (ventes)', J.eur(t.realized, 0), J.cls(t.realized))}${stat('Investi', eur0(t.cost), '', 'Prix de revient des titres encore détenus')}${stat('Net d’impôt estimé', J.eur(net, 0), J.cls(net), 'Si tout était vendu aujourd’hui, compte-titres au taux forfaitaire de 30 % (12,8 % impôt + 17,2 % prélèvements sociaux). Indicatif : hors PEA, pertes reportables et dividendes.')}</div>
         <span class="chev" aria-hidden="true"></span></header>
       <div class="fold-b"><div class="hero-tools"><div class="row" style="gap:8px">${pills('evo-mode', [['titles', 'Comparer les titres'], ['gain', 'Gain'], ['value', 'Valeur']], EVO.mode)}${pills('evo-unit', [['eur', '€'], ['pct', '%']], EVO.unit)}</div>${pills('evo-per', PERIODS.map(p => [p[0], p[1]]), EVO.per)}</div>
-        <div class="hero-grid"><div id="evo-chart"><div class="lc-empty"><span class="spinner"></span></div></div><aside class="movers" id="movers"></aside></div></div></section>`;
+        <p id="evo-note" class="small muted"></p><div class="hero-grid"><div id="evo-chart"><div class="lc-empty"><span class="spinner"></span></div></div><aside class="movers" id="movers"></aside></div></div></section>`;
   }
   function periodStart(h) {
     const per = PERIODS.find(p => p[0] === EVO.per) || PERIODS[PERIODS.length - 1];
@@ -52,52 +52,59 @@
     const i = h.dates.findIndex(d => d >= since);
     return i <= 0 ? 0 : i - 1;                                   // départ : la dernière valeur connue avant la période
   }
-  /* Gain d'un titre (ou du portefeuille) sur la période, en € et en % du capital engagé (valeur au début + achats nets pendant la période). */
-  function perf(gain, values, netIn, i0, i) {
-    const g = gain[i] - (i0 === 0 ? 0 : gain[i0]), base = (i0 === 0 ? 0 : values[i0]) + netIn[i] - (i0 === 0 ? 0 : netIn[i0]);
-    return { eur: g, pct: base > 0.5 ? 100 * g / base : null };
+  /* Gain / (valeur initiale + achats, frais compris). Les ventes restent dans le gain,
+     jamais dans ce dénominateur. Sur Tout : gain total / achats cumulés, comme le résumé. */
+  function perf(gain, values, purchases, i0, i) {
+    if (gain[i] === null || (i0 > 0 && (gain[i0] === null || values[i0] === null))) return { eur: null, pct: null };
+    const g = gain[i] - (i0 === 0 ? 0 : gain[i0]);
+    const base = (i0 === 0 ? 0 : values[i0]) + purchases[i] - (i0 === 0 ? 0 : purchases[i0]);
+    return { eur: g, pct: base > 0 ? 100 * g / base : null };
   }
   const PER_LABEL = { '1w': 'la semaine', '1m': 'le mois', '3m': '3 mois', '6m': '6 mois', '1y': 'un an', all: 'depuis le début' };
   function drawEvo() {
     const host = J.$('#evo-chart'), mv = J.$('#movers'), h = H; if (!host || !h) return;
-    if (!h.dates || !h.dates.length) { host.innerHTML = '<div class="lc-empty">Ajoutez une transaction pour voir l’évolution.</div>'; mv.innerHTML = ''; return; }
     const last = h.dates.length - 1, toggle = id => { EVO.hidden.has(id) ? EVO.hidden.delete(id) : EVO.hidden.add(id); store('evo_hidden', [...EVO.hidden]); drawEvo(); };
-    const height = innerWidth < 700 ? 190 : 230, pct = EVO.unit === 'pct', fmtV = pct ? (v => J.pct(v, 1)) : eur0;
-    J.$$('#evo-unit button').forEach(b => { b.disabled = EVO.mode === 'value' && b.dataset.v === 'pct'; });
+    const intraday = EVO.per === '1d', mode = intraday ? 'value' : EVO.mode, unit = mode === 'value' ? 'eur' : EVO.unit;
+    J.$$('#evo-mode button').forEach(b => { b.disabled = intraday && b.dataset.v !== 'value'; b.classList.toggle('on', b.dataset.v === mode); b.title = b.disabled ? 'En 1 J, seule la valeur des quantités actuelles est disponible.' : ''; });
+    const note = J.$('#evo-note');
+    if (note) note.textContent = intraday ? '1 J : valeur en euros des quantités actuelles sur la dernière séance disponible. Comparaison et gain intraday indisponibles : les mouvements de la séance ne sont pas reconstitués.' : (h.notes || []).join(' ');
+    const height = innerWidth < 700 ? 190 : 230, pct = unit === 'pct', fmtV = pct ? (v => J.pct(v, 1)) : eur0;
+    J.$$('#evo-unit button').forEach(b => { b.disabled = mode === 'value' && b.dataset.v === 'pct'; b.classList.toggle('on', b.dataset.v === unit); b.title = b.disabled ? 'La valeur est exprimée en euros.' : ''; });
+    if (!h.dates || !h.dates.length) { host.innerHTML = '<div class="lc-empty">Ajoutez une transaction pour voir l’évolution.</div>'; mv.innerHTML = ''; return; }
     if (EVO.per === '1d') {
       const it = h.intraday || { t: [], value: [] };
       J.lineChart(host, it.t, [{ id: 'v', label: 'Valeur', values: it.value, color: '#6366f1', area: true }], { height, format: eur0, time: true });
       if (it.t.length < 2) host.querySelector('.lc-empty').textContent = 'Pas de cotations de 15 minutes enregistrées aujourd’hui pour vos titres.';
       const d0 = it.value[0], d1 = it.value[it.value.length - 1];
-      mv.innerHTML = it.t.length > 1 ? `<h3>Aujourd’hui</h3><p class="mv-big ${J.cls(d1 - d0)}">${sgn(d1 - d0)}</p><p class="small muted">Valeur des titres détenus aujourd’hui, de ${J.dateTime(it.t[0])} à ${J.dateTime(it.t[it.t.length - 1])}.</p>` : '';
+      mv.innerHTML = it.t.length > 1 ? `<h3>Aujourd’hui</h3><p class="mv-big ${J.cls(d1 - d0)}">${sgn(d0 === null || d1 === null ? null : d1 - d0)}</p><p class="small muted">Valeur des titres détenus aujourd’hui, de ${J.dateTime(it.t[0])} à ${J.dateTime(it.t[it.t.length - 1])}.</p>` : '';
       fillPeriodCells(null); return;
     }
     const i0 = periodStart(h), xs = h.dates.slice(i0), idx = xs.map((_, k) => i0 + k);
     const markers = (h.trades || []).filter(t => t.date >= xs[0] && !t.note).map(t => ({ x: t.date, kind: t.side, label: (t.side === 'buy' ? 'Achat ' : 'Vente ') + t.symbol }));
-    const pfSeries = i => perf(h.gain, h.value, h.net_in, i0, i), lineSeries = (l, i) => perf(l.gain, l.values, l.net_in, i0, i);
+    const pfSeries = i => perf(h.gain, h.value, h.purchases, i0, i), lineSeries = (l, i) => perf(l.gain, l.values, l.purchases, i0, i);
     let series;
-    if (EVO.mode === 'value') {
-      series = [{ id: 'value', label: 'Valeur', values: idx.map(i => h.value[i]), color: '#6366f1', area: true }, { id: 'net', label: 'Argent investi', values: idx.map(i => h.net_in[i]), color: '#94a3b8', dash: '5 5', width: 1.6 }];
+    if (mode === 'value') {
+      series = [{ id: 'value', label: 'Valeur', values: idx.map(i => h.value[i]), color: '#6366f1', area: true }, { id: 'net', label: 'Apports nets', values: idx.map(i => h.net_in[i]), color: '#94a3b8', dash: '5 5', width: 1.6 }];
     } else {
-      const tot = idx.map(i => pfSeries(i)[EVO.unit]), up = (tot[tot.length - 1] || 0) >= 0;
-      const titles = h.lines.map((l, k) => ({ id: 't:' + l.key, label: l.symbol, values: idx.map(i => { const v = lineSeries(l, i); return l.values[i] > 0 || l.net_in[i] !== 0 ? v[EVO.unit] : null; }), color: PAL[k % PAL.length], width: 1.8 })).filter(x => x.values.some(v => v !== null));
-      series = EVO.mode === 'gain' ? [{ id: 'gain', label: 'Portefeuille', values: tot, color: up ? '#16a34a' : '#dc2626', area: true }].concat(titles)
+      const tot = idx.map(i => pfSeries(i)[unit]), up = (tot[tot.length - 1] || 0) >= 0;
+      const titles = h.lines.map((l, k) => ({ id: 't:' + l.key, label: l.symbol, values: idx.map(i => { const v = lineSeries(l, i); return l.purchases[i] > 0 ? v[unit] : null; }), color: PAL[k % PAL.length], width: 1.8 })).filter(x => x.values.some(v => v !== null));
+      series = mode === 'gain' ? [{ id: 'gain', label: 'Portefeuille', values: tot, color: up ? '#16a34a' : '#dc2626', area: true }].concat(titles)
         : [{ id: 'gain', label: 'Portefeuille', values: tot, color: '#0f172a', width: 2.6, dash: '6 4' }].concat(titles);
-      if (EVO.mode === 'gain' && !store('evo_hidden_init')) { h.lines.forEach(l => EVO.hidden.add('t:' + l.key)); store('evo_hidden_init', 1); store('evo_hidden', [...EVO.hidden]); }
+      if (mode === 'gain' && !store('evo_hidden_init')) { h.lines.forEach(l => EVO.hidden.add('t:' + l.key)); store('evo_hidden_init', 1); store('evo_hidden', [...EVO.hidden]); }
     }
-    J.lineChart(host, xs, series, { height, format: EVO.mode === 'value' ? eur0 : fmtV, zeroLine: EVO.mode !== 'value', markers: EVO.mode === 'value' ? markers : [], hidden: EVO.mode === 'titles' ? CMP : EVO.hidden, onToggle: EVO.mode === 'titles' ? (id => { CMP.has(id) ? CMP.delete(id) : CMP.add(id); store('cmp_hidden', [...CMP]); drawEvo(); }) : toggle });
+    J.lineChart(host, xs, series, { height, format: mode === 'value' ? eur0 : fmtV, zeroLine: mode !== 'value', markers: mode === 'value' ? markers : [], hidden: mode === 'titles' ? CMP : EVO.hidden, onToggle: mode === 'titles' ? (id => { CMP.has(id) ? CMP.delete(id) : CMP.add(id); store('cmp_hidden', [...CMP]); drawEvo(); }) : toggle });
     // Barres divergentes : à gauche (rouge) ce qui fait baisser, à droite (vert) ce qui fait monter, sur la période choisie
-    const rows = h.lines.map(l => ({ l, ...lineSeries(l, last) })).filter(r => r.l.values.slice(i0).some(v => v > 0) || Math.abs(r.eur) >= .5);
-    rows.sort((a, b) => (b[EVO.unit] ?? -1e9) - (a[EVO.unit] ?? -1e9));
-    const tot = pfSeries(last), m = Math.max(1e-9, ...rows.map(r => Math.abs(r[EVO.unit] || 0)));
-    const val = r => r[EVO.unit] === null || r[EVO.unit] === undefined ? '–' : pct ? J.pct(r[EVO.unit], 1) : sgn(r[EVO.unit]);
+    const rows = h.lines.map(l => ({ l, ...lineSeries(l, last) })).filter(r => r.l.values.slice(i0).some(v => v > 0) || r.eur !== null && Math.abs(r.eur) >= .5);
+    rows.sort((a, b) => (b[unit] ?? -1e9) - (a[unit] ?? -1e9));
+    const tot = pfSeries(last), m = Math.max(1e-9, ...rows.map(r => Math.abs(r[unit] || 0)));
+    const val = r => r[unit] === null || r[unit] === undefined ? '–' : pct ? J.pct(r[unit], 1) : sgn(r[unit]);
     mv.innerHTML = `<h3>Sur ${PER_LABEL[EVO.per] === 'depuis le début' ? 'toute la période' : PER_LABEL[EVO.per]}</h3>
       <p class="mv-big ${J.cls(tot.eur)}">${sgn(tot.eur)}${tot.pct !== null ? ` <small>${J.pct(tot.pct, 1)}</small>` : ''}</p>
       <div class="dv-head"><span class="down">fait baisser</span><span class="up">fait monter</span></div>
-      <div class="dv">${rows.map(r => { const v = r[EVO.unit] || 0, w = (50 * Math.abs(v) / m).toFixed(1); return `<div class="dv-row" title="${J.esc(r.l.name)} : ${sgn(r.eur)}${r.pct !== null ? ' (' + J.pct(r.pct, 1) + ')' : ''} sur la période"><span class="dv-s">${J.esc(r.l.symbol)}</span><span class="dv-track"><i class="${v >= 0 ? 'up' : 'down'}" style="${v >= 0 ? 'left:50%' : 'right:50%'};width:${w}%"></i></span><span class="dv-v ${J.cls(v)}">${val(r)}</span></div>`; }).join('') || '<p class="small muted">Rien n’a bougé.</p>'}</div>
-      <p class="small muted" style="margin-top:8px">${pct ? '% = gain sur la période ÷ argent engagé (valeur au début + achats pendant la période).' : 'Gain ou perte en euros sur la période, frais compris.'}</p>`;
+      <div class="dv">${rows.map(r => { const v = r[unit] || 0, w = (50 * Math.abs(v) / m).toFixed(1); return `<div class="dv-row" title="${J.esc(r.l.name)} : ${sgn(r.eur)}${r.pct !== null ? ' (' + J.pct(r.pct, 1) + ')' : ''} sur la période"><span class="dv-s">${J.esc(r.l.symbol)}</span><span class="dv-track"><i class="${v >= 0 ? 'up' : 'down'}" style="${v >= 0 ? 'left:50%' : 'right:50%'};width:${w}%"></i></span><span class="dv-v ${J.cls(v)}">${val(r)}</span></div>`; }).join('') || (tot.eur === null ? '<p class="small muted">Valorisation indisponible.</p>' : '<p class="small muted">Rien n’a bougé.</p>')}</div>
+      <p class="small muted" style="margin-top:8px">${pct ? '% = gain sur la période ÷ argent engagé (valeur au début + achats pendant la période).' : 'Gain ou perte en euros sur la période, frais compris. Le pourcentage rapporte ce gain à la valeur au départ + achats de la période ; ce n’est pas un rendement annualisé ni pondéré dans le temps.'}</p>`;
     fillPeriodCells(new Map(h.lines.map(l => [l.key, lineSeries(l, last)])));
-    const dd = h.dates.length > 1 ? h.value[last] - h.value[last - 1] - (h.net_in[last] - h.net_in[last - 1]) : null;
+    const dd = h.dates.length > 1 && h.value[last] !== null && h.value[last - 1] !== null ? h.value[last] - h.value[last - 1] - (h.net_in[last] - h.net_in[last - 1]) : null;
     const hd = J.$('#hero-day'); if (hd && dd !== null) hd.innerHTML = `<span class="${J.cls(dd)}">${sgn(dd)}</span> depuis la clôture du ${J.date(h.dates[last - 1])}`;
   }
   const CMP = new Set(store('cmp_hidden') || []);
@@ -128,7 +135,7 @@
       return `<tr class="pos-row" data-open="${p.listing_id || ''}">
         <td class="pt">${p.linked ? `<a href="titre.html?id=${p.listing_id}" target="_blank" rel="noopener" class="pn">${name}</a>` : `<span class="pn">${name}</span>`}
           <div class="ps">${J.esc(p.symbol)} · ${J.num(p.qty, p.qty % 1 ? 4 : 0)} × ${p.price !== null ? px(p.price, p.price_currency) : '–'}${held !== null ? ` · acheté il y a ${held} j` : ''}</div>
-          <div class="ps">${strats.map(x => `<span class="chip-s" title="Stratégie de l’achat (modifiable dans « Alertes »)">${J.esc(x)}</span>`).join('')}${w && w.level !== 'info' ? `<span class="badge ${LEVEL[w.level][0]}" title="${J.esc(w.alerts.map(x => x.message).join(' '))}">${LEVEL[w.level][1]}</span>` : ''}${filet}${p.catalogue_status === 'excluded' ? ` <span class="badge ko" title="${J.esc(p.excluded_reason || '')}">Hors sélection</span>` : ''}${!p.linked ? ' <span class="badge wait">Sans cours</span>' : ''}</div></td>
+          <div class="ps">${strats.map(x => `<span class="chip-s" title="Stratégie de l’achat (modifiable dans « Alertes »)">${J.esc(x)}</span>`).join('')}${w && w.level !== 'info' ? `<span class="badge ${LEVEL[w.level][0]}" title="${J.esc(w.alerts.map(x => x.message).join(' '))}">${LEVEL[w.level][1]}</span>` : ''}${filet}${p.catalogue_status === 'excluded' ? ` <span class="badge ko" title="${J.esc(p.excluded_reason || '')}">Hors sélection</span>` : ''}${p.value === null ? ' <span class="badge wait">Valorisation indisponible</span>' : ''}${p.price_source === 'daily' ? ' <span class="badge wait">Clôture du ' + J.date(p.price_time) + '</span>' : ''}</div></td>
         <td class="pc hide-s">${p.listing_id ? `<button type="button" class="sp-btn" data-chart="${p.listing_id}" title="Ouvrir la courbe">${spark(c)}</button>` : ''}</td>
         <td class="num"><b>${J.eur(p.value, 0)}</b><div class="ps">${p.weight !== null ? J.pct(p.weight, 0, false) + ' du total' : ''}</div></td>
         <td class="num per" data-per="${p.listing_id || ''}"><span class="muted">…</span></td>
@@ -178,7 +185,7 @@
     page.innerHTML = `${d.integrity && !d.integrity.ok ? `<div class="notice err">${d.integrity.issues.map(x => 'Transaction n° ' + x.transaction_id + ' : ' + J.esc(x.message)).join('<br>')}</div>` : ''}
     <div class="pf-bar"><div class="pf-tabs" id="pf-tabs">${list.map(p => `<button data-id="${p.id}" class="${p.id === current ? 'on' : ''}">${J.esc(p.name)}${p.is_default ? ' ★' : ''}</button>`).join('')}<button class="add" id="new-pf" title="Nouveau portefeuille">＋</button></div>
       <button class="btn primary" id="add-tx">＋ Transaction</button></div>
-    ${d.totals.unpriced ? `<div class="notice warn">${d.totals.unpriced} position(s) sans cours : la valeur totale est sous-estimée.</div>` : ''}${splitNotice(d.positions)}
+    ${d.totals.unpriced ? `<div class="notice warn">${d.totals.unpriced} position(s) sans cours ou change exploitable : valorisation et gain total indisponibles. Aucun prix d’achat n’est utilisé comme cours actuel.</div>` : ''}${splitNotice(d.positions)}
     ${hero(d)}
     ${section('positions', `Positions <span class="cnt">${d.positions.length}</span>`, '', positionsTable(d))}
     ${d.lots && d.lots.length ? section('lots', `Alertes ${nAlerts ? `<span class="cnt warn">${nAlerts}</span>` : '<span class="cnt">0</span>'}`, '', lotsBody(d)) : ''}

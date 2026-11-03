@@ -1,6 +1,6 @@
 """Évolution d'un portefeuille jour par jour, VENTES COMPRISES : valeur, apports nets, résultat cumulé, et valeur de chaque titre.
 
-- Valeur(j)       : Σ quantité détenue × clôture du jour × change du jour (euros). Un titre sans clôture connue est valorisé à son dernier prix d'achat.
+- Valeur(j)       : Σ quantité détenue × clôture du jour × change du jour (euros). Sans cours connu ou change, la valeur est indisponible (jamais remplacée par un prix d'achat).
 - Apports nets(j) : Σ achats (prix × quantité × change de la transaction + frais) − Σ ventes (produit net de frais). C'est l'argent sorti de la poche.
 - Résultat(j)     : Valeur − Apports nets = plus-values latentes + plus-values réalisées (identique au « gain » du registre quand les cours coïncident).
 Les splits : clôtures et quantités sont exprimées dans les unités d'aujourd'hui (comme les courbes des fiches). Un split déjà saisi à la main par un « achat gratuit »
@@ -68,7 +68,7 @@ def build(transactions, bars, splits, unit, fx, meta, today=None, bars15=None):
     today = (today or datetime.date.today()).isoformat()
     txs = sorted(transactions, key=lambda t: (str(t['trade_at']), int(t.get('id') or 0)))
     if not txs:
-        return {'dates': [], 'value': [], 'net_in': [], 'gain': [], 'lines': [], 'trades': [], 'notes': [], 'intraday': {'t': [], 'value': []}}
+        return {'dates': [], 'value': [], 'net_in': [], 'gain': [], 'purchases': [], 'unpriced': [], 'lines': [], 'trades': [], 'notes': [], 'intraday': {'t': [], 'value': []}}
     notes = []
     series, applied = {}, {}
     for lid in {int(t['listing_id']) for t in txs if t.get('listing_id')}:
@@ -88,7 +88,7 @@ def build(transactions, bars, splits, unit, fx, meta, today=None, bars15=None):
         m = meta.get(lid) or {}
         live, when = _num(m.get('price')), m.get('price_time')
         day_live = when.date().isoformat() if hasattr(when, 'date') else (str(when)[:10] if when else None)
-        if live and day_live and series[lid] and day_live > series[lid][-1][0] and day_live <= today:
+        if live and day_live and (not series[lid] or day_live >= series[lid][-1][0]) and day_live <= today:
             series[lid].append((today, live))
     closes = {lid: _Carry(series[lid]) for lid in series}
     rates = {c: _Carry(v) for c, v in fx.items()}
@@ -101,9 +101,9 @@ def build(transactions, bars, splits, unit, fx, meta, today=None, bars15=None):
         r = rates[base].at(day) if base in rates else None
         return None if r is None else r / (100 if u in ('GBp', 'GBX') else 1)
 
-    holdings, fallback, net_in, k = {}, {}, 0.0, 0
+    holdings, net_in, purchases, k = {}, 0.0, 0.0, 0
     lines = {}
-    out = {'dates': [], 'value': [], 'net_in': [], 'gain': []}
+    out = {'dates': [], 'value': [], 'net_in': [], 'gain': [], 'purchases': [], 'unpriced': []}
     trades = []
     for day in calendar:
         while k < len(txs) and str(txs[k]['trade_at'])[:10] <= day:
@@ -127,46 +127,57 @@ def build(transactions, bars, splits, unit, fx, meta, today=None, bars15=None):
             if t['side'] == 'buy':
                 holdings[key] = holdings.get(key, 0.0) + qty * factor
                 net_in += gross + fees
+                purchases += gross + fees
             else:
                 holdings[key] = max(0.0, holdings.get(key, 0.0) - qty * factor)
                 net_in -= gross - fees
-            if price > 0:
-                fallback[key] = price * rate / factor
-            lines.setdefault(key, {'key': str(key), 'symbol': t['symbol'], 'name': (meta.get(key) or {}).get('name') or t.get('name') or t['symbol'], 'values': [], 'net_in': [], '_in': 0.0})
+            lines.setdefault(key, {'key': str(key), 'symbol': t['symbol'], 'name': (meta.get(key) or {}).get('name') or t.get('name') or t['symbol'], 'values': [], 'net_in': [], 'purchases': [], '_in': 0.0, '_purchases': 0.0})
+            if t['side'] == 'buy':
+                lines[key]['_purchases'] += gross + fees
             lines[key]['_in'] += (gross + fees) if t['side'] == 'buy' else -(gross - fees)
             trades.append({'date': str(t['trade_at'])[:10], 'side': t['side'], 'symbol': t['symbol']})
-        total = 0.0
+        total, unpriced = 0.0, 0
         for key, line in lines.items():
             q = holdings.get(key, 0.0)
             v = 0.0
             if q > 1e-12:
                 c = closes[key].at(day) if isinstance(key, int) and key in closes else None
                 f = to_eur(key, day) if c is not None else None
-                v = q * c * f if c is not None and f is not None else q * fallback.get(key, 0.0)
-            line['values'].append(round(v, 2))
+                v = q * c * f if c is not None and f is not None else None
+            line['values'].append(None if v is None else round(v, 2))
+            line['purchases'].append(round(line['_purchases'], 2))
             line['net_in'].append(round(line['_in'], 2))
-            total += v
+            if v is None:
+                unpriced += 1
+            else:
+                total += v
         # titres apparus après le début : leurs valeurs antérieures valent 0
         for line in lines.values():
             if len(line['values']) < len(out['dates']) + 1:
                 pad = len(out['dates']) + 1 - len(line['values'])
                 line['values'][:0] = [0.0] * pad
                 line['net_in'][:0] = [0.0] * pad
+                line['purchases'][:0] = [0.0] * pad
         out['dates'].append(day)
-        out['value'].append(round(total, 2))
+        out['value'].append(None if unpriced else round(total, 2))
+        out['unpriced'].append(unpriced)
+        out['purchases'].append(round(purchases, 2))
         out['net_in'].append(round(net_in, 2))
-        out['gain'].append(round(total - net_in, 2))
+        out['gain'].append(None if unpriced else round(total - net_in, 2))
     for line in lines.values():
         line.pop('_in', None)
-        line['gain'] = [round(v - i, 2) for v, i in zip(line['values'], line['net_in'])]      # gain ou perte cumulé du titre (latent + réalisé)
-    out['lines'] = sorted(lines.values(), key=lambda l: -max(l['values'] or [0]))
-    out['intraday'] = intraday_value(holdings, bars15 or {}, {k: (closes[k].last if k in closes else None) for k in holdings if isinstance(k, int)}, to_eur, today, fallback)
+        line.pop('_purchases', None)
+        line['gain'] = [None if v is None else round(v - i, 2) for v, i in zip(line['values'], line['net_in'])]      # gain ou perte cumulé du titre (latent + réalisé)
+    out['lines'] = sorted(lines.values(), key=lambda l: -max((v for v in l['values'] if v is not None), default=0))
+    out['intraday'] = intraday_value(holdings, bars15 or {}, {k: (closes[k].last if k in closes else None) for k in holdings if isinstance(k, int)}, to_eur, today)
     out['trades'] = trades
+    if any(out['unpriced']):
+        notes.append('Valorisation indisponible aux dates sans cours ou change : aucune estimation au prix d’achat.')
     out['notes'] = notes
     return out
 
 
-def intraday_value(holdings, bars15, last_close, to_eur, today, fallback):
+def intraday_value(holdings, bars15, last_close, to_eur, today):
     """Valeur du portefeuille ACTUEL barre par barre (15 min) sur la dernière journée de cotation connue : quantités d'aujourd'hui,
     chaque titre au dernier prix de 15 min connu (sinon sa dernière clôture), change du jour. Sans barre : rien."""
     held = {k: q for k, q in holdings.items() if q > 1e-12}
@@ -180,17 +191,20 @@ def intraday_value(holdings, bars15, last_close, to_eur, today, fallback):
     idx = {k: 0 for k in cur}
     out = {'t': [], 'value': []}
     for s in slots:
-        total = 0.0
+        total, unavailable = 0.0, False
         for k, q in held.items():
             if not isinstance(k, int):
-                total += q * fallback.get(k, 0.0)
+                unavailable = True
                 continue
             while idx[k] < len(series[k]) and series[k][idx[k]][0] <= s:
                 cur[k] = series[k][idx[k]][1]; idx[k] += 1
             f = to_eur(k, today)
-            total += q * cur[k] * f if cur[k] is not None and f is not None else q * fallback.get(k, 0.0)
+            if cur[k] is None or f is None:
+                unavailable = True
+            else:
+                total += q * cur[k] * f
         out['t'].append(s)
-        out['value'].append(round(total, 2))
+        out['value'].append(None if unavailable else round(total, 2))
     return out
 
 

@@ -58,3 +58,14 @@ def test_curves_start_at_the_oldest_open_purchase():
     c = al.curves(lots, series)['7']
     assert c['buys'] == ['2026-01-04', '2026-01-06'] and c['points'][0] == ['2026-01-02', 10.0]      # achat un dimanche : départ de la clôture précédente
     assert al.curves([{'listing_id': 8, 'trade_date': '2026-01-04'}], {})['8']['points'] == []
+
+
+def test_momentum_alert_preserves_the_percentage_unit_from_series():
+    from engine.analytics.series import momentum_6_1
+    closes = [100.0] * 105 + [90.0] * 22
+    momentum = momentum_6_1([str(i) for i in range(127)], closes, [])
+    assert round(momentum, 6) == -10
+    out = al.evaluate({'trade_date': '2026-10-01'}, al.defaults('momentum'), None,
+                      {'momentum_6m': momentum}, False, TODAY)
+    alert = next(a for a in out if a['kind'] == 'momentum')
+    assert alert['value'] == -10 and '-10,0 %' in alert['message']

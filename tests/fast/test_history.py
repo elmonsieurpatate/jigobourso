@@ -30,11 +30,12 @@ def test_split_converts_quantities_and_ignores_manual_free_buy():
     assert r['trades'][1]['note'] == 'split saisi à la main'
 
 
-def test_foreign_currency_uses_the_daily_rate_and_unknown_close_uses_the_purchase_price():
+def test_foreign_currency_uses_the_daily_rate_and_never_invents_a_quote():
     bars = {1: [('2026-01-06', 20.0, None)]}
     fx = {'USD': [('2026-01-01', 0.9), ('2026-01-06', 0.8)]}
     r = h.build([tx(1, '2026-01-05', 'buy', 10, 20, fx=0.9, cur='USD')], bars, {}, {1: 'USD'}, fx, {}, datetime.date(2026, 1, 6))
-    assert r['dates'] == ['2026-01-05', '2026-01-06'] and r['value'] == [180.0, 160.0] and r['gain'] == [0.0, -20.0]
+    assert r['dates'] == ['2026-01-05', '2026-01-06'] and r['value'] == [None, 160.0] and r['gain'] == [None, -20.0]
+    assert r['unpriced'] == [1, 0] and r['notes']
 
 
 def test_lines_start_at_zero_and_missing_fx_is_reported():
@@ -57,3 +58,29 @@ def test_intraday_value_of_current_holdings():
     r = h.build([tx(1, '2026-01-05', 'buy', 10, 10)], BARS, {}, {1: 'EUR'}, {}, {}, TODAY, bars15=bars15)
     assert r['intraday'] == {'t': ['2026-01-09T14:30:00', '2026-01-09T14:45:00'], 'value': [120.0, 125.0]}
     assert h.build([tx(1, '2026-01-05', 'buy', 10, 10)], BARS, {}, {1: 'EUR'}, {}, {}, TODAY)['intraday'] == {'t': [], 'value': []}
+
+
+def test_gross_purchases_survive_partial_and_full_sales():
+    r = h.build([tx(1, '2026-01-05', 'buy', 10, 10, fees=1),
+                 tx(2, '2026-01-06', 'buy', 10, 20, fees=2),
+                 tx(3, '2026-01-07', 'sell', 20, 25, fees=3)], BARS, {}, {1: 'EUR'}, {}, {}, TODAY)
+    assert r['purchases'] == [101, 303, 303, 303, 303]
+    assert r['lines'][0]['purchases'] == r['purchases']
+    assert r['gain'][-1] == 194 and r['value'][-1] == 0
+
+
+def test_missing_quote_is_unavailable_in_daily_and_intraday_totals():
+    trades = [tx(1, '2026-01-05', 'buy', 1, 10), tx(2, '2026-01-05', 'buy', 1, 20, lid=2)]
+    r = h.build(trades, BARS, {}, {1: 'EUR', 2: 'EUR'}, {}, {}, TODAY,
+                bars15={1: [('2026-01-09T14:30:00', 12.0), ('2026-01-09T14:45:00', 13.0)]})
+    assert r['value'][-1] is None and r['gain'][-1] is None and r['unpriced'][-1] == 1
+    assert r['intraday']['value'] == [None, None]
+    assert next(l for l in r['lines'] if l['symbol'] == 'A' and l['key'] == '2')['values'][-1] is None
+
+
+def test_quote_without_daily_history_and_sold_unpriced_position():
+    r = h.build([tx(1, '2026-01-05', 'buy', 2, 10)], {}, {}, {1: 'EUR'}, {},
+                {1: {'price': 12, 'price_time': datetime.datetime(2026, 1, 9, 12)}}, TODAY)
+    assert r['value'][-1] == 24 and r['gain'][-1] == 4
+    r = h.build([tx(1, '2026-01-05', 'buy', 2, 10), tx(2, '2026-01-06', 'sell', 2, 12)], {}, {}, {1: 'EUR'}, {}, {}, TODAY)
+    assert r['value'][-1] == 0 and r['gain'][-1] == 4

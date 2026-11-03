@@ -89,7 +89,17 @@ function open_lots(array $rows): array {
         unset($l);
     }
     $out = [];
-    foreach ($lots as $list) foreach ($list as $l) if ($l['remaining'] > 1e-9) $out[] = $l;
+    // Même frontière que la valorisation : appliquer aussi les événements sans opération ultérieure.
+    $today = gmdate('Y-m-d');
+    foreach ($lots as $key => $list) {
+        $lid = (int)($list[0]['tx']['listing_id'] ?? 0);
+        $c = $cursor[$key] ?? '';
+        $factor = $lid && isset($events[$lid]) ? pending_split_ratio($events[$lid], $freeBuys[$lid] ?? [], $c, $today) : 1.0;
+        foreach ($list as $l) {
+            $l['remaining'] *= $factor;
+            if ($l['remaining'] > 1e-9) $out[] = $l;
+        }
+    }
     usort($out, function ($a, $b) { return [$a['tx']['trade_at'], (int)$a['tx']['id']] <=> [$b['tx']['trade_at'], (int)$b['tx']['id']]; });
     return $out;
 }

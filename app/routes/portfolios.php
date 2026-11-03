@@ -240,8 +240,9 @@ return [
             foreach ($v['totals']['excluded'] as $name) $excluded[] = $p['name'] . ' · ' . $name;
         }
         ksort($years);
-        $all['total_gain'] = $all['unrealized'] + $all['realized'];
-        $all['unrealized_pct'] = $all['cost'] > 0 ? 100 * $all['unrealized'] / $all['cost'] : null;
+        if ($all['unpriced']) { $all['value'] = null; $all['unrealized'] = null; }
+        $all['total_gain'] = $all['unrealized'] === null ? null : $all['unrealized'] + $all['realized'];
+        $all['unrealized_pct'] = $all['unrealized'] !== null && $all['cost'] > 0 ? 100 * $all['unrealized'] / $all['cost'] : null;
         $all['partial'] = (bool)$excluded;
         $all['excluded'] = $excluded;
         return ['integrity' => ['ok' => !$issues, 'issues' => $issues], 'portfolios' => $rows, 'totals' => $all, 'realized_by_year' => $years];
