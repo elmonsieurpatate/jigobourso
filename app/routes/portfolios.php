@@ -254,9 +254,9 @@ return [
         $f = fopen('php://output', 'w');
         // Un texte qui commence par = + - @ (ou tabulation / retour) serait interprété comme une formule par un tableur : on le préfixe d'une apostrophe.
         $cell = function ($v) { return is_string($v) && $v !== '' && strpbrk($v[0], "=+-@\t\r") !== false ? "'" . $v : $v; };
-        fputcsv($f, ['date', 'sens', 'symbole', 'nom', 'isin', 'quantite', 'prix_unitaire', 'devise', 'change_eur', 'frais', 'note']);
+        fputcsv($f, ['date', 'sens', 'symbole', 'nom', 'isin', 'quantite', 'prix_unitaire', 'devise', 'change_eur', 'frais', 'note'], ',', '"', '');
         foreach (q('SELECT * FROM portfolio_transactions WHERE portfolio_id = ? ORDER BY trade_at, id', [$p['id']])->fetchAll() as $t)
-            fputcsv($f, [$t['trade_at'], $t['side'], $cell($t['symbol']), $cell($t['name']), $cell($t['isin']), $t['quantity'], $t['unit_price'], $t['currency'], $t['fx_to_eur'], $t['fees'], $cell($t['note'])]);
+            fputcsv($f, [$t['trade_at'], $t['side'], $cell($t['symbol']), $cell($t['name']), $cell($t['isin']), $t['quantity'], $t['unit_price'], $t['currency'], $t['fx_to_eur'], $t['fees'], $cell($t['note'])], ',', '"', '');
         exit;
     },
 ];

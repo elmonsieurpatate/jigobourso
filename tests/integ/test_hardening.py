@@ -1,5 +1,7 @@
 """Correctifs de l'audit du 29/10/2026 : bornes des montants, limites de connexion et d'inscription, export CSV, mode strict, verrou de traitement, purge."""
+import csv
 import datetime as dt
+import io
 import os
 import subprocess
 
@@ -59,12 +61,15 @@ def test_registration_code_attempts_are_limited_with_a_short_key(world):
     c.close()
 
 
-def test_csv_export_neutralises_spreadsheet_formulas(world):
+@pytest.mark.parametrize('note', ['=HYPERLINK("http://evil.example")', '=1+1, "texte"', '=1+1\\'])
+def test_csv_export_neutralises_spreadsheet_formulas(world, note):
     a = login(world, 'alice', 'alice-secret-1234'); pf = new_portfolio(a)
-    assert tx(a, pf, note='=HYPERLINK("http://evil.example")')[0] == 200
+    assert tx(a, pf, note=note)[0] == 200
     with a.opener.open(f'{world}/api.php?r=export&id={pf}', timeout=30) as r:
         body = r.read().decode()
-    assert "'=HYPERLINK" in body and '\n=HYPERLINK' not in body and ',=HYPERLINK' not in body
+    rows = list(csv.reader(io.StringIO(body)))
+    assert len(rows) == 2 and len(rows[0]) == len(rows[1]) == 11
+    assert rows[0][-1] == 'note' and rows[1][-1] == "'" + note
 
 
 def test_pdo_session_is_strict(world):
