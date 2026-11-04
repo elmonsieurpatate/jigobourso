@@ -210,6 +210,21 @@ def judge(config, measures, tech, missing, last_close_date=None, expected_last_d
     Même jugement que les mesures viennent du calcul direct ou de strategy_metrics."""
     reasons = []
     modern=config.get('version')==4
+    # Also protect results loaded from series_state, computed before the strict
+    # Momentum coverage rule. Never trust a stored endpoint return over evidence
+    # of missing sessions. Absent coverage metadata remains compatible with
+    # callers supplying already validated, non-dated measures.
+    if isinstance(momentum, dict):
+        momentum = dict(momentum)
+        for key, window in (('6m', 126), ('12m', 252)):
+            coverage = (measures.get(window) or {}).get('coverage')
+            if coverage is not None and coverage < 1:
+                momentum[key] = None
+    elif config['ranking']['mode'] in MOMENTUM_WINDOWS:
+        window = MOMENTUM_WINDOWS[config['ranking']['mode']]
+        coverage = (measures.get(window) or {}).get('coverage')
+        if coverage is not None and coverage < 1:
+            momentum = None
     criteria=explorer_config.CRITERIA if modern else CRITERIA
     if modern and not config['selection']['require_fresh']:expected_last_date=None
     if expected_last_date and ((last_close_date is None and modern) or last_close_date and last_close_date < expected_last_date):

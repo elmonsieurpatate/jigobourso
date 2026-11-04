@@ -172,7 +172,8 @@ def judge_universe(conn, config, ids=None):
         custom_momentum=config.get('version')==4 and any(c['metric'] in ('momentum6','momentum12') for c in config['ranking'].get('components',[]))
         saved_momentum = ({'6m': u.get('momentum_6m'), '12m': u.get('momentum_12m')} if config['ranking']['mode'] == strategy.RISK_MOMENTUM or custom_momentum
                           else u.get('momentum_12m') if config['ranking']['mode'] == 'momentum12' else u.get('momentum_6m'))
-        momentum_arg = saved_momentum if isinstance(saved_momentum, dict) else (None if saved_momentum is None else float(saved_momentum))
+        momentum_arg = ({k: None if value is None else float(value) for k, value in saved_momentum.items()}
+                        if isinstance(saved_momentum, dict) else (None if saved_momentum is None else float(saved_momentum)))
         effective=explorer_config.effective(config,'etf' if u['kind']=='etf' else 'equity') if config.get('version')==4 else config
         v = strategy.judge(effective, measures, tech, missing, last, expected or None, momentum=momentum_arg)
         if u['quality'] == 'incomplete' and v['status'] == 'unknown':
@@ -196,7 +197,7 @@ def _row(v, rates, conn=None):
             'quality': u['quality'], 'price_stale': hours.price_is_stale(u['mic'], u['price_time'], hours.utcnow(), expected_close(conn, u['mic']) if conn is not None else None, last_collection(conn, u['mic']) if conn is not None else None), 'measures': {str(n): dict(m,slope_period=explorer_config.period_slope(m.get('slope'),n)) if m else None for n, m in v['measures'].items()}, 'reasons': v['reasons']}
 
 
-CACHE_FORMAT = 8
+CACHE_FORMAT = 9  # Invalidate verdict/path caches built before the V4 P0 fixes.
 MAX_NEW_CONFIGS_PER_HOUR = 60       # calculs d'univers complets (réglages jamais vus ou données changées) acceptés par heure, tous utilisateurs confondus
 ENTRY_FIELDS = ('id', 'symbol', 'name', 'isin', 'kind', 'mic', 'country', 'status', 'group', 'rank', 'score', 'category', 'fails', 'instrument_id', 'currency', 'price_currency', 'net_assets', 'proximity', 'score_parts', 'score_missing')
 
@@ -760,8 +761,11 @@ def instrument_sheet(conn, request):
         splits = [(r['event_date'].isoformat(), float(r['ratio']) if r['ratio'] else None) for r in cur.fetchall()]
     cutoff = expected_close(conn, u['mic'])
     calendars = window_calendars(u['mic'], cutoff, all_windows) if cutoff else {}
-    tech_dates = session_dates(u['mic'], cutoff, 205 if config.get('version')==4 else 55) if cutoff else None
+    # Historical profiles may also require MA200/MA200_prev. Their configuration
+    # version must not truncate the technical window to 55 closes.
+    tech_dates = session_dates(u['mic'], cutoff, 205) if cutoff else None
     dates, closes, basis, breaks, full, missing, tech = analyze_series(bars, all_windows, splits, calendars, tech_dates)
+    sheet['technical'] = tech
     if config.get('version')==4 and explorer_config.needs_extended(config):
         extras=extended_metrics(conn,[u],all_windows).get(lid,{})
         full={n:dict(m,**extras.get(n,{})) if m else None for n,m in full.items()}

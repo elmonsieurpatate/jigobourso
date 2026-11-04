@@ -126,9 +126,16 @@ def _momentum(dates, closes, breaks, expected, long_window):
     if expected:
         if len(expected) <= long_window:
             return None
+        # The endpoints alone do not establish that this is a usable history.
+        # Require every expected close, including the skipped month: its returns
+        # are excluded from the formula, not from the data-quality check.
+        required = list(expected[-(long_window + 1):])
+        if len(set(required)) != len(required):
+            return None
         start, end = expected[-1 - long_window], expected[-1 - MOMENTUM_SKIP]
         observed = dict(zip(dates, closes))
-        if start not in observed or end not in observed or not (observed[start] > 0):
+        if any(d not in observed or observed[d] is None or not math.isfinite(observed[d])
+               or observed[d] <= 0 for d in required):
             return None
         first = dates.index(start)
         if any(b > first for b in breaks):
@@ -147,7 +154,8 @@ def momentum_6_1(dates, closes, breaks, expected=None):
     """Momentum 6 mois : variation du cours (en %) entre J−126 et J−21 séances. None si la mesure n'est pas fiable.
 
     `expected` : les 127 séances attendues par le calendrier de la place, la dernière étant J ; sans calendrier, on compte les clôtures de la série (J−126 = 127e clôture avant la dernière).
-    Jamais d'estimation : une clôture absente à l'une des deux dates, ou une rupture de cours non expliquée après J−126, rend la mesure indisponible.
+    Couverture de 100 % des 127 clôtures attendues ; aucune estimation. Une
+    clôture absente ou une rupture inexpliquée après J−126 invalide la mesure.
     Même définition que le test chronologique (scripts/backtest_walkforward.py, signal mom_6_1)."""
     return _momentum(dates, closes, breaks, expected, MOMENTUM_LONG)
 

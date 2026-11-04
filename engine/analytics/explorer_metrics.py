@@ -9,7 +9,7 @@ from bisect import bisect_right
 from collections import defaultdict
 from .series import prepare_series
 from engine.market.calendar import window_calendars
-from engine.market.collect import to_eur_factor
+from engine.market.collect import SUBUNITS, to_eur_factor
 
 
 def path_metrics(prices,volumes=None,turnovers=None):
@@ -22,7 +22,13 @@ def path_metrics(prices,volumes=None,turnovers=None):
          'gain_net_share':100*max(0,max(daily))/total if total>0 else None,
          'current_drawdown':100*(1-prices[-1]/max(prices))}
     for field,values in [('avg_volume',volumes),('turnover_eur',turnovers)]:
-        out[field]=sum(values)/len(values) if values and len(values)==len(steps) and all(v is not None for v in values) else None
+        valid = [v for v in (values or ()) if v is not None and math.isfinite(v) and v >= 0]
+        complete = values is not None and len(values) == len(steps) and len(valid) == len(steps)
+        out[field] = sum(valid) / len(steps) if complete else None
+        prefix = 'volume' if field == 'avg_volume' else 'turnover'
+        out.update({prefix + '_source': 'daily_prices.volume' if field == 'avg_volume' else 'raw_close*historical_volume*dated_fx',
+                    prefix + '_observations': len(valid), prefix + '_expected': len(steps),
+                    prefix + '_coverage': min(1.0, len(valid) / len(steps))})
     return out
 
 
@@ -46,7 +52,9 @@ def load(conn,universe,windows,expected_close):
             for r in q.fetchall():splits[r['listing_id']].append((str(r['event_date']),float(r['ratio']) if r['ratio'] is not None else None))
             for lid in part:
                 u=meta[lid];dates,prices,_,breaks=prepare_series(bars[lid],splits[lid]);observations=dict(zip(dates,prices))
-                currency=u.get('price_currency') or u.get('currency');base='GBP' if currency in ('GBp','GBX') else currency
+                currency=u.get('price_currency') or u.get('currency')
+                subunit = SUBUNITS.get(currency) or SUBUNITS.get((currency or '').upper())
+                base = subunit[0] if subunit else (currency or '').upper()
                 for n,ds in calendars[u['mic']].items():
                     if not ds or any(ds[0]<dates[b]<=ds[-1] for b in breaks):continue
                     vs=[volume.get((lid,d)) for d in ds[1:]];amounts=[]

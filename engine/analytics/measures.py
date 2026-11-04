@@ -12,7 +12,8 @@ Définitions (unités affichables) :
   drawdown    plus forte baisse depuis un sommet de la fenêtre, en % (valeur positive)
   er          rendement net / distance parcourue en ln(cours) : +1 = montée sans aucun repli, 0 = aller-retour,
               négatif = baisse. Mesure l'efficacité de la progression.
-Fenêtres courtes : 1 séance = performance seule ; 2 séances = pas de régression (R² et ER non définis) ;
+Fenêtres courtes : 1 séance = performance et pente ; dès 2 séances, régression et ER
+calculables (mais leurs critères de stratégie exigent au moins 3 séances) ;
 volatilité à partir de 3 séances.
 """
 import math
@@ -65,7 +66,8 @@ def dated_window_metrics(session_dates, observations):
     (volatilité, drawdown, ER) restent indisponibles dès qu'une clôture manque.
 
     Le seuil de support du modèle de tendance est 80 % des clôtures attendues,
-    arrondi au supérieur, avec les deux bornes et au moins 3 points. Cela permet
+    arrondi au supérieur et au moins 3 points. Le rendement exige les deux bornes,
+    la régression peut utiliser les seuls points réellement présents. Cela permet
     une séance isolée manquante sur une semaine (5/6) ou plus long, mais pas une
     longue interruption; il s'agit d'un minimum d'échantillon, pas d'un seuil
     de sélection stratégique.
@@ -129,7 +131,7 @@ def technical_state(closes):
     ma20 = moving_average(closes, 20)
     return {'close': closes[-1], 'ma20': ma20, 'ma50': moving_average(closes, 50),
             'ma50_prev': moving_average(closes[:-5], 50) if len(closes) > 5 else None,
-            'ma200': moving_average(closes, 200), 'ma200_prev': moving_average(closes[:-5], 200) if len(closes) > 205 else None,
+            'ma200': moving_average(closes, 200), 'ma200_prev': moving_average(closes[:-5], 200) if len(closes) >= 205 else None,
             'daily_change': 100 * (closes[-1] / closes[-2] - 1) if len(closes) >= 2 else None,
             'gap_to_ma20': 100 * (closes[-1] / ma20 - 1) if ma20 else None}
 
@@ -137,16 +139,25 @@ def technical_state(closes):
 def dated_technical_state(expected_dates, observations):
     """Indicateurs de contexte calculés sur des séances calendaires sans sauter les trous."""
     dates = list(expected_dates or ())
-    def values(days):
-        if len(days) != len(set(days)) or not days or any(d not in observations for d in days):
+    def values(days, required):
+        if len(days) != required or len(days) != len(set(days)):
             return None
-        return [float(observations[d]) for d in days]
+        result = []
+        for day in days:
+            value = observations.get(day)
+            if value is None:
+                return None
+            value = float(value)
+            if not math.isfinite(value) or value <= 0:
+                return None
+            result.append(value)
+        return result
     close = observations.get(dates[-1]) if dates else None
-    last20, last50 = values(dates[-20:]), values(dates[-50:])
-    prev50 = values(dates[-55:-5]) if len(dates) >= 55 else None
-    last200 = values(dates[-200:])
-    prev200 = values(dates[-205:-5]) if len(dates) >= 205 else None
-    last2 = values(dates[-2:])
+    last20, last50 = values(dates[-20:], 20), values(dates[-50:], 50)
+    prev50 = values(dates[-55:-5], 50) if len(dates) >= 55 else None
+    last200 = values(dates[-200:], 200)
+    prev200 = values(dates[-205:-5], 200) if len(dates) >= 205 else None
+    last2 = values(dates[-2:], 2)
     ma20 = sum(last20) / 20 if last20 else None
     ma50 = sum(last50) / 50 if last50 else None
     ma50_prev = sum(prev50) / 50 if prev50 else None
