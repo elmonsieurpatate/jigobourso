@@ -115,5 +115,7 @@ def test_rejected_default_proximity_is_applied_before_pagination_without_reranki
     verdicts=service.judge_universe(conn,cfg)
     expected=[v['key'] for v in sorted(verdicts,key=lambda v:(*service.criteria_proximity(v['reasons']),v['symbol']))]
     assert actual==expected and len(set(actual))==6
+    all_rows=service.explore(conn,{'config':cfg,'view':{'status':'all','sort':'proximity','tradable':False}})
+    assert all_rows['ordering']=='rank' # A broad symbol search does not claim to show only near misses.
     assert [(r['id'],r['rank'],r['score']) for r in explore(conn,status='retained')['rows']]==[(r['id'],r['rank'],r['score']) for r in original['rows']]
     conn.close()
