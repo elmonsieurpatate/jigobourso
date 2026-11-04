@@ -60,8 +60,9 @@ def serve(cmd):
     try:
         request = json.load(sys.stdin)
         if cmd == 'presets':
+            from .analytics import explorer_config as C
             result = {'presets': {name: strategy.preset(name) for name in strategy.PRESETS}, 'labels': strategy.LABELS,
-                      'slope_levels': strategy.SLOPE_LEVELS, 'r2_levels': strategy.R2_LEVELS, 'rank_modes': list(strategy.RANK_MODES), 'experimental': list(strategy.EXPERIMENTAL)}
+                      'version':4,'empty':C.empty(),'v4_presets':{name:C.editable(strategy.preset(name)) for name in strategy.PRESETS},'metrics':sorted(C.METRICS),'bounds':C.BOUNDS,'slope_levels': strategy.SLOPE_LEVELS, 'r2_levels': strategy.R2_LEVELS, 'rank_modes': list(strategy.RANK_MODES), 'experimental': list(strategy.EXPERIMENTAL)}
         elif cmd == 'intraday':
             from engine.market import intraday
             from engine.market.yahoo import YahooClient
@@ -91,7 +92,8 @@ def serve(cmd):
         elif cmd in ADMIN:
             result = ADMIN[cmd](connect(), request)
         elif cmd == 'validate-config':
-            result = strategy.validate(request)
+            from .analytics import explorer_config as C
+            result = C.editable(request) if request.get('_editable') else C.upgrade(request) if request.get('_upgrade') else strategy.validate(request)
         else:
             conn = connect()
             result = service.explore(conn, request) if cmd == 'explore' else service.instrument_sheet(conn, request)

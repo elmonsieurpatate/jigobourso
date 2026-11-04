@@ -13,6 +13,7 @@ l'appelant ne lui fournit que des cotations recommandables (`v_recommendable`) ;
 """
 import copy
 import math
+from . import explorer_config, configurable_score
 from collections import defaultdict
 
 from .measures import window_metrics, technical_state
@@ -106,6 +107,7 @@ def _number(v, lo, hi, what):
 
 def validate(config):
     """Contrôle strict d'une configuration ; renvoie une copie normalisée ou lève ValueError (message affichable)."""
+    if isinstance(config,dict) and config.get('version')==4:return explorer_config.validate(config)
     if not isinstance(config, dict) or config.get('version') != VERSION:
         raise ValueError('Configuration de stratégie absente ou obsolète')
     c = copy.deepcopy(config)
@@ -149,7 +151,21 @@ def validate(config):
 
 def required_sessions(config):
     """Fenêtres à mesurer pour cette configuration (utile au calcul nocturne)."""
-    return sorted({p['sessions'] for p in config['periods'] if p['enabled']})
+    if config.get('version')!=4:return sorted({p['sessions'] for p in config['periods'] if p['enabled']})
+    periods=[p for p in config['periods'] if p['enabled']]
+    if config.get('version')==4:
+        periods += [p for kind in ('equity','etf') for p in explorer_config.effective(config,kind)['periods'] if p['enabled']]
+    windows={p['sessions'] for p in periods}
+    active_ids={p['id'] for p in periods}
+    if config['ranking']['mode'] in MOMENTUM_WINDOWS and ('year' if config['ranking']['mode']=='momentum12' else 'half') in active_ids:windows.add(MOMENTUM_WINDOWS[config['ranking']['mode']])
+    if config['ranking']['mode']==RISK_MOMENTUM:
+        if 'half' in active_ids:windows.add(126)
+        if 'year' in active_ids:windows.add(252)
+    if config.get('version')==4:
+        for p in configurable_score.active_components(config):
+            if p['metric']=='momentum6':windows|={126}
+            if p['metric']=='momentum12':windows|={252}
+    return sorted(windows)
 
 
 def _check(period, criterion, metric, value, threshold, op):
@@ -165,16 +181,23 @@ def _check(period, criterion, metric, value, threshold, op):
 def evaluate_one(config, candidate):
     """Évalue un titre depuis ses clôtures. candidate : {'bars': [(date, close, adj)], 'split_dates', 'expected_last_date'}.
     Renvoie {'status', 'reasons', 'measures' {séances: mesures|None}, 'technical', 'basis', 'breaks'}."""
-    windows = [p['sessions'] for p in config['periods'] if p['enabled']]
+    windows = required_sessions(config)
     dates, closes, basis, breaks, measures, missing, tech = analyze_series(
         candidate.get('bars') or [], windows, candidate.get('split_dates') or (),
         candidate.get('session_windows'), candidate.get('technical_sessions'))
+    if config.get('version')==4 and explorer_config.needs_extended(config):
+        from .explorer_metrics import path_metrics
+        for n,m in measures.items():
+            if m is not None:
+                ds=(candidate.get('session_windows') or {}).get(n,dates[-(n+1):]);obs=dict(zip(dates,closes))
+                m.update(path_metrics([obs.get(d) for d in ds]))
     mode = config['ranking']['mode']
     momentum = None
-    if mode in MOMENTUM_WINDOWS or mode == RISK_MOMENTUM:
+    custom=config.get('version')==4 and any(p['metric'] in ('momentum6','momentum12') for p in config['ranking'].get('components',[]))
+    if mode in MOMENTUM_WINDOWS or mode == RISK_MOMENTUM or custom:
         momentum = {'6m': momentum_6_1(dates, closes, breaks, (candidate.get('session_windows') or {}).get(126)),
                     '12m': momentum_12_1(dates, closes, breaks, (candidate.get('session_windows') or {}).get(252))}
-        if mode != RISK_MOMENTUM:
+        if mode != RISK_MOMENTUM and not custom:
             measure = momentum_12_1 if mode == 'momentum12' else momentum_6_1
             momentum = measure(dates, closes, breaks, (candidate.get('session_windows') or {}).get(MOMENTUM_WINDOWS[mode]))
     verdict = judge(config, measures, tech, missing, dates[-1] if dates else None, candidate.get('expected_last_date'), momentum)
@@ -186,22 +209,26 @@ def judge(config, measures, tech, missing, last_close_date=None, expected_last_d
     """Applique les critères à des mesures déjà calculées (fenêtres absentes : `missing` {séances: 'history'|'break'|'invalid'}).
     Même jugement que les mesures viennent du calcul direct ou de strategy_metrics."""
     reasons = []
-    if expected_last_date and last_close_date and last_close_date < expected_last_date:
+    modern=config.get('version')==4
+    criteria=explorer_config.CRITERIA if modern else CRITERIA
+    if modern and not config['selection']['require_fresh']:expected_last_date=None
+    if expected_last_date and ((last_close_date is None and modern) or last_close_date and last_close_date < expected_last_date):
         reasons.append({'period': None, 'criterion': 'freshness', 'metric': 'last_close_date', 'value': last_close_date, 'threshold': expected_last_date, 'result': 'missing'})
     for p in config['periods']:
         if not p['enabled']:
             continue
         m = measures.get(p['sessions'])
+        if modern and not p.get('require_history') and not any(p.get(f) is not None for f,_,_ in criteria):continue
         if m is None:
             reasons.append({'period': p['id'], 'criterion': 'data', 'metric': missing.get(p['sessions'], 'history'), 'value': None,
-                            'threshold': p['sessions'] + 1, 'result': 'missing'})
+                            'threshold': p['sessions'] + 1, 'mandatory':bool(p.get('require_history')) if modern else True, 'result': 'missing'})
             continue
         if m.get('coverage') is not None and m['coverage'] < 1:
             reasons.append({'period': p['id'], 'criterion': 'coverage', 'metric': 'observed_closes',
                             'value': m.get('observations'), 'threshold': m.get('expected_closes'),
                             'missing': m.get('missing_sessions'), 'coverage': m.get('coverage'), 'result': 'warning'})
-        for field, metric, op in CRITERIA:
-            chk = _check(p['id'], field, metric, m.get(metric), p[field], op)
+        for field, metric, op in criteria:
+            chk = _check(p['id'], field, metric, m.get(metric), p.get(field), op)
             if chk:
                 reasons.append(chk)
     t = config['technical']
@@ -217,11 +244,24 @@ def judge(config, measures, tech, missing, last_close_date=None, expected_last_d
             continue
         result = 'missing' if value is None or threshold is None else ('pass' if ok(value, threshold) else 'fail')
         reasons.append({'period': 'technical', 'criterion': name, 'metric': metric, 'value': value, 'threshold': threshold, 'result': result})
-    if config['ranking']['mode'] in MOMENTUM_WINDOWS and momentum is None:
+    active_ids={p['id'] for p in config['periods'] if p['enabled']}
+    momentum_active=not modern or ('year' if config['ranking']['mode']=='momentum12' else 'half') in active_ids
+    if config['ranking']['mode'] in MOMENTUM_WINDOWS and momentum_active and momentum is None:
         window = MOMENTUM_WINDOWS[config['ranking']['mode']]
         reasons.append({'period': None, 'criterion': 'data', 'metric': 'break' if missing.get(window) == 'break' else 'momentum', 'value': None, 'threshold': window + 1, 'result': 'missing'})
-    if config['ranking']['mode'] == RISK_MOMENTUM and (not isinstance(momentum, dict) or momentum.get('6m') is None or momentum.get('12m') is None):
+    required_mom=[key for pid,key in [('half','6m'),('year','12m')] if not modern or pid in active_ids]
+    if config['ranking']['mode'] == RISK_MOMENTUM and required_mom and (not isinstance(momentum, dict) or any(momentum.get(key) is None for key in required_mom)):
         reasons.append({'period': None, 'criterion': 'data', 'metric': 'momentum', 'value': None, 'threshold': '6 et 12 mois', 'result': 'missing'})
+    if modern:
+        threshold=config.get('liquidity',{}).get('min_quoted_volume')
+        chk=_check('liquidity','min_quoted_volume','quoted_avg_volume',tech.get('quoted_avg_volume'),threshold,'>=')
+        if chk:reasons.append(chk)
+        if config['selection']['combine']=='any':
+            checks=[r for r in reasons if r['criterion']!='freshness' and not r.get('mandatory') and r['result'] in ('pass','fail','missing')]
+            if any(r['result']=='pass' for r in checks):
+                reasons=[dict(r,result='alternative') if r in checks and r['result'] in ('fail','missing') else r for r in reasons]
+        if config['selection']['missing']=='reject':
+            reasons=[dict(r,result='fail',missing=True) if r['result']=='missing' else r for r in reasons]
     results = {r['result'] for r in reasons}
     status = 'rejected' if 'fail' in results else ('unknown' if 'missing' in results else 'retained')
     return {'status': status, 'reasons': reasons, 'measures': measures, 'technical': tech, 'momentum': momentum}
@@ -229,8 +269,26 @@ def judge(config, measures, tech, missing, last_close_date=None, expected_last_d
 
 def rank(config, verdicts):
     """Ajoute 'score' (0-100) et 'rang' (dans le groupe) aux verdicts retenus. Verdicts : dicts avec key, group, symbol, status, measures."""
+    if config.get('version')==4 and config.get('asset_rules') and config['ranking']['mode']!='weighted':
+        for kind in {v['group'] for v in verdicts}:
+            ec=copy.deepcopy(explorer_config.effective(config,kind));ec['asset_rules']={}
+            rank(ec,[v for v in verdicts if v['group']==kind])
+        return verdicts
+    if config.get('version')==4 and config['ranking']['mode']==RISK_MOMENTUM:
+        # Same fixed legacy formula, with deselected periods genuinely inactive.
+        ec=copy.deepcopy(config)
+        ec['ranking']={'mode':'weighted','missing':'renormalize','aggregation':'mean','grouping':'asset_kind','components':[
+            dict(id='legacy-'+metric,metric=metric,period=period,kind='all',enabled=True,weight=weight,direction=direction,normalization='percentile',transform='identity',min=0,max=100,exponent=1)
+            for metric,period,weight,direction in [('momentum6','half',.35,'higher'),('momentum12','year',.45,'higher'),('volatility','year',.10,'lower'),('drawdown','year',.10,'lower')]]}
+        return configurable_score.rank(ec,verdicts,_percentiles)
+    if config.get('version')==4 and config['ranking']['mode'] in MOMENTUM_WINDOWS:
+        required='year' if config['ranking']['mode']=='momentum12' else 'half'
+        if not any(p['id']==required and p['enabled'] for p in config['periods']):
+            for v in verdicts:v['score']=v['rank']=None;v['score_parts']=[]
+            return verdicts
+    if config.get('version')==4 and config['ranking']['mode']=='weighted':return configurable_score.rank(config,verdicts,_percentiles)
     mode, weights = config['ranking']['mode'], config['ranking']['weights']
-    active = [p for p in config['periods'] if p['enabled']]
+    active = [p for p in config['periods'] if p['enabled'] and (config.get('version')!=4 or weights.get(p['id'],0)>0)]
     retained = [v for v in verdicts if v['status'] == 'retained']
     pct = defaultdict(dict)
     if mode == RISK_MOMENTUM:
@@ -256,6 +314,14 @@ def rank(config, verdicts):
                     if vals[2] is not None: score, weight = score + .10 * (100 - vals[2]), weight + .10
                     if vals[3] is not None: score, weight = score + .10 * (100 - vals[3]), weight + .10
                     v['score'] = score / weight
+                    if config.get('version')==4:
+                        specs=[('mom6','momentum6','half',.35,False),('mom12','momentum12','year',.45,False),('vol','volatility','year',.10,True),('dd','drawdown','year',.10,True)]
+                        v['score_parts']=[]
+                        for i,(key,metric,period,w,invert) in enumerate(specs):
+                            if vals[i] is None:continue
+                            raw=(v.get('momentum') or {}).get('6m' if key=='mom6' else '12m') if key.startswith('mom') else (v['measures'].get(252) or {}).get(metric)
+                            normalized=100-vals[i] if invert else vals[i]
+                            v['score_parts'].append(dict(id='legacy-'+key,metric=metric,period=period,raw=raw,normalized=normalized,weight=w,effective_weight=w/weight,contribution=normalized*w/weight,direction='lower' if invert else 'higher',normalization='percentile',transform='identity'))
             for i, v in enumerate(sorted((v for v in members if v['score'] is not None), key=lambda v: (-v['score'], v['symbol'], str(v['key']))), 1):
                 v['rank'] = i
         return verdicts
@@ -267,6 +333,8 @@ def rank(config, verdicts):
             ranks = _percentiles({v['key']: v['momentum'] for v in members if v.get('momentum') is not None})
             for v in members:
                 v['score'] = ranks.get(v['key'])
+                if config.get('version')==4 and v['score'] is not None:
+                    v['score_parts']=[dict(id='legacy-momentum',metric='momentum12' if mode=='momentum12' else 'momentum6',period='year' if mode=='momentum12' else 'half',raw=v['momentum'],normalized=v['score'],weight=1,effective_weight=1,contribution=v['score'],direction='higher',normalization='percentile',transform='identity')]
             for i, v in enumerate(sorted((v for v in members if v['score'] is not None), key=lambda v: (-v['score'], v['symbol'], str(v['key']))), 1):
                 v['rank'] = i
         return verdicts
@@ -281,6 +349,15 @@ def rank(config, verdicts):
         parts = [(pct[(v['group'], p['id'])].get(v['key']), float(weights.get(p['id'], 1))) for p in active]
         parts = [(x, w) for x, w in parts if x is not None and w > 0]
         v['score'] = sum(x * w for x, w in parts) / sum(w for _, w in parts) if parts else None
+        if config.get('version')==4:
+            total=sum(w for _,w in parts);v['score_parts']=[]
+            metric={'trend':'slope','performance':'perf','regularity':'r2','stability':'volatility'}[mode]
+            for p in active:
+                x=pct[(v['group'],p['id'])].get(v['key']);w=float(weights.get(p['id'],0));m=v['measures'].get(p['sessions']) or {}
+                if x is None or w<=0:continue
+                raw=m.get(metric)
+                if metric=='slope':raw=explorer_config.period_slope(raw,p['sessions'])
+                v['score_parts'].append(dict(id='legacy-'+p['id'],metric=metric,period=p['id'],raw=raw,normalized=x,weight=w,effective_weight=w/total,contribution=x*w/total,direction='lower' if mode=='stability' else 'higher',normalization='percentile',transform='identity'))
     for group in {v['group'] for v in retained}:
         ranked = sorted((v for v in retained if v['group'] == group and v['score'] is not None),
                         key=lambda v: (-v['score'], v['symbol'], str(v['key'])))

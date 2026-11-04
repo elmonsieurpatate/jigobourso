@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/engine.php';
 require_once __DIR__ . '/../services/ledger.php';
+require_once __DIR__ . '/../services/explorer_library.php';
 
 function held_listing_ids(int $userId): array {
     // Quantité nette > 0, splits confirmés compris (même règle que la valorisation des portefeuilles).
@@ -26,7 +27,7 @@ function held_listing_ids(int $userId): array {
 function clean_view($in): array {
     $view = [];
     if (!is_array($in)) return $view;
-    foreach (['kind', 'geo_region', 'market', 'country', 'category', 'budget', 'min_price', 'max_price', 'min_score', 'max_volatility', 'max_drawdown', 'min_volume', 'max_fee', 'cap', 'regularity', 'risk', 'liquidity', 'pea', 'owned_only', 'open_now', 'fresh_only', 'sort', 'dir'] as $k)
+    foreach (['currency', 'min_aum', 'max_aum', 'kind', 'geo_region', 'market', 'country', 'category', 'budget', 'min_price', 'max_price', 'min_score', 'max_volatility', 'max_drawdown', 'min_volume', 'max_fee', 'cap', 'regularity', 'risk', 'liquidity', 'pea', 'owned_only', 'open_now', 'fresh_only', 'sort', 'dir'] as $k)
         if (isset($in[$k]) && is_scalar($in[$k]) && $in[$k] !== '' && $in[$k] !== false) $view[$k] = $in[$k];
     if (isset($view['kind']) && !in_array($view['kind'], ['all', 'equity', 'etf', 'large_etf'], true)) unset($view['kind']);
     if (isset($view['geo_region']) && !in_array($view['geo_region'], ['us', 'eu', 'emerging'], true)) unset($view['geo_region']);
@@ -39,6 +40,11 @@ function clean_view($in): array {
 }
 
 return [
+    'explorer/library' => function () { $u=require_user();return explorer_library_list((int)$u['id']); },
+    'explorer/library/legacy' => function () { need_post();$u=require_user();return explorer_legacy_action((int)$u['id'],body()); },
+    'explorer/library/save' => function () { need_post();$u=require_user();return explorer_library_save((int)$u['id'],body()); },
+    'explorer/library/delete' => function () { need_post();$u=require_user();q('DELETE FROM explorer_saved WHERE id=? AND user_id=?',[(int)(body()['id']??0),$u['id']]);return ['ok'=>true]; },
+    'explorer/detail' => function () { need_post();$u=require_user();$b=body();$view=clean_view($b['view']??[]);$view['owned_ids']=held_listing_ids((int)$u['id']);return engine_call('sheet',['listing_id'=>(int)($b['id']??0),'config'=>$b['config']??'regular','view'=>$view,'fetch_profile'=>false]); },
     'strategy/presets' => function () { require_user(); return engine_call('presets', []); },
     'strategy/validate' => function () { need_post(); require_user(); return ['config' => engine_call('validate-config', body())]; },
     'explore' => function () {

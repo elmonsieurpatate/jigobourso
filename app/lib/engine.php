@@ -22,9 +22,30 @@ function engine_acquire(float $wait = 8.0) {
 }
 function engine_release($fh): void { if (is_resource($fh)) { flock($fh, LOCK_UN); fclose($fh); } }
 
+/** Preserve empty JSON objects in the V4 schema across PHP associative decoding.
+ * Lists (periods/components) stay lists. Legacy configurations remain untouched.
+ */
+function explorer_config_shape(array $config): array {
+    if (($config['version'] ?? null) !== 4) return $config;
+    foreach (['technical','selection','liquidity','presentation'] as $field)
+        if (array_key_exists($field,$config) && $config[$field] === []) $config[$field] = new stdClass();
+    if (isset($config['ranking']) && is_array($config['ranking']) && ($config['ranking']['weights'] ?? null) === []) $config['ranking']['weights'] = new stdClass();
+    if (isset($config['asset_rules']) && is_array($config['asset_rules'])) {
+        foreach ($config['asset_rules'] as &$rule) {
+            if (!is_array($rule)) continue;
+            foreach (['periods','technical','selection','liquidity'] as $field)
+                if (array_key_exists($field,$rule) && $rule[$field] === []) $rule[$field] = new stdClass();
+        } unset($rule);
+        if ($config['asset_rules'] === []) $config['asset_rules'] = new stdClass();
+    }
+    return $config;
+}
+
 // Appelle le moteur Python (python -m engine.cli <commande>) : JSON sur stdin, JSON sur stdout, délai maximal ENGINE_TIMEOUT.
 // stderr va dans un fichier temporaire (jamais dans un tube : un tube plein bloquerait les deux processus).
 function engine_call(string $command, array $request) {
+    $request=explorer_config_shape($request);
+    if (isset($request['config']) && is_array($request['config'])) $request['config']=explorer_config_shape($request['config']);
     $env = [];
     foreach (['JIGO_DB_HOST', 'JIGO_DB_PORT', 'JIGO_DB_SOCKET', 'JIGO_DB_NAME', 'JIGO_DB_USER', 'JIGO_DB_PASSWORD', 'PATH', 'HOME'] as $k) {
         $v = cfg($k);
@@ -65,6 +86,15 @@ function engine_call(string $command, array $request) {
     if ($code !== 0 || !is_array($data)) {
         error_log('engine ' . $command . ' code ' . $code . ': ' . $stderr);
         throw new ApiError('Le moteur d’analyse n’a pas répondu', 503);
+    }
+    $data=explorer_config_shape($data);
+    if (isset($data['config']) && is_array($data['config'])) $data['config']=explorer_config_shape($data['config']);
+    if ($command==='presets') {
+        if (isset($data['empty']) && is_array($data['empty'])) $data['empty']=explorer_config_shape($data['empty']);
+        if (isset($data['v4_presets']) && is_array($data['v4_presets'])) {
+            foreach ($data['v4_presets'] as &$config) $config=explorer_config_shape($config);
+            unset($config);
+        }
     }
     return $data;
 }

@@ -7,6 +7,8 @@ import datetime
 import hashlib
 import json
 import re
+import zlib
+import base64
 from collections import Counter, defaultdict
 
 from engine.catalogue.rules import MARKETS, is_leveraged_name
@@ -14,7 +16,7 @@ from engine.shared import settings as settings_mod
 from engine.market import hours
 from engine.market.collect import effective_expected_close, latest_rates, to_eur_factor
 from engine.market.calendar import window_calendars, session_dates
-from . import signals, strategy
+from . import signals, strategy, explorer_config, explorer_metrics
 from . import geography
 from .measures import window_metrics
 from .series import usable_closes, find_breaks, clean_window, analyze_series, prepare_series, data_corrections
@@ -82,10 +84,11 @@ def _load_universe(conn, windows, ids=None):
         universe = cur.fetchall()
         marks = ','.join(['%s'] * len(windows))
         scope = f' AND listing_id IN ({",".join(["%s"] * len(ids))})' if ids else ''
-        cur.execute(f'SELECT listing_id, sessions, slope, slope_log, r2, perf, volatility, drawdown, er, observations, expected_closes, coverage FROM strategy_metrics WHERE sessions IN ({marks})' + scope, list(windows) + list(ids or []))
         stored = defaultdict(dict)
-        for r in cur.fetchall():
-            stored[r['listing_id']][r['sessions']] = {k: (None if v is None else float(v)) for k, v in r.items() if k not in ('listing_id',)}
+        if windows:
+            cur.execute(f'SELECT listing_id, sessions, slope, slope_log, r2, perf, volatility, drawdown, er, observations, expected_closes, coverage FROM strategy_metrics WHERE sessions IN ({marks})' + scope, list(windows) + list(ids or []))
+            for r in cur.fetchall():
+                stored[r['listing_id']][r['sessions']] = {k: (None if v is None else float(v)) for k, v in r.items() if k not in ('listing_id',)}
         cur.execute('SELECT mic, MAX(last_close_date) d FROM series_state s JOIN listings l ON l.id=s.listing_id GROUP BY mic')
         latest_by_mic = {r['mic']: r['d'] for r in cur.fetchall()}
     return universe, stored, latest_by_mic
@@ -139,11 +142,14 @@ def judge_universe(conn, config, ids=None):
     needs_live = [u['id'] for u in universe if any(n not in stored.get(u['id'], {}) or stored[u['id']][n].get('coverage') is None for n in windows)]
     absent = sorted({n for n in windows if any(n not in stored.get(lid, {}) or stored[lid][n].get('coverage') is None for lid in needs_live)})
     live = _live_measures(conn, needs_live, absent) if needs_live and absent else {}
+    extra = extended_metrics(conn,universe,windows) if config.get('version')==4 and explorer_config.needs_extended(config) else {}
     verdicts = []
     for u in universe:
         measures = {n: (live.get(u['id'], {}).get(n) if stored.get(u['id'], {}).get(n, {}).get('coverage') is None
                         else stored.get(u['id'], {}).get(n)) or live.get(u['id'], {}).get(n)
                     for n in windows}
+        for n,m in measures.items():
+            if m is not None and n in extra.get(u['id'],{}):measures[n]={**m,**extra[u['id']][n]}
         count = u['closes_count'] or 0
         missing = {n: _missing_reason(count, n, m, u.get('break_age')) for n, m in measures.items() if m is None}
         for n in windows:
@@ -152,6 +158,7 @@ def judge_universe(conn, config, ids=None):
                 missing[n] = _missing_reason(count, n, None, u.get('break_age'))             # historique trop court, rupture dans la fenêtre ou calendrier : le vrai motif
         tech = {k: (None if u[k] is None else float(u[k])) for k in ('close_px', 'ma20', 'ma50', 'ma50_prev', 'ma200', 'ma200_prev', 'daily_change', 'gap_to_ma20')}
         tech['close'] = tech.pop('close_px')
+        if config.get('version')==4:tech['quoted_avg_volume']=None if u.get('avg_volume_3m') is None else float(u['avg_volume_3m'])
         last = u['last_close_date'].isoformat() if u['last_close_date'] else None
         expected = max(expected_close(conn, u['mic']), str(latest_by_mic.get(u['mic']) or ''))
         if last and last < expected:
@@ -162,10 +169,12 @@ def judge_universe(conn, config, ids=None):
             u['quality'] = 'incomplete'
         elif u['quality'] not in ('break', 'insufficient') and any(n in missing and missing[n] == 'calendar' for n in windows):
             u['quality'] = 'calendar_unknown'
-        saved_momentum = ({'6m': u.get('momentum_6m'), '12m': u.get('momentum_12m')} if config['ranking']['mode'] == strategy.RISK_MOMENTUM
+        custom_momentum=config.get('version')==4 and any(c['metric'] in ('momentum6','momentum12') for c in config['ranking'].get('components',[]))
+        saved_momentum = ({'6m': u.get('momentum_6m'), '12m': u.get('momentum_12m')} if config['ranking']['mode'] == strategy.RISK_MOMENTUM or custom_momentum
                           else u.get('momentum_12m') if config['ranking']['mode'] == 'momentum12' else u.get('momentum_6m'))
         momentum_arg = saved_momentum if isinstance(saved_momentum, dict) else (None if saved_momentum is None else float(saved_momentum))
-        v = strategy.judge(config, measures, tech, missing, last, expected or None, momentum=momentum_arg)
+        effective=explorer_config.effective(config,'etf' if u['kind']=='etf' else 'equity') if config.get('version')==4 else config
+        v = strategy.judge(effective, measures, tech, missing, last, expected or None, momentum=momentum_arg)
         if u['quality'] == 'incomplete' and v['status'] == 'unknown':
             v['status_label'] = 'Historique incomplet'
         u['instrument_id'] = u.get('instrument_id', u['id'])
@@ -184,12 +193,12 @@ def _row(v, rates, conn=None):
             'currency': cur, 'price': price, 'price_eur': price * factor if price is not None and factor else None,
             'price_time': u['price_time'].isoformat(sep=' ') if u['price_time'] else None, 'quote_at': u['quote_at'].isoformat(sep=' ') if u.get('quote_at') else None, 'price_source': u['price_source'],
             'status': v['status'], 'status_label': STATUS_LABELS[v['status']], 'score': v['score'], 'rank': v['rank'], 'momentum': v.get('momentum'),
-            'quality': u['quality'], 'price_stale': hours.price_is_stale(u['mic'], u['price_time'], hours.utcnow(), expected_close(conn, u['mic']) if conn is not None else None, last_collection(conn, u['mic']) if conn is not None else None), 'measures': {str(n): m for n, m in v['measures'].items()}, 'reasons': v['reasons']}
+            'quality': u['quality'], 'price_stale': hours.price_is_stale(u['mic'], u['price_time'], hours.utcnow(), expected_close(conn, u['mic']) if conn is not None else None, last_collection(conn, u['mic']) if conn is not None else None), 'measures': {str(n): dict(m,slope_period=explorer_config.period_slope(m.get('slope'),n)) if m else None for n, m in v['measures'].items()}, 'reasons': v['reasons']}
 
 
-CACHE_FORMAT = 6
+CACHE_FORMAT = 8
 MAX_NEW_CONFIGS_PER_HOUR = 60       # calculs d'univers complets (réglages jamais vus ou données changées) acceptés par heure, tous utilisateurs confondus
-ENTRY_FIELDS = ('id', 'symbol', 'name', 'isin', 'kind', 'mic', 'country', 'status', 'group', 'rank', 'score', 'category', 'fails', 'instrument_id', 'currency', 'price_currency', 'net_assets', 'proximity')
+ENTRY_FIELDS = ('id', 'symbol', 'name', 'isin', 'kind', 'mic', 'country', 'status', 'group', 'rank', 'score', 'category', 'fails', 'instrument_id', 'currency', 'price_currency', 'net_assets', 'proximity', 'score_parts', 'score_missing')
 
 
 def criteria_proximity(reasons):
@@ -227,24 +236,65 @@ def data_version(conn):
     return f"{clock}.{CACHE_FORMAT}.{strategy.VERSION}|{a['t']}|{a['n']}|{j}"
 
 
+def packed(payload):
+    text=json.dumps(payload,separators=(',',':'))
+    return json.dumps({'compressed':base64.b64encode(zlib.compress(text.encode())).decode()})
+
+
+def unpacked(payload):
+    data=json.loads(payload)
+    return json.loads(zlib.decompress(base64.b64decode(data['compressed']))) if isinstance(data,dict) and 'compressed' in data else data
+
+
+def compact_parts(v):
+    return [[p['id'],p['raw'],p['normalized'],p['effective_weight'],p['contribution'],{k:v for k,v in p.items() if k not in ('raw','normalized','effective_weight','contribution')}] for p in v.get('score_parts',[])]
+
+
+def expanded_parts(entry,config):
+    defs={p['id']:p for p in config['ranking'].get('components',[])}
+    return [dict(defs.get(p[0],p[5] if len(p)>5 else {}),raw=p[1],normalized=p[2],effective_weight=p[3],contribution=p[4]) for p in entry.get('score_parts',[]) or []]
+
+
+def extended_metrics(conn,universe,windows):
+    # Shared across configurations. No per-title SQL and no provider access.
+    version=data_version(conn);key=hashlib.sha1(('explorer-path-v1:'+','.join(map(str,windows))).encode()).hexdigest()
+    with conn.cursor() as q:
+        q.execute('SELECT payload,data_version FROM result_cache WHERE cache_key=%s',(key,));hit=q.fetchone()
+    if hit and hit['data_version']==version:
+        result=unpacked(hit['payload']);wanted={u['id'] for u in universe}
+        return {int(lid):{int(n):m for n,m in group.items()} for lid,group in result.items() if int(lid) in wanted}
+    result=explorer_metrics.load(conn,universe,windows,expected_close)
+    # Only cache complete universe batches: a detail request must not poison it.
+    with conn.cursor() as q:
+        q.execute('SELECT COUNT(*) n FROM v_recommendable');complete=q.fetchone()['n']==len(universe)
+        if complete:q.execute('REPLACE INTO result_cache(cache_key,data_version,built_at,payload) VALUES (%s,%s,%s,%s)',(key,version,datetime.datetime.utcnow().replace(microsecond=0),packed(result)))
+    if complete:conn.commit()
+    return result
+
+
 def cached_verdicts(conn, config):
     """Verdicts légers (identité, statut, groupe, rang, score) de tout l'univers pour cette configuration, mis en cache en base."""
-    key = hashlib.sha1(('proximity-v1:' + json.dumps(config, sort_keys=True, separators=(',', ':'))).encode()).hexdigest()
+    financial={k:v for k,v in config.items() if k!='presentation'}
+    key = hashlib.sha1(('explorer-v4:' + json.dumps(financial, sort_keys=True, separators=(',', ':'))).encode()).hexdigest()
     version = data_version(conn)
+    if config.get('version')==4 and (any(explorer_config.effective(config,k)['liquidity'].get('min_quoted_volume') is not None for k in ('equity','etf')) or any(p['metric']=='quoted_avg_volume' for p in config['ranking'].get('components',[]))):
+        with conn.cursor() as cur:
+            cur.execute('SELECT r.listing_id,p.avg_volume_3m FROM v_recommendable r LEFT JOIN latest_prices p ON p.listing_id=r.listing_id ORDER BY r.listing_id')
+            version+='|'+hashlib.sha1(json.dumps(cur.fetchall(),default=str,separators=(',',':')).encode()).hexdigest()[:12]
     with conn.cursor() as cur:
         cur.execute('SELECT data_version, payload FROM result_cache WHERE cache_key=%s', (key,))
         hit = cur.fetchone()
     if hit and hit['data_version'] == version:
-        return [dict(zip(ENTRY_FIELDS, e)) for e in json.loads(hit['payload'])]
+        return [dict(zip(ENTRY_FIELDS, e)) for e in unpacked(hit['payload'])]
     with conn.cursor() as cur:        # garde-fou : chaque configuration inédite évalue tout l'univers ; on borne le nombre de calculs par heure pour protéger la base partagée
         cur.execute("SELECT COUNT(*) n FROM result_cache WHERE built_at > %s AND data_version <> 'intraday-fetch'", (datetime.datetime.utcnow() - datetime.timedelta(hours=1),))
         if cur.fetchone()['n'] >= MAX_NEW_CONFIGS_PER_HOUR:
             raise ValueError('Trop de réglages différents ont été calculés depuis une heure : réessayez un peu plus tard, ou utilisez un des quatre profils de départ.')
     entries = [[v['key'], v['symbol'], v['row']['name'], v['row']['isin'], v['row']['kind'], v['row']['mic'], v['row']['country'], v['status'], v['group'], v['rank'],
-                None if v['score'] is None else round(v['score'], 4), v['row']['category'], _fails(v), v['row'].get('instrument_id'), v['row'].get('currency'), v['row'].get('price_currency'), v['row'].get('net_assets'), criteria_proximity(v['reasons'])] for v in judge_universe(conn, config)]
+                None if v['score'] is None else round(v['score'], 4), v['row']['category'], _fails(v), v['row'].get('instrument_id'), v['row'].get('currency'), v['row'].get('price_currency'), v['row'].get('net_assets'), criteria_proximity(v['reasons']),compact_parts(v),v.get('score_missing',0)] for v in judge_universe(conn, config)]
     with conn.cursor() as cur:
         cur.execute('REPLACE INTO result_cache(cache_key, data_version, built_at, payload) VALUES (%s,%s,%s,%s)',
-                    (key, version, datetime.datetime.utcnow().replace(microsecond=0), json.dumps(entries, ensure_ascii=False, separators=(',', ':'))))
+                    (key, version, datetime.datetime.utcnow().replace(microsecond=0), packed(entries) if config.get('version')==4 else json.dumps(entries, ensure_ascii=False, separators=(',', ':'))))
         cur.execute('DELETE FROM result_cache WHERE built_at < %s', (datetime.datetime.utcnow() - datetime.timedelta(days=3),))
     conn.commit()
     return [dict(zip(ENTRY_FIELDS, e)) for e in entries]
@@ -313,7 +363,7 @@ def _aux(conn, ref, rates):
 
 def _reference_window(config, stored=(1, 5, 21, 63, 126, 252)):
     """Fenêtre servant aux filtres et tris de colonnes : la plus longue période active, ramenée à une fenêtre précalculée."""
-    longest = max(p['sessions'] for p in config['periods'] if p['enabled'])
+    longest = max((p['sessions'] for p in config['periods'] if p['enabled']),default=21)
     return min(stored, key=lambda n: (abs(n - longest), n))
 
 
@@ -401,6 +451,11 @@ def scoped_entries(conn, config, view, rates=None, aux=None, now=None):
 
     def keep(e):
         a = aux.get(e['id'], {})
+        if view.get('currency') and (e.get('price_currency') or e.get('currency')) not in _choices(view['currency']):return False
+        aum=_aum_eur(e,rates) if e['kind']=='etf' else None
+        for field,compare in [('min_aum',lambda v,t:v>=t),('max_aum',lambda v,t:v<=t)]:
+            threshold=_num(view,field)
+            if threshold is not None and e['kind']=='etf' and (aum is None or not compare(aum,threshold)):return False
         price = a.get('price_eur')
         if (budget is not None and (price is None or price > budget)) or (min_price is not None and (price is None or price < min_price)) or (max_price is not None and (price is None or price > max_price)):
             return False
@@ -422,7 +477,7 @@ def scoped_entries(conn, config, view, rates=None, aux=None, now=None):
         out = []
         for e in base:
             v = ranked.get(e['id'])
-            out.append(dict(e, rank=v['rank'] if v else None, score=None if not v or v['score'] is None else round(v['score'], 4)))
+            out.append(dict(e, rank=v['rank'] if v else None, score=None if not v or v['score'] is None else round(v['score'], 4),score_parts=compact_parts(v) if v else [],score_missing=v.get('score_missing',0) if v else 0))
         base = out
     return entries, base, ref, aux
 
@@ -520,6 +575,7 @@ def explore(conn, request):
         v = detail[e['id']]
         v['rank'], v['score'] = e['rank'], e['score']      # rang et score viennent de la sélection complète, pas de la page
         r = _row(v, rates, conn)
+        r['score_parts']=expanded_parts(e,config);r['score_missing']=e.get('score_missing',0)
         a = aux.get(e['id'], {})
         r.update({'position': position, 'volume': a.get('volume'), 'last_close': a['last_close'].isoformat() if a.get('last_close') else None,
                   'analyst': analyst_view(a.get('analyst')) if e['kind'] == 'equity' else None, 'ref': {k: a.get(k) for k in REF_FIELDS}, 'open': e['mic'] in hours.HOURS and hours.is_open(e['mic'], now),
@@ -529,7 +585,12 @@ def explore(conn, request):
             r['fund_nature'] = fund_natures.get(e['id'])
         out.append(r)
     if not export:
-        _attach_curves(conn, out, ref)
+        if config.get('version')==4:
+            for kind in ('equity','etf'):
+                subset=[r for r in out if r['kind']==kind];effective=explorer_config.effective(config,kind);n=max((p['sessions'] for p in effective['periods'] if p['enabled']),default=ref)
+                _attach_analysis_curves(conn,subset,n)
+                for r in subset:r['curve_sessions']=n;r['curve_label']=signals.period_label(n)
+        else:_attach_curves(conn, out, ref)
     reasons = defaultdict(int)
     for e in base:
         if e['status'] != 'retained':
@@ -638,6 +699,26 @@ def _attach_curves(conn, rows, sessions=63, points=66):
         r['curve'] = downsample(curves.get(r['id'], [])[-(sessions + 1):], points)
 
 
+def _attach_analysis_curves(conn, rows, sessions, points=66):
+    """V4 sparklines use the same confirmed market dates and split basis as analysis."""
+    if not rows:return
+    calendars={m:window_calendars(m,expected_close(conn,m),[sessions]).get(sessions,[]) for m in {r['mic'] for r in rows}}
+    starts=[ds[0] for ds in calendars.values() if ds]
+    if not starts:return
+    ids=[r['id'] for r in rows];marks=','.join(['%s']*len(ids));bars=defaultdict(list);splits=defaultdict(list)
+    with conn.cursor() as cur:
+        cur.execute(f'SELECT listing_id,price_date,close_px,adj_close_px FROM daily_prices WHERE listing_id IN ({marks}) AND price_date>=%s ORDER BY listing_id,price_date',ids+[min(starts)])
+        for b in cur.fetchall():bars[b['listing_id']].append((str(b['price_date']),float(b['close_px']),None if b['adj_close_px'] is None else float(b['adj_close_px'])))
+        cur.execute(f"SELECT listing_id,event_date,ratio FROM corporate_events WHERE listing_id IN ({marks}) AND kind IN ('split','reverse_split')",ids)
+        for e in cur.fetchall():splits[e['listing_id']].append((str(e['event_date']),float(e['ratio']) if e['ratio'] else None))
+    for row in rows:
+        ds=calendars[row['mic']]
+        dates,prices,_,breaks=prepare_series([b for b in bars[row['id']] if ds and b[0]<=ds[-1]],splits[row['id']])
+        observations=dict(zip(dates,prices));broken={dates[i] for i in breaks}
+        values=[None if d in broken else observations.get(d) for d in ds]
+        row['curve']=downsample(values,points);row['curve_dates']=downsample(ds,points)
+
+
 def instrument_sheet(conn, request):
     """Fiche complète d'une cotation : identité, prix, verdict détaillé (toutes périodes, même inactives), séries, qualité."""
     config = _config(request)
@@ -679,9 +760,13 @@ def instrument_sheet(conn, request):
         splits = [(r['event_date'].isoformat(), float(r['ratio']) if r['ratio'] else None) for r in cur.fetchall()]
     cutoff = expected_close(conn, u['mic'])
     calendars = window_calendars(u['mic'], cutoff, all_windows) if cutoff else {}
-    tech_dates = session_dates(u['mic'], cutoff, 55) if cutoff else None
+    tech_dates = session_dates(u['mic'], cutoff, 205 if config.get('version')==4 else 55) if cutoff else None
     dates, closes, basis, breaks, full, missing, tech = analyze_series(bars, all_windows, splits, calendars, tech_dates)
-    sheet['measures'] = {str(n): m for n, m in full.items()}
+    if config.get('version')==4 and explorer_config.needs_extended(config):
+        extras=extended_metrics(conn,[u],all_windows).get(lid,{})
+        full={n:dict(m,**extras.get(n,{})) if m else None for n,m in full.items()}
+    sheet['measures'] = {str(n):dict(m,slope_period=explorer_config.period_slope(m.get('slope'),n)) if m else None for n,m in full.items()}
+    sheet['analysis_windows']={str(n):ds for n,ds in calendars.items()}
     sheet['window_coverage'] = {str(n): {k: m.get(k) for k in ('observations', 'expected_closes', 'missing_sessions', 'coverage')}
                                 for n, m in full.items() if m and m.get('coverage') is not None}
     sheet['analysis_basis'] = basis
@@ -708,7 +793,7 @@ def instrument_sheet(conn, request):
         mine = next((e for e in scoped if e['id'] == lid), None)
         v = judge_universe(conn, config, [lid])[0]
         group = 'etf' if u['kind'] == 'etf' else 'equity'
-        sheet['verdict'] = {'status': v['status'], 'status_label': STATUS_LABELS[v['status']], 'score': mine['score'] if mine else None, 'rank': mine['rank'] if mine else None,
+        sheet['verdict'] = {'score_parts':expanded_parts(mine or {},config),'status': v['status'], 'status_label': STATUS_LABELS[v['status']], 'score': mine['score'] if mine else None, 'rank': mine['rank'] if mine else None,
                             'of': sum(1 for e in scoped if e['group'] == group and e['status'] == 'retained'), 'in_scope': mine is not None,
                             'scope_filtered': len(scoped) != len(entries), 'examined': len(scoped), 'universe': len(entries), 'reasons': v['reasons']}
     elif u['status'] == 'excluded':
@@ -724,7 +809,7 @@ def instrument_sheet(conn, request):
         sheet['etf_compare'] = etf.compare(conn, lid)
     sheet['strategy'] = {'name': config.get('name'), 'ranking': config['ranking']['mode'], 'source': request.get('source') or None, 'experimental': config.get('name') in strategy.EXPERIMENTAL or config['ranking']['mode'] in strategy.MOMENTUM_WINDOWS or config['ranking']['mode'] == strategy.RISK_MOMENTUM,
                          'technical': {k: v for k, v in config['technical'].items() if v},
-                         'periods': [{'id': p['id'], 'label': strategy.LABELS[p['id']], 'sessions': p['sessions'], 'criteria': {f: p[f] for f, _, _ in strategy.CRITERIA if p[f] is not None}} for p in config['periods'] if p['enabled']]}
+                         'periods': [{'id': p['id'], 'label': strategy.LABELS[p['id']], 'sessions': p['sessions'], 'criteria': {f: p.get(f) for f, _, _ in (explorer_config.CRITERIA if config.get('version')==4 else strategy.CRITERIA) if p.get(f) is not None}} for p in config['periods'] if p['enabled']]}
     sheet['config_periods'] = [{'id': p['id'], 'label': strategy.LABELS[p['id']], 'sessions': p['sessions'], 'enabled': p['enabled']} for p in config['periods']]
     return sheet
 
