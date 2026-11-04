@@ -1,0 +1,77 @@
+name: Audit V1 — lecture seule Hostinger
+on:
+  push:
+    branches: [audit/v1-readonly-20261104]
+    paths: [.github/workflows/audit-v1-readonly.yml]
+permissions:
+  contents: write
+jobs:
+  read_sources:
+    runs-on: ubuntu-22.04
+    environment: production
+    timeout-minutes: 10
+    steps:
+      - name: Lire et chiffrer les sources sans écriture Hostinger
+        env:
+          DEPLOY_KEY: ${{ secrets.HOSTINGER_SSH_PRIVATE_KEY }}
+          RECIPIENT_CERT: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUVMekNDQXBlZ0F3SUJBZ0lVUjU4cEZacFV1ZFFSMFBMdTI1Rnh4bXdmWG4wd0RRWUpLb1pJaHZjTkFRRUwKQlFBd0p6RWxNQ01HQTFVRUF3d2NTbWxuYjJKdmRYSnpieTFXTVMxeVpXRmtiMjVzZVMxaGRXUnBkREFlRncweQpOakV4TURReE9UTTJORE5hRncweU5qRXhNRGN4T1RNMk5ETmFNQ2N4SlRBakJnTlZCQU1NSEVwcFoyOWliM1Z5CmMyOHRWakV0Y21WaFpHOXViSGt0WVhWa2FYUXdnZ0dpTUEwR0NTcUdTSWIzRFFFQkFRVUFBNElCandBd2dnR0sKQW9JQmdRREtaK09KbkxJemNnMkxSbEtnQ25OUmNxQWVIajZ0dUZCb0dtUkVwLzhuUDBpUTEzenlxaE9QVGprLwpNYWhGR1RlUHRMbmkvZFJpVFNVUkZTcFpUSEpFd0ZQQ1YvRDFuODExSXhCaXpjWVlNM1VZaHcwUjRSNmhaVUNrCkFmNG1YOUFzbFBTN1YvNE9IYWcwaDZjVm1qcU9tZGV6QmhkOXh3QXRxSUJPMUhweUF2NVluV0Vpek15MlFzM0sKWHlQL3RxdWgrT09Cekl2UXVxTjI2Znl4Ukk3Z0xYM01Lc2d6blk1TEFobEhEUzY3RGY2OWRNU2lyZ25WakZZdApJUERTVXZjVXNsUHRnYnRWaWpVbTdlVXJjL3RpajlERjdEQml1cndBMmhRaUlOOUJQcGhGMnhSMC85bDZhM0ZhClNZdGk0S0R5WmcyNEIxdVJTQzZ6RkYwWFVmd1cvU2NjSmU5TndVczZPUE5QaG9qendnTHBLeVM0M2E2enkyWUEKZGQyelhTTzBvanArYlMraUt0QXgwZVB3RkFMbWlRN0lDUzNYYzlHODh5VEJCRkJmeHpzMDMza0JOK0cwY0REaQptaGdQZXFGS0VidG1zcjAzd29sbjh5OHdMSE9MMVlpVHpKSm4yQzlNM05lOWVBOUF4MFRoVWdEVU5Mdlo1Vld2CmU1VFpob3NDQXdFQUFhTlRNRkV3SFFZRFZSME9CQllFRkJmMzQ3WUdlU0JrbFFDaEtYdWpMZ05ESkEyZE1COEcKQTFVZEl3UVlNQmFBRkJmMzQ3WUdlU0JrbFFDaEtYdWpMZ05ESkEyZE1BOEdBMVVkRXdFQi93UUZNQU1CQWY4dwpEUVlKS29aSWh2Y05BUUVMQlFBRGdnR0JBTHFsRXBaZjRFL1M3R3pKVUY5TnJiUmsxdVBLbFJkeHZIZ2hYUFhXCis0VWk1OHV0S2hYeGo4UC9MNnNhclg2aVBGOVBRMWFnaVk5Z2EyMkpwMGdSa3U0dnIrWkFyV1ZVeDJhSm9uSTcKNkM0TFpiODUveG9NWk90UW83cTZsaXdYbHNRUjREcERtRU82T2Q3U3p4KzlhV1gySDVSMVZnazhqakVMcFpvQwpwYkVkSlBKUzNWdUpERHFMeVlLWTBFdUM5SW0vaWF1WTFhTER2TTJJOEtRQk0xYnpHeEluYjFsa1phZVJKeW9VCm5VRjB0R0JvRkNkMkVLL0pOQXJjbFFVbC9ROVI5RDZKOVdqZWlnMElnZnNldEdqdTg0TkZ3Y2h6L1R0Q1dCdzcKUUtqdlBsbFA4Vjd5MmFQOCt2Yk5zTlhxNVZwT1F6WDE2TTlKakFQTVZMc1FVald1aXhTdzI0MzJBazZKMHh5MApSY1hmbFh2MFlLR1BBMzB6ZkZ2U3hhdTRFOWFqSGlHb29oOXp4QUkzNzd1eEFEOFNmbVptZkdjZzNqeUFBMkpxCjl5dHNRZjBvZjN1V3BhNGNmcW5zZmJxVFRHZ2tTTEk5VWExbkgvU2l6NVRLc3lwV0g0OFBMbnk0KzNyZFpWS0kKdnVTMUVHZHB1K1ZFenIrNHpVUjBOZ094MVE9PQotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg==
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          install -d -m 700 "$RUNNER_TEMP/v1-audit"
+          printf '%s\n' "$DEPLOY_KEY" > "$RUNNER_TEMP/v1-audit/ssh.key"
+          printf '%s' "$RECIPIENT_CERT" | base64 -d > "$RUNNER_TEMP/v1-audit/recipient.pem"
+          printf '%s\n' '[147.79.103.168]:65002 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAr7QtJ399JQsqSyH2cDwi5RUdPt5VVTateWLrGAKuVE' > "$RUNNER_TEMP/v1-audit/known_hosts"
+          ssh -F /dev/null -p 65002 -i "$RUNNER_TEMP/v1-audit/ssh.key" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UpdateHostKeys=no -o UserKnownHostsFile="$RUNNER_TEMP/v1-audit/known_hosts" -o ConnectTimeout=20 u381524662@147.79.103.168 'python3 -B -' <<'REMOTE' | openssl cms -encrypt -binary -aes-256-cbc -outform DER -out "$RUNNER_TEMP/v1-audit/sources.cms" "$RUNNER_TEMP/v1-audit/recipient.pem"
+          import os, pathlib, tarfile, json, io, hashlib
+          root=pathlib.Path.home()/'domains/bourse.turnjoy.dev'
+          if not root.is_dir():raise SystemExit('Domaine V1 introuvable')
+          excluded={'.git','.venv','venv','node_modules','private','data','logs','cache','__pycache__','backups','backup','vendor','sessions','uploads'}
+          extensions={'.py','.php','.js','.ts','.html','.css','.md'}
+          forbidden={'config.php','config.py','db.php','database.php','secrets.py','credentials.py','env.php','settings_local.py'}
+          manifest=[];total=0
+          with tarfile.open(fileobj=__import__('sys').stdout.buffer,mode='w|gz') as archive:
+              for parent,dirs,files in os.walk(root,followlinks=False):
+                  dirs[:]=sorted(d for d in dirs if d not in excluded and not d.startswith('.') and not pathlib.Path(parent,d).is_symlink())
+                  for name in sorted(files):
+                      p=pathlib.Path(parent,name)
+                      if p.is_symlink() or name.startswith('.') or name.lower() in forbidden:continue
+                      if p.suffix.lower() not in extensions and name not in ('requirements.txt','package.json'):continue
+                      size=p.stat().st_size
+                      if size>2_000_000:continue
+                      total+=size
+                      if total>30_000_000:raise SystemExit('Volume de sources supérieur à la limite de sûreté')
+                      content=p.read_bytes();relative=str(p.relative_to(root))
+                      info=tarfile.TarInfo(relative);info.size=len(content);info.mode=0o600
+                      archive.addfile(info,io.BytesIO(content))
+                      manifest.append({'path':relative,'bytes':len(content),'sha256':hashlib.sha256(content).hexdigest()})
+              raw=json.dumps({'root':str(root),'files':manifest},indent=2).encode()
+              info=tarfile.TarInfo('AUDIT_MANIFEST.json');info.size=len(raw);info.mode=0o600;archive.addfile(info,io.BytesIO(raw))
+          REMOTE
+      - name: Publier uniquement le résultat chiffré dans Git
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          AUDIT_RESULT: ${{ job.status }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          install -d "$RUNNER_TEMP/v1-result"
+          cd "$RUNNER_TEMP/v1-result"
+          git init -q
+          git config user.name github-actions[bot]
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          if [ "$AUDIT_RESULT" = success ]; then cp "$RUNNER_TEMP/v1-audit/sources.cms" sources.cms; fi
+          python3 - <<'PYTHON'
+          import json,os,pathlib
+          pathlib.Path('status.json').write_text(json.dumps({'status':os.environ['AUDIT_RESULT'],'commit':os.environ['GITHUB_SHA'],'run_url':'https://github.com/'+os.environ['GITHUB_REPOSITORY']+'/actions/runs/'+os.environ['GITHUB_RUN_ID']},indent=2))
+          PYTHON
+          git add .
+          git commit -qm 'Résultat chiffré audit V1 en lecture seule'
+          auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+          export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=http.https://github.com/.extraheader GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $auth"
+          git push -q "https://github.com/$GITHUB_REPOSITORY.git" HEAD:refs/heads/audit/v1-sources-encrypted-20261104
+      - name: Retirer la clé SSH temporaire du runner
+        if: always()
+        run: rm -f "$RUNNER_TEMP/v1-audit/ssh.key"
