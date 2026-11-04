@@ -115,21 +115,9 @@ def test_level_filters_only_hide_and_never_change_rank_score_or_order():
     assert 1 in [e['id'] for e in exact]                                                      # un titre retrouvé par son symbole exact n'est jamais masqué
 
 
-def test_the_interface_exposes_the_three_multi_choice_filters_and_the_summary():
-    html, js = (ROOT / 'app/public/index.html').read_text(), (ROOT / 'app/public/assets/explorer.js').read_text()
-    for key in ('regularity', 'risk', 'liquidity'):
-        assert f'id="{key}"' in html and f"{key}: JMulti(el('{key}'))" in js
-    assert "'regularity', 'risk', 'liquidity'" in (ROOT / 'app/routes/explore.php').read_text()
+def test_existing_assessment_is_preserved_in_the_full_sheet():
     assert 'JEtf.assessment(s.assessment)' in (ROOT / 'app/public/assets/titre.js').read_text()
     assert 's.period' in (ROOT / 'app/public/assets/etf.js').read_text()
-
-
-def test_explorer_clears_saved_filters_on_full_reload():
-    js = (ROOT / 'app/public/assets/explorer.js').read_text()
-    assert "nav.type === 'reload'" in js
-    assert "localStorage.removeItem('jigo_explorer2')" in js
-    assert "sessionStorage.removeItem('jigo_explorer2')" in js
-    assert "sessionStorage.removeItem('jigo_explorer_scroll')" in js
 
 
 def test_downsample_keeps_first_and_last_values_and_the_shape():

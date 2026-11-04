@@ -1,410 +1,123 @@
-/* Page Explorer : stratégie réglable, filtres avancés, tableau triable, comparaison actions / ETF, statistiques d'exclusion, export CSV. */
+/* Explorer V4: one versioned state, explicit draft/apply boundary, one financial engine. */
+'use strict';
 (async () => {
-  if (new URLSearchParams(location.search).has('manage')) { location.replace('mes-filtres.html'); return; }
-  const user = await J.init('explorer'); if (!user) return;
-  const [P, ov, mine0] = await Promise.all([J.api('strategy/presets'), J.api('data/overview').catch(() => null), J.api('presets/mine').catch(() => ({ presets: {} }))]);
-  let MINE = mine0.presets && !Array.isArray(mine0.presets) ? mine0.presets : {};           // réglages personnels des stratégies de départ : { clé: { config, view, updated_at } }
-  const NAMES = { regular: ['Croissance régulière', 'Une hausse soutenue et bien alignée, sur un mois et trois mois.'], fast: ['Croissance rapide', 'Une hausse marquée sur la semaine et le mois, même irrégulière.'],
-    recovery: ['Rebond', 'Repart à la hausse après six mois sans progrès notable.'], low_volatility: ['Hausse calme', 'Une hausse douce avec peu de variations et de replis.'],
-    momentum: ['Momentum 6 mois', 'Les titres qui ont le plus progressé entre il y a 6 mois et il y a 1 mois (le dernier mois est ignoré). Décrit le passé.'],
-    momentum12: ['Momentum 12 mois', 'Les titres qui ont le plus progressé entre il y a 12 mois et il y a 1 mois (le dernier mois est ignoré). Décrit le passé.'],
-    momentum_risk: ['Momentum ajusté du risque', 'Tendance haussière sur 200 jours, momentum 6 et 12 mois, avec pénalité de volatilité et de repli. Profil expérimental.'] };
-  const EXP = new Set(P.experimental || []);
-  const MOM_WIN = { momentum: '6 mois', momentum12: '12 mois' };
-  const EXP_NOTE = k => k === 'momentum_risk' ? 'Stratégie expérimentale : tendance au-dessus d’une moyenne mobile 200 jours ascendante, puis score combinant momentum 6 et 12 mois, volatilité et repli maximal sur 12 mois. Ces mesures décrivent le passé et ne prédisent pas la suite.' : 'Stratégie à titre d’essai : elle classe les titres selon leur progression passée entre il y a ' + (MOM_WIN[k] || '6 mois') + ' et il y a 1 mois (le dernier mois est ignoré). Elle décrit le passé et ne prédit pas la suite. Dans l’historique étudié, ce type de classement a connu des mois à plus de −25 % et des baisses de plus de 50 % depuis un sommet ; ses meilleurs titres sont souvent très volatils et l’avantage observé diminue quand on exige des titres très négociables. Aucune performance n’est garantie.';
-  const CRIT = { min_slope: 'pente insuffisante', min_r2: 'régularité insuffisante', min_er: 'efficacité insuffisante', min_return: 'performance trop faible', max_return: 'performance trop forte',
-    max_volatility: 'volatilité trop forte', max_drawdown: 'repli trop fort', data: 'historique insuffisant ou rupture de cours', freshness: 'cours non à jour',
-    above_ma50: 'cours sous la moyenne 50 j', ma50_rising: 'moyenne 50 j orientée à la baisse', max_daily_change: 'variation du jour trop forte', max_gap_ma20: 'écart à la moyenne 20 j trop grand' };
-  const LEVELS = { regularity: [['ok', 'Régulière'], ['warn', 'Moyennement régulière'], ['bad', 'Irrégulière'], ['unknown', 'Inconnue']],
-    risk: [['ok', 'Volatilité faible'], ['warn', 'Volatilité modérée'], ['bad', 'Volatilité forte'], ['unknown', 'Inconnue']],
-    liquidity: [['ok', 'Facilement négociable'], ['warn', 'À surveiller'], ['bad', 'Limitée'], ['unknown', 'Non déterminée']] };
-  const FILTERS = ['geo_region', 'country', 'category', 'regularity', 'risk', 'liquidity', 'budget', 'min_price', 'min_score', 'max_volatility', 'max_drawdown', 'min_volume', 'max_fee', 'cap'];
-  const CHECKS = ['pea', 'mine', 'open_now', 'fresh_only'];
-  const MARKETS = { XETR: 'Xetra', XPAR: 'Paris', XAMS: 'Amsterdam', XLON: 'Londres', XMIL: 'Milan', XMAD: 'Madrid', XSTO: 'Stockholm', XOSL: 'Oslo', XSWX: 'Zurich', XNAS: 'Nasdaq', XNYS: 'NYSE', XASE: 'NYSE American', ARCX: 'NYSE Arca', BATS: 'Cboe' };
-  const url = new URLSearchParams(location.search);
-  // Un rechargement complet repart des réglages par défaut ; les changements restent mémorisés pendant la navigation normale.
-  try {
-    const nav = performance.getEntriesByType('navigation')[0];
-    if (nav && nav.type === 'reload') {
-      localStorage.removeItem('jigo_explorer2');
-      sessionStorage.removeItem('jigo_explorer2');
-      sessionStorage.removeItem('jigo_explorer_scroll');
-    }
-  } catch (_) { }
-  const saved = (() => { try { return JSON.parse(sessionStorage.getItem('jigo_explorer2')) || JSON.parse(localStorage.getItem('jigo_explorer2')) || {}; } catch (e) { return {}; } })();
-  const S = { preset: saved.preset || 'regular', label: saved.label || null, config: saved.config || P.presets[saved.preset || 'regular'], status: saved.status || 'retained', page: saved.page || 1, sort: saved.sort || 'rank', dir: saved.dir || 'asc', size: saved.size || 20, level: saved.level || 'guided', compare: !!saved.compare, base: saved.base || null };
-  const el = id => J.$('#' + id);
-  const text = ['q', 'kind', 'market', ...FILTERS];
-  text.forEach(k => { const v = k === 'q' ? (url.has('q') && saved.pageKey !== location.pathname + location.search ? url.get('q') : (saved.view || {}).q) : (saved.view || {})[k]; if (v !== undefined && v !== null && el(k)) el(k).value = v; });
-  CHECKS.forEach(k => { if (el(k) && (saved.view || {})[k]) el(k).checked = true; });
-  if ((saved.view || {}).market_ui === '__pea') el('market').value = '__pea';
-  if ((saved.view || {}).tradable === false) el('tradable').checked = false;         // activé par défaut ; seul un choix explicite de le désactiver est conservé
-  const MS = { country: JMulti(el('country')), category: JMulti(el('category')), regularity: JMulti(el('regularity')), risk: JMulti(el('risk')), liquidity: JMulti(el('liquidity')) };
-  Object.keys(LEVELS).forEach(k => MS[k].set(LEVELS[k].map(([v, l]) => [v, l, ''])));
-  ['country', 'category', ...Object.keys(LEVELS)].forEach(k => { const v = (saved.view || {})[k]; if (v) el(k).value = v; });
-  let timer, seq = 0, lastRes = null;
-
-  /* bandeau de sources */
-  function drawSources() {
-    if (!ov) { el('sources').innerHTML = '<span>Catalogue : <b>FinanceDatabase</b></span><span>Cours : <b>Yahoo Finance</b></span>'; return; }
-    const latest = ov.places.map(p => p.last_close).filter(Boolean).sort().pop(), stale = ov.places.reduce((a, p) => a + p.stale, 0), ok = ov.places.reduce((a, p) => a + p.ok, 0), tot = ov.places.reduce((a, p) => a + p.followed, 0);
-    el('sources').innerHTML = `<span>Catalogue : <b>FinanceDatabase</b> · chargé le ${J.date(ov.catalogue.loaded_at)}</span><span>Cours : <b>Yahoo Finance</b> · dernière clôture ${J.date(latest)}</span>
-      <span><i class="dot ${stale ? 'stale' : ''}"></i>${J.num(ok, 0)} séries sur ${J.num(tot, 0)} à jour${stale ? ' · ' + stale + ' en retard' : ''}</span><span>Univers : <b>${J.num(ov.catalogue.recommendable, 0)}</b> titres analysés</span><a href="donnees.html" style="margin-left:auto">Détail des données →</a>`;
+  const user=await J.init('explorer');if(!user)return;
+  const $=id=>document.getElementById(id),copy=x=>JSON.parse(JSON.stringify(x)),esc=J.esc;
+  const P=await J.api('strategy/presets'),KEY='jigo.explorer.v4.'+user.id;
+  const names={regular:'Croissance régulière',fast:'Croissance rapide',recovery:'Rebond',low_volatility:'Hausse calme',momentum:'Momentum 6 mois (expérimental)',momentum12:'Momentum 12 mois (expérimental)',momentum_risk:'Momentum ajusté du risque (expérimental)'};
+  const modes={weighted:'Score configurable',trend:'Tendance (historique)',performance:'Performance (historique)',regularity:'Régularité (historique)',stability:'Stabilité (historique)',momentum:'Momentum 6 mois (expérimental)',momentum12:'Momentum 12 mois (expérimental)',momentum_risk:'Momentum ajusté du risque (expérimental)'};
+  const metricNames={slope:'Pente sur la période (%)',perf:'Performance (%)',r2:'Régularité (R²)',volatility:'Volatilité (% / séance)',er:'Efficacité (ER)',drawdown:'Repli maximal (%)',current_drawdown:'Recul actuel (%)',up_fraction:'Proportion de séances en hausse (0–1)',up_days:'Séances en hausse',gain_share:'Concentration des hausses (%)',gain_net_share:'Plus forte hausse / gain net (%)',worst_day:'Pire séance (%)',largest_day:'Meilleure séance (%)',avg_volume:'Volume moyen (titres / séance)',turnover_eur:'Montant échangé moyen (€ / séance)',quoted_avg_volume:'Volume moyen 3 mois coté',momentum6:'Momentum 6 mois hors dernier mois (%)',momentum12:'Momentum 12 mois hors dernier mois (%)',daily_change:'Variation dernière clôture (%)',gap_to_ma20:'Écart moyenne 20 séances (%)',ma50_trend:'Variation moyenne 50 séances (%)',above_ma50:'Cours > moyenne 50 séances (0/1)',above_ma200:'Cours > moyenne 200 séances (0/1)'};
+  const slope=(s,n)=>s==null?null:100*Math.expm1(n*Math.log1p(s/100)),inverse=(s,n)=>100*Math.expm1(Math.log1p(s/100)/n);
+  const defaultSearch=()=>({config:copy(P.v4_presets.regular),universe:{tradable:true},preset:'regular'});
+  let S={schema:4,applied:defaultSearch(),draft:defaultSearch(),preferences:{mode:'beginner',configuration:'period',period:'month',target:'all',columns:['slope','perf','r2','volatility'],panels:{}}},library=[],last=null,page=1,requestSerial=0;
+  const tell=(text,bad=false)=>{$('message').textContent=text;$('message').className=bad?'down':'muted';};
+  const safe=fn=>async(...args)=>{try{await fn(...args);}catch(e){tell(e.message,true);}};
+  try{const saved=JSON.parse(localStorage.getItem(KEY));if(saved?.schema===4)S=saved;}catch(e){tell('Préférences locales illisibles : valeurs d’origine chargées.');}
+  // A legacy browser snapshot is offered explicitly; it never overrides the V4 applied state.
+  let oldSnapshot=null;try{oldSnapshot=JSON.parse(localStorage.getItem('jigo_explorer2'));}catch(_){}
+  page=S.preferences.result?.page||1;
+  const persist=()=>{try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){tell('Stockage local indisponible : les sauvegardes de la bibliothèque restent utilisables.',true);}};
+  const dirty=()=>{persist();const changed=JSON.stringify(S.draft)!==JSON.stringify(S.applied);const preset=S.draft.preset,opt=$('strategy').querySelector('option[value="'+CSS.escape(preset||'custom')+'"]');if(opt&&names[preset])opt.textContent=names[preset]+(JSON.stringify(S.draft.config)!==JSON.stringify(P.v4_presets[preset])?' · modifiée':'');const active=S.draft.config.periods.filter(p=>p.enabled).map(p=>({day:'1 jour',week:'1 semaine',month:'1 mois',quarter:'3 mois',half:'6 mois',year:'1 an'})[p.id]).join(' · ')||'aucune';$('draft-note').textContent='Périodes : '+active+'. '+(changed?'Réglages modifiés — résultats inchangés jusqu’à Appliquer.':'Résultats fondés sur les réglages appliqués.');$('draft-note').classList.toggle('ex-dirty',changed);};
+  const config=()=>S.draft.config,periods=()=>[...config().periods].reverse();
+  function effective(c,kind){const r=c.asset_rules?.[kind];if(!r)return c;const x=copy(c);x.periods.forEach(p=>Object.assign(p,r.periods?.[p.id]||{}));for(const f of ['technical','selection','liquidity'])Object.assign(x[f],r[f]||{});return x;}
+  function working(){return effective(config(),S.preferences.target);}
+  function setPeriod(id,field,value){const kind=S.preferences.target;if(kind==='all')Object.assign(config().periods.find(p=>p.id===id),{[field]:value});else{const rules=config().asset_rules;rules[kind]??={periods:{}};rules[kind].periods[id]??={};rules[kind].periods[id][field]=value;}dirty();}
+  function setSection(section,key,value){if(S.preferences.target==='all')config()[section][key]=value;else{const rule=config().asset_rules[S.preferences.target]??={periods:{}};rule[section]??={};rule[section][key]=value;}dirty();}
+  function options(obj,selected){return Object.entries(obj).map(([v,t])=>`<option value="${esc(v)}" ${v===selected?'selected':''}>${esc(t)}</option>`).join('');}
+  function render(){
+    $('strategy').innerHTML='<option value="custom">Personnalisée</option><option value="empty">Configuration vide</option>'+options(names,S.draft.preset)+library.filter(i=>i.kind==='strategy'&&i.active).map(i=>`<option value="saved:${esc(i.id)}">${esc(i.name)}</option>`).join('');$('strategy').value=S.draft.preset||'custom';
+    $('kind').value=S.draft.universe.kind||'';$('q').value=S.draft.universe.q||'';$('mode').value=S.preferences.mode;$('configuration').value=S.preferences.configuration;$('target').value=S.preferences.target;
+    $('status').value=S.preferences.result?.status||'retained';$('sort').value=S.preferences.result?.sort||'rank';
+    const c=working();$('periods').innerHTML=c.periods.map(p=>`<label><input type="checkbox" data-period="${p.id}" ${p.enabled?'checked':''}>${esc(J.PERIODS[p.id])}<small>${p.sessions} s.</small></label>`).join('');
+    $('periods').querySelectorAll('input').forEach(el=>el.onchange=()=>{setPeriod(el.dataset.period,'enabled',el.checked);renderCriteria();renderScore();});
+    $('edit-period').innerHTML=periods().map(p=>`<option value="${p.id}">${esc(J.PERIODS[p.id])} (${p.sessions} séances)</option>`).join('');$('edit-period').value=S.preferences.period;
+    for(const id of ['settings','universe']){const open=!!S.preferences.panels[id];$(id).hidden=!open;$(id+'-toggle').setAttribute('aria-expanded',String(open));}
+    $('expert-selection').open=S.preferences.mode==='expert';$('score-panel').open=S.preferences.mode==='expert';
+    renderCriteria();renderUniverse();renderScore();renderColumns();dirty();
   }
-
-  function freeConfig() { const c = JSON.parse(JSON.stringify(P.presets.regular)); c.name = 'free'; c.periods.forEach(p => { p.enabled = p.id === 'month'; ['min_slope', 'min_r2', 'min_er', 'min_return', 'max_return', 'max_volatility', 'max_drawdown'].forEach(f => p[f] = null); }); c.ranking.mode = 'trend'; return c; }
-  const SUB = { regular: 'Hausse stable', fast: 'Hausse marquée', recovery: 'Après une baisse', low_volatility: 'Peu de variations', momentum: '126 → 21 séances', momentum12: '252 → 21 séances', momentum_risk: 'Tendance · momentum · risque' };
-  const CURRENT_SAVED = () => S.preset === 'custom' ? searches.find(x => x.name === S.label) : null;
-  const strategyEnabled = key => { try { return JSON.parse(localStorage.getItem('jigo_strategy_availability') || '{}')['preset:' + key] !== false; } catch (_) { return true; } };
-  const searchEnabled = id => { try { return JSON.parse(localStorage.getItem('jigo_strategy_availability') || '{}')['search:' + id] !== false; } catch (_) { return true; } };
-  function appendSavedStrategies() {
-    const current = el('strats').querySelector('.strat-grid'); if (!current) return;
-    const active = CURRENT_SAVED();
-    current.insertAdjacentHTML('beforeend', searches.filter(x => searchEnabled(x.id)).map(x => `<button type="button" class="strat slim saved-strategy ${active && active.id == x.id ? 'on' : ''}" data-k="saved" data-saved-id="${+x.id}" title="${J.esc(x.view?.description || x.name)}"><span class="ico" aria-hidden="true">${J.esc(x.view?.icon || '🔎')}</span><span class="tx"><b>${J.esc(x.name)}</b><span>${J.esc(x.view?.description || 'Filtre personnel · disponible')}</span></span></button>`).join(''));
-    J.$$('#strats .saved-strategy').forEach(b => b.onclick = () => { const x = searches.find(y => +y.id === +b.dataset.savedId); if (x) applySearch(x); });
-  }
-  const helpHtml = k => `<b>${J.esc(NAMES[k][0])}</b><p>${J.esc(NAMES[k][1])}</p>${EXP.has(k) ? `<p class="helpwarn">${J.esc(EXP_NOTE(k))}</p>` : ''}`;
-  function drawStrategies() {
-    const hadGrid = !!el('strats').querySelector('.strat-grid');
-    el('strats').innerHTML = '<div class="strat-grid">' + Object.keys(P.presets).filter(strategyEnabled).map(k => `<div class="strat ${S.preset === k ? 'on' : ''} ${EXP.has(k) ? 'exp' : ''}" role="button" tabindex="0" aria-pressed="${S.preset === k}" data-k="${k}"><span class="ico">${JMenu.icon(k)}</span><span class="tx"><b>${NAMES[k][0]}${MINE[k] ? ' <i class="mod" title="Vous avez enregistré votre propre réglage pour cette stratégie">modifiée</i>' : ''}</b><span>${SUB[k] || ''}</span></span><button type="button" class="q" data-help="${k}" aria-label="Explication : ${J.esc(NAMES[k][0])}" aria-expanded="false">?</button></div>`).join('') + '</div>' +
-      '<div class="strat-extra">' + `<button class="strat slim ${S.preset === 'free' ? 'on' : ''}" data-k="free"><span class="ico">${JMenu.icon('free')}</span><span class="tx"><b>Recherche libre</b><span>Aucun critère de départ</span></span></button>` +
-      '</div>';
-    J.$$('#strats .strat[data-k]').forEach(b => { b.onclick = e => { if (e.target.closest('.q')) return; choose(b.dataset.k); }; b.onkeydown = e => { if ((e.key === 'Enter' || e.key === ' ') && e.target === b) { e.preventDefault(); choose(b.dataset.k); } }; });
-    syncReset();
-    J.$$('#strats .q').forEach(q => q.onclick = e => { e.stopPropagation(); JMenu.pop(q, helpHtml(q.dataset.help)); });
-    const act = S.config.periods.filter(p => p.enabled).map(p => J.PERIODS[p.id].toLowerCase() + ' (' + p.sessions + ' séances)');
-    el('strategy-summary').textContent = 'Périodes : ' + act.join(', ') + ' · classement par ' + ({ trend: 'pente', performance: 'performance', regularity: 'régularité', stability: 'stabilité', momentum: 'momentum 6 mois (J−126 → J−21 séances)', momentum12: 'momentum 12 mois (J−252 → J−21 séances)', momentum_risk: 'momentum ajusté du risque' }[S.config.ranking.mode]) + (MOM_WIN[S.config.ranking.mode] || S.config.ranking.mode === 'momentum_risk' ? ' · ' + EXP_NOTE(S.config.ranking.mode) : (EXP.has(S.preset) ? ' · ' + EXP_NOTE(S.preset) : ''));
-    drawSliders(); appendSavedStrategies();
-    if (hadGrid) {
-      const grid = el('strats').querySelector('.strat-grid'), active = grid.querySelector('.strat.on[data-k]');
-      if (active) {
-        const box = active.getBoundingClientRect(), viewport = grid.getBoundingClientRect();
-        if (box.left < viewport.left) grid.scrollLeft -= viewport.left - box.left;
-        else if (box.right > viewport.right) grid.scrollLeft += box.right - viewport.right;
+  const basics=[['slope','min_slope','max_slope',-40,100,.1,1,'Pente sur la période (%)'],['r2','min_r2','max_r2',0,1,.01,2,'Régularité (R²)'],['volatility','min_volatility','max_volatility',0,20,.1,1,'Volatilité (% / séance)']];
+  function editedPeriods(){const c=working();return S.preferences.configuration==='global'?[...c.periods].reverse().filter(p=>p.enabled):[c.periods.find(p=>p.id===S.preferences.period)];}
+  function renderCriteria(){
+    const selected=editedPeriods().filter(Boolean),p=selected[0];$('global-note').textContent=S.preferences.configuration==='global'?'Chaque modification s’applique aux granularités actives compatibles. Les seuils préexistants restent conservés tant que vous ne touchez pas un contrôle.':'Seuils propres à cette granularité. Pente = progression de la droite de régression sur toute la période.';
+    $('criteria').innerHTML='';if(!p){$('criteria').textContent='Activez une granularité pour utiliser les réglages globaux.';}
+    const edit=(field,value)=>selected.forEach(x=>{if(x.sessions<3&&/r2|er|volatility/.test(field))return;setPeriod(x.id,field,value==null?null:field.includes('slope')?inverse(value,x.sessions):value);});
+    if(p){const grid=document.createElement('div');grid.className='ex-grid';$('criteria').append(grid);
+      for(const [metric,lo,hi,min,max,step,dec,label] of basics){
+        const eligible=selected.filter(x=>x.sessions>=3||metric==='slope'),first=eligible[0],disabled=!first;
+        const display=(x,f)=>f.includes('slope')?slope(x[f],x.sessions):x[f],a=first?display(first,lo):null,b=first?display(first,hi):null;
+        const mixed=eligible.some(x=>display(x,lo)!==a||display(x,hi)!==b);
+        const card=document.createElement('div');card.className='ex-range';card.innerHTML=`<h3>${esc(label)}</h3><div class="bound-switches"><label><input type="checkbox" class="enable-low" ${a!=null?'checked':''} ${disabled?'disabled':''}> Minimum</label><label><input type="checkbox" class="enable-high" ${b!=null?'checked':''} ${disabled?'disabled':''}> Maximum</label></div><div class="range"></div><div class="illustration" aria-hidden="true"></div><p class="small muted range-note">${disabled?'Non applicable en une séance.':mixed?'Valeurs différentes selon les périodes : modifiez pour les harmoniser.':'Une borne décochée ne participe pas à la sélection.'}</p>`;grid.append(card);
+        let ready=false;const low=card.querySelector('.enable-low'),high=card.querySelector('.enable-high');
+        const initial=[a??min,b??max];let previous=[...initial];const scaleMin=Math.min(min,...initial),scaleMax=Math.max(max,...initial);
+        const handle=JMenu.dualRange(card.querySelector('.range'),{label,min:scaleMin,max:scaleMax,step,dec,low:initial[0],high:initial[1],disabled,
+          onInput:(l,h)=>{card.querySelector('.illustration').innerHTML=JMenu.chart(metric==='slope'?'slope3':metric,metric==='r2'?l:Math.min(1,Math.max(0,(l-min)/(max-min))));if(ready){if(low.checked&&l!==previous[0])edit(lo,l);if(high.checked&&h!==previous[1])edit(hi,h);}previous=[l,h];}});ready=true;
+        low.onchange=()=>edit(lo,low.checked?handle.get()[0]:null);high.onchange=()=>edit(hi,high.checked?handle.get()[1]:null);
       }
     }
+    const advancedLabels={min_return:'Performance minimale (%)',max_return:'Performance maximale (%)',min_er:'Efficacité minimale (−1 à 1)',max_er:'Efficacité maximale',max_drawdown:'Repli maximal autorisé (%)',max_current_drawdown:'Recul actuel maximal (%)',min_up_fraction:'Part minimale de séances en hausse (0–1)',min_up_days:'Nombre minimal de séances en hausse',max_gain_share:'Concentration maximale des hausses (%)',max_gain_net_share:'Plus forte séance / gain net : maximum (%)',min_worst_day:'Pire séance : minimum (%)',min_volume:'Volume moyen minimal (titres / séance)',min_turnover_eur:'Montant échangé minimal (€ / séance)'};
+    $('advanced').innerHTML=p?`<label><span>Historique de la période obligatoire</span><input type="checkbox" id="require-history" ${p.require_history?'checked':''}></label>`+Object.entries(advancedLabels).map(([k,t])=>`<label>${esc(t)}<input data-bound="${k}" type="number" step="any" value="${p[k]??''}" ${p.sessions<3&&k.includes('_er')?'disabled':''} placeholder="Sans contrainte"></label>`).join(''):'';
+    if(p){$('require-history').onchange=e=>selected.forEach(x=>setPeriod(x.id,'require_history',e.target.checked));$('advanced').querySelectorAll('[data-bound]').forEach(el=>el.oninput=()=>edit(el.dataset.bound,el.value===''?null:Number(el.value)));}
+    const c=working(),tech={above_ma50:'Cours au-dessus de la moyenne 50 séances',ma50_rising:'Moyenne 50 séances en hausse',above_ma200:'Cours au-dessus de la moyenne 200 séances',ma200_rising:'Moyenne 200 séances en hausse'};
+    $('technical').innerHTML=Object.entries(tech).map(([k,t])=>`<label><span>${esc(t)}</span><input type="checkbox" data-tech="${k}" ${c.technical[k]?'checked':''}></label>`).join('')+['max_daily_change','max_gap_ma20'].map(k=>`<label>${k==='max_daily_change'?'Variation absolue du jour : maximum (%)':'Écart absolu moyenne 20 : maximum (%)'}<input type="number" step="any" data-tech-number="${k}" value="${c.technical[k]??''}" placeholder="Sans contrainte"></label>`).join('')+`<label>Volume moyen coté 3 mois : minimum<input type="number" step="any" id="quoted-volume" value="${c.liquidity.min_quoted_volume??''}" placeholder="Sans contrainte"></label>`;
+    $('technical').querySelectorAll('[data-tech]').forEach(el=>el.onchange=()=>setSection('technical',el.dataset.tech,el.checked));$('technical').querySelectorAll('[data-tech-number]').forEach(el=>el.oninput=()=>setSection('technical',el.dataset.techNumber,el.value===''?null:Number(el.value)));
+    $('quoted-volume').oninput=e=>setSection('liquidity','min_quoted_volume',e.target.value===''?null:Number(e.target.value));
+    $('combine').value=c.selection.combine;$('missing').value=c.selection.missing;$('require-fresh').checked=c.selection.require_fresh;
   }
-  function view() {
-    const v = { q: el('q').value.trim(), kind: el('kind').value, market: el('market').value === '__pea' ? '' : el('market').value };
-    FILTERS.forEach(k => { v[k] = el(k).value.trim(); });
-    CHECKS.forEach(k => { v[k === 'mine' ? 'owned_only' : k] = el(k).checked; });
-    if (el('market').value === '__pea') v.pea = true;
-    v.tradable = el('tradable').checked;
-    return v;
+  const universeFields={regularity:'Régularité (ok|warn|bad|unknown)',risk:'Risque (ok|warn|bad|unknown)',liquidity:'Négociabilité (ok|warn|bad|unknown)',market:'Place (code MIC)',country:'Pays (séparés par |)',category:'Secteur / catégorie (séparés par |)',currency:'Devise (EUR|USD…)',geo_region:'Zone (us, eu, emerging)',min_price:'Prix minimal (€)',max_price:'Prix maximal (€)',budget:'Budget maximal par titre (€)',min_volume:'Volume coté minimal (titres / jour)',max_fee:'Frais ETF maximaux (% / an)',min_aum:'Encours ETF minimal (€)',max_aum:'Encours ETF maximal (€)',cap:'Taille (micro|small|mid|large|mega)'};
+  function renderUniverse(){const u=S.draft.universe;$('universe-fields').innerHTML=Object.entries(universeFields).map(([k,t])=>`<label>${esc(t)}<input data-universe="${k}" value="${esc(u[k]??'')}" ${['regularity','risk','liquidity','market','country','category','currency','geo_region','cap'].includes(k)?'':'type="number" min="0" step="any"'}></label>`).join('')+Object.entries({tradable:'Titres facilement négociables',pea:'PEA probable',owned_only:'Titres détenus',open_now:'Place ouverte',fresh_only:'Données à jour'}).map(([k,t])=>`<label><span>${esc(t)}</span><input type="checkbox" data-universe-check="${k}" ${u[k]?'checked':''}></label>`).join('');
+    $('universe-fields').querySelectorAll('[data-universe]').forEach(el=>el.oninput=()=>{if(el.value==='')delete u[el.dataset.universe];else u[el.dataset.universe]=el.type==='number'?Number(el.value):el.value;dirty();});$('universe-fields').querySelectorAll('[data-universe-check]').forEach(el=>el.onchange=()=>{u[el.dataset.universeCheck]=el.checked;dirty();});}
+  function renderScore(){const r=config().ranking;$('rank-mode').innerHTML=options(modes,r.mode);$('score-missing').value=r.missing||'unknown';$('aggregation').value=r.aggregation||'mean';$('grouping').value=r.grouping||'asset_kind';$('score-add').hidden=r.mode!=='weighted';
+    if(r.mode!=='weighted'){$('score-components').className=r.mode==='weighted'?'':'ex-grid';$('score-components').innerHTML=periods().map(p=>`<label>${esc(J.PERIODS[p.id])} : poids<input type="number" min="0" max="100" step="any" data-weight="${p.id}" value="${r.weights[p.id]??0}"></label>`).join('');$('score-components').querySelectorAll('[data-weight]').forEach(el=>el.oninput=()=>{r.weights[el.dataset.weight]=Number(el.value);dirty();});return;}
+    $('score-components').className='';$('score-components').innerHTML=r.components.map((p,i)=>`<div class="ex-component" data-component="${i}"><div class="ex-toolbar"><label><input type="checkbox" data-f="enabled" ${p.enabled?'checked':''}> Actif</label><label><input type="checkbox" data-f="required" ${p.required?'checked':''}> Mesure obligatoire</label><button class="btn" data-remove="${i}">Supprimer la contribution</button></div><div class="ex-grid">${select('metric','Mesure',metricNames,p.metric)}${select('period','Période',Object.fromEntries(periods().map(x=>[x.id,J.PERIODS[x.id]])),p.period)}${select('kind','Type',{all:'Tous',equity:'Actions',etf:'ETF'},p.kind)}${select('direction','Sens',{higher:'Valeur élevée favorisée',lower:'Valeur basse favorisée'},p.direction)}${select('normalization','Normalisation',{percentile:'Percentile de la population',linear:'Bornes fixes (0–100)',raw:'Valeur brute'},p.normalization)}${select('transform','Transformation',{identity:'Aucune',log1p:'Log(1 + valeur)',sqrt:'Racine carrée',power:'Puissance signée'},p.transform)}${['weight','min','max','exponent'].map(k=>`<label>${({weight:'Poids',min:'Borne basse',max:'Borne haute',exponent:'Exposant'})[k]}<input type="number" step="any" data-f="${k}" value="${p[k]}"></label>`).join('')}</div></div>`).join('');
+    $('score-components').querySelectorAll('[data-component]').forEach(row=>{const part=r.components[Number(row.dataset.component)];row.querySelectorAll('[data-f]').forEach(el=>el.onchange=()=>{part[el.dataset.f]=el.type==='checkbox'?el.checked:el.type==='number'?Number(el.value):el.value;dirty();});});$('score-components').querySelectorAll('[data-remove]').forEach(el=>el.onclick=()=>{r.components.splice(Number(el.dataset.remove),1);dirty();renderScore();});
   }
-  addEventListener('pagehide', () => { persist(); try { sessionStorage.setItem('jigo_explorer_scroll', String(scrollY)); } catch (e) {} });
-  function persist() { try { localStorage.setItem('jigo_explorer2', JSON.stringify({ pageKey: location.pathname + location.search, preset: S.preset, base: S.base || null, config: S.config, status: S.status, page: S.page, level: S.level, compare: S.compare, sort: S.sort, dir: S.dir, size: S.size, view: { ...view(), mine: el('mine').checked, market_ui: el('market').value }, label: S.label || null })); sessionStorage.setItem('jigo_explorer2', localStorage.getItem('jigo_explorer2')); } catch (e) { } }
-
-  /* éditeur : réglages guidés + détaillé */
-  const levelOpts = (obj, labels, cur) => Object.entries(labels).map(([k, l]) => `<option value="${k}" ${k === cur ? 'selected' : ''}>${l}</option>`).join('');
-  function guessLevel(map, value, none = '') { if (value === null || value === undefined) return none; const best = Object.entries(map).filter(([, v]) => v !== null).sort((a, b) => Math.abs(a[1] - value) - Math.abs(b[1] - value))[0]; return best && Math.abs(best[1] - value) < 0.02 * Math.max(1, Math.abs(value)) ? best[0] : 'custom'; }
-  function drawEditor() {
-    const applyButton=el('apply-menu');applyButton.remove();
-    const c = S.config, box = el('editor'), act = c.periods.filter(p => p.enabled), p0 = act[0] || c.periods[0];
-    const sl = guessLevel(P.slope_levels, p0.min_slope, 'none'), rl = guessLevel(Object.fromEntries(Object.entries(P.r2_levels)), p0.min_r2, 'none'), dd = p0.max_drawdown === null ? '' : String(p0.max_drawdown);
-    const num = (p, f, step) => `<input type="number" step="${step}" value="${p[f] ?? ''}" data-p="${p.id}" data-f="${f}" style="width:100px" placeholder="–">`;
-    box.innerHTML = `<div class="row between"><h2 style="margin:0">Régler la stratégie</h2><span class="seg" id="lvl"><button data-l="guided" class="${S.level === 'guided' ? 'on' : ''}">Réglages guidés</button><button data-l="detail" class="${S.level === 'detail' ? 'on' : ''}">Réglage détaillé</button></span></div><div class="row editor-actions" style="margin-top:12px"></div>
-    <p class="muted small" style="margin:6px 0 12px">Un titre est retenu s’il respecte tous les critères de toutes les périodes cochées. Case vide = pas de critère. Pente = hausse moyenne par séance ; R² = régularité de la hausse (1 = droite parfaite).</p>
-    <div class="row" style="gap:18px;margin-bottom:10px">${c.periods.map(p => `<label class="row gap-s small"><input type="checkbox" ${p.enabled ? 'checked' : ''} data-p="${p.id}" data-f="enabled"> ${J.PERIODS[p.id]}${p.id==='day'?' (clôtures)':''} <input type="number" min="2" max="252" value="${p.sessions}" data-p="${p.id}" data-f="sessions" style="width:60px" ${p.id === 'day' ? 'disabled' : ''}> <span class="muted">séances</span></label>`).join('')}</div>
-    <p id="day-rule" class="small muted" role="status"></p><div id="guided" ${S.level === 'guided' ? '' : 'hidden'}><div class="filters" style="border:0;background:none;padding:0">
-      <label class="guided-slope">Pente exigée<select id="g-slope"><option value="none">Aucune</option>${Object.entries({ gentle: 'Douce (doublement en ~8 ans)', moderate: 'Modérée (~4 ans)', strong: 'Forte (~2 ans)', very_strong: 'Très forte (~1 an)' }).map(([k, l]) => `<option value="${k}" ${k === sl ? 'selected' : ''}>${l}</option>`).join('')}${sl === 'custom' ? '<option value="custom" selected>Personnalisée</option>' : ''}</select></label>
-      <label class="guided-r2">Régularité exigée<select id="g-r2"><option value="none">Aucune</option>${Object.entries({ flexible: 'Souple (R² ≥ 0,56)', balanced: 'Équilibrée (R² ≥ 0,75)', strict: 'Stricte (R² ≥ 0,89)' }).map(([k, l]) => `<option value="${k}" ${k === rl ? 'selected' : ''}>${l}</option>`).join('')}${rl === 'custom' ? '<option value="custom" selected>Personnalisée</option>' : ''}</select></label>
-      <label>Tolérance aux corrections<select id="g-dd">${[['', 'Aucune limite'], ['5', 'Repli max. 5 %'], ['10', 'Repli max. 10 %'], ['20', 'Repli max. 20 %']].map(([v, l]) => `<option value="${v}" ${v === dd ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
-      <label>Classer par<select id="r-mode">${[['trend', 'Pente'], ['performance', 'Performance'], ['regularity', 'Régularité'], ['stability', 'Stabilité (faible volatilité)'], ['momentum', 'Momentum 6 mois (essai)'], ['momentum12', 'Momentum 12 mois (essai)'], ['momentum_risk', 'Momentum ajusté du risque (essai)']].map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select></label></div>
-      <p class="muted small" style="margin:8px 0 0">Ces réglages s’appliquent à chaque période cochée. Pour un réglage différent par période, passez au réglage détaillé.</p></div>
-    <div id="detail" ${S.level === 'detail' ? '' : 'hidden'}><div class="table-wrap"><table><thead><tr><th>Période</th><th class="num">Pente min. (%/séance)</th><th class="num">R² min.</th><th class="num">ER min.</th><th class="num">Perf. min. (%)</th><th class="num">Perf. max. (%)</th><th class="num">Volat. max.</th><th class="num">Repli max. (%)</th><th class="num">Poids</th></tr></thead><tbody>
-    ${c.periods.map(p => `<tr><td>${J.PERIODS[p.id]}</td><td class="num">${num(p, 'min_slope', .01)}</td><td class="num">${num(p, 'min_r2', .01)}</td><td class="num">${num(p, 'min_er', .01)}</td><td class="num">${num(p, 'min_return', 1)}</td><td class="num">${num(p, 'max_return', 1)}</td><td class="num">${num(p, 'max_volatility', .1)}</td><td class="num">${num(p, 'max_drawdown', 1)}</td><td class="num"><input type="number" min="0" step=".5" data-w="${p.id}" value="${(c.ranking.weights || {})[p.id] ?? 1}" style="width:64px"></td></tr>`).join('')}</tbody></table></div>
-    <div class="row" style="margin-top:12px"><label class="row gap-s small"><input type="checkbox" id="t-ma50" ${c.technical.above_ma50 ? 'checked' : ''}> Cours au-dessus de la moyenne 50 j</label>
-      <label class="row gap-s small"><input type="checkbox" id="t-ma50r" ${c.technical.ma50_rising ? 'checked' : ''}> Moyenne 50 j en hausse</label>
-      <label class="row gap-s small"><input type="checkbox" id="t-ma200" ${c.technical.above_ma200 ? 'checked' : ''}> Cours au-dessus de la moyenne 200 j</label>
-      <label class="row gap-s small"><input type="checkbox" id="t-ma200r" ${c.technical.ma200_rising ? 'checked' : ''}> Moyenne 200 j en hausse</label>
-      <label class="row gap-s small">Variation du jour max. (%) <input type="number" id="t-day" value="${c.technical.max_daily_change ?? ''}" style="width:70px"></label>
-      <label class="row gap-s small">Écart moy. 20 j max. (%) <input type="number" id="t-gap" value="${c.technical.max_gap_ma20 ?? ''}" style="width:70px"></label>
-      <label class="row gap-s small">Classer par <select id="r-mode2">${[['trend', 'Pente'], ['performance', 'Performance'], ['regularity', 'Régularité'], ['stability', 'Stabilité'], ['momentum', 'Momentum 6 mois'], ['momentum12', 'Momentum 12 mois'], ['momentum_risk', 'Momentum ajusté du risque']].map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select></label></div></div>
-    <div id="editor-msg" class="notice err" hidden style="margin-top:10px"></div>
-    <div class="row" style="margin-top:12px"><select id="save-to" aria-label="Portefeuille"><option value="">Enregistrer pour un portefeuille…</option></select><button class="btn" id="save-btn">Enregistrer</button></div>`;
-    if(box.hidden)J.$('#menu .mact').prepend(applyButton);else J.$('.editor-actions',box).append(applyButton);
-    J.$('#r-mode', box).value = c.ranking.mode; J.$('#r-mode2', box).value = c.ranking.mode;
-    ['#g-slope', '#g-r2', '#g-dd'].forEach(id => { const e = J.$(id, box); e.dataset.init = e.value; });
-    J.$$('#lvl button', box).forEach(b => b.onclick = async () => { if(await readEditor(false)){S.level = b.dataset.l; drawEditor();} });
-    const day=J.$('[data-p="day"][data-f="enabled"]',box),dayReturn=J.$('[data-p="day"][data-f="min_return"]',box);
-    const dayHint=()=>{const n=dayReturn.value;J.$('#day-rule',box).textContent=!day.checked?'':n!==''?'Dernier jour : variation entre les deux dernières clôtures ≥ '+n+' %. Le cours intrajournalier peut évoluer différemment.':'Dernier jour activé sans performance minimale : une baisse peut rester admissible. Réglez « Perf. min. » en mode détaillé.'};
-    day.addEventListener('change',()=>{if(day.checked&&J.$$('[data-p="day"][data-f]',box).filter(e=>!['enabled','sessions'].includes(e.dataset.f)).every(e=>e.value===''))dayReturn.value='0';dayHint()});
-    dayReturn.addEventListener('input',dayHint);dayHint();
-    box.oninput=markDirty;box.onchange=markDirty;
-    J.api('portfolios').then(r => { const sel = J.$('#save-to', box); r.portfolios.forEach(p => sel.insertAdjacentHTML('beforeend', `<option value="${p.id}">${J.esc(p.name)}</option>`)); });
-    J.$('#save-btn', box).onclick = async () => { const id = J.$('#save-to', box).value; if (!id) return; if (await readEditor()) { await J.post('portfolio/strategy', { id: +id, config: S.config }); J.toast('Stratégie enregistrée pour ce portefeuille'); } };
+  function select(f,label,values,value){return `<label>${esc(label)}<select data-f="${f}">${options(values,value)}</select></label>`;}
+  function renderColumns(){$('column-options').innerHTML=['slope','perf','r2','volatility','er','drawdown'].map(k=>`<label><input type="checkbox" data-column="${k}" ${S.preferences.columns.includes(k)?'checked':''}>${esc(metricNames[k])}</label>`).join('');$('column-options').querySelectorAll('input').forEach(el=>el.onchange=()=>{S.preferences.columns=[...$('column-options').querySelectorAll(':checked')].map(x=>x.dataset.column);persist();if(last)renderResults(last);});}
+  function relevant(row){return effective(S.applied.config,row.kind).periods.filter(p=>p.enabled).reverse();}
+  function measureText(row,p){const m=row.measures?.[p.sessions];if(!m)return 'Données insuffisantes';return S.preferences.columns.map(k=>`${({slope:'Pente',perf:'Perf.',r2:'R²',volatility:'Vol.',er:'ER',drawdown:'Repli'})[k]} ${k==='slope'?J.pct(m.slope_period):['r2','er'].includes(k)?J.num(m[k]):J.pct(m[k])}`).join(' · ');}
+  async function load(){const serial=++requestSerial;$('results').setAttribute('aria-busy','true');const response=await J.post('explore',{config:S.applied.config,view:{...S.applied.universe,status:$('status').value,sort:$('sort').value,dir:$('sort').value==='score'?'desc':'asc',page,page_size:30}});if(serial!==requestSerial)return;S.preferences.result={status:$('status').value,sort:$('sort').value,page:response.page};persist();last=response;renderResults(response);$('results').setAttribute('aria-busy','false');}
+  function spark(values){if(!values||values.filter(x=>x!=null).length<2)return '<span class="muted small">Historique insuffisant</span>';const ys=values.filter(x=>x!=null),lo=Math.min(...ys),span=Math.max(...ys)-lo||1;let path='',pen=false;values.forEach((v,i)=>{if(v==null){pen=false;return;}path+=(pen?'L':'M')+(i*110/(values.length-1)).toFixed(2)+' '+(31-(v-lo)*28/span).toFixed(2);pen=true;});return `<svg class="spark" viewBox="0 0 110 34" role="img" aria-label="Cours historiques, séances absentes non reliées"><path d="${path}" stroke="currentColor" fill="none" stroke-width="1.8"/></svg>`;}
+  function renderResults(r){const active=[...S.applied.config.periods].filter(p=>p.enabled).reverse(),extra=new Set(active.map(p=>p.id));for(const k of ['equity','etf'])effective(S.applied.config,k).periods.filter(p=>p.enabled).forEach(p=>extra.add(p.id));const ps=[...S.applied.config.periods].filter(p=>extra.has(p.id)).reverse();
+    $('result-note').textContent=`${r.total} résultats · ${r.examined} titres examinés · ${r.universe} dans le catalogue. Pentes sur la période ; volatilités par séance. Dernier jour = dernière clôture confirmée. Notation : ${modes[S.applied.config.ranking.mode]}. ${Object.keys(S.applied.config.asset_rules).length?'Règles spécifiques : '+Object.keys(S.applied.config.asset_rules).map(k=>k==='equity'?'Actions':'ETF').join(', ')+'. ':''}${r.ordering==='proximity'?'Écartés classés par proximité des critères.':''}`;
+    const curve=row=>`<div title="Cours historiques sur ${esc(row.curve_label||r.curve_label)}">${spark(row.curve)}<small>${esc(row.curve_label||r.curve_label)}</small></div>`;
+    const title=row=>`<label><input type="checkbox" data-compare="${row.id}" aria-label="Comparer ${esc(row.symbol)}"></label><button class="btn" data-detail="${row.id}"><b>${esc(row.symbol)}</b></button><div>${esc(row.name)}</div><small>${esc(row.market||row.mic)} · ${esc(row.currency)}${row.held?' · Détenu':''}</small>${(row.signals||[]).filter(s=>s.key==='risk').map(s=>`<div class="sig ${esc(s.level)}" title="${esc(s.text+' '+s.tip)}">${esc(s.label)} · ${esc(s.period)}</div>`).join('')}${row.etf_group_info?'<div class="ex-badge">ETF similaires : groupe '+esc(row.etf_group)+'</div>':''}`;
+    $('results').innerHTML=r.rows.length?`<div class="ex-table-wrap"><table class="ex-table rtable"><thead><tr><th>Titre</th><th>Prix / qualité</th><th>Statut / score</th><th>Courbe du cours</th>${ps.map(p=>`<th>${esc(J.PERIODS[p.id])}<small>${p.sessions} séances</small></th>`).join('')}</tr></thead><tbody>${r.rows.map(row=>`<tr><td class="ex-title">${title(row)}</td><td>${J.eur(row.price_eur)}<br><small>${esc(J.priceLabel(row))} · ${J.dateTime(row.price_time)}<br>${esc(row.quality||'indisponible')} · clôture ${J.date(row.last_close)}${row.price_stale?' · Cours ancien':''}</small></td><td>${J.statusBadge(row.status,row.status_label)}<br>${row.score==null?'Sans score':J.num(row.score)+' points'}${row.rank?' · #'+row.rank:''}</td><td>${curve(row)}</td>${ps.map(p=>`<td>${relevant(row).some(x=>x.id===p.id)?measureText(row,p).split(' · ').map(x=>'<div>'+esc(x)+'</div>').join(''):'Inactive pour ce type'}</td>`).join('')}</tr>`).join('')}</tbody></table></div><div class="ex-mobile">${r.rows.map(row=>`<article>${title(row)}<p>${J.eur(row.price_eur)} · ${J.statusBadge(row.status,row.status_label)} · ${row.score==null?'Sans score':J.num(row.score)+' pts'}</p><small>Clôture ${J.date(row.last_close)} · ${esc(row.quality||'indisponible')}</small>${curve(row)}<div class="period-measures">${relevant(row).map(p=>`<div><b>${esc(J.PERIODS[p.id])}</b><br>${esc(measureText(row,p))}</div>`).join('')}</div></article>`).join('')}</div>`:'<div class="empty">Aucun titre dans cette vue. Consultez les écartés et les non évaluables pour comprendre les critères.</div>';
+    $('results').querySelectorAll('[data-detail]').forEach(el=>el.onclick=safe(()=>detail(Number(el.dataset.detail))));$('pager').innerHTML=`<button class="btn" id="prev" ${r.page<=1?'disabled':''}>Précédent</button><span>Page ${r.page} / ${r.pages}</span><button class="btn" id="next" ${r.page>=r.pages?'disabled':''}>Suivant</button>`;$('prev').onclick=safe(async()=>{page--;await load();});$('next').onclick=safe(async()=>{page++;await load();});
   }
-  async function readEditor(apply = true) {
-    const box = el('editor'), c = JSON.parse(JSON.stringify(S.config)), v = x => x === '' || x === null ? null : Number(x);
-    J.$$('[data-p]', box).forEach(i => { const p = c.periods.find(x => x.id === i.dataset.p); if (i.dataset.f === 'enabled') p.enabled = i.checked; else if (i.dataset.f === 'sessions') p.sessions = p.id === 'day' ? 1 : parseInt(i.value, 10); else if (S.level === 'detail') p[i.dataset.f] = v(i.value); });
-    if (S.level === 'guided') {
-      c.periods.find(p=>p.id==='day').min_return=v(J.$('[data-p="day"][data-f="min_return"]',box).value);
-      const g = id => { const e = J.$(id, box); return e.value !== e.dataset.init ? e.value : null; }, sl = g('#g-slope'), rl = g('#g-r2'), dd = g('#g-dd');   // seuls les réglages que vous avez touchés écrasent les périodes
-      c.periods.filter(p => p.enabled).forEach(p => { if (sl !== null && sl !== 'custom') p.min_slope = sl === 'none' ? null : P.slope_levels[sl]; if (rl !== null && rl !== 'custom') p.min_r2 = rl === 'none' || p.sessions < 3 ? null : P.r2_levels[rl]; if (dd !== null) p.max_drawdown = dd === '' || p.sessions < 3 ? null : Number(dd); });
-      c.ranking = { mode: J.$('#r-mode', box).value, weights: c.ranking.weights || {} };
-    } else {
-      c.technical = { above_ma50: J.$('#t-ma50', box).checked, ma50_rising: J.$('#t-ma50r', box).checked, above_ma200: J.$('#t-ma200', box).checked, ma200_rising: J.$('#t-ma200r', box).checked, max_daily_change: v(J.$('#t-day', box).value), max_gap_ma20: v(J.$('#t-gap', box).value) };
-      const w = {}; J.$$('[data-w]', box).forEach(i => { if (i.value !== '' && Number(i.value) !== 1) w[i.dataset.w] = Number(i.value); });
-      c.ranking = { mode: J.$('#r-mode2', box).value, weights: w };
-    }
-    const m = J.$('#editor-msg', box);
-    try { S.config = (await J.post('strategy/validate', c)).config; m.hidden = true; } catch (e) { m.textContent = e.message; m.hidden = false; return false; }
-    if(!apply){markDirty();return true;}
-    if (P.presets[S.preset]) S.base = S.preset; S.config.name = 'custom'; S.preset = 'custom'; S.page = 1; persist(); drawStrategies(); load(); return true;
+  function reasonText(reason,c){if(reason.criterion==='freshness'||reason.criterion==='data'||reason.criterion==='coverage')return J.explain(reason);const p=c.periods.find(p=>p.id===reason.period),isSlope=reason.metric==='slope',value=isSlope&&p?slope(reason.value,p.sessions):reason.value,threshold=isSlope&&p?slope(reason.threshold,p.sessions):reason.threshold;return `<li class="${reason.result==='fail'?'down':''}">${esc(J.PERIODS[reason.period]||reason.period||'Score')} · ${esc((reason.criterion.startsWith('min_')?'Minimum ':reason.criterion.startsWith('max_')?'Maximum ':'')+(metricNames[reason.metric]||reason.criterion))} : ${reason.value==null?'indisponible':typeof value==='number'?J.num(value,4):esc(value)} ; seuil ${typeof threshold==='number'?J.num(threshold,4):esc(threshold)} · ${esc(({pass:'respecté',fail:'non respecté',missing:'indisponible',alternative:'autre critère satisfait',warning:'attention'})[reason.result]||reason.result)}${isSlope?' (% sur la période)':''}</li>`;}
+  async function detail(id){const snap=copy(S.applied),sheet=await J.post('explorer/detail',{id,config:snap.config,view:snap.universe}),c=effective(snap.config,sheet.kind),ps=c.periods.filter(p=>p.enabled).reverse();if(!ps.length)ps.push(c.periods.find(p=>p.id==='month'));
+    const d=J.dialog({title:sheet.symbol+' — '+sheet.name,body:`<p>${J.eur(sheet.price_eur)} · ${esc(sheet.market)} · Clôtures ${esc(sheet.analysis_basis)} · ${esc(sheet.state?.quality||'indisponible')}</p><label>Fenêtre de régression<select class="detail-period">${ps.map(p=>`<option value="${p.sessions}">${esc(J.PERIODS[p.id])} (${p.sessions} séances)</option>`).join('')}</select></label><div class="ex-detail-chart"></div><p class="ex-chart-note"></p><h3>Pourquoi ce résultat ?</h3><ul>${(sheet.verdict?.reasons||[]).map(r=>reasonText(r,c)).join('')}</ul><h3>Contributions au score</h3><div>${(sheet.verdict?.score_parts||[]).map(p=>`<p>${esc(metricNames[p.metric]||p.metric)} · ${esc(J.PERIODS[p.period])} : mesure ${J.num(p.raw,4)} → ${J.num(p.normalized)} ; poids ${J.num(p.weight)} ; contribution <b>${J.num(p.contribution)} points</b></p>`).join('')||'Méthode historique ou aucune contribution active.'}</div><p><a href="titre.html?id=${id}&src=explorer">Fiche complète, autres cotations et analyses ETF →</a></p>`,actions:[{label:'Fermer',run:()=>{}}]});
+    const paint=()=>{const n=Number(d.querySelector('.detail-period').value),dates=sheet.analysis_windows[n]||[],map=new Map(sheet.daily),ys=dates.map(day=>map.get(day)??null),m=sheet.measures[n];let regression=ys.map(()=>null);if(m&&ys.every(x=>x!=null)&&ys.length===n+1){const logs=ys.map(Math.log),mean=logs.reduce((a,b)=>a+b,0)/logs.length,b=m.slope_log;regression=logs.map((_,i)=>Math.exp(mean+b*(i-n/2)));}J.lineChart(d.querySelector('.ex-detail-chart'),dates,[{id:'price',label:'Cours ajusté',values:ys,color:'#6354ff'},{id:'regression',label:'Régression log-prix',values:regression,color:'#eb8c23'}],{format:v=>J.num(v),height:270});d.querySelector('.ex-chart-note').textContent=dates.length?`${dates[0]} → ${dates.at(-1)} · ${n} séances, ${n+1} clôtures. Pente ${J.pct(m?.slope_period)} · R² ${n===1?'non applicable':J.num(m?.r2,4)}. Une séance absente reste absente.`:'Calendrier non disponible pour cette place.';};d.querySelector('.detail-period').onchange=paint;paint();
   }
-
-  /* curseurs de critères : ils lisent et modifient la configuration de la stratégie (période concernée), comme le réglage guidé */
-  const yearly = s => 100 * (Math.pow(1 + s / 100, 252) - 1), perSession = a => Number((100 * (Math.pow(1 + a / 100, 1 / 252) - 1)).toFixed(5));
-  const SPAN = n => ({ 1: '1 jour', 5: '1 semaine', 21: '1 mois', 63: '3 mois', 126: '6 mois', 252: '12 mois' }[n] || n + ' séances');
-  /* Pente et volatilité se règlent sur la période la plus longue de la stratégie (6 mois pour Momentum 6 mois, 12 mois pour Momentum 12 mois, 3 mois pour Croissance régulière…). */
-  const SLIDERS = [
-    { id: 'r2', title: () => 'Régularité (R²)', field: 'min_r2', scope: 'all', min: 0, max: 1, step: .01, dec: 2, side: 'low', chart: 'r2', help: () => 'Le R² mesure la régularité de la hausse : 1 = ligne droite parfaite, 0 = hausse très irrégulière. Ce curseur fixe le R² minimum exigé pour chaque période utilisée par la stratégie.' },
-    { id: 'slope', title: n => `Pente (${SPAN(n)})`, field: 'min_slope', scope: 'longest', min: 0, max: 100, step: 1, dec: 0, side: 'low', unit: '% /an', chart: 'slope3', to: yearly, from: perSession, help: n => `La pente est la hausse moyenne du cours sur ${SPAN(n)} (la période la plus longue de la stratégie), exprimée en rythme annuel. Un titre dont la pente est inférieure au minimum choisi n’est pas retenu.` },
-    { id: 'vol', title: n => `Volatilité (${SPAN(n)})`, field: 'max_volatility', scope: 'longest', min: 0, max: 10, step: .1, dec: 1, side: 'high', unit: '% /séance', chart: 'wave', help: n => `La volatilité mesure l’amplitude des variations quotidiennes sur ${SPAN(n)} (la période la plus longue de la stratégie). Ce curseur fixe le maximum accepté : plus il est bas, plus les titres retenus varient calmement.` }
-  ];
-  function drawSliders() {
-    const box = el('sliders'); if (!box) return;
-    const enabled = S.config.periods.filter(p => p.enabled), longest = enabled.reduce((m, p) => p.sessions > (m ? m.sessions : 0) ? p : m, null);
-    const spanN = longest ? longest.sessions : 63;
-    box.innerHTML = SLIDERS.map(d => `<div class="sl" data-s="${d.id}"><div class="sl-head"><b>${d.title(spanN)}</b><button type="button" class="q" data-sh="${d.id}" aria-label="Explication : ${J.esc(d.title(spanN))}" aria-expanded="false">?</button><span class="sl-chart"></span></div><div class="sl-body"></div></div>`).join('');
-    SLIDERS.forEach(d => {
-      const host = J.$(`.sl[data-s="${d.id}"]`, box), targets = d.scope === 'all' ? enabled.filter(p => p.sessions >= 3) : (longest ? [longest] : []);
-      const raw = targets.length ? targets[0][d.field] : null, ui = raw === null || raw === undefined ? null : (d.to ? d.to(raw) : raw);
-      const low = d.side === 'low' ? Math.max(d.min, Math.min(d.max, ui === null ? d.min : ui)) : d.min, high = d.side === 'high' ? Math.max(d.min, Math.min(d.max, ui === null ? d.max : ui)) : d.max;
-      const draw = (l, h) => { J.$('.sl-chart', host).innerHTML = JMenu.chart(d.chart, ((d.side === 'low' ? l : h) - d.min) / (d.max - d.min)); };
-      host.querySelector('.q').onclick = e => { e.stopPropagation(); JMenu.pop(e.currentTarget, `<b>${J.esc(d.title(spanN))}</b><p>${J.esc(d.help(spanN))}</p><p class="muted small">Le réglage s’applique quand vous cliquez sur « Appliquer ».</p>`); };
-      JMenu.dualRange(J.$('.sl-body', host), { label: d.title(spanN), min: d.min, max: d.max, step: d.step, dec: d.dec, unit: d.unit, low, high, lockLow: d.side === 'high', lockHigh: d.side === 'low', disabled: !targets.length, onInput: draw,
-        onChange: (l, h) => {
-          const u = d.side === 'low' ? l : h, none = d.side === 'low' ? u <= d.min : u >= d.max, val = none ? null : (d.from ? d.from(u) : u);
-          if ((raw ?? null) === val || (ui !== null && Math.abs(ui - u) < 1e-9)) return;
-          S.config.periods.forEach(p => { if (targets.some(x => x.id === p.id)) p[d.field] = val; });
-          if (P.presets[S.preset]) S.base = S.preset; S.config.name = 'custom'; S.preset = 'custom'; S.label = null; persist(); drawStrategies(); if (!el('editor').hidden) drawEditor(); markDirty();
-        } });
-    });
-  }
-  /* raccourcis Prix et Volume : ils écrivent dans les champs du tiroir « Filtres avancés » (une seule source de vérité) */
-  const bands = { 'f-price': [['min_price', 'budget'], v => v.split('|')], 'f-volume': [['min_volume'], v => [v]] };
-  function syncMenu() {
-    Object.entries(bands).forEach(([id, [fields, split]]) => {
-      const sel = el(id), cur = fields.map(f => el(f).value.trim()).join('|'), match = [...sel.options].find(o => o.value !== 'custom' && split(o.value).join('|') === (fields.length === 1 ? cur : cur));
-      [...sel.querySelectorAll('option[value="custom"]')].forEach(o => o.remove());
-      if (!cur.replace(/\|/g, '')) sel.value = '';
-      else if (match) sel.value = match.value;
-      else { sel.insertAdjacentHTML('beforeend', '<option value="custom">Personnalisé</option>'); sel.value = 'custom'; }
-    });
-    el('market-flag').innerHTML = el('market').value === '__pea' ? EU_FLAG : GLOBE;
-  }
-  const EU_FLAG = '<svg viewBox="0 0 28 20" width="28" height="20" aria-hidden="true"><rect width="28" height="20" rx="3" fill="#0b4ea2"/>' + Array.from({ length: 12 }, (_, i) => `<circle cx="${14 + 6.5 * Math.sin(i * Math.PI / 6)}" cy="${10 - 6.5 * Math.cos(i * Math.PI / 6)}" r="1.05" fill="#ffd400"/>`).join('') + '</svg>';
-  const GLOBE = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></svg>';
-  Object.entries(bands).forEach(([id, [fields, split]]) => el(id).addEventListener('change', () => {
-    const v = el(id).value; if (v === 'custom') return;
-    const parts = split(v); fields.forEach((f, i) => { el(f).value = parts[i] || ''; });
-    el(fields[0]).dispatchEvent(new Event('input', { bubbles: true }));
-  }));
-  el('market').addEventListener('change', syncMenu);
-  /* recherches enregistrées : critères + filtres + tri */
-  let searches = [];
-  /* réglages personnels : choisir, remplacer, remettre par défaut */
-  function setView(v) {
-    v = v || {};
-    [...FILTERS, 'kind', 'market'].forEach(k => { el(k).value = v[k] ?? ''; }); el('q').value = v.q || ''; el('pea').checked = !!v.pea; el('mine').checked = !!v.owned_only; el('open_now').checked = !!v.open_now; el('fresh_only').checked = !!v.fresh_only; el('tradable').checked = v.tradable !== false;
-    S.status = ['retained', 'rejected', 'unknown', 'all'].includes(v.status) ? v.status : S.status;
-    S.sort = v.sort || 'rank'; S.dir = v.dir || 'asc'; el('filters').hidden = !(FILTERS.some(k => el(k).value) || CHECKS.some(k => el(k).checked)); syncMenu();
-  }
-  function presetConfig(k) { const c = JSON.parse(JSON.stringify(MINE[k] ? MINE[k].config : P.presets[k])); c.name = k; return c; }
-  function choose(k) {
-    S.label = null; S.preset = k; S.base = P.presets[k] ? k : null; S.page = 1;
-    // Chaque stratégie repart avec une vue claire : les filtres cochés d'une précédente stratégie ne s'appliquent pas à la suivante.
-    setView({ status: 'retained', sort: 'rank', dir: 'asc', tradable: true });
-    if (k === 'free') S.config = freeConfig(); else S.config = presetConfig(k);
-    persist(); drawStrategies(); drawEditor(); load();
-  }
-  const baseKey = () => P.presets[S.preset] ? S.preset : (S.base && P.presets[S.base] ? S.base : null);
-  function syncReset() { const b = el('reset-default'); if (!b) return; const k = baseKey(); b.hidden = !(k && MINE[k]); if (k) b.textContent = 'Remettre « ' + NAMES[k][0] + ' » par défaut'; }
-  async function resetPreset(k) {
-    if (!await J.confirm('Remettre par défaut', 'Le réglage de « ' + NAMES[k][0] + ' » redeviendra celui de départ : les critères et filtres que vous aviez enregistrés pour cette stratégie seront supprimés.', 'Remettre par défaut')) return false;
-    await J.post('preset/reset', { preset: k }); delete MINE[k];
-    if (baseKey() === k) choose(k); else drawStrategies();
-    J.toast('« ' + NAMES[k][0] + ' » : réglage de départ rétabli'); return true;
-  }
-  const savedView = () => {
-    const metadata = CURRENT_SAVED()?.view || {};
-    return { ...view(), status: S.status, sort: S.sort, dir: S.dir, ...(metadata.icon ? { icon: metadata.icon } : {}), ...(metadata.description ? { description: metadata.description } : {}) };
-  };
-  async function drawSaved() {
-    searches = (await J.api('searches')).searches;
-    const availability = (() => { try { return JSON.parse(localStorage.getItem('jigo_strategy_availability') || '{}'); } catch (_) { return {}; } })();
-    if (S.preset !== 'custom' && P.presets[S.preset] && availability['preset:' + S.preset] === false) {
-      const fallback = Object.keys(P.presets).find(strategyEnabled) || 'regular';
-      S.preset = fallback; S.base = fallback; S.label = null; S.config = presetConfig(fallback); persist();
-    } else if (S.preset === 'custom' && S.label) {
-      const activeSearch = searches.find(x => x.name === S.label);
-      if (activeSearch && availability['search:' + activeSearch.id] === false) { const fallback = Object.keys(P.presets).find(strategyEnabled) || 'regular'; S.preset = fallback; S.base = fallback; S.label = null; S.config = presetConfig(fallback); persist(); }
-    }
-    appendSavedStrategies();
-    el('saved').innerHTML = '';
-    el('reset-default').onclick = () => { const k = baseKey(); if (k) resetPreset(k); }; syncReset();
-    el('saved-save').onclick = () => {
-      const base = baseKey();
-      J.dialog({ title: 'Enregistrer vos réglages', onopen: d => { const t = J.$('#sv-target', d); if (t) t.onchange = () => { J.$('#sv-namebox', d).hidden = t.value === 'preset'; }; },
-        body: (base ? J.field('Où enregistrer ?', `<select id="sv-target"><option value="new">Un filtre à part, avec un nom</option><option value="preset">Le réglage de « ${J.esc(NAMES[base][0])} » (remplace son réglage de départ)</option></select>`) : '') + `<div id="sv-namebox">${J.field('Nom', `<input id="sv-name" maxlength="80" value="${J.esc(S.label || '')}" autofocus>`)}</div><p class="small muted">Enregistre vos critères, périodes, recherche, filtres et tri. Un nom existant est remplacé. Gérez vos filtres depuis « Mes filtres ».</p>`,
-        actions: [{ label: 'Annuler', run: () => { } }, { label: 'Enregistrer', cls: 'primary', run: async d => {
-          const target = (J.$('#sv-target', d) || {}).value || 'new';
-          if (target === 'preset' && base) {
-            const v = savedView(); try { await J.post('preset/save', { preset: base, config: S.config, view: v }); } catch (e) { J.formError(d, e.message); return true; }
-            MINE[base] = { config: JSON.parse(JSON.stringify(S.config)), view: v, updated_at: new Date().toISOString().slice(0, 19).replace('T', ' ') };
-            S.preset = base; S.config.name = base; S.label = null; persist(); drawStrategies(); J.toast('Réglage de « ' + NAMES[base][0] + ' » enregistré'); return false;
-          }
-          const name = J.$('#sv-name', d).value.trim(); if (!name) return true;
-          try { await J.post('search/save', { name, config: S.config, view: savedView() }); } catch (e) { J.formError(d, e.message); return true; }
-          S.label = name; persist(); await drawSaved(); drawStrategies(); J.toast('Recherche « ' + name + ' » enregistrée'); return false;
-        } }] });
-    };
-  }
-  function applySearch(x) {
-    S.config = x.config; S.preset = 'custom'; S.base = null; S.label = x.name; S.page = 1; setView(x.view);
-    persist(); drawStrategies(); if (!el('editor').hidden) drawEditor(); load();
-  }
-  el('edit-btn').onclick = () => { const e = el('editor'); if(!e.hidden)J.$('#menu .mact').prepend(el('apply-menu'));e.hidden = !e.hidden; el('edit-btn').setAttribute('aria-expanded', String(!e.hidden)); document.body.classList.toggle('strategy-editing', !e.hidden); if (!e.hidden) drawEditor(); };
-  el('filters-btn').onclick = () => {
-    const mobile = matchMedia('(max-width: 640px)').matches, menu = el('menu'), advanced = el('filters'), button = el('filters-btn');
-    if (mobile) {
-      const open = !menu.classList.contains('filters-open'); menu.classList.toggle('filters-open', open); advanced.hidden = !open;
-      button.setAttribute('aria-expanded', String(open)); el('filters-toggle-label').textContent = open ? 'Masquer les filtres' : 'Filtres avancés';
-    } else {
-      advanced.hidden = !advanced.hidden; button.setAttribute('aria-expanded', String(!advanced.hidden));
-    }
-  };
-
-  function drawTabs(res) {
-    const sc = res.scope_counts, tabs = [['retained', 'Retenus', sc.retained], ['rejected', 'Écartés', sc.rejected], ['unknown', 'Non évaluables', sc.unknown], ['all', 'Tous', sc.retained + sc.rejected + sc.unknown]];
-    el('status-tabs').innerHTML = tabs.map(([k, l, n]) => `<button class="${S.status === k ? 'on' : ''}" data-s="${k}">${l} <span class="count">${J.num(n, 0)}</span></button>`).join('');
-    J.$$('#status-tabs button').forEach(b => b.onclick = () => { S.status = b.dataset.s;if(S.status==='rejected'){S.sort='proximity';S.dir='asc'}else if(S.sort==='proximity'){S.sort='rank';S.dir='asc'} S.page = 1; load(); });
-    const n = FILTERS.filter(k => el(k).value.trim()).length + CHECKS.filter(k => el(k).checked).length;
-    el('filters-count').hidden = !n; el('filters-count').textContent = n;
-  }
-  const COLS = [['rank', 'Rang', 'rk'], ['name', 'Titre'], ['price', 'Prix (€)', 'num'], [null, 'Tendance', 'trend-column'], ['slope', 'Pente', 'num'], ['r2', 'R²', 'num'], ['perf', 'Perf.', 'num'], ['volatility', 'Volat.', 'num'], ['drawdown', 'Repli', 'num'], ['volume', 'Volume moy.', 'num'], ['score', 'Score', 'num'], [null, 'Analystes', 'hide-s'], ['fresh', 'Données', 'num'], [null, 'Verdict', '']];
-  function header(ref) {
-    const tip = { slope: '%/séance', r2: 'régularité', perf: 'performance', volatility: '%/séance', drawdown: 'repli maximal' };
-    return '<thead><tr>' + COLS.map(([k, l, c]) => k ? `<th class="sortable ${c || ''} ${S.sort === k ? 'sorted' : ''}" data-k="${k}" title="${tip[k] ? tip[k] + ' sur ' + ref + ' séances' : 'Trier'}">${l}${S.sort === k ? (S.dir === 'asc' ? ' ▲' : ' ▼') : ''}</th>` : `<th class="${c || ''}">${l}</th>`).join('') + '</tr></thead>';
-  }
-  function sheetHref(id) { return 'titre.html?src=explorer&id=' + encodeURIComponent(id) + '#explore=' + encodeURIComponent(JSON.stringify({config:S.config,view:view(),preset:S.preset,label:S.label})); }
-  /* Une seule valeur : le rang du titre, sans le numéro de ligne qui prêtait à confusion. */
-  function rankCell(r) { return `<span title="Rang dans les titres retenus de son type">${r.rank || '–'}</span>`; }
-  /* ETF « presque identiques » (Groupe A, B…) : le mieux classé reste visible, les autres se déplient sous lui avec « + ». Rangs, scores et ordre ne changent pas. */
-  const openGroups = new Set();
-  const famWhy = i => i && !i.leader ? `<span class="fam-why"><b>Rapproche :</b> ${(i.why || []).map(J.esc).join(' · ')}.${(i.diff || []).length ? ` <b>Diffère :</b> ${i.diff.map(J.esc).join(' · ')}.` : ' <b>Aucune différence relevée</b> dans le nom, la devise et les frais connus.'}</span>` : '';
-  function groupedRows(rows) {
-    const members = {};
-    rows.forEach(r => { if (r.etf_group) (members[r.etf_group] = members[r.etf_group] || []).push(r); });
-    const open = g => openGroups.has(g);
-    return rows.map(r => {
-      const g = r.etf_group, list = g ? members[g] : null;
-      if (!list || list.length < 2) return row(r);
-      if (list[0] !== r) return null;
-      const btn = `<button type="button" class="fam-toggle" data-g="${J.esc(g)}" aria-expanded="${open(g)}" title="Afficher ou masquer les ETF presque identiques"><span class="fam-sign">${open(g) ? '−' : '+'}</span> ${list.length - 1} similaire${list.length > 2 ? 's' : ''} · ${r.etf_group_info && r.etf_group_info.index ? J.esc(r.etf_group_info.index) + ' · ' : ''}Groupe ${J.esc(g)}</button>`;
-      const lead = row(r).replace(/(<td class="name">[\s\S]*?)<\/td>/, (m, a) => a + btn + '</td>');
-      return lead + list.slice(1).map(c => row(c).replace('<tr ', `<tr data-child-of="${J.esc(g)}" ${open(g) ? '' : 'hidden '}`).replace(/(<td class="name">[\s\S]*?)<\/td>/, (m, a) => a + famWhy(c.etf_group_info) + '</td>')).join('');
-    }).filter(x => x !== null).join('');
-  }
-  const ANALYST_TIP = 'Consensus des analystes financiers relevé par Yahoo (1 = achat fort, 5 = vente forte). Ce n’est pas une recommandation de Jigobourso et n’entre dans aucun score, filtre ou classement.';
-  const analystCell = a => a ? `<span class="help" title="${J.esc(ANALYST_TIP)}">${J.esc(a.text)}</span>` : '<span class="muted" title="Information indisponible pour ce titre">—</span>';
-  function row(r) {
-    const m = r.ref || {};
-    const badge = r.status === 'excluded' ? `<span class="badge ko help" title="${J.esc(r.excluded_reason || '')}">Exclu</span>` : J.statusBadge(r.status, r.status_label);
-    const curveLabel=(lastRes||{}).curve_label||'3 mois';
-    const trend=`<span class="trend-chart" role="img" aria-label="${J.esc('Évolution des clôtures sur '+curveLabel+' — période la plus longue de la stratégie')}" title="${J.esc('Clôtures sur '+curveLabel+' : période la plus longue de la stratégie')}">${J.spark(r.curve)}</span>`;
-    const fresh = r.last_close ? J.date(r.last_close) : '–';
-    const freshState = typeof r.price_stale !== 'boolean' ? 'Fraîcheur inconnue' : (r.price_stale ? 'Cours en retard' : (r.quality === 'stale' ? 'Clôture en retard' : 'Cours à jour'));
-    const freshClass = r.price_stale === true || (r.quality && r.quality !== 'ok') ? 'warn' : (r.price_stale === false ? 'freshness-ok' : 'muted');
-    const freshTitle = `Dernière clôture quotidienne : ${fresh}. Dernier cours horodaté par la source : ${J.dateTime(r.price_time)}. Dernière collecte Yahoo : ${J.dateTime(r.quote_at)}. ${freshState}${r.quality && r.quality !== 'ok' ? ' · qualité de l’historique : ' + r.quality : ''}.`;
-    return `<tr data-id="${r.id}"${r.etf_group ? ` class="in-family" data-group="${J.esc(r.etf_group)}"` : ''}><td class="rk">${rankCell(r)}</td>
-      <td class="name"><span class="nm">${`<a data-sheet href="${J.esc(sheetHref(r.id))}" target="_blank" rel="noopener" aria-label="Ouvrir ${J.esc(r.symbol)} dans un nouvel onglet">${J.esc(r.name)}</a>`}</span><span class="sub">${J.esc(r.symbol)} · ${J.esc(r.market)} <span class="tag ${r.kind === 'etf' ? 'etf' : ''}">${r.kind === 'etf' ? 'ETF' : 'ACTION'}</span>${r.pea ? ' <span class="tag pea">PEA</span>' : ''}${r.held ? ' <span class="tag held">DÉTENU</span>' : ''}${r.open ? ' <span class="tag open">OUVERT</span>' : ''}${r.etf_group ? ` <span class="tag grp" title="Cet ETF évolue presque comme les autres ETF du groupe ${J.esc(r.etf_group)} (voir le bandeau au-dessus du tableau). Information seulement : son rang n’est pas modifié.">Groupe ${J.esc(r.etf_group)}</span>` : ''}</span><span class="trend-mobile">${trend}<small>${J.esc(curveLabel)}</small></span>${r.category ? `<span class="fund-nature">${J.esc(r.category)}</span>` : ''}${r.kind === 'etf' && r.fund_nature ? `<span class="fund-nature">${J.esc(r.fund_nature)}</span>` : ''}${r.kind === 'etf' && r.aum_eur !== null && r.aum_eur !== undefined ? `<span class="fund-nature" title="Encours du fonds : valeur des actifs détenus par le fonds, convertie en euros à partir des dernières données disponibles. Ce n’est ni sa capitalisation boursière ni son volume échangé.">Actifs sous gestion : ${J.eur(r.aum_eur, 0)}</span>` : ''}${r.kind === 'etf' && r.fee !== null && r.fee !== undefined ? `<span class="fund-nature" title="Frais courants annuels du fonds (Yahoo Finance)">Frais : ${J.num(r.fee, 2)} %/an</span>` : ''}${(r.signals || []).length ? `<span class="sigs">${JEtf.rowSignals(r.signals)}</span>` : ''}${r.status === 'excluded' ? `<span class="sub warn">${J.esc(r.excluded_reason || '')}</span>` : ''}</td>
-      <td class="num">${r.price_eur !== null && r.price_eur !== undefined ? J.eur(r.price_eur) : J.money(r.price, r.currency)}<span class="sub" style="display:block">${r.currency !== 'EUR' && r.price !== null ? J.money(r.price, r.currency) : (r.price ? J.priceLabel(r) : '')}</span>${r.price_stale ? '<span class="sub warn">Cours ancien</span>' : ''}</td>
-      <td class="trend-column">${trend}<small class="muted">${J.esc(curveLabel)}</small></td>
-      <td class="num ${J.cls(m.slope)}">${m.slope !== null && m.slope !== undefined ? J.num(m.slope, 3) : '–'}</td><td class="num">${J.num(m.r2, 2)}</td><td class="num ${J.cls(m.perf)}">${J.pct(m.perf, 1)}</td>
-      <td class="num">${m.volatility !== null && m.volatility !== undefined ? J.num(m.volatility, 2) : '–'}</td><td class="num">${m.drawdown !== null && m.drawdown !== undefined ? J.num(m.drawdown, 1) + ' %' : '–'}</td>
-      <td class="num">${r.volume ? J.num(r.volume, 0) : '–'}</td><td class="num">${r.score !== null && r.score !== undefined ? `<b>${J.num(r.score, 0)}</b><div class="score-bar"><i style="width:${r.score}%"></i></div>` : '–'}${(S.config.ranking.mode === 'momentum' || S.config.ranking.mode === 'momentum12') && r.momentum !== null && r.momentum !== undefined ? `<span class="sub ${J.cls(r.momentum)}" style="display:block" title="Variation du cours entre il y a ${S.config.ranking.mode === 'momentum12' ? '252' : '126'} et il y a 21 séances">mom. ${J.pct(r.momentum, 1)}</span>` : ''}${S.config.ranking.mode === 'momentum_risk' && r.momentum ? `<span class="sub" style="display:block">6 m. ${J.pct(r.momentum['6m'], 1)} · 12 m. ${J.pct(r.momentum['12m'], 1)}</span>` : ''}</td>
-      <td class="hide-s small">${analystCell(r.analyst)}</td>
-      <td class="num small ${freshClass}" title="${J.esc(freshTitle)}"><div class="data-freshness"><span>${fresh}${r.quality && r.quality !== 'ok' ? ' ⚠' : ''}</span><span class="fresh-time">${r.price_time ? J.dateTime(r.price_time) : 'Heure inconnue'} · ${freshState}</span></div></td><td>${badge}</td></tr>`;
-  }
-  function drawWhy(res) {
-    const total = (res.scope_counts.rejected || 0) + (res.scope_counts.unknown || 0), groups = {};
-    Object.entries(res.reasons).forEach(([k, n]) => { const [per, crit] = k.split('|'); (groups[per || 'general'] = groups[per || 'general'] || []).push([crit, n]); });
-    const label = p => p === 'technical' ? 'Filtres techniques' : p === 'general' ? 'Général' : J.PERIODS[p] || p;
-    el('why-body').innerHTML = total ? `<p class="small muted" style="margin:0 0 10px">Parmi les ${J.num(total, 0)} titres non retenus (avec les filtres actuels), nombre de titres qui échouent à chaque critère. Un titre peut échouer à plusieurs critères : les totaux se cumulent.</p>` +
-      Object.entries(groups).map(([per, list]) => `<h3 style="margin:10px 0 6px;font-size:.95rem">${J.esc(label(per))}</h3>` + list.sort((a, b) => b[1] - a[1]).map(([crit, n]) => `<div class="row between small" style="gap:10px"><span style="min-width:230px">${J.esc(CRIT[crit] || crit)}</span><div class="bar" style="flex:1"><i style="width:${Math.min(100, 100 * n / total)}%"></i></div><span class="muted" style="min-width:90px;text-align:right">${J.num(n, 0)} · ${J.num(100 * n / total, 0)} %</span></div>`).join('')).join('') : '<p class="muted">Aucun titre écarté avec ces filtres.</p>';
-  }
-  async function load() {
-    const my = ++seq; el('apply-menu').classList.remove('pending'); el('results').innerHTML = '<div class="empty"><span class="spinner"></span></div>';
-    persist();
-    if (S.compare) return loadCompare(my);
-    const v = { ...view(), status: S.status, sort: S.sort, dir: S.dir, page: S.page, page_size: S.size };
-    let res;
-    try { res = await J.post('explore', { config: S.config, view: v }); } catch (e) { if (my === seq) el('results').innerHTML = `<div class="empty"><div class="notice err">${J.esc(e.message)}</div></div>`; return; }
-    if (my !== seq) return;
-    lastRes = res; const lm = (res.level_filters || {}).masked || 0; el('level-note').textContent = lm ? `${J.num(lm, 0)} titre${lm > 1 ? 's' : ''} masqué${lm > 1 ? 's' : ''} par vos filtres de régularité, volatilité ou négociabilité (rang et score inchangés).` : '';
-    el('tradable-note').textContent = res.tradable.on ? (res.tradable.masked ? `${J.num(res.tradable.masked, 0)} titre${res.tradable.masked > 1 ? 's' : ''} masqué${res.tradable.masked > 1 ? 's' : ''} : valeur échangée estimée trop faible. Décochez pour tout voir.` : 'Aucun titre masqué dans cette vue.') : 'Tous les titres du catalogue sont affichés.';
-    drawTabs(res); drawWhy(res); fillFacets(res);
-    const ranksMasked = (res.tradable?.masked || 0) + (res.level_filters?.masked || 0);
-    const rankNote = res.ordering==='proximity'?'Écartés : moins de critères à corriger d’abord, puis écarts relatifs les plus faibles. Données incomplètes en dernier. Les scores des titres retenus restent inchangés.':ranksMasked ? 'Des titres sont masqués par vos filtres : leurs rangs restent comptés, donc certains numéros sautent. Actions et ETF ont des classements séparés.' : 'Actions et ETF ont des classements séparés.';
-    el('results').innerHTML = res.rows.length ? JEtf.concentration(res.etf_concentration) + `<div class="small muted rank-note">${rankNote}</div><div class="small muted explorer-legend">${JEtf.LEGEND}</div><div class="table-wrap"><table class="rtable">${header(res.ref_sessions)}<tbody>${groupedRows(res.rows)}</tbody></table></div>` : `<div class="empty">${v.q ? 'Aucun titre ne correspond à cette recherche.' : 'Aucun titre dans cette vue avec ces critères et ces filtres.'}</div>`;
-    if (!window.jigoScrollRestored) { window.jigoScrollRestored = true; try { requestAnimationFrame(() => scrollTo(0, +(sessionStorage.getItem('jigo_explorer_scroll') || 0))); } catch (e) {} }
-    J.$$('#results tbody tr').forEach(tr => { const a = tr.querySelector('a[data-sheet]'); a.addEventListener('click', () => { persist(); sessionStorage.setItem('jigo_explorer_scroll', String(scrollY)); }); tr.onclick = e => { if (e.target.closest('a,button,input')) return; persist(); window.open(a.href, '_blank', 'noopener'); }; });
-    J.$$('#results .fam-toggle').forEach(b => b.onclick = () => { const g = b.dataset.g, on = !openGroups.has(g); on ? openGroups.add(g) : openGroups.delete(g); b.setAttribute('aria-expanded', on); b.querySelector('.fam-sign').textContent = on ? '−' : '+'; J.$$('#results tr[data-child-of]').forEach(tr => { if (tr.dataset.childOf === g) tr.hidden = !on; }); });
-    J.$$('#results th.sortable').forEach(th => th.onclick = () => { const k = th.dataset.k; if (S.sort === k) S.dir = S.dir === 'asc' ? 'desc' : 'asc'; else { S.sort = k; S.dir = ['name', 'price', 'volatility', 'drawdown', 'rank'].includes(k) ? 'asc' : 'desc'; } S.page = 1; load(); });
-    el('pager').innerHTML = `<span class="muted small">${J.num(res.examined, 0)} titres examinés sur ${J.num(res.universe, 0)} · ${J.num(res.total, 0)} résultat${res.total > 1 ? 's' : ''}${res.populations.etf && res.populations.equity ? ' · actions et ETF sont classés séparément' : ''} · mesures sur ${res.ref_sessions} séances</span>
-      <span class="row gap-s"><select id="size" aria-label="Lignes par page">${[20, 50, 100].map(n => `<option value="${n}" ${n === S.size ? 'selected' : ''}>${n} par page</option>`).join('')}</select><button class="btn small" id="prev" ${res.page <= 1 ? 'disabled' : ''}>←</button><span class="small">Page ${res.page} / ${res.pages}</span><button class="btn small" id="next" ${res.page >= res.pages ? 'disabled' : ''}>→</button></span>`;
-    el('prev').onclick = () => { S.page--; load(); window.scrollTo({ top: 0 }); }; el('next').onclick = () => { S.page++; load(); window.scrollTo({ top: 0 }); };
-    el('size').onchange = e => { S.size = +e.target.value; S.page = 1; load(); };
-  }
-  async function loadCompare(my) {
-    const base = { ...view(), kind: '', status: 'retained', sort: 'rank', page: 1, page_size: 12 };
-    let eq, etf;
-    try { [eq, etf] = await Promise.all([J.post('explore', { config: S.config, view: { ...base, kind: 'equity' } }), J.post('explore', { config: S.config, view: { ...base, kind: 'etf' } })]); } catch (e) { el('results').innerHTML = `<div class="empty"><div class="notice err">${J.esc(e.message)}</div></div>`; return; }
-    if (my !== seq) return;
-    drawTabs(eq);
-    const col = (title, res) => `<div><h2 style="margin:0 0 4px">${title}</h2><div class="muted small" style="margin-bottom:8px">${J.num(res.counts[title === 'Actions' ? 'equity' : 'etf'].retained || 0, 0)} retenus sur ${J.num(res.populations[title === 'Actions' ? 'equity' : 'etf'], 0)} · 12 premiers</div>
-      ${res.rows.map(r => `<a class="result" target="_blank" rel="noopener" href="${J.esc(sheetHref(r.id))}" style="grid-template-columns:34px 1fr auto"><div class="rank">${r.rank}</div><div style="min-width:0"><div class="name">${J.esc(r.name)}</div><div class="meta">${J.esc(r.symbol)} · ${J.esc(r.market)} · pente ${J.num(r.ref.slope, 3)} · R² ${J.num(r.ref.r2, 2)}</div></div><div class="num"><b>${J.num(r.score, 0)}</b><div class="meta">${J.pct(r.ref.perf, 1)}</div></div></a>`).join('') || '<div class="muted">Aucun titre retenu.</div>'}</div>`;
-    el('results').innerHTML = `<div class="grid cols-2" style="padding:16px 18px;gap:24px">${col('Actions', eq)}<div>${JEtf.concentration(etf.etf_concentration)}${col('ETF', etf)}</div></div>`;
-    el('pager').innerHTML = '<span class="muted small">Chaque groupe est classé à part : un ETF n’est jamais comparé à une action pour le rang ; ici les deux classements sont côte à côte.</span>';
-  }
-  function fillFacets(res) {
-    Object.keys(LEVELS).forEach(k => MS[k].set(LEVELS[k].map(([v, l]) => [v, l, (((res.level_filters || {}).counts || {})[k] || {})[v] || 0])));
-    if (!MS.country.loaded) { MS.country.loaded = 1; MS.country.set(Object.entries(res.facets.countries).map(([c, n]) => [c, c, n])); }
-    if (!MS.category.loaded) { MS.category.loaded = 1; MS.category.set(Object.entries(res.facets.categories || {}).sort((a, b) => a[0].localeCompare(b[0], 'fr')).map(([c, n]) => [c, c, n])); }
-    if (!el('market').dataset.filled && (el('market').dataset.filled = 1)) Object.entries(res.facets.markets).sort((a, b) => b[1] - a[1]).forEach(([m, n]) => el('market').insertAdjacentHTML('beforeend', `<option value="${J.esc(m)}">${J.esc(MARKETS[m] || m)} (${n})</option>`));
-    ['market'].forEach(k => { const v = (saved.view || {})[k]; if (v && !el(k).dataset.restored) { el(k).value = v; el(k).dataset.restored = 1; } }); syncMenu();
-    el('filters-note').textContent = 'Les filtres numériques utilisent les mesures sur ' + res.ref_sessions + ' séances (la plus longue période active).';
-  }
-  el('compare-btn').onclick = () => { S.compare = !S.compare; el('compare-btn').classList.toggle('primary', S.compare); el('compare-btn').textContent = S.compare ? 'Retour au tableau' : 'Comparer actions / ETF'; S.page = 1; load(); };
-  el('export-btn').onclick = async () => {
-    const res = await J.post('explore', { config: S.config, view: { ...view(), status: S.status, sort: S.sort, dir: S.dir, export: true } });
-    const head = ['Rang', 'Nom', 'Symbole', 'ISIN', 'Place', 'Type', 'Pays', 'Encours fonds (EUR)', 'Prix (devise)', 'Devise', 'Prix (EUR)', 'Pente', 'R2', 'Perf %', 'Volatilité', 'Repli %', 'Volume moyen', 'Score', 'Statut', 'Dernière clôture'];
-    const q = v => { v = v === null || v === undefined ? '' : String(v).replace('.', ','); return /[;"\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
-    const lines = res.rows.map(r => [r.rank, r.name, r.symbol, r.isin, r.market, r.kind, r.country, r.aum_eur, r.price, r.currency, r.price_eur, r.ref.slope, r.ref.r2, r.ref.perf, r.ref.volatility, r.ref.drawdown, r.volume, r.score, r.status_label, r.last_close].map(q).join(';'));
-    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + [head.join(';'), ...lines].join('\r\n')], { type: 'text/csv;charset=utf-8' })); a.download = 'jigobourso-explorer-' + new Date().toISOString().slice(0, 10) + '.csv'; a.click();
-    J.toast(res.rows.length + ' lignes exportées' + (res.total > res.rows.length ? ' (limite de 3 000)' : ''));
-  };
-  el('reset-filters').onclick = () => { FILTERS.forEach(k => el(k).value = ''); CHECKS.forEach(k => el(k).checked = false); el('kind').value = ''; el('market').value = ''; syncMenu(); el('tradable').checked = true; S.page = 1; load(); };
-  el('tradable').onchange = () => { S.page = 1; load(); };
-  /* Les réglages et filtres ne lancent plus la recherche à chaque geste (trop lent) : un bouton « Appliquer » (ou la touche Entrée) la déclenche. */
-  async function applyMenu() { clearTimeout(timer); S.page = 1; if (el('q').value.trim()) S.status = 'all'; if(!el('editor').hidden)return readEditor(); load(); }
-  function markDirty() { el('apply-menu').classList.add('pending'); }
-  [...text, ...CHECKS].forEach(k => el(k).addEventListener(el(k).type === 'search' || el(k).type === 'number' || el(k).placeholder ? 'input' : 'change', markDirty));
-  el('apply-menu').onclick = applyMenu;
-  ['kind', 'geo_region'].forEach(k => el(k).addEventListener('change', applyMenu));
-  ['q', 'min_price', 'budget', 'min_score', 'max_volatility', 'max_drawdown', 'min_volume'].forEach(k => el(k).addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); applyMenu(); } }));
-  /* liens du menu latéral : ?kind=, ?compare=1, ?preset= */
-  if (url.get('kind')) el('kind').value = url.get('kind'); ['geo_region', 'max_fee'].forEach(k => { if (url.get(k)) el(k).value = url.get(k); });
-  if (url.get('preset') === 'free') { S.preset = 'free'; S.label = null; S.config = freeConfig(); } else if (P.presets[url.get('preset')]) { S.preset = url.get('preset'); S.base = S.preset; S.label = null; S.config = presetConfig(S.preset); if (MINE[S.preset]) setView(MINE[S.preset].view); }
-  drawSources(); drawStrategies(); syncMenu(); drawSaved(); if (el('q').value) S.status = 'all';
-  if (url.get('compare')) { S.compare = true; el('compare-btn').classList.add('primary'); el('compare-btn').textContent = 'Retour au tableau'; }
-  if (FILTERS.some(k => el(k).value) || CHECKS.some(k => el(k).checked)) {
-    el('filters').hidden = false;
-    if (matchMedia('(max-width: 640px)').matches) { el('menu').classList.add('filters-open'); el('filters-btn').setAttribute('aria-expanded', 'true'); el('filters-toggle-label').textContent = 'Masquer les filtres'; }
-  }
-  load();
-  if (url.get('edit') === '1') { el('editor').hidden = false; document.body.classList.add('strategy-editing'); el('edit-btn').setAttribute('aria-expanded', 'true'); drawEditor(); }
+  async function refreshLibrary(){library=(await J.api('explorer/library')).items;library.forEach(i=>{if(i.legacy)i.active=!(S.preferences.disabledItems||[]).includes(i.id);});if(oldSnapshot?.config)library.push({id:'legacy-browser',kind:'search',name:'Dernière recherche de l’ancienne interface',legacy:true,active:true,payload:{config:oldSnapshot.config,universe:oldSnapshot.view||{}}});renderLibrary();}
+  function payload(kind){return {schema:4,...(kind!=='universe'?{config:copy(config())}:{}),...(kind!=='strategy'?{universe:copy(S.draft.universe)}:{})};}
+  async function loadItem(item){const p=item.payload;if(item.kind!=='universe'){S.draft.config=p.config.version===4?copy(p.config):(await J.post('strategy/validate',{...p.config,_upgrade:true})).config;S.draft.preset='custom';}if(item.kind!=='strategy')S.draft.universe=copy(p.universe||{});if(item.kind!=='universe')S.preferences.configuration=S.draft.config.presentation.configuration;render();tell(item.legacy?'Ancienne sauvegarde chargée en brouillon après conversion explicite des unités ; original conservé.':'Sauvegarde chargée en brouillon. Cliquez sur Appliquer.');}
+  const download=(name,data,type='application/json')=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);};
+  function renderLibrary(){$('library-items').innerHTML=library.map((i,index)=>`<div class="ex-library-row"><strong>${esc(i.name)}<small> · ${esc(({strategy:'Stratégie',universe:'Univers',search:'Recherche complète'})[i.kind])}${i.legacy?' · Historique '+esc(i.id):''}${!i.active?' · Désactivée':''}</small></strong>${['Charger','Dupliquer','Exporter',...(!i.legacy?['Remplacer par le brouillon']:[]),...(i.id==='legacy-browser'?[]:i.id.startsWith('legacy-preset:')?['Activer / désactiver','Supprimer']:['Renommer','Activer / désactiver','Supprimer'])].map((a,j)=>`<button class="btn small" data-item="${index}" data-action="${a}">${a}</button>`).join('')}</div>`).join('')||'<p>Aucune sauvegarde.</p>';
+    $('library-items').querySelectorAll('button').forEach(el=>el.onclick=safe(async()=>{const i=library[Number(el.dataset.item)],action=el.dataset.action;if(action==='Remplacer par le brouillon'){await J.post('explorer/library/save',{id:i.id,kind:i.kind,name:i.name,active:i.active,payload:payload(i.kind)});await refreshLibrary();tell('Sauvegarde remplacée par le brouillon ; résultats inchangés.');return;}if(action==='Charger'){await loadItem(i);return;}if(action==='Exporter'){download('explorer-'+i.kind+'.json',JSON.stringify({schema:4,kind:i.kind,name:i.name,payload:i.payload},null,2));return;}if(i.legacy&&action==='Activer / désactiver'){const ids=new Set(S.preferences.disabledItems||[]);if(i.active)ids.add(i.id);else ids.delete(i.id);S.preferences.disabledItems=[...ids];persist();await refreshLibrary();return;}if(i.legacy&&['Supprimer','Renommer'].includes(action)){const name=action==='Renommer'?prompt('Nouveau nom',i.name):null;if(action==='Renommer'&&!name)return;await J.post('explorer/library/legacy',{id:i.id,action:action==='Supprimer'?'delete':'rename',name});await refreshLibrary();return;}if(action==='Supprimer'){await J.post('explorer/library/delete',{id:i.id});}else{const name=action==='Activer / désactiver'?i.name:prompt(action==='Dupliquer'?'Nom de la copie':'Nouveau nom',i.name+(action==='Dupliquer'?' (copie)':''));if(!name)return;let data=copy(i.payload);if(data.config?.version===3)data.config=(await J.post('strategy/validate',{...data.config,_upgrade:true})).config;await J.post('explorer/library/save',{...(action==='Dupliquer'?{}:{id:i.id}),kind:i.kind,name,payload:data,active:action==='Activer / désactiver'?!i.active:i.active});}await refreshLibrary();render();}));}
+  $('strategy').onchange=safe(async e=>{const value=e.target.value;if(value.startsWith('saved:')){await loadItem(library.find(x=>x.id===value.slice(6)));return;}if(value==='custom')return;S.draft.config=copy(value==='empty'?P.empty:P.v4_presets[value]);S.draft.preset=value;render();});
+  $('kind').onchange=e=>{S.draft.universe.kind=e.target.value;dirty();};$('q').oninput=e=>{S.draft.universe.q=e.target.value;dirty();};
+  for(const field of ['mode','configuration','target'])$(field).onchange=e=>{S.preferences[field]=e.target.value;if(field==='configuration')config().presentation.configuration=e.target.value;render();};$('edit-period').onchange=e=>{S.preferences.period=e.target.value;persist();renderCriteria();};
+  for(const id of ['settings','universe'])$(id+'-toggle').onclick=()=>{S.preferences.panels[id]=!S.preferences.panels[id];$(id).hidden=!S.preferences.panels[id];$(id+'-toggle').setAttribute('aria-expanded',String(!$(id).hidden));persist();};
+  $('combine').onchange=e=>setSection('selection','combine',e.target.value);$('missing').onchange=e=>setSection('selection','missing',e.target.value);$('require-fresh').onchange=e=>setSection('selection','require_fresh',e.target.checked);
+  $('neutral').onclick=()=>{S.draft={config:copy(P.empty),universe:{tradable:false},preset:'empty'};render();tell('Brouillon vide préparé ; aucune sauvegarde supprimée.');};$('original').onclick=()=>{const preset=P.v4_presets[S.draft.preset]?S.draft.preset:P.v4_presets[config().name]?config().name:'regular';S.draft.config=copy(P.v4_presets[preset]);S.draft.preset=preset;render();tell('Valeurs d’origine préparées, filtres d’univers conservés.');};
+  $('rank-mode').onchange=safe(async e=>{const mode=e.target.value;if(mode===config().ranking.mode)return;if(mode==='weighted'){$('settings').inert=true;$('apply').disabled=true;try{config().ranking=(await J.post('strategy/validate',{...config(),_editable:true})).config.ranking;}finally{$('settings').inert=false;$('apply').disabled=false;}}else config().ranking={mode,weights:Object.fromEntries(config().periods.map(p=>[p.id,p.enabled?1:0]))};dirty();renderScore();});
+  for(const k of ['missing','aggregation','grouping'])$(''+({missing:'score-missing',aggregation:'aggregation',grouping:'grouping'})[k]).onchange=e=>{config().ranking[k]=e.target.value;dirty();};
+  $('score-add').onclick=()=>{config().ranking.components.push({id:'c-'+Date.now()+'-'+Math.random().toString(36).slice(2),metric:'slope',period:S.preferences.period,kind:'all',enabled:true,weight:1,direction:'higher',normalization:'percentile',min:0,max:100,transform:'identity',exponent:1});dirty();renderScore();};
+  $('apply').onclick=safe(async()=>{const validated=await J.post('strategy/validate',config());S.draft.config=validated.config;S.applied=copy(S.draft);persist();dirty();page=1;await load();tell('Recherche appliquée.');});
+  for(const id of ['status','sort'])$(id).onchange=safe(async()=>{page=1;S.preferences.result={status:$('status').value,sort:$('sort').value,page};persist();await load();});
+  $('save-new').onclick=safe(async()=>{await J.post('explorer/library/save',{kind:$('save-kind').value,name:$('save-name').value,payload:payload($('save-kind').value)});await refreshLibrary();render();tell('Brouillon enregistré dans la bibliothèque ; résultats inchangés.');});
+  $('library-open').onclick=()=>{$('library').open=true;$('library').scrollIntoView({behavior:'smooth'});};$('import').onclick=()=>$('import-file').click();$('import-file').onchange=safe(async e=>{const file=e.target.files[0];if(!file)return;if(file.size>100000)throw Error('Fichier limité à 100 Ko');const data=JSON.parse(await file.text());if(data.schema!==4||!['strategy','universe','search'].includes(data.kind))throw Error('Format d’import inconnu');await J.post('explorer/library/save',{kind:data.kind,name:data.name,payload:data.payload});await refreshLibrary();render();tell('Import enregistré ; cliquez sur Charger puis Appliquer.');});
+  $('export').onclick=safe(async()=>{const r=await J.post('explore',{config:S.applied.config,view:{...S.applied.universe,status:$('status').value,export:true}});const cell=x=>'"'+String(x??'').replaceAll('"','""')+'"';const rows=[['Ticker','Nom','Statut','Score','Prix EUR'],...r.rows.map(x=>[x.symbol,x.name,x.status,x.score,x.price_eur])];download('classement.csv','\uFEFF'+rows.map(row=>row.map(cell).join(';')).join('\r\n'),'text/csv;charset=utf-8');});
+  $('compare').onclick=safe(async()=>{const ids=[...new Set([...$('results').querySelectorAll('[data-compare]:checked')].map(x=>Number(x.dataset.compare)))];if(ids.length<2||ids.length>6)throw Error('Sélectionnez entre 2 et 6 titres pour comparer leurs cours.');const sheets=await Promise.all(ids.map(id=>J.post('explorer/detail',{id,config:S.applied.config,view:S.applied.universe})));const n=Math.max(...S.applied.config.periods.filter(p=>p.enabled).map(p=>p.sessions),21),dates=sheets[0].analysis_windows[n]||[],colors=['#6354ff','#00a58e','#ff9a00','#e64192','#2884ff','#87b900'];const d=J.dialog({title:'Comparer les cours — base 100',body:'<p>Comparaison des cours ajustés sur les mêmes dates. Ce graphique ne représente ni un rendement personnel ni une contribution au portefeuille.</p><div class="ex-detail-chart"></div>',actions:[{label:'Fermer',run:()=>{}}]});J.lineChart(d.querySelector('.ex-detail-chart'),dates,sheets.map((s,i)=>{const map=new Map(s.daily),base=map.get(dates[0]);return {id:String(s.id),label:s.symbol,color:colors[i],values:dates.map(day=>base&&map.has(day)?100*map.get(day)/base:null)};}),{height:270,format:J.num});});
+  try{
+    await refreshLibrary();const url=new URL(location.href);let notice='',consumed=false;
+    const preset=url.searchParams.get('preset');
+    if(preset==='free'||P.v4_presets[preset]){S.draft.config=copy(preset==='free'?P.empty:P.v4_presets[preset]);S.draft.preset=preset==='free'?'empty':preset;notice='Stratégie préparée en brouillon. Cliquez sur Appliquer.';consumed=true;url.searchParams.delete('preset');}
+    for(const key of ['q','kind','geo_region','max_fee'])if(url.searchParams.has(key)){S.draft.universe[key]=url.searchParams.get(key);notice='Recherche préparée en brouillon. Cliquez sur Appliquer.';consumed=true;url.searchParams.delete(key);}
+    if(url.searchParams.get('edit')==='1'){S.preferences.panels.settings=true;consumed=true;url.searchParams.delete('edit');}
+    if(url.searchParams.has('compare'))notice='Cochez entre 2 et 6 titres puis choisissez « Comparer la sélection ». Les classements Actions et ETF restent distincts par défaut.';
+    if(consumed)history.replaceState(null,'',url.pathname+url.search+url.hash);
+    render();if(url.searchParams.has('library')||url.searchParams.has('manage'))$('library').open=true;await load();if(notice)tell(notice);
+  }catch(e){tell(e.message,true);}
 })();

@@ -1,5 +1,7 @@
 # Jigobourso v2 — architecture (refonte totale)
 
+Évolution Explorer du 4 novembre 2026 : [configuration V4, moteur et sauvegardes](EXPLORER_V4.md), [validations exécutées et limites](EXPLORER_V4_VALIDATION.md). Les indications historiques ci-dessous ne remplacent pas ce contrat versionné.
+
 Statut : construction dans `/home/jigo/myProjects/jigobourso-v2/`, séparée de la production et de `bou-fix`.
 Aucun ancien fichier n'est conservé par défaut : une fonction n'est reprise que si elle est pertinente **et** testée (voir §6).
 Rien n'est déployé ni modifié en production sans accord explicite. Ni Git ni GitHub ne sont touchés.

@@ -1,56 +1,21 @@
 <!doctype html>
-<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Explorer — Jigobourso</title><link rel="stylesheet" href="assets/app.css?v=2026110102"></head>
-<body><main class="wrap">
-<div class="page-head"><div><h1>Explorer</h1><p>Actions et ETF classés selon votre stratégie : réglez les critères, filtrez, triez, comparez, puis ouvrez la fiche d’un titre.</p></div>
-  <div class="row"><button class="btn" id="compare-btn">Comparer actions / ETF</button><button class="btn" id="export-btn">Exporter en CSV</button></div></div>
-<div class="sourcebar" id="sources" style="margin-bottom:14px"><span class="spinner"></span></div>
-
-<p class="muted small explorer-intro" style="margin:0 0 8px">Un profil préremplit les critères. Les filtres déterminent les titres examinés, puis le classement se fait parmi eux.</p>
-<section aria-label="Stratégie"><div class="strat-cards" id="strats"></div></section>
-<div class="row explorer-actions" style="margin-top:10px"><button class="btn drawer-toggle" id="edit-btn" aria-expanded="false" aria-controls="editor"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg> Régler la stratégie</button><button class="btn drawer-toggle" id="filters-btn" aria-expanded="false" aria-controls="menu filters"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h18l-7 8v5l-4 2v-7z"/></svg> <span id="filters-toggle-label">Filtres avancés</span> <span class="count-pill" id="filters-count" hidden></span></button><button type="button" class="btn small" id="reset-default" hidden></button><span class="muted small" id="strategy-summary"></span><span id="saved" class="saved-filter-inline"></span></div>
-<section class="card menu" id="menu" aria-label="Recherche et critères">
-  <div class="menu-bar">
-    <label class="mi search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="q" type="search" placeholder="Rechercher un titre, un symbole…" aria-label="Nom, symbole ou ISIN"></label>
-    <label class="mi market"><span class="flag" id="market-flag" aria-hidden="true"></span><select id="market" aria-label="Place"><option value="">Toutes les places</option><option value="__pea">Europe (PEA)</option></select></label>
-    <div class="mf kind-filter"><span>Type de titres</span><select id="kind" aria-label="Type de titres"><option value="">Tous</option><option value="equity">Actions</option><option value="etf">ETF</option><option value="large_etf">Les plus gros ETF</option></select></div>
-    <div class="mf geo-filter"><span>Zone géographique</span><select id="geo_region" aria-label="Zone géographique"><option value="">Tous</option><option value="us">US</option><option value="eu">EU</option><option value="emerging">Émergents</option></select></div>
-    <div class="mf fee-filter"><span>Frais ETF</span><select id="max_fee" aria-label="Frais courants maximaux d’un ETF"><option value="">Tous</option><option value="0.1">≤ 0,1 %/an</option><option value="0.2">≤ 0,2 %/an</option><option value="0.3">≤ 0,3 %/an</option><option value="0.5">≤ 0,5 %/an</option></select></div>
-    <div class="mf"><span>Prix</span><select id="f-price" aria-label="Prix d’une part"><option value="">Tout</option><option value="|10">≤ 10 €</option><option value="10|50">10 à 50 €</option><option value="50|200">50 à 200 €</option><option value="200|">&gt; 200 €</option></select></div>
-    <div class="mf"><span>Volume</span><select id="f-volume" aria-label="Volume moyen par jour"><option value="">Tout</option><option value="10000">≥ 10 000 titres/j</option><option value="100000">≥ 100 000 titres/j</option><option value="1000000">≥ 1 million de titres/j</option></select></div>
-    <div class="mf"><span>Capitalisation</span><select id="cap" aria-label="Capitalisation boursière"><option value="">Tout</option><option value="micro">Micro (&lt; 300 M€)</option><option value="small">Petite (0,3 à 2 Md€)</option><option value="mid">Moyenne (2 à 10 Md€)</option><option value="large">Grande (10 à 200 Md€)</option><option value="mega">Très grande (&gt; 200 Md€)</option></select></div>
-    <div class="mf fld"><span>Secteur</span><input type="hidden" id="category"></div>
-    <div class="mf mact"><button type="button" class="btn primary" id="apply-menu" title="Lancer la recherche avec les réglages ci-dessus">Appliquer</button><button type="button" class="btn" id="saved-save" title="Enregistrer ces critères et filtres : remplacer le réglage d’une stratégie de départ, ou créer une recherche à part">Enregistrer</button><a class="btn" id="saved-manage" href="mes-filtres.html" title="Consulter et gérer vos filtres enregistrés">Mes filtres</a></div>
-  </div>
-  <div class="sliders" id="sliders"></div>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Explorer — Jigobourso</title><link rel="stylesheet" href="assets/app.css?v=20261104"><link rel="stylesheet" href="assets/explorer.css?v=20261104"></head>
+<body><main class="wrap explorer-v4">
+<header class="page-head"><div><h1>Explorer / Classement</h1><p>Choisissez votre univers, sélectionnez vos critères, puis classez les titres retenus.</p></div><button class="btn" id="library-open">Ma bibliothèque</button></header>
+<p id="message" role="status" aria-live="polite"></p>
+<section class="card" aria-label="Recherche">
+<div class="ex-toolbar"><label>Stratégie<select id="strategy"></select></label><label>Type<select id="kind"><option value="">Tous</option><option value="equity">Actions</option><option value="etf">ETF</option><option value="large_etf">Les plus gros ETF</option></select></label><label>Rechercher un titre<input id="q" type="search" placeholder="Nom, symbole, ISIN"></label><label>Présentation<select id="mode"><option value="beginner">Débutant</option><option value="expert">Expert</option></select></label></div>
+<div id="periods" class="ex-periods" aria-label="Granularités"></div>
+<div class="ex-toolbar"><button class="btn" id="settings-toggle" aria-expanded="false" aria-controls="settings">Régler la stratégie</button><button class="btn" id="universe-toggle" aria-expanded="false" aria-controls="universe">Filtres d’univers</button><button class="btn" id="neutral">Tout remettre à zéro</button><button class="btn" id="original">Valeurs d’origine</button><button class="btn primary" id="apply">Appliquer</button></div>
+<p id="draft-note" class="small muted"></p>
+<div id="settings" hidden><div class="ex-toolbar"><label>Configuration<select id="configuration"><option value="period">Par granularité</option><option value="global">Globale</option></select></label><label>Règles pour<select id="target"><option value="all">Actions et ETF : règles communes</option><option value="equity">Actions : règles spécifiques</option><option value="etf">ETF : règles spécifiques</option></select></label><label>Granularité à régler<select id="edit-period"></select></label></div>
+<p class="small muted" id="global-note"></p><div id="criteria"></div>
+<details id="expert-selection"><summary>Critères avancés et traitement des données</summary><div id="advanced" class="ex-grid"></div><div id="technical" class="ex-grid"></div><div class="ex-toolbar"><label>Combinaison<select id="combine"><option value="all">Tous les critères</option><option value="any">Au moins un critère</option></select></label><label>Données absentes<select id="missing"><option value="unknown">Non évaluable</option><option value="reject">Écarter explicitement</option></select></label><label><input type="checkbox" id="require-fresh"> Exiger les dernières clôtures</label></div><p class="small muted">L’historique explicitement exigé et la fraîcheur restent obligatoires, même avec « au moins un critère ».</p></details>
+<details id="score-panel"><summary>Classement — indépendant de la sélection</summary><div class="ex-toolbar"><label>Méthode<select id="rank-mode"></select></label><label id="score-missing-label">Mesure de score absente<select id="score-missing"><option value="unknown">Non évaluable</option><option value="renormalize">Recalculer avec les mesures disponibles</option></select></label><label>Agrégation<select id="aggregation"><option value="mean">Moyenne pondérée</option><option value="sum">Somme pondérée</option></select></label><label>Population<select id="grouping"><option value="asset_kind">Actions et ETF séparément</option><option value="combined">Tous ensemble</option></select></label></div><div id="score-components"></div><button type="button" class="btn" id="score-add">Ajouter une contribution</button><p class="small muted">Poids nul = sans effet. Poids négatif = pénalité. Le score est calculé sur la sélection complète avant pagination. Les percentiles dépendent de cette population.</p></details>
+</div>
+<div id="universe" hidden><h2>Univers — indépendant de la stratégie financière</h2><div id="universe-fields" class="ex-grid"></div><p class="small muted">Industrie et réplication ETF : absentes du catalogue disponible, aucun filtre fictif. Les frais, encours et régions d’ETF utilisent uniquement les données déjà stockées.</p></div>
 </section>
-<section id="editor" class="card" hidden style="margin-top:14px"></section>
-
-<section class="card" style="margin-top:12px;padding:0">
-  <div style="padding:14px 18px 0"><div class="tabs" id="status-tabs" style="margin-bottom:0"></div></div>
-  <div class="tradable-row"><label class="switch-label"><input type="checkbox" class="switch" id="tradable" checked role="switch"> Titres facilement négociables</label><span class="small muted" id="tradable-note"></span></div><div class="small muted" id="level-note" style="margin:2px 0 6px"></div>
-  <div class="filters" id="filters" hidden>
-    <div class="fld"><span>Pays</span><input type="hidden" id="country"></div>
-    <div class="fld"><span>Régularité <span class="muted small">(période de la stratégie)</span></span><input type="hidden" id="regularity"></div>
-    <div class="fld"><span>Volatilité <span class="muted small">(période de la stratégie)</span></span><input type="hidden" id="risk"></div>
-    <div class="fld"><span>Négociabilité <span class="muted small">(volume moyen 3 mois)</span></span><input type="hidden" id="liquidity"></div>
-    <label>Budget (prix d’une part ≤ €)<input id="budget" type="number" min="0" step="1" placeholder="ex. 500"></label>
-    <label>Prix min. (€)<input id="min_price" type="number" min="0" step="1"></label>
-    <label>Score min. (0–100)<input id="min_score" type="number" min="0" max="100" step="1"></label>
-    <label>Volatilité max. (%/séance)<input id="max_volatility" type="number" min="0" step=".1"></label>
-    <label>Repli max. (%)<input id="max_drawdown" type="number" min="0" step="1"></label>
-    <label>Volume moyen min. (titres/j)<input id="min_volume" type="number" min="0" step="1000"></label>
-    <div class="toggles">
-      <label class="check"><input type="checkbox" id="pea"> PEA (actions, probable)</label>
-      <label class="check"><input type="checkbox" id="mine"> Titres détenus</label>
-      <label class="check"><input type="checkbox" id="open_now"> Place ouverte maintenant</label>
-      <label class="check"><input type="checkbox" id="fresh_only"> Données à jour uniquement</label>
-    </div>
-    <div class="filters-actions"><button class="btn small" id="reset-filters">Réinitialiser les filtres</button><span class="muted small" id="filters-note"></span></div>
-  </div>
-  <div id="results"><div class="empty"><span class="spinner"></span></div></div>
-  <div class="row between" style="padding:12px 18px;border-top:1px solid var(--line)" id="pager"></div>
-</section>
-<details class="card" id="why" style="margin-top:14px"><summary style="cursor:pointer;font-weight:700">Pourquoi des titres sont écartés ? <span class="muted small" style="font-weight:400">statistiques par critère</span></summary><div id="why-body" style="margin-top:12px"></div></details>
-<p class="muted small" style="margin-top:14px">Analyse descriptive des cours passés, sans conseil ni promesse de performance. Un titre « retenu » remplit vos critères ; ce n’est pas une recommandation d’achat. Catalogue : FinanceDatabase · Cours : Yahoo Finance.</p>
-</main>
-<script src="assets/app.js?v=2026110102"></script><script src="assets/etf.js?v=2026110102"></script><script src="assets/explorer-menu.js?v=2026110102"></script><script src="assets/multiselect.js?v=2026110102"></script><script src="assets/explorer.js?v=2026110102"></script></body></html>
+<section class="card" style="margin-top:16px"><div class="ex-toolbar"><label>Résultats<select id="status"><option value="retained">Retenus</option><option value="rejected">Écartés : critères les plus proches d’abord</option><option value="unknown">Non évaluables</option><option value="all">Tous</option></select></label><label>Trier<select id="sort"><option value="rank">Classement</option><option value="score">Score</option><option value="symbol">Symbole</option><option value="price">Prix</option></select></label><button class="btn" id="export">Exporter CSV</button><button class="btn" id="compare">Comparer la sélection</button><details id="columns"><summary>Colonnes</summary><div id="column-options"></div></details></div><p id="result-note" class="small muted"></p><div id="results" aria-live="polite"></div><div id="pager" class="ex-toolbar"></div></section>
+<details class="card" id="library" style="margin-top:16px"><summary>Bibliothèque : stratégies, univers et recherches</summary><div class="ex-toolbar"><label>Catégorie<select id="save-kind"><option value="strategy">Stratégie financière</option><option value="universe">Univers uniquement</option><option value="search">Recherche complète</option></select></label><label>Nom<input id="save-name" maxlength="80"></label><button class="btn" id="save-new">Enregistrer le brouillon</button><button class="btn" id="import">Importer JSON</button><input type="file" id="import-file" accept="application/json,.json" hidden></div><p class="small muted">Charger prépare un brouillon ; Appliquer lance la recherche. Les anciennes sauvegardes conservent leurs identifiants et restent disponibles.</p><div id="library-items"></div></details>
+<p class="small muted">Données FinanceDatabase / Yahoo déjà collectées. Analyses descriptives du passé, sans recommandation ni promesse de performance.</p>
+</main><script src="assets/app.js?v=20261104"></script><script src="assets/etf.js?v=20261104"></script><script src="assets/charts.js?v=20261104"></script><script src="assets/explorer-menu.js?v=20261104"></script><script src="assets/explorer.js?v=20261104"></script></body></html>
