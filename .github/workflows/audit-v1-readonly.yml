@@ -28,7 +28,7 @@ jobs:
           root=pathlib.Path.home()/'domains/bourse.turnjoy.dev'
           if not root.is_dir():raise SystemExit('Domaine V1 introuvable')
           excluded={'.git','.venv','venv','node_modules','private','data','logs','cache','__pycache__','backups','backup','vendor','sessions','uploads'}
-          extensions={'.py','.php','.js','.ts','.html','.css','.md'}
+          extensions={'.py','.php','.js','.ts','.html','.css','.md','.sh'}
           forbidden={'config.php','config.py','db.php','database.php','secrets.py','credentials.py','env.php','settings_local.py'}
           manifest=[];total=0
           with tarfile.open(fileobj=__import__('sys').stdout.buffer,mode='w|gz') as archive:
@@ -45,7 +45,7 @@ jobs:
                       content=p.read_bytes();relative=str(p.relative_to(root))
                       info=tarfile.TarInfo(relative);info.size=len(content);info.mode=0o600
                       archive.addfile(info,io.BytesIO(content))
-                      manifest.append({'path':relative,'bytes':len(content),'sha256':hashlib.sha256(content).hexdigest()})
+                      manifest.append({'path':relative,'bytes':len(content),'sha256':hashlib.sha256(content).hexdigest(),'mtime':p.stat().st_mtime})
               raw=json.dumps({'root':str(root),'files':manifest},indent=2).encode()
               info=tarfile.TarInfo('AUDIT_MANIFEST.json');info.size=len(raw);info.mode=0o600;archive.addfile(info,io.BytesIO(raw))
           REMOTE
@@ -71,7 +71,7 @@ jobs:
           git commit -qm 'Résultat chiffré audit V1 en lecture seule'
           auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
           export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=http.https://github.com/.extraheader GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $auth"
-          git push -q "https://github.com/$GITHUB_REPOSITORY.git" HEAD:refs/heads/audit/v1-sources-encrypted-20261104
+          git push -q "https://github.com/$GITHUB_REPOSITORY.git" HEAD:refs/heads/audit/v1-sources-encrypted-20261104-2
       - name: Retirer la clé SSH temporaire du runner
         if: always()
         run: rm -f "$RUNNER_TEMP/v1-audit/ssh.key"
