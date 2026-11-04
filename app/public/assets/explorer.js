@@ -102,10 +102,10 @@
     const c = S.config, box = el('editor'), act = c.periods.filter(p => p.enabled), p0 = act[0] || c.periods[0];
     const sl = guessLevel(P.slope_levels, p0.min_slope, 'none'), rl = guessLevel(Object.fromEntries(Object.entries(P.r2_levels)), p0.min_r2, 'none'), dd = p0.max_drawdown === null ? '' : String(p0.max_drawdown);
     const num = (p, f, step) => `<input type="number" step="${step}" value="${p[f] ?? ''}" data-p="${p.id}" data-f="${f}" style="width:100px" placeholder="–">`;
-    box.innerHTML = `<div class="row between"><h2 style="margin:0">Régler la stratégie</h2><span class="seg" id="lvl"><button data-l="guided" class="${S.level === 'guided' ? 'on' : ''}">Réglages guidés</button><button data-l="detail" class="${S.level === 'detail' ? 'on' : ''}">Réglage détaillé</button></span></div>
+    box.innerHTML = `<div class="row between"><h2 style="margin:0">Régler la stratégie</h2><span class="seg" id="lvl"><button data-l="guided" class="${S.level === 'guided' ? 'on' : ''}">Réglages guidés</button><button data-l="detail" class="${S.level === 'detail' ? 'on' : ''}">Réglage détaillé</button></span></div><div class="row editor-actions" style="margin-top:12px"><button class="btn primary" id="apply">Appliquer</button></div>
     <p class="muted small" style="margin:6px 0 12px">Un titre est retenu s’il respecte tous les critères de toutes les périodes cochées. Case vide = pas de critère. Pente = hausse moyenne par séance ; R² = régularité de la hausse (1 = droite parfaite).</p>
-    <div class="row" style="gap:18px;margin-bottom:10px">${c.periods.map(p => `<label class="row gap-s small"><input type="checkbox" ${p.enabled ? 'checked' : ''} data-p="${p.id}" data-f="enabled"> ${J.PERIODS[p.id]} <input type="number" min="2" max="252" value="${p.sessions}" data-p="${p.id}" data-f="sessions" style="width:60px" ${p.id === 'day' ? 'disabled' : ''}> <span class="muted">séances</span></label>`).join('')}</div>
-    <div id="guided" ${S.level === 'guided' ? '' : 'hidden'}><div class="filters" style="border:0;background:none;padding:0">
+    <div class="row" style="gap:18px;margin-bottom:10px">${c.periods.map(p => `<label class="row gap-s small"><input type="checkbox" ${p.enabled ? 'checked' : ''} data-p="${p.id}" data-f="enabled"> ${J.PERIODS[p.id]}${p.id==='day'?' (clôtures)':''} <input type="number" min="2" max="252" value="${p.sessions}" data-p="${p.id}" data-f="sessions" style="width:60px" ${p.id === 'day' ? 'disabled' : ''}> <span class="muted">séances</span></label>`).join('')}</div>
+    <p id="day-rule" class="small muted" role="status"></p><div id="guided" ${S.level === 'guided' ? '' : 'hidden'}><div class="filters" style="border:0;background:none;padding:0">
       <label class="guided-slope">Pente exigée<select id="g-slope"><option value="none">Aucune</option>${Object.entries({ gentle: 'Douce (doublement en ~8 ans)', moderate: 'Modérée (~4 ans)', strong: 'Forte (~2 ans)', very_strong: 'Très forte (~1 an)' }).map(([k, l]) => `<option value="${k}" ${k === sl ? 'selected' : ''}>${l}</option>`).join('')}${sl === 'custom' ? '<option value="custom" selected>Personnalisée</option>' : ''}</select></label>
       <label class="guided-r2">Régularité exigée<select id="g-r2"><option value="none">Aucune</option>${Object.entries({ flexible: 'Souple (R² ≥ 0,56)', balanced: 'Équilibrée (R² ≥ 0,75)', strict: 'Stricte (R² ≥ 0,89)' }).map(([k, l]) => `<option value="${k}" ${k === rl ? 'selected' : ''}>${l}</option>`).join('')}${rl === 'custom' ? '<option value="custom" selected>Personnalisée</option>' : ''}</select></label>
       <label>Tolérance aux corrections<select id="g-dd">${[['', 'Aucune limite'], ['5', 'Repli max. 5 %'], ['10', 'Repli max. 10 %'], ['20', 'Repli max. 20 %']].map(([v, l]) => `<option value="${v}" ${v === dd ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
@@ -121,18 +121,24 @@
       <label class="row gap-s small">Écart moy. 20 j max. (%) <input type="number" id="t-gap" value="${c.technical.max_gap_ma20 ?? ''}" style="width:70px"></label>
       <label class="row gap-s small">Classer par <select id="r-mode2">${[['trend', 'Pente'], ['performance', 'Performance'], ['regularity', 'Régularité'], ['stability', 'Stabilité'], ['momentum', 'Momentum 6 mois'], ['momentum12', 'Momentum 12 mois'], ['momentum_risk', 'Momentum ajusté du risque']].map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select></label></div></div>
     <div id="editor-msg" class="notice err" hidden style="margin-top:10px"></div>
-    <div class="row" style="margin-top:12px"><button class="btn primary" id="apply">Appliquer</button><select id="save-to" aria-label="Portefeuille"><option value="">Enregistrer pour un portefeuille…</option></select><button class="btn" id="save-btn">Enregistrer</button></div>`;
+    <div class="row" style="margin-top:12px"><select id="save-to" aria-label="Portefeuille"><option value="">Enregistrer pour un portefeuille…</option></select><button class="btn" id="save-btn">Enregistrer</button></div>`;
     J.$('#r-mode', box).value = c.ranking.mode; J.$('#r-mode2', box).value = c.ranking.mode;
     ['#g-slope', '#g-r2', '#g-dd'].forEach(id => { const e = J.$(id, box); e.dataset.init = e.value; });
-    J.$$('#lvl button', box).forEach(b => b.onclick = () => { S.level = b.dataset.l; drawEditor(); });
-    J.$('#apply', box).onclick = readEditor;
+    J.$$('#lvl button', box).forEach(b => b.onclick = async () => { if(await readEditor(false)){S.level = b.dataset.l; drawEditor();} });
+    const day=J.$('[data-p="day"][data-f="enabled"]',box),dayReturn=J.$('[data-p="day"][data-f="min_return"]',box);
+    const dayHint=()=>{const n=dayReturn.value;J.$('#day-rule',box).textContent=!day.checked?'':n!==''?'Dernier jour : variation entre les deux dernières clôtures ≥ '+n+' %. Le cours intrajournalier peut évoluer différemment.':'Dernier jour activé sans performance minimale : une baisse peut rester admissible. Réglez « Perf. min. » en mode détaillé.'};
+    day.addEventListener('change',()=>{if(day.checked&&J.$$('[data-p="day"][data-f]',box).filter(e=>!['enabled','sessions'].includes(e.dataset.f)).every(e=>e.value===''))dayReturn.value='0';dayHint()});
+    dayReturn.addEventListener('input',dayHint);dayHint();
+    box.oninput=markDirty;box.onchange=markDirty;
+    J.$('#apply', box).onclick = applyMenu;
     J.api('portfolios').then(r => { const sel = J.$('#save-to', box); r.portfolios.forEach(p => sel.insertAdjacentHTML('beforeend', `<option value="${p.id}">${J.esc(p.name)}</option>`)); });
     J.$('#save-btn', box).onclick = async () => { const id = J.$('#save-to', box).value; if (!id) return; if (await readEditor()) { await J.post('portfolio/strategy', { id: +id, config: S.config }); J.toast('Stratégie enregistrée pour ce portefeuille'); } };
   }
-  async function readEditor() {
+  async function readEditor(apply = true) {
     const box = el('editor'), c = JSON.parse(JSON.stringify(S.config)), v = x => x === '' || x === null ? null : Number(x);
     J.$$('[data-p]', box).forEach(i => { const p = c.periods.find(x => x.id === i.dataset.p); if (i.dataset.f === 'enabled') p.enabled = i.checked; else if (i.dataset.f === 'sessions') p.sessions = p.id === 'day' ? 1 : parseInt(i.value, 10); else if (S.level === 'detail') p[i.dataset.f] = v(i.value); });
     if (S.level === 'guided') {
+      c.periods.find(p=>p.id==='day').min_return=v(J.$('[data-p="day"][data-f="min_return"]',box).value);
       const g = id => { const e = J.$(id, box); return e.value !== e.dataset.init ? e.value : null; }, sl = g('#g-slope'), rl = g('#g-r2'), dd = g('#g-dd');   // seuls les réglages que vous avez touchés écrasent les périodes
       c.periods.filter(p => p.enabled).forEach(p => { if (sl !== null && sl !== 'custom') p.min_slope = sl === 'none' ? null : P.slope_levels[sl]; if (rl !== null && rl !== 'custom') p.min_r2 = rl === 'none' || p.sessions < 3 ? null : P.r2_levels[rl]; if (dd !== null) p.max_drawdown = dd === '' || p.sessions < 3 ? null : Number(dd); });
       c.ranking = { mode: J.$('#r-mode', box).value, weights: c.ranking.weights || {} };
@@ -143,6 +149,7 @@
     }
     const m = J.$('#editor-msg', box);
     try { S.config = (await J.post('strategy/validate', c)).config; m.hidden = true; } catch (e) { m.textContent = e.message; m.hidden = false; return false; }
+    if(!apply){markDirty();return true;}
     if (P.presets[S.preset]) S.base = S.preset; S.config.name = 'custom'; S.preset = 'custom'; S.page = 1; persist(); drawStrategies(); load(); return true;
   }
 
@@ -382,7 +389,7 @@
   el('reset-filters').onclick = () => { FILTERS.forEach(k => el(k).value = ''); CHECKS.forEach(k => el(k).checked = false); el('kind').value = ''; el('market').value = ''; syncMenu(); el('tradable').checked = true; S.page = 1; load(); };
   el('tradable').onchange = () => { S.page = 1; load(); };
   /* Les réglages et filtres ne lancent plus la recherche à chaque geste (trop lent) : un bouton « Appliquer » (ou la touche Entrée) la déclenche. */
-  function applyMenu() { clearTimeout(timer); S.page = 1; if (el('q').value.trim()) S.status = 'all'; load(); }
+  async function applyMenu() { clearTimeout(timer); S.page = 1; if (el('q').value.trim()) S.status = 'all'; if(!el('editor').hidden)return readEditor(); load(); }
   function markDirty() { el('apply-menu').classList.add('pending'); }
   [...text, ...CHECKS].forEach(k => el(k).addEventListener(el(k).type === 'search' || el(k).type === 'number' || el(k).placeholder ? 'input' : 'change', markDirty));
   el('apply-menu').onclick = applyMenu;

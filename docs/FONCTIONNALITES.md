@@ -39,3 +39,9 @@ Référence : les besoins utilisateur, pas l'ancienne implémentation. Chaque li
 
 ## Pas encore fait (limites connues)
 Actualités et calendrier de résultats (absents aussi de l'ancien moteur en pratique) ; assistant de décision (architecture prête, voir `ARCHITECTURE.md` §10).
+
+### Réglage de l’Explorer et dernier jour
+
+La recherche par titre, place et type reste accessible pendant le réglage de la stratégie, y compris sur mobile. « Appliquer » reste disponible quand les filtres avancés sont repliés et applique ensemble la recherche, les filtres et l’éditeur ouvert. Les changements sont conservés lors du passage entre modes guidé et détaillé.
+
+Activer « Dernier jour » sans critère existant renseigne explicitement une performance minimale de **0 % entre les deux dernières clôtures quotidiennes**. Ce seuil reste modifiable/supprimable en mode détaillé ; un critère personnel existant n’est pas écrasé. Une période activée sans seuil ne signifie pas, à elle seule, une exigence de hausse : l’éditeur le signale. Les seuils semaine/mois de Croissance rapide et les algorithmes de classement restent inchangés. Le cours intrajournalier peut évoluer autrement que les clôtures utilisées. La vue Retenus exclut les titres qui échouent ; les vues Tous/Rejetés et une recherche explicite permettent toujours de les consulter avec leur verdict.

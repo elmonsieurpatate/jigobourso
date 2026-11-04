@@ -105,3 +105,21 @@ def test_technical_filter():
     down = bars(0.006, 250) + [(f'x{i}', 100.0 * 0.9 ** (i + 1) * 3, None) for i in range(1)]
     r = S.evaluate(c, [{'key': 2, 'symbol': 'D', 'group': 'equity', 'bars': down}])
     assert r[0]['status'] in ('rejected', 'unknown')
+
+
+def test_fast_with_added_last_day_rejects_decline_only_when_direction_is_defined():
+    c = S.preset('fast')
+    candidate = {'bars': [(f'd{i:04d}', 100 * 1.01 ** i * (.98 if i == 59 else 1), None) for i in range(60)]}
+    # Strong week/month do not imply a positive last close-to-close return.
+    assert S.evaluate_one(c, candidate)['status'] == 'retained'
+    day = next(p for p in c['periods'] if p['id'] == 'day')
+    day['enabled'] = True
+    assert S.evaluate_one(c, candidate)['status'] == 'retained'
+    day['min_return'] = 0
+    r = S.evaluate_one(S.validate(c), candidate)
+    assert r['status'] == 'rejected'
+    failure = next(x for x in r['reasons'] if x['period'] == 'day' and x['criterion'] == 'min_return')
+    assert failure['result'] == 'fail' and failure['value'] < 0 and failure['threshold'] == 0
+    # Explicit personal tolerance is still respected; the engine and presets are unchanged.
+    day['min_return'] = -2
+    assert S.evaluate_one(S.validate(c), candidate)['status'] == 'retained'

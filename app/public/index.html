@@ -8,7 +8,6 @@
 <p class="muted small explorer-intro" style="margin:0 0 8px">Un profil préremplit les critères. Les filtres déterminent les titres examinés, puis le classement se fait parmi eux.</p>
 <section aria-label="Stratégie"><div class="strat-cards" id="strats"></div></section>
 <div class="row explorer-actions" style="margin-top:10px"><button class="btn drawer-toggle" id="edit-btn" aria-expanded="false" aria-controls="editor"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg> Régler la stratégie</button><button class="btn drawer-toggle" id="filters-btn" aria-expanded="false" aria-controls="menu filters"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h18l-7 8v5l-4 2v-7z"/></svg> <span id="filters-toggle-label">Filtres avancés</span> <span class="count-pill" id="filters-count" hidden></span></button><button type="button" class="btn small" id="reset-default" hidden></button><span class="muted small" id="strategy-summary"></span><span id="saved" class="saved-filter-inline"></span></div>
-<section id="editor" class="card" hidden style="margin-top:14px"></section>
 <section class="card menu" id="menu" aria-label="Recherche et critères">
   <div class="menu-bar">
     <label class="mi search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="q" type="search" placeholder="Rechercher un titre, un symbole…" aria-label="Nom, symbole ou ISIN"></label>
@@ -24,6 +23,7 @@
   </div>
   <div class="sliders" id="sliders"></div>
 </section>
+<section id="editor" class="card" hidden style="margin-top:14px"></section>
 
 <section class="card" style="margin-top:12px;padding:0">
   <div style="padding:14px 18px 0"><div class="tabs" id="status-tabs" style="margin-bottom:0"></div></div>

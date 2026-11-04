@@ -355,7 +355,7 @@ tr[hidden] { display: none; }
 /* Explorer mobile : les filtres restent complets, avec des contrôles plus denses. */
 @media (max-width: 640px) {
   #menu:not(.filters-open) .menu-bar > .mf:not(.kind-filter):not(.geo-filter):not(.mact) { display:none; }
-  #menu:not(.filters-open) .menu-bar > .mact { display:none; }
+  #menu:not(.filters-open) .menu-bar > .mact { display:flex; }
   .menu { margin-top:8px; }
   .menu-bar { padding:8px; gap:6px; }
   .mi { height:38px; padding:0 10px; gap:8px; border-radius:11px; }
@@ -379,7 +379,7 @@ tr[hidden] { display: none; }
 .tax-estimate-note { margin:10px 2px 14px; max-width:110ch; line-height:1.45; }
 .rank-note { margin:4px 14px 8px; line-height:1.35; }
 @media (max-width:640px) {
-  body.strategy-editing #menu .menu-bar { display:none; }
+  body.strategy-editing #menu .menu-bar { display:grid; }
   body.strategy-editing #sliders { display:grid !important; grid-template-columns:1fr; }
   body.strategy-editing #guided .guided-slope,
   body.strategy-editing #guided .guided-r2 { display:none; }
@@ -487,3 +487,8 @@ dialog:has(.pc-box){width:min(900px,calc(100vw - 24px))}
 /* Ranking trends remain visible when the desktop column is collapsed. */
 .rtable .trend-column{width:140px;min-width:140px}.rtable .trend-chart{display:block;width:120px;height:34px}.rtable .trend-column>small{display:block;font-size:.65rem}.rtable .trend-mobile{display:none}
 @media(max-width:860px){.rtable .trend-column{display:none}.rtable .trend-mobile{display:flex;align-items:center;gap:8px;margin:6px 0}.rtable .trend-mobile small{color:var(--muted);font-size:.65rem}.rtable .trend-mobile .trend-chart{flex:none}}
+
+/* Keep the primary action available while scrolling through strategy settings. */
+.editor-actions{position:sticky;top:70px;z-index:6;background:var(--surface);padding:10px;border:1px solid var(--line);border-radius:10px}#editor{overflow:visible}
+
+#editor input,#editor select,#editor button{scroll-margin-top:150px;scroll-margin-bottom:40px}
