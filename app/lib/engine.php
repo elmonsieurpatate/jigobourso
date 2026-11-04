@@ -46,6 +46,7 @@ function explorer_config_shape(array $config): array {
 function engine_call(string $command, array $request) {
     $request=explorer_config_shape($request);
     if (isset($request['config']) && is_array($request['config'])) $request['config']=explorer_config_shape($request['config']);
+    if (isset($request['view']['secondary']) && $request['view']['secondary']===[]) $request['view']['secondary']=new stdClass();
     $env = [];
     foreach (['JIGO_DB_HOST', 'JIGO_DB_PORT', 'JIGO_DB_SOCKET', 'JIGO_DB_NAME', 'JIGO_DB_USER', 'JIGO_DB_PASSWORD', 'PATH', 'HOME'] as $k) {
         $v = cfg($k);
@@ -89,6 +90,7 @@ function engine_call(string $command, array $request) {
     }
     $data=explorer_config_shape($data);
     if (isset($data['config']) && is_array($data['config'])) $data['config']=explorer_config_shape($data['config']);
+    if (isset($data['preset']) && is_array($data['preset'])) $data['preset']=explorer_config_shape($data['preset']);
     if ($command==='presets') {
         if (isset($data['empty']) && is_array($data['empty'])) $data['empty']=explorer_config_shape($data['empty']);
         if (isset($data['v4_presets']) && is_array($data['v4_presets'])) {

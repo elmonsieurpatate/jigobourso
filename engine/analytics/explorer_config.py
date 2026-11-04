@@ -10,7 +10,7 @@ BOUNDS = {
  'min_er':(-1,1),'max_er':(-1,1),'min_return':(-100,10000),'max_return':(-100,10000),
  'min_volatility':(0,100),'max_volatility':(0,100),'max_drawdown':(0,100),
  'max_current_drawdown':(0,100),'min_up_fraction':(0,1),'min_up_days':(0,252),
- 'max_gain_share':(0,100),'max_gain_net_share':(0,100000),'min_worst_day':(-100,10000),
+ 'max_gain_share':(0,100),'max_gain_net_share':(0,100000),'max_log_net_share':(0,100000),'min_worst_day':(-100,10000),
  'min_volume':(0,1e15),'min_turnover_eur':(0,1e18)}
 CRITERIA = (
  ('min_slope','slope','>='),('max_slope','slope','<='),('min_r2','r2','>='),('max_r2','r2','<='),
@@ -18,8 +18,8 @@ CRITERIA = (
  ('min_volatility','volatility','>='),('max_volatility','volatility','<='),('max_drawdown','drawdown','<='),
  ('max_current_drawdown','current_drawdown','<='),('min_up_fraction','up_fraction','>='),
  ('min_up_days','up_days','>='),('max_gain_share','gain_share','<='),('max_gain_net_share','gain_net_share','<='),
- ('min_worst_day','worst_day','>='),('min_volume','avg_volume','>='),('min_turnover_eur','turnover_eur','>='))
-EXTRA = {'current_drawdown','up_fraction','up_days','gain_share','gain_net_share','worst_day','avg_volume','turnover_eur','largest_day'}
+ ('max_log_net_share','log_net_share','<='),('min_worst_day','worst_day','>='),('min_volume','avg_volume','>='),('min_turnover_eur','turnover_eur','>='))
+EXTRA = {'current_drawdown','up_fraction','up_days','gain_share','gain_net_share','log_net_share','worst_day','avg_volume','turnover_eur','largest_day'}
 METRICS = {'perf','slope','r2','er','volatility','drawdown'} | EXTRA | {'momentum6','momentum12','quoted_avg_volume','daily_change','gap_to_ma20','ma50_trend','above_ma50','above_ma200'}
 TECHNICAL = {'momentum6','momentum12','quoted_avg_volume','daily_change','gap_to_ma20','ma50_trend','above_ma50','above_ma200'}
 LEGACY_MODES = ('trend','performance','regularity','stability','momentum','momentum12','momentum_risk')
@@ -162,6 +162,20 @@ def validate(raw):
     config_mode=object_field(c,'presentation').get('configuration','period')
     if config_mode not in ('global','period'):raise ValueError('Mode de configuration invalide')
     c['presentation']={'configuration':config_mode}
+    if 'growth' in c:
+        from . import growth
+        g=c['growth']
+        if not isinstance(g,dict) or g.get('version')!=growth.VERSION:raise ValueError('Version de formule croissance inconnue')
+        c['growth']={'version':growth.VERSION,'weights':growth.weights(g.get('weights'))}
+        if c['ranking']['mode']!='weighted' or c['ranking'].get('components'):
+            raise ValueError('Growth-1 utilise deux formules fixes ; leurs poids sont réglables dans l’administration')
+        if c['asset_rules']:raise ValueError('Growth-1 utilise les mêmes critères de trajectoire pour actions et ETF')
+        primary=[p for p in ps if p['enabled'] and p['id'] in growth.PRIMARY]
+        if not primary:raise ValueError('Sélectionnez au moins une période primaire')
+        for p in primary:
+            if p['sessions']!=SESSIONS[p['id']] or p['min_slope'] is None or p['min_slope']<=0 or p['min_r2'] is None:
+                raise ValueError('Pente positive et R² requis sur chaque période primaire')
+            p['require_history']=True
     return c
 
 
@@ -176,6 +190,7 @@ def effective(c,kind):
 
 
 def needs_extended(c):
+    if c.get('growth'):return True
     for kind in ('equity','etf'):
         ec=effective(c,kind)
         if any(p['enabled'] and any(p.get(f) is not None for f,m,_ in CRITERIA if m in EXTRA) for p in ec['periods']):return True

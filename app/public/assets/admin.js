@@ -1,11 +1,11 @@
 /* Administration : construire le catalogue à la main, dans l'ordre (FinanceDatabase → Yahoo → historiques), consulter les titres, suivre le cron. */
 (async () => {
   if (!await J.init('admin', { admin: true })) return;
-  const page = J.$('#page'); const TABS = ['fdb', 'yahoo', 'titres', 'cron', 'logs', 'users', 'settings'];
+  const page = J.$('#page'); const TABS = ['fdb', 'yahoo', 'titres', 'cron', 'logs', 'users', 'settings', 'explorer'];
   const LEGACY = { data: 'fdb', catalogue: 'fdb', overview: 'fdb', jobs: 'logs', run: 'logs', schedule: 'cron' };
   const hashTab = () => { const h = location.hash.slice(1); return TABS.includes(h) ? h : (LEGACY[h] || 'fdb'); };
   let tab = hashTab();
-  const TITLES = { fdb: 'FinanceDatabase', yahoo: 'Yahoo Finance', titres: 'Actions / ETF', cron: 'Cron', logs: 'Journaux', users: 'Utilisateurs', settings: 'Réglages' };
+  const TITLES = { fdb: 'FinanceDatabase', yahoo: 'Yahoo Finance', titres: 'Actions / ETF', cron: 'Cron', logs: 'Journaux', users: 'Utilisateurs', settings: 'Réglages', explorer: 'Explorer V4' };
   const STATE = { completed: ['ok', 'Terminé'], completed_with_errors: ['wait', 'Terminé avec erreurs'], failed: ['ko', 'Échec'], running: ['info', 'En cours'], queued: ['info', 'En attente'], paused: ['wait', 'En pause'], interrupted: ['ko', 'Interrompu'] };
   const TSTATE = { ok: ['ok', 'Fonctionne'], late: ['wait', 'En retard'], error: ['ko', 'En erreur'], inactive: ['', 'Désactivée'], never: ['wait', 'Jamais exécutée'], running: ['info', 'En cours'] };
   const JOBNAME = { fdb_import: 'Import FinanceDatabase', fdb_filter: 'Filtrage FinanceDatabase', yahoo_info: 'Import des informations Yahoo', yahoo_filter: 'Filtrage Yahoo', history: 'Import / mise à jour des historiques',
@@ -18,7 +18,7 @@
   async function render() {
     page.innerHTML = '<div class="empty"><span class="spinner"></span></div>';
     J.$('.page-head h1').textContent = 'Administration · ' + TITLES[tab];
-    try { await ({ fdb, yahoo, titres, cron, logs, users, settings })[tab](); } catch (e) { page.innerHTML = `<div class="notice err">${J.esc(e.message)}</div>`; }
+    try { await ({ fdb, yahoo, titres, cron, logs, users, settings, explorer:()=>GrowthAdmin.render(page) })[tab](); } catch (e) { page.innerHTML = `<div class="notice err">${J.esc(e.message)}</div>`; }
   }
   window.addEventListener('hashchange', () => { const t = hashTab(); if (t !== tab) { tab = t; render(); } });
 

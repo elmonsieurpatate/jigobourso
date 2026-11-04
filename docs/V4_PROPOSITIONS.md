@@ -1,5 +1,9 @@
 # Explorer V4 — Propositions à valider avant gel
 
+> Document de la phase préalable/P0. La clarification utilisateur autorise désormais
+> l’implémentation avec paramètres provisoires. Voir la version intégrée et les
+> défauts semaine/mois dans [README_EXPLORER_V4.md](README_EXPLORER_V4.md).
+
 Date : 4 novembre 2026. Statut : **proposition, non validée par l’utilisateur**.
 Ces valeurs ne sont pas les paramètres actifs de l’application. Le banc de calcul
 est isolé dans `scripts/preview_growth_v4.py` ; aucun appel applicatif ne l’utilise.

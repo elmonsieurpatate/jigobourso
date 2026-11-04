@@ -24,6 +24,7 @@ function system_counts(): array {
 }
 
 return [
+    'admin/explorer' => function () { require_admin(); $b=$_SERVER['REQUEST_METHOD']==='POST'?body():['action'=>'get']; if (($b['action']??'get')!=='get') need_post(); return engine_call('growth-admin',$b); },
     'admin/users' => function () {
         require_admin();
         return ['users' => q('SELECT id, username, email, is_admin, active, created_at, last_login, (SELECT COUNT(*) FROM portfolios p WHERE p.user_id = users.id) AS portfolios FROM users ORDER BY username')->fetchAll()];

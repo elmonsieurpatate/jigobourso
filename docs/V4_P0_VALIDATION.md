@@ -1,5 +1,9 @@
 # Explorer V4 — Correctifs techniques P0 et validation
 
+> Document de la phase préalable/P0. La clarification utilisateur autorise désormais
+> l’implémentation avec paramètres provisoires. Voir la version intégrée et les
+> défauts semaine/mois dans [README_EXPLORER_V4.md](README_EXPLORER_V4.md).
+
 Branche : `feature/explorer-v4-growth`, base applicative `8048982`.
 Commit technique : `e3891fe`.
 Ce lot ne constitue pas la livraison complète de V4. Les formules et paramètres

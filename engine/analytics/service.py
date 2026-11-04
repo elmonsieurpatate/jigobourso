@@ -94,19 +94,21 @@ def _load_universe(conn, windows, ids=None):
     return universe, stored, latest_by_mic
 
 
-def _live_measures(conn, ids, windows):
+def _live_measures(conn, ids, windows, context=False):
     """Mesures des fenêtres absentes de strategy_metrics, calculées depuis les clôtures (chemin lent, fenêtres non standard)."""
     out = defaultdict(dict)
     if not ids or not windows:
         return out
     mic_by_id = {}
+    batch=400 if context else 2000
+    market_context={}
     with conn.cursor() as cur:
-        for i in range(0, len(ids), 2000):
-            part = ids[i:i + 2000]
+        for i in range(0, len(ids), batch):
+            part = ids[i:i + batch]
             cur.execute(f"SELECT id, mic FROM listings WHERE id IN ({','.join(['%s'] * len(part))})", part)
             mic_by_id.update({r['id']: r['mic'] for r in cur.fetchall()})
-        for i in range(0, len(ids), 2000):
-            part = ids[i:i + 2000]
+        for i in range(0, len(ids), batch):
+            part = ids[i:i + batch]
             cur.execute(f"SELECT listing_id, price_date, close_px, adj_close_px FROM daily_prices WHERE listing_id IN ({','.join(['%s'] * len(part))}) ORDER BY listing_id, price_date", part)
             bars = defaultdict(list)
             for r in cur.fetchall():
@@ -117,11 +119,16 @@ def _live_measures(conn, ids, windows):
                 splits[r['listing_id']].append((r['event_date'].isoformat(), float(r['ratio']) if r['ratio'] else None))
             for lid, rows in bars.items():
                 mic = mic_by_id.get(lid)
-                cutoff = expected_close(conn, mic) if mic else None
-                calendars = window_calendars(mic, cutoff, windows) if cutoff else {}
-                tech_dates = session_dates(mic, cutoff, 55) if cutoff else None
-                _, _, _, _, measured, _, _ = analyze_series(rows, windows, splits[lid], calendars, tech_dates)
+                if mic not in market_context:
+                    cutoff = expected_close(conn, mic) if mic else None
+                    market_context[mic]=(window_calendars(mic,cutoff,windows) if cutoff else {},
+                                         session_dates(mic,cutoff,205 if context else 55) if cutoff else None,cutoff)
+                calendars,tech_dates,cutoff=market_context[mic]
+                future=sum(day>cutoff for day,_,_ in rows) if context and cutoff else 0
+                if context and cutoff:rows=[bar for bar in rows if bar[0]<=cutoff]
+                dates, _, _, breaks, measured, _, technical = analyze_series(rows, windows, splits[lid], calendars, tech_dates)
                 out[lid].update({n: m for n, m in measured.items() if m is not None})
+                if context:out[lid]['_context']=dict(technical=technical,last=dates[-1] if dates else None,count=len(dates),breaks=breaks,future=future)
     return out
 
 
@@ -139,12 +146,17 @@ def judge_universe(conn, config, ids=None):
     """Verdicts de l'univers recommandable (ou d'un sous-ensemble `ids` : rang et score n'y ont alors pas de sens)."""
     windows = strategy.required_sessions(config)
     universe, stored, latest_by_mic = _load_universe(conn, windows, ids)
+    if config.get('growth'):stored={}
     needs_live = [u['id'] for u in universe if any(n not in stored.get(u['id'], {}) or stored[u['id']][n].get('coverage') is None for n in windows)]
     absent = sorted({n for n in windows if any(n not in stored.get(lid, {}) or stored[lid][n].get('coverage') is None for lid in needs_live)})
-    live = _live_measures(conn, needs_live, absent) if needs_live and absent else {}
-    extra = extended_metrics(conn,universe,windows) if config.get('version')==4 and explorer_config.needs_extended(config) else {}
+    live = (_live_measures(conn,needs_live,absent,context=True) if config.get('growth') else _live_measures(conn,needs_live,absent)) if needs_live and absent else {}
+    extra = (explorer_metrics.load(conn,universe,windows,expected_close) if config.get('growth') else extended_metrics(conn,universe,windows)) if config.get('version')==4 and explorer_config.needs_extended(config) else {}
     verdicts = []
     for u in universe:
+        context=live.get(u['id'],{}).get('_context')
+        if context:
+            u=dict(u,closes_count=context['count'],last_close_date=datetime.date.fromisoformat(context['last']) if context['last'] else None,
+                   quality='break' if context['breaks'] else 'insufficient' if context['count']<22 else 'ok')
         measures = {n: (live.get(u['id'], {}).get(n) if stored.get(u['id'], {}).get(n, {}).get('coverage') is None
                         else stored.get(u['id'], {}).get(n)) or live.get(u['id'], {}).get(n)
                     for n in windows}
@@ -158,9 +170,10 @@ def judge_universe(conn, config, ids=None):
                 missing[n] = _missing_reason(count, n, None, u.get('break_age'))             # historique trop court, rupture dans la fenêtre ou calendrier : le vrai motif
         tech = {k: (None if u[k] is None else float(u[k])) for k in ('close_px', 'ma20', 'ma50', 'ma50_prev', 'ma200', 'ma200_prev', 'daily_change', 'gap_to_ma20')}
         tech['close'] = tech.pop('close_px')
+        if context:tech.update(context['technical'])
         if config.get('version')==4:tech['quoted_avg_volume']=None if u.get('avg_volume_3m') is None else float(u['avg_volume_3m'])
         last = u['last_close_date'].isoformat() if u['last_close_date'] else None
-        expected = max(expected_close(conn, u['mic']), str(latest_by_mic.get(u['mic']) or ''))
+        expected = expected_close(conn,u['mic']) if config.get('growth') else max(expected_close(conn, u['mic']), str(latest_by_mic.get(u['mic']) or ''))
         if last and last < expected:
             u['quality'] = 'stale'
         elif u['quality'] not in ('break', 'insufficient') and (
@@ -176,6 +189,9 @@ def judge_universe(conn, config, ids=None):
                         if isinstance(saved_momentum, dict) else (None if saved_momentum is None else float(saved_momentum)))
         effective=explorer_config.effective(config,'etf' if u['kind']=='etf' else 'equity') if config.get('version')==4 else config
         v = strategy.judge(effective, measures, tech, missing, last, expected or None, momentum=momentum_arg)
+        if context and context['future']:
+            v['reasons'].append(dict(period=None,criterion='future_data',metric='clôtures postérieures à la référence ignorées',
+                                     value=context['future'],threshold=expected,result='warning'))
         if u['quality'] == 'incomplete' and v['status'] == 'unknown':
             v['status_label'] = 'Historique incomplet'
         u['instrument_id'] = u.get('instrument_id', u['id'])
@@ -485,6 +501,9 @@ def scoped_entries(conn, config, view, rates=None, aux=None, now=None):
 
 def explore(conn, request):
     config = _config(request)
+    if config.get('growth'):
+        from . import growth_service
+        return growth_service.explore(conn,dict(request,config=config))
     view = request.get('view') or {}
     export = bool(view.get('export'))
     page, size = max(1, int(view.get('page', 1))), min(100, max(1, int(view.get('page_size', 24))))
@@ -723,6 +742,9 @@ def _attach_analysis_curves(conn, rows, sessions, points=66):
 def instrument_sheet(conn, request):
     """Fiche complète d'une cotation : identité, prix, verdict détaillé (toutes périodes, même inactives), séries, qualité."""
     config = _config(request)
+    if config.get('growth'):
+        from . import growth_service
+        return growth_service.detail(conn,dict(request,config=config))
     lid = int(request['listing_id'])
     rates = latest_rates(conn)
     with conn.cursor() as cur:
@@ -760,6 +782,8 @@ def instrument_sheet(conn, request):
         cur.execute("SELECT event_date, ratio FROM corporate_events WHERE listing_id=%s AND kind IN ('split','reverse_split')", (lid,))
         splits = [(r['event_date'].isoformat(), float(r['ratio']) if r['ratio'] else None) for r in cur.fetchall()]
     cutoff = expected_close(conn, u['mic'])
+    sheet['market_snapshot']={'schema':1,'symbol':u['symbol'],'mic':u['mic'],'expected_last_date':cutoff,
+                              'bars':bars[-400:],'split_dates':splits,'source':'historique Yahoo stocké, aucune donnée de portefeuille'}
     calendars = window_calendars(u['mic'], cutoff, all_windows) if cutoff else {}
     # Historical profiles may also require MA200/MA200_prev. Their configuration
     # version must not truncate the technical window to 55 closes.

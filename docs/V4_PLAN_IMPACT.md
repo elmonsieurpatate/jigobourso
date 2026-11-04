@@ -1,5 +1,9 @@
 # Explorer V4 — Plan d’impact et avancement
 
+> Document de la phase préalable/P0. La clarification utilisateur autorise désormais
+> l’implémentation avec paramètres provisoires. Voir la version intégrée et les
+> défauts semaine/mois dans [README_EXPLORER_V4.md](README_EXPLORER_V4.md).
+
 Branche : `feature/explorer-v4-growth`, créée à partir de `main` à `8048982`.
 Référence : [audit du 4 novembre 2026](README_AUDIT_V4.md).
 

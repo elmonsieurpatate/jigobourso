@@ -165,6 +165,7 @@ def required_sessions(config):
         for p in configurable_score.active_components(config):
             if p['metric']=='momentum6':windows|={126}
             if p['metric']=='momentum12':windows|={252}
+    if config.get('growth'):windows|={1,5,21,63}
     return sorted(windows)
 
 
@@ -242,9 +243,13 @@ def judge(config, measures, tech, missing, last_close_date=None, expected_last_d
             reasons.append({'period': p['id'], 'criterion': 'coverage', 'metric': 'observed_closes',
                             'value': m.get('observations'), 'threshold': m.get('expected_closes'),
                             'missing': m.get('missing_sessions'), 'coverage': m.get('coverage'), 'result': 'warning'})
+        if config.get('growth') and p['id'] in ('week','month','quarter') and m.get('coverage')!=1:
+            reasons.append({'period':p['id'],'criterion':'data','metric':'complete_coverage','value':m.get('observations'),
+                            'threshold':p['sessions']+1,'mandatory':True,'result':'missing'})
         for field, metric, op in criteria:
             chk = _check(p['id'], field, metric, m.get(metric), p.get(field), op)
             if chk:
+                if config.get('growth') and p['id'] in ('week','month','quarter') and field in ('min_slope','min_r2'):chk['mandatory']=True
                 reasons.append(chk)
     t = config['technical']
     for name, metric, value, threshold, ok in (
@@ -284,6 +289,9 @@ def judge(config, measures, tech, missing, last_close_date=None, expected_last_d
 
 def rank(config, verdicts):
     """Ajoute 'score' (0-100) et 'rang' (dans le groupe) aux verdicts retenus. Verdicts : dicts avec key, group, symbol, status, measures."""
+    if config.get('growth'):
+        from . import growth
+        return growth.rank(config,verdicts)
     if config.get('version')==4 and config.get('asset_rules') and config['ranking']['mode']!='weighted':
         for kind in {v['group'] for v in verdicts}:
             ec=copy.deepcopy(explorer_config.effective(config,kind));ec['asset_rules']={}

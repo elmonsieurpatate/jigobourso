@@ -33,6 +33,7 @@ function clean_view($in): array {
     if (isset($view['geo_region']) && !in_array($view['geo_region'], ['us', 'eu', 'emerging'], true)) unset($view['geo_region']);
     if (isset($in['q']) && is_scalar($in['q'])) $view['q'] = mb_substr(trim((string)$in['q']), 0, 100);
     if (array_key_exists('tradable', $in) && is_bool($in['tradable'])) $view['tradable'] = $in['tradable'];
+    if (isset($in['secondary']) && is_array($in['secondary'])) $view['secondary']=$in['secondary']===[]?new stdClass():$in['secondary'];
     if (isset($in['status']) && in_array($in['status'], ['retained', 'rejected', 'unknown', 'all'], true)) $view['status'] = $in['status'];
     if (isset($in['description']) && is_scalar($in['description'])) $view['description'] = mb_substr(trim((string)$in['description']), 0, 300);
     if (isset($in['icon']) && in_array($in['icon'], ['📈', '⚡', '🔎', '🛡️', '🌱', '📊', '💼', '⭐'], true)) $view['icon'] = $in['icon'];
@@ -40,6 +41,8 @@ function clean_view($in): array {
 }
 
 return [
+    'explorer/settings' => function () { require_user(); return engine_call('growth-settings',[]); },
+    'explorer/library/state' => function () { need_post();$u=require_user();return explorer_library_state((int)$u['id'],body()); },
     'explorer/library' => function () { $u=require_user();return explorer_library_list((int)$u['id']); },
     'explorer/library/legacy' => function () { need_post();$u=require_user();return explorer_legacy_action((int)$u['id'],body()); },
     'explorer/library/save' => function () { need_post();$u=require_user();return explorer_library_save((int)$u['id'],body()); },

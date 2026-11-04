@@ -7,7 +7,32 @@ function explorer_library_list(int $uid): array {
         $items[]=['id'=>'legacy-search:'.$r['id'],'name'=>$r['name'],'kind'=>'search','legacy'=>true,'active'=>true,'updated_at'=>$r['updated_at'],'payload'=>['schema'=>3,'config'=>json_decode($r['config'],true),'universe'=>json_decode($r['view'],true)?:new stdClass()]];
     foreach (q('SELECT preset,config,view,updated_at FROM saved_presets WHERE user_id=?',[$uid])->fetchAll() as $r)
         $items[]=['id'=>'legacy-preset:'.$r['preset'],'name'=>$r['preset'].' (réglage personnel)','kind'=>'search','legacy'=>true,'active'=>true,'updated_at'=>$r['updated_at'],'payload'=>['schema'=>3,'config'=>json_decode($r['config'],true),'universe'=>json_decode($r['view'],true)?:new stdClass()]];
-    return ['items'=>$items];
+    $states=[];
+    foreach(q('SELECT item_key,active,archived FROM explorer_states WHERE user_id=?',[$uid])->fetchAll() as $r)
+        $states[$r['item_key']]=['active'=>(bool)$r['active'],'archived'=>(bool)$r['archived']];
+    foreach($items as &$item) {
+        $key=$item['legacy']?$item['id']:'saved:'.$item['id'];$state=$states[$key]??null;
+        $item['archived']=$state['archived']??false;
+        if($state && $item['legacy'])$item['active']=$state['active'];
+    } unset($item);
+    return ['items'=>$items,'states'=>$states?:new stdClass()];
+}
+
+function explorer_library_state(int $uid,array $b): array {
+    $key=(string)($b['id']??'');
+    if(preg_match('/^[0-9]+$/',$key))$key='saved:'.$key;
+    $active=$b['active']??false;$archived=$b['archived']??false;
+    if(!is_bool($active)||!is_bool($archived))throw new ApiError('États booléens requis',422);
+    if(preg_match('/^saved:([0-9]+)$/',$key,$m)) {
+        if(!q('SELECT id FROM explorer_saved WHERE id=? AND user_id=?',[$m[1],$uid])->fetch())throw new ApiError('Sauvegarde introuvable',404);
+        q('UPDATE explorer_saved SET active=?,updated_at=? WHERE id=? AND user_id=?',[$active?1:0,now_utc(),$m[1],$uid]);
+    } elseif(preg_match('/^legacy-search:([0-9]+)$/',$key,$m)) {
+        if(!q('SELECT id FROM saved_searches WHERE id=? AND user_id=?',[$m[1],$uid])->fetch())throw new ApiError('Recherche introuvable',404);
+    } elseif(preg_match('/^legacy-preset:([a-z0-9_]+)$/',$key,$m)) {
+        if(!q('SELECT preset FROM saved_presets WHERE preset=? AND user_id=?',[$m[1],$uid])->fetch())throw new ApiError('Profil introuvable',404);
+    } elseif(!in_array($key,['builtin:regular','builtin:fast','builtin:recovery','builtin:low_volatility','builtin:momentum','builtin:momentum12','builtin:momentum_risk'],true))throw new ApiError('Profil introuvable',404);
+    q('INSERT INTO explorer_states(user_id,item_key,active,archived,updated_at) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE active=VALUES(active),archived=VALUES(archived),updated_at=VALUES(updated_at)',[$uid,$key,$active?1:0,$archived?1:0,now_utc()]);
+    return ['ok'=>true];
 }
 function explorer_library_save(int $uid,array $b): array {
     $kind=(string)($b['kind']??'');

@@ -1,5 +1,9 @@
 # Explorer V4 — Dossier de revue des paramètres provisoires
 
+> Document de la phase préalable/P0. La clarification utilisateur autorise désormais
+> l’implémentation avec paramètres provisoires. Voir la version intégrée et les
+> défauts semaine/mois dans [README_EXPLORER_V4.md](README_EXPLORER_V4.md).
+
 Statut : **à examiner, aucun gel et aucune intégration des scores dans l’application**.
 Ce dossier répond aux cinq points demandés après la proposition initiale.
 

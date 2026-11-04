@@ -20,6 +20,7 @@ def path_metrics(prices,volumes=None,turnovers=None):
          'gain_share':100*max(positive)/sum(positive) if positive else 0.0,
          'largest_day':max(daily),'worst_day':min(daily),
          'gain_net_share':100*max(0,max(daily))/total if total>0 else None,
+         'log_net_share':100*max(positive)/sum(steps) if positive and sum(steps)>0 else None,
          'current_drawdown':100*(1-prices[-1]/max(prices))}
     for field,values in [('avg_volume',volumes),('turnover_eur',turnovers)]:
         valid = [v for v in (values or ()) if v is not None and math.isfinite(v) and v >= 0]

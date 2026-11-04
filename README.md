@@ -3,6 +3,13 @@
 Outil d'aide à la sélection d'actions et d'ETF (analyse descriptive des cours passés) et de suivi de portefeuilles.
 PHP (site et API) · Python (moteur : catalogue, collecte, calculs) · MariaDB. Aucun framework ; une seule dépendance Python (PyMySQL).
 
+## Explorer V4 — version de revue
+
+Le [guide Explorer V4](docs/README_EXPLORER_V4.md) décrit le parcours intégré,
+les paramètres administrables, la comparaison V1 et les procédures de migration
+et de retour arrière. Voir aussi la [validation exécutée](docs/V4_VALIDATION_FINALE.md).
+Cette branche de revue ne constitue pas un déploiement en production.
+
 ```
 db/schema.sql     schéma unique            engine/   moteur Python (catalogue, market, analytics, jobs, migration)
 app/public/       pages, assets, api.php   app/      lib/ routes/ services/ (PHP)
