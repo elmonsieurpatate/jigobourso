@@ -483,3 +483,7 @@ dialog:has(.pc-box){width:min(900px,calc(100vw - 24px))}
 @media(max-width:600px){.cockpit-contribution{grid-template-columns:minmax(0,1fr) auto}.cockpit-contribution .contribution-track{grid-row:2}.cockpit-contribution .contribution-meta{grid-row:3;font-size:.59rem}.cockpit-contribution>span:first-child{grid-template-columns:7px 1fr}.cockpit-contribution>span:first-child small{grid-column:2;white-space:normal}.selected-purchases button{align-self:start}}
 /* Seven columns must fit the desktop container even with wider fallback fonts. */
 @media(min-width:601px){.positions-table{table-layout:fixed;max-width:100%}.positions-table th,.positions-table td{min-width:0;overflow-wrap:anywhere}.positions-table th:first-child{width:18%}.positions-table th:last-child{width:16%}.positions-table td:not(:first-child){white-space:normal}.positions-table .badge{white-space:normal}.positions-table button{max-width:100%;white-space:normal}}
+
+/* Ranking trends remain visible when the desktop column is collapsed. */
+.rtable .trend-column{width:140px;min-width:140px}.rtable .trend-chart{display:block;width:120px;height:34px}.rtable .trend-column>small{display:block;font-size:.65rem}.rtable .trend-mobile{display:none}
+@media(max-width:860px){.rtable .trend-column{display:none}.rtable .trend-mobile{display:flex;align-items:center;gap:8px;margin:6px 0}.rtable .trend-mobile small{color:var(--muted);font-size:.65rem}.rtable .trend-mobile .trend-chart{flex:none}}
