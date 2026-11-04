@@ -99,10 +99,11 @@
   const levelOpts = (obj, labels, cur) => Object.entries(labels).map(([k, l]) => `<option value="${k}" ${k === cur ? 'selected' : ''}>${l}</option>`).join('');
   function guessLevel(map, value, none = '') { if (value === null || value === undefined) return none; const best = Object.entries(map).filter(([, v]) => v !== null).sort((a, b) => Math.abs(a[1] - value) - Math.abs(b[1] - value))[0]; return best && Math.abs(best[1] - value) < 0.02 * Math.max(1, Math.abs(value)) ? best[0] : 'custom'; }
   function drawEditor() {
+    const applyButton=el('apply-menu');applyButton.remove();
     const c = S.config, box = el('editor'), act = c.periods.filter(p => p.enabled), p0 = act[0] || c.periods[0];
     const sl = guessLevel(P.slope_levels, p0.min_slope, 'none'), rl = guessLevel(Object.fromEntries(Object.entries(P.r2_levels)), p0.min_r2, 'none'), dd = p0.max_drawdown === null ? '' : String(p0.max_drawdown);
     const num = (p, f, step) => `<input type="number" step="${step}" value="${p[f] ?? ''}" data-p="${p.id}" data-f="${f}" style="width:100px" placeholder="–">`;
-    box.innerHTML = `<div class="row between"><h2 style="margin:0">Régler la stratégie</h2><span class="seg" id="lvl"><button data-l="guided" class="${S.level === 'guided' ? 'on' : ''}">Réglages guidés</button><button data-l="detail" class="${S.level === 'detail' ? 'on' : ''}">Réglage détaillé</button></span></div><div class="row editor-actions" style="margin-top:12px"><button class="btn primary" id="apply">Appliquer</button></div>
+    box.innerHTML = `<div class="row between"><h2 style="margin:0">Régler la stratégie</h2><span class="seg" id="lvl"><button data-l="guided" class="${S.level === 'guided' ? 'on' : ''}">Réglages guidés</button><button data-l="detail" class="${S.level === 'detail' ? 'on' : ''}">Réglage détaillé</button></span></div><div class="row editor-actions" style="margin-top:12px"></div>
     <p class="muted small" style="margin:6px 0 12px">Un titre est retenu s’il respecte tous les critères de toutes les périodes cochées. Case vide = pas de critère. Pente = hausse moyenne par séance ; R² = régularité de la hausse (1 = droite parfaite).</p>
     <div class="row" style="gap:18px;margin-bottom:10px">${c.periods.map(p => `<label class="row gap-s small"><input type="checkbox" ${p.enabled ? 'checked' : ''} data-p="${p.id}" data-f="enabled"> ${J.PERIODS[p.id]}${p.id==='day'?' (clôtures)':''} <input type="number" min="2" max="252" value="${p.sessions}" data-p="${p.id}" data-f="sessions" style="width:60px" ${p.id === 'day' ? 'disabled' : ''}> <span class="muted">séances</span></label>`).join('')}</div>
     <p id="day-rule" class="small muted" role="status"></p><div id="guided" ${S.level === 'guided' ? '' : 'hidden'}><div class="filters" style="border:0;background:none;padding:0">
@@ -122,6 +123,7 @@
       <label class="row gap-s small">Classer par <select id="r-mode2">${[['trend', 'Pente'], ['performance', 'Performance'], ['regularity', 'Régularité'], ['stability', 'Stabilité'], ['momentum', 'Momentum 6 mois'], ['momentum12', 'Momentum 12 mois'], ['momentum_risk', 'Momentum ajusté du risque']].map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select></label></div></div>
     <div id="editor-msg" class="notice err" hidden style="margin-top:10px"></div>
     <div class="row" style="margin-top:12px"><select id="save-to" aria-label="Portefeuille"><option value="">Enregistrer pour un portefeuille…</option></select><button class="btn" id="save-btn">Enregistrer</button></div>`;
+    if(box.hidden)J.$('#menu .mact').prepend(applyButton);else J.$('.editor-actions',box).append(applyButton);
     J.$('#r-mode', box).value = c.ranking.mode; J.$('#r-mode2', box).value = c.ranking.mode;
     ['#g-slope', '#g-r2', '#g-dd'].forEach(id => { const e = J.$(id, box); e.dataset.init = e.value; });
     J.$$('#lvl button', box).forEach(b => b.onclick = async () => { if(await readEditor(false)){S.level = b.dataset.l; drawEditor();} });
@@ -130,7 +132,6 @@
     day.addEventListener('change',()=>{if(day.checked&&J.$$('[data-p="day"][data-f]',box).filter(e=>!['enabled','sessions'].includes(e.dataset.f)).every(e=>e.value===''))dayReturn.value='0';dayHint()});
     dayReturn.addEventListener('input',dayHint);dayHint();
     box.oninput=markDirty;box.onchange=markDirty;
-    J.$('#apply', box).onclick = applyMenu;
     J.api('portfolios').then(r => { const sel = J.$('#save-to', box); r.portfolios.forEach(p => sel.insertAdjacentHTML('beforeend', `<option value="${p.id}">${J.esc(p.name)}</option>`)); });
     J.$('#save-btn', box).onclick = async () => { const id = J.$('#save-to', box).value; if (!id) return; if (await readEditor()) { await J.post('portfolio/strategy', { id: +id, config: S.config }); J.toast('Stratégie enregistrée pour ce portefeuille'); } };
   }
@@ -265,7 +266,7 @@
     S.config = x.config; S.preset = 'custom'; S.base = null; S.label = x.name; S.page = 1; setView(x.view);
     persist(); drawStrategies(); if (!el('editor').hidden) drawEditor(); load();
   }
-  el('edit-btn').onclick = () => { const e = el('editor'); e.hidden = !e.hidden; el('edit-btn').setAttribute('aria-expanded', String(!e.hidden)); document.body.classList.toggle('strategy-editing', !e.hidden); if (!e.hidden) drawEditor(); };
+  el('edit-btn').onclick = () => { const e = el('editor'); if(!e.hidden)J.$('#menu .mact').prepend(el('apply-menu'));e.hidden = !e.hidden; el('edit-btn').setAttribute('aria-expanded', String(!e.hidden)); document.body.classList.toggle('strategy-editing', !e.hidden); if (!e.hidden) drawEditor(); };
   el('filters-btn').onclick = () => {
     const mobile = matchMedia('(max-width: 640px)').matches, menu = el('menu'), advanced = el('filters'), button = el('filters-btn');
     if (mobile) {
@@ -279,7 +280,7 @@
   function drawTabs(res) {
     const sc = res.scope_counts, tabs = [['retained', 'Retenus', sc.retained], ['rejected', 'Écartés', sc.rejected], ['unknown', 'Non évaluables', sc.unknown], ['all', 'Tous', sc.retained + sc.rejected + sc.unknown]];
     el('status-tabs').innerHTML = tabs.map(([k, l, n]) => `<button class="${S.status === k ? 'on' : ''}" data-s="${k}">${l} <span class="count">${J.num(n, 0)}</span></button>`).join('');
-    J.$$('#status-tabs button').forEach(b => b.onclick = () => { S.status = b.dataset.s; S.page = 1; load(); });
+    J.$$('#status-tabs button').forEach(b => b.onclick = () => { S.status = b.dataset.s;if(S.status==='rejected'){S.sort='proximity';S.dir='asc'}else if(S.sort==='proximity'){S.sort='rank';S.dir='asc'} S.page = 1; load(); });
     const n = FILTERS.filter(k => el(k).value.trim()).length + CHECKS.filter(k => el(k).checked).length;
     el('filters-count').hidden = !n; el('filters-count').textContent = n;
   }
@@ -347,7 +348,7 @@
     el('tradable-note').textContent = res.tradable.on ? (res.tradable.masked ? `${J.num(res.tradable.masked, 0)} titre${res.tradable.masked > 1 ? 's' : ''} masqué${res.tradable.masked > 1 ? 's' : ''} : valeur échangée estimée trop faible. Décochez pour tout voir.` : 'Aucun titre masqué dans cette vue.') : 'Tous les titres du catalogue sont affichés.';
     drawTabs(res); drawWhy(res); fillFacets(res);
     const ranksMasked = (res.tradable?.masked || 0) + (res.level_filters?.masked || 0);
-    const rankNote = ranksMasked ? 'Des titres sont masqués par vos filtres : leurs rangs restent comptés, donc certains numéros sautent. Actions et ETF ont des classements séparés.' : 'Actions et ETF ont des classements séparés.';
+    const rankNote = res.ordering==='proximity'?'Écartés : moins de critères à corriger d’abord, puis écarts relatifs les plus faibles. Données incomplètes en dernier. Les scores des titres retenus restent inchangés.':ranksMasked ? 'Des titres sont masqués par vos filtres : leurs rangs restent comptés, donc certains numéros sautent. Actions et ETF ont des classements séparés.' : 'Actions et ETF ont des classements séparés.';
     el('results').innerHTML = res.rows.length ? JEtf.concentration(res.etf_concentration) + `<div class="small muted rank-note">${rankNote}</div><div class="small muted explorer-legend">${JEtf.LEGEND}</div><div class="table-wrap"><table class="rtable">${header(res.ref_sessions)}<tbody>${groupedRows(res.rows)}</tbody></table></div>` : `<div class="empty">${v.q ? 'Aucun titre ne correspond à cette recherche.' : 'Aucun titre dans cette vue avec ces critères et ces filtres.'}</div>`;
     if (!window.jigoScrollRestored) { window.jigoScrollRestored = true; try { requestAnimationFrame(() => scrollTo(0, +(sessionStorage.getItem('jigo_explorer_scroll') || 0))); } catch (e) {} }
     J.$$('#results tbody tr').forEach(tr => { const a = tr.querySelector('a[data-sheet]'); a.addEventListener('click', () => { persist(); sessionStorage.setItem('jigo_explorer_scroll', String(scrollY)); }); tr.onclick = e => { if (e.target.closest('a,button,input')) return; persist(); window.open(a.href, '_blank', 'noopener'); }; });

@@ -189,7 +189,26 @@ def _row(v, rates, conn=None):
 
 CACHE_FORMAT = 6
 MAX_NEW_CONFIGS_PER_HOUR = 60       # calculs d'univers complets (réglages jamais vus ou données changées) acceptés par heure, tous utilisateurs confondus
-ENTRY_FIELDS = ('id', 'symbol', 'name', 'isin', 'kind', 'mic', 'country', 'status', 'group', 'rank', 'score', 'category', 'fails', 'instrument_id', 'currency', 'price_currency', 'net_assets')
+ENTRY_FIELDS = ('id', 'symbol', 'name', 'isin', 'kind', 'mic', 'country', 'status', 'group', 'rank', 'score', 'category', 'fails', 'instrument_id', 'currency', 'price_currency', 'net_assets', 'proximity')
+
+
+def criteria_proximity(reasons):
+    """Display order of rejected instruments, separate from retained ranks/scores.
+
+    Complete evidence first, then fewer failed checks, then sum of relative gaps.
+    Zero thresholds use a natural metric unit; boolean failures count as one.
+    """
+    missing = sum(r.get('result') == 'missing' for r in reasons)
+    failed = [r for r in reasons if r.get('result') == 'fail']
+    gap = 0.0
+    for r in failed:
+        v, t = r.get('value'), r.get('threshold')
+        if isinstance(v, (int, float)) and not isinstance(v, bool) and isinstance(t, (int, float)) and not isinstance(t, bool):
+            floor = .01 if r.get('metric') in ('r2','er','slope') else 1.0
+            gap += abs(v-t) / max(abs(t),floor)
+        else:
+            gap += 1.0
+    return [missing, len(failed), gap]
 
 
 def _fails(v):
@@ -210,7 +229,7 @@ def data_version(conn):
 
 def cached_verdicts(conn, config):
     """Verdicts légers (identité, statut, groupe, rang, score) de tout l'univers pour cette configuration, mis en cache en base."""
-    key = hashlib.sha1(json.dumps(config, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+    key = hashlib.sha1(('proximity-v1:' + json.dumps(config, sort_keys=True, separators=(',', ':'))).encode()).hexdigest()
     version = data_version(conn)
     with conn.cursor() as cur:
         cur.execute('SELECT data_version, payload FROM result_cache WHERE cache_key=%s', (key,))
@@ -222,7 +241,7 @@ def cached_verdicts(conn, config):
         if cur.fetchone()['n'] >= MAX_NEW_CONFIGS_PER_HOUR:
             raise ValueError('Trop de réglages différents ont été calculés depuis une heure : réessayez un peu plus tard, ou utilisez un des quatre profils de départ.')
     entries = [[v['key'], v['symbol'], v['row']['name'], v['row']['isin'], v['row']['kind'], v['row']['mic'], v['row']['country'], v['status'], v['group'], v['rank'],
-                None if v['score'] is None else round(v['score'], 4), v['row']['category'], _fails(v), v['row'].get('instrument_id'), v['row'].get('currency'), v['row'].get('price_currency'), v['row'].get('net_assets')] for v in judge_universe(conn, config)]
+                None if v['score'] is None else round(v['score'], 4), v['row']['category'], _fails(v), v['row'].get('instrument_id'), v['row'].get('currency'), v['row'].get('price_currency'), v['row'].get('net_assets'), criteria_proximity(v['reasons'])] for v in judge_universe(conn, config)]
     with conn.cursor() as cur:
         cur.execute('REPLACE INTO result_cache(cache_key, data_version, built_at, payload) VALUES (%s,%s,%s,%s)',
                     (key, version, datetime.datetime.utcnow().replace(microsecond=0), json.dumps(entries, ensure_ascii=False, separators=(',', ':'))))
@@ -448,7 +467,10 @@ def explore(conn, request):
     rows, level_counts = level_filtered_rows(rows, aux, ref, prefilter_cfg, wanted, query, set(view.get('owned_ids') or []) if view.get('owned_only') else set())
     level_masked = sum(level_counts['regularity'].values()) - len(rows)
     sort, desc = view.get('sort', 'rank'), view.get('dir') == 'desc'
-    if sort in SORT_KEYS:
+    proximity_order = status == 'rejected' and sort in ('rank','proximity')
+    if proximity_order:
+        rows = sorted(rows,key=lambda e: (*(e.get('proximity') or [999,999,float('inf')]), e['symbol']))
+    elif sort in SORT_KEYS:
         key = SORT_KEYS[sort]
         have = [e for e in rows if key(e, aux.get(e['id'], {})) is not None]
         none = [e for e in rows if key(e, aux.get(e['id'], {})) is None]
@@ -520,7 +542,7 @@ def explore(conn, request):
             countries[e['country']] += 1
         if e['category']:
             categories[e['category']] += 1
-    return {'etf_concentration': etf_concentration, 'config': config, 'total': total, 'page': page, 'pages': max(1, -(-total // size)), 'rows': out, 'ref_sessions': ref, 'curve_label': signals.period_label(ref),
+    return {'etf_concentration': etf_concentration, 'config': config, 'total': total, 'page': page, 'pages': max(1, -(-total // size)), 'rows': out, 'ref_sessions': ref, 'curve_label': signals.period_label(ref), 'ordering': 'proximity' if proximity_order else sort,
             'universe': len(entries), 'examined': len(base), 'tradable': {'on': bool(view.get('tradable', True)), 'masked': masked}, 'level_filters': {'masked': level_masked, 'counts': level_counts},
             'counts': {g: dict(c) for g, c in counts.items()}, 'scope_counts': scope_counts, 'populations': {g: sum(c.values()) for g, c in counts.items()},
             'reasons': dict(reasons), 'facets': {'markets': dict(markets), 'countries': dict(sorted(countries.items())), 'categories': dict(sorted(categories.items()))}}

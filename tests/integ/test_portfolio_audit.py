@@ -20,7 +20,7 @@ def account(world):
 
 
 def add(client, pf, side='buy', qty=10, price=100, date='2026-05-01', **extra):
-    status, data = client.call('tx/add', dict(portfolio_id=pf, listing_id=1, side=side,
+    status, data = client.call('tx/add', dict(portfolio_id=pf, listing_id=extra.pop('listing_id',1), side=side,
                                             quantity=qty, unit_price=price, trade_at=date, **extra))
     assert status == 200, data
     return data['id']
@@ -332,3 +332,25 @@ def test_preview_fx_fees_edit_and_ownership(world):
     bob = login(world, 'bob', 'bob-secret-12345')
     assert preview(bob, pf)[0] == 404
     assert preview(a, pf, quantity=11)[0] == 422
+
+
+def test_history_neutral_return_keeps_five_percent_after_new_two_hundred_purchase(world):
+    a,pf=account(world)
+    add(a,pf,qty=2,price=100,date='2026-01-05')
+    add(a,pf,qty=2,price=100,date='2026-01-07',listing_id=2)
+    conn=connect()
+    with conn.cursor() as q:
+        q.execute('DELETE FROM latest_prices')
+        q.executemany('INSERT INTO daily_prices(listing_id,price_date,close_px) VALUES (%s,%s,%s)',
+            [(1,'2026-01-05',100),(1,'2026-01-06',105),(1,'2026-01-07',105),
+             (2,'2026-01-05',100),(2,'2026-01-06',100),(2,'2026-01-07',100)])
+    conn.commit();conn.close()
+    before=portfolio(a,pf)['transactions_list']
+    status,h=a.call('portfolio/history',params=f'&id={pf}')
+    assert status==200,h
+    assert h['performance']['index'][h['dates'].index('2026-01-06')]==pytest.approx(1.05)
+    assert h['performance']['index'][h['dates'].index('2026-01-07')]==pytest.approx(1.05)
+    d=portfolio(a,pf)
+    assert d['totals']['total_gain']==10 and d['totals']['invested_total']==400
+    assert d['totals']['total_gain']/d['totals']['invested_total']*100==2.5
+    assert d['transactions_list']==before

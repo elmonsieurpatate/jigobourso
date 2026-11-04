@@ -101,3 +101,19 @@ def test_the_trend_curve_covers_the_longest_period_of_the_strategy():
     year = service.explore(conn, {'config': cfg, 'view': {'status': 'all', 'tradable': False, 'page_size': 50}})
     assert year['curve_label'] == '1 an' and all(len(r['curve']) == 66 for r in year['rows'])              # 253 clôtures ramenées à 66 points
     r = year['rows'][0]
+
+
+def test_rejected_default_proximity_is_applied_before_pagination_without_reranking_retained():
+    conn=connect();seed(conn)
+    original=explore(conn,status='retained')
+    cfg=service.strategy.preset('fast')
+    next(p for p in cfg['periods'] if p['id']=='month')['min_return']=1000
+    request={'config':cfg,'view':{'status':'rejected','tradable':False,'page_size':2}}
+    pages=[service.explore(conn,{**request,'view':{**request['view'],'page':page}}) for page in (1,2,3)]
+    assert all(r['ordering']=='proximity' and r['scope_counts']['retained']==0 for r in pages)
+    actual=[r['id'] for page in pages for r in page['rows']]
+    verdicts=service.judge_universe(conn,cfg)
+    expected=[v['key'] for v in sorted(verdicts,key=lambda v:(*service.criteria_proximity(v['reasons']),v['symbol']))]
+    assert actual==expected and len(set(actual))==6
+    assert [(r['id'],r['rank'],r['score']) for r in explore(conn,status='retained')['rows']]==[(r['id'],r['rank'],r['score']) for r in original['rows']]
+    conn.close()

@@ -10,7 +10,7 @@ import datetime
 import math
 
 from .series import prepare_series
-from . import session
+from . import session, performance
 
 
 def _num(v):
@@ -56,10 +56,12 @@ class _Carry:
     """Dernière valeur connue à une date (séries triées)."""
     def __init__(self, pairs):
         self.pairs, self.i, self.last = pairs, 0, None
+        self.last_day = None
 
     def at(self, day):
         while self.i < len(self.pairs) and self.pairs[self.i][0] <= day:
             self.last = self.pairs[self.i][1]
+            self.last_day = self.pairs[self.i][0]
             self.i += 1
         return self.last
 
@@ -69,7 +71,7 @@ def build(transactions, bars, splits, unit, fx, meta, today=None, bars15=None):
     today = (today or datetime.date.today()).isoformat()
     txs = sorted(transactions, key=lambda t: (str(t['trade_at']), int(t.get('id') or 0)))
     if not txs:
-        return {'dates': [], 'value': [], 'net_in': [], 'gain': [], 'purchases': [], 'unpriced': [], 'lines': [], 'trades': [], 'notes': [], 'intraday': {'t': [], 'value': []}}
+        return {'dates': [], 'value': [], 'net_in': [], 'gain': [], 'purchases': [], 'unpriced': [], 'lines': [], 'trades': [], 'notes': [], 'intraday': {'t': [], 'value': []}, 'performance': performance.linked([],[],[])}
     notes = []
     series, applied = {}, {}
     for lid in {int(t['listing_id']) for t in txs if t.get('listing_id')}:
@@ -85,12 +87,14 @@ def build(transactions, bars, splits, unit, fx, meta, today=None, bars15=None):
     if calendar and calendar[-1] < today and series:
         calendar.append(today)
     # Dernier point : le dernier cours connu (cotation du jour) quand il est plus récent que la dernière clôture, comme la valeur affichée en haut de page.
+    quote_observed = {}
     for lid in series:
         m = meta.get(lid) or {}
         live, when = _num(m.get('price')), m.get('price_time')
         day_live = when.date().isoformat() if hasattr(when, 'date') else (str(when)[:10] if when else None)
         if live and day_live and (not series[lid] or day_live >= series[lid][-1][0]) and day_live <= today:
             series[lid].append((today, live))
+            quote_observed[lid] = day_live
     closes = {lid: _Carry(series[lid]) for lid in series}
     rates = {c: _Carry(v) for c, v in fx.items()}
 
@@ -106,6 +110,9 @@ def build(transactions, bars, splits, unit, fx, meta, today=None, bars15=None):
     lines = {}
     out = {'dates': [], 'value': [], 'net_in': [], 'gain': [], 'purchases': [], 'unpriced': []}
     trades = []
+    performance_values = []
+    stale_performance = False
+    invalid_performance = False
     for day in calendar:
         while k < len(txs) and str(txs[k]['trade_at'])[:10] <= day:
             t = txs[k]; k += 1
@@ -130,6 +137,7 @@ def build(transactions, bars, splits, unit, fx, meta, today=None, bars15=None):
                 net_in += gross + fees
                 purchases += gross + fees
             else:
+                if qty * factor > holdings.get(key,0.0) + 1e-9: invalid_performance = True
                 holdings[key] = max(0.0, holdings.get(key, 0.0) - qty * factor)
                 net_in -= gross - fees
             lines.setdefault(key, {'key': str(key), 'symbol': t['symbol'], 'name': (meta.get(key) or {}).get('name') or t.get('name') or t['symbol'], 'values': [], 'net_in': [], 'purchases': [], 'quantities': [], '_in': 0.0, '_purchases': 0.0})
@@ -140,6 +148,7 @@ def build(transactions, bars, splits, unit, fx, meta, today=None, bars15=None):
                            'quantity': qty, 'unit_price': price, 'currency': t.get('currency'), 'fees_eur': fees, 'fx_to_eur': rate,
                            'first_buy': t['side'] == 'buy' and not any(x.get('key') == str(key) and x['side'] == 'buy' for x in trades)})
         total, unpriced = 0.0, 0
+        stale_today = False
         for key, line in lines.items():
             q = holdings.get(key, 0.0)
             v = 0.0
@@ -147,6 +156,14 @@ def build(transactions, bars, splits, unit, fx, meta, today=None, bars15=None):
                 c = closes[key].at(day) if isinstance(key, int) and key in closes else None
                 f = to_eur(key, day) if c is not None else None
                 v = q * c * f if c is not None and f is not None else None
+                observed = closes[key].last_day if isinstance(key,int) and key in closes else None
+                if observed == today and key in quote_observed: observed = quote_observed[key]
+                if observed and (datetime.date.fromisoformat(day)-datetime.date.fromisoformat(observed)).days>7:
+                    stale_today = True
+                currency = (unit.get(key) or 'EUR')
+                base = 'GBP' if currency.upper() in ('GBP','GBX') else currency.upper()
+                if base != 'EUR' and base in rates and rates[base].last_day and (datetime.date.fromisoformat(day)-datetime.date.fromisoformat(rates[base].last_day)).days>7:
+                    stale_today = True
             line['quantities'].append(q)
             line['values'].append(None if v is None else round(v, 2))
             line['purchases'].append(round(line['_purchases'], 2))
@@ -163,6 +180,8 @@ def build(transactions, bars, splits, unit, fx, meta, today=None, bars15=None):
                 line['values'][:0] = [0.0] * pad
                 line['net_in'][:0] = [0.0] * pad
                 line['purchases'][:0] = [0.0] * pad
+        performance_values.append(None if unpriced or stale_today else total)
+        stale_performance = stale_performance or stale_today
         out['dates'].append(day)
         out['value'].append(None if unpriced else round(total, 2))
         out['unpriced'].append(unpriced)
@@ -178,6 +197,9 @@ def build(transactions, bars, splits, unit, fx, meta, today=None, bars15=None):
     out['market'] = market_history(holdings, bars, splits, unit, {k: {**{'symbol': l['symbol'], 'name': l['name']}, **meta.get(k, {})} for k, l in lines.items()}, today, bars15 or {}, fx)
     out['session'] = session.build(holdings,bars15 or {},unit,fx,txs,applied,meta)
     out['trades'] = trades
+    out['performance'] = performance.linked(out['dates'],performance_values,trades,invalid=bool(notes) or invalid_performance)
+    if invalid_performance: out['performance']['notes'].append('Historique des quantités incohérent : performance hors mouvements indisponible.')
+    if stale_performance: out['performance']['notes'].append('Cours ou change de plus de sept jours : performance hors mouvements indisponible aux dates concernées.')
     if any(out['unpriced']):
         notes.append('Valorisation indisponible aux dates sans cours ou change : aucune estimation au prix d’achat.')
     out['notes'] = notes

@@ -492,3 +492,6 @@ dialog:has(.pc-box){width:min(900px,calc(100vw - 24px))}
 .editor-actions{position:sticky;top:70px;z-index:6;background:var(--surface);padding:10px;border:1px solid var(--line);border-radius:10px}#editor{overflow:visible}
 
 #editor input,#editor select,#editor button{scroll-margin-top:150px;scroll-margin-bottom:40px}
+
+#neutral-performance,.capital-yield{white-space:nowrap}.cockpit-summary .capital-yield{font-size:inherit;color:inherit}
+@media(max-width:860px){.cockpit-summary>div:nth-child(3){flex-direction:column;align-items:flex-start;gap:4px}}

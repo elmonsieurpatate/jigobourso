@@ -6,7 +6,7 @@ Deux espaces : **Mon portefeuille** et **Historique et gestion**. La période pr
 
 Trois onglets immédiatement accessibles :
 
-- **Mon portefeuille**, par défaut : résultat global net des mouvements d’achat et de vente ; une transaction n’est pas assimilée à une performance de marché.
+- **Mon portefeuille**, par défaut en % : performance hors achats/ventes, chaînée entre observations. En € : gains/pertes effectivement gagnés, ventes comprises. Ces deux unités ne sont pas deux mesures identiques.
 - **Mes gains/pertes** : résultat personnel par instrument, frais, change et ventes compris, calculé à partir du registre et de l’historique existants.
 - **Cours des actions** : historique boursier avant et après acquisition ; aucune performance personnelle n’est inventée avant l’achat. En % : cours normalisés à une origine commune (0 % = base 100), hors change ; en € : cours convertis au taux historique daté (au plus sept jours).
 
@@ -34,6 +34,22 @@ Aucun moteur comptable parallèle : `ledger.php` reste la référence pour PMP e
 Le classement conserve toutes les positions ayant contribué, y compris les titres soldés, et trie selon l’impact en euros (pas selon le rendement individuel). Les pertes principales sont identifiées. Le total des contributions calculables reste cohérent avec le résultat du moteur. Une donnée manquante est explicitement signalée.
 
 Le résultat réalisé reste visible après liquidation, dans le résumé, le classement et la consultation des positions clôturées. Une courbe personnelle peut conserver le résultat réalisé après liquidation ; elle ne prétend pas représenter une exposition au marché pendant cette période. Les périodes de détention séparées permettent de distinguer liquidation et rachat.
+
+## Performance hors achats et ventes
+
+Le résumé distingue désormais **gains en euros**, **rendement sur les achats cumulés** et **performance hors achats/ventes**. Réalisé, latent, capital restant et fiscalité indicative conservent les calculs du registre. Les contributions en euros s’additionnent au gain ; les points de contribution sur capital engagé s’additionnent au rendement sur capital, **pas** à la nouvelle performance chaînée.
+
+`performance.py` consomme en lecture seule les valorisations non arrondies du même historique et les mêmes transactions converties en euros. Il ne modifie ni une opération, ni un cours, ni un taux enregistré. Les achats (frais compris) sont des entrées dans la poche de titres ; le produit net des ventes en est une sortie. L’application ne tient pas un compte espèces : ce n’est pas un rendement de compte complet avec liquidités ou dividendes.
+
+Faute de valorisation de tout le portefeuille immédiatement avant chaque opération, il serait faux d’annoncer un TWR exact. La méthode utilisée est le **Modified Dietz chaîné quotidiennement** : pour chaque intervalle, `r = (valeur_fin − valeur_début − somme_flux) / (valeur_début + somme(poids × flux))`, puis multiplication des `1+r`. Le poids correspond à la fraction de l’intervalle restant après l’heure UTC enregistrée de la transaction, avec frontières de jour UTC pour les valorisations quotidiennes. Un intervalle sans mouvement est le rendement des deux valorisations observées ; les jours de mouvement sont **estimés**, et cette limite est affichée.
+
+À l’entrée depuis une poche vide, le capital de référence est le total des achats : on ne double pas artificiellement une variation initiale parce qu’un premier achat a été saisi à midi. Une liquidation complète sans nouvel achat utilise la valeur de départ et le produit net de vente. Une poche vide sans mouvement garde un facteur neutre ; un rachat ultérieur conserve le rendement historique tout en commençant une nouvelle exposition. Les frais restent des dépenses. Un dénominateur non positif, une valorisation absente ou un historique de change invalide ne produit pas un rendement inventé.
+
+Les cours et taux vieux de plus de sept jours rendent les observations concernées indisponibles pour cette nouvelle performance, sans modifier les anciens totaux. Un trou n’est jamais franchi artificiellement dans la performance depuis le début ; une période ultérieure entièrement couverte peut être rebased à sa propre origine. Les splits restent traités par l’historique existant (prix et quantités dans des unités cohérentes).
+
+Exemple testé : achat 200 €, valeur 210 € (+5 %), nouvel achat 200 € à prix inchangé. Valeur 410 €, gain 10 €, rendement sur achats 2,5 %, performance hors mouvements toujours 5 %. Une variation de marché ou des frais le même jour peuvent légitimement changer cette dernière : seule la dilution mécanique par l’achat est neutralisée.
+
+Le graphique principal n’ajoute aucun mode : % montre cette performance, € garde le gain. La période globale rebase les rendements chaînés ; le zoom reste visuel. Le 1J réutilise l’estimation intrajournalière existante uniquement quand elle est calculable, avec ses limites sur transactions, FX et données absentes.
 
 ## Achats, ventes et traçabilité
 

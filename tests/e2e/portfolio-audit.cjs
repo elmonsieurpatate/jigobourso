@@ -18,10 +18,10 @@ try{for(const width of [1280,390,375]){
    const c=await page.evaluate(()=>{const d=document.querySelector('#evo-chart')._financial.getState().data;return {series:d.series,xs:d.times.map(t=>new Date(t*1000).toISOString().slice(0,10))}}),svg=await page.locator('.fc-plot').boundingBox();assert.ok(svg.width>=250);minWidth=Math.min(minWidth,svg.width);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
    const i0=history.dates.indexOf(c.xs[0]),last=history.dates.length-1;
    const oracle=l=>{const gain=l.gain[last]-(i0?l.gain[i0]:0),base=(i0?(l.values||l.value)[i0]:0)+l.purchases[last]-(i0?l.purchases[i0]:0);return unit==='eur'?gain:base>0?100*gain/base:null};
-   if(mode==='portfolio')assert.ok(Math.abs(c.series.find(s=>s.id==='portfolio').values.at(-1)-oracle(history))<1e-8);
+   if(mode==='portfolio'){const expected=unit==='eur'?oracle(history):100*(history.performance.index.at(-1)/(i0?history.performance.index[i0]:1)-1);assert.ok(Math.abs(c.series.find(s=>s.id==='portfolio').values.at(-1)-expected)<1e-8)}
    else for(const line of history.lines){assert.ok(Math.abs(c.series.find(s=>s.id===line.key).values.at(-1)-oracle(line))<1e-8)}
    const contributions=await page.locator('[data-contribution]').evaluateAll(es=>es.map(e=>Number(e.dataset.eur)));const sum=contributions.reduce((a,b)=>a+b,0),expected=history.gain[last]-(i0?history.gain[i0]:0);assert.ok(Math.abs(sum-expected)<.031);
-   if(period==='all'&&unit==='pct'&&mode==='portfolio')assert.ok(Math.abs(c.series[0].values.at(-1)-100*233.4/3942)<.001,'purchases denominator, sales not subtracted');
+   if(period==='all'&&unit==='pct'&&mode==='portfolio')assert.match(await page.locator('.hero-g').innerText(),/Sur achats cumulés/);
    checks.push({period,mode,unit});
   }
  }
