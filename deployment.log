@@ -1,2 +1,16 @@
 == Validation du déploiement : quick
 == Contrôles du serveur (lecture seule)
+== Mode rapide : diagnostic exhaustif des classements non exécuté
+== Contrôle des fichiers SQL : ajouts seulement
+== Mode rapide : essai isolé Hostinger non exécuté
+== Version des pages : ?v=202611052056
+== Transfert du code
+== Dépendances Python, migrations de schéma, contrôles
+moteur importable
+== Contrôle d'intégrité financière
+PHP valide
+== Mode rapide : vérifications exhaustives des calculs et ETF non exécutées
+== Vérification publique
+site OK : menus de test 200, versions vérifiées, API filtres protégées (401)
+site OK : accueil 200, version 202611052056 servie, API répond (200)
+Déploiement terminé : 465574ed0171b9abd0ec9e3bec9c53793dc11f02
