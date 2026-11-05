@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/http.php';
+require_once __DIR__ . '/secondary_metadata.php';
 
 const SECONDARY_DEFINITIONS = 'explorer_secondary_filters';
 const SECONDARY_DEFAULTS = 'explorer_secondary_defaults';
@@ -49,6 +50,21 @@ function secondary_initialize_once(): void {
             if(!$f['editable']&&!array_key_exists('values',$defaults['filters'][$id])) $defaults['filters'][$id]['values']=secondary_all();
             unset($stored);
         }
+        secondary_metadata_migrate($definitions,$defaults);
+        // Legacy category activation becomes an explicit selection, never a hidden category.
+        if(($defaults['category_selection_version']??0)<1){
+            $previous=[];
+            foreach($definitions['filters'] as $filter)foreach($filter['measures'] as $measure){
+                $inactive=array_column(array_filter($measure['categories'],fn($c)=>($c['active']??true)===false),'id');
+                if(!$inactive)continue;
+                $selection=$defaults['filters'][$filter['id']][$measure['id']];
+                $previous[$filter['id']][$measure['id']]=['selection'=>$selection,'legacy_unselected'=>$inactive];
+                $selected=$selection['mode']==='all'?secondary_ids($measure):$selection['selected'];
+                $defaults['filters'][$filter['id']][$measure['id']]=['mode'=>'custom','selected'=>array_values(array_diff($selected,$inactive))];
+            }
+            $defaults['category_selection_version']=1;
+            $defaults['category_selection_previous']=$previous;
+        }
         foreach ([[SECONDARY_DEFINITIONS,$oldD,$definitions],[SECONDARY_DEFAULTS,$oldS,$defaults]] as [$name,$old,$next]) {
             if($old!==$next) { $next['revision']=(int)$old['revision']+1; q('UPDATE settings SET value_json=?,updated_at=? WHERE name=?',[secondary_json($next),now_utc(),$name]); }
         }
@@ -73,24 +89,34 @@ function secondary_find(array $definitions,string $id): array {
     foreach($definitions['filters'] as $f) if($f['id']===$id)return $f;
     throw new ApiError('Filtre inconnu.',404);
 }
-/** Catalogue stocké complet, sans lancer une sélection ni modifier les garde-fous techniques. */
-function secondary_catalogue(): array {
-    $out=['country'=>[],'sector'=>[],'market'=>[],'asset'=>[]];
-    foreach(q("SELECT DISTINCT TRIM(country) value FROM instruments WHERE country IS NOT NULL AND TRIM(country)<>'' ORDER BY value")->fetchAll() as $r) $out['country'][]=['id'=>'country:'.$r['value'],'label'=>$r['value'],'value'=>$r['value']];
-    foreach(q("SELECT DISTINCT kind,TRIM(category) value FROM instruments WHERE category IS NOT NULL AND TRIM(category)<>'' ORDER BY kind,value")->fetchAll() as $r) $out['sector'][]=['id'=>$r['kind'].':'.$r['value'],'label'=>($r['kind']==='equity'?'Actions · secteur : ':'ETF · catégorie : ').$r['value'],'value'=>$r['value'],'kind'=>$r['kind']];
-    foreach(q("SELECT DISTINCT TRIM(mic) value FROM listings WHERE TRIM(mic)<>'' ORDER BY value")->fetchAll() as $r) $out['market'][]=['id'=>'market:'.$r['value'],'label'=>$r['value'],'value'=>$r['value']];
-    foreach(q('SELECT DISTINCT kind value FROM instruments ORDER BY kind')->fetchAll() as $r) $out['asset'][]=['id'=>'asset:'.$r['value'],'label'=>['equity'=>'Action','etf'=>'ETF'][$r['value']]??$r['value'],'value'=>$r['value']];
-    foreach($out as &$values)$values[]=['id'=>'unknown','label'=>'Inconnu','value'=>null];unset($values);
-    return $out;
+/** Categories are fixed; assignments only use the stored instrument/listing metadata. */
+function secondary_catalogue_report(): array {
+    $values=secondary_metadata_config()['groups'];$assignments=[];
+    foreach($values as &$group)foreach($group as &$v){$v['value']=$v['id']==='unknown'?null:$v['id'];$v['count']=0;}unset($v,$group);
+    $queries=[
+        'country'=>"SELECT country raw,COUNT(*) count FROM instruments GROUP BY country ORDER BY country",
+        'sector'=>"SELECT kind,category raw,COUNT(*) count FROM instruments GROUP BY kind,category ORDER BY kind,category",
+        'market'=>"SELECT mic raw,COUNT(*) count FROM listings GROUP BY mic ORDER BY mic",
+        'asset'=>"SELECT kind raw,COUNT(*) count FROM instruments GROUP BY kind ORDER BY kind",
+    ];
+    foreach($queries as $filter=>$sql){$assignments[$filter]=[];
+        foreach(q($sql)->fetchAll() as $row){
+            $result=secondary_metadata_classify($filter,$row['raw'],$row['kind']??null);
+            $assignments[$filter][]=array_merge($row,$result);
+            foreach($values[$filter] as &$v)if($v['id']===$result['id'])$v['count']+=(int)$row['count'];unset($v);
+        }
+    }
+    return ['values'=>$values,'assignments'=>$assignments];
 }
+function secondary_catalogue(): array { return secondary_catalogue_report()['values']; }
 function secondary_read(): array {
     secondary_initialize();
     // Read the two documents consistently, including during a restore transaction.
     $values=q('SELECT name,value_json FROM settings WHERE name IN (?,?)',[SECONDARY_DEFINITIONS,SECONDARY_DEFAULTS])->fetchAll(PDO::FETCH_KEY_PAIR);
     $definitions=secondary_decode($values[SECONDARY_DEFINITIONS]);$defaults=secondary_decode($values[SECONDARY_DEFAULTS]);
-    $catalogue=secondary_catalogue();
+    $report=secondary_catalogue_report();$catalogue=$report['values'];
     foreach($definitions['filters'] as &$f) if(!$f['editable'])$f['values']=$catalogue[$f['id']]??[];unset($f);
-    return ['schema'=>2,'source'=>'settings','source_label'=>'Réglages persistants de l’administration','definitions'=>$definitions,'defaults'=>$defaults,'proposed'=>secondary_proposed(),'catalogue_scope'=>'Valeurs présentes dans le catalogue stocké ; aucun calcul de classement.','filtering_connected'=>false];
+    return ['schema'=>2,'source'=>'settings','source_label'=>'Réglages persistants de l’administration','definitions'=>$definitions,'defaults'=>$defaults,'proposed'=>secondary_proposed(),'metadata_mapping'=>secondary_metadata_config(),'catalogue_mapping'=>$report['assignments'],'migration_notices'=>$defaults['metadata_migration']['notices']??[],'catalogue_scope'=>'Groupes fixes ; affectations et effectifs issus du catalogue stocké. Aucun calcul de classement.','filtering_connected'=>false];
 }
 function secondary_bound($v): bool { return $v===null || ((is_int($v)||is_float($v))&&is_finite((float)$v)); }
 function secondary_validate_measure(array $m,array $categories): void {
@@ -111,7 +137,7 @@ function secondary_validate_measure(array $m,array $categories): void {
         }else{
             if($c['values']!==[]||($c['min']===null&&$c['minIncluded'])||($c['max']===null&&$c['maxIncluded'])||($c['min']!==null&&$c['max']!==null&&($c['min']>$c['max']||($c['min']==$c['max']&&!($c['minIncluded']&&$c['maxIncluded'])))))throw new ApiError('Intervalle vide, inversé ou incohérent.',422);
         }
-        if($c['active'])$active[]=$c;
+        $active[]=$c;
     }
     foreach($active as $i=>$a)foreach(array_slice($active,$i+1) as $b){
         if($m['kind']==='enum'){$overlap=(bool)array_intersect($a['values'],$b['values']);}

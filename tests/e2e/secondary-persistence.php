@@ -26,15 +26,16 @@ $original=$untouched();$state=secondary_read();$check(count($state['definitions'
 $check(count(array_filter($state['definitions']['filters'],fn($f)=>$f['editable']))===9,'9 éditables');
 $raw=q('SELECT name,value_json,updated_at FROM settings WHERE name IN (?,?) ORDER BY name',[SECONDARY_DEFINITIONS,SECONDARY_DEFAULTS])->fetchAll();secondary_initialize();secondary_read();
 $check($raw===q('SELECT name,value_json,updated_at FROM settings WHERE name IN (?,?) ORDER BY name',[SECONDARY_DEFINITIONS,SECONDARY_DEFAULTS])->fetchAll(),'Initialisation strictement idempotente');
-foreach($state['definitions']['filters'] as $f){foreach($f['measures'] as $m){secondary_validate_measure($m,$m['categories']);$check($state['defaults']['filters'][$f['id']][$m['id']]['mode']==='all','Toutes incluses initialement');}}
-$metadata=secondary_catalogue();$check(array_column($metadata['asset'],'value')===['equity','etf',null],'Pas de type inventé');$check(in_array('equity:Technology',array_column($metadata['sector'],'id'),true)&&in_array('etf:Technology',array_column($metadata['sector'],'id'),true),'Secteur action distinct de catégorie ETF');
-$check(!in_array('Allemagne',array_column($metadata['country'],'label'),true),'Aucun pays fictif');
+foreach($state['definitions']['filters'] as $f){$check($f['enabled'],'13 filtres activés initialement');if(!$f['editable'])$check($state['defaults']['filters'][$f['id']]['values']['mode']==='all','Métadonnées toutes incluses initialement');foreach($f['measures'] as $m){secondary_validate_measure($m,$m['categories']);$check($state['defaults']['filters'][$f['id']][$m['id']]['mode']==='all','Toutes incluses initialement');}}
+$metadata=secondary_catalogue();$check(array_column($metadata['asset'],'id')===['asset:equity','asset:etf'],'Deux types uniquement');
+$check(count($metadata['country'])===5&&count($metadata['market'])===5&&count($metadata['sector'])===12,'Groupes fixes');
+$report=secondary_catalogue_report();$check(in_array('sector:technology',array_column($report['assignments']['sector'],'id'),true),'Correspondances sectorielles explicites');
 $save=function($f,$s){return secondary_write(['action'=>'save','filter_id'=>$f['id'],'filter'=>$f,'revision'=>$s['definitions']['revision']]);};
 $vol=secondary_find($state['definitions'],'volatility');$vol['enabled']=false;$vol['measures'][0]['categories'][2]['name']='Modérée persistante';$vol['measures'][0]['categories'][2]['description']='Description persistante';$vol['measures'][0]['categories'][2]['color']='#aabbcc';
 $stale=$state;$state=$save($vol,$state);secondary_initialize();$state=secondary_read();$actual=secondary_find($state['definitions'],'volatility');
 $check(!$actual['enabled']&&$actual['measures'][0]['categories'][2]['name']==='Modérée persistante','Édition et activation conservées');
 $reject(fn()=>$save($vol,$stale),409);
-$vol=$actual;$new=$vol['measures'][0]['categories'][0];$new['id']='new-1';$new['name']='Nouvelle inactive';$new['active']=false;$new['description']='Nouvel identifiant stable';$vol['measures'][0]['categories'][]=$new;$state=$save($vol,$state);
+$vol=$actual;$new=$vol['measures'][0]['categories'][0];$new['id']='new-1';$new['name']='Nouvelle catégorie';$new['active']=true;$new['min']=0;$new['max']=0.75;$new['minIncluded']=false;$new['maxIncluded']=true;$vol['measures'][0]['categories'][0]['max']=0;$new['description']='Nouvel identifiant stable';$vol['measures'][0]['categories'][]=$new;$state=$save($vol,$state);
 $vol=secondary_find($state['definitions'],'volatility');$newId=end($vol['measures'][0]['categories'])['id'];$check((bool)preg_match('/^cat-[a-f0-9]{32}$/',$newId),'Identifiant serveur pérenne');
 $state=secondary_read();$check(end(secondary_find($state['definitions'],'volatility')['measures'][0]['categories'])['id']===$newId,'Identifiant conservé au rechargement');
 $vol['measures'][0]['categories']=array_reverse($vol['measures'][0]['categories']);$state=$save($vol,$state);$check(secondary_find($state['definitions'],'volatility')['measures'][0]['categories'][0]['id']===$newId,'Ordre persistant');

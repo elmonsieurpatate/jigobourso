@@ -34,3 +34,8 @@ def test_secondary_filters_persistence_and_preservation():
     result = subprocess.run(['php', str(script)], cwd=root, capture_output=True, text=True, timeout=45)
     assert result.returncode == 0, result.stdout + result.stderr
     assert 'PASS:' in result.stdout
+
+    result = subprocess.run(['php', str(root / 'tests/e2e/secondary-metadata-persistence.php')],
+                            cwd=root, capture_output=True, text=True, timeout=45)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert 'PASS:' in result.stdout

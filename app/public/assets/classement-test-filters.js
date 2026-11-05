@@ -9,7 +9,6 @@
         if(!f.enabled)continue;
         const options=[];
         if(f.editable)for(const m of f.measures)for(const c of m.categories){
-          if(!c.active)continue;
           const lo=c.min===null?'−∞':format(c.min),hi=c.max===null?'+∞':format(c.max);
           const interval=c.unknown?'Donnée indisponible':m.kind==='enum'?c.values.map(v=>m.domain.find(d=>d.value===v)?.label||v).join(', '):`${c.min!==null&&c.minIncluded?'[':']'} ${lo} ; ${hi} ${c.max!==null&&c.maxIncluded?']':'['} ${m.unit}`;
           options.push({id:m.id+'::'+c.id,categoryId:c.id,measure:m.id,label:(f.measures.length>1?m.name+' · ':'')+c.name,color:c.color,range:interval,description:c.description||''});
@@ -50,5 +49,34 @@
       const s=payload.defaults.filters[key]?.[o.measure];return !s||s.mode==='all'||s.selected.includes(o.categoryId);
     }).map(o=>o.id)]));
   }
-  window.ClassementTestSecondary={normalize,all,apply,defaults};
+  function metadataLegacyId(mapping,key,id){
+    if(mapping.groups[key].some(v=>v.id===id))return id;
+    if(id==='unknown')return key==='asset'?null:'unknown';
+    const norm=v=>v.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ');
+    const raw=id.startsWith(key+':')?id.slice(key.length+1):id;
+    const lookup=(map,key,fallback)=>Object.prototype.hasOwnProperty.call(map,key)?map[key]:fallback;
+    const missing=v=>['','unknown','inconnu','inconnue','n/a','n.a.','none','null','not available','unavailable','-','—'].includes(v);
+    if(key==='asset')return ['equity','etf'].includes(norm(raw))?'asset:'+norm(raw):null;
+    if(key==='country')return missing(norm(raw))?'unknown':lookup(mapping.country_aliases,norm(raw),'country:other');
+    if(key==='market')return lookup(mapping.mic_groups,raw.trim().toUpperCase(),'unknown');
+    const match=/^(equity|etf):(.*)$/s.exec(id),value=norm(match?match[2]:raw);
+    if(missing(value))return 'unknown';
+    return lookup(match?.[1]==='equity'?mapping.equity_sectors:match?.[1]==='etf'?mapping.etf_categories:{},value,'sector:other');
+  }
+  function migrateOverrides(payload,overrides){
+    const mapping=payload.metadata_mapping;if(!mapping)return {overrides,notices:[],previous:{}};
+    const next={...overrides},notices=[],previous={};
+    for(const [key,groups] of Object.entries(mapping.groups)){
+      const own=next[key];if(!own||own.metadataVersion===mapping.version)continue;
+      const map=ids=>[...new Set(ids.filter(id=>typeof id==='string').map(id=>metadataLegacyId(mapping,key,id)).filter(id=>id!==null))];
+      let selected=map(own.selected);
+      if(key==='asset'&&own.selected.length&&!selected.length)selected=groups.map(v=>v.id);
+      // Mark the entire new domain known: new groups must not silently join a restrictive preference.
+      const known=groups.map(v=>v.id);next[key]={...own,selected,known,metadataVersion:mapping.version};
+      previous[key]=own;
+      if(JSON.stringify(own.selected)!==JSON.stringify(selected))notices.push(key);
+    }
+    return {overrides:next,notices,previous};
+  }
+  window.ClassementTestSecondary={normalize,all,apply,defaults,migrateOverrides,metadataLegacyId};
 })();

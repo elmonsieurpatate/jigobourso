@@ -6,7 +6,7 @@ Cette étape conserve les interfaces Administration et Classement test validées
 
 La table existante `settings` reçoit seulement deux documents JSON, de schéma 1 :
 
-- `explorer_secondary_filters` : révision, 13 filtres, activation, neuf groupes de mesures éditables et leurs catégories ordonnées (identifiant, nom, explication, couleur, bornes, inclusivité, valeurs d’état, activation, inconnue).
+- `explorer_secondary_filters` : révision, 13 filtres, activation, neuf groupes de mesures éditables et leurs catégories ordonnées (identifiant, nom, explication, couleur, bornes, inclusivité, valeurs d’état, champ historique d’activation conservé pour compatibilité, inconnue).
 - `explorer_secondary_defaults` : révision indépendante et sélection par défaut pour chaque mesure, ou pour les valeurs d’un filtre catalogue.
 
 `mode: all` inclut toutes les catégories, inconnue comprise, ainsi que celles ajoutées ultérieurement. `mode: custom` conserve une liste explicite d’identifiants ; une liste vide signifie aucune sélection. Les choix de défauts ne modifient pas les définitions.
@@ -38,16 +38,16 @@ Le serveur revalide identifiants, noms, descriptions, types, couleurs, bornes, i
 
 ## Quatre filtres catalogue, en lecture seule
 
-Les listes proviennent du catalogue **stocké**, sans téléchargement ni lancement du moteur :
+Les valeurs brutes du catalogue **stocké** sont affectées à des groupes en lecture seule, décrits dans la section « regroupements v2 » ci-dessous. Aucun téléchargement ni lancement du moteur n’est requis.
 
-| Filtre | Source et règle |
+| Filtre | Source |
 |---|---|
-| Pays | `instruments.country`, sans en déduire une exposition géographique |
-| Secteur | `instruments.category`, avec identifiant et libellé distinguant **secteur d’action** et **catégorie d’ETF** |
-| Marché / Place | Valeurs effectivement présentes dans `listings.mic` |
-| Type d’actif | Valeurs effectivement présentes dans `instruments.kind` ; le schéma actuel fournit actions/ETF, aucun OPCVM n’est inventé |
+| Zone géographique | `instruments.country`, pas la cotation ni l’exposition du portefeuille |
+| Secteur | `instruments.kind` + `instruments.category`, tables distinctes actions/ETF |
+| Marché / Place | Codes réellement présents dans `listings.mic` |
+| Type d’actif | `instruments.kind` ; deux types pris en charge : actions/ETF |
 
-La valeur logique « Inconnu » représente l’absence de donnée. Elle n’est pas un pays, secteur, marché ou type synthétique. Les sources sont identiques quel que soit l’état actif du filtre. L’administration garde leur accès ; dans Classement test, chaque filtre actif apparaît une seule fois. Le masquage d’un contrôle ne désactive aucun garde-fou technique.
+Inconnu représente une donnée absente/non localisable ; le type d’actif n’a pas de troisième catégorie artificielle. Chaque filtre actif apparaît une seule fois dans Classement test. L’administration conserve les filtres inactifs et le masquage d’un contrôle ne désactive aucun garde-fou technique.
 
 Les coches « Par défaut » sur ces lignes règlent seulement leur sélection initiale, pas leurs valeurs.
 
@@ -55,7 +55,7 @@ Les coches « Par défaut » sur ces lignes règlent seulement leur sélection i
 
 Le raccordement concerne la page validée `classement-test.html`. L’ancien Explorer et son moteur de classement sont conservés.
 
-1. Charger la configuration serveur et ne présenter que les filtres actifs et catégories actives.
+1. Charger la configuration serveur et ne présenter que les filtres actifs, avec toutes leurs catégories.
 2. Sans choix local, appliquer les défauts administrateur ; initialement, tout est inclus.
 3. Si un choix local existe, le conserver sur les identifiants encore disponibles. Une modification de libellé, couleur, description ou borne ne réinitialise pas ce choix.
 4. Les nouvelles catégories suivent les défauts administrateur ; celles supprimées ne produisent pas de choix fantômes. Désactiver un filtre ne supprime pas ses préférences locales.
@@ -122,3 +122,100 @@ Aucun fichier de `engine/`, `db/schema.sql` ou `.github/` n’a été modifié p
 Un essai répété a reproduit un interblocage InnoDB (1213) : l’initialisation prenait d’abord des verrous partagés via `INSERT IGNORE` sur les clés existantes, puis tentait de les promouvoir en verrous exclusifs. L’initialisation verrouille désormais les deux lignes directement en exclusif et dans un ordre fixe. Le cas d’une toute première insertion concurrente est repris uniquement après rollback, de façon bornée ; un conflit persistant est signalé en 409, sans remplacement des données.
 
 Après correction : douze paires de sauvegardes concurrentes réelles ont donné chacune 200/409 ; quatre initialisations simultanées, avant création des clés, ont toutes retourné les 13 filtres. Le test d’intégration ciblé a été rejoué après correction. La suite complète de 188 tests avait également réussi avant ce dernier correctif localisé au nouveau service.
+
+## Correction des métadonnées : regroupements v2
+
+Les quatre filtres en lecture seule utilisent désormais des **groupes stables**, pas une liste des valeurs brutes. La définition est dans `app/config/secondary_metadata_groups.json` ; les neuf groupes financiers et leurs personnalisations ne changent pas. Aucun calcul ni filtrage des résultats boursiers n’est raccordé par cette correction.
+
+| Filtre | Groupes / identifiants stables |
+|---|---|
+| Zone géographique | États-Unis (`country:us`), Europe (`country:europe`), Pays émergents (`country:emerging`), Autres (`country:other`), Inconnue (`unknown`) |
+| Secteur | Technologie, Finance, Santé, Industrie, Consommation, Énergie, Matériaux, Services publics, Immobilier, Communication, Autres (`sector:…`), Inconnu (`unknown`) |
+| Marché / Place | Marchés américains (`market:us`), européens (`market:europe`), émergents (`market:emerging`), Autres marchés (`market:other`), Inconnu (`unknown`) |
+| Type d’actif | Actions (`asset:equity`), ETF (`asset:etf`), uniquement |
+
+Les groupes restent disponibles même si leur effectif est nul. Ce sont des **catégories**, pas des pays, des types ou des cotations inventés. Les effectifs et affectations sont obtenus exclusivement à partir du catalogue stocké. Tous les 13 filtres sont actifs et toutes leurs catégories incluses sur une installation neuve ; une activation ou sélection préexistante n’est jamais réinitialisée.
+
+### Politique géographique explicite
+
+- Source instrument : `instruments.country`, jamais le MIC, la devise ou le symbole. Pour un ETF, le pays stocké est son rattachement/domicile fourni par le catalogue, **pas l’exposition de ses participations**. Les limites de l’import existant ne sont pas corrigées ici.
+- Alias de pays : snapshot des 249 entrées ISO 3166-1 fourni par `iso-codes` (noms anglais/français, noms officiels/courants, codes alpha-2/alpha-3), plus alias courants explicites. Aucun appel réseau au chargement. Fichier source de génération local : `/usr/share/iso-codes/json/iso_3166-1.json` et traduction française `iso_3166-1` ; la table générée est versionnée dans le dépôt.
+- Ordre : États-Unis, puis **Europe**, puis **émergents**, puis Autres. Europe correspond à l’Europe UN M49, avec Chypre (UE) et Kosovo ajoutés explicitement. Cela inclut Royaume-Uni, Norvège, Suisse et Russie ; cela n’affirme aucune négociabilité.
+- La liste émergente de référence est celle des 24 marchés MSCI EM de 2024 : Brésil, Chili, Chine, Colombie, Tchéquie, Égypte, Grèce, Hongrie, Inde, Indonésie, Corée du Sud, Koweït, Malaisie, Mexique, Pérou, Philippines, Pologne, Qatar, Arabie saoudite, Afrique du Sud, Taïwan, Thaïlande, Turquie, Émirats arabes unis. **Tchéquie, Grèce, Hongrie et Pologne sont classées Europe**, par priorité géographique. Cette politique est un regroupement pratique, pas la reproduction d’un indice en temps réel. Canada, Japon, Australie, Hong Kong et Singapour vont dans Autres.
+- Un pays non vide et non reconnu va dans Autres avec motif `unmapped-country` et valeur brute conservée. Une absence ou sentinelle explicite (`unknown`, `n/a`, etc.) va dans Inconnue. Aucun pays non vide n’est abandonné.
+- Sources documentaires : [ISO 3166](https://www.iso.org/iso-3166-country-codes.html), [UN M49](https://unstats.un.org/unsd/methodology/m49/), [MSCI Market Classification](https://www.msci.com/our-solutions/indexes/market-classification). Référentiels figés pour rendre le résultat déterministe ; pas de prétention à une actualisation automatique.
+
+### Places et secteurs
+
+La table MIC est distincte du pays instrument, fondée sur la localisation de la place ([ISO 10383](https://www.iso20022.org/market-identifier-codes)). Elle couvre notamment **toutes les places nommées dans `engine/catalogue/rules.py::MARKET_NAMES`**. Les affectations utilisent seulement les codes effectivement rencontrés dans `listings.mic` ; on ne déduit jamais un pays d’un préfixe MIC. Exemple : entreprise française cotée sur XNAS → instrument Europe, cotation Marchés américains. XSHG → émergents ; XHKG → Autres marchés. Un MIC absent ou non mappé va dans Inconnu, avec valeur brute et motif `unmapped-mic` conservés ; il n’est pas arbitrairement déclaré américain ou européen.
+
+Pour les actions, la table explicite des grandes familles est proche des 11 familles GICS : `Consumer Cyclical`, `Consumer Defensive`, `Consumer Discretionary` et `Consumer Staples` → Consommation ; `Financial Services`/`Financials` → Finance, etc. Les catégories d’ETF sont traitées par une **autre table**, et non par réutilisation automatique du secteur action. Seuls les libellés sectoriels explicitement reconnus (ex. `Sector Equity Technology`, `Technology`) reçoivent une famille. Un ETF large `Equity`, obligataire `Bond`, ou une catégorie non sectorielle/non reconnue va dans Autres ; l’absence de catégorie va dans Inconnu. Ce regroupement n’invente pas une analyse des participations du fonds.
+
+L’API ajoute `catalogue_mapping` : pour chaque valeur brute rencontrée, type éventuel, effectif, groupe et motif. Les valeurs ambiguës restent ainsi auditables. `metadata_mapping` fournit le même référentiel au migrateur local du navigateur ; les tests vérifient la concordance PHP/JavaScript. Un type d’actif autre que les deux types du schéma est signalé `unsupported`, jamais présenté comme une troisième option.
+
+### Migration contrôlée et préférences
+
+Aucune nouvelle table ni troisième clé `settings`. Les documents conservent leur schéma 1 et reçoivent `metadata_version: 2`.
+
+1. Sous les deux verrous de lignes existants, migrer une seule fois les identités en lecture seule. Conserver leur état actif/inactif et toutes les catégories et valeurs financières.
+2. Traduire chaque ancien identifiant de pays, MIC ou secteur vers son groupe. Fusionner les doublons par union. `all` reste `all` ; `custom: []` reste vide. Les nouveaux groupes ne sont pas automatiquement ajoutés à une sélection restrictive.
+3. Archiver les anciennes définitions et sélections dans `metadata_migration.previous`, à l’intérieur des deux documents existants. Les changements produisent des `migration_notices` visibles dans la zone d’information administrative existante.
+4. L’élargissement France → Europe est inévitable avec les nouvelles catégories : il est **signalé**, sans prétendre conserver une restriction pays par pays. Aucune règle résiduelle cachée « France seulement » n’est conservée.
+5. L’ancienne option artificielle de type « unknown » disparaît. Si elle était seule sélectionnée, inclure les deux types pris en charge et signaler la migration ; si des types connus étaient sélectionnés, les conserver. Les anciennes données restent archivées.
+6. Migrer aussi les choix locaux **par utilisateur**, prioritaires sur les défauts administrateur. Archiver leurs anciens `selected`/`known` dans `secondaryMetadataPreviousByUser`, dans le même document local existant. Les groupes nouvellement définis sont marqués connus pour éviter qu’ils rejoignent silencieusement une préférence restrictive. L’avis reste présent dans le texte du panneau de filtres ; l’enregistrement du profil conserve l’archive.
+7. Après migration, aucun nouveau démarrage/rechargement ne réécrit les choix. La restauration explicite reste ciblée sur le filtre choisi et remet son activation et ses défauts à tout inclus.
+
+Pour examiner les anciennes préférences, consulter ces archives dans les deux documents. Un retour à l’ancien code ne doit pas consommer directement les identifiants regroupés : une restauration de configuration doit rétablir explicitement les anciennes sélections archivées. Aucune restauration automatique ni migration destructive n’est exécutée.
+
+### Validation et limites du catalogue
+
+L’inspection en lecture seule d’une copie jetable de `/workspace/jigo-tools/db` a trouvé **0 instrument dans le catalogue local `jigobourso_v2`**. Aucun accès à la production n’a été utilisé. Il serait donc incorrect d’affirmer avoir validé les valeurs réellement présentes en production. Les codes de places définis dans le dépôt sont tous couverts ; les valeurs brutes absentes de la table sont signalées par le diagnostic plutôt que perdues.
+
+La validation utilise des fixtures déclarées synthétiques (France/XPAR et double cotation XNAS, ETF large, métadonnées absentes), les alias ISO figés et des tests sans réseau. Le catalogue réel devra être contrôlé ultérieurement avec `catalogue_mapping`, en lecture seule et avec autorisation d’accès appropriée. Aucune initialisation ni migration n’a été lancée en production.
+
+
+### Résultats des commandes exécutées pour cette correction
+
+- `make fast PY=/workspace/jigobourso/.venv/bin/python` : **445 passed**, un avertissement préexistant de calendrier.
+- `python -m pytest tests/integ -q`, sur une nouvelle instance MariaDB sans réseau, base jetable `jigobourso_it` : **194 passed**, 958 avertissements de dépréciation préexistants, 161,54 s. Rapport : `/tmp/jigo-metadata-integ.HnTmwN/results.log`.
+- `bash scripts/test_secondary_filters.sh` : PHP/MariaDB réel et Chromium, **réussi**. Initialisation complète 13/9/4, migration des quatre métadonnées, archives, activation, défauts, rechargement, restauration, conflits concurrents, maintien des préférences par utilisateur, absence de modification des scores/rangs et doubles cotations.
+- Le test rapide `test_secondary_metadata.py` exécute les implémentations PHP et JavaScript sur tous les alias ISO livrés ainsi que 32 cas explicites. Régression couverte : `NA` est bien la Namibie, pas une absence de donnée.
+- Navigateur réel : **1280, 390, 375 px**, clair et sombre, aucun débordement horizontal. Captures supplémentaires du filtre géographique en lecture seule : `/tmp/jigo-secondary-tests.zxYZGT/browser/metadata-*.png`. Rapport navigateur : `/tmp/jigo-secondary-tests.zxYZGT/browser/results.json`.
+- Aperçu statique : `node tests/e2e/admin-categories-test.cjs` sur serveur local, **8 configurations réussies** (1600/1280/390/375 px, clair/sombre). Il utilise aussi les nouveaux groupes et seulement Actions/ETF.
+- `node tests/e2e/classement-test-secondary-logic.cjs`, `node tests/e2e/admin-categories-model.cjs`, `php tests/e2e/classement-test-categories.php` : **réussis**.
+- Syntaxe PHP, JavaScript et `git diff --check` : **réussis**. Comparaison des neuf définitions financières avec le commit de départ : **strictement identiques**.
+
+Lors de ces validations préalables : aucun push, déploiement, changement du moteur financier, des stratégies, des scores ou du schéma SQL. Les migrations de préférences n’ont été exécutées que sur les bases et navigateurs isolés de test.
+
+### Fichiers modifiés / ajoutés
+
+- `app/config/explorer_secondary_filters.json`
+- `app/public/admin-categories-test.html`
+- `app/public/assets/admin-categories-demo.js`
+- `app/public/assets/admin-categories-test.js`
+- `app/public/assets/classement-test-filters.js`
+- `app/public/assets/classement-test.js`
+- `app/public/assets/secondary-filter-store.js`
+- `app/services/secondary_filters.php`
+- `docs/FILTRES_PERSISTANCE.md`
+- `scripts/test_secondary_filters.sh`
+- `tests/e2e/admin-categories-model.cjs`
+- `tests/e2e/admin-categories-test.cjs`
+- `tests/e2e/secondary-persistence-browser.cjs`
+- `tests/e2e/secondary-persistence.php`
+- `tests/integ/test_secondary_filters.py`
+- `app/config/secondary_metadata_groups.json`
+- `app/services/secondary_metadata.php`
+- `tests/e2e/secondary-metadata-persistence.php`
+- `tests/e2e/secondary-metadata.cjs`
+- `tests/e2e/secondary-metadata.php`
+- `tests/fast/test_secondary_metadata.py`
+
+
+## Activation des filtres, sélection des catégories
+
+Seul le filtre possède un état actif/inactif. La colonne de statut des catégories et leur commande d’activation ont été retirées. Toutes les catégories restent visibles dans Explorer, y compris celles qui portent un ancien champ `active: false`. Ce champ est conservé uniquement pour la compatibilité des documents historiques ; il ne masque plus rien et ne dispense plus de la validation des bornes.
+
+Les anciennes catégories masquées sont converties une seule fois en catégories visibles mais non sélectionnées dans les défauts administrateur. Cette migration dans `explorer_secondary_defaults` conserve les choix initiaux dans `category_selection_previous`, puis pose `category_selection_version: 1`. Les nouvelles configurations incluent toutes les catégories. Les choix locaux continuent à primer sur les défauts administrateur. Des bornes historiques qui se chevauchent restent conservées et sont signalées pour correction, pas supprimées automatiquement.
+
+Le déploiement Quick conserve les deux menus séparés. `scripts/check_secondary_catalogue.php` vérifie en lecture seule les données réellement stockées sur la cible : chaque instrument et chaque cotation doivent recevoir un groupe explicite. Les replis vers Autres/Inconnu sont comptés sans modifier le catalogue ni initialiser les réglages. Le contrôle public des pages et des droits API reste obligatoire.

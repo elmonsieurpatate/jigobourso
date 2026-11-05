@@ -8,7 +8,7 @@
     for(const f of filters){
       defaults.filters[f.id]={};
       for(const m of f.measures)defaults.filters[f.id][m.id]={mode:'all',selected:[]};
-      if(!f.editable){f.values=(f.examples||[]).map((x,i)=>({id:'demo-'+i,label:x,value:x}));delete f.examples;defaults.filters[f.id].values={mode:'all',selected:[]};}
+      if(!f.editable){if(!Array.isArray(f.values))f.values=(f.examples||[]).map((x,i)=>({id:'demo-'+i,label:x,value:x}));delete f.examples;defaults.filters[f.id].values={mode:'all',selected:[]};}
     }
     return {schema:2,source:'offline',definitions:{schema:1,revision:1,filters},defaults};
   }
@@ -16,7 +16,7 @@
   async function write(request){
     if(!window.JigoSecondaryOffline){state=await J.post('admin/secondary-filters/save',request);return copy(state);}
     const id=request.filter_id,index=state.definitions.filters.findIndex(f=>f.id===id);
-    if(request.action==='save'){state.definitions.filters[index]=copy(request.filter);state.definitions.revision++;}
+    if(request.action==='save'){const f=copy(request.filter);if(!f.editable)f.values=state.definitions.filters[index].values;state.definitions.filters[index]=f;state.definitions.revision++;}
     else if(request.action==='defaults'){state.defaults.filters[id][request.measure_id]=copy(request.selection);state.defaults.revision++;}
     else if(request.action==='restore'){
       const f=copy(window.AdminCategoryDemo.filters.find(f=>f.id===id));

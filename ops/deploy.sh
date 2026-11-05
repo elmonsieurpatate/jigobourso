@@ -296,6 +296,10 @@ PYVERIFY
   phase="vérification publique"
   echo "== Vérification publique"
   public_check "$version"
+  if [ -f scripts/check_secondary_catalogue.php ]; then
+    echo "== Vérification des métadonnées du classement test (lecture seule)"
+    remote_sh "cd $root && set -a && . ./private/env && set +a && php scripts/check_secondary_catalogue.php"
+  fi
   if [ -z "$sandbox" ]; then
     for page in login.html recover.html reset.html verify-email.html; do
       test "$(curl -s -o /dev/null -w '%{http_code}' "$base/$page")" = 200 || exit 4

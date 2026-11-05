@@ -23,8 +23,8 @@
       }
     }
     if(unknownCount>1)categories.filter(c=>c.unknown).forEach(c=>add(c.id,'unknown','Une seule catégorie « Inconnue » est autorisée.'));
-    if(indicator.supportsUnknown&&!categories.some(c=>c.unknown&&c.active))warnings.push('Les données absentes ne disposent d’aucune catégorie inconnue active.');
-    const active=categories.filter(c=>c.active&&!c.unknown);
+    if(indicator.supportsUnknown&&!categories.some(c=>c.unknown))warnings.push('Les données absentes ne disposent d’aucune catégorie inconnue.');
+    const active=categories.filter(c=>!c.unknown);
     if(indicator.kind==='enum'){
       for(const d of indicator.domain){const own=active.filter(c=>(c.values||[]).includes(d.value));if(own.length>1)own.forEach(c=>add(c.id,'values',`La valeur « ${d.label} » est également utilisée ailleurs.`));else if(!own.length)warnings.push(`Valeur non couverte : ${d.label}.`);}
     }else{
@@ -35,7 +35,7 @@
         if(lo<hi||(lo===hi&&Number.isFinite(lo)&&includes(a,lo)&&includes(b,lo))){for(const c of[a,b]){const other=c===a?b:a;add(c.id,'min',`Chevauchement avec « ${other.name} ».`);add(c.id,'max',`Chevauchement avec « ${other.name} ».`);}}
       }
       const sorted=[...valid].sort((a,b)=>(a.min??-Infinity)-(b.min??-Infinity));
-      if(!sorted.length)warnings.push('Aucune plage numérique active.');
+      if(!sorted.length)warnings.push('Aucune plage numérique.');
       else{
         if(sorted[0].min!==null)warnings.push(`Valeurs inférieures à ${sorted[0].min} non couvertes${sorted[0].minIncluded?'':' (borne comprise)'}.`);
         let edge=sorted[0].max??Infinity,included=sorted[0].maxIncluded;

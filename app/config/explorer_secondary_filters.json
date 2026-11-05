@@ -1370,9 +1370,9 @@
     },
     {
       "id": "country",
-      "name": "Pays",
-      "description": "Pays associé au titre.",
-      "provenance": "Pays associé au titre.",
+      "name": "Zone géographique",
+      "description": "Zone du pays de rattachement de l’instrument, indépendante de sa cotation.",
+      "provenance": "instruments.country : pays de rattachement, pas la place de cotation.",
       "editable": false,
       "enabled": true,
       "measures": []
@@ -1380,8 +1380,8 @@
     {
       "id": "sector",
       "name": "Secteur",
-      "description": "Classification sectorielle du titre.",
-      "provenance": "Classification sectorielle du titre.",
+      "description": "Grandes familles sectorielles ; correspondances actions et catégories ETF distinctes.",
+      "provenance": "instruments.kind + instruments.category : secteur action ou catégorie ETF explicitement reconnue.",
       "editable": false,
       "enabled": true,
       "measures": []
@@ -1389,8 +1389,8 @@
     {
       "id": "market",
       "name": "Marché / Place",
-      "description": "Place de cotation associée au titre.",
-      "provenance": "Place de cotation associée au titre.",
+      "description": "Zone de la place de cotation ; indépendante du pays de l’instrument.",
+      "provenance": "listings.mic : localisation de la place selon une correspondance MIC explicite.",
       "editable": false,
       "enabled": true,
       "measures": []
@@ -1398,8 +1398,8 @@
     {
       "id": "asset",
       "name": "Type d’actif",
-      "description": "Type d’actif issu du catalogue du titre.",
-      "provenance": "Type d’actif issu du catalogue du titre.",
+      "description": "Actions et ETF uniquement, types pris en charge.",
+      "provenance": "instruments.kind : equity ou etf uniquement.",
       "editable": false,
       "enabled": true,
       "measures": []

@@ -1371,66 +1371,191 @@ window.AdminCategoryDemo = {
     },
     {
       "id": "country",
-      "name": "Pays",
-      "description": "Pays associé au titre.",
-      "provenance": "Pays associé au titre.",
+      "name": "Zone géographique",
+      "description": "Zone du pays de rattachement de l’instrument, indépendante de sa cotation.",
+      "provenance": "instruments.country : pays de rattachement, pas la place de cotation.",
       "editable": false,
       "enabled": true,
-      "examples": [
-        "France",
-        "États-Unis",
-        "Allemagne",
-        "Royaume-Uni",
-        "Non renseigné"
-      ],
-      "measures": []
+      "measures": [],
+      "values": [
+        {
+          "id": "country:us",
+          "label": "États-Unis",
+          "value": "country:us",
+          "count": 0
+        },
+        {
+          "id": "country:europe",
+          "label": "Europe",
+          "value": "country:europe",
+          "count": 0
+        },
+        {
+          "id": "country:emerging",
+          "label": "Pays émergents",
+          "value": "country:emerging",
+          "count": 0
+        },
+        {
+          "id": "country:other",
+          "label": "Autres",
+          "value": "country:other",
+          "count": 0
+        },
+        {
+          "id": "unknown",
+          "label": "Inconnue",
+          "value": null,
+          "count": 0
+        }
+      ]
     },
     {
       "id": "sector",
       "name": "Secteur",
-      "description": "Classification sectorielle du titre.",
-      "provenance": "Classification sectorielle du titre.",
+      "description": "Grandes familles sectorielles ; correspondances actions et catégories ETF distinctes.",
+      "provenance": "instruments.kind + instruments.category : secteur action ou catégorie ETF explicitement reconnue.",
       "editable": false,
       "enabled": true,
-      "examples": [
-        "Technologie",
-        "Santé",
-        "Industrie",
-        "Finance",
-        "Non renseigné"
-      ],
-      "measures": []
+      "measures": [],
+      "values": [
+        {
+          "id": "sector:technology",
+          "label": "Technologie",
+          "value": "sector:technology",
+          "count": 0
+        },
+        {
+          "id": "sector:finance",
+          "label": "Finance",
+          "value": "sector:finance",
+          "count": 0
+        },
+        {
+          "id": "sector:health",
+          "label": "Santé",
+          "value": "sector:health",
+          "count": 0
+        },
+        {
+          "id": "sector:industry",
+          "label": "Industrie",
+          "value": "sector:industry",
+          "count": 0
+        },
+        {
+          "id": "sector:consumption",
+          "label": "Consommation",
+          "value": "sector:consumption",
+          "count": 0
+        },
+        {
+          "id": "sector:energy",
+          "label": "Énergie",
+          "value": "sector:energy",
+          "count": 0
+        },
+        {
+          "id": "sector:materials",
+          "label": "Matériaux",
+          "value": "sector:materials",
+          "count": 0
+        },
+        {
+          "id": "sector:utilities",
+          "label": "Services publics",
+          "value": "sector:utilities",
+          "count": 0
+        },
+        {
+          "id": "sector:real-estate",
+          "label": "Immobilier",
+          "value": "sector:real-estate",
+          "count": 0
+        },
+        {
+          "id": "sector:communication",
+          "label": "Communication",
+          "value": "sector:communication",
+          "count": 0
+        },
+        {
+          "id": "sector:other",
+          "label": "Autres",
+          "value": "sector:other",
+          "count": 0
+        },
+        {
+          "id": "unknown",
+          "label": "Inconnu",
+          "value": null,
+          "count": 0
+        }
+      ]
     },
     {
       "id": "market",
       "name": "Marché / Place",
-      "description": "Place de cotation associée au titre.",
-      "provenance": "Place de cotation associée au titre.",
+      "description": "Zone de la place de cotation ; indépendante du pays de l’instrument.",
+      "provenance": "listings.mic : localisation de la place selon une correspondance MIC explicite.",
       "editable": false,
       "enabled": true,
-      "examples": [
-        "Euronext Paris · XPAR",
-        "Nasdaq · XNAS",
-        "NYSE · XNYS",
-        "Xetra · XETR",
-        "Non renseignée"
-      ],
-      "measures": []
+      "measures": [],
+      "values": [
+        {
+          "id": "market:us",
+          "label": "Marchés américains",
+          "value": "market:us",
+          "count": 0
+        },
+        {
+          "id": "market:europe",
+          "label": "Marchés européens",
+          "value": "market:europe",
+          "count": 0
+        },
+        {
+          "id": "market:emerging",
+          "label": "Marchés émergents",
+          "value": "market:emerging",
+          "count": 0
+        },
+        {
+          "id": "market:other",
+          "label": "Autres marchés",
+          "value": "market:other",
+          "count": 0
+        },
+        {
+          "id": "unknown",
+          "label": "Inconnu",
+          "value": null,
+          "count": 0
+        }
+      ]
     },
     {
       "id": "asset",
       "name": "Type d’actif",
-      "description": "Type d’actif issu du catalogue du titre.",
-      "provenance": "Type d’actif issu du catalogue du titre.",
+      "description": "Actions et ETF uniquement, types pris en charge.",
+      "provenance": "instruments.kind : equity ou etf uniquement.",
       "editable": false,
       "enabled": true,
-      "examples": [
-        "Action",
-        "ETF",
-        "OPCVM",
-        "Non renseigné"
-      ],
-      "measures": []
+      "measures": [],
+      "values": [
+        {
+          "id": "asset:equity",
+          "label": "Actions",
+          "value": "asset:equity",
+          "count": 0
+        },
+        {
+          "id": "asset:etf",
+          "label": "ETF",
+          "value": "asset:etf",
+          "count": 0
+        }
+      ]
     }
   ],
   "indicators": [

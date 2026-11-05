@@ -30,6 +30,14 @@
   let rawLocal={};try{rawLocal=JSON.parse(localStorage.getItem(key)||'{}')||{};}catch(_){}
   const byUser=rawLocal.secondaryOverridesByUser||{};
   let overrides=Object.fromEntries(Object.entries(byUser[userKey]||{}).filter(([,v])=>v&&Array.isArray(v.selected)&&Array.isArray(v.known)));
+  const metadataMigration=secondary.migrateOverrides(categoryPayload,overrides);
+  overrides=metadataMigration.overrides;
+  if(Object.keys(metadataMigration.previous).length){
+    const previous=rawLocal.secondaryMetadataPreviousByUser||{};
+    rawLocal.secondaryMetadataPreviousByUser={...previous,[userKey]:{...(previous[userKey]||{}),...metadataMigration.previous}};
+    rawLocal.secondaryOverridesByUser={...byUser,[userKey]:overrides};
+    try{localStorage.setItem(key,JSON.stringify(rawLocal));}catch(_){/* Current session still uses the migrated preferences. */}
+  }
   // Migrate explicit restrictive selections from the prior stable-label prototype once.
   if(!byUser[userKey]&&categoryPayload.schema===2&&rawLocal.filters&&rawLocal.categorySignature){
     let previous={};try{previous=JSON.parse(rawLocal.categorySignature);}catch(_){}
@@ -49,11 +57,13 @@
     return[k,[...selected]];
   }));
   state.secondaryOverridesByUser={...byUser,[userKey]:overrides};
+  state.secondaryMetadataPreviousByUser=rawLocal.secondaryMetadataPreviousByUser||{};
   function saveLocalSelection(id){
     if(id)overrides[id]={selected:[...state.filters[id]],known:categories[id].options.map(o=>o.id)};
     state.secondaryOverridesByUser[userKey]=overrides;
     try{const saved=JSON.parse(localStorage.getItem(key)||'{}')||{};saved.secondaryOverridesByUser={...(saved.secondaryOverridesByUser||{}),[userKey]:overrides};state.secondaryOverridesByUser=saved.secondaryOverridesByUser;localStorage.setItem(key,JSON.stringify(saved));}catch(_){feedback('Stockage local indisponible : les sélections restent dans cette page.');}
   }
+  if(metadataMigration.notices.length)queueMicrotask(()=>feedback('Préférences regroupées : vérifiez les filtres géographiques, sectoriels et de places. Les anciennes sélections sont conservées sur cet appareil.'));
   const categorySignature=JSON.stringify(categoryPayload.definitions||categoryPayload.categories);
   state.categorySignature=categorySignature;
   // Jeu fictif immuable. Le formulaire de stratégie n'entre jamais dans son calcul.
@@ -156,7 +166,7 @@
     preview();
   }
   function renderFilters() {
-    $('#ct-filter-source').textContent=(categoryPayload.source_label||'Catégories administrateur')+' · bornes en lecture seule';
+    $('#ct-filter-source').textContent=(categoryPayload.source_label||'Catégories administrateur')+' · bornes en lecture seule'+(Object.keys(state.secondaryMetadataPreviousByUser[userKey]||{}).length?' · anciennes préférences regroupées : vérifiez vos sélections':'');
     if(categoryPayload.schema===2)document.querySelector('.ct-filter-logic').textContent='Réglages chargés · filtrage des résultats non raccordé à cette étape. Les scores et l’ordre restent inchangés.';
     const drawIndicator=([k,c])=>`<div class="ct-multi" data-indicator="${k}"><button type="button" class="ct-multi-trigger" data-open-filter="${k}" title="${esc(c.label)} · ${esc(c.unit)}" aria-expanded="${activeFilter===k}" aria-controls="ct-list-${k}"><span>${esc(c.label)}</span><b data-count="${k}">${state.filters[k].length} / ${c.options.length}</b><span aria-hidden="true">⌄</span></button><div class="ct-multi-popup" id="ct-list-${k}" ${activeFilter===k?'':'hidden'}><label class="ct-category-search"><span aria-hidden="true">⌕</span><input type="search" data-category-search="${k}" placeholder="Rechercher une catégorie…" aria-label="Rechercher une catégorie : ${esc(c.label)}" value="${activeFilter===k?esc(filterQuery):''}"></label><div class="ct-category-options" role="group" aria-label="Catégories : ${esc(c.label)}">${c.options.map(o=>`<label class="ct-category-option" data-search-text="${esc(o.label.toLocaleLowerCase('fr'))}"><input type="checkbox" data-filter="${k}" data-category="${o.id}" ${state.filters[k].includes(o.id)?'checked':''}><i style="background:${o.color}" aria-hidden="true"></i><span>${esc(o.label)}</span><small>${esc(o.range)}</small></label>`).join('')}</div><p class="ct-no-category" hidden>Aucune catégorie correspondante.</p><footer><span data-selected-count="${k}">${state.filters[k].length} / ${c.options.length} sélectionnées</span><button type="button" data-all-indicator="${k}">Tout sélectionner</button><button type="button" data-close-filter="${k}" aria-label="Fermer ${esc(c.label)}">Fermer</button></footer></div></div>`;
     const primaryKeys=categoryPayload.schema===2?['volatility','liquidity','volume','positive','spikes','concentration']:['volatility','turnover_eur','avg_volume','drawdown','up_fraction','gain_share'];

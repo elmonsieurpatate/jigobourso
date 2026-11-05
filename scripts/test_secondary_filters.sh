@@ -26,6 +26,7 @@ export JIGO_DB_SOCKET="$secondary_run/db.sock" JIGO_DB_HOST=127.0.0.1 JIGO_DB_NA
 MYSQL_PWD=filters-local-only mariadb --no-defaults --socket="$secondary_run/db.sock" -uroot jigobourso_filters_it < db/schema.sql
 php tests/e2e/secondary-persistence.php seed
 php tests/e2e/secondary-persistence.php | tee "$secondary_run/php-results.txt"
+php tests/e2e/secondary-metadata-persistence.php | tee "$secondary_run/metadata-results.txt"
 secondary_port=$(python3 - <<'PY'
 import socket
 with socket.socket() as server:
