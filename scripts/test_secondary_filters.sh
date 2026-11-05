@@ -41,4 +41,5 @@ for _ in $(seq 1 50); do
   sleep .1
 done
 BASE="http://127.0.0.1:$secondary_port" AUDIT_OUT="$secondary_run/browser" node tests/e2e/secondary-persistence-browser.cjs | tee "$secondary_run/browser-results.txt"
+BASE="http://127.0.0.1:$secondary_port" AUDIT_OUT="$secondary_run/mobile" node tests/e2e/classement-test-mobile.cjs
 printf 'Rapports et captures de validation : %s\n' "$secondary_run"

@@ -78,3 +78,16 @@ Le test PHP porte sur l’adaptateur pur sans connexion DB. Le test navigateur s
 - Saisie de règles, changement de profil, bouton Appliquer et changement Simple/Expert ne recalculent ni ne reclassent les exemples. Un changement de mode préserve la page de résultats courante.
 
 Validation : `node tests/e2e/classement-test-ranking.cjs`. Ce test vérifie les deux thèmes en 1440/1280/390/375 px, les pages, les tris, les valeurs inconnues, les colonnes, les détails, l’indépendance du formulaire, le masquage et son compteur, la conservation des scores/rangs et le retour depuis une sélection vide. Les seules routes simulées sont les lectures de session, de navigation et de catégories ; aucune donnée de production.
+
+
+## Correction mobile après contrôle utilisateur
+
+Le mode mobile transformait volontairement le tableau en fiches à deux colonnes : une ligne mesurait 259 px à 375/390/430 px et les en-têtes disparaissaient. Cette disposition est supprimée. Le tableau garde ses lignes (51 px mesurés), ses en-têtes, une colonne de titre fixe et un défilement horizontal limité au conteneur du tableau. Les autres composants ne défilent pas horizontalement.
+
+L’ouverture d’un filtre forçait le focus sur un champ de recherche de 11 px, combinaison favorisant le zoom de Safari iOS et l’ouverture du clavier. Sur téléphone et écran tactile, l’ouverture ne force plus ce focus. Les champs mobiles ont une police d’au moins 16 px ; le clavier s’ouvre seulement si l’utilisateur touche la recherche. Les libellés de filtres peuvent tenir sur deux lignes ; catégories, bornes et commandes restent dans la largeur disponible. Aucun verrouillage du zoom utilisateur n’est ajouté.
+
+`tests/e2e/classement-test-mobile.cjs` contrôle les dimensions effectives des lignes, les en-têtes, le maintien du titre pendant le défilement horizontal, le focus, la taille de texte de la recherche, la largeur des listes et les sélections conservées entre modes. `REPRODUCE_MOBILE_BASELINE=1` reproduit aussi le comportement du commit `a47f8ca` (nécessite cet historique Git). Matrice : 375/390/430/1280 px, clair/sombre, Chromium avec contexte mobile et tactile. Captures et résultats : `/tmp/jigo-mobile-regression/`.
+
+Les tests complets de classement (tri, pagination, colonnes, détails et filtres) passent également à 1440/1280/390/375 px dans les deux thèmes. Les tests PHP/MariaDB et navigateur sur base isolée restent verts.
+
+Limite explicite : WebKit n’est pas installé ; le téléchargement a été refusé par la politique réseau (403). Le correctif s’appuie sur une reproduction DOM/CSS et des tests Chromium mobile. Aucune validation Safari iPhone réelle n’est annoncée.

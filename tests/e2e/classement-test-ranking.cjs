@@ -34,6 +34,6 @@ try{for(const theme of ['light','dark'])for(const width of [1440,1280,390,375]){
  await p.locator('#ct-show-demo-all').click();assert.equal(await p.locator('[data-demo-row]').count(),30);assert.equal(await p.locator('#ct-masked-count').innerText(),'0 titre masqué');
  await p.locator('#ct-page-size').selectOption('10');await p.locator('#ct-filter-panel > summary').click();await p.evaluate(()=>{document.querySelector('#ct-feedback').textContent='';scrollTo(0,0)});
  assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
- if(width<700)assert.equal(await p.locator('.ct-table-wrap').evaluate(e=>e.scrollWidth>e.clientWidth),false);
+ if(width<700){assert.equal(await p.locator('.ct-table-wrap').evaluate(e=>e.scrollWidth>e.clientWidth),true);assert.equal(await p.locator('[data-demo-row]').first().evaluate(e=>getComputedStyle(e).display),'table-row');}
  assert.deepEqual(errors,[]);await p.screenshot({path:`${OUT}/${theme}-${width}.png`,fullPage:true});report.push({theme,width,passed:true,checks:['30-labelled-fictitious-rows','page-navigation','nulls-last','sort-both-directions','columns','row-details','primary-form-independent','secondary-masking-counts','scores-and-intrinsic-rank-preserved','zero-state-reset','responsive-no-overflow'],apiCalls:calls});console.log(JSON.stringify(report.at(-1)));await c.close();
 }}finally{await b.close();fs.writeFileSync(OUT+'/results.json',JSON.stringify(report,null,2));}})().catch(e=>{console.error(e);process.exitCode=1});
