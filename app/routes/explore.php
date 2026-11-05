@@ -45,6 +45,12 @@ return [
     'explorer/library/save' => function () { need_post();$u=require_user();return explorer_library_save((int)$u['id'],body()); },
     'explorer/library/delete' => function () { need_post();$u=require_user();q('DELETE FROM explorer_saved WHERE id=? AND user_id=?',[(int)(body()['id']??0),$u['id']]);return ['ok'=>true]; },
     'explorer/detail' => function () { need_post();$u=require_user();$b=body();$view=clean_view($b['view']??[]);$view['owned_ids']=held_listing_ids((int)$u['id']);return engine_call('sheet',['listing_id'=>(int)($b['id']??0),'config'=>$b['config']??'regular','view'=>$view,'fetch_profile'=>false]); },
+    'classement-test/categories' => function () {
+        require_user();
+        // Compatibility URL; the shared settings service is now the sole live source.
+        require_once __DIR__ . '/../services/secondary_filters.php';
+        return secondary_read();
+    },
     'strategy/presets' => function () { require_user(); return engine_call('presets', []); },
     'strategy/validate' => function () { need_post(); require_user(); return ['config' => engine_call('validate-config', body())]; },
     'explore' => function () {

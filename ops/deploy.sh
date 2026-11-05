@@ -9,6 +9,9 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 operation=${1:-diagnostic}
 case "$operation" in diagnostic|deploy|rollback) ;; *) exit 2 ;; esac
+validation=${JIGO_DEPLOY_VALIDATION:-full}
+case "$validation" in full|quick) ;; *) echo "Mode de validation inconnu" >&2; exit 2 ;; esac
+echo "== Validation du déploiement : $validation"
 sha=${GITHUB_SHA:-local}
 version=$(date -u +%Y%m%d%H%M)
 ssh_opts=(-F /dev/null -p 65002 -i "$RUNNER_TEMP/jigobourso-ssh/key"
@@ -39,6 +42,18 @@ public_check() {                                  # accueil servi avec la bonne 
   if [ -n "$expect" ]; then grep -q "?v=$expect" "$RUNNER_TEMP/index.html" || { echo "la page servie n'a pas la version attendue ($expect)" >&2; return 4; }; fi
   me=$(curl -s -o /dev/null -w '%{http_code}' "$base/api/auth/me")
   case "$me" in 200|401) ;; *) echo "api/auth/me : HTTP $me" >&2; return 4 ;; esac
+  if [ -n "$expect" ] && [ -f app/routes/secondary_filters.php ]; then
+    local page endpoint
+    for page in classement-test.html admin-categories-test.html; do
+      code=$(curl -s -o "$RUNNER_TEMP/$page" -w '%{http_code}' "$base/$page")
+      test "$code" = 200 && grep -q "?v=$expect" "$RUNNER_TEMP/$page" || { echo "menu de test $page : contrôle HTTP/version échoué" >&2; return 4; }
+    done
+    for endpoint in explorer/secondary-filters admin/secondary-filters; do
+      code=$(curl -s -o /dev/null -w '%{http_code}' "$base/api.php?r=$endpoint")
+      test "$code" = 401 || { echo "API filtres sans authentification : HTTP $code" >&2; return 4; }
+    done
+    echo "site OK : menus de test 200, versions vérifiées, API filtres protégées (401)"
+  fi
   echo "site OK : accueil 200${expect:+, version $expect servie}, API répond ($me)"
 }
 
@@ -73,6 +88,7 @@ if [ -f "$ROOT/.deployed" ]; then
 fi
 REMOTE
 
+if [ "$validation" = full ] || [ "$operation" != deploy ]; then
 echo "== Contrôle des classements (lecture seule)"
 remote_sh "ROOT=$root bash -s" <<'REMOTE'
 set -euo pipefail
@@ -92,6 +108,9 @@ for name in ('regular', 'momentum_risk'):
 conn.close()
 PY
 REMOTE
+else
+  echo "== Mode rapide : diagnostic exhaustif des classements non exécuté"
+fi
 
 if [ "$operation" = diagnostic ]; then echo "Diagnostic terminé : rien modifié."; exit 0; fi
 
@@ -112,7 +131,7 @@ python3 scripts/migrate.py --check
 
 # Le runner Hostinger prépare une copie de la production dans une base isolée. Attendre
 # son résultat avant de toucher au site public ; son seul effet persistant est la base sandbox.
-if [ -z "$sandbox" ]; then
+if [ -z "$sandbox" ] && [ "$validation" = full ]; then
   echo "== Essai isolé Hostinger (copie + base sandbox)"
   sandbox_ready=$(remote_sh "HOME=\$HOME ROOT=$root bash -s" <<'REMOTE'
 set -euo pipefail
@@ -138,6 +157,8 @@ REMOTE
   done
   [ "$complete" -eq 1 ] || { echo "délai dépassé pour l’essai isolé Hostinger" >&2; exit 1; }
   fi
+elif [ -z "$sandbox" ]; then
+  echo "== Mode rapide : essai isolé Hostinger non exécuté"
 fi
 
 # Preserve financial evidence before any code replacement. Never auto-rewrite legacy transactions.
@@ -238,6 +259,7 @@ chmod 600 "$ROOT/logs/financial-integrity.json"
 find app scripts -name '*.php' -print0 | xargs -0 -n1 php -l > /dev/null && echo "PHP valide"
 REMOTE
 
+  if [ "$validation" = full ]; then
   phase="vérification des calculs financiers"
   echo "== Vérification des calculs financiers avec les calendriers de séance"
   remote_sh "cd $root && set -a && . ./private/env && set +a && PYTHONPATH=$root .venv/bin/python scripts/prepare_financial_release.py"
@@ -245,6 +267,10 @@ REMOTE
   phase="vérification ETF, comptes et intégrité financière"
   echo "== Vérification ETF"
   remote_sh "cd $root && set -a && . ./private/env && set +a && PYTHONPATH=$root .venv/bin/python scripts/verify_etf_release.py" > "$RUNNER_TEMP/etf-report.json"
+  else
+    echo "== Mode rapide : vérifications exhaustives des calculs et ETF non exécutées"
+  fi
+  phase="préservation des comptes et intégrité financière"
   echo "== Vérification des comptes et des transactions"
   remote_sh "cd $root && set -a && . ./private/env && set +a && php scripts/check_financial_integrity.php" > "$RUNNER_TEMP/financial-after.json"
   remote_sh "cd $root && set -a && . ./private/env && set +a && JIGO_ACCOUNT_POSTCHECK=1 php scripts/verify_account_release.php" > "$RUNNER_TEMP/account-after.json"

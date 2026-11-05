@@ -1,9 +1,39 @@
 # Déploiement automatique (GitHub Actions)
 
-Chaque push sur `main` lance `.github/workflows/deploy.yml` : syntaxe PHP/Python, contrôle des migrations, `tests/fast`, `tests/integ` (base jetable du runner), puis `ops/deploy.sh` sur Hostinger.
+Chaque push normal sur `main` lance `.github/workflows/deploy.yml` en mode **avec tests** : contrôles de syntaxe PHP/Python/JavaScript, migrations additives, `tests/fast`, `tests/integ` (base jetable du runner), tests navigateur, puis `ops/deploy.sh` sur Hostinger.
+
+Le lancement manuel propose `operation` (`diagnostic`, `deploy`, `rollback`) et `validation` (`full`, `quick`). L’opération par défaut reste `diagnostic` ; la validation par défaut reste `full`. Le déploiement est autorisé uniquement depuis `main`.
+
+| Demande | Choix Actions | Comportement |
+|---|---|---|
+| Déploiement avec tests | `operation=deploy`, `validation=full` | Syntaxe puis tests complets GitHub, essai isolé Hostinger et vérifications financières/ETF avant mise en service |
+| Déploiement rapide | `operation=deploy`, `validation=quick` | Syntaxe/migrations contrôlées ; pas de suites de tests complètes, diagnostic exhaustif des classements, répétition Hostinger ni vérifications exhaustives des calculs/ETF |
+| Diagnostic / retour arrière | `operation=diagnostic` ou `rollback` | Contrôles courts, sans relancer les suites CI complètes ; procédure distante habituelle |
+
+Dans **les deux modes de déploiement**, restent obligatoires : sauvegarde du code et des données financières, vérification de la conservation des transactions et comptes, migrations additives, import du moteur et syntaxe PHP distante, contrôles HTTP/version du site et retour arrière automatique du code en cas d’échec. Le recalcul dérivé demandé lorsqu’un moteur/schéma change reste détaché, comme auparavant. Le mode rapide n’a pas de durée garantie : transfert, dépendances ou migrations peuvent encore prendre du temps.
+
+### Lancer le mode choisi
+
+Depuis GitHub : Actions → **Jigobourso — déploiement Hostinger** → Run workflow → branche `main` → opération `deploy` → validation `quick` ou `full`.
+
+Depuis la CLI, pour le commit déjà présent sur `main` :
+
+```sh
+# Déploiement rapide
+gh workflow run deploy.yml --ref main -f operation=deploy -f validation=quick
+# Déploiement avec tests
+gh workflow run deploy.yml --ref main -f operation=deploy -f validation=full
+```
+
+**Nouveau commit à déployer rapidement :** inclure le marqueur `[deploy quick]` dans le message du commit poussé sur `main`. Le workflow exécute les contrôles courts puis déploie sans lancer les tests complets. Un push sans ce marqueur reste en mode complet. Ne pas utiliser `[skip ci]`, qui empêcherait le workflow de démarrer, et ne pas doubler le push par un lancement manuel.
+
+L’environnement `production`, la concurrence exclusive et `cancel-in-progress: false` restent inchangés : un déploiement commencé n’est pas interrompu par une autre demande. Le résumé Actions indique le mode et si les tests complets ont été exécutés ou ignorés. Un test complet échoué, annulé ou sauté par erreur ne permet pas un déploiement normal ; seul le saut explicitement demandé en mode rapide (manuel ou marqueur de commit) est autorisé pour `deploy`.
+
+Les nouveaux choix deviennent disponibles quand ce workflow est publié sur `main`. Modifier le fichier localement n’effectue aucun déploiement.
+
 - Transmis : `app/ engine/ db/ docs/ scripts/ README.md requirements.txt`. Jamais touchés : `private/` (env, clé cron), `data/`, `logs/`, `.venv`, base de production, tâche cron hPanel.
 - **Retour arrière automatique** : avant tout transfert, sauvegarde `tgz` du code distant (`.jigobourso-v2-code-backups/`, 5 dernières). Si une étape échoue après le début du transfert (dépendances, migration, import du moteur, `php -l`, contrôle public), le code est restauré depuis cette sauvegarde (`rsync --delete` sur les seuls dossiers de code) et le site est revérifié. Les données et secrets ne sont jamais concernés.
-- **Retour arrière manuel** : Actions › « Jigobourso V2 » › Run workflow › `rollback` (dernière sauvegarde), ou `ROLLBACK_BACKUP=<fichier>`.
+- **Retour arrière manuel** : Actions › « Jigobourso — déploiement Hostinger » › Run workflow › `rollback` (dernière sauvegarde), ou `ROLLBACK_BACKUP=<fichier>`.
 - **Dépendances Python** : si `requirements.txt` change (empreinte `.requirements.sha`), le venv est sauvegardé (3 dernières copies) puis mis à jour. Le venv de production n'a pas `pip` (`ensurepip` indisponible) : le `pip` du système installe dans le venv (`--target`). Échec = retour arrière du code.
 - **Schéma SQL** : `db/schema.sql` crée seulement les tables absentes et redéfinit les vues. Toute évolution d'une table existante passe par `db/migrations/AAAAMMJJ_nom.sql` (voir son README) : appliquée une seule fois (`schema_migrations`), ajouts seulement (`ADD COLUMN`, `CREATE INDEX`, `CREATE TABLE IF NOT EXISTS`) ; `DROP`, `DELETE`, `UPDATE`, `MODIFY`… sont refusés par le CI et par `scripts/migrate.py`. Avant une migration, dump complet de la base (`.jigobourso-v2-code-backups/db-*.sql.gz`, 3 dernières). Un retour arrière du code ne défait pas une migration (colonnes ajoutées ignorées par l'ancien code).
 - Après transfert : import du moteur, `php -l`, puis contrôle public (accueil 200, version `?v=` servie, `api/auth/me`). Le fichier `.deployed` (hors web) note commit et date.

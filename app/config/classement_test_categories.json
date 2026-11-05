@@ -1,0 +1,387 @@
+{
+  "schema": 1,
+  "source": "proposed",
+  "source_label": "Valeurs proposées de l’administration V4 · instantané, aucun réglage enregistré",
+  "reference": "1039bb5a6ea96834d859c4851a4c24df24c08003",
+  "categories": {
+    "volatility": {
+      "label": "Volatilité",
+      "unit": "%/séance",
+      "bounds": [
+        1.5,
+        3,
+        5
+      ],
+      "labels": [
+        "Faible",
+        "Modérée",
+        "Élevée",
+        "Très élevée"
+      ],
+      "colors": [
+        "#166534",
+        "#1d4ed8",
+        "#9a3412",
+        "#b91c1c"
+      ],
+      "unknown_label": "Inconnu",
+      "unknown_color": "#475569"
+    },
+    "turnover_eur": {
+      "label": "Montant historique",
+      "unit": "€/séance",
+      "bounds": [
+        1000000.0,
+        2000000.0,
+        4000000.0
+      ],
+      "labels": [
+        "Limité",
+        "Intermédiaire",
+        "Important",
+        "Très important"
+      ],
+      "colors": [
+        "#b91c1c",
+        "#9a3412",
+        "#1d4ed8",
+        "#166534"
+      ],
+      "unknown_label": "Inconnu",
+      "unknown_color": "#475569"
+    },
+    "quoted_turnover": {
+      "label": "Montant coté Yahoo, trois mois",
+      "unit": "€/jour",
+      "bounds": [
+        1000000.0,
+        2000000.0,
+        4000000.0
+      ],
+      "labels": [
+        "Limité",
+        "Intermédiaire",
+        "Important",
+        "Très important"
+      ],
+      "colors": [
+        "#b91c1c",
+        "#9a3412",
+        "#1d4ed8",
+        "#166534"
+      ],
+      "unknown_label": "Inconnu",
+      "unknown_color": "#475569"
+    },
+    "avg_volume": {
+      "label": "Volume historique",
+      "unit": "titres/séance",
+      "bounds": [
+        10000.0,
+        100000.0,
+        1000000.0
+      ],
+      "labels": [
+        "Très faible",
+        "Faible",
+        "Moyen",
+        "Important"
+      ],
+      "colors": [
+        "#475569",
+        "#334155",
+        "#1e40af",
+        "#1e3a8a"
+      ],
+      "unknown_label": "Inconnu",
+      "unknown_color": "#475569"
+    },
+    "up_fraction": {
+      "label": "Séances positives",
+      "unit": "proportion 0–1",
+      "bounds": [
+        0.4,
+        0.55,
+        0.7
+      ],
+      "labels": [
+        "Peu fréquentes",
+        "Partagées",
+        "Fréquentes",
+        "Très fréquentes"
+      ],
+      "colors": [
+        "#b91c1c",
+        "#9a3412",
+        "#1d4ed8",
+        "#166534"
+      ],
+      "unknown_label": "Inconnu",
+      "unknown_color": "#475569"
+    },
+    "largest_day": {
+      "label": "Meilleure séance",
+      "unit": "%",
+      "bounds": [
+        3,
+        7,
+        15
+      ],
+      "labels": [
+        "Limitée",
+        "Marquée",
+        "Forte",
+        "Très forte"
+      ],
+      "colors": [
+        "#166534",
+        "#1d4ed8",
+        "#9a3412",
+        "#b91c1c"
+      ],
+      "unknown_label": "Inconnu",
+      "unknown_color": "#475569"
+    },
+    "worst_day": {
+      "label": "Pire séance",
+      "unit": "%",
+      "bounds": [
+        -10,
+        -5,
+        -2
+      ],
+      "labels": [
+        "Très forte baisse",
+        "Forte baisse",
+        "Baisse modérée",
+        "Baisse limitée"
+      ],
+      "colors": [
+        "#b91c1c",
+        "#9a3412",
+        "#1d4ed8",
+        "#166534"
+      ],
+      "unknown_label": "Inconnu",
+      "unknown_color": "#475569"
+    },
+    "gain_share": {
+      "label": "Meilleure hausse log / hausses log positives",
+      "unit": "%",
+      "bounds": [
+        20,
+        40,
+        60
+      ],
+      "labels": [
+        "Répartie",
+        "Modérée",
+        "Concentrée",
+        "Très concentrée"
+      ],
+      "colors": [
+        "#166534",
+        "#1d4ed8",
+        "#9a3412",
+        "#b91c1c"
+      ],
+      "unknown_label": "Inconnu",
+      "unknown_color": "#475569"
+    },
+    "gain_net_share": {
+      "label": "Meilleure hausse simple / gain net simple",
+      "unit": "%",
+      "bounds": [
+        25,
+        50,
+        100
+      ],
+      "labels": [
+        "Limitée",
+        "Modérée",
+        "Importante",
+        "Supérieure au gain net"
+      ],
+      "colors": [
+        "#166534",
+        "#1d4ed8",
+        "#9a3412",
+        "#b91c1c"
+      ],
+      "unknown_label": "Inconnu",
+      "unknown_color": "#475569"
+    },
+    "log_net_share": {
+      "label": "Meilleure hausse log / gain net log",
+      "unit": "%",
+      "bounds": [
+        25,
+        50,
+        100
+      ],
+      "labels": [
+        "Limitée",
+        "Modérée",
+        "Importante",
+        "Supérieure au gain net"
+      ],
+      "colors": [
+        "#166534",
+        "#1d4ed8",
+        "#9a3412",
+        "#b91c1c"
+      ],
+      "unknown_label": "Inconnu",
+      "unknown_color": "#475569"
+    },
+    "drawdown": {
+      "label": "Repli maximal",
+      "unit": "%",
+      "bounds": [
+        5,
+        10,
+        20
+      ],
+      "labels": [
+        "Faible",
+        "Modéré",
+        "Élevé",
+        "Très élevé"
+      ],
+      "colors": [
+        "#166534",
+        "#1d4ed8",
+        "#9a3412",
+        "#b91c1c"
+      ],
+      "unknown_label": "Inconnu",
+      "unknown_color": "#475569"
+    },
+    "current_drawdown": {
+      "label": "Recul actuel",
+      "unit": "%",
+      "bounds": [
+        3,
+        7,
+        15
+      ],
+      "labels": [
+        "Proche du sommet",
+        "Repli",
+        "Recul marqué",
+        "Recul important"
+      ],
+      "colors": [
+        "#166534",
+        "#1d4ed8",
+        "#9a3412",
+        "#b91c1c"
+      ],
+      "unknown_label": "Inconnu",
+      "unknown_color": "#475569"
+    },
+    "er": {
+      "label": "Efficacité du chemin",
+      "unit": "−1 à 1",
+      "bounds": [
+        0,
+        0.3,
+        0.7
+      ],
+      "labels": [
+        "Négative ou nulle",
+        "Faible",
+        "Moyenne",
+        "Élevée"
+      ],
+      "colors": [
+        "#b91c1c",
+        "#9a3412",
+        "#1d4ed8",
+        "#166534"
+      ],
+      "unknown_label": "Inconnu",
+      "unknown_color": "#475569"
+    },
+    "perf": {
+      "label": "Rendement observé",
+      "unit": "%",
+      "bounds": [
+        0,
+        5,
+        15
+      ],
+      "labels": [
+        "Nul ou négatif",
+        "Hausse limitée",
+        "Hausse marquée",
+        "Hausse forte"
+      ],
+      "colors": [
+        "#b91c1c",
+        "#9a3412",
+        "#1d4ed8",
+        "#166534"
+      ],
+      "unknown_label": "Inconnu",
+      "unknown_color": "#475569"
+    },
+    "coverage": {
+      "label": "Couverture",
+      "unit": "proportion 0–1",
+      "bounds": [
+        0,
+        0.999999
+      ],
+      "labels": [
+        "Absente",
+        "Partielle",
+        "Complète"
+      ],
+      "colors": [
+        "#475569",
+        "#9a3412",
+        "#166534"
+      ],
+      "unknown_label": "Inconnu",
+      "unknown_color": "#475569"
+    },
+    "freshness": {
+      "label": "Fraîcheur des clôtures",
+      "unit": "code 0 récent / 1 ancien",
+      "bounds": [
+        0.5
+      ],
+      "labels": [
+        "À jour",
+        "Ancienne"
+      ],
+      "colors": [
+        "#166534",
+        "#9a3412"
+      ],
+      "unknown_label": "Inconnu",
+      "unknown_color": "#475569"
+    },
+    "quality": {
+      "label": "Continuité des données",
+      "unit": "code 0 complète / 1 partielle / 2 rupture",
+      "bounds": [
+        0.5,
+        1.5
+      ],
+      "labels": [
+        "Complète",
+        "Partielle",
+        "Rupture"
+      ],
+      "colors": [
+        "#166534",
+        "#9a3412",
+        "#b91c1c"
+      ],
+      "unknown_label": "Inconnu",
+      "unknown_color": "#475569"
+    }
+  }
+}

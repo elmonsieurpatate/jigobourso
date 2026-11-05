@@ -1,0 +1,22 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
+const root=path.join(__dirname,'../../app/public/assets'),env={window:{},Intl};
+for(const file of['admin-categories-demo.js','admin-categories-model.js'])vm.runInNewContext(fs.readFileSync(path.join(root,file),'utf8'),env);
+const M=env.window.AdminCategoryModel,seed=env.window.AdminCategoryDemo,original=JSON.stringify(seed),vol=M.copy(seed.indicators.find(x=>x.id==='volatility'));
+assert.equal(seed.filters.length,13);assert.equal(seed.filters.filter(f=>f.editable).length,9);assert.equal(seed.filters.filter(f=>!f.editable).length,4);assert.ok(seed.filters.filter(f=>!f.editable).every(f=>f.measures.length===0&&f.provenance&&f.examples.length));
+for(const i of seed.indicators){const r=M.validate(i,i.categories);assert.equal(r.valid,true,i.id);assert.equal(r.warnings.length,0,i.id);}
+const a=M.copy(vol.categories);a[2].min=4;a[2].max=2;assert.ok(M.validate(vol,a).errors[a[2].id].min);assert.ok(M.validate(vol,a).errors[a[2].id].max);
+const split=M.copy(vol.categories);split[2].max=2;let r=M.validate(vol,split);assert.equal(r.valid,true);assert.ok(r.warnings.some(x=>x.includes('non couvert')));
+split.push({id:'split',name:'Intermédiaire',description:'Explication locale.',min:2,max:3,minIncluded:false,maxIncluded:true,color:'#aa88dd',active:true,unknown:false,values:[]});r=M.validate(vol,split);assert.equal(r.valid,true);assert.equal(r.warnings.length,0);
+split.at(-1).minIncluded=true;r=M.validate(vol,split);assert.equal(r.valid,false);assert.match(r.errors.split.min,/Chevauchement/);
+split.at(-1).active=false;assert.equal(M.validate(vol,split).valid,true);
+const point=M.copy(vol.categories);point[2].min=point[2].max=2;point[2].minIncluded=false;assert.equal(M.validate(vol,point).valid,false);
+const unknown=M.copy(vol.categories);unknown.push({...M.copy(unknown.at(-1)),id:'duplicate',name:'Absence bis'});assert.match(M.validate(vol,unknown).errors.duplicate.unknown,/seule/);
+const badUnknown=M.copy(vol.categories);badUnknown.at(-1).min=0;assert.match(M.validate(vol,badUnknown).errors[badUnknown.at(-1).id].unknown,/ni borne/);
+assert.ok(M.validate(vol,vol.categories.filter(x=>!x.unknown)).warnings.some(x=>x.includes('absentes')));
+const names=M.copy(vol.categories);names[1].name=' très faible ';assert.equal(M.validate(vol,names).valid,false);
+const bad=M.copy(vol.categories);bad[2].min=NaN;bad[2].description='x'.repeat(181);bad[2].color='url(bad)';r=M.validate(vol,bad);assert.ok(r.errors[bad[2].id].min&&r.errors[bad[2].id].description&&r.errors[bad[2].id].color);
+const quality=M.copy(seed.indicators.find(x=>x.id==='quality'));quality.categories[0].values.push('1');assert.ok(M.validate(quality,quality.categories).errors[quality.categories[0].id].values);
+const returns=seed.filters.find(f=>f.id==='returns');assert.equal(returns.measures.length,3);const own=M.copy(returns);own.measures[0].categories[0].name='Semaine personnalisée';assert.notEqual(own.measures[0].categories[0].name,own.measures[1].categories[0].name);
+assert.equal(seed.filters.find(f=>f.id==='concentration').measures.length,3);assert.equal(seed.filters.find(f=>f.id==='spikes').measures.length,2);
+assert.equal(M.validate(vol,[...vol.categories].reverse()).valid,true);assert.equal(M.validate(vol,[...vol.categories].reverse()).warnings.length,0);assert.equal(JSON.stringify(seed),original);
+console.log('PASS : 13 filtres (9 éditables/4 sources), unités et mesures distinctes, catégories, bornes, inconnue, états, explications, ordre indépendant, horizons isolés, données initiales immuables.');

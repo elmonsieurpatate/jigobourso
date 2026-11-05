@@ -136,6 +136,7 @@ J.ICONS = {
 J.icon = (n, cls = 'ic') => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">${J.ICONS[n]}</svg>`;
 J.NAV = (admin) => [
   { sec: 'Marchés' },
+  { id: 'classement-test', label: 'Classement test', icon: 'chart', file: ['classement-test.html'], href: 'classement-test.html' },
   { id: 'explorer', label: 'Explorer', icon: 'compass', file: ['index.html', 'titre.html', 'mes-filtres.html'], children: [
     { label: 'Classement', href: 'index.html', on: q => !q.has('kind') && !q.has('compare') && !q.has('preset') && !q.has('manage') && !q.has('edit') },
     { label: 'Comparer actions / ETF', href: 'index.html?compare=1', on: q => q.has('compare') },
@@ -148,7 +149,7 @@ J.NAV = (admin) => [
   { id: 'suivi', label: 'Suivi des classements', icon: 'pulse', file: ['suivi.html'], href: 'suivi.html' },
   { id: 'donnees', label: 'Données', icon: 'db', file: ['donnees.html'], children: [
     { label: 'Sources et fraîcheur', href: 'donnees.html', on: (q, h) => h !== '#places' }, { label: 'Couverture par place', href: 'donnees.html#places', on: (q, h) => h === '#places' }] },
-  ...(admin ? [{ sec: 'Administration' }, { id: 'admin', label: 'Administration', icon: 'shield', file: ['admin.html'], children: [
+  ...(admin ? [{ sec: 'Administration' }, { id: 'admin-categories-test', label: 'Filtres et catégories · test', icon: 'panel', file: ['admin-categories-test.html'], href: 'admin-categories-test.html' }, { id: 'admin', label: 'Administration', icon: 'shield', file: ['admin.html'], children: [
     { label: 'FinanceDatabase', href: 'admin.html#fdb', on: (q, h) => !h || h === '#fdb' }, { label: 'Yahoo Finance', href: 'admin.html#yahoo', on: (q, h) => h === '#yahoo' },
     { label: 'Actions / ETF', href: 'admin.html#titres', on: (q, h) => h === '#titres' }, { label: 'Cron', href: 'admin.html#cron', on: (q, h) => h === '#cron' }, { label: 'Journaux', href: 'admin.html#logs', on: (q, h) => h === '#logs' },
     { label: 'Utilisateurs', href: 'admin.html#users', on: (q, h) => h === '#users' }, { label: 'Réglages', href: 'admin.html#settings', on: (q, h) => h === '#settings' }] }] : []),
