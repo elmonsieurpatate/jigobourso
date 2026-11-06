@@ -70,7 +70,7 @@ def test_explorer_cache_is_identical_and_invalidated():
     first = service.explore(conn, request)
     with conn.cursor() as cur:
         cur.execute('SELECT COUNT(*) n FROM result_cache')
-        assert cur.fetchone()['n'] == 1
+        assert cur.fetchone()['n'] == 2                                 # verdicts de la configuration + scores globaux (indépendants des filtres)
     assert service.explore(conn, request) == first                      # lecture du cache
     with conn.cursor() as cur:
         cur.execute('DELETE FROM result_cache')
