@@ -202,12 +202,12 @@ def store_gap_bars(conn, r, data, now):
         cur.execute('SELECT price_date FROM daily_prices WHERE listing_id=%s', (r['listing_id'],))
         have = {x['price_date'] for x in cur.fetchall()}
         out = {}
-        for ts, _o, _h, _l, close, _v in data['bars']:
+        for ts, _o, _h, _l, close, volume in data['bars']:
             day = local_date(ts, data['timezone'])
             if day not in have and hours.is_settled(r['mic'], day, now):
-                out[day] = close
+                out[day] = (close, volume)                    # le volume de la même barre est conservé (None si Yahoo n'en donne pas : jamais zéro inventé)
         if out:
-            cur.executemany('INSERT IGNORE INTO daily_prices(listing_id,price_date,close_px) VALUES (%s,%s,%s)', [(r['listing_id'], d, c) for d, c in out.items()])
+            cur.executemany('INSERT IGNORE INTO daily_prices(listing_id,price_date,close_px,volume) VALUES (%s,%s,%s,%s)', [(r['listing_id'], d, c, v) for d, (c, v) in out.items()])
     conn.commit()
     return len(out)
 
@@ -289,6 +289,162 @@ def fill_gaps_batch(conn, client, rows, now, limit=GAP_LIMIT, budget_s=GAP_BUDGE
             pool.shutdown()
     save_tried()
     return {'candidates': len(todo), 'examined': done, 'added': added, 'remaining': len(todo) - done, 'rate_limited': limited}
+
+
+# ───────── volumes quotidiens (Yahoo Chart) ─────────
+# Les clôtures viennent de Spark (sans volume) : le volume d'une séance s'obtient par un appel Chart par titre, la même mécanique que les clôtures manquantes
+# (un fil de travail par appel Yahoo, écriture en base dans le fil principal, arrêt au premier 429, reprise). Seul `daily_prices.volume` est écrit : jamais un cours.
+VOLUME_BUDGET_S = 90           # temps d'un passage de maintenance ; le rattrapage manuel n'a pas ce plafond
+VOLUME_BACKFILL_RANGE = '1y'   # titre jamais interrogé : un an de volumes en un appel
+VOLUME_REFRESH_RANGE = '1mo'   # titre déjà interrogé : nouvelles séances + deux dernières séances à consolider
+VOLUME_REFRESH_SESSIONS = 2    # le volume d'une séance fraîchement réglée peut encore bouger : les deux dernières séances sont relues
+VOLUME_RETRY_HOURS = 6         # un titre sans volume exploitable (ou en échec) n'est pas redemandé avant ce délai
+VOLUME_ERRORS = 'volume_errors'
+
+
+def store_volumes(conn, r, data, now, refresh=VOLUME_REFRESH_SESSIONS):
+    """Écrit les volumes d'une réponse Chart pour un titre. Jamais un cours : seul `volume` est mis à jour, sur une séance DÉJÀ en base et RÉGLÉE
+    (une séance en cours n'est jamais enregistrée). Un volume absent chez Yahoo reste NULL ; un volume égal à zéro est une donnée valide (aucun échange).
+    Écrit quand le volume est vide, et relit les `refresh` dernières séances du titre (volume consolidé). Renvoie le nombre de volumes écrits."""
+    lid = r['listing_id']
+    by_day = {}
+    for ts, _o, _h, _l, _close, volume in (data or {}).get('bars') or []:
+        day = local_date(ts, data['timezone'])
+        if volume is not None and hours.is_settled(r['mic'], day, now):
+            by_day[day] = volume
+    with conn.cursor() as cur:
+        cur.execute('SELECT price_date, close_px, volume FROM daily_prices WHERE listing_id=%s ORDER BY price_date', (lid,))
+        have = cur.fetchall()
+        recent = {x['price_date'] for x in have[-refresh:]}
+        out = [(lid, x['price_date'], x['close_px'], by_day[x['price_date']]) for x in have
+               if x['price_date'] in by_day and (x['volume'] is None or (x['price_date'] in recent and x['volume'] != by_day[x['price_date']]))]
+        if out:
+            # close_px est relu tel quel et ne figure pas dans la clause de mise à jour : la clôture enregistrée ne peut pas changer
+            cur.executemany('INSERT INTO daily_prices(listing_id,price_date,close_px,volume) VALUES (%s,%s,%s,%s) ON DUPLICATE KEY UPDATE volume=VALUES(volume)', out)
+        stamp = naive_utc(now)
+        cur.execute('INSERT INTO liquidity_state(listing_id,computed_at,volume_checked_at) VALUES (%s,%s,%s) ON DUPLICATE KEY UPDATE volume_checked_at=VALUES(volume_checked_at)', (lid, stamp, stamp))
+    conn.commit()
+    return len(out)
+
+
+def volume_candidates(conn, rows, now, since=None):
+    """Titres à interroger, [(listing_id, fenêtre Yahoo)], les jamais interrogés d'abord puis les plus anciennement interrogés.
+    Automatique (since=None) : jamais interrogé (un an), ou une séance a été réglée depuis la dernière interrogation, ou la dernière clôture n'a toujours pas de volume
+    (relance au plus toutes les VOLUME_RETRY_HOURS) ; tous deux sur la fenêtre courte. Rattrapage (since=date) : tout titre non interrogé depuis `since`, sur un an."""
+    by_id = {r['listing_id']: r for r in rows}
+    if since is not None and since.tzinfo is not None:
+        since = naive_utc(since)
+    checked, lastnull = {}, set()
+    with conn.cursor() as cur:
+        for part in _batches(list(by_id), CHUNK):
+            marks = ','.join(['%s'] * len(part))
+            cur.execute(f'SELECT listing_id, volume_checked_at FROM liquidity_state WHERE listing_id IN ({marks})', part)
+            checked.update({x['listing_id']: x['volume_checked_at'] for x in cur.fetchall()})
+            if since is None:
+                cur.execute(f"""SELECT d.listing_id FROM daily_prices d JOIN (SELECT listing_id, MAX(price_date) m FROM daily_prices WHERE listing_id IN ({marks}) GROUP BY listing_id) x
+                                ON x.listing_id=d.listing_id AND x.m=d.price_date WHERE d.volume IS NULL""", part)
+                lastnull.update(x['listing_id'] for x in cur.fetchall())
+    stamp = naive_utc(now)
+    retry_before = stamp - datetime.timedelta(hours=VOLUME_RETRY_HOURS)
+    thresholds = {}
+    todo = []
+    for lid, r in by_id.items():
+        at = checked.get(lid)
+        if since is not None:
+            if at is None or at < since:
+                todo.append((at is not None, at or datetime.datetime.min, lid, VOLUME_BACKFILL_RANGE))
+            continue
+        if at is None:
+            todo.append((False, datetime.datetime.min, lid, VOLUME_BACKFILL_RANGE))
+            continue
+        if r['mic'] not in thresholds:
+            try:
+                thresholds[r['mic']] = hours.settle_utc(r['mic'], latest_settled(r['mic'], now))
+            except Exception:                                                              # noqa: BLE001 : place sans horaires connus : au plus un passage par jour
+                thresholds[r['mic']] = stamp - datetime.timedelta(days=1)
+        if at < thresholds[r['mic']] or (lid in lastnull and at < retry_before):
+            todo.append((True, at, lid, VOLUME_REFRESH_RANGE))
+    todo.sort(key=lambda t: (t[0], t[1], t[2]))
+    return [(lid, rng) for _a, _b, lid, rng in todo]
+
+
+def fill_volumes_batch(conn, client, rows, now, limit=100000, budget_s=VOLUME_BUDGET_S, since=None, progress=None, workers=1, client_factory=None):
+    """Volumes quotidiens des titres du jeu de collecte. Un appel Chart par titre, `workers` appels en parallèle (chacun avec sa propre session Yahoo, donc sa pause de 0,3 s) ;
+    les écritures restent dans le fil principal, un titre à la fois (commit par titre : une interruption ne perd que le titre en cours). Arrêt au premier 429 (le titre n'est
+    pas marqué : il sera repris), au budget de temps, ou à `limit`. Un échec isolé n'arrête pas les autres titres ; il est repris à la fin du passage (une fois), puis au passage suivant.
+    Reprise : un titre marqué (`liquidity_state.volume_checked_at`) n'est plus candidat avant la prochaine séance réglée (ou, en rattrapage, avant `since`)."""
+    from engine.shared.db import ensure
+    by_id = {r['listing_id']: r for r in rows}
+    plan = volume_candidates(conn, rows, now, since)
+    errors_seen = setting(conn, VOLUME_ERRORS, {})
+    stamp_s = naive_utc(now).strftime('%Y-%m-%dT%H')
+    cutoff = naive_utc(now) - datetime.timedelta(hours=VOLUME_RETRY_HOURS)
+    if since is None:                                       # le passage automatique n'insiste pas sur un titre en échec récent
+        plan = [(i, g) for i, g in plan if not (errors_seen.get(str(i)) and datetime.datetime.strptime(errors_seen[str(i)], '%Y-%m-%dT%H') > cutoff)]
+    todo = plan[:limit]
+    started = time.monotonic()
+    local = threading.local()
+    stats = {'candidates': len(plan), 'examined': 0, 'written': 0, 'without_volume': 0, 'errors': 0, 'retried': 0, 'rate_limited': False}
+    failed = []
+
+    def fetch(item):
+        lid, rng = item
+        c = client
+        if workers > 1:
+            if not hasattr(local, 'client'):
+                local.client = client_factory()
+            c = local.client
+        try:
+            return lid, c.chart(by_id[lid]['symbol'], rng, '1d'), None
+        except Exception as e:                                                             # noqa: BLE001
+            return lid, None, e
+
+    def handle(results):
+        for lid, data, err in results:
+            if isinstance(err, RateLimited):
+                stats['rate_limited'] = True
+                continue                                                                   # non marqué : repris au prochain passage
+            if err is not None or not data or not data.get('bars'):
+                if err is not None or data is None:
+                    failed.append(lid)
+                    continue
+            ensure(conn)                                                                   # la connexion a pu être fermée pendant l'attente de Yahoo (20 s d'inactivité)
+            n = store_volumes(conn, by_id[lid], data, now)
+            stats['examined'] += 1
+            stats['written'] += n
+            if not n and not any(b[5] is not None for b in (data or {}).get('bars') or []):
+                stats['without_volume'] += 1
+            errors_seen.pop(str(lid), None)
+            if progress:
+                progress(stats['examined'], len(todo))
+
+    def run_pass(items):
+        pool = ThreadPoolExecutor(max_workers=workers) if workers > 1 else None
+        chunk = workers * 4 if workers > 1 else 1
+        try:
+            for start in range(0, len(items), chunk):
+                if time.monotonic() - started > budget_s or stats['rate_limited']:
+                    return
+                part = items[start:start + chunk]
+                handle(list(pool.map(fetch, part)) if pool else [fetch(i) for i in part])
+        finally:
+            if pool:
+                pool.shutdown()
+
+    run_pass(todo)
+    if failed and not stats['rate_limited'] and time.monotonic() - started <= budget_s:     # reprise des échecs une fois, en fin de passage
+        again, failed[:] = [(i, g) for i, g in todo if i in set(failed)], []
+        stats['retried'] = len(again)
+        run_pass(again)
+    for lid in failed:
+        errors_seen[str(lid)] = stamp_s
+    stats['errors'] = len(failed)
+    keep = {k: v for k, v in errors_seen.items() if datetime.datetime.strptime(v, '%Y-%m-%dT%H') > cutoff - datetime.timedelta(days=1)}
+    with conn.cursor() as cur:
+        cur.execute('INSERT INTO settings(name, value_json, updated_at) VALUES (%s,%s,%s) ON DUPLICATE KEY UPDATE value_json=VALUES(value_json), updated_at=VALUES(updated_at)', (VOLUME_ERRORS, json.dumps(keep), naive_utc(now)))
+    conn.commit()
+    stats['remaining'] = max(0, len(plan) - stats['examined'] - len(failed))
+    return stats
 
 
 def collect_daily(conn, client, rows, now, range_='2y', progress=None):

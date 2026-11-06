@@ -60,7 +60,7 @@ def test_database_socket_replaces_host_for_isolated_tests(monkeypatch):
         db.connect()
 
 
-STEPS = ('backup', 'quotes', 'fx', 'fx_history', 'gaps', 'detect', 'verify', 'recheck', 'compute', 'warm', 'etf', 'snapshot', 'outcomes', 'prune', 'housekeeping')
+STEPS = ('backup', 'quotes', 'fx', 'fx_history', 'gaps', 'volumes', 'detect', 'verify', 'recheck', 'compute', 'warm', 'etf', 'snapshot', 'outcomes', 'prune', 'housekeeping')
 
 
 @pytest.fixture
@@ -81,6 +81,8 @@ def plan(monkeypatch):
     monkeypatch.setattr(tasks.collect, 'refresh_fx', step('fx'))
     monkeypatch.setattr(tasks.collect, 'backfill_fx', step('fx_history', 0))
     monkeypatch.setattr(tasks.collect, 'fill_gaps_batch', step('gaps', {'added': 2, 'examined': 1, 'remaining': 0, 'rate_limited': False}))
+    monkeypatch.setattr(tasks.collect, 'fill_volumes_batch', step('volumes', {'examined': 5, 'written': 40, 'without_volume': 1, 'errors': 0, 'remaining': 0, 'rate_limited': False}))
+    monkeypatch.setattr(tasks, '_volumes_job_running', lambda conn: False)
     monkeypatch.setattr(tasks.splits, 'detect', step('detect', 0))
     monkeypatch.setattr(tasks.splits, 'verify', step('verify', {'confirmed': 0, 'real_move': 0, 'unanswered': 0}))
     monkeypatch.setattr(tasks.splits, 'recheck', step('recheck', {'rechecked': 0, 'confirmed': 0, 'unanswered': 0, 'waiting': 0}))
@@ -100,7 +102,7 @@ def plan(monkeypatch):
 def test_maintenance_runs_everything_and_the_backup_comes_first(plan):
     calls, fail, pending, logs, log = plan
     ok, errors, summary = tasks.maintenance(Conn(), object(), None, log)
-    assert calls[0] == 'backup' and calls == ['backup', 'quotes', 'fx', 'fx_history', 'gaps', 'detect', 'verify', 'recheck', 'compute', 'warm', 'etf', 'snapshot', 'outcomes', 'prune', 'housekeeping']
+    assert calls[0] == 'backup' and calls == ['backup', 'quotes', 'fx', 'fx_history', 'gaps', 'volumes', 'detect', 'verify', 'recheck', 'compute', 'warm', 'etf', 'snapshot', 'outcomes', 'prune', 'housekeeping']
     assert errors == 0 and pending['maintenance_pending'] is False and 'séries 9612' in summary and 'en échec' not in summary
 
 
@@ -185,3 +187,18 @@ def test_manual_gap_fill_is_a_registered_job_on_the_whole_catalogue(monkeypatch)
     monkeypatch.setattr(tasks.compute, 'compute_all', lambda *a: (2, 10))
     assert tasks.gaps_all(None, object(), None, object())[0] == 2
     assert seen['force'] is True and seen['limit'] == 2
+
+
+def test_maintenance_skips_the_volume_step_while_the_manual_catchup_runs(plan, monkeypatch):
+    calls, fail, pending, logs, log = plan
+    monkeypatch.setattr(tasks, '_volumes_job_running', lambda conn: True)
+    ok, errors, summary = tasks.maintenance(Conn(), object(), None, log)
+    assert 'volumes' not in calls and 'compute' in calls and errors == 0       # pas de doublon d'appels Yahoo ; le reste continue
+
+
+def test_a_volume_failure_is_a_real_error_with_its_location_and_blocks_nothing(plan):
+    calls, fail, pending, logs, log = plan
+    fail['volumes'] = RuntimeError('Yahoo illisible')
+    ok, errors, summary = tasks.maintenance(Conn(), object(), None, log)
+    assert errors == 1 and 'Volumes quotidiens' in summary and 'compute' in calls and pending['maintenance_pending'] is True
+    assert any(lvl == 'error' and 'Volumes quotidiens' in msg and 'RuntimeError' in msg and '.py:' in msg for lvl, msg in logs)   # erreur non masquée, avec fichier:ligne

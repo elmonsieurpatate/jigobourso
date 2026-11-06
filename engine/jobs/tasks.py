@@ -32,6 +32,16 @@ def _step(log, name, fn, detail=None):
     return log.step(name, fn, detail) if hasattr(log, 'step') else fn()
 
 
+def _where(e):
+    """Ligne du code d'où vient l'erreur (fichier:ligne), pour pouvoir la retrouver dans le journal sans la masquer."""
+    tb = e.__traceback__
+    last = None
+    while tb is not None:
+        last = tb
+        tb = tb.tb_next
+    return f' [{os.path.basename(last.tb_frame.f_code.co_filename)}:{last.tb_lineno}]' if last else ''
+
+
 def _progress(log, label, total):
     done = [0]
 
@@ -218,8 +228,14 @@ def history_coverage(conn):
         cur.execute("""SELECT COUNT(*) titles, COALESCE(SUM(s.expected_252-s.observed_252),0) days, COALESCE(SUM(s.expected_252-s.observed_252<=2),0) small
                        FROM series_state s JOIN v_collect_set c ON c.listing_id=s.listing_id WHERE s.coverage_252<1 AND s.expected_252 IS NOT NULL""")
         g = cur.fetchone()
+        cur.execute("""SELECT COUNT(*) titles, COALESCE(SUM(l.volume_checked_at IS NOT NULL),0) checked, COALESCE(SUM(l.source='daily'),0) real_liq, MAX(l.volume_checked_at) last_at
+                       FROM v_collect_set c LEFT JOIN liquidity_state l ON l.listing_id=c.listing_id""")
+        v = cur.fetchone()
+    failing = len(collect.setting(conn, collect.VOLUME_ERRORS, {}))
     return {'absent': int(r['absent']), 'partial': int(r['partial']), 'complete': int(r['complete']), 'last_day': r['last_day'].isoformat() if r['last_day'] else None,
-            'gap_titles': int(g['titles']), 'gap_days': int(g['days']), 'gap_small': int(g['small'])}
+            'gap_titles': int(g['titles']), 'gap_days': int(g['days']), 'gap_small': int(g['small']),
+            'volume_titles': int(v['titles']), 'volume_checked': int(v['checked']), 'volume_real_liquidity': int(v['real_liq']), 'volume_errors': failing,
+            'volume_last': v['last_at'].isoformat() if v['last_at'] else None}
 
 
 def history(conn, client, now, log):
@@ -318,7 +334,7 @@ def maintenance(conn, client, now, log):
             ensure(conn)
             conn.rollback()
             failed.append(name)
-            log('warning' if isinstance(e, RateLimited) else 'error', f'{name} : {type(e).__name__}: {e}')
+            log('warning' if isinstance(e, RateLimited) else 'error', f'{name} : {type(e).__name__}: {e}{_where(e)}')
             return default
 
     # 1. L'irremplaçable d'abord : comptes, portefeuilles, transactions.
@@ -330,6 +346,12 @@ def maintenance(conn, client, now, log):
     attempt('Historique des taux de change', lambda: collect.backfill_fx(conn, client, now), lambda r: f'{r} taux ajoutés')
     attempt('Clôtures manquantes', lambda: collect.fill_gaps_batch(conn, client, rows, now),
             lambda r: f'{r["added"]} clôtures ajoutées sur {r["examined"]} titres examinés, {r["remaining"]} restent à examiner' + (' (limitation Yahoo : reprise au prochain passage)' if r['rate_limited'] else ''))
+    if _volumes_job_running(conn):
+        log('info', 'Volumes quotidiens : le rattrapage manuel est en cours, étape ignorée pour ne pas doubler les appels Yahoo')
+    else:
+        attempt('Volumes quotidiens', lambda: collect.fill_volumes_batch(conn, client, rows, now, workers=GAP_WORKERS, client_factory=type(client)),
+                lambda r: f'{r["examined"]} titres traités ({r["written"]} volumes écrits, {r["without_volume"]} sans volume chez Yahoo), {r["errors"]} en échec, {r["remaining"]} restent à traiter'
+                          + (' (limitation Yahoo : reprise au prochain passage)' if r['rate_limited'] else ''))
     attempt('Détection des sauts de cours', lambda: splits.detect(conn, now), lambda r: f'{r} nouveaux sauts ressemblant à un split')
     attempt('Splits déclarés par Yahoo', lambda: splits.verify(conn, client, now), lambda r: f'{r["confirmed"]} confirmés (cours corrigés), {r["real_move"]} non déclarés par Yahoo (revérifiés plus tard), {r["unanswered"]} sans réponse')
     attempt('Revérification des sauts non déclarés', lambda: splits.recheck(conn, client, now), lambda r: f'{r["rechecked"]} revérifiés, {r["confirmed"]} confirmés tardivement (cours corrigés), {r["unanswered"]} sans réponse, {r["waiting"]} en attente du prochain passage')
@@ -449,9 +471,9 @@ def tick(conn, client, now=None, trigger='cron'):
     return done
 
 
-JOBS = ('fdb_import', 'fdb_filter', 'yahoo_info', 'yahoo_filter', 'history', 'gaps')
+JOBS = ('fdb_import', 'fdb_filter', 'yahoo_info', 'yahoo_filter', 'history', 'gaps', 'volumes')
 MANUAL_LABELS = {'maintenance': 'Entretien après collecte', 'metrics': 'Indicateurs et classements', 'etf': 'Similarité des ETF', 'fdb_import': 'Import FinanceDatabase', 'fdb_filter': 'Filtrage FinanceDatabase', 'yahoo_info': 'Import des informations Yahoo',
-                 'yahoo_filter': 'Filtrage Yahoo', 'history': 'Import / mise à jour des historiques', 'gaps': 'Clôtures manquantes (tout le catalogue)'}
+                 'yahoo_filter': 'Filtrage Yahoo', 'history': 'Import / mise à jour des historiques', 'gaps': 'Clôtures manquantes (tout le catalogue)', 'volumes': 'Volumes quotidiens (tout le catalogue)'}
 
 
 def precheck(conn, name):
@@ -473,7 +495,7 @@ def precheck(conn, name):
         raise ValueError('Aucun titre à interroger : filtrez d’abord FinanceDatabase (étape 2).')
     if name == 'history' and not collect.collection_set(conn):
         raise ValueError('Le catalogue final est vide : filtrez d’abord Yahoo Finance (étape 4).')
-    if name == 'gaps' and not collect.collection_set(conn):
+    if name in ('gaps', 'volumes') and not collect.collection_set(conn):
         raise ValueError('Le catalogue final est vide : filtrez d’abord Yahoo Finance (étape 4).')
     if busy:
         raise ValueError(f'« {MANUAL_LABELS[busy["job_type"]]} » est déjà en cours : attendez sa fin.')
@@ -505,10 +527,34 @@ def gaps_all(conn, client, now, log):
     return r['examined'], int(r['rate_limited']), f'{r["added"]} clôtures ajoutées sur {r["examined"]} titres examinés sur {r["candidates"]} incomplets' + (' · limitation Yahoo, à relancer' if r['rate_limited'] else '')
 
 
+VOLUME_RESUME_HOURS = 12                                      # un titre déjà traité depuis moins de 12 h n'est pas redemandé par une relance du rattrapage (reprise sans perte)
+
+
+def _volumes_job_running(conn):
+    with conn.cursor() as cur:
+        cur.execute("SELECT 1 FROM jobs WHERE job_type='volumes' AND status IN ('queued','running') LIMIT 1")
+        return cur.fetchone() is not None
+
+
+def volumes_all(conn, client, now, log):
+    """« Volumes quotidiens » sur tout le catalogue : un an de volumes par titre, quatre fils Yahoo, sans plafond de temps ni de quantité ; relançable (les titres déjà traités sont sautés),
+    les échecs sont repris en fin de passage. Recalcule ensuite les indicateurs et classements (la liquidité passe de « estimée » à « réelle » dès que 15 des 20 dernières séances ont un volume)."""
+    rows = collect.collection_set(conn)
+    since = collect.naive_utc(now) - datetime.timedelta(hours=VOLUME_RESUME_HOURS)
+    r = _step(log, 'Volumes quotidiens', lambda: collect.fill_volumes_batch(conn, client, rows, now, limit=len(rows), budget_s=6 * 3600, since=since, workers=GAP_WORKERS, client_factory=type(client),
+                                                                 progress=lambda d, t: log.progress(f'Volumes quotidiens : {d} / {t} titres') if hasattr(log, 'progress') else None),
+              lambda r: f'{r["examined"]} titres traités sur {r["candidates"]}, {r["written"]} volumes écrits, {r["errors"]} en échec' + (' (limitation Yahoo : relancez plus tard)' if r['rate_limited'] else ''))
+    if r['written']:
+        _step(log, 'Indicateurs et classements', lambda: compute.compute_all(conn, now), lambda c: f'{c[0]} séries, {c[1]} lignes de mesures')
+    if not r['candidates']:
+        return 0, 0, 'rien à faire : tous les titres ont déjà leurs volumes à jour'
+    return r['examined'], r['errors'] + int(r['rate_limited']), f'{r["examined"]} titres traités sur {r["candidates"]}, {r["written"]} volumes écrits, {r["errors"]} en échec' + (' · limitation Yahoo, à relancer' if r['rate_limited'] else '')
+
+
 def run_manual(conn, client, name, now=None, trigger='admin'):
     """Lance un traitement de construction du catalogue (ou la collecte manuelle). Renvoie l'identifiant du traitement."""
     now = now or hours.utcnow()
     fns = {'fdb_import': lambda log: fdb_import(conn, log, now), 'fdb_filter': lambda log: fdb_filter(conn, log, now), 'yahoo_info': lambda log: yahoo_info(conn, client, now, log),
-           'yahoo_filter': lambda log: yahoo_filter(conn, log, now), 'history': lambda log: history(conn, client, now, log), 'gaps': lambda log: gaps_all(conn, client, now, log),
+           'yahoo_filter': lambda log: yahoo_filter(conn, log, now), 'history': lambda log: history(conn, client, now, log), 'gaps': lambda log: gaps_all(conn, client, now, log), 'volumes': lambda log: volumes_all(conn, client, now, log),
            'maintenance': lambda log: maintenance(conn, client, now, log), 'metrics': lambda log: _recompute(conn, now, log, 'metrics'), 'etf': lambda log: _recompute(conn, now, log, 'etf')}
     return run_job(conn, name, fns[name], trigger=trigger)

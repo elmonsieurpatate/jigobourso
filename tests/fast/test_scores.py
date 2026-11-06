@@ -139,7 +139,24 @@ def test_liquidity_is_a_global_indicator_counted_once():
 def test_liquidity_scale_is_absolute_and_logarithmic():
     assert SC.liquidity_note(2e6) == pytest.approx(0) and SC.liquidity_note(50e6) == pytest.approx(100)
     assert SC.liquidity_note(10e6) == pytest.approx(100 * math.log10(5) / math.log10(25))
-    assert SC.liquidity_note(None) is None and SC.liquidity_note(0) is None and SC.liquidity_note(1e9) == 100
+    assert SC.liquidity_note(None) is None and SC.liquidity_note(1e9) == 100
+
+
+def test_liquidity_note_distinguishes_positive_known_zero_and_unknown():
+    assert SC.liquidity_note(10e6) > 0                                    # liquidité positive : note normale
+    assert SC.liquidity_note(0) == 0.0 and SC.liquidity_note(0.0) == 0.0   # zéro réel (volumes connus, aucun échange) : note 0, pas « inconnu »
+    for unknown in (None, float('nan'), float('inf'), -1.0):               # absent, invalide ou négatif : inconnu
+        assert SC.liquidity_note(unknown) is None
+
+
+def test_known_zero_liquidity_counts_in_the_complex_score_but_unknown_is_left_out():
+    P_ = P(21)
+    inputs = {21: M(.7, .9, .6, .3, 2, 5, .1, .8)}
+    zero = SC.score_title(inputs, {'turnover_eur': 0.0, 'source': 'daily'}, P_)['complex']
+    unknown = SC.score_title(inputs, {'turnover_eur': None, 'source': None}, P_)['complex']
+    assert zero['contributions']['liquidity']['value'] == 0.0 and not zero['contributions']['liquidity'].get('unavailable')
+    assert unknown['contributions']['liquidity'].get('unavailable')
+    assert zero['score'] < unknown['score']                                # le zéro réel pèse (poids conservé) ; l'inconnu est renormalisé, ni bonus ni pénalité
 
 
 def test_recent_anchor_is_progressive_not_brutal():
@@ -328,3 +345,13 @@ def test_spike_share_criterion_in_path_metrics():
     m = path_metrics([100, 101, 140, 141, 142])
     assert m['spike_share'] == pytest.approx(math.log1p(140 / 101 - 1) / math.log(1.42))
     assert path_metrics([100, 99, 98])['spike_share'] == 1.0
+
+
+def test_real_zero_volumes_give_a_known_zero_turnover_not_unknown():
+    bars = [(10.0, 0)] * 20
+    r = LQ.liquidity(bars, 10.0, 500000, 1.0)
+    assert r == {'turnover_eur': 0.0, 'days': 20, 'source': 'daily'}      # 20 séances à volume nul : liquidité réelle nulle, pas l'estimation
+    few = LQ.liquidity([(10.0, 0)] * 5, 10.0, 500000, 1.0)
+    assert few['source'] == 'estimated' and few['turnover_eur'] == 10.0 * 500000   # moins de 15 séances à volume réel : repli sur l'estimation
+    nothing = LQ.liquidity([(10.0, None)] * 20, None, None, 1.0)
+    assert nothing['turnover_eur'] is None and nothing['source'] is None   # aucune donnée : inconnue

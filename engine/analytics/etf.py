@@ -414,6 +414,7 @@ def warm_profiles(conn, client, now, limit=WARM_LIMIT, budget_s=WARM_BUDGET_S):
                      WHERE i.kind='etf' AND l.status='selected' AND l.is_primary=1 ORDER BY l.id""")
         wanted += [dict(r, tier=3) for r in c.fetchall()]
     seen, todo = set(), []
+    ensure(conn)
     profiles = read_profiles(conn)
     stamp = now.replace(tzinfo=None, microsecond=0)
     for r in wanted:
@@ -439,6 +440,7 @@ def warm_profiles(conn, client, now, limit=WARM_LIMIT, budget_s=WARM_BUDGET_S):
         except Exception:                                                              # noqa: BLE001 : réponse absente ou illisible : réessai plus tard
             continue
         if state == 'ok' or r['id'] not in profiles:
+            ensure(conn)                                                               # la connexion a pu être fermée pendant l'attente de Yahoo (inactivité de 20 s sur l'hébergement)
             with conn.cursor() as c:
                 c.execute("""INSERT INTO etf_profiles(listing_id,fetched_at,version,state,data_json) VALUES (%s,%s,%s,%s,%s)
                              ON DUPLICATE KEY UPDATE fetched_at=VALUES(fetched_at), version=VALUES(version), state=VALUES(state), data_json=VALUES(data_json)""",

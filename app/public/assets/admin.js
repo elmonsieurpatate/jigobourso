@@ -8,12 +8,12 @@
   const TITLES = { fdb: 'FinanceDatabase', yahoo: 'Yahoo Finance', titres: 'Actions / ETF', cron: 'Cron', logs: 'Journaux', users: 'Utilisateurs', scores: 'Configuration des scores (V4)', settings: 'Réglages' };
   const STATE = { completed: ['ok', 'Terminé'], completed_with_errors: ['wait', 'Terminé avec erreurs'], failed: ['ko', 'Échec'], running: ['info', 'En cours'], queued: ['info', 'En attente'], paused: ['wait', 'En pause'], interrupted: ['ko', 'Interrompu'] };
   const TSTATE = { ok: ['ok', 'Fonctionne'], late: ['wait', 'En retard'], error: ['ko', 'En erreur'], inactive: ['', 'Désactivée'], never: ['wait', 'Jamais exécutée'], running: ['info', 'En cours'] };
-  const JOBNAME = { fdb_import: 'Import FinanceDatabase', fdb_filter: 'Filtrage FinanceDatabase', yahoo_info: 'Import des informations Yahoo', yahoo_filter: 'Filtrage Yahoo', history: 'Import / mise à jour des historiques',
+  const JOBNAME = { fdb_import: 'Import FinanceDatabase', fdb_filter: 'Filtrage FinanceDatabase', yahoo_info: 'Import des informations Yahoo', yahoo_filter: 'Filtrage Yahoo', history: 'Import / mise à jour des historiques', gaps: 'Clôtures manquantes', volumes: 'Volumes quotidiens',
     metrics: 'Indicateurs et classements', etf: 'Similarité des ETF', maintenance: 'Entretien après collecte', catchup: 'Rattrapage des données manquantes', intraday: 'Barres de 15 min', daily: 'Clôtures quotidiennes', catalogue: 'Import FinanceDatabase (ancien)', nightly: 'Analyse de nuit (ancienne)' };
   const jobName = t => JOBNAME[t] || (t.includes(':') ? (JOBNAME[t.split(':')[0]] || t.split(':')[0]) + ' · ' + t.split(':')[1] : t);
   const nf = v => v == null ? '–' : J.num(+v, 0);
   const dur = s => s == null ? '–' : s < 90 ? Math.round(s) + ' s' : s < 5400 ? Math.round(s / 60) + ' min' : (s / 3600).toFixed(1).replace('.', ',') + ' h';
-  const MANUAL = ['fdb_import', 'fdb_filter', 'yahoo_info', 'yahoo_filter', 'history', 'gaps', 'maintenance', 'metrics', 'etf'];
+  const MANUAL = ['fdb_import', 'fdb_filter', 'yahoo_info', 'yahoo_filter', 'history', 'gaps', 'volumes', 'maintenance', 'metrics', 'etf'];
 
   async function render() {
     page.innerHTML = '<div class="empty"><span class="spinner"></span></div>';
@@ -204,6 +204,8 @@
         <p class="small muted" style="margin:8px 0">Cotations principales retenues : ${nf(fin.total)}${fin.held_extra ? ` · ${fin.held_extra} titre(s) détenu(s) hors catalogue, toujours valorisés` : ''}. Dernière séance en base : ${cov.last_day ? J.date(cov.last_day) : '–'}. Dernière mise à jour des historiques : <b>${hist ? J.dateTime(hist.finished_at || hist.started_at) : 'jamais'}</b>.</p>
         <button class="btn primary" id="go-history" style="font-size:16px;padding:12px 20px" ${fin.total ? '' : 'disabled title="Le catalogue final est vide : filtrez d’abord Yahoo"'}>Importer / mettre à jour les historiques</button>
         <button class="btn" id="go-gaps" style="margin-left:8px" ${fin.total ? '' : 'disabled'} title="Un appel Yahoo par titre dont l’année est incomplète">Combler les clôtures manquantes</button>
+        <button class="btn" id="go-volumes" style="margin-left:8px" ${fin.total ? '' : 'disabled'} title="Un appel Yahoo par titre : un an de volumes quotidiens">Collecter les volumes quotidiens</button>
+        <p class="small" style="margin:6px 0 0">Volumes quotidiens : <b>${nf(cov.volume_checked)}</b> titres traités sur <b>${nf(cov.volume_titles)}</b> · liquidité réelle pour <b>${nf(cov.volume_real_liquidity)}</b> titres · <span class="${cov.volume_errors ? 'warn' : ''}">${nf(cov.volume_errors)} en échec (repris automatiquement)</span> · dernière collecte : <b>${cov.volume_last ? J.dateTime(cov.volume_last) : 'jamais'}</b>. L’entretien automatique renouvelle les volumes à chaque nouvelle séance.</p>
         <p class="small" style="margin:6px 0 0">Clôtures manquantes sur la dernière année : <b>${nf(cov.gap_days)}</b> séances sur <b>${nf(cov.gap_titles)}</b> titres${cov.gap_titles ? ` (dont ${nf(cov.gap_small)} titres à 1 ou 2 séances seulement)` : ''}. Un titre déjà essayé aujourd’hui n’est pas redemandé : s’il reste incomplet, c’est que Yahoo n’a pas ces jours.</p>
         <p class="small muted" style="margin:8px 0 0">Récupère les clôtures quotidiennes manquantes (jusqu’à ${fin.full} séances, sans retélécharger l’existant), complète les barres de 15 minutes des deux dernières séances, puis recalcule les indicateurs. Le cron entretient ensuite ces historiques automatiquement.</p>
         ${h ? `<h3 style="margin:16px 0 6px">Résultat de la dernière mise à jour</h3><div class="table-wrap"><table><thead><tr><th></th><th class="num">Titres</th><th class="num">Déjà à jour</th><th class="num">Interrogés</th><th class="num">Données ajoutées</th><th class="num">Déjà présentes</th><th class="num">Sans réponse</th></tr></thead><tbody>
@@ -216,6 +218,7 @@
     J.$('#go-reset').onclick = async () => { if (await J.confirm('Valeurs par défaut', 'Les filtres Yahoo reviennent à leur configuration d’origine (non appliquée tant que vous ne cliquez pas sur « Filtrer »).', 'Restaurer')) { await J.post('admin/rules/reset', { level: 'prefilter' }); render(); } };
     J.$('#go-history').onclick = () => run('history', 'Importer / mettre à jour les historiques', 'Travaille sur les ' + nf(fin.total) + ' titres du catalogue final. Ça peut durer longtemps la première fois ; la progression s’affiche en haut de page.');
     J.$('#go-gaps').onclick = () => run('gaps', 'Combler les clôtures manquantes', 'Interroge Yahoo (un appel par titre) pour chaque titre dont la dernière année a des séances manquantes, ajoute uniquement les jours absents, puis recalcule les indicateurs. Plusieurs minutes ; reprenable si Yahoo limite les appels.');
+    J.$('#go-volumes').onclick = () => run('volumes', 'Collecter les volumes quotidiens', 'Interroge Yahoo (un appel par titre, 4 en parallèle) pour récupérer un an de volumes quotidiens, sans toucher aux clôtures, puis recalcule liquidités, indicateurs et classements. Reprenable : les titres déjà traités sont sautés.');
     bindFunnel('yahoo', f.steps, f.run); explainBox(J.$('#explain'));
   }
 

@@ -79,8 +79,12 @@ def resolve_weights(periods, kappa=KAPPA):
 
 
 def liquidity_note(turnover_eur):
-    if turnover_eur is None or not math.isfinite(turnover_eur) or turnover_eur <= 0:
+    """Note 0-100 de la valeur échangée par jour. Donnée absente ou invalide (None, non finie, négative) : inconnue (None), la composante sort du calcul.
+    Valeur connue égale à zéro (volumes réels, aucun échange) : note 0, qui compte dans le calcul."""
+    if turnover_eur is None or not math.isfinite(turnover_eur) or turnover_eur < 0:
         return None
+    if turnover_eur == 0:
+        return 0.0
     return 100 * clamp(math.log10(max(turnover_eur, 1) / LIQUIDITY_FLOOR_EUR) / math.log10(LIQUIDITY_CEIL_EUR / LIQUIDITY_FLOOR_EUR))
 
 
