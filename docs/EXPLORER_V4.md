@@ -232,7 +232,7 @@ Les scénarios B à J ont des parcours Chromium dans
 Le scénario A exact V1 reste bloqué pour les raisons ci-dessus. Les autres suites
 navigateur conservent les contrôles financiers, ETF, portefeuilles et comptes.
 
-Le workflow `explorer-review.yml` exécute la validation sur pull request, sans
+Le workflow `pr-validation.yml` exécute la validation sur pull request, sans
 secrets de production ni étape de déploiement. Le workflow Hostinger existant reste
 inchangé. Livraison sur branche dédiée et PR vers main ; aucune fusion ni mise en
 production autorisée par cette demande.

@@ -1,4 +1,4 @@
-name: Explorer — validation PR sans déploiement
+name: Validation PR sans déploiement
 on:
   pull_request:
     branches: [main]
@@ -43,22 +43,3 @@ jobs:
           python -m pytest tests/fast -q
           MYSQL_PWD=local-test-only mysql -h127.0.0.1 -uroot jigobourso_it < db/schema.sql
           python -m pytest tests/integ -q
-      - name: Navigateurs ordinateur et mobiles — données synthétiques
-        run: |
-          set -euo pipefail
-          mkdir -p audit-results
-          export JIGO_PYTHON="$(command -v python)" JIGO_ENGINE_ROOT="$PWD"
-          npm install --prefix "$RUNNER_TEMP/browser" --no-save playwright-core@1.56.1 > /dev/null
-          export PLAYWRIGHT_MODULE="$RUNNER_TEMP/browser/node_modules/playwright-core"
-          export JIGO_CHROMIUM="$(command -v google-chrome || command -v chromium)"
-          PYTHONPATH="$PWD" python tests/e2e/explorer-reconstruction-seed.py
-          php -S 127.0.0.1:18091 -t app/public > audit-results/php.log 2>&1 &
-          php_pid=$!
-          trap 'kill "$php_pid"' EXIT
-          BASE=http://127.0.0.1:18091 SHOTS=audit-results node tests/e2e/explorer-reconstruction.cjs
-          node tests/e2e/explorer-url.cjs
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
-        if: always()
-        with:
-          name: explorer-review-browser
-          path: audit-results

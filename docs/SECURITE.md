@@ -12,7 +12,7 @@
 | Blocage PHP ↔ Python (stderr plein), pas de délai maximal, processus illimités | `engine_call` : stderr dans un fichier, délai de 90 s (`JIGO_ENGINE_TIMEOUT`), 4 appels simultanés au plus. |
 | `cron-rejets.log` sans limite | Archivé au-delà de 256 Ko. La clé du cron peut passer par l'en-tête `X-Cron-Key`. |
 | CSP `script-src 'unsafe-inline'`, pas de HSTS | Scripts déplacés dans `assets/bilan.js` et `assets/register.js` ; CSP stricte, HSTS (180 jours), `Permissions-Policy`, `X-Powered-By` retiré. |
-| Codes de place non échappés | `J.esc` dans `admin.js` et `explorer.js`. |
+| Codes de place non échappés | `J.esc` dans `admin.js` et `classement-test.js`. |
 | Export CSV interprété comme formule | Préfixe `'` pour `= + - @`. |
 | `tx/add` en 500 si `currency` n'est pas du texte ; lignes mortes ; `portfolio/default` sans rollback ; booléens d'`admin/user/update` | Corrigés. |
 | Deux traitements du même type en parallèle | `GET_LOCK` autour de « vérifier puis créer » (`engine/jobs/runner.py`). |
