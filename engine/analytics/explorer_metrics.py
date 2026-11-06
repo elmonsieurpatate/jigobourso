@@ -20,7 +20,8 @@ def path_metrics(prices,volumes=None,turnovers=None):
          'gain_share':100*max(positive)/sum(positive) if positive else 0.0,
          'largest_day':max(daily),'worst_day':min(daily),
          'gain_net_share':100*max(0,max(daily))/total if total>0 else None,
-         'current_drawdown':100*(1-prices[-1]/max(prices))}
+         'current_drawdown':100*(1-prices[-1]/max(prices)),
+         'spike_share':(math.log1p(max(daily)/100)/(logs[-1]-logs[0])) if logs[-1]>logs[0] else 1.0}
     for field,values in [('avg_volume',volumes),('turnover_eur',turnovers)]:
         out[field]=sum(values)/len(values) if values and len(values)==len(steps) and all(v is not None for v in values) else None
     return out

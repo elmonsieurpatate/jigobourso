@@ -13,7 +13,7 @@ def test_excluded_search_page_two_must_not_repeat_page_one():
 
 def test_owned_only_with_no_holdings_must_return_nothing():
     entry={'id':1,'kind':'equity','mic':'XNYS','country':'US','category':None,'status':'retained','group':'equity','score':50,'rank':1,'fails':[]}
-    with patch.object(S,'cached_verdicts',return_value=[entry]):
+    with patch.object(S,'cached_verdicts',return_value=[entry]),patch.object(S,'data_version',return_value='x'),patch.object(S.score_service,'attach',side_effect=lambda conn,cfg,entries,version:entries):
         _,scoped,_,_=S.scoped_entries(None,T.preset('regular'),{'owned_only':True,'owned_ids':[]},rates={},aux={})
     assert not scoped, 'Owned-only filter returns unowned securities for an empty portfolio'
 

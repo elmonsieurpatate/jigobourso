@@ -1,11 +1,11 @@
 /* Administration : construire le catalogue à la main, dans l'ordre (FinanceDatabase → Yahoo → historiques), consulter les titres, suivre le cron. */
 (async () => {
   if (!await J.init('admin', { admin: true })) return;
-  const page = J.$('#page'); const TABS = ['fdb', 'yahoo', 'titres', 'cron', 'logs', 'users', 'settings'];
+  const page = J.$('#page'); const TABS = ['fdb', 'yahoo', 'titres', 'cron', 'logs', 'users', 'scores', 'settings'];
   const LEGACY = { data: 'fdb', catalogue: 'fdb', overview: 'fdb', jobs: 'logs', run: 'logs', schedule: 'cron' };
   const hashTab = () => { const h = location.hash.slice(1); return TABS.includes(h) ? h : (LEGACY[h] || 'fdb'); };
   let tab = hashTab();
-  const TITLES = { fdb: 'FinanceDatabase', yahoo: 'Yahoo Finance', titres: 'Actions / ETF', cron: 'Cron', logs: 'Journaux', users: 'Utilisateurs', settings: 'Réglages' };
+  const TITLES = { fdb: 'FinanceDatabase', yahoo: 'Yahoo Finance', titres: 'Actions / ETF', cron: 'Cron', logs: 'Journaux', users: 'Utilisateurs', scores: 'Scores', settings: 'Réglages' };
   const STATE = { completed: ['ok', 'Terminé'], completed_with_errors: ['wait', 'Terminé avec erreurs'], failed: ['ko', 'Échec'], running: ['info', 'En cours'], queued: ['info', 'En attente'], paused: ['wait', 'En pause'], interrupted: ['ko', 'Interrompu'] };
   const TSTATE = { ok: ['ok', 'Fonctionne'], late: ['wait', 'En retard'], error: ['ko', 'En erreur'], inactive: ['', 'Désactivée'], never: ['wait', 'Jamais exécutée'], running: ['info', 'En cours'] };
   const JOBNAME = { fdb_import: 'Import FinanceDatabase', fdb_filter: 'Filtrage FinanceDatabase', yahoo_info: 'Import des informations Yahoo', yahoo_filter: 'Filtrage Yahoo', history: 'Import / mise à jour des historiques',
@@ -18,7 +18,7 @@
   async function render() {
     page.innerHTML = '<div class="empty"><span class="spinner"></span></div>';
     J.$('.page-head h1').textContent = 'Administration · ' + TITLES[tab];
-    try { await ({ fdb, yahoo, titres, cron, logs, users, settings })[tab](); } catch (e) { page.innerHTML = `<div class="notice err">${J.esc(e.message)}</div>`; }
+    try { await ({ fdb, yahoo, titres, cron, logs, users, scores, settings })[tab](); } catch (e) { page.innerHTML = `<div class="notice err">${J.esc(e.message)}</div>`; }
   }
   window.addEventListener('hashchange', () => { const t = hashTab(); if (t !== tab) { tab = t; render(); } });
 
@@ -338,6 +338,37 @@
     J.$('#add-u').onclick = () => J.dialog({ title: 'Créer un compte', body: J.field('Identifiant', '<input id="nu">') + J.field('E-mail (facultatif)', '<input id="ne" type="email">') + J.field('Mot de passe (10 caractères minimum)', '<input id="np" type="password" autocomplete="new-password">') + '<label class="row gap-s"><input type="checkbox" id="na"> Administrateur</label>', actions: [{ label: 'Annuler', run: () => { } }, { label: 'Créer', cls: 'primary', run: async d => { await J.post('admin/user/create', { username: J.$('#nu', d).value, email: J.$('#ne', d).value, password: J.$('#np', d).value, is_admin: J.$('#na', d).checked }); render(); } }] });
     J.$$('[data-act]').forEach(b => b.onclick = async () => { await J.post('admin/user/update', { id: +b.dataset.act, active: b.dataset.v === '1' }); render(); });
     J.$$('[data-pw]').forEach(b => b.onclick = () => J.dialog({ title: 'Nouveau mot de passe', body: J.field('Mot de passe (10 caractères minimum)', '<input id="pw" type="password" autocomplete="new-password">') + '<p class="small muted">Ses sessions ouvertes seront fermées.</p>', actions: [{ label: 'Annuler', run: () => { } }, { label: 'Enregistrer', cls: 'primary', run: async d => { await J.post('admin/user/update', { id: +b.dataset.pw, password: J.$('#pw', d).value }); J.toast('Mot de passe modifié'); } }] }));
+  }
+  const COMPLEX_LABELS = { dynamics: 'Dynamique', r2: 'Régularité (R²)', up_days: 'Séances positives', concentration: 'Concentration des gains', volatility: 'Volatilité', drawdown: 'Drawdown', liquidity: 'Liquidité', acceleration: 'Accélération' };
+  async function scores() {
+    const s = await J.api('admin/scores'); const c = s.coverage; const cur = s.current; const d = s.design;
+    const pct = n => c.universe ? J.num(100 * n / c.universe, 1) + ' %' : '–';
+    const total = Object.values(cur.complex_weights).reduce((a, b) => a + (+b || 0), 0);
+    page.innerHTML = `<div class="notice">Ces réglages valent pour tous les classements. Ils ne contiennent aucun critère de conformité : changer un filtre ne modifie jamais une note. Les événements externes (résultats, rachat probable) restent hors des scores. ${s.customised ? '<b>Valeurs modifiées.</b>' : 'Valeurs de conception.'}</div>
+      <div class="grid cols-2" style="margin-top:14px">
+        <div class="card"><h2>Poids des granularités</h2><p class="muted small">Poids automatiques ω ∝ n<sup>1−κ</sup> : κ plus grand = plus de poids aux périodes courtes. Valeur de conception : ${d.kappa}.</p>
+          ${J.field('κ (0 à 0,95)', `<input id="sc-k" type="number" step="0.05" min="0" max="0.95" value="${cur.kappa}">`)}
+          ${J.field('Seuil de couverture (0,1 à 1)', `<input id="sc-t" type="number" step="0.05" min="0.1" max="1" value="${cur.threshold}">`)}
+          <p class="muted small">En dessous du seuil, la note est « inconnu » ; entre le seuil et 1, « partiel ». Zéro n’est jamais confondu avec une donnée absente.</p></div>
+        <div class="card"><h2>Poids du score complexe</h2><p class="muted small">Total actuel : <b id="sc-sum">${J.num(total, 0)}</b> (normalisé à 100 au calcul).</p>
+          ${Object.keys(d.complex_weights).map(k => J.field(`${COMPLEX_LABELS[k] || k} <span class="muted">(conception ${d.complex_weights[k]})</span>`, `<input class="sc-w" data-k="${k}" type="number" step="1" min="0" max="1000" value="${cur.complex_weights[k] ?? 0}">`)).join('')}</div></div>
+      <div class="row gap-s" style="margin-top:14px"><button class="btn primary" id="sc-save">Enregistrer</button><button class="btn" id="sc-reset">Revenir aux valeurs de conception</button></div>
+      <div class="card" style="margin-top:16px"><h2>Liquidité et volumes</h2>
+        <p class="muted small">Source de la valeur échangée par titre noté. « Quotidienne » = volumes réels × cours sur 20 séances ; « estimée » = moyenne trimestrielle × cours (surestime d’environ 12 % en médiane).</p>
+        <div class="table-wrap"><table><tbody>
+          <tr><td>Titres notés</td><td class="num">${J.num(c.universe, 0)}</td><td></td></tr>
+          <tr><td>Liquidité quotidienne (volumes réels)</td><td class="num">${J.num(c.daily, 0)}</td><td class="num">${pct(c.daily)}</td></tr>
+          <tr><td>Liquidité estimée</td><td class="num">${J.num(c.estimated, 0)}</td><td class="num">${pct(c.estimated)}</td></tr>
+          <tr><td>Liquidité inconnue</td><td class="num">${J.num(c.unknown, 0)}</td><td class="num">${pct(c.unknown)}</td></tr>
+          <tr><td>Mesures de score stockées</td><td class="num">${J.num(c.score_inputs, 0)}</td><td></td></tr></tbody></table></div>
+        <p class="small muted">Dernier calcul : ${c.computed_at ? J.dateTime(c.computed_at) : '–'} · dernière vérification des volumes : ${c.volume_checked_at ? J.dateTime(c.volume_checked_at) : 'jamais'} · collecte des volumes : ${s.volume_collection ? 'activée' : 'désactivée'}.</p></div>`;
+    const sum = () => { J.$('#sc-sum').textContent = J.num(J.$$('.sc-w').reduce((a, i) => a + (+i.value || 0), 0), 0); };
+    J.$$('.sc-w').forEach(i => i.oninput = sum);
+    J.$('#sc-save').onclick = async () => {
+      const cw = {}; J.$$('.sc-w').forEach(i => { cw[i.dataset.k] = i.value === '' ? null : +i.value; });
+      try { await J.post('admin/scores/save', { kappa: +J.$('#sc-k').value, threshold: +J.$('#sc-t').value, complex_weights: cw }); J.toast('Réglages des scores enregistrés'); render(); } catch (e) { J.toast(e.message); }
+    };
+    J.$('#sc-reset').onclick = async () => { try { await J.post('admin/scores/save', { reset: true }); J.toast('Valeurs de conception rétablies'); render(); } catch (e) { J.toast(e.message); } };
   }
   async function settings() {
     const s = (await J.api('admin/system')).settings;

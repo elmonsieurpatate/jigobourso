@@ -138,6 +138,14 @@ return [
         q('INSERT INTO settings(name, value_json, updated_at) VALUES (?,?,?) ON DUPLICATE KEY UPDATE value_json = VALUES(value_json), updated_at = VALUES(updated_at)', [$name, json_encode($val), now_utc()]);
         return ['ok' => true];
     },
+    'admin/scores' => function () { require_admin(); return engine_call('scores-state', []); },
+    'admin/scores/save' => function () {
+        need_post(); require_admin(); $b = body();
+        if (!empty($b['reset'])) return engine_call('scores-save', ['reset' => true]);
+        $cw = $b['complex_weights'] ?? [];
+        if (!is_array($cw)) throw new ApiError('Poids du score complexe invalides');
+        return engine_call('scores-save', ['kappa' => $b['kappa'] ?? null, 'threshold' => $b['threshold'] ?? null, 'complex_weights' => $cw]);
+    },
     'admin/run' => function () {
         need_post(); require_admin();
         $job = str_in(body(), 'job', 24);

@@ -16,7 +16,7 @@ from engine.shared import settings as settings_mod
 from engine.market import hours
 from engine.market.collect import effective_expected_close, latest_rates, to_eur_factor
 from engine.market.calendar import window_calendars, session_dates
-from . import signals, strategy, explorer_config, explorer_metrics
+from . import signals, strategy, explorer_config, explorer_metrics, score_service, liquidity
 from . import geography
 from .measures import window_metrics
 from .series import usable_closes, find_breaks, clean_window, analyze_series, prepare_series, data_corrections
@@ -78,9 +78,9 @@ def _load_universe(conn, windows, ids=None):
         cur.execute("""SELECT l.id, l.instrument_id, l.symbol, l.mic, l.currency, i.name, i.isin, i.kind, i.country, i.category,
                               p.price, p.price_time, p.quote_at, p.source AS price_source, p.currency AS price_currency, p.avg_volume_3m, p.net_assets,
                               s.last_close_date, s.closes_count, s.close_px, s.ma20, s.ma50, s.ma50_prev, s.ma200, s.ma200_prev, s.daily_change, s.gap_to_ma20, s.quality, s.break_age, s.break_dates,
-                       s.coverage_252, s.expected_252, s.momentum_6m, s.momentum_12m
+                       s.coverage_252, s.expected_252, s.momentum_6m, s.momentum_12m, ls.turnover_eur, ls.source AS turnover_source
                        FROM v_recommendable r JOIN listings l ON l.id=r.listing_id JOIN instruments i ON i.id=l.instrument_id
-                       LEFT JOIN latest_prices p ON p.listing_id=l.id LEFT JOIN series_state s ON s.listing_id=l.id""" + only, list(ids or []))
+                       LEFT JOIN latest_prices p ON p.listing_id=l.id LEFT JOIN series_state s ON s.listing_id=l.id LEFT JOIN liquidity_state ls ON ls.listing_id=l.id""" + only, list(ids or []))
         universe = cur.fetchall()
         marks = ','.join(['%s'] * len(windows))
         scope = f' AND listing_id IN ({",".join(["%s"] * len(ids))})' if ids else ''
@@ -158,7 +158,9 @@ def judge_universe(conn, config, ids=None):
                 missing[n] = _missing_reason(count, n, None, u.get('break_age'))             # historique trop court, rupture dans la fenêtre ou calendrier : le vrai motif
         tech = {k: (None if u[k] is None else float(u[k])) for k in ('close_px', 'ma20', 'ma50', 'ma50_prev', 'ma200', 'ma200_prev', 'daily_change', 'gap_to_ma20')}
         tech['close'] = tech.pop('close_px')
-        if config.get('version')==4:tech['quoted_avg_volume']=None if u.get('avg_volume_3m') is None else float(u['avg_volume_3m'])
+        if config.get('version')==4:
+            tech['quoted_avg_volume']=None if u.get('avg_volume_3m') is None else float(u['avg_volume_3m'])
+            tech['turnover_eur']=None if u.get('turnover_eur') is None else float(u['turnover_eur']);tech['turnover_source']=u.get('turnover_source');tech['us_listing']=u['mic'] in liquidity.US_MICS
         last = u['last_close_date'].isoformat() if u['last_close_date'] else None
         expected = max(expected_close(conn, u['mic']), str(latest_by_mic.get(u['mic']) or ''))
         if last and last < expected:
@@ -274,7 +276,7 @@ def extended_metrics(conn,universe,windows):
 
 def cached_verdicts(conn, config):
     """Verdicts légers (identité, statut, groupe, rang, score) de tout l'univers pour cette configuration, mis en cache en base."""
-    financial={k:v for k,v in config.items() if k!='presentation'}
+    financial={k:v for k,v in config.items() if k not in ('presentation','scoring')}      # les paramètres de score ne changent aucun verdict de conformité
     key = hashlib.sha1(('explorer-v4:' + json.dumps(financial, sort_keys=True, separators=(',', ':'))).encode()).hexdigest()
     version = data_version(conn)
     if config.get('version')==4 and (any(explorer_config.effective(config,k)['liquidity'].get('min_quoted_volume') is not None for k in ('equity','etf')) or any(p['metric']=='quoted_avg_volume' for p in config['ranking'].get('components',[]))):
@@ -367,7 +369,7 @@ def _reference_window(config, stored=(1, 5, 21, 63, 126, 252)):
     return min(stored, key=lambda n: (abs(n - longest), n))
 
 
-SORT_KEYS = {'name': lambda e, a: (e['name'] or '').casefold(), 'symbol': lambda e, a: e['symbol'].casefold(), 'score': lambda e, a: e['score'],
+SORT_KEYS = {'score_simple': lambda e, a: e.get('score_simple'), 'score_complex': lambda e, a: e.get('score_complex'), 'name': lambda e, a: (e['name'] or '').casefold(), 'symbol': lambda e, a: e['symbol'].casefold(), 'score': lambda e, a: e['score'],
              'price': lambda e, a: a.get('price_eur'), 'volume': lambda e, a: a.get('volume'), 'fresh': lambda e, a: a.get('last_close') and a['last_close'].toordinal(),
              'slope': lambda e, a: a.get('slope'), 'r2': lambda e, a: a.get('r2'), 'perf': lambda e, a: a.get('perf'),
              'volatility': lambda e, a: a.get('volatility'), 'drawdown': lambda e, a: a.get('drawdown')}
@@ -392,6 +394,8 @@ def scoped_entries(conn, config, view, rates=None, aux=None, now=None):
     rates = rates if rates is not None else latest_rates(conn)
     now = now or hours.utcnow()
     entries = cached_verdicts(conn, config)         # verdict de chaque titre éligible pour CETTE configuration (jamais pour un préréglage par défaut)
+    if config.get('version') in (3, 4):
+        entries = score_service.attach(conn, config, entries, data_version(conn))       # scores simple et complexe : calculés hors filtres, jamais recalculés dans la sélection
     ref = _reference_window(config)
     aux = aux if aux is not None else _aux(conn, ref, rates)
     kind, market = view.get('kind') or '', view.get('market') or ''
@@ -471,7 +475,7 @@ def scoped_entries(conn, config, view, rates=None, aux=None, now=None):
             return False
         return not (view.get('fresh_only') and a.get('quality') != 'ok')
     base = [e for e in base if keep(e)]
-    if len(base) != len(entries):                   # sélection plus étroite que l'univers : on reclasse les retenus entre eux
+    if len(base) != len(entries) and not score_service.is_scores_mode(config):                   # sélection plus étroite que l'univers : on reclasse les retenus entre eux
         retained = [e['id'] for e in base if e['status'] == 'retained']
         ranked = {v['key']: v for v in judge_universe(conn, config, retained)} if retained else {}
         out = []
@@ -482,8 +486,16 @@ def scoped_entries(conn, config, view, rates=None, aux=None, now=None):
     return entries, base, ref, aux
 
 
+def score_view(entry, detail):
+    """Les deux scores d'un titre avec leur décomposition ; rangs globaux (parmi tous les titres notés du groupe), jamais ceux de la page ou du filtre."""
+    out = {'rank_simple': entry.get('score_rank_simple'), 'rank_complex': entry.get('score_rank_complex')}
+    if detail is None:
+        return dict(out, simple={'score': entry.get('score_simple'), 'status': entry.get('score_simple_status')}, complex={'score': entry.get('score_complex'), 'status': entry.get('score_complex_status')})
+    return dict(out, simple=detail['simple'], complex=detail['complex'], weights=detail['weights'], periods=detail['periods'], missing=detail['missing'], liquidity=detail['liquidity'])
+
+
 def explore(conn, request):
-    config = _config(request)
+    config = score_service.apply_admin(conn, _config(request))
     view = request.get('view') or {}
     export = bool(view.get('export'))
     page, size = max(1, int(view.get('page', 1))), min(100, max(1, int(view.get('page_size', 24))))
@@ -522,7 +534,7 @@ def explore(conn, request):
     rows, level_counts = level_filtered_rows(rows, aux, ref, prefilter_cfg, wanted, query, set(view.get('owned_ids') or []) if view.get('owned_only') else set())
     level_masked = sum(level_counts['regularity'].values()) - len(rows)
     sort, desc = view.get('sort', 'rank'), view.get('dir') == 'desc'
-    proximity_order = status == 'rejected' and sort in ('rank','proximity')
+    proximity_order = status == 'rejected' and (sort == 'proximity' or sort == 'rank' and not score_service.is_scores_mode(config))
     if proximity_order:
         rows = sorted(rows,key=lambda e: (*(e.get('proximity') or [999,999,float('inf')]), e['symbol']))
     elif sort in SORT_KEYS:
@@ -540,6 +552,7 @@ def explore(conn, request):
     page_rows = (rows + excluded_hits)[(page - 1) * size:page * size]      # pagination : uniquement après filtrage, évaluation et classement
     wanted = [e['id'] for e in page_rows if e not in excluded_hits]
     detail = {v['key']: v for v in judge_universe(conn, config, wanted)} if wanted else {}
+    score_detail = score_service.details(conn, config, wanted)
     out = []
     from . import etf
     etf_top = [e['id'] for e in rows if e.get('group') == 'etf'][:10]          # dix premiers ETF de la vue, avant pagination, dans l'ordre déjà déterminé
@@ -576,6 +589,7 @@ def explore(conn, request):
         v['rank'], v['score'] = e['rank'], e['score']      # rang et score viennent de la sélection complète, pas de la page
         r = _row(v, rates, conn)
         r['score_parts']=expanded_parts(e,config);r['score_missing']=e.get('score_missing',0)
+        r['scores']=score_view(e,score_detail.get(e['id']))
         a = aux.get(e['id'], {})
         r.update({'position': position, 'volume': a.get('volume'), 'last_close': a['last_close'].isoformat() if a.get('last_close') else None,
                   'analyst': analyst_view(a.get('analyst')) if e['kind'] == 'equity' else None, 'ref': {k: a.get(k) for k in REF_FIELDS}, 'open': e['mic'] in hours.HOURS and hours.is_open(e['mic'], now),
@@ -603,7 +617,7 @@ def explore(conn, request):
             countries[e['country']] += 1
         if e['category']:
             categories[e['category']] += 1
-    return {'etf_concentration': etf_concentration, 'config': config, 'total': total, 'page': page, 'pages': max(1, -(-total // size)), 'rows': out, 'ref_sessions': ref, 'curve_label': signals.period_label(ref), 'ordering': 'proximity' if proximity_order else sort if sort in SORT_KEYS else 'rank',
+    return {'scoring': score_service.summary(config, entries), 'etf_concentration': etf_concentration, 'config': config, 'total': total, 'page': page, 'pages': max(1, -(-total // size)), 'rows': out, 'ref_sessions': ref, 'curve_label': signals.period_label(ref), 'ordering': 'proximity' if proximity_order else sort if sort in SORT_KEYS else 'rank',
             'universe': len(entries), 'examined': len(base), 'tradable': {'on': bool(view.get('tradable', True)), 'masked': masked}, 'level_filters': {'masked': level_masked, 'counts': level_counts},
             'counts': {g: dict(c) for g, c in counts.items()}, 'scope_counts': scope_counts, 'populations': {g: sum(c.values()) for g, c in counts.items()},
             'reasons': dict(reasons), 'facets': {'markets': dict(markets), 'countries': dict(sorted(countries.items())), 'categories': dict(sorted(categories.items()))}}

@@ -256,6 +256,11 @@ def judge(config, measures, tech, missing, last_close_date=None, expected_last_d
         threshold=config.get('liquidity',{}).get('min_quoted_volume')
         chk=_check('liquidity','min_quoted_volume','quoted_avg_volume',tech.get('quoted_avg_volume'),threshold,'>=')
         if chk:reasons.append(chk)
+        li=config.get('liquidity',{})
+        turnover_threshold=li.get('min_turnover_eur_us') if tech.get('us_listing') and li.get('min_turnover_eur_us') is not None else li.get('min_turnover_eur')
+        chk=_check('liquidity','min_turnover_eur','turnover_eur',tech.get('turnover_eur'),turnover_threshold,'>=')
+        if chk:
+            chk['source']=tech.get('turnover_source');reasons.append(chk)
         if config['selection']['combine']=='any':
             checks=[r for r in reasons if r['criterion']!='freshness' and not r.get('mandatory') and r['result'] in ('pass','fail','missing')]
             if any(r['result']=='pass' for r in checks):
@@ -286,6 +291,10 @@ def rank(config, verdicts):
         if not any(p['id']==required and p['enabled'] for p in config['periods']):
             for v in verdicts:v['score']=v['rank']=None;v['score_parts']=[]
             return verdicts
+    if config.get('version')==4 and config['ranking']['mode']==explorer_config.SCORES_MODE:
+        # Les scores V4 ne se calculent pas ici : ils dépendent du seul titre (score_service), jamais des verdicts ni de la population retenue.
+        for v in verdicts:v.update(score=None,rank=None,score_parts=[],score_missing=0)
+        return verdicts
     if config.get('version')==4 and config['ranking']['mode']=='weighted':return configurable_score.rank(config,verdicts,_percentiles)
     mode, weights = config['ranking']['mode'], config['ranking']['weights']
     active = [p for p in config['periods'] if p['enabled'] and (config.get('version')!=4 or weights.get(p['id'],0)>0)]
