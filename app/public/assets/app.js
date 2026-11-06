@@ -149,10 +149,13 @@ J.NAV = (admin) => [
   { id: 'suivi', label: 'Suivi des classements', icon: 'pulse', file: ['suivi.html'], href: 'suivi.html' },
   { id: 'donnees', label: 'Données', icon: 'db', file: ['donnees.html'], children: [
     { label: 'Sources et fraîcheur', href: 'donnees.html', on: (q, h) => h !== '#places' }, { label: 'Couverture par place', href: 'donnees.html#places', on: (q, h) => h === '#places' }] },
-  ...(admin ? [{ sec: 'Administration' }, { id: 'admin-categories-test', label: 'Filtres et catégories · test', icon: 'panel', file: ['admin-categories-test.html'], href: 'admin-categories-test.html' }, { id: 'admin', label: 'Administration', icon: 'shield', file: ['admin.html'], children: [
+  ...(admin ? [{ sec: 'Administration' }, { id: 'admin', label: 'Administration', icon: 'shield', file: ['admin.html', 'admin-categories-test.html'], children: [
+    { head: 'Administration' },
     { label: 'FinanceDatabase', href: 'admin.html#fdb', on: (q, h) => !h || h === '#fdb' }, { label: 'Yahoo Finance', href: 'admin.html#yahoo', on: (q, h) => h === '#yahoo' },
     { label: 'Actions / ETF', href: 'admin.html#titres', on: (q, h) => h === '#titres' }, { label: 'Cron', href: 'admin.html#cron', on: (q, h) => h === '#cron' }, { label: 'Journaux', href: 'admin.html#logs', on: (q, h) => h === '#logs' },
-    { label: 'Utilisateurs', href: 'admin.html#users', on: (q, h) => h === '#users' }, { label: 'Scores', href: 'admin.html#scores', on: (q, h) => h === '#scores' }, { label: 'Réglages', href: 'admin.html#settings', on: (q, h) => h === '#settings' }] }] : []),
+    { label: 'Utilisateurs', href: 'admin.html#users', on: (q, h) => h === '#users' }, { label: 'Réglages', href: 'admin.html#settings', on: (q, h) => h === '#settings' },
+    { head: 'Explorer' },
+    { label: 'Scores', href: 'admin.html#scores', on: (q, h) => h === '#scores' }, { label: 'Filtres et catégories', href: 'admin-categories-test.html', on: () => true }] }] : []),
 ];
 J.buildShell = function (page, user) {
   const file = location.pathname.split('/').pop() || 'index.html', store = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) { } } };
@@ -165,7 +168,7 @@ J.buildShell = function (page, user) {
     if (!n.children) return `<a class="nv ${here ? 'on' : ''}" href="${n.href}" title="${J.esc(n.label)}">${J.icon(n.icon)}<span class="lbl">${J.esc(n.label)}</span></a>`;
     const open = here || opened[n.id];
     return `<div class="grp ${open ? 'open' : ''} ${here ? 'cur' : ''}" data-id="${n.id}"><button class="nv" type="button" aria-expanded="${!!open}" title="${J.esc(n.label)}">${J.icon(n.icon)}<span class="lbl">${J.esc(n.label)}</span>${J.icon('chev', 'chev')}</button>
-      <div class="sub" data-sub="${n.id}">${n.children.map(c => `<a class="sv ${here && isOn(c) ? 'on' : ''}" href="${c.href}">${J.esc(c.label)}</a>`).join('')}</div></div>`;
+      <div class="sub" data-sub="${n.id}">${n.children.map(c => c.head ? `<div class="sh">${J.esc(c.head)}</div>` : `<a class="sv ${here && isOn(c) ? 'on' : ''}" href="${c.href}">${J.esc(c.label)}</a>`).join('')}</div></div>`;
   }).join('');
   const initial = (user.username || '?').slice(0, 1);
   document.body.classList.add('has-shell');
@@ -186,7 +189,7 @@ J.buildShell = function (page, user) {
   document.addEventListener('keydown', e => { if (e.key === 'Escape') { body.classList.remove('side-open'); closeFly(); sync(); } });
   matchMedia('(max-width: 960px)').addEventListener('change', () => { body.classList.remove('side-open'); sync(); });
   /* groupes dépliables */
-  J.$$('.grp > .nv', side).forEach(b => b.onclick = () => { const g = b.parentElement; if (body.classList.contains('side-collapsed') && !narrow()) { location.href = nav.find(n => n.id === g.dataset.id).children[0].href; return; } g.classList.toggle('open'); b.setAttribute('aria-expanded', g.classList.contains('open')); opened[g.dataset.id] = g.classList.contains('open'); store.set('jigo_nav_open', JSON.stringify(opened)); });
+  J.$$('.grp > .nv', side).forEach(b => b.onclick = () => { const g = b.parentElement; if (body.classList.contains('side-collapsed') && !narrow()) { location.href = nav.find(n => n.id === g.dataset.id).children.find(c => c.href).href; return; } g.classList.toggle('open'); b.setAttribute('aria-expanded', g.classList.contains('open')); opened[g.dataset.id] = g.classList.contains('open'); store.set('jigo_nav_open', JSON.stringify(opened)); });
   J.$$('#nav a', side).forEach(a => a.addEventListener('click', () => { if (narrow()) body.classList.remove('side-open'); }));
   /* menu volant quand la barre est réduite */
   let fly = null; const closeFly = () => { if (fly) { fly.remove(); fly = null; } };
@@ -196,7 +199,7 @@ J.buildShell = function (page, user) {
   /* portefeuilles : un sous-menu par portefeuille */
   if (J.$('[data-sub="portefeuilles"]')) J.api('portfolios').then(r => { const sub = J.$('[data-sub="portefeuilles"]'), cur = new URLSearchParams(location.search).get('id'); r.portfolios.forEach(p => sub.insertAdjacentHTML('beforeend', `<a class="sv ${file === 'portefeuilles.html' && (cur == p.id || (!cur && false)) ? 'on' : ''}" href="portefeuilles.html?id=${p.id}">${J.esc(p.name)}${p.is_default ? ' ★' : ''}</a>`)); }).catch(() => { });
   /* en-tête : fil d'Ariane, recherche, thème */
-  const active = nav.find(n => n.file && n.file.includes(file)), child = active && active.children ? active.children.find(isOn) : null;
+  const active = nav.find(n => n.file && n.file.includes(file)), child = active && active.children ? active.children.find(c => c.href && isOn(c)) : null;
   J.$('#crumbs').innerHTML = active ? `<span>${J.esc(active.label)}</span>` + (file === 'titre.html' ? '<i>›</i><b>Fiche</b>' : child ? `<i>›</i><b>${J.esc(child.label)}</b>` : '') : '';
   J.$('#quick-form').onsubmit = e => { e.preventDefault(); const v = J.$('#quick').value.trim(); if (v) location.href = 'index.html?q=' + encodeURIComponent(v); };
   const themeIcon = () => { J.$('#theme-btn').innerHTML = J.icon(document.documentElement.dataset.theme === 'dark' ? 'sun' : 'moon', ''); };

@@ -8,7 +8,7 @@ import copy
 
 from engine.shared import settings
 
-from . import explorer_config as C, score_service, scores as SC
+from . import explorer_config as C, score_categories, score_service, scores as SC
 
 PROFILES = 'scores_profiles'
 SCORING_PERIODS = tuple(p for p in C.PERIODS if C.SESSIONS[p] >= SC.MIN_SESSIONS)
@@ -340,6 +340,9 @@ def simulate(conn, request):
     draft = request.get('draft') or {}
     cfg = build_config(conn, name, draft.get('profile'), draft.get('global'))
     book = score_service.score_book(conn, cfg, service.data_version(conn))
+    eq = score_service.params_for(cfg, 'equity')
+    gran = _granularity(eq)
+    meta = {'granularity': gran, 'periods': [dict(id=p['id'], sessions=p['sessions']) for p in eq['periods']]}
     if not book:
         return {'empty': True, 'reason': 'Aucun titre noté : les mesures de score sont vides (calcul nocturne non exécuté sur cette base).', 'suggestions': [], 'candidates': []}
     lid = request.get('listing_id')
@@ -351,24 +354,38 @@ def simulate(conn, request):
         candidates = [dict(id=i, symbol=info[i]['symbol'], mic=info[i]['mic'], name=info[i]['name']) for i in found if i in info]
         lid = candidates[0]['id'] if candidates else None
         if lid is None:
-            return {'empty': False, 'not_found': True, 'candidates': [], 'suggestions': _suggestions(conn, book)}
+            return {'empty': False, 'not_found': True, 'candidates': [], 'suggestions': _suggestions(conn, book, sessions=gran), **meta}
     if lid is None:
-        return {'empty': False, 'candidates': [], 'suggestions': _suggestions(conn, book)}
+        return {'empty': False, 'candidates': [], 'suggestions': _suggestions(conn, book, sessions=gran), **meta}
     lid = int(lid)
     scored = score_service.details(conn, cfg, [lid]).get(lid)
     info = _titles(conn, [lid]).get(lid)
     if scored is None or info is None:
-        return {'empty': False, 'not_found': True, 'candidates': candidates, 'suggestions': _suggestions(conn, book)}
+        return {'empty': False, 'not_found': True, 'candidates': candidates, 'suggestions': _suggestions(conn, book, sessions=gran), **meta}
     params = score_service.params_for(cfg, info['kind'])
     return {'empty': False, 'title': dict(id=lid, symbol=info['symbol'], mic=info['mic'], name=info['name'], kind=info['kind'], isin=info['isin']),
             'candidates': candidates, 'result': scored, 'periods': [dict(id=p['id'], sessions=p['sessions']) for p in params['periods']],
-            'kappa': params['kappa'], 'suggestions': _suggestions(conn, book)}
+            'kappa': params['kappa'], 'suggestions': _suggestions(conn, book, sessions=gran),
+            'curve': series(conn, [lid], _granularity(params)).get(lid, []), 'granularity': _granularity(params), 'ranks': _rank_of(book, lid)}
 
 
-def _suggestions(conn, book, n=8):
-    top = sorted((e for e in book.values() if e['simple'] is not None), key=lambda e: -e['simple'])[:n]
+def _rank_of(book, lid):
+    """Rang général du titre pour chaque score, sur l'ensemble des titres notés."""
+    out = {}
+    for key in ('simple', 'complex'):
+        ranks = _ranks(book, key)
+        out[key] = {'rank': ranks.get(lid), 'of': len(ranks)}
+    return out
+
+
+def _suggestions(conn, book, n=8, sessions=0):
+    """Titres les mieux notés (score simple), avec leurs deux scores, leur rang et leur courbe."""
+    ranks = _ranks(book, 'simple')
+    top = sorted((e for e in book.values() if e['simple'] is not None), key=lambda e: (-e['simple'], e['id']))[:n]
     info = _titles(conn, [e['id'] for e in top])
-    return [dict(id=e['id'], symbol=info[e['id']]['symbol'], mic=info[e['id']]['mic'], name=info[e['id']]['name'], simple=e['simple'], complex=e['complex'])
+    curves = series(conn, [e['id'] for e in top], sessions)
+    return [dict(id=e['id'], symbol=info[e['id']]['symbol'], mic=info[e['id']]['mic'], name=info[e['id']]['name'], simple=e['simple'], complex=e['complex'],
+                 rank=ranks.get(e['id']), curve=curves.get(e['id'], []))
             for e in top if e['id'] in info]
 
 
@@ -504,6 +521,71 @@ def _top(conn, book, key, n=10):
                  status=e[key + '_status']) for i, e in enumerate(ranked, 1) if e['id'] in info]
 
 
+PAGE = 25
+CATEGORY_FILE = 'app/config/explorer_secondary_filters.json'
+
+
+def _definitions(conn):
+    """Définitions des filtres de l'administration (réglages), sinon fichier livré avec l'application. Lecture seule."""
+    import json
+    import os
+    d = settings.get(conn, score_categories.SETTING)
+    if isinstance(d, dict) and d.get('filters'):
+        return d
+    path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), CATEGORY_FILE)
+    try:
+        with open(path, encoding='utf-8') as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {'filters': []}
+
+
+def series(conn, ids, sessions):
+    """Dernières clôtures (sessions + 1 points) de chaque titre, pour tracer la courbe sur la granularité de la stratégie. Données réelles uniquement :
+    un titre sans historique n'a pas de courbe (liste vide), rien n'est interpolé."""
+    ids = list(ids)
+    out = {i: [] for i in ids}
+    if not ids or sessions < 1:
+        return out
+    import datetime
+    since = datetime.date.today() - datetime.timedelta(days=int(sessions * 2 + 10))
+    with conn.cursor() as cur:
+        for k in range(0, len(ids), 200):
+            part = ids[k:k + 200]
+            cur.execute(f"""SELECT listing_id, COALESCE(adj_close_px, close_px) AS px FROM daily_prices
+                            WHERE listing_id IN ({','.join(['%s'] * len(part))}) AND price_date>=%s AND COALESCE(adj_close_px, close_px) IS NOT NULL
+                            ORDER BY listing_id, price_date""", part + [since])
+            for r in cur.fetchall():
+                out[r['listing_id']].append(float(r['px']))
+    return {i: [round(v, 4) for v in vals[-(sessions + 1):]] for i, vals in out.items()}
+
+
+def _granularity(params):
+    return max((p['sessions'] for p in params['periods']), default=0)
+
+
+def _listing(conn, book, which, category, offset, limit, cats, sessions):
+    """Classement d'un score, éventuellement restreint à une catégorie de note. Le rang est le rang GÉNÉRAL (sur tous les titres notés) : une catégorie ne le change pas."""
+    key = 'simple' if which == 'simple' else 'complex'
+    ranked = sorted((e for e in book.values() if e[key] is not None), key=lambda e: (-e[key], e['id']))
+    rank_of = {e['id']: i for i, e in enumerate(ranked, 1)}
+    counts = {c['id']: 0 for c in cats}
+    for e in ranked:
+        cid = score_categories.assign(e[key], cats)
+        if cid in counts:
+            counts[cid] += 1
+    chosen = [e for e in ranked if category in (None, '') or score_categories.assign(e[key], cats) == category]
+    page = chosen[offset:offset + limit]
+    info = _titles(conn, [e['id'] for e in page])
+    curves = series(conn, [e['id'] for e in page], sessions)
+    rows = [dict(rank=rank_of[e['id']], id=e['id'], symbol=info[e['id']]['symbol'], mic=info[e['id']]['mic'], name=info[e['id']]['name'], kind=info[e['id']]['kind'],
+                 simple=e['simple'], complex=e['complex'], simple_status=e['simple_status'], complex_status=e['complex_status'],
+                 coverage=e[key + '_coverage'], curve=curves.get(e['id'], [])) for e in page if e['id'] in info]
+    return {'which': key, 'category': category or None, 'total': len(chosen), 'offset': offset, 'rows': rows,
+            'categories': [dict(id=c['id'], name=c['name'], color=c.get('color'), min=c.get('min'), max=c.get('max'), minIncluded=c.get('minIncluded'), maxIncluded=c.get('maxIncluded'),
+                                count=counts.get(c['id'], 0)) for c in cats if not c.get('unknown')]}
+
+
 def ranking(conn, request):
     """Résultat principal d'un réglage : titres notés et classés, indisponibles, répartition des notes, poids réels des périodes et effet par rapport au réglage enregistré.
     Aucun filtre n'intervient : les seuils facultatifs ne retirent aucun titre de ce classement."""
@@ -524,6 +606,14 @@ def ranking(conn, request):
            'weights': [dict(id=p['id'], sessions=p['sessions'], weight=weights[p['id']], custom='weight' in p) for p in params['periods']],
            'kappa': params['kappa'], 'reliability_threshold': params['threshold'],
            'top': {k: _top(conn, book, k) for k in ('simple', 'complex')}, 'compared': None}
+    which = 'complex' if request.get('which') == 'complex' else 'simple'
+    cats, _ = score_categories.measure(_definitions(conn), which)
+    sessions = _granularity(params)
+    cat = request.get('category')
+    off = max(0, int(request.get('offset') or 0))
+    lim = max(1, min(100, int(request.get('limit') or PAGE)))
+    out['granularity'] = {'sessions': sessions, 'periods': [dict(id=p['id'], sessions=p['sessions']) for p in params['periods']]}
+    out['listing'] = _listing(conn, book, which, cat if isinstance(cat, str) else None, off, lim, cats, sessions)
     if draft:
         saved_book = score_service.score_book(conn, build_config(conn, name), version)
         out['compared'] = {k: _movement(saved_book, book, k) for k in ('simple', 'complex')}

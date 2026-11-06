@@ -200,6 +200,7 @@ body.side-collapsed .side { width: var(--side-rail); }
 .side .nv.on svg.ic, .side .grp.cur > .nv svg.ic { color: #aeb3ff; }
 .side .sub { display: none; margin: 0 0 6px 21px; padding-left: 12px; border-left: 1px solid var(--side-line); }
 .side .grp.open > .sub { display: block; }
+.side .sh { margin: 8px 0 2px; padding: 0 10px; font-size: .68rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--side-ink); opacity: .55; }
 .side .sv { position: relative; display: flex; align-items: center; gap: 8px; padding: 7px 10px; margin: 1px 0; border-radius: 9px; color: var(--side-ink); font-size: .9rem; font-weight: 500; text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .side .sv::before { content: ""; flex: none; width: 5px; height: 5px; border-radius: 50%; background: currentColor; opacity: .45; }
 .side .sv:hover { background: rgba(255, 255, 255, .06); color: #fff; text-decoration: none; } .side .sv.on { color: #fff; background: rgba(255, 255, 255, .1); font-weight: 700; } .side .sv.on::before { background: #8c93ff; opacity: 1; }

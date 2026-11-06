@@ -14,14 +14,14 @@
   const SIMPLE = [
     ['Dynamique', 'Pente de chaque période, ramenée à une croissance sur la période puis à une échelle de saturation (17 % × (séances/5)^0,52). 100 % = croissance saturée. Moyenne pondérée des périodes mesurables.', 'facteur de 0 à 1'],
     ['Régularité', 'R² de chaque période, chacun pesant min(1, séances/21) car un R² sur peu de séances est bruité. Moyenne pondérée des périodes où le R² est mesuré.', 'facteur de 0 à 1']];
-  const LASTDAY = 'Dernier jour : aucun coefficient propre. La dernière séance compte comme les autres séances dans les mesures de chaque période. Le filtre facultatif « dernier jour positif » est indépendant de la notation (Filtres de consultation, mode avancé).';
+  const LASTDAY = 'Dernier jour : aucun coefficient propre. La dernière séance compte comme les autres séances dans les mesures de chaque période.';
   const TABS = [['config', 'Configuration du moteur'], ['profils', 'Profils de stratégies'], ['simulation', 'Simulation & exemples'], ['suivi', 'Suivi des calculs']];
   const $ = (s, r) => (r || document).querySelector(s);
   const E = s => J.esc(String(s ?? ''));
   const fmt = (v, d = 1) => v === null || v === undefined ? '—' : J.num(v, d);
   const clone = o => JSON.parse(JSON.stringify(o));
 
-  let root, S, draft, savedJson, sel, adv = false, rank = null, confBusy = false, confFail = false, confStale = false, tab = 'config', scoreTab = 'simple', mon = null, monErr = null, sim = null, simBusy = false, simQ = '', useDraft = true, error = '';
+  let root, S, draft, savedJson, sel, rkWhich = 'simple', rkCat = null, rkMore = false, rank = null, confBusy = false, confFail = false, confStale = false, tab = 'config', scoreTab = 'simple', mon = null, monErr = null, sim = null, simBusy = false, simQ = '', useDraft = true, error = '';
   const autoCache = {};
 
   const v4 = () => S.strategies.filter(s => s.engine === 'v4');
@@ -74,7 +74,7 @@
   // seuls l'onglet courant et l'état de la barre sont mis à jour.
   function skeleton() {
     root.innerHTML = `<div class="as">
-      <div class="notice as-principle"><b>Principe V4 : un moteur unique pour toutes les stratégies.</b> Le score simple mesure uniquement la pente et le R² des périodes sélectionnées ; le score complexe ajoute séances positives, concentration, volatilité, drawdown, liquidité et l’ancrage récent. Chaque stratégie choisit ses périodes, ses seuils et ses pondérations, sans changer la méthode de calcul. Tous les titres évaluables sont notés et classés ; les seuils sont des filtres de consultation facultatifs, désactivés par défaut, qui n’entrent jamais dans une note.</div>
+      <div class="notice as-principle"><b>Principe V4 : un moteur unique pour toutes les stratégies.</b> Le score simple mesure uniquement la pente et le R² des périodes sélectionnées ; le score complexe ajoute séances positives, concentration, volatilité, drawdown, liquidité et l’ancrage récent. Chaque stratégie choisit ses périodes, ses seuils et ses pondérations, sans changer la méthode de calcul. Tous les titres évaluables sont notés et classés ; les filtres d’affichage (page « Filtres et catégories ») n’entrent jamais dans une note.</div>
       <div class="tabs as-tabs" id="as-tabs"></div><div id="as-err"></div><div id="as-body"></div>
       <div class="as-bar"><div id="as-status"></div><div class="row gap-s">
         <button class="btn" data-a="cancel">Annuler les modifications</button>
@@ -96,6 +96,7 @@
     $('#as-err').innerHTML = error ? `<div class="notice err" style="margin-bottom:12px">${E(error)}</div>` : '';
     $('#as-body').innerHTML = tab === 'config' ? configView(st, isV4) : tab === 'profils' ? profilesView() : tab === 'simulation' ? simulationView(isV4) : monitorView();
     if (tab === 'suivi' && !mon && !monErr) loadMonitor();
+    if (tab === 'simulation' && !sim && !simBusy && !error && isV4) runSim(null);
     if (tab === 'profils' && !rank && !confBusy && !confFail && st && st.engine === 'v4') runConf();
   }
 
@@ -164,7 +165,6 @@
       ${st.components.length ? `<div class="table-wrap"><table><thead><tr><th>Composante</th><th>Période</th><th class="num">Poids</th></tr></thead><tbody>${st.components.map(c => `<tr><td>${E(c.metric)}</td><td>${E(labels()[c.period] || c.period)}</td><td class="num">${fmt(c.weight, 2)}</td></tr>`).join('')}</tbody></table></div>` : '<p class="muted">Aucune composante de score pondérée.</p>'}`;
   }
 
-  const PCT = (v, d = 1) => v === null || v === undefined ? '' : v;
   function profilesView() {
     const row = s => {
       if (s.engine === 'v4') {
@@ -179,30 +179,7 @@
       <tr class="as-group"><td colspan="6">Moteur commun V4 — mêmes calculs de score, seuls les réglages changent</td></tr>${v4().map(row).join('')}
       <tr class="as-group"><td colspan="6">Anciens moteurs — comportement préservé tant qu’aucune migration n’est validée</td></tr>${S.strategies.filter(s => s.engine === 'historic').map(row).join('')}</tbody></table></div>
       <p class="as-hint">Stratégies personnelles : ${pe.total ? `${pe.total} enregistrée${pe.total > 1 ? 's' : ''}, dont ${pe.common_engine} sur le moteur commun et ${pe.historic} sur un ancien moteur (non migrées).` : 'aucune enregistrée sur cette base.'}${pe.configurable.length ? ' Configurables ici : ' + pe.configurable.map(c => E(c.name)).join(', ') + '.' : ''}</p></div>
-      ${p ? conformityCard(st, p) + technicalCard(p) + previewCard() : ''}`;
-  }
-
-  function conformityCard(st, p) {
-    const on = !!(p.filters && p.filters.enabled), dis = on ? '' : 'disabled';
-    const th = (id, f, step) => { const x = p.periods[id]; return `<td><input type="number" class="as-num" data-a="thr-p" data-p="${id}" data-f="${f}" step="${step}" value="${PCT(x[f])}" ${x.enabled && on ? '' : 'disabled'} placeholder="aucun"></td>`; };
-    const mm = (v) => v === null || v === undefined ? '' : v / 1e6;
-    return `<div class="card"><div class="row between" style="flex-wrap:wrap;gap:8px"><h3 class="as-h" style="margin:0">Filtres de consultation (facultatifs) — « ${E(st.label)} »</h3>
-        <label class="row gap-s as-chk"><input type="checkbox" data-a="filters-on" ${on ? 'checked' : ''}> <b>Activer ces filtres</b></label></div>
-      <div class="notice as-sep" style="margin-top:10px"><b>Ce ne sont pas des réglages de notation.</b> Tous les titres évaluables reçoivent leurs deux scores et sont classés, avec ou sans filtre. Activés, ces seuils servent seulement à <b>restreindre l’affichage</b> (conformes / écartés) ; ils ne modifient jamais une note ni le classement général. <b>${on ? 'Filtres activés.' : 'Filtres désactivés (par défaut) : aucun titre n’est écarté.'}</b> Une case vide = aucun seuil.</div>
-      <div class="row gap-s" style="margin:8px 0;flex-wrap:wrap"><button class="btn small" data-a="preset" data-v="balanced">Remplir avec les valeurs « équilibré »</button><button class="btn small" data-a="preset" data-v="v1">Remplir avec les seuils V1</button><span class="as-hint" style="margin:0">Un préréglage remplit seulement les cases ; il n’active rien et rien n’est enregistré tant que vous n’enregistrez pas.</span></div>
-      <div class="row gap-s" style="margin:6px 0"><div class="seg"><button data-a="adv" data-v="0" class="${adv ? '' : 'on'}">Mode simple</button><button data-a="adv" data-v="1" class="${adv ? 'on' : ''}">Mode avancé</button></div></div>
-      <div class="table-wrap"><table class="as-conf"><thead><tr><th>Granularité</th><th>Notée</th><th>Pente minimale (%/séance)</th><th>R² minimal (0–1)</th>${adv ? '<th>Rendement minimal (%)</th><th>Concentration max (0–1)</th><th>Volatilité max (%/séance)</th><th>Séances positives min (0–1)</th><th>Drawdown max (%)</th>' : ''}<th>Historique exigé</th></tr></thead><tbody>
-        ${S.scoring_periods.map(id => { const x = p.periods[id]; return `<tr class="${x.enabled ? '' : 'as-off'}"><td>${E(labels()[id])} <span class="muted">(${x.sessions} s)</span></td><td><input type="checkbox" data-a="active" data-p="${id}" ${x.enabled ? 'checked' : ''}></td>
-          ${th(id, 'min_slope', 0.05)}${th(id, 'min_r2', 0.05)}${adv ? th(id, 'min_return', 0.5) + th(id, 'max_spike_share', 0.05) + th(id, 'max_volatility', 0.5) + th(id, 'min_up_fraction', 0.05) + th(id, 'max_drawdown', 1) : ''}
-          <td><input type="checkbox" data-a="req" data-p="${id}" ${x.require_history ? 'checked' : ''} ${x.enabled && on ? '' : 'disabled'}></td></tr>`; }).join('')}</tbody></table></div>
-      ${adv ? `<div class="as-adv"><h4 class="as-h">Dernier jour (filtre facultatif, indépendant de la notation)</h4>
-        <label class="row gap-s"><input type="checkbox" data-a="day-on" ${p.day_filter.enabled ? 'checked' : ''} ${dis}> Exiger un dernier jour positif : variation de la dernière séance clôturée ≥</label>
-        <input type="number" class="as-num" data-a="day-min" step="0.1" value="${p.day_filter.min_return}" ${p.day_filter.enabled && on ? '' : 'disabled'}> %
-        <p class="as-hint">Masque le titre de la sélection sans changer sa note ni son rang général.</p>
-        <h4 class="as-h">Liquidité minimale (valeur échangée par jour)</h4>
-        <div class="row gap-s" style="flex-wrap:wrap"><label>Hors États-Unis <input type="number" class="as-num" data-a="liq" data-f="min_turnover_eur" step="0.5" value="${mm(p.liquidity.min_turnover_eur)}" placeholder="aucun" ${dis}> M€</label>
-        <label>Places américaines <input type="number" class="as-num" data-a="liq" data-f="min_turnover_eur_us" step="0.5" value="${mm(p.liquidity.min_turnover_eur_us)}" placeholder="aucun" ${dis}> M€</label></div>
-        <p class="as-hint">Une mauvaise liquidité baisse la note complexe (poids « Liquidité ») ; ce seuil, lui, ne fait que filtrer l’affichage.</p></div>` : '<p class="as-hint">Mode simple : exactement deux seuils par granularité (pente et R²). Les critères facultatifs (rendement, concentration, volatilité, séances positives, drawdown, dernier jour, liquidité) sont en mode avancé.</p>'}</div>`;
+      ${p ? technicalCard(p) + previewCard() : ''}`;
   }
 
   function technicalCard(p) {
@@ -225,54 +202,77 @@
     return rows.length ? `<table class="as-mini"><tbody>${rows.map(r => `<tr><td class="num">${r.rank}</td><td><b>${E(r.symbol)}</b> <span class="muted">${E(r.name)}</span></td><td class="num">${fmt(r.score, 1)}</td><td>${r.status === 'partiel' ? '<span class="badge wait">incomplet</span>' : ''}</td></tr>`).join('')}</tbody></table>` : '<p class="muted">Aucun titre noté.</p>';
   }
 
+  // Courbe de cours : points réels uniquement, rien d'interpolé. Vert si la période finit au-dessus de son début, rouge sinon.
+  function spark(vals, w = 96, h = 26) {
+    if (!vals || vals.length < 2) return `<span class="as-nocurve muted" title="Historique insuffisant">—</span>`;
+    const lo = Math.min(...vals), hi = Math.max(...vals), span = hi - lo || 1, n = vals.length - 1;
+    const pts = vals.map((v, i) => `${(i * (w - 2) / n + 1).toFixed(1)},${(h - 2 - (v - lo) / span * (h - 4)).toFixed(1)}`).join(' ');
+    const up = vals[vals.length - 1] >= vals[0];
+    return `<svg class="as-spark ${up ? 'up' : 'dn'}" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="Cours sur ${n} séances"><polyline points="${pts}" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>`;
+  }
+  function bigCurve(vals) {
+    if (!vals || vals.length < 2) return '<p class="muted">Pas assez d’historique pour tracer la courbe.</p>';
+    const w = 520, h = 140, lo = Math.min(...vals), hi = Math.max(...vals), span = hi - lo || 1, n = vals.length - 1;
+    const pts = vals.map((v, i) => `${(40 + i * (w - 48) / n).toFixed(1)},${(h - 14 - (v - lo) / span * (h - 28)).toFixed(1)}`).join(' ');
+    const up = vals[n] >= vals[0], chg = vals[0] ? (vals[n] / vals[0] - 1) * 100 : null;
+    return `<div class="as-bigcurve"><svg class="as-spark ${up ? 'up' : 'dn'}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="Courbe des cours"><polyline points="${pts}" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>
+      <span class="as-ax hi">${fmt(hi, 2)}</span><span class="as-ax lo">${fmt(lo, 2)}</span></div>
+      <p class="as-hint">Cours sur les ${n} dernières séances (granularité de la stratégie)${chg === null ? '' : ' · variation <b>' + (chg >= 0 ? '+' : '') + fmt(chg, 1) + ' %</b>'}.</p>`;
+  }
+  const scoreCell = (v, st, main) => `<span class="as-sc ${main ? 'main' : ''}">${v === null || v === undefined ? '<span class="muted">inconnu</span>' : `<b>${fmt(v, 1)}</b>`}${st === 'partiel' ? ' <span class="badge wait" title="Données incomplètes">inc.</span>' : ''}</span>`;
+  // Une ligne de classement : rang, nom, courbe, scores à droite. `which` met en avant le score qui sert au classement.
+  function rowHtml(r, which, pick) {
+    return `<div class="as-rk ${pick ? 'pick' : ''}" ${pick ? `data-a="sim-pick" data-id="${r.id}" tabindex="0" role="button"` : ''}><span class="as-rk-n">${r.rank ?? '—'}</span>
+      <span class="as-rk-name"><b>${E(r.symbol)}</b> <span class="muted">${E(r.name)}</span></span>${spark(r.curve)}
+      <span class="as-rk-sc"><span class="as-rk-l">Simple</span>${scoreCell(r.simple, r.simple_status, which === 'simple')}<span class="as-rk-l">Complexe</span>${scoreCell(r.complex, r.complex_status, which === 'complex')}</span></div>`;
+  }
+  const stratPicker = () => `<select data-a="strategy" class="as-select" aria-label="Stratégie">${v4().map(s => `<option value="${E(s.name)}" ${s.name === sel ? 'selected' : ''}>${E(s.label)}</option>`).join('')}</select>`;
+  const granText = g => g ? `${(g.periods || []).map(x => E(labels()[x.id] || x.id)).join(' + ')} — courbes sur ${g.sessions} séances` : '';
+
   function previewCard() {
-    const c = rank, s = c ? c.summary : null;
+    const c = rank, s = c ? c.summary : null, st = strat();
     const block = (key, label) => { const x = s[key], rel = c.compared && c.compared[key]; return `<div class="as-rankcol"><h4 class="as-h">${label}</h4>
         <div class="as-tiles as-tiles3"><div class="as-tile"><span>Notés et classés</span><b>${J.num(x.ranked, 0)}</b><small>sur ${J.num(s.universe, 0)} titres</small></div>
           <div class="as-tile"><span>Note indisponible</span><b>${J.num(x.unavailable, 0)}</b><small>calcul impossible ou mesures absentes</small></div>
           <div class="as-tile"><span>Données incomplètes</span><b>${J.num(x.reduced_history, 0)}</b><small>${J.num(x.unreliable, 0)} sous le seuil de fiabilité</small></div></div>
         ${dist(x.distribution)}
-        ${rel ? `<p class="as-hint"><b>Effet de vos modifications :</b> ${J.num(rel.score_changed, 0)} notes changent ; rang médian déplacé de ${J.num(rel.median_shift, 0)} ; ${J.num(rel.moved_over_10, 0)} titres bougent de plus de 10 places ; dans le top ${rel.top} : ${rel.top_entered} entrée${rel.top_entered > 1 ? 's' : ''}, ${rel.top_left} sortie${rel.top_left > 1 ? 's' : ''}.</p>` : '<p class="as-hint">Aucune modification en cours : comparaison indisponible.</p>'}
-        <h5 class="as-h">Dix premiers</h5>${rankTop(c.top[key])}</div>`; };
-    return `<div class="card"><div class="row between"><h3 class="as-h" style="margin:0">Classement général sur la base actuelle</h3><button class="btn small" data-a="conf-run">${confBusy ? 'Calcul…' : 'Recalculer'}</button></div>
+        ${rel ? `<p class="as-hint"><b>Effet de vos modifications :</b> ${J.num(rel.score_changed, 0)} notes changent ; rang médian déplacé de ${J.num(rel.median_shift, 0)} ; ${J.num(rel.moved_over_10, 0)} titres bougent de plus de 10 places ; dans le top ${rel.top} : ${rel.top_entered} entrée${rel.top_entered > 1 ? 's' : ''}, ${rel.top_left} sortie${rel.top_left > 1 ? 's' : ''}.</p>` : ''}</div>`; };
+    return `<div class="card"><div class="row between" style="flex-wrap:wrap;gap:8px"><h3 class="as-h" style="margin:0">Classement général sur la base actuelle</h3><button class="btn small" data-a="conf-run">${confBusy ? 'Calcul…' : 'Recalculer'}</button></div>
+      <div class="row gap-s" style="flex-wrap:wrap;margin:8px 0"><span class="muted">Stratégie :</span> ${stratPicker()}<span class="as-hint" style="margin:0">${c ? granText(c.granularity) : ''}</span></div>
       ${confStale ? '<p class="as-hint" style="color:var(--warn)">Réglages modifiés depuis ce calcul : cliquez sur « Recalculer ».</p>' : ''}
       ${confBusy && !c ? '<div class="empty"><span class="spinner"></span></div>' : !c ? `<p class="muted">${confFail ? 'Calcul impossible : voir le message ci-dessus.' : 'Calcul au premier affichage.'}</p>` : s.universe === 0 ? '<div class="notice warn" style="margin-top:8px">Aucun titre dans cette base : rien à noter. Aucune valeur d’exemple n’est affichée.</div>' : `
-        <p class="as-hint">Tous les titres évaluables sont notés et classés, du meilleur au moins bon, sans quota ni seuil. Les filtres facultatifs ne retirent rien d’ici.</p>
-        <div class="as-ranks">${block('simple', 'Score simple')}${block('complex', 'Score complexe')}</div>
+        <p class="as-hint">Stratégie « ${E(st ? st.label : '')} » : ${granText(c.granularity)}. Tous les titres évaluables sont notés et classés, du meilleur au moins bon. Le rang est le rang général : choisir une catégorie ne le change pas.</p>
+        <div class="row between" style="flex-wrap:wrap;gap:8px"><div class="seg"><button data-a="rk-which" data-v="simple" class="${rkWhich === 'simple' ? 'on' : ''}">Classé par score simple</button><button data-a="rk-which" data-v="complex" class="${rkWhich === 'complex' ? 'on' : ''}">Classé par score complexe</button></div></div>
+        <div class="as-chips" style="margin:8px 0"><button class="btn small ${rkCat ? '' : 'primary'}" data-a="rk-cat" data-v="">Toutes <b>${J.num(c.listing.categories.reduce((a, x) => a + x.count, 0), 0)}</b></button>
+          ${c.listing.categories.map(k => `<button class="btn small ${rkCat === k.id ? 'primary' : ''}" data-a="rk-cat" data-v="${E(k.id)}"><i class="as-dot" style="background:${E(k.color || '#999')}"></i> ${E(k.name)} <b>${J.num(k.count, 0)}</b></button>`).join('')}</div>
+        <div class="as-rklist">${c.listing.rows.length ? c.listing.rows.map(r => rowHtml(r, rkWhich)).join('') : '<p class="muted">Aucun titre dans cette catégorie.</p>'}</div>
+        ${c.listing.rows.length < c.listing.total ? `<div style="margin-top:8px"><button class="btn small" data-a="rk-more" ${rkMore ? 'disabled' : ''}>${rkMore ? 'Chargement…' : `Afficher la suite (${c.listing.rows.length} sur ${J.num(c.listing.total, 0)})`}</button></div>` : `<p class="as-hint">${J.num(c.listing.total, 0)} titre${c.listing.total > 1 ? 's' : ''}.</p>`}
+        <div class="as-ranks" style="margin-top:14px">${block('simple', 'Score simple')}${block('complex', 'Score complexe')}</div>
         ${s.unavailable_reasons.length ? `<p class="as-hint"><b>Pourquoi une note est indisponible :</b> ${s.unavailable_reasons.map(r => `${E(r.reason)} (${J.num(r.count, 0)})`).join(' · ')}${s.no_inputs ? ` · ${J.num(s.no_inputs, 0)} titres sans mesures de score calculées` : ''}.</p>` : s.no_inputs ? `<p class="as-hint">${J.num(s.no_inputs, 0)} titres sans mesures de score calculées.</p>` : ''}
-        <p class="as-hint">Moteur de notation version ${c.engine_version}. Poids réels des périodes : ${c.weights.map(w => `${E(labels()[w.id])} <b>${fmt(100 * w.weight, 1)} %</b>`).join(' · ')} (κ = ${fmt(c.kappa, 2)}${c.weights.some(w => w.custom) ? ', poids personnalisés' : ', automatiques'}).</p>`}
-      ${confFilter(c)}</div>`;
+        <p class="as-hint">Moteur de notation version ${c.engine_version}. Poids réels des périodes : ${c.weights.map(w => `${E(labels()[w.id])} <b>${fmt(100 * w.weight, 1)} %</b>`).join(' · ')} (κ = ${fmt(c.kappa, 2)}${c.weights.some(w => w.custom) ? ', poids personnalisés' : ', automatiques'}).</p>`}</div>`;
   }
 
-  function confFilter(c) {
-    const p = prof();
-    if (!p || !p.filters || !p.filters.enabled) return '<p class="as-hint">Filtres facultatifs désactivés : aucun titre n’est écarté de la consultation.</p>';
-    if (!c || !c.filters) return '';
-    const t = c.filters.counts;
-    return `<h4 class="as-h">Effet des filtres facultatifs (consultation seulement)</h4><div class="as-tiles as-tiles3"><div class="as-tile"><span>Conformes</span><b>${J.num(t.retained, 0)}</b><small>sur ${J.num(c.filters.universe, 0)} titres</small></div>
-      <div class="as-tile"><span>Masqués par un filtre</span><b>${J.num(t.rejected, 0)}</b><small>${J.num(c.filters.rejected_with_both_scores, 0)} gardent leurs deux scores</small></div>
-      <div class="as-tile"><span>Non évaluables</span><b>${J.num(t.unknown, 0)}</b><small>contrôle technique</small></div></div>`;
-  }
-
-  async function runConf() {
-    confBusy = true; confFail = false; confStale = false; paintBody();
-    try {
-      const body = { strategy: sel }; if (dirty()) body.draft = { global: draft.global, profile: payload() };
-      rank = await J.post('admin/scores/ranking', body);
-      const p = prof();
-      if (p && p.filters && p.filters.enabled) { const f = await J.post('admin/scores/conformity', body); rank.filters = f; }
-      error = '';
-    }
+  const rankBody = (extra) => { const body = { strategy: sel, which: rkWhich, category: rkCat, limit: 25, ...extra }; if (dirty()) body.draft = { global: draft.global, profile: payload() }; return body; };
+  async function runConf(keepCat) {
+    confBusy = true; confFail = false; confStale = false; if (!keepCat) rkCat = null; paintBody();
+    try { rank = await J.post('admin/scores/ranking', rankBody({ offset: 0 })); error = ''; }
     catch (e) { rank = null; confFail = true; error = e.message; }
     confBusy = false; paint();
+  }
+  async function rankMore() {
+    rkMore = true; paintBody();
+    try { const r = await J.post('admin/scores/ranking', rankBody({ offset: rank.listing.rows.length })); rank.listing.rows = rank.listing.rows.concat(r.listing.rows); rank.listing.total = r.listing.total; }
+    catch (e) { error = e.message; }
+    rkMore = false; paint();
   }
 
   // ───────────── simulation ─────────────
   function simulationView(isV4) {
-    if (!isV4) return `<div class="notice warn">La simulation porte sur une stratégie V4. Choisissez-en une dans « Configuration du moteur ».</div>`;
-    const chips = sim && sim.suggestions && sim.suggestions.length ? `<div class="as-chips"><span class="muted">Mieux notés :</span> ${sim.suggestions.map(c => `<button class="btn small" data-a="sim-pick" data-id="${c.id}">${E(c.symbol)} · ${fmt(c.simple, 0)}</button>`).join(' ')}</div>` : '';
-    return `<div class="card"><div class="row gap-s" style="flex-wrap:wrap"><input id="as-q" class="as-search" placeholder="Symbole, nom ou ISIN d’un titre noté" value="${E(simQ)}"><button class="btn primary" data-a="sim-run">Décomposer</button>
-        <label class="row gap-s as-chk"><input type="checkbox" data-a="use-draft" ${useDraft ? 'checked' : ''}> avec mes modifications non enregistrées</label></div>${chips}</div>
+    if (!isV4) return `<div class="notice warn">La simulation porte sur une stratégie V4. Choisissez-en une ci-dessous.<div style="margin-top:8px">${stratPicker()}</div></div>`;
+    const sg = sim && sim.suggestions && sim.suggestions.length ? `<h4 class="as-h" style="margin-top:12px">Mieux classés — score simple</h4><div class="as-rklist">${sim.suggestions.map(r => rowHtml(r, 'simple', true)).join('')}</div>` : '';
+    return `<div class="card"><div class="row gap-s" style="flex-wrap:wrap;margin-bottom:8px"><span class="muted">Stratégie :</span> ${stratPicker()}<span class="as-hint" style="margin:0">${sim && sim.granularity ? granText({ periods: sim.periods, sessions: sim.granularity }) : ''}</span></div>
+        <div class="row gap-s" style="flex-wrap:wrap"><input id="as-q" class="as-search" placeholder="Symbole, nom ou ISIN d’un titre noté" value="${E(simQ)}"><button class="btn primary" data-a="sim-run">Décomposer</button>
+        <label class="row gap-s as-chk"><input type="checkbox" data-a="use-draft" ${useDraft ? 'checked' : ''}> avec mes modifications non enregistrées</label></div>${sg}</div>
       <div id="as-sim">${simBusy ? '<div class="empty"><span class="spinner"></span></div>' : simBody()}</div>`;
   }
 
@@ -282,12 +282,14 @@
     if (sim.not_found) return '<div class="card"><div class="notice warn">Aucun titre noté ne correspond à cette recherche.</div></div>';
     if (!sim.result) return `<div class="card"><p class="muted">${sim.candidates && sim.candidates.length ? 'Plusieurs titres correspondent.' : 'Choisissez un titre parmi les mieux notés ci-dessus.'}</p></div>`;
     const r = sim.result, ids = sim.periods.map(x => x.id), L = labels();
-    const sc = (o, cls) => `<div class="as-score ${cls}"><span>${cls === 's' ? 'Score simple' : 'Score complexe'}</span><b>${o.score === null ? 'inconnu' : fmt(o.score, 1)}</b>${o.score === null ? '' : ' / 100'}<small>${o.status === 'ok' ? 'données complètes' : o.status === 'partiel' ? 'données incomplètes' : E(o.why || '')} · couverture ${fmt(100 * (o.coverage || 0), 0)} %${o.score !== null && o.reliable === false ? ' · peu fiable' : ''}</small></div>`;
+    const rk = sim.ranks || {}, rkOf = cls => { const x = rk[cls === 's' ? 'simple' : 'complex']; return x && x.rank ? `rang <b>${x.rank}</b> sur ${J.num(x.of, 0)} · ` : ''; };
+    const sc = (o, cls) => `<div class="as-score ${cls}"><span>${cls === 's' ? 'Score simple' : 'Score complexe'}</span><b>${o.score === null ? 'inconnu' : fmt(o.score, 1)}</b>${o.score === null ? '' : ' / 100'}<small>${rkOf(cls)}${o.status === 'ok' ? 'données complètes' : o.status === 'partiel' ? 'données incomplètes' : E(o.why || '')} · couverture ${fmt(100 * (o.coverage || 0), 0)} %${o.score !== null && o.reliable === false ? ' · peu fiable' : ''}</small></div>`;
     const cell = (c, key, unit, d) => { if (!c) return '<td class="num muted">—</td>'; const raw = c.raw || {}; const val = key === 'growth' ? c.growth : raw[key]; const note = c[key === 'growth' ? 'dynamics' : { r2: 'r2', up_fraction: 'up_days', spike_share: 'concentration', accel: 'acceleration', volatility: 'volatility', drawdown: 'drawdown' }[key]];
       return `<td class="num">${val === null || val === undefined ? '<span class="muted">indisponible</span>' : fmt(unit === '%' ? val * (['up_fraction', 'spike_share'].includes(key) ? 100 : 1) : val, d) + (unit ? ' ' + unit : '')}${note === null || note === undefined ? '' : `<br><small class="muted">note ${fmt(note, 0)}</small>`}</td>`; };
     const rows = [['Croissance (Dynamique)', 'growth', '%', 2], ['Régularité (R²)', 'r2', '', 2], ['Séances positives', 'up_fraction', '%', 0], ['Plus gros pic ÷ hausse nette', 'spike_share', '%', 0], ['Accélération (écart de pente)', 'accel', '', 3], ['Volatilité (par séance)', 'volatility', '%', 2], ['Drawdown', 'drawdown', '%', 1]];
     const s = r.simple, c = r.complex, liq = r.liquidity || {};
     return `<div class="card"><div class="row between" style="flex-wrap:wrap;gap:12px"><div><h3 class="as-h" style="margin:0">${E(sim.title.name)}</h3><span class="muted">${E(sim.title.symbol)} · ${E(sim.title.mic)} · ${sim.title.kind === 'etf' ? 'ETF' : 'Action'}</span></div><div class="row gap-s">${sc(s, 's')}${sc(c, 'c')}</div></div>
+      ${bigCurve(sim.curve)}
       <div class="table-wrap"><table class="as-dec"><thead><tr><th>Mesure</th>${ids.map(i => `<th class="num">${E(L[i])}<br><small class="muted">poids réel ${fmt(100 * ((r.weights_effective || {})[i] || 0), 1)} %${r.periods[i] ? '' : ' (période sans données)'}</small></th>`).join('')}</tr></thead><tbody>
         ${rows.map(([n, k, u, d]) => `<tr><td>${n}</td>${ids.map(i => cell(r.periods[i], k, u, d)).join('')}</tr>`).join('')}</tbody></table></div>
       <div class="as-two"><div><h4 class="as-h">Score simple (pente × R²)</h4>${s.score === null ? `<p class="muted">${E(s.why || '')}</p>` : `<p>100 × Dynamique <b>${fmt(s.dynamics, 2)}</b> × Régularité <b>${fmt(s.quality, 2)}</b> = <b>${fmt(s.score, 1)}</b></p>
@@ -359,7 +361,7 @@
       q.periods[t.dataset.p].enabled = on;
       if (q.weights_mode === 'custom') { if (on) q.weights[t.dataset.p] = 0; else delete q.weights[t.dataset.p]; }
       later();
-    } else if (a === 'filters-on') { p.filters = { enabled: t.checked }; if (rank) rank.filters = null; confStale = true; paint(); }
+    }
     else if (a === 'req') { p.periods[t.dataset.p].require_history = t.checked; confStale = true; paintBar(); }
     else if (a === 'pw') {
       p.weights[t.dataset.p] = +t.value || 0;
@@ -379,14 +381,6 @@
     else if (a === 'use-draft') { useDraft = t.checked; }
   }
 
-  function applyPreset(kind) {
-    const ref = clone(S.references[kind]), p = prof(), before = active(p).join();
-    S.scoring_periods.forEach(id => { Object.assign(p.periods[id], ref.periods[id], { sessions: p.periods[id].sessions }); });
-    p.day_filter = ref.day_filter; p.liquidity = ref.liquidity; p.technical = ref.technical;
-    if (before !== active(p).join()) { p.weights_mode = 'auto'; p.weights = {}; }
-    rank = null; J.toast(kind === 'v1' ? 'Préréglage V1 appliqué (non enregistré)' : 'Valeurs initiales appliquées (non enregistrées)'); paint();
-  }
-
   function toCustom() {
     const p = prof(), w = autoWeights(p) || {}, ids = active(p); let acc = 0;
     p.weights = {}; ids.forEach((i, n) => { const v = n === ids.length - 1 ? Math.round((100 - acc) * 10) / 10 : Math.round((w[i] || 0) * 10) / 10; p.weights[i] = v; acc += v; });
@@ -403,9 +397,10 @@
     else if (a === 'cw-norm') { const p = prof(), tot = sum(p.complex_weights) || 1; let acc = 0; const keys = Object.keys(p.complex_weights); keys.forEach((k, i) => { const x = i === keys.length - 1 ? Math.round((100 - acc) * 10) / 10 : Math.round(p.complex_weights[k] / tot * 1000) / 10; p.complex_weights[k] = x; acc += x; }); paint(); }
     else if (a === 'cw-ref') { prof().complex_weights = clone(S.design.complex_weights); paint(); }
     else if (a === 'open') { sel = v; tab = 'profils'; sim = null; rank = null; paint(); }
-    else if (a === 'adv') { adv = v === '1'; paint(); }
-    else if (a === 'preset') { applyPreset(v); }
-    else if (a === 'conf-run') { runConf(); }
+    else if (a === 'conf-run') { runConf(true); }
+    else if (a === 'rk-which') { rkWhich = v; rkCat = null; runConf(true); }
+    else if (a === 'rk-cat') { rkCat = v || null; runConf(true); }
+    else if (a === 'rk-more') rankMore();
     else if (a === 'cancel') { reset(); rank = null; paint(); }
     else if (a === 'save') save();
     else if (a === 'restore') restore();

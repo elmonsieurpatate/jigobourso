@@ -75,6 +75,15 @@ def test_general_ranking_rates_every_evaluable_title_and_filters_remove_none():
     assert s['universe'] == 2 and s['simple']['ranked'] == 2 and s['complex']['ranked'] == 2 and s['simple']['unavailable'] == 0      # tous notés, aucun quota
     assert sum(s['simple']['distribution']['histogram']) == 2 and [x['symbol'] for x in r['top']['simple']][0] == 'UP.DE'
     assert abs(sum(w['weight'] for w in r['weights']) - 1) < 1e-9 and r['compared'] is None
+    # classement par catégorie : courbes réelles, rang général inchangé, granularité = période active la plus longue
+    lst = r['listing']
+    assert r['granularity']['sessions'] == 21 and lst['which'] == 'simple' and lst['total'] == 2 and [x['rank'] for x in lst['rows']] == [1, 2]
+    assert all(len(x['curve']) <= 22 for x in lst['rows']) and sum(c['count'] for c in lst['categories']) == 2
+    one = next(c for c in lst['categories'] if c['count'])
+    sub = A.ranking(conn, {'strategy': 'growth_v4', 'which': 'complex', 'category': None})['listing']
+    assert sub['which'] == 'complex'
+    sim0 = A.simulate(conn, {'strategy': 'growth_v4', 'q': 'UP.DE'})
+    assert sim0['ranks']['simple']['rank'] == 1 and sim0['granularity'] == 21 and isinstance(sim0['curve'], list) and sim0['suggestions'][0]['rank'] == 1
     # seuils extrêmes SANS activer les filtres : ni notes ni classement ne bougent, et l'Explorer ne retire aucun titre
     p = A.profile_of(A.base_config('growth_v4'))
     for x in p['periods'].values():

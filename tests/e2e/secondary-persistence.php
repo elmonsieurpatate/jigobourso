@@ -75,6 +75,21 @@ $check(count($ids)===15&&in_array('score_simple',$ids,true)&&in_array('score_com
 $after13=array_values(array_filter($state['definitions']['filters'],fn($f)=>!in_array($f['id'],['score_simple','score_complex'],true)));$check($after13===$before13,'Les 13 filtres existants et leurs réglages sont intacts');
 $check($state['defaults']['filters']['score_simple']['score_simple_v4']['mode']==='all'&&$state['defaults']['filters']['score_complex']['score_complex_v4']['mode']==='all','Défauts des scores créés (tout inclus)');
 $check($untouched()===$original,'Réglages historiques, recherches, profils, utilisateurs et catalogue inchangés');
+// Ordre des filtres : permutation stricte, révision obligatoire, aucun filtre modifié.
+$orig=$state['definitions']['filters'];$ids0=array_column($orig,'id');$rev=$state['definitions']['revision'];$rev_d=$state['defaults']['revision'];
+$perm=array_reverse($ids0);$o=secondary_write(['action'=>'order','order'=>$perm,'revision'=>$rev]);
+$check(array_column($o['definitions']['filters'],'id')===$perm&&$o['definitions']['revision']===$rev+1,'Ordre enregistré et révision incrémentée');
+$byId=[];foreach($orig as $f)$byId[$f['id']]=$f;$same=true;foreach($o['definitions']['filters'] as $f)if($f!==$byId[$f['id']])$same=false;$check($same,'Ordre : aucun filtre ni catégorie modifié');
+$check($o['defaults']['revision']===$rev_d,'Ordre : défauts inchangés');
+secondary_initialize();$check(array_column(secondary_read()['definitions']['filters'],'id')===$perm,'Ordre conservé après rechargement et initialisation');
+$reject(fn()=>secondary_write(['action'=>'order','order'=>$ids0,'revision'=>$rev]),409);
+$r2=$o['definitions']['revision'];
+$reject(fn()=>secondary_write(['action'=>'order','order'=>array_slice($ids0,1),'revision'=>$r2]),422);
+$reject(fn()=>secondary_write(['action'=>'order','order'=>array_merge(array_slice($ids0,1),['inconnu']),'revision'=>$r2]),422);
+$reject(fn()=>secondary_write(['action'=>'order','order'=>array_merge(array_slice($ids0,1),[$ids0[1]]),'revision'=>$r2]),422);
+$reject(fn()=>secondary_write(['action'=>'order','order'=>'x','revision'=>$r2]),422);
+$same_rev=secondary_write(['action'=>'order','order'=>$perm,'revision'=>$r2]);$check($same_rev['definitions']['revision']===$r2,'Même ordre : pas de nouvelle révision');
+$state=secondary_write(['action'=>'order','order'=>$ids0,'revision'=>$r2]);$check(array_column($state['definitions']['filters'],'id')===$ids0,'Ordre d’origine rétabli');
 // Reset only these two test documents to the proposals before browser tests.
 foreach($state['definitions']['filters'] as $f)if(!$f['enabled'])$state=secondary_write(['action'=>'restore','filter_id'=>$f['id'],'revision'=>$state['definitions']['revision'],'defaults_revision'=>$state['defaults']['revision']]);
 echo "PASS: DB MariaDB réelle, 15/11/4, idempotence, rechargement, activation, catégories, couleurs/descriptions, IDs stables, ordre, défauts distincts, conflits, validation, métadonnées réelles, restauration ciblée, conservation de l’existant.\n";

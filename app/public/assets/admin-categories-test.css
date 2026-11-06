@@ -103,3 +103,9 @@ body:has(.ac) #nav>a.nv.on .ic{color:#fff}
 .ac .sr-only{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
 .ac[aria-busy]{cursor:progress}
 @media(max-width:700px){.ac-persist-actions{width:100%;margin-left:0}.ac-default-controls{align-items:flex-start;flex-wrap:wrap}.ac td[data-label="Par défaut"]{grid-column:1;grid-row:5;display:flex;align-items:center;gap:8px}.ac td[data-label="Par défaut"]:before{margin:0}.ac td[data-label="Par défaut"] .ac-default-check{justify-content:flex-start}}
+.ac-order-note{margin:0 0 8px;color:var(--muted,#64748b);font-size:13px}
+.ac-order-title{margin:14px 0 6px;font-size:14px}
+.ac-order-list{list-style:none;margin:0;padding:0;border:1px solid var(--line,#e2e8f0);border-radius:10px;overflow:hidden}
+.ac-order-list li{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 10px;border-bottom:1px solid var(--line,#e2e8f0)}
+.ac-order-list li:last-child{border-bottom:0}
+.ac-order-btns{display:flex;gap:4px}

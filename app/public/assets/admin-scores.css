@@ -50,3 +50,20 @@
 .as-hist i { display: block; width: 100%; background: var(--accent, #2f6fed); border-radius: 2px 2px 0 0; min-height: 1px; opacity: .8; }
 .as-hist small { font-size: 10px; color: var(--muted, #888); }
 .as-list { margin: 4px 0 4px 18px; padding: 0; } .as-list li { margin-bottom: 4px; }
+
+/* Classement : rang, nom, courbe, scores à droite */
+.as-rklist { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.as-rk { display: grid; grid-template-columns: 38px minmax(0, 1fr) 100px auto; gap: 10px; align-items: center; padding: 7px 12px; border-bottom: 1px solid var(--line); font-size: .9rem; }
+.as-rk:last-child { border-bottom: 0; }
+.as-rk.pick { cursor: pointer; } .as-rk.pick:hover, .as-rk.pick:focus { background: var(--surface-2, rgba(127,127,127,.08)); outline: 0; }
+.as-rk-n { color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; }
+.as-rk-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.as-rk-sc { display: grid; grid-template-columns: auto auto; column-gap: 8px; align-items: baseline; justify-items: end; font-variant-numeric: tabular-nums; min-width: 120px; }
+.as-rk-l { color: var(--muted); font-size: .72rem; }
+.as-sc.main b { font-size: 1.05rem; } .as-sc:not(.main) { color: var(--muted); }
+.as-spark { display: block; } .as-spark.up { color: #1a9d55; } .as-spark.dn { color: #e0453a; }
+.as-bigcurve { position: relative; margin: 12px 0 2px; height: 140px; } .as-bigcurve svg { width: 100%; height: 100%; }
+.as-ax { position: absolute; left: 0; font-size: .72rem; color: var(--muted); } .as-ax.hi { top: 0; } .as-ax.lo { bottom: 0; }
+.as-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; vertical-align: baseline; }
+@media (max-width: 640px) { .as-rk { grid-template-columns: 30px minmax(0, 1fr) auto; } .as-rk .as-spark, .as-rk .as-nocurve { grid-column: 2; grid-row: 2; } .as-rk-sc { grid-column: 3; grid-row: 1 / span 2; } }
+.row > .as-select { width: auto; max-width: 380px; } .as-score small b { font-size: inherit; }

@@ -172,6 +172,16 @@ function secondary_write(array $request): array {
     try{
         $d=secondary_decode(q('SELECT value_json FROM settings WHERE name=? FOR UPDATE',[SECONDARY_DEFINITIONS])->fetchColumn());
         $s=secondary_decode(q('SELECT value_json FROM settings WHERE name=? FOR UPDATE',[SECONDARY_DEFAULTS])->fetchColumn());
+        if(($request['action']??null)==='order'){
+            // Ordre d'affichage des filtres dans l'Explorer : permutation exacte des filtres existants, rien d'autre n'est modifié.
+            if(($request['revision']??null)!==$d['revision'])throw new ApiError('Les filtres ont changé dans une autre session. Rechargez avant d’enregistrer.',409);
+            $order=$request['order']??null;$current=array_column($d['filters'],'id');
+            if(!is_array($order)||$order!==array_values($order)||count($order)!==count($current)||count(array_filter($order,'is_string'))!==count($order)||array_diff($order,$current)||count(array_unique($order))!==count($order))throw new ApiError('Ordre des filtres invalide.',422);
+            $byId=[];foreach($d['filters'] as $f)$byId[$f['id']]=$f;
+            $next=array_map(fn($i)=>$byId[$i],$order);
+            if($next!==$d['filters']){$d['filters']=$next;$d['revision']++;q('UPDATE settings SET value_json=?,updated_at=? WHERE name=?',[secondary_json($d),now_utc(),SECONDARY_DEFINITIONS]);}
+            $db->commit();return secondary_read();
+        }
         if(!is_string($request['filter_id']??null))throw new ApiError('Identifiant de filtre requis.',422);
         $id=$request['filter_id'];$stored=secondary_find($d,$id);$canonical=secondary_find(secondary_proposed(),$id);$action=$request['action']??'save';
         $index=array_search($id,array_column($d['filters'],'id'),true);$changedD=false;$changedS=false;
