@@ -109,7 +109,7 @@ def table(conn, request):
             'periods': {str(n): {'slope': _num(v.get('slope')), 'r2': _num(v.get('r2'))} for n, v in m.items()},
             'slope': _num(mo.get('slope')), 'r2': _num(mo.get('r2')), 'perf': perf, 'volatility': _num(mo.get('volatility')), 'drawdown': _num(mo.get('drawdown')),
             'turnover_eur': _num(d.get('turnover_eur')), 'liquidity_source': d.get('liquidity_source'), 'avg_volume': _num(d.get('avg_volume_3m')),
-            'analyst': _num(d.get('analyst_rating')), 'quality': d.get('quality'),
+            'analyst': d.get('analyst_rating'), 'quality': d.get('quality'),
             'simple': e['simple'], 'complex': e['complex'], 'simple_status': e['simple_status'], 'complex_status': e['complex_status'],
             'rank_simple': rank_s.get(lid), 'rank_complex': rank_c.get(lid), 'curve': curves.get(lid, []), 'secondary': secondary})
     return {'strategy': name, 'reference_sessions': REFERENCE, 'universe': len(rows), 'scored': {'simple': len(simple), 'complex': len(complex_)}, 'rows': rows}

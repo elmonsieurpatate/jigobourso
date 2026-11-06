@@ -20,11 +20,13 @@ def test_table_has_scores_ranks_groups_and_unknowns_stay_none():
     seed(conn)
     with conn.cursor() as cur:
         cur.execute("UPDATE instruments SET category='Technology' WHERE id=1")
+        cur.execute("UPDATE latest_prices SET analyst_rating='1.6 - Buy' WHERE listing_id=1")      # texte de Yahoo, pas un nombre
     conn.commit()
     t = R.table(conn, {})
     rows = {r['symbol']: r for r in t['rows']}
     assert t['universe'] == 2 and set(rows) == {'UP.DE', 'ZIG.DE'}
     up = rows['UP.DE']
+    assert up['analyst'] == '1.6 - Buy'
     assert up['simple'] is not None and up['rank_simple'] == 1 and up['rank_complex'] in (1, 2)
     assert up['group'] == {'country': 'country:europe', 'market': 'market:europe', 'sector': 'sector:technology', 'asset': 'asset:equity'}
     assert rows['ZIG.DE']['group']['sector'] == 'unknown'                           # secteur non renseigné : inconnu, pas « autres »
