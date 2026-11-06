@@ -32,7 +32,7 @@
           <div class="row gap-s"><label class="row gap-s small" style="cursor:pointer"><input type="checkbox" data-act="toggle" data-id="${esc(r.id)}" ${m.enabled ? 'checked' : ''}> Active</label>
           <button class="btn small" data-act="edit" data-id="${esc(r.id)}">Modifier</button>
           ${m.enabled ? `<a class="btn small primary" href="classement-test.html?strategy=${encodeURIComponent(r.id)}">Ouvrir</a>` : ''}
-          ${r.builtin ? (r.row ? `<button class="btn small" data-act="restore" data-id="${esc(r.id)}">Restaurer</button>` : '') : `<button class="btn small" data-act="copy" data-id="${esc(r.id)}">Dupliquer</button><button class="btn small danger" data-act="delete" data-id="${esc(r.id)}">Supprimer</button>`}</div></div>
+          ${r.builtin ? `<button class="btn small" data-act="restore" data-id="${esc(r.id)}" title="Remet les réglages d’origine">Restaurer par défaut</button>` : `<button class="btn small" data-act="copy" data-id="${esc(r.id)}">Dupliquer</button><button class="btn small danger" data-act="delete" data-id="${esc(r.id)}">Supprimer</button>`}</div></div>
           ${editing === r.id ? form(r) : ''}</div>`;
       }).join('');
     J.$$('[data-act]', page).forEach(b => { const a = b.dataset.act; if (a === 'toggle') b.onchange = () => act(a, b.dataset.id, b.checked); else b.onclick = () => a === 'cancel' ? (editing = null, render()) : act(a, b.dataset.id); });
@@ -59,7 +59,7 @@
         render(`« ${n} » créée.`);
       }
       else if (a === 'delete') { if (!await J.confirm('Supprimer la stratégie', `« ${name} » sera supprimée définitivement. Les autres stratégies ne changent pas.`, 'Supprimer')) return; view = await post({ action: 'delete', id }); if (editing === id) editing = null; render(`« ${name} » supprimée.`); }
-      else if (a === 'restore') { if (!await J.confirm('Restaurer les valeurs par défaut', `Les réglages de « ${name} » reprendront leurs valeurs d’origine (nom, icône et explications restent). Les autres stratégies ne changent pas.`, 'Restaurer')) return; view = await post({ action: 'restore', id }); render(`« ${name} » restaurée.`); }
+      else if (a === 'restore') { if (!await J.confirm('Restaurer les valeurs par défaut', `Les réglages de « ${name} » reprendront leurs valeurs d’origine (nom, icône et explications restent). Les autres stratégies ne changent pas.`, 'Restaurer')) return; view = await post({ action: 'restore', id }); render(`« ${name} » : valeurs par défaut restaurées.`); }
     } catch (e) {
       if (/autre session|Rechargez/i.test(e.message || '')) { try { view = await J.api('classement-test/strategies'); } catch (_) { } }
       render(e.message || 'Action impossible.', true);
