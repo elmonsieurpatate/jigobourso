@@ -57,7 +57,7 @@
   <p class="small" style="margin:0 0 8px"><a href="index.html">← Explorer</a></p>
   <div class="hero"><div><h1>${J.esc(s.name)}</h1>
     <div class="chips" style="margin-top:8px"><span class="badge">${J.esc(s.symbol)}</span><span class="badge">${J.esc(s.market)} · ${J.esc(s.mic)}</span><span class="badge">${s.kind === 'etf' ? 'ETF' : 'Action'}</span>${s.isin ? `<span class="badge">${J.esc(s.isin)}</span>` : ''}${s.country ? `<span class="badge">${J.esc(s.country)}</span>` : ''}${s.category ? `<span class="badge">${J.esc(s.category)}</span>` : ''}${PEA ? `<span class="badge">${PEA[0]}</span>` : ''}${held ? '<span class="badge">Détenu</span>' : ''}${s.is_primary ? '' : '<span class="badge">Cotation secondaire</span>'}</div>
-    <div style="margin-top:10px">${v.status ? J.statusBadge(v.status, v.status_label) : ''}${v.rank ? ` <span class="muted">n° ${v.rank} sur ${v.of} ${s.kind === 'etf' ? 'ETF' : 'actions'} retenus${v.scope_filtered ? ' (sélection)' : ''} · selon ${J.esc((s.strategy || {}).source || 'réglage par défaut')} · score ${J.num(v.score, 0)}/100</span>` : ''}</div></div>
+    <div style="margin-top:10px">${v.status ? J.statusBadge(v.status, v.status_label) : ''}${v.rank && !s.scores_v4 ? ` <span class="muted">n° ${v.rank} sur ${v.of} ${s.kind === 'etf' ? 'ETF' : 'actions'} retenus${v.scope_filtered ? ' (sélection)' : ''} · selon ${J.esc((s.strategy || {}).source || 'réglage par défaut')} · score ${J.num(v.score, 0)}/100</span>` : ''}</div></div>
     <div style="text-align:right"><div class="px">${J.money(s.price, s.currency)}</div><div class="muted">${s.price ? J.priceLabel(s) + ' · ' + J.dateTime(s.price_time) : 'Pas de cours'}</div>${lastDay !== null ? `<div class="${J.cls(lastDay)}" style="font-weight:700">${J.pct(lastDay)} <span class="muted" style="font-weight:400">sur la dernière séance</span></div>` : ''}
     ${s.price_eur !== null && s.currency !== 'EUR' ? `<div class="muted small">≈ ${J.eur(s.price_eur)}</div>` : ''}<div style="margin-top:10px"><button class="btn small" id="add">+ Ajouter à un portefeuille</button></div></div></div>
   ${s.price_stale ? '<div class="notice warn">Cours ancien : aucune cotation récente confirmée. Le prix affiché reste daté, il ne représente pas un cours actuel.</div>' : ''}
@@ -138,6 +138,17 @@
     history.replaceState(null, '', '#' + t); panes[t]();
   }
   J.$$('#tabs button').forEach(b => b.onclick = () => open(b.dataset.t));
+  if (s.scores_v4) {                                                                  // scores V4 du moteur commun : les mêmes que dans le classement
+    const sv = s.scores_v4, rk = sv.ranks || {}, f1 = x => x === null || x === undefined ? 'inconnu' : J.num(x, 1);
+    const rkTxt = k => rk[k] && rk[k].rank ? `rang <b>${rk[k].rank}</b> sur ${J.num(rk[k].of, 0)}` : 'non classé';
+    const parts = Object.entries((sv.complex || {}).contributions || {}).filter(([, c]) => c && c.weight > 0).map(([k, c]) => `<tr><td>${J.esc(sv.labels[k] || k)}</td><td class="num">${c.unavailable ? '<span class="muted">indisponible</span>' : J.num(c.value, 0) + ' / 100'}</td><td class="num">${J.num(100 * c.weight, 0)} %</td></tr>`).join('');
+    const liq = sv.liquidity || {};
+    page.querySelector('.hero').insertAdjacentHTML('afterend', `<div class="card" style="margin:12px 0"><h3 style="margin:0 0 8px">Scores V4</h3>
+      <div class="row gap-s" style="flex-wrap:wrap;gap:12px"><div class="kpi"><span class="l">Score simple</span><span class="v">${f1(sv.simple.score)}</span><span class="small muted">${rkTxt('simple')}</span></div>
+      <div class="kpi"><span class="l">Score complexe</span><span class="v">${f1(sv.complex.score)}</span><span class="small muted">${rkTxt('complex')}</span></div>
+      <div class="kpi"><span class="l">Liquidité</span><span class="v">${liq.turnover_eur === null || liq.turnover_eur === undefined ? 'inconnue' : J.num(liq.turnover_eur / 1e6, 2) + ' M€/j'}</span><span class="small muted">${liq.source === 'daily' ? 'volumes quotidiens réels' : liq.source === 'estimated' ? 'estimée (volume moyen 3 mois)' : ''}</span></div></div>
+      ${parts ? `<details style="margin-top:10px"><summary class="small">Contributions au score complexe</summary><div class="table-wrap"><table><thead><tr><th>Composante</th><th class="num">Note</th><th class="num">Poids</th></tr></thead><tbody>${parts}</tbody></table></div></details>` : ''}</div>`);
+  }
   J.$('#add').onclick = async () => { const p = await J.api('portfolios'); if (!p.portfolios.length) { const n = await J.post('portfolio/create', { name: 'Portefeuille principal' }); p.portfolios.push({ id: n.id, name: 'Portefeuille principal' }); } J.txDialog({ portfolios: p.portfolios, portfolioId: (p.portfolios.find(x => x.is_default) || p.portfolios[0]).id, listing: { id: s.id, symbol: s.symbol, name: s.name, currency: s.currency, price: s.price }, onDone: () => location.reload() }); };
   open(location.hash.slice(1) || 'cours');
 })();

@@ -1,0 +1,115 @@
+"""Tableau « Classement » : tous les titres notés avec les deux scores V4, leurs rangs et les valeurs des filtres secondaires.
+
+Lecture seule. Aucun score n'est recalculé ici : ils viennent du moteur commun (`score_service.score_book`, mis en cache) ; le tri, les filtres et la pagination se font dans la page.
+Une donnée absente reste None (jamais 0). Les groupes pays / secteur / place / type reprennent exactement les correspondances de l'administration (`secondary_metadata_groups.json`).
+"""
+import json
+import os
+
+from engine.market.collect import latest_rates, to_eur_factor
+
+from . import scores_admin, score_service, service
+
+CONFIG = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'app', 'config', 'secondary_metadata_groups.json')
+ACCENTS = str.maketrans({'é': 'e', 'è': 'e', 'ê': 'e', 'ë': 'e', 'à': 'a', 'â': 'a', 'ä': 'a', 'á': 'a', 'ã': 'a', 'å': 'a', 'î': 'i', 'ï': 'i', 'í': 'i', 'ì': 'i', 'ô': 'o', 'ö': 'o', 'ó': 'o',
+                         'ò': 'o', 'õ': 'o', 'û': 'u', 'ü': 'u', 'ú': 'u', 'ù': 'u', 'ç': 'c', 'ñ': 'n', 'ý': 'y', 'ÿ': 'y'})
+MISSING = {'', 'unknown', 'inconnu', 'inconnue', 'n/a', 'n.a.', 'none', 'null', 'not available', 'unavailable', '-', '—'}
+WINDOWS = {'week': 5, 'month': 21, 'quarter': 63}
+REFERENCE = 21                                           # fenêtre des mesures affichées (un mois)
+QUALITY = {'ok': 0, 'insufficient': 1, 'incomplete': 1, 'stale': 1, 'inconsistent_adjustments': 2, 'break': 2}
+
+
+def _config():
+    with open(CONFIG, encoding='utf-8') as f:
+        return json.load(f)
+
+
+def _key(value):
+    return ' '.join((value or '').strip().lower().translate(ACCENTS).split())
+
+
+def classify(cfg, which, raw, kind=None):
+    """Identifiant de groupe d'un pays, d'un secteur ou d'une place (même règle que app/services/secondary_metadata.php)."""
+    key = _key(raw)
+    if key in MISSING:
+        return 'unknown'
+    if which == 'country':
+        return cfg['country_aliases'].get(key, 'country:other')
+    if which == 'market':
+        return cfg['mic_groups'].get((raw or '').strip().upper(), 'unknown')
+    mapping = cfg['equity_sectors'] if kind == 'equity' else cfg['etf_categories'] if kind == 'etf' else {}
+    return mapping.get(key, 'sector:other')
+
+
+def _num(v):
+    return None if v is None else float(v)
+
+
+def _fetch(conn, ids):
+    marks = ','.join(['%s'] * len(ids))
+    out = {i: {} for i in ids}
+    with conn.cursor() as cur:
+        cur.execute(f"""SELECT l.id, l.symbol, l.mic, l.currency, i.name, i.kind, i.isin, i.country, i.category, p.price, p.price_time, p.avg_volume_3m, p.analyst_rating,
+                               s.last_close_date, s.close_px, s.daily_change, s.quality, s.coverage_252, q.turnover_eur, q.source AS liquidity_source, q.days AS liquidity_days
+                        FROM listings l JOIN instruments i ON i.id=l.instrument_id LEFT JOIN latest_prices p ON p.listing_id=l.id LEFT JOIN series_state s ON s.listing_id=l.id
+                        LEFT JOIN liquidity_state q ON q.listing_id=l.id WHERE l.id IN ({marks})""", ids)
+        for r in cur.fetchall():
+            out[r['id']].update(r)
+        cur.execute(f"SELECT listing_id, sessions, slope, r2, perf, volatility, drawdown, coverage FROM strategy_metrics WHERE listing_id IN ({marks}) AND sessions IN (5,21,63,126,252)", ids)
+        for r in cur.fetchall():
+            out[r['listing_id']].setdefault('m', {})[r['sessions']] = r
+        cur.execute(f"SELECT listing_id, up_fraction, spike_share FROM score_inputs WHERE listing_id IN ({marks}) AND sessions=%s", ids + [REFERENCE])
+        for r in cur.fetchall():
+            out[r['listing_id']]['x'] = r
+    return out
+
+
+def table(conn, request):
+    """Toutes les lignes du classement, avec scores et rangs généraux (indépendants des filtres, du tri et de la page)."""
+    name = request.get('strategy') or 'growth_v4'
+    cfg = scores_admin.build_config(conn, name)
+    book = score_service.score_book(conn, cfg, service.data_version(conn))
+    ids = sorted(book)
+    simple = sorted((e for e in book.values() if e['simple'] is not None), key=lambda e: (-e['simple'], e['id']))
+    complex_ = sorted((e for e in book.values() if e['complex'] is not None), key=lambda e: (-e['complex'], e['id']))
+    rank_s = {e['id']: i for i, e in enumerate(simple, 1)}
+    rank_c = {e['id']: i for i, e in enumerate(complex_, 1)}
+    data = _fetch(conn, ids) if ids else {}
+    curves = scores_admin.series(conn, ids, REFERENCE) if ids else {}
+    rates = latest_rates(conn)
+    groups = _config()
+    rows = []
+    for lid in ids:
+        d, e = data.get(lid) or {}, book[lid]
+        if not d:
+            continue
+        m = d.get('m') or {}
+        mo = m.get(REFERENCE) or {}
+        factor = to_eur_factor(d.get('currency'), rates)
+        price = _num(d.get('price'))
+        if price is None:
+            price = _num(d.get('close_px'))
+        up = _num((d.get('x') or {}).get('up_fraction'))
+        spike = _num((d.get('x') or {}).get('spike_share'))
+        perf = {k: _num((m.get(n) or {}).get('perf')) for k, n in WINDOWS.items()}
+        quality = QUALITY.get(d.get('quality'))
+        secondary = {
+            'volatility': _num(mo.get('volatility')), 'turnover_eur': _num(d.get('turnover_eur')), 'avg_volume': _num(d.get('avg_volume_3m')),
+            'up_fraction': None if up is None else 100 * up, 'gain_share': None if spike is None else 100 * spike, 'drawdown': _num(mo.get('drawdown')),
+            'perf-week': perf['week'], 'perf-month': perf['month'], 'perf-quarter': perf['quarter'], 'quality': quality,
+            'freshness': None, 'coverage': None if d.get('coverage_252') is None else 100 * float(d['coverage_252']),
+            'score_simple_v4': e['simple'], 'score_complex_v4': e['complex']}
+        rows.append({
+            'id': lid, 'symbol': d['symbol'], 'name': d['name'], 'mic': d['mic'], 'currency': d.get('currency'), 'kind': d['kind'], 'isin': d.get('isin'),
+            'country': d.get('country'), 'category': d.get('category'),
+            'group': {'country': classify(groups, 'country', d.get('country')), 'market': classify(groups, 'market', d['mic']),
+                      'sector': classify(groups, 'sector', d.get('category'), d['kind']), 'asset': 'asset:' + d['kind']},
+            'price': price, 'price_eur': None if price is None or not factor else price * factor, 'price_time': d['price_time'].isoformat() if d.get('price_time') else None,
+            'last_close': d['last_close_date'].isoformat() if d.get('last_close_date') else None, 'change': _num(d.get('daily_change')),
+            'periods': {str(n): {'slope': _num(v.get('slope')), 'r2': _num(v.get('r2'))} for n, v in m.items()},
+            'slope': _num(mo.get('slope')), 'r2': _num(mo.get('r2')), 'perf': perf, 'volatility': _num(mo.get('volatility')), 'drawdown': _num(mo.get('drawdown')),
+            'turnover_eur': _num(d.get('turnover_eur')), 'liquidity_source': d.get('liquidity_source'), 'avg_volume': _num(d.get('avg_volume_3m')),
+            'analyst': _num(d.get('analyst_rating')), 'quality': d.get('quality'),
+            'simple': e['simple'], 'complex': e['complex'], 'simple_status': e['simple_status'], 'complex_status': e['complex_status'],
+            'rank_simple': rank_s.get(lid), 'rank_complex': rank_c.get(lid), 'curve': curves.get(lid, []), 'secondary': secondary})
+    return {'strategy': name, 'reference_sessions': REFERENCE, 'universe': len(rows), 'scored': {'simple': len(simple), 'complex': len(complex_)}, 'rows': rows}

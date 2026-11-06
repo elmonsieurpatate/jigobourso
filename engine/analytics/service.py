@@ -825,6 +825,7 @@ def instrument_sheet(conn, request):
                          'technical': {k: v for k, v in config['technical'].items() if v},
                          'periods': [{'id': p['id'], 'label': strategy.LABELS[p['id']], 'sessions': p['sessions'], 'criteria': {f: p.get(f) for f, _, _ in (explorer_config.CRITERIA if config.get('version')==4 else strategy.CRITERIA) if p.get(f) is not None}} for p in config['periods'] if p['enabled']]}
     sheet['config_periods'] = [{'id': p['id'], 'label': strategy.LABELS[p['id']], 'sessions': p['sessions'], 'enabled': p['enabled']} for p in config['periods']]
+    sheet['scores_v4'] = _scores_v4(conn, lid)
     return sheet
 
 
@@ -1034,3 +1035,17 @@ def _etf_profile(conn, listing_id, symbol, allow_fetch):
             data = profile_data(data)
         return {'state': row['state'], 'fetched_at': row['fetched_at'].isoformat(sep=' '), 'data': data}
     return {'state': 'none', 'fetched_at': None, 'data': None}
+
+
+def _scores_v4(conn, lid):
+    """Scores V4 du titre (simple, complexe, rangs généraux, contributions) avec la stratégie V4 enregistrée ; None si le titre n'est pas noté. Lecture seule."""
+    from . import scores, scores_admin
+    try:
+        sim = scores_admin.simulate(conn, {'strategy': 'growth_v4', 'listing_id': lid})
+    except Exception:                                                                        # noqa: BLE001 : la fiche reste complète sans ce bloc
+        return None
+    result = sim.get('result')
+    if not result:
+        return None
+    return {'strategy': 'growth_v4', 'ranks': sim.get('ranks'), 'simple': result['simple'], 'complex': result['complex'], 'liquidity': result.get('liquidity'),
+            'labels': scores.COMPLEX_LABELS, 'weights_effective': result.get('weights_effective'), 'periods': [dict(id=p['id'], sessions=p['sessions']) for p in sim.get('periods', [])]}

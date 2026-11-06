@@ -69,6 +69,13 @@ return [
         foreach ($res['rows'] as &$r) $r['held'] = in_array($r['id'], $held, true);
         return $res;
     },
+    'ranking/table' => function () {          // tous les titres notés (scores V4, rangs, valeurs des filtres) : tri, filtres et pages se font dans la page
+        $u = require_user();
+        $res = engine_call('ranking-table', ['strategy' => 'growth_v4']);
+        $held = held_listing_ids((int)$u['id']);
+        foreach ($res['rows'] as &$r) $r['held'] = in_array($r['id'], $held, true);
+        return $res;
+    },
     'data/overview' => function () { require_user(); return engine_call('overview', []); },
     'suivi' => function () { require_user(); return engine_call('suivi', []); },
     'bars15' => function () {                   // barres de 15 min stockées des 7 derniers jours (vue « 1 semaine » d'un graphique)
