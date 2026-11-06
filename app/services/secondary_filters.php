@@ -38,7 +38,7 @@ function secondary_initialize_once(): void {
             $id=$f['id']; $index=array_search($id,array_column($definitions['filters'],'id'),true);
             if ($index===false) { $definitions['filters'][]=$f; $index=count($definitions['filters'])-1; }
             $stored=&$definitions['filters'][$index];
-            foreach (['enabled','name','description','editable'] as $key) if(!array_key_exists($key,$stored)) $stored[$key]=$f[$key];
+            foreach (['enabled','name','description','editable','group'] as $key) if(!array_key_exists($key,$stored)) $stored[$key]=$f[$key];
             if (!isset($stored['measures'])) $stored['measures']=$f['measures'];
             foreach ($f['measures'] as $m) {
                 $mi=array_search($m['id'],array_column($stored['measures'],'id'),true);
@@ -151,7 +151,8 @@ function secondary_validate_measure(array $m,array $categories): void {
 }
 function secondary_validate_filter(array $candidate,array $canonical): void {
     if(($candidate['id']??null)!==$canonical['id']||!is_bool($candidate['enabled']??null))throw new ApiError('Filtre ou activation invalide.',422);
-    if(array_diff(array_keys($candidate),['id','name','description','editable','enabled','measures','provenance']))throw new ApiError('Champ de filtre non autorisé.',422);
+    if(array_diff(array_keys($candidate),['id','name','description','editable','enabled','group','measures','provenance']))throw new ApiError('Champ de filtre non autorisé.',422);
+    if(!in_array($candidate['group']??null,['main','other'],true))throw new ApiError('Groupe invalide : principal ou autre.',422);
     if(isset($canonical['provenance'])&&($candidate['provenance']??null)!==$canonical['provenance'])throw new ApiError('Provenance non modifiable.',422);
     // Definition identity/units/domains cannot be changed by this API.
     foreach(['name','description','editable'] as $key)if(($candidate[$key]??null)!==$canonical[$key])throw new ApiError('Identité de filtre non modifiable.',422);

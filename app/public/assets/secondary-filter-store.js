@@ -6,6 +6,7 @@
   function offlineState(){
     const filters=copy(window.AdminCategoryDemo.filters),defaults={schema:1,revision:1,filters:{}};
     for(const f of filters){
+      if(!f.group)f.group=['volatility','liquidity','volume','positive','spikes','concentration'].includes(f.id)?'main':'other';
       defaults.filters[f.id]={};
       for(const m of f.measures)defaults.filters[f.id][m.id]={mode:'all',selected:[]};
       if(!f.editable){if(!Array.isArray(f.values))f.values=(f.examples||[]).map((x,i)=>({id:'demo-'+i,label:x,value:x}));delete f.examples;defaults.filters[f.id].values={mode:'all',selected:[]};}

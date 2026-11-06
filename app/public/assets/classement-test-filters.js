@@ -14,7 +14,7 @@
           options.push({id:m.id+'::'+c.id,categoryId:c.id,measure:m.id,label:(f.measures.length>1?m.name+' · ':'')+c.name,color:c.color,range:interval,description:c.description||''});
         }
         else for(const v of f.values)options.push({id:v.id,categoryId:v.id,measure:'values',label:v.label,color:'#64748b',range:v.value===null?'Donnée indisponible':f.provenance,description:f.provenance});
-        out[f.id]={label:f.name,unit:f.editable?'':f.provenance,options,configurationOnly:true};
+        out[f.id]={group:f.group==='main'?'main':'other',label:f.name,unit:f.editable?'':f.provenance,options,configurationOnly:true};
       }
       return out;
     }

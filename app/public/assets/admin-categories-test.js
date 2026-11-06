@@ -27,7 +27,7 @@
   const icon=id=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[id]||icons.quality}</svg>`;
   function notify(text){$('#ac-feedback').textContent=text;clearTimeout(timer);timer=setTimeout(()=>$('#ac-feedback').textContent='',5000);}
   function renderList(){
-    $('#ac-filter-select').innerHTML=[true,false].map(editable=>`<optgroup label="${editable?'Catégories éditables (9)':'Valeurs issues des données (4)'}">${filters.filter(f=>f.editable===editable).map(f=>`<option value="${f.id}" ${f.id===selected?'selected':''}>${esc(f.name)}${editable?'':' (non éditable)'}</option>`).join('')}</optgroup>`).join('');
+    $('#ac-filter-select').innerHTML=[true,false].map(editable=>`<optgroup label="${editable?'Catégories éditables (9)':'Valeurs issues des données (4)'}">${filters.filter(f=>f.editable===editable).map(f=>`<option value="${f.id}" ${f.id===selected?'selected':''}>${esc(f.name)}${editable?'':' (non éditable)'} · ${f.group==='main'?'principal':'autre'}</option>`).join('')}</optgroup>`).join('');
   }
   function renderTabs(){
     for(const key of ['categories','information']){
@@ -41,7 +41,7 @@
     $('#ac-filter-description').textContent=f.description;
     $('#ac-filter-type').textContent=f.editable?(i.kind==='numeric'?'Numérique':'États prédéfinis'):'Métadonnée du titre';
     $('#ac-indicator-unit').textContent=f.editable?i.unit:'Sans unité';
-    $('#ac-filter-enabled').checked=f.enabled;$('#ac-disabled-note').hidden=f.enabled;
+    $('#ac-filter-enabled').checked=f.enabled;$('#ac-filter-group').value=f.group||'other';$('#ac-disabled-note').hidden=f.enabled;
     $('#ac-editability').textContent=f.editable?'⚙ Catégories éditables':'🔒 Valeurs non éditables';$('#ac-editability').className='ac-editability '+(f.editable?'editable':'locked');
     $('#ac-guidance-title').textContent=f.editable?'ⓘ Catégories persistantes':'ⓘ Valeurs issues du catalogue';
     $('#ac-guidance-description').textContent=f.editable?'Ajoutez, modifiez ou supprimez des catégories. Elles serviront à filtrer les titres, jamais à modifier leurs scores.':'Ces groupes fixes sont en lecture seule. Leurs affectations proviennent du catalogue ; les coches règlent uniquement leur sélection par défaut.';
@@ -134,6 +134,7 @@
     else if(b.dataset.move)await moveCategory(b.dataset.move,Number(b.dataset.delta));
   }catch(error){notify(error.message);}});
   $('#ac-filter-select').onchange=e=>selectIndicator(e.target.value);
+  $('#ac-filter-group').onchange=async e=>{const next=M.copy(filter());next.group=e.target.value;try{await persist(next);renderList();renderMain();notify(next.group==='main'?'Filtre classé dans les principaux.':'Filtre classé dans les autres indicateurs.');}catch(error){e.target.value=filter().group;notify(error.message);}};
   $('#ac-filter-enabled').onchange=async e=>{const next=M.copy(filter());next.enabled=e.target.checked;try{await persist(next);renderMain();notify('Visibilité dans Explorer enregistrée.');}catch(error){e.target.checked=filter().enabled;notify(error.message);}};
   async function setDefaults(selection){if(saving){renderMain();return;}saving=true;busy(true);try{accept(await store.defaults(selected,current()?.id||'values',selection));renderMain();notify('Sélection par défaut enregistrée.');}catch(error){renderMain();notify(error.message);}finally{saving=false;busy(false);}}
   $('#ac-page').addEventListener('change',e=>{const id=e.target.dataset.defaultId;if(!id)return;const options=filter().editable?current().categories:filter().values;let chosen=options.filter(o=>selectedByDefault(o.id)).map(o=>o.id);chosen=e.target.checked?[...new Set([...chosen,id])]:chosen.filter(x=>x!==id);setDefaults({mode:'custom',selected:chosen});});
