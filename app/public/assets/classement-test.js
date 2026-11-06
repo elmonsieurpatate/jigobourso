@@ -129,6 +129,7 @@
   for(const id of Object.keys(builtinNames)){if(serverOk)state.profiles[id]=fresh(id);ovBy[id]=cloneJSON(seed);}
   for(const it of serverView?.items||[]){names[it.id]=it.name;state.profiles[it.id]=cloneJSON(it.config);ovBy[it.id]=cloneJSON(it.filters||{});if(!it.builtin)customIds.push(it.id);}
   if(serverOk&&order().includes(serverView.selected))state.strategy=serverView.selected;
+  {const want=new URLSearchParams(location.search).get('strategy');if(serverOk&&want&&order().includes(want))state.strategy=want;}
   for(const id of order()){const s=state.strategy;state.strategy=id;tree();state.strategy=s;saved[id]={p:cloneJSON(state.profiles[id]),o:cloneJSON(ovBy[id])};}
   try{const l=JSON.parse(localStorage.getItem(key)||'{}')||{};if(['simple','expert'].includes(l.mode))state.mode=l.mode;if(Array.isArray(l.columns)&&l.columns.every(n=>Number.isInteger(n)&&n>=0&&n<columns.length))state.columns=l.columns;}catch(_){/* préférences d'affichage facultatives */}
   overrides=ovBy[state.strategy];state.filters=filtersFor(overrides);
@@ -373,10 +374,13 @@
     feedback(`Stratégie « ${names[id]} » enregistrée.`);
   });
   $('#ct-duplicate').onclick=()=>guarded(async()=>{
-    const from=state.strategy,name=await askName('Dupliquer la stratégie',uniqueCopyName(names[from]),'Dupliquer');if(!name)return;
+    const from=state.strategy,wasDirty=isDirty(from),name=await askName('Enregistrer sous un nouveau nom',uniqueCopyName(names[from]),'Enregistrer');if(!name)return;
     const payload=currentPayload(),view=await post({action:'create',name,...payload}),nid=view.selected;takeView(view);
-    state.profiles[nid]=cloneJSON(payload.config);ovBy[nid]=cloneJSON(payload.filters);markSaved(nid);switchTo(nid,false);
-    feedback(`« ${name} » créée à partir de « ${names[from]} ».`);
+    state.profiles[nid]=cloneJSON(payload.config);ovBy[nid]=cloneJSON(payload.filters);markSaved(nid);
+    /* l'original retrouve sa dernière version enregistrée : les modifications vivent désormais dans la nouvelle stratégie */
+    state.profiles[from]=cloneJSON(saved[from].p);overrides=cloneJSON(saved[from].o);
+    switchTo(nid,false);
+    feedback(wasDirty?`« ${name} » enregistrée avec vos modifications ; « ${names[from]} » est inchangée.`:`« ${name} » créée à partir de « ${names[from]} ».`);
   });
   $('#ct-rename').onclick=()=>guarded(async()=>{
     const id=state.strategy,name=await askName('Renommer la stratégie',names[id],'Renommer');if(!name)return;
