@@ -34,7 +34,7 @@ def params_for(config, kind):
         for p in active:
             p['weight'] = float(custom[p['id']])
     return {'periods': active, 'required': [p['id'] for p in cfg['periods'] if p['enabled'] and p.get('require_history') and p['sessions'] >= SC.MIN_SESSIONS],
-            'kappa': float(sc['kappa']), 'complex_weights': {k: float(v) for k, v in dict(SC.COMPLEX_WEIGHTS, **sc['complex_weights']).items()}, 'threshold': float(sc['threshold'])}
+            'kappa': float(sc['kappa']), 'complex_weights': {k: float(v) for k, v in dict(SC.COMPLEX_WEIGHTS, **sc['complex_weights']).items()}, 'threshold': float(sc['threshold']), 'anchor': float(sc.get('anchor', SC.ANCHOR_LAMBDA))}
 
 
 def _f(v):
@@ -71,7 +71,7 @@ def _score_all(data, config):
     result = {}
     for lid, d in data.items():
         p = params[d['kind']]
-        result[lid] = SC.score_title(d['inputs'], d['liquidity'], p['periods'], kappa=p['kappa'], required=p['required'], threshold=p['threshold'], complex_weights=p['complex_weights'])
+        result[lid] = SC.score_title(d['inputs'], d['liquidity'], p['periods'], kappa=p['kappa'], required=p['required'], threshold=p['threshold'], complex_weights=p['complex_weights'], anchor=p['anchor'])
     return result
 
 
@@ -171,7 +171,7 @@ def apply_global(conn, config):
     base = C.validate_scoring(None, [])
     admin = admin_defaults(conn)
     sc = dict(config.get('scoring') or base)
-    for field in ('kappa', 'threshold', 'complex_weights'):
+    for field in ('kappa', 'threshold', 'complex_weights', 'anchor'):
         if sc.get(field) == base[field]:
             sc[field] = admin[field]
     return dict(config, scoring=sc)

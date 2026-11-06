@@ -29,7 +29,7 @@ def row(state, name='growth_v4'):
 
 def test_defaults_are_design_values():
     st = A.state(None)
-    assert st['global'] == {'kappa': 0.7, 'threshold': 0.75, 'customised': False, 'saved_at': None}
+    assert st['global'] == {'kappa': 0.7, 'threshold': 0.75, 'anchor': 0.5, 'customised': False, 'saved_at': None}
     g = row(st)
     assert g['current']['complex_weights'] == SC.COMPLEX_WEIGHTS and g['current']['weights_mode'] == 'auto' and not g['customised']
     assert [k for k, x in g['current']['periods'].items() if x['enabled']] == ['week', 'month']
@@ -239,3 +239,16 @@ def test_enabling_filters_applies_thresholds_but_never_changes_scores():
     assert wk['min_slope'] == 0.30 and wk['require_history']
     assert S._key(cfg, 1) == S._key(S.apply_admin(None, A.growth_v4()), 1)
     assert S._key(cfg, 1) == S._key(A.neutral(A.growth_v4()), 1)          # même notation avec ou sans filtres
+
+
+def test_anchor_is_a_common_setting_validated_persisted_and_part_of_the_cache_key(memory):
+    base = S._key(S.apply_admin(None, A.growth_v4()), 1)
+    p = profile()
+    A.save(None, {'global': {'kappa': 0.7, 'threshold': 0.75, 'anchor': 0.0}, 'profile': p})
+    assert A.state(None)['global']['anchor'] == 0.0 and S.params_for(S.apply_admin(None, A.growth_v4()), 'equity')['anchor'] == 0.0
+    assert S._key(S.apply_admin(None, A.growth_v4()), 1) != base                    # l'ancrage change les notes complexes : il change la clé
+    for bad in (-0.1, 1.5):
+        with pytest.raises(ValueError):
+            A.save(None, {'global': {'kappa': 0.7, 'threshold': 0.75, 'anchor': bad}})
+    A.save(None, {'reset': 'global'})
+    assert A.state(None)['global']['anchor'] == 0.5 and S._key(S.apply_admin(None, A.growth_v4()), 1) == base

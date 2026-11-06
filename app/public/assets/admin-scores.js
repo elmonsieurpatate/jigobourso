@@ -12,9 +12,8 @@
     ['acceleration', 'Accélération', 'Variation de pente par rapport à la fenêtre précédente (0 dans le profil de référence).']];
   const CLABEL = Object.fromEntries(COMPLEX.map(c => [c[0], c[1]]));
   const SIMPLE = [
-    ['Dynamique', 'Croissance lissée de chaque période, ramenée à une échelle de saturation (17 % × (séances/5)^0,52). 100 % = croissance saturée.', 'facteur de 0 à 1'],
-    ['Régularité', 'R² (pleine fiabilité dès 21 séances) × (1 − ½ × part du plus gros pic) × (½ + ½ × séances positives). Pénalise les hausses en un seul saut.', 'facteur de 0 à 1'],
-    ['Accélération', 'Écart de pente avec la fenêtre précédente, pondéré par la régularité. Indisponible : facteur neutre.', 'facteur de 0,90 à 1,10']];
+    ['Dynamique', 'Pente de chaque période, ramenée à une croissance sur la période puis à une échelle de saturation (17 % × (séances/5)^0,52). 100 % = croissance saturée. Moyenne pondérée des périodes mesurables.', 'facteur de 0 à 1'],
+    ['Régularité', 'R² de chaque période, chacun pesant min(1, séances/21) car un R² sur peu de séances est bruité. Moyenne pondérée des périodes où le R² est mesuré.', 'facteur de 0 à 1']];
   const LASTDAY = 'Dernier jour : aucun coefficient propre. La dernière séance compte comme les autres séances dans les mesures de chaque période. Le filtre facultatif « dernier jour positif » est indépendant de la notation (Filtres de consultation, mode avancé).';
   const TABS = [['config', 'Configuration du moteur'], ['profils', 'Profils de stratégies'], ['simulation', 'Simulation & exemples'], ['suivi', 'Suivi des calculs']];
   const $ = (s, r) => (r || document).querySelector(s);
@@ -36,7 +35,7 @@
   const savedProfiles = () => JSON.parse(savedJson).profiles;
 
   function reset() {
-    draft = { global: { kappa: S.global.kappa, threshold: S.global.threshold }, profiles: {} };
+    draft = { global: { kappa: S.global.kappa, threshold: S.global.threshold, anchor: S.global.anchor }, profiles: {} };
     v4().forEach(s => { draft.profiles[s.name] = clone(s.current); });
     savedJson = JSON.stringify(draft);
     error = '';
@@ -75,7 +74,7 @@
   // seuls l'onglet courant et l'état de la barre sont mis à jour.
   function skeleton() {
     root.innerHTML = `<div class="as">
-      <div class="notice as-principle"><b>Principe V4 : un moteur unique pour toutes les stratégies.</b> Le score simple mesure la croissance et sa régularité (avec accélération) ; le score complexe ajoute risque, volatilité, concentration et liquidité. Chaque stratégie choisit ses périodes, ses seuils et ses pondérations, sans changer la méthode de calcul. Tous les titres évaluables sont notés et classés ; les seuils sont des filtres de consultation facultatifs, désactivés par défaut, qui n’entrent jamais dans une note.</div>
+      <div class="notice as-principle"><b>Principe V4 : un moteur unique pour toutes les stratégies.</b> Le score simple mesure uniquement la pente et le R² des périodes sélectionnées ; le score complexe ajoute séances positives, concentration, volatilité, drawdown, liquidité et l’ancrage récent. Chaque stratégie choisit ses périodes, ses seuils et ses pondérations, sans changer la méthode de calcul. Tous les titres évaluables sont notés et classés ; les seuils sont des filtres de consultation facultatifs, désactivés par défaut, qui n’entrent jamais dans une note.</div>
       <div class="tabs as-tabs" id="as-tabs"></div><div id="as-err"></div><div id="as-body"></div>
       <div class="as-bar"><div id="as-status"></div><div class="row gap-s">
         <button class="btn" data-a="cancel">Annuler les modifications</button>
@@ -131,13 +130,15 @@
         <div class="as-field"><label>Priorité aux périodes courtes <span class="as-i" title="Symbole κ. À 0, chaque séance pèse pareil donc les longues périodes dominent. Plus la valeur est haute, plus la semaine et le mois pèsent. Ne sert qu’aux poids automatiques.">ⓘ</span></label><input type="number" class="as-num" data-a="kappa" min="0" max="0.95" step="0.05" value="${draft.global.kappa}"></div>
         <p class="as-hint">Valeur 0 à 0,95 · proposée : ${S.design.kappa}. Commun à toutes les stratégies.</p>
         <div class="as-field"><label>Seuil de fiabilité (couverture) <span class="as-i" title="Information seulement : sous ce seuil, la note est calculée mais signalée « peu fiable ». Elle n’est jamais supprimée et ce seuil ne change aucune note.">ⓘ</span></label><input type="number" class="as-num" data-a="thr" min="0.1" max="1" step="0.05" value="${draft.global.threshold}"></div>
-        <p class="as-hint">Valeur 0,1 à 1 · proposée : ${S.design.threshold}.</p></div></div>`;
+        <p class="as-hint">Valeur 0,1 à 1 · proposée : ${S.design.threshold}. Information seulement.</p>
+        <div class="as-field"><label>Ancrage récent du score complexe <span class="as-i" title="Pénalise progressivement le score complexe quand la période la plus courte est faible : note × (1 − λ × (1 − vigueur de la période courte)). 0 = neutralisé, 0,5 = valeur actuelle, 1 = maximal. Ne touche pas au score simple.">ⓘ</span></label><input type="number" class="as-num" data-a="anchor" min="0" max="1" step="0.05" value="${draft.global.anchor}"></div>
+        <p class="as-hint">Valeur 0 à 1 · proposée : ${S.design.anchor}. À 0, aucune pénalité. Détail dans l’onglet « Score complexe ».</p></div></div>`;
   }
 
   function simpleView() {
     const f = S.formula;
-    return `<h3 class="as-h">Score simple (croissance et régularité)</h3><p class="as-hint">Mesure la force de la tendance, sa régularité et son accélération.</p>
-      <div class="as-formula">Score simple = 100 × <b>Dynamique</b> × <b>Régularité</b> × <b>facteur d’accélération</b> <span class="muted">(plafonné à 100)</span></div>
+    return `<h3 class="as-h">Score simple (croissance et régularité)</h3><p class="as-hint">Mesure la force de la tendance (pente) et sa régularité (R²) sur les périodes sélectionnées. Rien d’autre.</p>
+      <div class="as-formula">Score simple = 100 × <b>Dynamique</b> (pente) × <b>Régularité</b> (R²) <span class="muted">(plafonné à 100)</span></div>
       <h3 class="as-h">Composantes (formule validée, non modifiable)</h3>
       ${SIMPLE.map(([n, d, e]) => `<div class="as-comp"><div class="row between"><b>${n}</b><span class="badge">${e}</span></div><p class="as-hint">${d}</p></div>`).join('')}
       <div class="notice warn as-lastday">${LASTDAY}</div>
@@ -150,6 +151,10 @@
       <div class="as-total ${Math.abs(total - 100) <= 0.05 ? 'ok' : 'ko'}">Total : <b id="cw-total">${fmt(total, 1)} %</b></div>
       ${COMPLEX.map(([k, n, d]) => `<div class="as-cw"><span title="${E(d)}">${n}</span><input type="number" class="as-num" data-a="cw" data-k="${k}" min="0" max="100" step="0.5" value="${cw[k] ?? 0}"><span class="as-bar-bg"><span class="as-bar-fg" id="cwb-${k}" style="width:${Math.min(100, cw[k] || 0)}%"></span></span><span class="as-pct" id="cwp-${k}">${fmt(cw[k], 0)} %</span></div>`).join('')}
       <div class="row gap-s" style="margin-top:10px"><button class="btn small" data-a="cw-norm">Normaliser à 100</button><button class="btn small" data-a="cw-ref">Valeurs de référence</button></div>
+      <h3 class="as-h" style="margin-top:14px">Ancrage récent (λ = ${fmt(draft.global.anchor, 2)})</h3>
+      <div class="as-formula">Note finale = somme pondérée × <b>(1 − λ × (1 − g))</b>, où g = min(1, dynamique de la période la plus courte ÷ 32), entre 0 et 1.</div>
+      <p class="as-hint">Si la période courte (la semaine) garde une dynamique d’au moins 32 sur 100, g = 1 et rien n’est retiré. Plus elle faiblit, plus la note baisse, jusqu’à −λ (−50 % à λ = 0,5) pour une semaine plate ou négative. <b>λ = 0 neutralise l’ancrage.</b> Réglage commun à toutes les stratégies (onglet « Configuration du moteur »). Il ne concerne pas le score simple.</p>
+      <p class="as-hint">Sur la base actuelle, la semaine faible pèse déjà dans la dynamique et dans les composantes amorties par g : l’ancrage s’y ajoute. Pour un titre à semaine plate, les deux premiers canaux retirent environ 35 % de la note et l’ancrage 0,5 porte la perte totale à environ 68 %. Le classement reste stable (corrélation de rang 0,996 entre λ = 0 et λ = 0,5, 93 titres communs sur le top 100) : l’ancrage sert surtout à départager les titres encore actifs de ceux qui ont calé.</p>
       <p class="as-hint">La liquidité est comptée une seule fois pour le titre, jamais par période. Le profil de référence (Dynamique 40, R² 15, séances positives 5, concentration 7, volatilité 15, drawdown 8, liquidité 10) est celui de Croissance rapide, pas forcément celui des autres stratégies.</p>`;
   }
 
@@ -285,8 +290,10 @@
     return `<div class="card"><div class="row between" style="flex-wrap:wrap;gap:12px"><div><h3 class="as-h" style="margin:0">${E(sim.title.name)}</h3><span class="muted">${E(sim.title.symbol)} · ${E(sim.title.mic)} · ${sim.title.kind === 'etf' ? 'ETF' : 'Action'}</span></div><div class="row gap-s">${sc(s, 's')}${sc(c, 'c')}</div></div>
       <div class="table-wrap"><table class="as-dec"><thead><tr><th>Mesure</th>${ids.map(i => `<th class="num">${E(L[i])}<br><small class="muted">poids réel ${fmt(100 * ((r.weights_effective || {})[i] || 0), 1)} %${r.periods[i] ? '' : ' (période sans données)'}</small></th>`).join('')}</tr></thead><tbody>
         ${rows.map(([n, k, u, d]) => `<tr><td>${n}</td>${ids.map(i => cell(r.periods[i], k, u, d)).join('')}</tr>`).join('')}</tbody></table></div>
-      <div class="as-two"><div><h4 class="as-h">Score simple (produit)</h4>${s.score === null ? `<p class="muted">${E(s.why || '')}</p>` : `<p>100 × Dynamique <b>${fmt(s.dynamics, 2)}</b> × Régularité <b>${fmt(s.quality, 2)}</b> × accélération <b>${fmt(s.acceleration_factor, 2)}</b> = <b>${fmt(s.score, 1)}</b></p><p class="as-hint">Chaque facteur est un multiplicateur : un seul maillon faible tire tout le score vers le bas.</p>`}</div>
-        <div><h4 class="as-h">Score complexe (somme pondérée)</h4>${c.score === null ? `<p class="muted">${E(c.why || '')}</p>` : `<table class="as-mini"><tbody>${Object.entries(c.contributions).map(([k, v]) => `<tr><td>${E(CLABEL[k] || k)}</td><td class="num">${v.value === null ? '<span class="muted">indisponible — hors calcul</span>' : `poids ${fmt(100 * v.weight, 1)} %${Math.abs(v.weight_effective - v.weight) > 0.0005 ? ' → réel ' + fmt(100 * v.weight_effective, 1) + ' %' : ''}`}</td><td class="num">${v.value === null ? '' : 'note ' + fmt(v.value, 0)}</td><td class="num">${v.points === null ? '' : '<b>+' + fmt(v.points_effective, 1) + '</b>'}</td></tr>`).join('')}</tbody></table><p class="as-hint">Total ${fmt(c.raw_total, 1)} × ancrage récent ${fmt(c.anchor, 2)} = <b>${fmt(c.score, 1)}</b></p>`}</div></div>
+      <div class="as-two"><div><h4 class="as-h">Score simple (pente × R²)</h4>${s.score === null ? `<p class="muted">${E(s.why || '')}</p>` : `<p>100 × Dynamique <b>${fmt(s.dynamics, 2)}</b> × Régularité <b>${fmt(s.quality, 2)}</b> = <b>${fmt(s.score, 1)}</b></p>
+          <table class="as-mini"><thead><tr><th>Période</th><th class="num">Poids réel</th><th class="num">Pente</th><th class="num">R²</th><th class="num">Fiabilité R²</th></tr></thead><tbody>${Object.entries(s.parts || {}).map(([k, v]) => `<tr><td>${E(L[k] || k)}</td><td class="num">${fmt(100 * v.weight, 1)} %</td><td class="num">${fmt(v.slope, 2)} %/s</td><td class="num">${v.r2 === null ? '<span class="muted">indisponible</span>' : fmt(v.r2, 2)}</td><td class="num">${v.r2_reliability === null ? '—' : fmt(100 * v.r2_reliability, 0) + ' %'}</td></tr>`).join('')}</tbody></table>
+          <p class="as-hint">Complétude : couverture ${fmt(100 * (s.coverage || 0), 0)} % ${s.status === 'ok' ? '(pente et R² mesurés sur toutes les périodes)' : '(une période n’a pas de R² ou de pente : elle sort du calcul, poids renormalisés)'}.</p>`}</div>
+        <div><h4 class="as-h">Score complexe (somme pondérée)</h4>${c.score === null ? `<p class="muted">${E(c.why || '')}</p>` : `<table class="as-mini"><tbody>${Object.entries(c.contributions).map(([k, v]) => `<tr><td>${E(CLABEL[k] || k)}</td><td class="num">${v.value === null ? '<span class="muted">indisponible — hors calcul</span>' : `poids ${fmt(100 * v.weight, 1)} %${Math.abs(v.weight_effective - v.weight) > 0.0005 ? ' → réel ' + fmt(100 * v.weight_effective, 1) + ' %' : ''}`}</td><td class="num">${v.value === null ? '' : 'note ' + fmt(v.value, 0)}</td><td class="num">${v.points === null ? '' : '<b>+' + fmt(v.points_effective, 1) + '</b>'}</td></tr>`).join('')}</tbody></table><p class="as-hint">Total ${fmt(c.raw_total, 1)} × ancrage récent ${fmt(c.anchor, 2)} (λ = ${fmt(c.anchor_lambda, 2)}, vigueur de la période courte ${fmt(100 * (c.anchor_gate ?? 0), 0)} %) = <b>${fmt(c.score, 1)}</b>. Complétude : couverture ${fmt(100 * (c.coverage || 0), 0)} %${c.status === 'ok' ? '' : ' — score partiel, composantes absentes hors calcul'}.</p>`}</div></div>
       <p class="as-hint">Liquidité : ${liq.turnover_eur ? fmt(liq.turnover_eur / 1e6, 1) + ' M€/jour (' + (liq.source === 'daily' ? 'volumes quotidiens réels' : 'estimée, moyenne trimestrielle') + ') · note ' + fmt(liq.note, 0) : 'indisponible'}. ${r.missing && (r.missing.secondary.length || r.missing.optional_periods.length || r.missing.required_periods.length) ? '<b>Qualité des données :</b> périodes sans historique : ' + (E(r.missing.required_periods.concat(r.missing.optional_periods).join(', ')) || 'aucune') + ' · mesures indisponibles : ' + (E(r.missing.secondary.join(', ')) || 'aucune') + '. Elles sortent du calcul et les poids restants sont renormalisés (ni bonus ni pénalité).' : '<b>Qualité des données :</b> complète.'}</p></div>`;
   }
 
@@ -362,6 +369,7 @@
     }
     else if (a === 'cw') { p.complex_weights[t.dataset.k] = +t.value || 0; paintBar(); }
     else if (a === 'kappa') { draft.global.kappa = +t.value; paintBar(); later(); }
+    else if (a === 'anchor') { draft.global.anchor = Math.min(1, Math.max(0, +t.value || 0)); paintBar(); }
     else if (a === 'thr') { draft.global.threshold = +t.value; paintBar(); }
     else if (a === 'thr-p') { p.periods[t.dataset.p][t.dataset.f] = t.value === '' ? null : +t.value; confStale = true; paintBar(); }
     else if (a === 'day-on') { p.day_filter.enabled = t.checked; confStale = true; paint(); }

@@ -188,7 +188,8 @@ def validate_scoring(raw,periods):
     complex_weights={k:number(v,0,1000,'Poids du score complexe') for k,v in complex_weights.items() if v is not None}
     if complex_weights and sum(complex_weights.get(k,SC.COMPLEX_WEIGHTS[k]) for k in SC.COMPLEX_WEIGHTS)<=0:raise ValueError('Le score complexe doit garder au moins un poids positif')
     threshold=number(raw.get('threshold',SC.COVERAGE_THRESHOLD),0.1,1,'Seuil de couverture');threshold=SC.COVERAGE_THRESHOLD if threshold is None else threshold
-    return {'kappa':kappa,'weights':weights,'complex_weights':complex_weights,'threshold':threshold}
+    anchor=number(raw.get('anchor',SC.ANCHOR_LAMBDA),0,1,'Ancrage récent');anchor=SC.ANCHOR_LAMBDA if anchor is None else anchor
+    return {'kappa':kappa,'weights':weights,'complex_weights':complex_weights,'threshold':threshold,'anchor':anchor}
 
 
 def growth_v1():

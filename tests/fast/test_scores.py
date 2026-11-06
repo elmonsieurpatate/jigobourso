@@ -16,16 +16,16 @@ def P(*sessions):
 # Valeurs de référence calculées avec le prototype validé sur les données réelles (variants.py / v8.py, 2026-11-06).
 GOLDEN = {
     'full_two': (dict(inputs={5: M(1.1, .82, .7, .35, 2.4, 3.0, .6, .5), 21: M(.75, .9, .62, .28, 2.1, 6.0, .3, .7)}, turn=20e6), (5, 21), (5, 21),
-                 dict(simple=26.77894246259532, complex=59.06218524301239, ss='ok', cs='ok')),
+                 dict(simple=36.809943022618114, complex=59.06218524301239, ss='ok', cs='ok')),
     'no_accel_month': (dict(inputs={5: M(.9, .7, .6, .5, 3.0, 4.0), 21: M(.5, .85, .6, .3, 2.5, 8.0)}, turn=8e6), (5, 21), (5, 21),
-                       dict(simple=15.640446460882732, complex=38.745666323877295, ss='partiel', cs='ok')),
+                       dict(simple=24.18366857517898, complex=38.745666323877295, ss='ok', cs='ok')),
     'four_periods': (dict(inputs={5: M(1.2, .8, .7, .3, 2.2, 2.5, .4, .6), 21: M(.7, .9, .65, .25, 2.0, 5.0, .2, .8), 63: M(.4, .75, .6, .35, 2.3, 9.0, .1, .7),
                                   126: M(.25, .8, .58, .3, 2.4, 14.0, .05, .6)}, turn=3e6), (5, 21, 63, 126), (5, 21),
-                     dict(simple=24.20505960412955, complex=49.64925352715027, ss='ok', cs='ok')),
+                     dict(simple=34.17178042837239, complex=49.64925352715027, ss='ok', cs='ok')),
     'declining_no_liquidity': (dict(inputs={5: M(-.5, .4, .4, 1.0, 3.5, 6.0, -.8, .5), 21: M(.05, .3, .5, .6, 3.1, 10.0, -.2, .4)}, turn=None), (5, 21), (5, 21),
-                               dict(simple=0.23718314813635621, complex=0.711702252992812, ss='ok', cs='partiel')),   # liquidité inconnue : poids renormalisés (V4.2), ni zéro ni bonus,
+                               dict(simple=0.5407443885922528, complex=0.711702252992812, ss='ok', cs='partiel')),   # liquidité inconnue : poids renormalisés (V4.2), ni zéro ni bonus,
     'optional_week_missing': (dict(inputs={5: None, 21: M(.6, .88, .65, .25, 1.8, 5.0, .1, .8), 63: M(.35, .7, .58, .3, 2.0, 12.0, .05, .6)}, turn=30e6), (5, 21, 63), (21,),
-                              dict(simple=21.07068751413848, complex=55.31844002403962, ss='partiel', cs='partiel')),   # semaine sans historique : calculé sur mois + trimestre (V4.2),
+                              dict(simple=29.910954194152865, complex=55.31844002403962, ss='partiel', cs='partiel')),   # semaine sans historique : calculé sur mois + trimestre (V4.2),
 }
 
 
@@ -113,8 +113,7 @@ def test_unknown_value_is_never_a_measured_zero():
     base = {5: M(1, .8, .7, .3, 2, 3, None, None), 21: M(.7, .9, .6, .3, 2, 5, None, None)}
     absent = SC.score_title(base, {'turnover_eur': 10e6}, P(5, 21))
     flat = SC.score_title({5: M(1, .8, .7, .3, 2, 3, 0.0, .8), 21: M(.7, .9, .6, .3, 2, 5, 0.0, .8)}, {'turnover_eur': 10e6}, P(5, 21))
-    assert absent['simple']['status'] == 'partiel' and flat['simple']['status'] == 'ok'          # accélération absente ≠ accélération nulle
-    assert absent['simple']['acceleration'] is None and flat['simple']['acceleration'] == pytest.approx(50)
+    assert absent['simple']['score'] == pytest.approx(flat['simple']['score'])                    # V4.3 : l'accélération n'entre plus dans le simple
     no_liq = SC.score_title(base, {'turnover_eur': None}, P(5, 21))
     zero_liq = SC.score_title(base, {'turnover_eur': 1.0}, P(5, 21))
     assert no_liq['complex']['status'] == 'partiel' and zero_liq['complex']['status'] == 'ok'        # liquidité inconnue ≠ liquidité mesurée très faible
@@ -151,13 +150,41 @@ def test_recent_anchor_is_progressive_not_brutal():
     assert flat['anchor'] == pytest.approx(0.5)                # un arrêt complet de la semaine retire au plus la moitié, pas tout
 
 
-def test_isolated_spike_in_the_week_is_penalised_in_the_simple_score():
-    smooth = {5: M(1.0, .85, .7, .3, 2, 3), 21: M(.7, .9, .65, .25, 2, 5)}
-    spiky = {5: M(1.0, .85, .7, 1.0, 2, 3), 21: M(.7, .9, .65, .25, 2, 5)}
-    a = SC.score_title(smooth, {'turnover_eur': 10e6}, P(5, 21))['simple']['score']
-    b = SC.score_title(spiky, {'turnover_eur': 10e6}, P(5, 21))['simple']['score']
-    assert b < a * 0.9                                           # la pénalité de concentration d'une fenêtre courte n'est pas diluée par sa fiabilité R²
+def test_simple_score_uses_only_slope_and_r2():
+    """V4.3 : pics, séances positives, accélération, volatilité, drawdown et liquidité ne changent pas le score simple ; ils changent le complexe."""
+    base = {5: M(1.0, .85, .7, .3, 2, 3, .2, .8), 21: M(.7, .9, .65, .25, 2, 5, .1, .8)}
+    other = {5: M(1.0, .85, .3, 1.0, 6, 25, -.5, .8), 21: M(.7, .9, .2, .9, 6, 30, -.5, .8)}
+    a, b = SC.score_title(base, {'turnover_eur': 50e6}, P(5, 21)), SC.score_title(other, {'turnover_eur': None}, P(5, 21))
+    assert a['simple']['score'] == pytest.approx(b['simple']['score'])
+    assert b['complex']['score'] < a['complex']['score'] * 0.8
+    assert set(a['simple']['parts']['week']) == {'weight', 'dynamics', 'slope', 'r2', 'r2_reliability'}
 
+
+def test_simple_score_separates_regular_irregular_flat_and_falling():
+    liq = {'turnover_eur': 10e6}
+    reg = SC.score_title({5: M(1.0, .92, .7, .3, 2, 3), 21: M(.7, .95, .7, .3, 2, 3)}, liq, P(5, 21))['simple']['score']
+    irr = SC.score_title({5: M(1.0, .45, .7, .3, 2, 3), 21: M(.7, .5, .7, .3, 2, 3)}, liq, P(5, 21))['simple']['score']
+    flat = SC.score_title({5: M(0.01, .2, .5, .3, 1, 1), 21: M(0.0, .1, .5, .3, 1, 1)}, liq, P(5, 21))['simple']['score']
+    down = SC.score_title({5: M(-0.8, .9, .3, .3, 2, 9), 21: M(-.5, .9, .3, .3, 2, 9)}, liq, P(5, 21))['simple']['score']
+    assert reg > irr > flat >= down == 0.0 and reg > 2 * irr * 0.9
+
+
+def test_simple_coverage_counts_periods_with_measured_r2_and_status_is_partial_without_them():
+    r = SC.score_title({5: M(1.0, None, .7, .3, 2, 3), 21: M(.7, .9, .65, .25, 2, 5)}, {'turnover_eur': 10e6}, P(5, 21))
+    assert r['simple']['status'] == 'partiel' and r['simple']['coverage'] == pytest.approx(0.584, abs=0.001) and r['simple']['score'] is not None
+
+
+def test_anchor_is_configurable_and_neutral_at_zero():
+    inputs = {5: M(0.3, .8, .7, .3, 2, 3, 0, .8), 21: M(.7, .9, .6, .3, 2, 5, 0, .8)}          # semaine lente : g_court < 1
+    liq = {'turnover_eur': 20e6}
+    off = SC.score_title(inputs, liq, P(5, 21), anchor=0)['complex']
+    half = SC.score_title(inputs, liq, P(5, 21), anchor=0.5)['complex']
+    full = SC.score_title(inputs, liq, P(5, 21), anchor=1)['complex']
+    assert off['anchor'] == 1.0 and off['score'] == pytest.approx(off['raw_total'])             # neutralisé : aucune pénalité
+    assert off['score'] > half['score'] > full['score'] and half['raw_total'] == pytest.approx(off['raw_total'])
+    assert half['anchor'] == pytest.approx(1 - 0.5 * (1 - half['anchor_gate'])) and 0 <= half['anchor_gate'] < 1
+    fast = SC.score_title({5: M(1.5, .8, .7, .3, 2, 3, 0, .8), 21: M(.7, .9, .6, .3, 2, 5, 0, .8)}, liq, P(5, 21), anchor=1)['complex']
+    assert fast['anchor'] == pytest.approx(1.0)                                                 # semaine vive : jamais de pénalité
 
 def test_regular_trend_beats_equally_fast_irregular_trend():
     regular = {5: M(1, .92, .75, .2, 1.5, 2), 21: M(.7, .95, .7, .2, 1.5, 3)}
@@ -260,7 +287,7 @@ def test_turnover_threshold_differs_for_us_listings_and_reports_the_source():
 def test_scoring_block_validation():
     c = C.growth_v1()
     c['scoring'] = {'kappa': 0.5, 'weights': {'week': 1, 'month': 3}, 'complex_weights': {'acceleration': 10}, 'threshold': 0.6}
-    assert C.validate(c)['scoring'] == {'kappa': 0.5, 'weights': {'week': 1.0, 'month': 3.0}, 'complex_weights': {'acceleration': 10.0}, 'threshold': 0.6}
+    assert C.validate(c)['scoring'] == {'kappa': 0.5, 'weights': {'week': 1.0, 'month': 3.0}, 'complex_weights': {'acceleration': 10.0}, 'threshold': 0.6, 'anchor': 0.5}
     for bad in ({'kappa': 1.0}, {'weights': {'nope': 1}}, {'complex_weights': {'nope': 1}}, {'weights': {'week': -1}}, {'threshold': 2}):
         c['scoring'] = bad
         with pytest.raises(ValueError):
@@ -270,7 +297,7 @@ def test_scoring_block_validation():
 def test_every_existing_configuration_gets_default_scoring_without_changing_its_filters():
     old = S.preset('fast')
     up = C.upgrade(old)
-    assert up['scoring'] == {'kappa': 0.7, 'weights': {}, 'complex_weights': {}, 'threshold': 0.75}
+    assert up['scoring'] == {'kappa': 0.7, 'weights': {}, 'complex_weights': {}, 'threshold': 0.75, 'anchor': 0.5}
     assert up['ranking']['mode'] == 'performance'                  # le classement historique est conservé tel quel
 
 

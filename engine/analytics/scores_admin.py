@@ -45,13 +45,13 @@ PERIOD_LABELS = {'week': 'Semaine', 'month': 'Mois', 'quarter': 'Trimestre', 'ha
 
 
 def design():
-    return {'kappa': SC.KAPPA, 'threshold': SC.COVERAGE_THRESHOLD, 'complex_weights': dict(SC.COMPLEX_WEIGHTS)}
+    return {'kappa': SC.KAPPA, 'threshold': SC.COVERAGE_THRESHOLD, 'anchor': SC.ANCHOR_LAMBDA, 'complex_weights': dict(SC.COMPLEX_WEIGHTS)}
 
 
 def formula():
     """Constantes de conception des deux scores (lecture seule : changer une formule est une décision de conception, pas un réglage)."""
-    return {'saturation': {'a': SC.SAT_A, 'b': SC.SAT_B}, 'gate_floor': SC.GATE_FLOOR, 'acceleration_amplitude': SC.ACC_AMPLITUDE,
-            'reliability_sessions': SC.RELIABILITY_SESSIONS, 'min_sessions': SC.MIN_SESSIONS, 'anchor': SC.ANCHOR_LAMBDA,
+    return {'saturation': {'a': SC.SAT_A, 'b': SC.SAT_B}, 'gate_floor': SC.GATE_FLOOR,
+            'reliability_sessions': SC.RELIABILITY_SESSIONS, 'min_sessions': SC.MIN_SESSIONS,
             'liquidity_floor_eur': SC.LIQUIDITY_FLOOR_EUR, 'liquidity_ceil_eur': SC.LIQUIDITY_CEIL_EUR}
 
 
@@ -188,8 +188,8 @@ def build_config(conn, name, profile=None, glob=None):
 
 
 def _with_global(config, glob):
-    g = C.validate_scoring({k: glob.get(k) for k in ('kappa', 'threshold')}, [])
-    return dict(config, scoring=dict(config['scoring'], kappa=g['kappa'], threshold=g['threshold']))
+    g = C.validate_scoring({k: glob.get(k) for k in ('kappa', 'threshold', 'anchor')}, [])
+    return dict(config, scoring=dict(config['scoring'], kappa=g['kappa'], threshold=g['threshold'], anchor=g['anchor']))
 
 
 def auto_weights(kappa, period_ids):
@@ -265,7 +265,7 @@ def state(conn):
     cur = score_service.admin_defaults(conn)
     stored = settings.get(conn, score_service.SETTING, None)
     return {'design': design(), 'formula': formula(), 'version': SC.VERSION, 'period_labels': PERIOD_LABELS, 'scoring_periods': list(SCORING_PERIODS),
-            'global': {'kappa': cur['kappa'], 'threshold': cur['threshold'], 'customised': bool(stored), 'saved_at': _iso(settings.saved_at(conn, score_service.SETTING)) if stored else None},
+            'global': {'kappa': cur['kappa'], 'threshold': cur['threshold'], 'anchor': cur['anchor'], 'customised': bool(stored), 'saved_at': _iso(settings.saved_at(conn, score_service.SETTING)) if stored else None},
             'strategies': strategies(conn), 'references': references(), 'personal': personal(conn), 'volume_collection': bool(settings.get(conn, 'volume_collection', False))}
 
 
@@ -288,8 +288,8 @@ def save(conn, request):
         return state(conn)
     if isinstance(request.get('global'), dict):
         g = request['global']
-        clean = C.validate_scoring({k: g.get(k) for k in ('kappa', 'threshold')}, [])
-        settings.put(conn, score_service.SETTING, {'kappa': clean['kappa'], 'threshold': clean['threshold']})
+        clean = C.validate_scoring({k: g.get(k) for k in ('kappa', 'threshold', 'anchor')}, [])
+        settings.put(conn, score_service.SETTING, {'kappa': clean['kappa'], 'threshold': clean['threshold'], 'anchor': clean['anchor']})
     elif any(k in request for k in ('kappa', 'threshold', 'complex_weights')):       # ancienne forme (réglages communs seuls)
         clean = C.validate_scoring({k: request.get(k) for k in ('kappa', 'threshold', 'complex_weights')}, [])
         if not any(clean['complex_weights'].get(k, SC.COMPLEX_WEIGHTS[k]) > 0 for k in SC.COMPLEX_WEIGHTS):

@@ -15,16 +15,14 @@ Le module ne connaît ni la base ni le réseau.
 """
 import math
 
-VERSION = 2
+VERSION = 3
 KAPPA = 0.7                  # poids automatiques : ω_p ∝ n_p^(1−κ) − n_{p−1}^(1−κ) ; κ = 0,7 redonne les 41,6 % / 58,4 % semaine / mois de V1
 COVERAGE_THRESHOLD = 0.75    # seuil de FIABILITÉ (information) : ne supprime plus aucune note
 MIN_SESSIONS = 3             # R² et volatilité n'existent pas sous 3 séances : la granularité « jour » n'entre jamais dans un score
 SAT_A, SAT_B = 17.0, 0.52    # croissance lissée qui sature la note de dynamique : 17·(n/5)^0,52 % (90e percentile observé, titres admis V1)
 GATE_FLOOR = 32.0            # note de dynamique (0-100) en dessous de laquelle régularité et risque d'une période sont amortis
 RELIABILITY_SESSIONS = 21    # le R² d'une fenêtre plus courte est bruité : poids min(1, n/21) dans la moyenne des R²
-ACC_AMPLITUDE = 0.10         # le facteur d'accélération du score simple varie de 1−0,10 à 1+0,10
-ACC_WEIGHT_IN_COVERAGE = 0.15
-ANCHOR_LAMBDA = 0.5          # ancrage récent progressif du score complexe : 1 − λ(1 − g_court)
+ANCHOR_LAMBDA = 0.5          # ancrage récent du score complexe : × (1 − λ(1 − g_court)) ; λ réglable dans l'administration (0 = neutralisé, 1 = maximal)
 LIQUIDITY_FLOOR_EUR, LIQUIDITY_CEIL_EUR = 2e6, 50e6      # échelle logarithmique 0 → 100 de la liquidité (valeur échangée par jour, en euros)
 
 COMPLEX_WEIGHTS = {'dynamics': 40, 'r2': 15, 'up_days': 5, 'concentration': 7, 'volatility': 15, 'drawdown': 8, 'liquidity': 10, 'acceleration': 0}
@@ -168,11 +166,12 @@ def _status(coverage):
 
 
 def _simple(periods, comps, weights, eff, threshold):
-    """Score simple = 100 × Dynamique × Régularité × facteur d'accélération (0,90 à 1,10), plafonné à 100.
-    Dynamique : moyenne des périodes mesurables (poids renormalisés). Régularité, pics, séances positives : moyennes sur les seules périodes où la mesure existe."""
+    """Score simple (V4.3) = 100 × Dynamique × Régularité, plafonné à 100 : uniquement la pente et le R² des périodes sélectionnées.
+    Dynamique = Σ ω_p × note de pente de la période p (poids renormalisés sur les périodes mesurables).
+    Régularité = moyenne pondérée des R², chaque R² pesant min(1, n/21) (un R² sur peu de séances est bruité) ; périodes sans R² écartées.
+    Pics, séances positives, accélération, volatilité, drawdown et liquidité n'y entrent pas : ils ne servent qu'au score complexe."""
     D = cd = 0.0
-    r_num = r_den = sp_num = sp_w = up_num = up_w = 0.0
-    a_num = a_w = a0 = 0.0
+    r_num = r_den = 0.0
     parts = {}
     for p in periods:
         c = comps[p['id']]
@@ -180,26 +179,19 @@ def _simple(periods, comps, weights, eff, threshold):
         if c is None or w <= 0:
             continue
         D += w * c['dynamics'] / 100
+        rel = None
         if c['r2'] is not None:
             rel = min(1.0, p['sessions'] / RELIABILITY_SESSIONS)
             r_num += w * rel * max(c['raw']['r2'], 0.0); r_den += w * rel
             cd += w0
-        if c['spike_factor'] is not None:
-            sp_num += w * c['spike_factor']; sp_w += w
-        if c['up_factor'] is not None:
-            up_num += w * c['up_factor']; up_w += w
-        if c['acceleration'] is not None:
-            a_num += w * c['acceleration']; a_w += w; a0 += w0
-        parts[p['id']] = {'weight': w, 'dynamics': c['dynamics'], 'r2': c['raw']['r2'], 'acceleration': c['acceleration']}
+        parts[p['id']] = {'weight': w, 'dynamics': c['dynamics'], 'slope': c['raw']['slope'], 'r2': c['raw']['r2'], 'r2_reliability': rel}
     cover_w = sum(weights.get(p['id'], 0.0) for p in periods) or 1.0
-    coverage = ((1 - ACC_WEIGHT_IN_COVERAGE) * cd + ACC_WEIGHT_IN_COVERAGE * a0) / cover_w
+    coverage = cd / cover_w                           # part du poids de référence dont la pente ET le R² sont mesurés
     if r_den <= 0:
         return {'score': None, 'status': 'inconnu', 'coverage': coverage, 'reliable': False, 'why': 'calcul impossible : régularité (R²) non mesurable sur aucune période', 'parts': parts}
-    Q = (r_num / r_den) * (sp_num / sp_w if sp_w else 1.0) * (up_num / up_w if up_w else 1.0)
-    acc = a_num / a_w if a_w else None
-    factor = 1.0 if acc is None else (1 - ACC_AMPLITUDE) + 2 * ACC_AMPLITUDE * acc / 100
-    return {'score': min(100.0, 100 * D * Q * factor), 'status': _status(coverage), 'coverage': coverage, 'reliable': coverage >= threshold - 1e-12,
-            'dynamics': D, 'quality': Q, 'acceleration': acc, 'acceleration_factor': factor, 'parts': parts}
+    Q = r_num / r_den
+    return {'score': min(100.0, 100 * D * Q), 'status': _status(coverage), 'coverage': coverage, 'reliable': coverage >= threshold - 1e-12,
+            'dynamics': D, 'quality': Q, 'parts': parts}
 
 
 def _complex(avail, comps, weights, eff, period_cover, liquidity_score, threshold, cw, anchor):
@@ -244,7 +236,7 @@ def _complex(avail, comps, weights, eff, period_cover, liquidity_score, threshol
     coverage *= period_cover
     short = comps[avail[0]['id']]                  # période la plus courte réellement mesurable (pas de pénalité si la plus courte n'existe pas)
     mult = 1 - anchor * (1 - short['gate'])        # ralentissement ou retournement récent : pénalité progressive, jamais une multiplication brutale
-    return {'score': 100 * base * mult, 'status': _status(coverage), 'coverage': coverage, 'reliable': coverage >= threshold - 1e-12, 'anchor': mult,
+    return {'score': 100 * base * mult, 'status': _status(coverage), 'coverage': coverage, 'reliable': coverage >= threshold - 1e-12, 'anchor': mult, 'anchor_gate': short['gate'], 'anchor_lambda': anchor,
             'raw_total': 100 * base, 'contributions': contributions}
 
 
