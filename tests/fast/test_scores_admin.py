@@ -252,3 +252,9 @@ def test_anchor_is_a_common_setting_validated_persisted_and_part_of_the_cache_ke
             A.save(None, {'global': {'kappa': 0.7, 'threshold': 0.75, 'anchor': bad}})
     A.save(None, {'reset': 'global'})
     assert A.state(None)['global']['anchor'] == 0.5 and S._key(S.apply_admin(None, A.growth_v4()), 1) == base
+
+
+def test_strategies_current_profile_always_carries_sessions():
+    from engine.analytics import scores_admin as A
+    cur = A.clean_profile(A.profile_of(A.base_config('growth_v4')))
+    assert 'sessions' not in cur['periods']['week']                    # clean_profile ne le garde pas : strategies() doit le rajouter

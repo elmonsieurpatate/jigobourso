@@ -283,6 +283,8 @@ def strategies(conn):
         base = base_config(name)
         cfg = build_config(conn, name)
         current = clean_profile(stored[name]) if name in stored else profile_of(base)       # valeurs saisies (seuils conservés même si les filtres sont désactivés)
+        for pid in SCORING_PERIODS:
+            current['periods'][pid].setdefault('sessions', C.SESSIONS[pid])                  # le profil enregistré ne garde pas la durée : l'affichage en a besoin
         active = [p for p in SCORING_PERIODS if current['periods'][p]['enabled']]
         out.append({'name': name, 'label': sp['label'], 'note': sp['note'], 'engine': 'v4', 'sort': cfg['ranking'].get('sort'), 'defaults': profile_of(base), 'current': current,
                     'customised': name in stored, 'auto_weights': auto_weights(glob['kappa'], active), 'saved_at': _iso(settings.saved_at(conn, PROFILES)) if name in stored else None})
