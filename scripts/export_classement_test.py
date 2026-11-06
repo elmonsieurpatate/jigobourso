@@ -12,17 +12,8 @@ public = Path(__file__).resolve().parents[1] / 'app' / 'public'
 html = (public / args.page).read_text()
 html = re.sub(r'<link rel="stylesheet" href="assets/([^?]+)\?[^\"]+">',
               lambda m: '<style>' + (public / 'assets' / m[1]).read_text() + '</style>', html)
-definitions = json.loads((public.parent / 'config' / 'explorer_secondary_filters.json').read_text())
-metadata = json.loads((public.parent / 'config' / 'secondary_metadata_groups.json').read_text())
-defaults = {'schema': 1, 'revision': 1, 'filters': {}}
-for f in definitions['filters']:
-    defaults['filters'][f['id']] = {m['id']: {'mode': 'all', 'selected': []} for m in f['measures']}
-    if not f['editable']:
-        f['values'] = [dict(v, value=None if v['id'] == 'unknown' else v['id'], count=0) for v in metadata['groups'][f['id']]]
-        defaults['filters'][f['id']]['values'] = {'mode': 'all', 'selected': []}
-category_payload = {'schema': 2, 'definitions': {'schema': 1, 'revision': 1, 'filters': definitions['filters']},
-                    'defaults': defaults, 'metadata_mapping': metadata, 'source': 'offline',
-                    'source_label': 'Propositions de catégories · aperçu hors ligne, sans catalogue réel'}
+category_payload = json.loads((public.parent / 'config' / 'classement_test_categories.json').read_text())
+category_payload['source_label'] = 'Instantané des catégories proposées de l’administration V4 · aperçu hors ligne'
 category_script = 'window.ClassementTestCategoryConfig = ' + json.dumps(category_payload, ensure_ascii=False).replace('<', chr(92) + 'u003c') + ';' + chr(10)
 shim = '''
 // Aperçu hors ligne : aucune donnée réelle et aucun appel réseau.
