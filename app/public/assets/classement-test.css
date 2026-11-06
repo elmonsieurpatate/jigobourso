@@ -185,3 +185,31 @@
 
 .ct-mobile-scroll-hint{display:none}
 @media(max-width:700px){.ct-mobile-scroll-hint{display:block;margin-top:4px;color:var(--ct-accent)}}
+
+/* Mobile : en-tête, réglages et commandes du classement plus compacts (rien ne change au-dessus de 700 px). */
+@media(max-width:700px){
+  .ct-heading-actions{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:stretch}
+  .ct-heading-actions>.btn{font-size:14px;padding:10px 12px;white-space:normal;line-height:1.2}
+  .ct-heading p{font-size:14px;margin:6px 0 0}
+  .ct-strategy{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px 12px;align-items:center}
+  .ct-strategy label{display:none}
+  .ct-strategy select{width:100%;min-width:0}
+  .ct-strategy .ct-provisional{grid-column:1/-1}
+  .ct-periods{gap:8px}
+  .ct-illustration{display:none}
+  .ct-slider-row{display:grid;grid-template-columns:36px minmax(0,1fr) 36px;gap:8px}
+  .ct-slider-row .ct-number{grid-column:1/-1;justify-content:flex-start}
+  .ct-slider-row button{width:36px;height:40px}
+  .ct-number input{width:96px}
+  .ct-number span{white-space:nowrap}
+  .ct-ranking-controls{grid-template-columns:minmax(0,1fr) minmax(0,1fr) 44px;grid-template-areas:"sort sort dir" "cols size size"}
+  .ct-ranking-controls .ct-sort-label{grid-area:sort}
+  .ct-ranking-controls #ct-sort-direction{grid-area:dir;height:40px;padding:0;font-size:18px}
+  .ct-ranking-controls .ct-columns{grid-area:cols}
+  .ct-ranking-controls #ct-page-size{grid-area:size;justify-self:stretch;width:100%;height:40px}
+  .ct-ranking-controls .ct-columns summary{height:40px;display:flex;align-items:center;font-size:13px}
+  .ct-ranking-controls{align-items:stretch}
+  .ct-config-footer{display:grid;gap:10px}
+  .ct-config-footer>div{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .ct-config-footer .btn{font-size:12px;padding:10px 8px;white-space:normal}
+}
