@@ -401,3 +401,15 @@
   $('#ct-apply').onclick=()=>feedback('Réglages conservés. Le tableau présente des données fictives, indépendantes de la stratégie.');
   tree();project();render();
 })().catch(error=>{const p=document.querySelector('#ct-feedback');p.textContent='Impossible d’ouvrir la page de test : '+error.message;});
+
+// Bloc « Stratégie » : réglages repliés par défaut (Afficher / Masquer), choix mémorisé dans ce navigateur.
+(function(){
+  const panel=document.querySelector('.ct-panel[aria-label="Stratégie et critères"]'),head=panel&&panel.querySelector('.ct-strategy');
+  if(!head||head.querySelector('.ct-fold'))return;
+  const KEY='jigobourso.ct.strategy-open';let open=false;
+  try{open=localStorage.getItem(KEY)==='1';}catch(_){/* préférence facultative */}
+  const b=document.createElement('button');b.type='button';b.className='btn small ct-fold';b.setAttribute('aria-controls','ct-simple ct-expert');
+  const apply=()=>{panel.classList.toggle('ct-collapsed',!open);b.setAttribute('aria-expanded',String(open));b.textContent=open?'Masquer les réglages':'Afficher les réglages';};
+  b.onclick=()=>{open=!open;apply();try{localStorage.setItem(KEY,open?'1':'0');}catch(_){/* préférence facultative */}};
+  head.appendChild(b);apply();
+})();

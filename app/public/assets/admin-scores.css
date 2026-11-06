@@ -91,3 +91,6 @@
   .as-bar .row { flex-wrap: nowrap; gap: 6px; } .as-bar .btn { white-space: nowrap; padding: 8px 10px; font-size: .8rem; min-height: 40px; }
 }
 .as-dec td:first-child { white-space: normal; min-width: 120px; max-width: 150px; }
+/* Simulation : le bloc de recherche et le bloc du résultat ne se touchent plus */
+#as-sim{margin-top:16px}
+#as-sim>.card+.card{margin-top:16px}
