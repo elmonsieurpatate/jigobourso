@@ -189,23 +189,13 @@ def validate_scoring(raw,periods):
     if complex_weights and sum(complex_weights.get(k,SC.COMPLEX_WEIGHTS[k]) for k in SC.COMPLEX_WEIGHTS)<=0:raise ValueError('Le score complexe doit garder au moins un poids positif')
     threshold=number(raw.get('threshold',SC.COVERAGE_THRESHOLD),0.1,1,'Seuil de couverture');threshold=SC.COVERAGE_THRESHOLD if threshold is None else threshold
     anchor=number(raw.get('anchor',SC.ANCHOR_LAMBDA),0,1,'Ancrage récent');anchor=SC.ANCHOR_LAMBDA if anchor is None else anchor
-    return {'kappa':kappa,'weights':weights,'complex_weights':complex_weights,'threshold':threshold,'anchor':anchor}
-
-
-def growth_v1():
-    """« Croissance rapide » — référence V1 : seuils historiques de scan.py, tous configurables (aucun n'est une règle interne).
-    Conformité : jour ≥ 0 (désactivable), semaine ≥ +3 %, mois ≥ +8 % avec R² ≥ 0,60, concentration V1 ≤ 0,45, volatilité ≤ 7 %/séance,
-    valeur échangée ≥ 5 M€ (places américaines) / 2 M€ (autres), clôtures récentes. Les scores, eux, ne dépendent d'aucun de ces seuils."""
-    c=empty();c['name']='growth_v1'
-    by={p['id']:p for p in c['periods']}
-    by['day'].update(enabled=True,min_return=0.0)
-    by['week'].update(enabled=True,require_history=True,min_return=3.0)
-    by['month'].update(enabled=True,require_history=True,min_return=8.0,min_r2=0.60,max_spike_share=0.45,max_volatility=7.0)
-    c['selection']={'combine':'all','missing':'unknown','require_fresh':True}
-    c['liquidity']={'min_quoted_volume':None,'min_turnover_eur':2e6,'min_turnover_eur_us':5e6}
-    c['ranking']={'mode':SCORES_MODE,'sort':'simple'}
-    c['scoring']={'kappa':0.7,'weights':{},'complex_weights':{},'threshold':0.75}
-    return validate(c)
+    sat_a=number(raw.get('sat_a',SC.SAT_A),SC.SAT_A_RANGE[0],SC.SAT_A_RANGE[1],'Saturation de la dynamique');sat_a=SC.SAT_A if sat_a is None else sat_a
+    accel_ref=number(raw.get('accel_ref',SC.ACCEL_REF),SC.ACCEL_REF_RANGE[0],SC.ACCEL_REF_RANGE[1],'Référence d’accélération');accel_ref=SC.ACCEL_REF if accel_ref is None else accel_ref
+    vol_mode=raw.get('vol_mode','absolute') or 'absolute'
+    if vol_mode not in SC.VOL_MODES:raise ValueError('Méthode de volatilité inconnue')
+    horizon=raw.get('momentum_horizon','6m') or '6m'
+    if horizon not in SC.MOMENTUM_HORIZONS:raise ValueError('Horizon de momentum inconnu')
+    return {'kappa':kappa,'weights':weights,'complex_weights':complex_weights,'threshold':threshold,'anchor':anchor,'sat_a':sat_a,'accel_ref':accel_ref,'vol_mode':vol_mode,'momentum_horizon':horizon}
 
 
 def effective(c,kind):

@@ -45,13 +45,31 @@ def test_auto_weights_follow_kappa_and_active_set():
     assert A.auto_weights(0.7, []) == {}
 
 
-def test_state_labels_and_engines_are_distinguished():
-    labels = {s['name']: (s['label'], s['engine']) for s in A.state(None)['strategies']}
-    assert labels['growth_v4'] == ('Croissance rapide — V4 (moteur commun)', 'v4')
-    assert labels['growth_v1'][1] == 'v4' and 'référence V1' in labels['growth_v1'][0]
-    assert labels['fast'] == ('Croissance rapide — ancien moteur', 'historic') and labels['regular'][1] == 'historic'
-    assert len({v[0] for v in labels.values()}) == len(labels)                    # aucun libellé en double
-    assert all(s['engine'] in ('v4', 'historic') for s in A.state(None)['strategies'])
+def test_state_exposes_exactly_the_seven_v4_strategies_and_no_legacy_engine():
+    sts = A.state(None)['strategies']
+    labels = {s['name']: s['label'] for s in sts}
+    assert list(labels) == ['growth_regular', 'growth_v4', 'rebound', 'calm_rise', 'momentum_6m', 'momentum_12m', 'momentum_risk']
+    assert all(s['engine'] == 'v4' for s in sts)
+    assert len({v for v in labels.values()}) == len(labels)                        # aucun libellé en double
+    assert [v for v in labels.values() if v.startswith('Croissance rapide')] == ['Croissance rapide']      # une seule « Croissance rapide »
+    assert 'growth_v1' not in labels
+
+
+def test_historic_strategies_have_distinct_real_settings():
+    built = {n: A.base_config(n)['scoring'] for n in A.V4_STRATEGIES}
+    cw = {n: tuple(sorted(c['complex_weights'].items())) for n, c in built.items()}
+    assert len(set(cw.values())) == len(cw) - 1 or len(set(cw.values())) == len(cw)      # growth_v4 : poids de conception ({}), les six autres ont les leurs
+    assert built['growth_v4']['sat_a'] == 17.0 and built['growth_v4']['accel_ref'] == 0.4 and built['growth_v4']['complex_weights'] == {}      # Croissance rapide inchangée
+    assert built['rebound']['accel_ref'] < 0.4 and built['rebound']['complex_weights']['acceleration'] == 20 and built['rebound']['complex_weights']['recovery'] == 25
+    assert built['calm_rise']['complex_weights']['volatility'] == 35 and built['growth_regular']['complex_weights']['r2'] == 35
+    assert built['momentum_6m']['momentum_horizon'] == '6m' and built['momentum_12m']['momentum_horizon'] == '12m' and built['momentum_risk']['momentum_horizon'] == 'blend'
+    for n, c in built.items():
+        if n != 'growth_v4':
+            assert abs(sum(c['complex_weights'].values()) - 100) < 1e-9, n
+    active = {n: tuple(p['id'] for p in A.base_config(n)['periods'] if p['enabled']) for n in A.V4_STRATEGIES}
+    assert active['growth_v4'] == ('week', 'month') and active['growth_regular'] == ('month', 'quarter') and active['momentum_12m'] == ('half', 'year')
+    for n in A.V4_STRATEGIES:                                                     # chaque profil par défaut est enregistrable tel quel
+        A.clean_profile(A.profile_of(A.base_config(n)))
 
 
 def test_profile_validation():
@@ -162,11 +180,10 @@ def test_simple_mode_defaults_impose_nothing_hidden():
     assert not p['day_filter']['enabled'] and p['liquidity'] == {'min_turnover_eur': None, 'min_turnover_eur_us': None}
 
 
-def test_v1_thresholds_are_a_reference_preset_not_the_simple_default():
+def test_balanced_reference_is_the_v4_default_and_has_no_hidden_threshold():
     ref = A.references()
-    assert ref['v1']['periods']['week']['min_return'] == 3.0 and ref['v1']['periods']['month']['min_return'] == 8.0 and ref['v1']['periods']['month']['max_spike_share'] == 0.45
-    assert ref['v1']['day_filter']['enabled'] and ref['v1']['liquidity']['min_turnover_eur_us'] == 5e6
     assert ref['balanced'] == A.profile_of(A.base_config('growth_v4')) and ref['balanced']['periods']['week']['min_return'] is None
+    assert 'v1' not in ref
 
 
 def test_advanced_criteria_and_day_filter_roundtrip_and_never_change_scores(memory):
@@ -187,11 +204,13 @@ def test_advanced_criteria_and_day_filter_roundtrip_and_never_change_scores(memo
 
 
 def test_last_day_filter_can_be_disabled_again(memory):
-    p = profile('growth_v1')
-    assert p['day_filter']['enabled']
+    p = profile('growth_v4')
+    p['day_filter'] = {'enabled': True, 'min_return': 0.0}
+    A.save(None, {'profile': p})
+    assert A.stored_profiles(None)['growth_v4']['day_filter']['enabled']
     p['day_filter']['enabled'] = False
     A.save(None, {'profile': p})
-    cfg = S.apply_admin(None, C.growth_v1())
+    cfg = S.apply_admin(None, A.base_config('growth_v4'))
     day = next(x for x in cfg['periods'] if x['id'] == 'day')
     assert not day['enabled'] and day['min_return'] is None
 

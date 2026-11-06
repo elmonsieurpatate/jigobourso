@@ -9,10 +9,19 @@
     ['volatility', 'Volatilité', 'Amplitude des variations quotidiennes (plus c’est calme, mieux c’est).'],
     ['drawdown', 'Drawdown (recul max)', 'Pire recul depuis un sommet sur la période.'],
     ['liquidity', 'Liquidité', 'Valeur échangée par jour, comptée une seule fois pour tout le titre.'],
-    ['acceleration', 'Accélération', 'Variation de pente par rapport à la fenêtre précédente (0 dans le profil de référence).']];
+    ['acceleration', 'Accélération', 'Variation de pente par rapport à la fenêtre précédente (0 dans le profil de référence).'],
+    ['momentum', 'Momentum (6/12 mois)', 'Variation du cours hors dernier mois (J−126 ou J−252 → J−21), comptée une seule fois pour le titre (0 dans le profil de référence).'],
+    ['recovery', 'Contexte de rebond', 'Le semestre n’a presque pas progressé : 100 si le rendement 6 mois est ≤ −10 %, 0 s’il est ≥ +20 % (0 dans le profil de référence).']];
+  const TUNING = [
+    ['sat_a', 'Saturation de la dynamique', '% sur 5 séances', 'Croissance (en % sur 5 séances ; (séances/5)^0,52 pour les autres périodes) à laquelle la note de dynamique atteint 100. Plus elle est haute, plus il faut une hausse violente pour saturer : à 17 une semaine à +17 % vaut déjà 100, à 40 il faut +40 %. Sert au score simple et au score complexe.'],
+    ['accel_ref', 'Référence d’accélération', 'coefficient', 'Écart de pente (par séance) pour lequel la note d’accélération vaut 100 : saturation(n) ÷ n × ce coefficient. Plus il est haut, plus il faut une accélération forte pour saturer. Le garde-fou de régularité reste actif : la note est multipliée par min(R², R² précédent) ÷ 0,6 (plafonné à 1).'],
+    ['vol_mode', 'Notation de la volatilité', 'méthode', 'Absolue : 100 à 1 %/séance, 0 à 5 %/séance. Relative à la pente : rapport volatilité ÷ pente (plancher de pente 0,3 %), 100 à 1 et 0 à 4 : une forte hausse peu heurtée n’est plus écrasée, une pente nulle ou négative reste à 0. Le drawdown et la liquidité restent notés à part.'],
+    ['momentum_horizon', 'Horizon du momentum', 'horizon', 'Variation du cours hors dernier mois : 6 mois (100 à +60 %), 12 mois (100 à +100 %) ou moyenne des deux. Sans effet tant que le poids « Momentum » est à 0.']];
+  const VOLMODES = { absolute: 'Absolue (1 % → 5 %/séance)', relative: 'Relative à la pente' };
+  const HORIZONS = { '6m': '6 mois', '12m': '12 mois', blend: 'Moyenne 6 et 12 mois' };
   const CLABEL = Object.fromEntries(COMPLEX.map(c => [c[0], c[1]]));
   const SIMPLE = [
-    ['Dynamique', 'Pente de chaque période, ramenée à une croissance sur la période puis à une échelle de saturation (17 % × (séances/5)^0,52). 100 % = croissance saturée. Moyenne pondérée des périodes mesurables.', 'facteur de 0 à 1'],
+    ['Dynamique', 'Pente de chaque période, ramenée à une croissance sur la période puis à une échelle de saturation (A % × (séances/5)^0,52 ; A = réglage de la stratégie, 17 par défaut). 100 % = croissance saturée. Moyenne pondérée des périodes mesurables.', 'facteur de 0 à 1'],
     ['Régularité', 'R² de chaque période, chacun pesant min(1, séances/21) car un R² sur peu de séances est bruité. Moyenne pondérée des périodes où le R² est mesuré.', 'facteur de 0 à 1']];
   const LASTDAY = 'Dernier jour : aucun coefficient propre. La dernière séance compte comme les autres séances dans les mesures de chaque période.';
   const TABS = [['config', 'Configuration du moteur'], ['profils', 'Profils de stratégies'], ['simulation', 'Simulation & exemples'], ['suivi', 'Suivi des calculs']];
@@ -107,8 +116,7 @@
 
   function strategyPicker() {
     return `<label class="as-lbl">Stratégie sélectionnée</label><select data-a="strategy" class="as-select">
-      <optgroup label="Moteur commun V4">${v4().map(s => `<option value="${E(s.name)}" ${s.name === sel ? 'selected' : ''}>${E(s.label)}</option>`).join('')}</optgroup>
-      <optgroup label="Anciens moteurs (préservés, lecture seule)">${S.strategies.filter(s => s.engine === 'historic').map(s => `<option value="${E(s.name)}" ${s.name === sel ? 'selected' : ''}>${E(s.label)}</option>`).join('')}</optgroup></select>`;
+      <optgroup label="Moteur commun V4">${v4().map(s => `<option value="${E(s.name)}" ${s.name === sel ? 'selected' : ''}>${E(s.label)}</option>`).join('')}</optgroup></select>`;
   }
 
   function configView(st, isV4) {
@@ -154,11 +162,27 @@
       <div class="as-total ${Math.abs(total - 100) <= 0.05 ? 'ok' : 'ko'}">Total : <b id="cw-total">${fmt(total, 1)} %</b></div>
       ${COMPLEX.map(([k, n, d]) => `<div class="as-cw"><span title="${E(d)}">${n}</span><input type="number" class="as-num" data-a="cw" data-k="${k}" min="0" max="100" step="0.5" value="${cw[k] ?? 0}"><span class="as-bar-bg"><span class="as-bar-fg" id="cwb-${k}" style="width:${Math.min(100, cw[k] || 0)}%"></span></span><span class="as-pct" id="cwp-${k}">${fmt(cw[k], 0)} %</span></div>`).join('')}
       <div class="row gap-s" style="margin-top:10px"><button class="btn small" data-a="cw-norm">Normaliser à 100</button><button class="btn small" data-a="cw-ref">Valeurs de référence</button></div>
+      ${tuningCard(p)}
       <h3 class="as-h" style="margin-top:14px">Ancrage récent (λ = ${fmt(draft.global.anchor, 2)})</h3>
       <div class="as-formula">Note finale = somme pondérée × <b>(1 − λ × (1 − g))</b>, où g = min(1, dynamique de la période la plus courte ÷ 32), entre 0 et 1.</div>
       <p class="as-hint">Si la période courte (la semaine) garde une dynamique d’au moins 32 sur 100, g = 1 et rien n’est retiré. Plus elle faiblit, plus la note baisse, jusqu’à −λ (−50 % à λ = 0,5) pour une semaine plate ou négative. <b>λ = 0 neutralise l’ancrage.</b> Réglage commun à toutes les stratégies (onglet « Configuration du moteur »). Il ne concerne pas le score simple.</p>
       <p class="as-hint">Sur la base actuelle, la semaine faible pèse déjà dans la dynamique et dans les composantes amorties par g : l’ancrage s’y ajoute. Pour un titre à semaine plate, les deux premiers canaux retirent environ 35 % de la note et l’ancrage 0,5 porte la perte totale à environ 68 %. Le classement reste stable (corrélation de rang 0,996 entre λ = 0 et λ = 0,5, 93 titres communs sur le top 100) : l’ancrage sert surtout à départager les titres encore actifs de ceux qui ont calé.</p>
       <p class="as-hint">La liquidité est comptée une seule fois pour le titre, jamais par période. Le profil de référence (Dynamique 40, R² 15, séances positives 5, concentration 7, volatilité 15, drawdown 8, liquidité 10) est celui de Croissance rapide, pas forcément celui des autres stratégies.</p>`;
+  }
+
+  function tuningCard(p) {
+    const t = p.tuning || S.design.tuning, d = S.design.tuning, R = S.design.tuning_ranges;
+    const field = ([k, n, unit, help]) => {
+      const dflt = d[k], cur = t[k], same = cur === dflt;
+      const input = k === 'vol_mode' ? `<select class="as-select" data-a="tune" data-k="${k}">${S.design.vol_modes.map(v => `<option value="${v}" ${v === cur ? 'selected' : ''}>${E(VOLMODES[v])}</option>`).join('')}</select>`
+        : k === 'momentum_horizon' ? `<select class="as-select" data-a="tune" data-k="${k}">${S.design.momentum_horizons.map(v => `<option value="${v}" ${v === cur ? 'selected' : ''}>${E(HORIZONS[v])}</option>`).join('')}</select>`
+        : `<input type="number" class="as-num" data-a="tune" data-k="${k}" min="${R[k][0]}" max="${R[k][1]}" step="${k === 'sat_a' ? 1 : 0.05}" value="${cur}"> <span class="muted">${unit}</span>`;
+      const shown = k === 'vol_mode' ? VOLMODES[dflt] : k === 'momentum_horizon' ? HORIZONS[dflt] : dflt;
+      return `<div class="as-field"><label>${n} <span class="as-i" title="${E(help)}">ⓘ</span></label>${input}
+        <p class="as-hint">${E(help)}<br>Valeur par défaut : <b>${E(shown)}</b>${k in R ? ` · bornes ${R[k][0]} à ${R[k][1]}` : ''} ${same ? '' : `<button class="btn small" data-a="tune-reset" data-k="${k}">Valeur par défaut</button>`}</p></div>`;
+    };
+    return `<h3 class="as-h" style="margin-top:14px">Normalisations de cette stratégie (réglages avancés)</h3>
+      <p class="as-hint">Propres à la stratégie sélectionnée : elles changent les notes de cette stratégie et d’aucune autre.</p>${TUNING.map(field).join('')}`;
   }
 
   function historicView(st) {
@@ -179,7 +203,7 @@
     return `<div class="card"><h3 class="as-h">Profils de stratégies</h3>
       <div class="table-wrap"><table><thead><tr><th>Stratégie</th><th>Moteur</th><th>Granularités et poids</th><th>Pondération</th><th>État</th><th></th></tr></thead><tbody>
       <tr class="as-group"><td colspan="6">Moteur commun V4 — mêmes calculs de score, seuls les réglages changent</td></tr>${v4().map(row).join('')}
-      <tr class="as-group"><td colspan="6">Anciens moteurs — comportement préservé tant qu’aucune migration n’est validée</td></tr>${S.strategies.filter(s => s.engine === 'historic').map(row).join('')}</tbody></table></div>
+</tbody></table></div>
       <p class="as-hint">Stratégies personnelles : ${pe.total ? `${pe.total} enregistrée${pe.total > 1 ? 's' : ''}, dont ${pe.common_engine} sur le moteur commun et ${pe.historic} sur un ancien moteur (non migrées).` : 'aucune enregistrée sur cette base.'}${pe.configurable.length ? ' Configurables ici : ' + pe.configurable.map(c => E(c.name)).join(', ') + '.' : ''}</p></div>
       ${p ? technicalCard(p) + previewCard() : ''}`;
   }
@@ -326,6 +350,7 @@
     const rows = [['Croissance (Dynamique)', 'growth', '%', 2], ['Régularité (R²)', 'r2', '', 2], ['Séances positives', 'up_fraction', '%', 0], ['Plus gros pic ÷ hausse nette', 'spike_share', '%', 0], ['Accélération (écart de pente)', 'accel', '', 3], ['Volatilité (par séance)', 'volatility', '%', 2], ['Drawdown', 'drawdown', '%', 1]];
     const s = r.simple, c = r.complex, liq = r.liquidity || {};
     return `<div class="card"><div class="row between" style="flex-wrap:wrap;gap:12px"><div><h3 class="as-h" style="margin:0">${E(sim.title.name)}</h3><span class="muted">${E(sim.title.symbol)} · ${E(sim.title.mic)} · ${sim.title.kind === 'etf' ? 'ETF' : 'Action'}</span></div><div class="as-scores">${sc(s, 's')}${sc(c, 'c')}</div></div>
+      ${sim.tuning ? `<p class="as-hint">Normalisations utilisées par le calcul : saturation de dynamique <b>${fmt(sim.tuning.sat_a, 1)}</b> · référence d’accélération <b>${fmt(sim.tuning.accel_ref, 2)}</b> · volatilité <b>${E(VOLMODES[sim.tuning.vol_mode] || sim.tuning.vol_mode)}</b> · momentum <b>${E(HORIZONS[sim.tuning.momentum_horizon] || sim.tuning.momentum_horizon)}</b>.</p>` : ''}
       ${chartCard()}
       <div class="table-wrap"><table class="as-dec"><thead><tr><th>Mesure</th>${ids.map(i => `<th class="num">${E(L[i])}<br><small class="muted">poids réel ${fmt(100 * ((r.weights_effective || {})[i] || 0), 1)} %${r.periods[i] ? '' : ' (période sans données)'}</small></th>`).join('')}</tr></thead><tbody>
         ${rows.map(([n, k, u, d]) => `<tr><td>${n}</td>${ids.map(i => cell(r.periods[i], k, u, d)).join('')}</tr>`).join('')}</tbody></table></div>
@@ -407,6 +432,7 @@
       paintBar();
     }
     else if (a === 'cw') { p.complex_weights[t.dataset.k] = +t.value || 0; paintBar(); }
+    else if (a === 'tune') { const k = t.dataset.k, R = S.design.tuning_ranges[k]; p.tuning = p.tuning || clone(S.design.tuning); p.tuning[k] = R ? Math.min(R[1], Math.max(R[0], +t.value || S.design.tuning[k])) : t.value; confStale = true; paintBar(); later(); }
     else if (a === 'kappa') { draft.global.kappa = +t.value; paintBar(); later(); }
     else if (a === 'anchor') { draft.global.anchor = Math.min(1, Math.max(0, +t.value || 0)); paintBar(); }
     else if (a === 'thr') { draft.global.threshold = +t.value; paintBar(); }
@@ -432,6 +458,7 @@
     else if (a === 'mode') { if (v === 'custom') toCustom(); else { prof().weights_mode = 'auto'; prof().weights = {}; } paint(); }
     else if (a === 'pw-auto') { prof().weights_mode = 'auto'; prof().weights = {}; paint(); }
     else if (a === 'cw-norm') { const p = prof(), tot = sum(p.complex_weights) || 1; let acc = 0; const keys = Object.keys(p.complex_weights); keys.forEach((k, i) => { const x = i === keys.length - 1 ? Math.round((100 - acc) * 10) / 10 : Math.round(p.complex_weights[k] / tot * 1000) / 10; p.complex_weights[k] = x; acc += x; }); paint(); }
+    else if (a === 'tune-reset') { prof().tuning = prof().tuning || clone(S.design.tuning); prof().tuning[t.dataset.k] = S.design.tuning[t.dataset.k]; confStale = true; paint(); }
     else if (a === 'cw-ref') { prof().complex_weights = clone(S.design.complex_weights); paint(); }
     else if (a === 'open') { sel = v; tab = 'profils'; sim = null; rank = null; paint(); }
     else if (a === 'conf-run') { runConf(true); }

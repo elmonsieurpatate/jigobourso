@@ -34,7 +34,8 @@ def params_for(config, kind):
         for p in active:
             p['weight'] = float(custom[p['id']])
     return {'periods': active, 'required': [p['id'] for p in cfg['periods'] if p['enabled'] and p.get('require_history') and p['sessions'] >= SC.MIN_SESSIONS],
-            'kappa': float(sc['kappa']), 'complex_weights': {k: float(v) for k, v in dict(SC.COMPLEX_WEIGHTS, **sc['complex_weights']).items()}, 'threshold': float(sc['threshold']), 'anchor': float(sc.get('anchor', SC.ANCHOR_LAMBDA))}
+            'kappa': float(sc['kappa']), 'complex_weights': {k: float(v) for k, v in dict(SC.COMPLEX_WEIGHTS, **sc['complex_weights']).items()}, 'threshold': float(sc['threshold']), 'anchor': float(sc.get('anchor', SC.ANCHOR_LAMBDA)),
+            'sat_a': float(sc.get('sat_a', SC.SAT_A)), 'accel_ref': float(sc.get('accel_ref', SC.ACCEL_REF)), 'vol_mode': sc.get('vol_mode', 'absolute'), 'momentum_horizon': sc.get('momentum_horizon', '6m')}
 
 
 def _f(v):
@@ -50,19 +51,20 @@ def load_inputs(conn, sessions, ids=None):
         args = list(ids)
     out = {}
     with conn.cursor() as cur:
-        cur.execute(f"""SELECT r.listing_id, i.kind, l.mic, ls.turnover_eur, ls.source, ls.days FROM v_recommendable r JOIN listings l ON l.id=r.listing_id
-                        JOIN instruments i ON i.id=l.instrument_id LEFT JOIN liquidity_state ls ON ls.listing_id=r.listing_id WHERE 1=1{scope}""", args)
+        cur.execute(f"""SELECT r.listing_id, i.kind, l.mic, ls.turnover_eur, ls.source, ls.days, ss.momentum_6m, ss.momentum_12m FROM v_recommendable r JOIN listings l ON l.id=r.listing_id
+                        JOIN instruments i ON i.id=l.instrument_id LEFT JOIN liquidity_state ls ON ls.listing_id=r.listing_id LEFT JOIN series_state ss ON ss.listing_id=r.listing_id WHERE 1=1{scope}""", args)
         for r in cur.fetchall():
             out[r['listing_id']] = {'kind': 'etf' if r['kind'] == 'etf' else 'equity', 'mic': r['mic'], 'inputs': {},
-                                    'liquidity': {'turnover_eur': _f(r['turnover_eur']), 'source': r['source'], 'days': r['days']}}
+                                    'liquidity': {'turnover_eur': _f(r['turnover_eur']), 'source': r['source'], 'days': r['days']},
+                                    'momentum': {'6m': _f(r['momentum_6m']), '12m': _f(r['momentum_12m'])}}
         if sessions:
             marks = ','.join(['%s'] * len(sessions))
-            cur.execute(f"""SELECT m.listing_id, m.sessions, m.slope, m.r2, m.volatility, m.drawdown, m.coverage, x.up_fraction, x.spike_share, x.accel, x.r2_prev
+            cur.execute(f"""SELECT m.listing_id, m.sessions, m.slope, m.r2, m.perf, m.volatility, m.drawdown, m.coverage, x.up_fraction, x.spike_share, x.accel, x.r2_prev
                             FROM strategy_metrics m JOIN v_recommendable r ON r.listing_id=m.listing_id LEFT JOIN score_inputs x ON x.listing_id=m.listing_id AND x.sessions=m.sessions
                             WHERE m.sessions IN ({marks}){scope}""", list(sessions) + args)
             for r in cur.fetchall():
                 if r['listing_id'] in out:
-                    out[r['listing_id']]['inputs'][r['sessions']] = {k: _f(r[k]) for k in ('slope', 'r2', 'volatility', 'drawdown', 'coverage', 'up_fraction', 'spike_share', 'accel', 'r2_prev')}
+                    out[r['listing_id']]['inputs'][r['sessions']] = {k: _f(r[k]) for k in ('slope', 'r2', 'perf', 'volatility', 'drawdown', 'coverage', 'up_fraction', 'spike_share', 'accel', 'r2_prev')}
     return out
 
 
@@ -71,7 +73,8 @@ def _score_all(data, config):
     result = {}
     for lid, d in data.items():
         p = params[d['kind']]
-        result[lid] = SC.score_title(d['inputs'], d['liquidity'], p['periods'], kappa=p['kappa'], required=p['required'], threshold=p['threshold'], complex_weights=p['complex_weights'], anchor=p['anchor'])
+        result[lid] = SC.score_title(d['inputs'], d['liquidity'], p['periods'], kappa=p['kappa'], required=p['required'], threshold=p['threshold'], complex_weights=p['complex_weights'], anchor=p['anchor'],
+                                 sat_a=p['sat_a'], accel_ref=p['accel_ref'], vol_mode=p['vol_mode'], momentum=d.get('momentum'), momentum_horizon=p['momentum_horizon'], recovery_perf=(d['inputs'].get(126) or {}).get('perf'))
     return result
 
 
@@ -171,7 +174,7 @@ def apply_global(conn, config):
     base = C.validate_scoring(None, [])
     admin = admin_defaults(conn)
     sc = dict(config.get('scoring') or base)
-    for field in ('kappa', 'threshold', 'complex_weights', 'anchor'):
+    for field in ('kappa', 'threshold', 'anchor'):               # les poids du score complexe sont propres à chaque stratégie : aucun repli global (ambiguïté supprimée)
         if sc.get(field) == base[field]:
             sc[field] = admin[field]
     return dict(config, scoring=sc)

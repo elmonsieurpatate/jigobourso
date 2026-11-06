@@ -13,7 +13,7 @@ from . import explorer_config as C, score_categories, score_service, scores as S
 PROFILES = 'scores_profiles'
 SCORING_PERIODS = tuple(p for p in C.PERIODS if C.SESSIONS[p] >= SC.MIN_SESSIONS)
 SIMPLE = {'min_slope': (-100, 100), 'min_r2': (0, 1)}                      # mode simple : exactement deux seuils par granularité
-ADVANCED = {'min_return': (-100, 10000), 'max_spike_share': (0, 1), 'max_volatility': (0, 100), 'min_up_fraction': (0, 1), 'max_drawdown': (0, 100)}
+ADVANCED = {'min_return': (-100, 10000), 'max_return': (-100, 10000), 'max_spike_share': (0, 1), 'max_volatility': (0, 100), 'min_up_fraction': (0, 1), 'max_drawdown': (0, 100)}
 THRESHOLDS = {**SIMPLE, **ADVANCED}
 LIQUIDITY = {'min_turnover_eur': (0, 1e12), 'min_turnover_eur_us': (0, 1e12)}
 TOLERANCE = 0.05
@@ -21,7 +21,7 @@ TOLERANCE = 0.05
 
 def growth_v4():
     """« Croissance rapide » V4, mode simple : semaine et mois obligatoires, pente et R² minimaux « Équilibré » (valeurs initiales à éprouver, cahier des charges V4 §2).
-    Aucun critère avancé, aucune liquidité minimale, aucun filtre sur le dernier jour : rien n'est imposé en silence. Les seuils historiques V1 sont un préréglage séparé (`growth_v1`)."""
+    Aucun critère avancé, aucune liquidité minimale, aucun filtre sur le dernier jour : rien n'est imposé en silence."""
     c = C.empty()
     c['name'] = 'growth_v4'
     by = {p['id']: p for p in c['periods']}
@@ -33,13 +33,62 @@ def growth_v4():
     return C.validate(c)
 
 
+def _historic(name, periods, weights, complex_weights, tuning=None, sort='complex'):
+    """Stratégie historique transposée dans le moteur V4 : mêmes calculs de score, réglages propres.
+    periods : {granularité: seuils d'admission} ; une granularité à poids 0 sert de contexte d'admission (aucune note)."""
+    c = growth_v4()
+    c['name'] = name
+    by = {p['id']: p for p in c['periods']}
+    for pid in SCORING_PERIODS:
+        by[pid].update(enabled=pid in periods, require_history=pid in periods and weights.get(pid, 0) > 0, **{f: None for f in THRESHOLDS})
+        by[pid].update(periods.get(pid, {}))
+    c['ranking'] = {'mode': C.SCORES_MODE, 'sort': sort}
+    c['scoring'] = dict(c['scoring'], weights=dict(weights), complex_weights=dict(complex_weights), **(tuning or {}))
+    return C.validate(c)
+
+
+def _regular():
+    return _historic('growth_regular', {'month': dict(min_slope=0.07, min_r2=0.56), 'quarter': dict(min_slope=0.07, min_r2=0.56)}, {},
+                     {'dynamics': 20, 'r2': 35, 'up_days': 15, 'concentration': 10, 'volatility': 5, 'drawdown': 5, 'liquidity': 10, 'acceleration': 0, 'momentum': 0}, {'sat_a': 10.0})
+
+
+def _rebound():
+    return _historic('rebound', {'week': dict(min_slope=0.07, min_r2=0.56), 'month': dict(min_slope=0.07, min_r2=0.56), 'half': dict(max_return=10.0)}, {'week': 50, 'month': 50, 'half': 0},
+                     {'dynamics': 15, 'r2': 10, 'up_days': 5, 'concentration': 5, 'volatility': 10, 'drawdown': 5, 'liquidity': 5, 'acceleration': 20, 'momentum': 0, 'recovery': 25}, {'accel_ref': 0.25})
+
+
+def _calm():
+    return _historic('calm_rise', {'month': dict(min_slope=0.07, min_r2=0.56, max_volatility=1.5, max_drawdown=20.0), 'quarter': dict(min_slope=0.07, min_r2=0.56, max_volatility=1.5, max_drawdown=20.0)}, {},
+                     {'dynamics': 10, 'r2': 10, 'up_days': 10, 'concentration': 5, 'volatility': 35, 'drawdown': 20, 'liquidity': 10, 'acceleration': 0, 'momentum': 0}, {'sat_a': 10.0})
+
+
+def _momentum(name, horizon, periods, weights, cw):
+    return _historic(name, {pid: {} for pid in periods}, weights, cw, {'momentum_horizon': horizon})
+
+
 V4_STRATEGIES = {
-    'growth_v4': {'label': 'Croissance rapide — V4 (moteur commun)', 'build': growth_v4,
+    'growth_regular': {'label': 'Croissance régulière', 'build': _regular,
+                       'note': 'Hausse soutenue ET régulière sur un mois et un trimestre : la régularité (R²), les séances positives et le risque pèsent plus que l’intensité (saturation de dynamique abaissée à 10 %).'},
+    'growth_v4': {'label': 'Croissance rapide', 'build': growth_v4,
                   'note': 'Mode simple : pente et R² par granularité, aucun autre filtre imposé.'},
-    'growth_v1': {'label': 'Croissance rapide — référence V1 (seuils historiques)', 'build': C.growth_v1,
-                  'note': 'Mêmes calculs de score ; seuils de conformité historiques de V1 (3 % semaine, 8 % mois, concentration, volatilité, liquidité).'}}
+    'rebound': {'label': 'Rebond', 'build': _rebound,
+                'note': 'Semaine et mois qui repartent à la hausse alors que le semestre n’a presque pas progressé (admission : rendement 6 mois ≤ 10 %). Contexte de rebond (semestre peu avancé) 25 % et accélération 20 % du score complexe, référence d’accélération abaissée (0,25) : un retournement net suffit.'},
+    'calm_rise': {'label': 'Hausse calme', 'build': _calm,
+                  'note': 'Mois et trimestre en hausse douce avec peu de variations (admission : volatilité ≤ 1,5 %/séance, repli ≤ 20 %). Volatilité 35 % et drawdown 20 % du score complexe.'},
+    'momentum_6m': {'label': 'Momentum 6 mois (expérimental)',
+                    'build': lambda: _momentum('momentum_6m', '6m', ('quarter', 'half'), {'quarter': 30, 'half': 70},
+                                               {'dynamics': 15, 'r2': 10, 'up_days': 0, 'concentration': 0, 'volatility': 5, 'drawdown': 10, 'liquidity': 10, 'acceleration': 0, 'momentum': 50}),
+                    'note': 'Variation du cours entre J−126 et J−21 séances (hors dernier mois), 50 % du score complexe ; le semestre porte la pente et la régularité. Aucun seuil.'},
+    'momentum_12m': {'label': 'Momentum 12 mois (expérimental)',
+                     'build': lambda: _momentum('momentum_12m', '12m', ('half', 'year'), {'half': 30, 'year': 70},
+                                                {'dynamics': 15, 'r2': 10, 'up_days': 0, 'concentration': 0, 'volatility': 5, 'drawdown': 10, 'liquidity': 10, 'acceleration': 0, 'momentum': 50}),
+                     'note': 'Variation du cours entre J−252 et J−21 séances (hors dernier mois), 50 % du score complexe ; l’année porte la pente et la régularité. Aucun seuil.'},
+    'momentum_risk': {'label': 'Momentum ajusté du risque (expérimental)',
+                      'build': lambda: _momentum('momentum_risk', 'blend', ('half', 'year'), {'half': 40, 'year': 60},
+                                                 {'dynamics': 0, 'r2': 0, 'up_days': 0, 'concentration': 0, 'volatility': 10, 'drawdown': 10, 'liquidity': 0, 'acceleration': 0, 'momentum': 80}),
+                      'note': 'Momentum 6 et 12 mois (moyenne, 80 %) corrigé par la volatilité et le repli maximal des périodes semestre et année (10 % chacun), comme l’ancien profil. Le filtre « au-dessus de la moyenne 200 jours » n’est pas une notation : il reste un filtre d’affichage.'}}
 # ───────────── stratégies du Classement (« Blou », Croissance régulière…) : chacune a son propre profil de scores ─────────────
-CT_BUILTIN = {'fast': ('growth_v4', None), 'regular': ('ct:regular', ('Croissance régulière', ('month', 'quarter'))), 'calm': ('ct:calm', ('Croissance calme', ('month', 'quarter', 'half')))}
+CT_BUILTIN = {'fast': 'growth_v4', 'regular': 'growth_regular', 'calm': 'calm_rise'}      # stratégies d'origine de la page Classement -> stratégie de scores V4
 DYNAMIC = {}                                          # nom -> spécification ; rempli par refresh(conn) en tête de chaque appel
 
 
@@ -65,9 +114,6 @@ def refresh(conn):
     """Recense les stratégies du Classement : les deux d'origine (hors Croissance rapide = moteur commun) et les stratégies personnelles de chaque utilisateur."""
     import json
     DYNAMIC.clear()
-    for key, (name, meta) in CT_BUILTIN.items():
-        if meta:
-            DYNAMIC[name] = {'label': meta[0] + ' (Classement)', 'build': _ct_builder(name, meta[1]), 'note': 'Stratégie du Classement : granularités actives de cette stratégie, notes réglées ici.'}
     if conn is None:
         return
     with conn.cursor() as cur:
@@ -102,24 +148,22 @@ def resolve(conn, ct_id, user_id):
     """Nom de la stratégie de scores d'une stratégie du Classement (identifiant de la page) pour un utilisateur."""
     refresh(conn)
     if ct_id in CT_BUILTIN:
-        return CT_BUILTIN[ct_id][0]
+        return CT_BUILTIN[ct_id]
     name = f'ct:{int(user_id)}:{ct_id}'
     return name if name in DYNAMIC else 'growth_v4'
 
 
-LEGACY_LABELS = {'regular': 'Croissance régulière', 'fast': 'Croissance rapide', 'recovery': 'Rebond', 'low_volatility': 'Hausse calme',
-                 'momentum': 'Momentum 6 mois (expérimental)', 'momentum12': 'Momentum 12 mois (expérimental)', 'momentum_risk': 'Momentum ajusté du risque (expérimental)'}
-LEGACY_SUFFIX = ' — ancien moteur'
 PERIOD_LABELS = {'week': 'Semaine', 'month': 'Mois', 'quarter': 'Trimestre', 'half': 'Semestre', 'year': 'Année'}
 
 
 def design():
-    return {'kappa': SC.KAPPA, 'threshold': SC.COVERAGE_THRESHOLD, 'anchor': SC.ANCHOR_LAMBDA, 'complex_weights': dict(SC.COMPLEX_WEIGHTS)}
+    return {'kappa': SC.KAPPA, 'threshold': SC.COVERAGE_THRESHOLD, 'anchor': SC.ANCHOR_LAMBDA, 'complex_weights': dict(SC.COMPLEX_WEIGHTS), 'tuning': dict(TUNING_DEFAULTS),
+            'tuning_ranges': {'sat_a': list(SC.SAT_A_RANGE), 'accel_ref': list(SC.ACCEL_REF_RANGE)}, 'vol_modes': list(SC.VOL_MODES), 'momentum_horizons': list(SC.MOMENTUM_HORIZONS)}
 
 
 def formula():
     """Constantes de conception des deux scores (lecture seule : changer une formule est une décision de conception, pas un réglage)."""
-    return {'saturation': {'a': SC.SAT_A, 'b': SC.SAT_B}, 'gate_floor': SC.GATE_FLOOR,
+    return {'saturation': {'a': SC.SAT_A, 'b': SC.SAT_B}, 'accel': {'k': SC.ACCEL_REF, 'r2': SC.ACCEL_R2}, 'gate_floor': SC.GATE_FLOOR,
             'reliability_sessions': SC.RELIABILITY_SESSIONS, 'min_sessions': SC.MIN_SESSIONS,
             'liquidity_floor_eur': SC.LIQUIDITY_FLOOR_EUR, 'liquidity_ceil_eur': SC.LIQUIDITY_CEIL_EUR}
 
@@ -140,7 +184,16 @@ def profile_of(config):
             'technical': {'require_fresh': bool((config.get('selection') or {}).get('require_fresh'))},
             'filters': {'enabled': False},                      # filtres de consultation : désactivés par défaut, jamais appliqués aux notes
             'weights_mode': 'custom' if weights else 'auto', 'weights': dict(weights),
-            'complex_weights': dict(SC.COMPLEX_WEIGHTS, **(sc.get('complex_weights') or {}))}
+            'complex_weights': dict(SC.COMPLEX_WEIGHTS, **(sc.get('complex_weights') or {})),
+            'tuning': tuning_of(sc)}
+
+
+TUNING_DEFAULTS = {'sat_a': SC.SAT_A, 'accel_ref': SC.ACCEL_REF, 'vol_mode': 'absolute', 'momentum_horizon': '6m'}
+
+
+def tuning_of(sc):
+    """Normalisations réglables d'une stratégie (valeurs de conception si absentes)."""
+    return {k: (sc or {}).get(k, v) for k, v in TUNING_DEFAULTS.items()}
 
 
 def apply_profile(config, profile):
@@ -167,6 +220,8 @@ def apply_profile(config, profile):
     sc['weights'] = dict(profile.get('weights') or {}) if profile.get('weights_mode') == 'custom' else {}
     if profile.get('complex_weights'):
         sc['complex_weights'] = dict(profile['complex_weights'])
+    if isinstance(profile.get('tuning'), dict):
+        sc.update(profile['tuning'])
     c['scoring'] = sc
     if not (profile.get('filters') or {}).get('enabled'):
         return neutral(c)
@@ -227,7 +282,9 @@ def clean_profile(raw):
         if abs(sum(vals.values()) - 100) > TOLERANCE:
             raise ValueError(f'Le total des poids des périodes doit faire 100 % (actuellement {sum(vals.values()):g} %)')
         out['weights'] = vals
-    cw = raw.get('complex_weights') or {}
+    cw = dict(raw.get('complex_weights') or {})
+    for new in ('momentum', 'recovery'):
+        cw.setdefault(new, 0)                             # composantes ajoutées après coup : un profil enregistré sans elles les garde à 0
     if set(cw) != set(SC.COMPLEX_WEIGHTS):
         raise ValueError('Poids du score complexe incomplets')
     cw = {k: C.number(v, 0, 100, 'Poids du score complexe') for k, v in cw.items()}
@@ -236,6 +293,10 @@ def clean_profile(raw):
     if abs(sum(cw.values()) - 100) > TOLERANCE:
         raise ValueError(f'Le total des poids du score complexe doit faire 100 % (actuellement {sum(cw.values()):g} %)')
     out['complex_weights'] = cw
+    if raw.get('tuning') is not None:
+        t = raw['tuning'] if isinstance(raw['tuning'], dict) else {}
+        v = C.validate_scoring({k: t.get(k) for k in TUNING_DEFAULTS if t.get(k) is not None}, [])
+        out['tuning'] = {k: v[k] for k in TUNING_DEFAULTS}
     return out
 
 
@@ -275,7 +336,6 @@ def auto_weights(kappa, period_ids):
 
 def strategies(conn):
     refresh(conn)
-    from . import strategy
     glob = score_service.admin_defaults(conn)
     stored = stored_profiles(conn)
     out = []
@@ -283,21 +343,18 @@ def strategies(conn):
         base = base_config(name)
         cfg = build_config(conn, name)
         current = clean_profile(stored[name]) if name in stored else profile_of(base)       # valeurs saisies (seuils conservés même si les filtres sont désactivés)
+        current.setdefault('tuning', tuning_of(base.get('scoring')))                          # profil enregistré avant les réglages de normalisation : valeurs de la stratégie
         for pid in SCORING_PERIODS:
             current['periods'][pid].setdefault('sessions', C.SESSIONS[pid])                  # le profil enregistré ne garde pas la durée : l'affichage en a besoin
         active = [p for p in SCORING_PERIODS if current['periods'][p]['enabled']]
         out.append({'name': name, 'label': sp['label'], 'note': sp['note'], 'engine': 'v4', 'sort': cfg['ranking'].get('sort'), 'defaults': profile_of(base), 'current': current,
                     'customised': name in stored, 'auto_weights': auto_weights(glob['kappa'], active), 'saved_at': _iso(settings.saved_at(conn, PROFILES)) if name in stored else None})
-    for name in strategy.PRESETS:
-        cfg = C.editable(strategy.preset(name))
-        comps = [dict(id=c['id'], metric=c['metric'], period=c['period'], weight=c['weight']) for c in (cfg['ranking'].get('components') or []) if c.get('enabled', True) and c.get('weight')]
-        out.append({'name': name, 'label': LEGACY_LABELS.get(name, name) + LEGACY_SUFFIX, 'engine': 'historic', 'periods': [p['id'] for p in cfg['periods'] if p['enabled']], 'components': comps})
     return out
 
 
 def references():
     """Préréglages applicables à un profil V4 (jamais appliqués sans action de l'administrateur)."""
-    return {'v1': profile_of(base_config('growth_v1')), 'balanced': profile_of(base_config('growth_v4'))}
+    return {'balanced': profile_of(base_config('growth_v4'))}
 
 
 def personal(conn):
@@ -363,11 +420,9 @@ def save(conn, request):
         g = request['global']
         clean = C.validate_scoring({k: g.get(k) for k in ('kappa', 'threshold', 'anchor')}, [])
         settings.put(conn, score_service.SETTING, {'kappa': clean['kappa'], 'threshold': clean['threshold'], 'anchor': clean['anchor']})
-    elif any(k in request for k in ('kappa', 'threshold', 'complex_weights')):       # ancienne forme (réglages communs seuls)
-        clean = C.validate_scoring({k: request.get(k) for k in ('kappa', 'threshold', 'complex_weights')}, [])
-        if not any(clean['complex_weights'].get(k, SC.COMPLEX_WEIGHTS[k]) > 0 for k in SC.COMPLEX_WEIGHTS):
-            raise ValueError('Le score complexe doit garder au moins un poids positif')
-        settings.put(conn, score_service.SETTING, clean)
+    elif any(k in request for k in ('kappa', 'threshold')):                          # ancienne forme (réglages communs seuls) : les poids du score complexe sont propres aux profils
+        clean = C.validate_scoring({k: request.get(k) for k in ('kappa', 'threshold')}, [])
+        settings.put(conn, score_service.SETTING, {'kappa': clean['kappa'], 'threshold': clean['threshold'], 'anchor': clean['anchor']})
     if isinstance(request.get('profile'), dict):
         name = request['profile'].get('name')
         if not known(name):
@@ -439,7 +494,7 @@ def simulate(conn, request):
     params = score_service.params_for(cfg, info['kind'])
     return {'empty': False, 'title': dict(id=lid, symbol=info['symbol'], mic=info['mic'], name=info['name'], kind=info['kind'], isin=info['isin']),
             'candidates': candidates, 'result': scored, 'periods': [dict(id=p['id'], sessions=p['sessions']) for p in params['periods']],
-            'kappa': params['kappa'], 'suggestions': _suggestions(conn, book, sessions=gran),
+            'kappa': params['kappa'], 'tuning': {k: params[k] for k in TUNING_DEFAULTS}, 'suggestions': _suggestions(conn, book, sessions=gran),
             'curve': dated_series(conn, lid, max(CURVE_SESSIONS, _granularity(params))),
             'windows': [dict(id=x, sessions=C.SESSIONS[x], active=any(q['id'] == x for q in params['periods'])) for x in SCORING_PERIODS if C.SESSIONS[x] <= max(CURVE_SESSIONS, _granularity(params))], 'granularity': _granularity(params), 'ranks': _rank_of(book, lid)}
 
@@ -484,7 +539,7 @@ def coverage(conn):
 def monitor(conn):
     """Suivi : titres notés, couverture, fraîcheur des données, origine de la liquidité, dernières erreurs de calcul."""
     from . import service
-    cfg = build_config(conn, 'growth_v1')
+    cfg = build_config(conn, 'growth_v4')
     book = score_service.score_book(conn, cfg, service.data_version(conn))
     counts = {'simple': {'ok': 0, 'partiel': 0, 'inconnu': 0}, 'complex': {'ok': 0, 'partiel': 0, 'inconnu': 0}}
     covs = []

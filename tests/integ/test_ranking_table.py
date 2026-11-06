@@ -62,7 +62,7 @@ def test_personal_classement_strategies_get_their_own_score_profile_and_ranking(
         cur.execute("INSERT INTO settings(name,value_json,updated_at) VALUES ('ct_strategies:7',%s,NOW())", (json.dumps(doc),))
     conn.commit()
     names = [s['name'] for s in A.state(conn)['strategies'] if s['engine'] == 'v4']
-    assert 'ct:7:cs-aaa' in names and 'ct:regular' in names and 'ct:calm' in names and 'growth_v4' in names        # « Blou » est dans l'interface des scores
+    assert 'ct:7:cs-aaa' in names and 'growth_regular' in names and 'calm_rise' in names and 'rebound' in names and 'growth_v4' in names        # « Blou » est dans l'interface des scores
     blou = [s for s in A.state(conn)['strategies'] if s['name'] == 'ct:7:cs-aaa'][0]
     assert blou['label'] == 'Blou' and [p for p, v in blou['current']['periods'].items() if v['enabled']] == ['month', 'quarter']
     # son propre profil : des poids complexes différents changent SES notes, pas celles des autres stratégies

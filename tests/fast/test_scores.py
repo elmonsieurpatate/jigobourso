@@ -269,8 +269,23 @@ def test_implausible_volumes_are_unknown(bad):
 
 
 # ── Configuration et conformité ──
-def test_growth_v1_profile_uses_historical_v1_thresholds_all_configurable():
-    c = C.growth_v1()
+def growth_v1_fixture():
+    """Configuration riche (jour, semaine, mois, concentration, volatilité, liquidité) pour éprouver les critères de conformité : ce n'est plus une stratégie du produit."""
+    c = C.empty()
+    by = {p['id']: p for p in c['periods']}
+    by['day'].update(enabled=True, min_return=0.0)
+    by['week'].update(enabled=True, require_history=True, min_return=3.0)
+    by['month'].update(enabled=True, require_history=True, min_return=8.0, min_r2=0.60, max_spike_share=0.45, max_volatility=7.0)
+    c['selection'] = {'combine': 'all', 'missing': 'unknown', 'require_fresh': True}
+    c['liquidity'] = {'min_quoted_volume': None, 'min_turnover_eur': 2e6, 'min_turnover_eur_us': 5e6}
+    c['ranking'] = {'mode': C.SCORES_MODE, 'sort': 'simple'}
+    c['scoring'] = {'kappa': 0.7, 'weights': {}, 'complex_weights': {}, 'threshold': 0.75}
+    return C.validate(c)
+
+
+
+def test_rich_compliance_fixture_keeps_every_threshold_configurable():
+    c = growth_v1_fixture()
     by = {p['id']: p for p in c['periods']}
     assert (by['week']['min_return'], by['month']['min_return'], by['month']['min_r2'], by['month']['max_spike_share'], by['month']['max_volatility']) == (3.0, 8.0, .6, .45, 7.0)
     assert c['liquidity']['min_turnover_eur'] == 2e6 and c['liquidity']['min_turnover_eur_us'] == 5e6
@@ -279,7 +294,7 @@ def test_growth_v1_profile_uses_historical_v1_thresholds_all_configurable():
 
 
 def test_last_negative_day_is_a_configurable_criterion_not_a_hard_exclusion():
-    c = C.growth_v1()
+    c = growth_v1_fixture()
     measures = {1: {'perf': -1.5, 'slope': -1.5, 'r2': None, 'volatility': None}, 5: {'perf': 6.0, 'slope': 1.0, 'r2': .8, 'volatility': 2, 'spike_share': .2, 'coverage': 1.0},
                 21: {'perf': 20.0, 'slope': .8, 'r2': .9, 'volatility': 2, 'spike_share': .2, 'coverage': 1.0}}
     tech = {'turnover_eur': 9e6, 'us_listing': False}
@@ -290,7 +305,7 @@ def test_last_negative_day_is_a_configurable_criterion_not_a_hard_exclusion():
 
 
 def test_turnover_threshold_differs_for_us_listings_and_reports_the_source():
-    c = C.growth_v1()
+    c = growth_v1_fixture()
     measures = {n: {'perf': 20.0, 'slope': .8, 'r2': .9, 'volatility': 2, 'spike_share': .2, 'coverage': 1.0} for n in (1, 5, 21)}
     tech = {'turnover_eur': 3e6, 'turnover_source': 'estimated'}
     assert S.judge(c, measures, dict(tech, us_listing=False), {})['status'] == 'retained'
@@ -302,9 +317,9 @@ def test_turnover_threshold_differs_for_us_listings_and_reports_the_source():
 
 
 def test_scoring_block_validation():
-    c = C.growth_v1()
+    c = growth_v1_fixture()
     c['scoring'] = {'kappa': 0.5, 'weights': {'week': 1, 'month': 3}, 'complex_weights': {'acceleration': 10}, 'threshold': 0.6}
-    assert C.validate(c)['scoring'] == {'kappa': 0.5, 'weights': {'week': 1.0, 'month': 3.0}, 'complex_weights': {'acceleration': 10.0}, 'threshold': 0.6, 'anchor': 0.5}
+    assert C.validate(c)['scoring'] == {'kappa': 0.5, 'weights': {'week': 1.0, 'month': 3.0}, 'complex_weights': {'acceleration': 10.0}, 'threshold': 0.6, 'anchor': 0.5, 'sat_a': 17.0, 'accel_ref': 0.4, 'vol_mode': 'absolute', 'momentum_horizon': '6m'}
     for bad in ({'kappa': 1.0}, {'weights': {'nope': 1}}, {'complex_weights': {'nope': 1}}, {'weights': {'week': -1}}, {'threshold': 2}):
         c['scoring'] = bad
         with pytest.raises(ValueError):
@@ -314,13 +329,13 @@ def test_scoring_block_validation():
 def test_every_existing_configuration_gets_default_scoring_without_changing_its_filters():
     old = S.preset('fast')
     up = C.upgrade(old)
-    assert up['scoring'] == {'kappa': 0.7, 'weights': {}, 'complex_weights': {}, 'threshold': 0.75, 'anchor': 0.5}
+    assert up['scoring'] == {'kappa': 0.7, 'weights': {}, 'complex_weights': {}, 'threshold': 0.75, 'anchor': 0.5, 'sat_a': 17.0, 'accel_ref': 0.4, 'vol_mode': 'absolute', 'momentum_horizon': '6m'}
     assert up['ranking']['mode'] == 'performance'                  # le classement historique est conservé tel quel
 
 
 def test_score_parameters_ignore_every_compliance_threshold():
     """Clé de cache et paramètres de score : identiques quand seuls des critères de conformité changent."""
-    a, b = C.growth_v1(), C.growth_v1()
+    a, b = growth_v1_fixture(), growth_v1_fixture()
     for p in b['periods']:
         p.update(min_return=None if p['min_return'] is None else p['min_return'] + 5, min_r2=0.2 if p['min_r2'] is not None else None)
     b['liquidity']['min_turnover_eur'] = 99e6
@@ -355,3 +370,84 @@ def test_real_zero_volumes_give_a_known_zero_turnover_not_unknown():
     assert few['source'] == 'estimated' and few['turnover_eur'] == 10.0 * 500000   # moins de 15 séances à volume réel : repli sur l'estimation
     nothing = LQ.liquidity([(10.0, None)] * 20, None, None, 1.0)
     assert nothing['turnover_eur'] is None and nothing['source'] is None   # aucune donnée : inconnue
+
+
+# ───────────── réglages de normalisation propres à chaque stratégie (saturation, accélération, volatilité, momentum) ─────────────
+
+def _m(slope, accel=None, r2=0.9, r2p=0.9, vol=1.0):
+    return {'slope': slope, 'r2': r2, 'volatility': vol, 'drawdown': 3.0, 'up_fraction': 0.8, 'spike_share': 0.3, 'accel': accel, 'r2_prev': r2p}
+
+
+def test_sat_a_default_keeps_previous_behaviour_and_higher_value_separates_strong_moves():
+    assert SC.saturation(5) == 17.0 and SC.saturation(5, 40.0) == 40.0
+    strong, extreme = _m(3.5), _m(10.7)
+    d17 = [SC.period_components(x, 5)['dynamics'] for x in (strong, extreme)]
+    assert d17 == [100.0, 100.0]                                             # comportement actuel : saturé
+    d40 = [SC.period_components(x, 5, sat_a=40.0)['dynamics'] for x in (strong, extreme)]
+    assert d40[0] < 60 < d40[1] and d40[1] == 100.0                           # SAT_A = 40 : l'intensité redevient visible
+    d21 = [SC.period_components(x, 21, sat_a=40.0)['dynamics'] for x in (_m(1.0), _m(3.2))]
+    assert d21[0] < d21[1]                                                    # toutes granularités : la saturation suit (n/5)^0,52
+
+
+def test_accel_ref_coefficient_changes_the_acceleration_note_only():
+    a, b = SC.period_components(_m(3.0, accel=2.0), 5, accel_ref=0.4), SC.period_components(_m(3.0, accel=2.0), 5, accel_ref=2.0)
+    assert a['acceleration'] == pytest.approx(100.0) and b['acceleration'] < 100.0
+    assert a['dynamics'] == b['dynamics']
+    # garde-fou de régularité explicite
+    irregular = SC.period_components(_m(3.0, accel=5.0, r2=0.3, r2p=0.9), 5)
+    assert irregular['accel_reliability'] == pytest.approx(0.5) and irregular['acceleration'] == pytest.approx(75.0)
+
+
+def test_acceleration_edge_cases():
+    neg = SC.period_components(_m(1.0, accel=-3.0), 5)
+    assert neg['acceleration'] == pytest.approx(0.0, abs=1e-9) or neg['acceleration'] < 50          # retournement : note < 50, jamais favorable
+    assert SC.period_components(_m(1.0, accel=None), 5)['acceleration'] is None                     # historique insuffisant : absent, pas 0
+    assert SC.period_components(_m(1.0, accel=2.0, r2=None), 5)['acceleration'] is None             # R² indisponible : absent
+    assert SC.period_components(_m(-2.0, accel=-1.0), 5)['dynamics'] == 0.0
+
+
+def test_relative_volatility_mode_rewards_strong_smooth_moves_and_keeps_guards():
+    assert SC.vol_note(2.0, 0.1, 'relative') == 0.0 or SC.vol_note(2.0, 0.1, 'relative') < 1        # pente quasi nulle : plancher, aucune division instable
+    assert SC.vol_note(4.0, 8.0, 'relative') == 100.0 and SC.vol_note(4.0, 8.0, 'absolute') == 25.0
+    assert SC.vol_note(4.0, -2.0, 'relative') == 0.0                                                # pente négative : jamais favorable
+    assert SC.vol_note(None, 3.0, 'relative') is None and SC.vol_note(2.0, None, 'relative') is None
+    # le drawdown et la liquidité restent notés indépendamment
+    liq = {'turnover_eur': 1e5}
+    exp = {5: _m(8.0, accel=2.0, vol=4.0), 21: _m(3.0, accel=1.0, vol=4.0)}
+    rel = SC.score_title(exp, liq, P(5, 21), vol_mode='relative')['complex']
+    ab = SC.score_title(exp, liq, P(5, 21), vol_mode='absolute')['complex']
+    assert rel['score'] > ab['score']
+    assert rel['contributions']['liquidity']['value'] == ab['contributions']['liquidity']['value'] == 0.0 or rel['contributions']['liquidity']['value'] < 10
+
+
+def test_momentum_component_zero_by_default_and_horizons():
+    inputs = {5: _m(1.0, accel=0.1), 21: _m(0.6, accel=0.1)}
+    base = SC.score_title(inputs, {'turnover_eur': 2e7}, P(5, 21))['complex']
+    assert 'momentum' not in base['contributions']                                                    # poids 0 par défaut : rien ne change
+    cw = {'dynamics': 50, 'momentum': 50}
+    s6 = SC.score_title(inputs, {'turnover_eur': 2e7}, P(5, 21), complex_weights=dict(cw, r2=0, up_days=0, concentration=0, volatility=0, drawdown=0, liquidity=0), momentum={'6m': 30.0, '12m': 100.0}, momentum_horizon='6m')['complex']
+    assert s6['contributions']['momentum']['value'] == pytest.approx(50.0)
+    s12 = SC.score_title(inputs, {'turnover_eur': 2e7}, P(5, 21), complex_weights=dict(cw, r2=0, up_days=0, concentration=0, volatility=0, drawdown=0, liquidity=0), momentum={'6m': 30.0, '12m': 100.0}, momentum_horizon='12m')['complex']
+    assert s12['contributions']['momentum']['value'] == pytest.approx(100.0)
+    assert SC.momentum_note({'6m': -20.0}, '6m') == 0.0 and SC.momentum_note({}, 'blend') is None
+    miss = SC.score_title(inputs, {'turnover_eur': 2e7}, P(5, 21), complex_weights={'dynamics': 50, 'momentum': 50}, momentum=None)['complex']
+    assert miss['contributions']['momentum'].get('unavailable')                                       # donnée absente : sort du calcul, ni 0 ni bonus
+
+
+def test_validate_scoring_bounds_for_new_parameters():
+    ok = C.validate_scoring({'sat_a': 40, 'accel_ref': 1.2, 'vol_mode': 'relative', 'momentum_horizon': 'blend'}, [])
+    assert (ok['sat_a'], ok['accel_ref'], ok['vol_mode'], ok['momentum_horizon']) == (40.0, 1.2, 'relative', 'blend')
+    for bad in ({'sat_a': 1}, {'sat_a': 1000}, {'accel_ref': 0}, {'accel_ref': 99}, {'vol_mode': 'x'}, {'momentum_horizon': '3m'}):
+        with pytest.raises(ValueError):
+            C.validate_scoring(bad, [])
+
+
+def test_recovery_note_rewards_a_half_year_that_has_not_progressed():
+    assert SC.recovery_note(-15.0) == 100.0 and SC.recovery_note(20.0) == 0.0 and SC.recovery_note(60.0) == 0.0
+    assert SC.recovery_note(5.0) == pytest.approx(50.0) and SC.recovery_note(None) is None
+    inputs = {5: _m(2.0, accel=1.0), 21: _m(1.0, accel=0.5)}
+    cw = dict(dynamics=50, recovery=50, r2=0, up_days=0, concentration=0, volatility=0, drawdown=0, liquidity=0, acceleration=0)
+    flat = SC.score_title(inputs, {'turnover_eur': 2e7}, P(5, 21), complex_weights=cw, recovery_perf=-5.0)['complex']
+    ran = SC.score_title(inputs, {'turnover_eur': 2e7}, P(5, 21), complex_weights=cw, recovery_perf=40.0)['complex']
+    assert flat["score"] > ran["score"] and flat["contributions"]["recovery"]["value"] == pytest.approx(SC.recovery_note(-5.0))
+    assert SC.score_title(inputs, {'turnover_eur': 2e7}, P(5, 21), complex_weights=cw)['complex']['contributions']['recovery'].get('unavailable')

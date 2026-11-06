@@ -126,3 +126,22 @@ Recherches enregistrées : critères + filtres + tri (`saved_searches`).
 - **Momentum des alertes** : les mesures du moteur sont déjà des pourcentages (−10 signifie −10 %) et ne sont pas multipliées par 100 pour leur affichage. Aucun seuil ou profil de classement n'est modifié.
 
 Régressions : `make fast`, `make integ`, puis `tests/e2e/portfolio-audit.cjs` sur les trois largeurs 1280/390/375. Préparer une base **locale isolée** avec `db/schema.sql`, puis exécuter `JIGO_TEST_DATABASE=1 JIGO_DB_NAME=jigobourso_portfolio_audit PYTHONPATH=. .venv/bin/python tests/e2e/portfolio_audit_seed.py` avec les variables locales `JIGO_DB_*` et PHP disponibles. Ce script remet à zéro uniquement une base autorisée `jigobourso_it` ou `jigobourso_portfolio_audit` sur `127.0.0.1`. Démarrer PHP sur cette même base, puis lancer `JIGO_TEST_DATABASE=1 BASE=http://127.0.0.1:18090 JIGO_CHROMIUM=/chemin/chromium node tests/e2e/portfolio-audit.cjs`. `PLAYWRIGHT_MODULE` et `AUDIT_OUT` permettent de choisir le module Playwright et le dossier des résultats. Ne jamais lancer cette préparation contre la production.
+
+## Moteur de scores V4 unique et sept stratégies (06/11/2026)
+
+**Un seul moteur de notation** : `engine/analytics/scores.py` (`score_title`) pour le score simple et le score complexe, alimenté par `score_service.py` (cache selon les paramètres et la version des données) et réglé par `scores_admin.py`. Toutes les stratégies passent par lui : seuls leurs réglages diffèrent.
+
+**Réglages propres à chaque stratégie** (profil enregistré dans `scores_profiles`, valeurs par défaut explicites, bornes validées, retour à la valeur par défaut dans l'administration) :
+
+| Réglage | Défaut | Bornes | Effet |
+|---|---|---|---|
+| `sat_a` — saturation de la dynamique | 17 | 5 à 200 | croissance (%) sur 5 séances qui donne 100 ; `saturation(n) = sat_a·(n/5)^0,52` |
+| `accel_ref` — référence d'accélération | 0,4 | 0,05 à 5 | `ref = saturation(n)/n × accel_ref` ; note = 50 + 50·clamp(accél/ref, −1, 1)·clamp(min(R², R²_préc)/0,6) |
+| `vol_mode` — notation de la volatilité | `absolute` | `absolute`, `relative` | absolue : 100 à 1 %/séance, 0 à 5 % ; relative : rapport volatilité/pente (plancher de pente 0,3 %), 100 à 1, 0 à 4 |
+| `momentum_horizon` | `6m` | `6m`, `12m`, `blend` | horizon de la composante « Momentum » (100 à +60 % / +100 %) |
+
+Poids du score complexe (neuf composantes, total 100 %), **propres à chaque profil, sans repli global** (l'ancien repli de `score_service.apply_global` vers des poids communs est supprimé) : dynamique, R², séances positives, concentration, volatilité, drawdown, liquidité, accélération, **momentum** (nouveau, variation hors dernier mois, `series_state.momentum_6m/12m`) et **contexte de rebond** (nouveau, 100 si le rendement 6 mois est ≤ −10 %, 0 s'il est ≥ +20 %). Les deux dernières valent 0 par défaut : les profils enregistrés avant leur ajout ne changent pas. Une composante indisponible sort du calcul (jamais 0, jamais bonus).
+
+**Les sept stratégies** (`scores_admin.V4_STRATEGIES`) : Croissance régulière, Croissance rapide (inchangée, une seule), Rebond, Hausse calme, Momentum 6 mois, Momentum 12 mois, Momentum ajusté du risque. Les seuils d'admission (pente, R², volatilité, drawdown, rendement 6 mois du Rebond) restent des filtres : ils n'entrent jamais dans une note. Les stratégies personnelles (`ct:<utilisateur>:<id>`) gardent leur profil.
+
+Limite connue : le filtre « au-dessus de la moyenne 200 jours » de l'ancien profil Momentum ajusté du risque n'est pas une notation ; il reste un filtre d'affichage. Les portefeuilles, alertes et le suivi utilisent encore `strategy.py` (profils historiques) pour leurs propres décisions : à migrer séparément.

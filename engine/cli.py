@@ -71,7 +71,7 @@ def serve(cmd):
         if cmd == 'presets':
             from .analytics import explorer_config as C
             result = {'presets': {name: strategy.preset(name) for name in strategy.PRESETS}, 'labels': strategy.LABELS,
-                      'version':4,'empty':C.empty(),'v4_presets':{**{name:C.editable(strategy.preset(name)) for name in strategy.PRESETS},'growth_v1':C.growth_v1()},'metrics':sorted(C.METRICS),'bounds':C.BOUNDS,'slope_levels': strategy.SLOPE_LEVELS, 'r2_levels': strategy.R2_LEVELS, 'rank_modes': list(strategy.RANK_MODES), 'experimental': list(strategy.EXPERIMENTAL)}
+                      'version':4,'empty':C.empty(),'metrics':sorted(C.METRICS),'bounds':C.BOUNDS,'slope_levels': strategy.SLOPE_LEVELS, 'r2_levels': strategy.R2_LEVELS, 'rank_modes': list(strategy.RANK_MODES), 'experimental': list(strategy.EXPERIMENTAL)}
         elif cmd == 'intraday':
             from engine.market import intraday
             from engine.market.yahoo import YahooClient
