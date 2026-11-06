@@ -12,6 +12,7 @@
   const secondary=window.ClassementTestSecondary;
   const categoryPayload=window.ClassementTestCategoryConfig || await J.api('explorer/secondary-filters');
   const categories=secondary.normalize(categoryPayload);
+  let serverView=null;try{serverView=await J.api('classement-test/strategies');}catch(_){/* page utilisable, enregistrement serveur indisponible */}
   const filters=Object.fromEntries(Object.entries(categories).map(([k,c])=>[k,[c.label,c.options]]));
   const columns = ['Titre','Cours','Variation %','Pente % / séance','R²','Volatilité','Liquidité','Volume','Recul maximal','Score','Tendance'];
   const metrics = { slope:['Pente (% / séance)','% / séance'], r2:['R² (régression)',''], volatility:['Volatilité quotidienne','%'], drawdown:['Recul maximal','%'], return:['Rendement observé','%'], volume:['Volume moyen','titres / séance'] };
@@ -50,18 +51,19 @@
       if(changed)overrides[f.id]={selected:[...target],known:categories[f.id].options.map(o=>o.id)};
     }
   }
-  state.filters=Object.fromEntries(Object.entries(categories).map(([k,c])=>{
-    const own=overrides[k],all=c.options.map(o=>o.id);if(!own)return[k,adminSelections[k]];
+  // Un choix enregistré garde ses identifiants ; seules les catégories apparues depuis suivent les défauts de l'administration.
+  const filtersFor=o=>Object.fromEntries(Object.entries(categories).map(([k,c])=>{
+    const own=o[k],all=c.options.map(x=>x.id);if(!own)return[k,adminSelections[k]];
     const selected=new Set(own.selected.filter(id=>all.includes(id)));
     for(const id of adminSelections[k])if(!own.known.includes(id))selected.add(id);
     return[k,[...selected]];
   }));
+  state.filters=filtersFor(overrides);
   state.secondaryOverridesByUser={...byUser,[userKey]:overrides};
   state.secondaryMetadataPreviousByUser=rawLocal.secondaryMetadataPreviousByUser||{};
   function saveLocalSelection(id){
     if(id)overrides[id]={selected:[...state.filters[id]],known:categories[id].options.map(o=>o.id)};
-    state.secondaryOverridesByUser[userKey]=overrides;
-    try{const saved=JSON.parse(localStorage.getItem(key)||'{}')||{};saved.secondaryOverridesByUser={...(saved.secondaryOverridesByUser||{}),[userKey]:overrides};state.secondaryOverridesByUser=saved.secondaryOverridesByUser;localStorage.setItem(key,JSON.stringify(saved));}catch(_){feedback('Stockage local indisponible : les sélections restent dans cette page.');}
+    ovBy[state.strategy]=overrides;
   }
   if(metadataMigration.notices.length)queueMicrotask(()=>feedback('Préférences regroupées : vérifiez les filtres géographiques, sectoriels et de places. Les anciennes sélections sont conservées sur cet appareil.'));
   const categorySignature=JSON.stringify(categoryPayload.definitions||categoryPayload.categories);
@@ -116,6 +118,48 @@
     if(enabled) ['slope','r2'].forEach(m=>tree().children.push(rule(m,k,config().periods[k][m])));
     project();
   }
+
+  // ───── Stratégies enregistrées (MariaDB) : une configuration et des choix de filtres propres à chacune ─────
+  const builtinNames={fast:'Croissance rapide',regular:'Croissance régulière',calm:'Croissance calme'};
+  const names={...builtinNames},ovBy={},saved={},cloneJSON=x=>JSON.parse(JSON.stringify(x));
+  let customIds=[],rev=serverView?serverView.revision:0,busy=false;
+  const serverOk=!!serverView;
+  const order=()=>[...Object.keys(builtinNames),...customIds];
+  const seed=cloneJSON(overrides);
+  for(const id of Object.keys(builtinNames)){if(serverOk)state.profiles[id]=fresh(id);ovBy[id]=cloneJSON(seed);}
+  for(const it of serverView?.items||[]){names[it.id]=it.name;state.profiles[it.id]=cloneJSON(it.config);ovBy[it.id]=cloneJSON(it.filters||{});if(!it.builtin)customIds.push(it.id);}
+  if(serverOk&&order().includes(serverView.selected))state.strategy=serverView.selected;
+  for(const id of order()){const s=state.strategy;state.strategy=id;tree();state.strategy=s;saved[id]={p:cloneJSON(state.profiles[id]),o:cloneJSON(ovBy[id])};}
+  try{const l=JSON.parse(localStorage.getItem(key)||'{}')||{};if(['simple','expert'].includes(l.mode))state.mode=l.mode;if(Array.isArray(l.columns)&&l.columns.every(n=>Number.isInteger(n)&&n>=0&&n<columns.length))state.columns=l.columns;}catch(_){/* préférences d'affichage facultatives */}
+  overrides=ovBy[state.strategy];state.filters=filtersFor(overrides);
+  state.selected=periods.find(([k])=>config().periods[k].enabled)?.[0]||state.selected;
+  const isDirty=id=>JSON.stringify([state.profiles[id],id===state.strategy?overrides:ovBy[id]])!==JSON.stringify([saved[id].p,saved[id].o]);
+  const anyDirty=()=>order().some(isDirty);
+  function renderStrategies(){
+    const sel=$('#ct-strategy');
+    sel.innerHTML=order().map(id=>`<option value="${esc(id)}">${esc(names[id])}${isDirty(id)?' •':''}</option>`).join('');
+    sel.value=state.strategy;
+    const builtin=!!builtinNames[state.strategy];
+    $('#ct-rename').hidden=builtin;$('#ct-delete').hidden=builtin;
+    $('#ct-reset').textContent=builtin?'Restaurer les valeurs par défaut':'Annuler les modifications';
+    $('#ct-strategy-state').textContent=!serverOk?'Enregistrement indisponible':isDirty(state.strategy)?'Modifications non enregistrées':'Enregistrée';
+    $('#ct-save').disabled=!serverOk;$('#ct-duplicate').disabled=!serverOk;
+  }
+  const post=body=>J.post('classement-test/strategies/save',{revision:rev,...body});
+  function takeView(view){rev=view.revision;for(const it of view.items)names[it.id]=it.name;customIds=view.items.filter(i=>!i.builtin).map(i=>i.id);}
+  function switchTo(id,remember=true){
+    closeFilter();ovBy[state.strategy]=overrides;state.strategy=id;overrides=ovBy[id]||(ovBy[id]={});state.filters=filtersFor(overrides);
+    tableState.page=1;tree();project();state.selected=periods.find(([k])=>config().periods[k].enabled)?.[0]||'week';render();
+    if(remember&&serverOk)J.post('classement-test/strategies/save',{action:'select',id}).catch(()=>{});
+  }
+  function currentPayload(){tree();project();return {config:cloneJSON(state.profiles[state.strategy]),filters:cloneJSON(overrides)};}
+  function markSaved(id){saved[id]={p:cloneJSON(state.profiles[id]),o:cloneJSON(id===state.strategy?overrides:ovBy[id])};}
+  async function guarded(fn){if(busy)return;busy=true;try{await fn();}catch(e){feedback(e.message||'Action impossible.');}finally{busy=false;renderStrategies();}}
+  function askName(title,initial,okLabel){return new Promise(resolve=>{let done=false;J.dialog({title,body:`<label class="field">Nom de la stratégie<input id="ct-name-input" maxlength="60" value="${esc(initial)}" autocomplete="off"></label>`,
+    actions:[{label:'Annuler',run:()=>{}},{label:okLabel,cls:'primary',run:d=>{const v=d.querySelector('#ct-name-input').value.trim();if(!v){J.formError(d,'Un nom est requis.');return true;}done=true;resolve(v);}}],
+    onopen:d=>{const i=d.querySelector('#ct-name-input');i.focus();i.select();}}).addEventListener('close',()=>{if(!done)resolve(null);});});}
+  function uniqueCopyName(base){let n=`Copie de ${base}`,i=2;const taken=new Set(order().map(id=>names[id].toLowerCase()));while(taken.has(n.toLowerCase()))n=`Copie de ${base} (${i++})`;return n.slice(0,60);}
+  window.addEventListener('beforeunload',e=>{if(anyDirty()){e.preventDefault();e.returnValue='';}});
   const fmt = n => new Intl.NumberFormat('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:3}).format(n);
   let timer;
   function feedback(text) { $('#ct-feedback').textContent=text; clearTimeout(timer); timer=setTimeout(()=>$('#ct-feedback').textContent='',5500); }
@@ -170,14 +214,16 @@
     if(categoryPayload.schema===2)document.querySelector('.ct-filter-logic').textContent='Réglages chargés · filtrage des résultats non raccordé à cette étape. Les scores et l’ordre restent inchangés.';
     const drawIndicator=([k,c])=>`<div class="ct-multi" data-indicator="${k}"><button type="button" class="ct-multi-trigger" data-open-filter="${k}" title="${esc(c.label)} · ${esc(c.unit)}" aria-expanded="${activeFilter===k}" aria-controls="ct-list-${k}"><span>${esc(c.label)}</span><b data-count="${k}">${state.filters[k].length} / ${c.options.length}</b><span aria-hidden="true">⌄</span></button><div class="ct-multi-popup" id="ct-list-${k}" ${activeFilter===k?'':'hidden'}><label class="ct-category-search"><span aria-hidden="true">⌕</span><input type="search" data-category-search="${k}" placeholder="Rechercher une catégorie…" aria-label="Rechercher une catégorie : ${esc(c.label)}" value="${activeFilter===k?esc(filterQuery):''}"></label><div class="ct-category-options" role="group" aria-label="Catégories : ${esc(c.label)}">${c.options.map(o=>`<label class="ct-category-option" data-search-text="${esc(o.label.toLocaleLowerCase('fr'))}"><input type="checkbox" data-filter="${k}" data-category="${o.id}" ${state.filters[k].includes(o.id)?'checked':''}><i style="background:${o.color}" aria-hidden="true"></i><span>${esc(o.label)}</span><small>${esc(o.range)}</small></label>`).join('')}</div><p class="ct-no-category" hidden>Aucune catégorie correspondante.</p><footer><span data-selected-count="${k}">${state.filters[k].length} / ${c.options.length} sélectionnées</span><button type="button" data-all-indicator="${k}">Tout sélectionner</button><button type="button" data-close-filter="${k}" aria-label="Fermer ${esc(c.label)}">Fermer</button></footer></div></div>`;
     const primaryKeys=categoryPayload.schema===2?['volatility','liquidity','volume','positive','spikes','concentration']:['volatility','turnover_eur','avg_volume','drawdown','up_fraction','gain_share'];
-    const primary=Object.entries(categories).filter(([k])=>primaryKeys.includes(k)),other=Object.entries(categories).filter(([k])=>!primaryKeys.includes(k));
+    const isPrimary=([k,c])=>categoryPayload.schema===2?c.group==='main':primaryKeys.includes(k);
+    const primary=Object.entries(categories).filter(isPrimary),other=Object.entries(categories).filter(e=>!isPrimary(e));
     $('#ct-filters').innerHTML=Object.keys(categories).length?`<div class="ct-filter-main">${primary.map(drawIndicator).join('')}</div>${other.length?`<details class="ct-more-filters"><summary>Autres indicateurs (${other.length}) <span id="ct-more-count"></span></summary><div class="ct-filter-main">${other.map(drawIndicator).join('')}</div></details>`:''}`:'<p>Aucun filtre actif. Les définitions restent accessibles dans l’administration.</p>';
     filterSummary();
     if(activeFilter) searchCategories(activeFilter,filterQuery);
   }
+  function isPrimaryKey(k){const c=categories[k];return categoryPayload.schema===2?c?.group==='main':['volatility','turnover_eur','avg_volume','drawdown','up_fraction','gain_share'].includes(k);}
   function filterSummary() {
     const changed=Object.keys(categories).filter(k=>state.filters[k].length!==categories[k].options.length);
-    const more=$('#ct-more-count');if(more)more.textContent=changed.filter(k=>!['volatility','turnover_eur','avg_volume','drawdown','up_fraction','gain_share'].includes(k)).length+' filtre(s) actif(s)';
+    const more=$('#ct-more-count');if(more)more.textContent=changed.filter(k=>!isPrimaryKey(k)).length+' filtre(s) actif(s)';
     $('#ct-filter-summary').textContent=changed.length?`${changed.length} / ${Object.keys(categories).length}`:'Tout inclus';
     for(const [k,c] of Object.entries(categories)) {
       const trigger=$(`[data-open-filter="${k}"]`);
@@ -261,7 +307,7 @@
     J.dialog({title:row.symbol+' · démonstration',body:`<p class="ct-demo-dialog-note">Toutes les valeurs de cette fiche sont inventées. Aucune cotation réelle, aucun conseil financier.</p><h3>${esc(row.name)}</h3><div class="ct-demo-detail-chart">${spark(row)}</div><dl class="ct-demo-detail"><dt>Cours fictif</dt><dd>${money(row.price)}</dd><dt>Variation fictive du jour</dt><dd>${percent(row.change,true)}</dd><dt>Pente fictive · un mois</dt><dd>${percent(row.slope,true)} / séance</dd><dt>R² fictif · un mois</dt><dd>${row.r2===null?'Indisponible':fmt(row.r2)}</dd><dt>Score d’exemple /100</dt><dd>${row.score}</dd><dt>Rang initial</dt><dd>${row.rank}</dd></dl>`,actions:[{label:'Fermer',run:()=>{}}]});
   }
   function render() {
-    $('#ct-strategy').value=state.strategy;
+    renderStrategies();
     document.querySelectorAll('[data-mode]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.mode===state.mode));
     $('#ct-simple').hidden=state.mode!=='simple';$('#ct-expert').hidden=state.mode!=='expert';
     renderSimple();renderExpert();renderFilters();renderColumns();
@@ -298,20 +344,49 @@
     if(el.dataset.ruleField){const r=at(el.closest('[data-path]').dataset.path),f=el.dataset.ruleField;r[f]=f==='value'?number(el.value,-1e12,1e12,r.value):el.value;if(f==='value')el.value=r.value;project();preview();}
     if(el.dataset.groupJoin!==undefined){at(el.dataset.groupJoin).join=el.value;project();preview();}
   });
-  $('#ct-strategy').onchange=e=>{state.strategy=e.target.value;tree();project();state.selected=periods.find(([k])=>config().periods[k].enabled)?.[0]||'week';render();};
+  $('#ct-strategy').onchange=e=>switchTo(e.target.value);
+  for(const t of ['input','change','click'])$('#ct-page').addEventListener(t,()=>queueMicrotask(renderStrategies));
   $('#ct-tab-rules').onclick=()=>$('#ct-rules').scrollIntoView({behavior:'smooth',block:'nearest'});
   $('#ct-tab-manage').onclick=()=>{$('#ct-filter-panel').open=true;$('#ct-filter-panel').scrollIntoView({behavior:'smooth',block:'start'});};
   $('#ct-tab-queries').onclick=()=>{
     const has=localStorage.getItem(key)!==null;
-    J.dialog({title:'Requêtes locales de test',body:`<p>${has?'Un état de recherche est enregistré sur cet appareil.':'Aucune recherche enregistrée sur cet appareil.'}</p><p>Le bouton Enregistrer mémorise les profils, leurs règles et les filtres. Aucun enregistrement serveur.</p>`,actions:[{label:'Fermer',run:()=>{}},...(has?[{label:'Recharger la sauvegarde',run:()=>location.reload()}]:[])]});
+    J.dialog({title:'Requêtes locales de test',body:`<p>${has?'Un état de recherche est enregistré sur cet appareil.':'Aucune recherche enregistrée sur cet appareil.'}</p><p>Chaque stratégie, avec ses règles et ses choix de filtres, est enregistrée dans votre compte avec « Enregistrer la stratégie ».</p>`,actions:[{label:'Fermer',run:()=>{}},...(has?[{label:'Recharger la sauvegarde',run:()=>location.reload()}]:[])]});
   };
   document.addEventListener('click',e=>{if(activeFilter&&!e.target.closest('.ct-multi'))closeFilter();});
   window.addEventListener('resize',()=>closeFilter());
   document.addEventListener('keydown',e=>{if(e.key==='Escape'&&activeFilter){e.preventDefault();closeFilter(true);}});
   $('#ct-filter-panel').addEventListener('toggle',()=>{if(!$('#ct-filter-panel').open)closeFilter();});
   for(const id of ['ct-all-filters','ct-reset-filters']) $('#'+id).onclick=e=>{e.preventDefault();e.stopPropagation();tableState.page=1;if(id==='ct-reset-filters'){overrides={};state.filters=secondary.defaults(categoryPayload,categories);saveLocalSelection();}else{state.filters=secondary.all(categories);for(const k of Object.keys(categories))saveLocalSelection(k);}renderFilters();};
-  $('#ct-reset').onclick=()=>{state.profiles[state.strategy]=fresh(state.strategy);state.selected=profiles[state.strategy].active[0];render();feedback('Critères du profil réinitialisés.');};
-  $('#ct-save').onclick=()=>{try{const fresh=JSON.parse(localStorage.getItem(key)||'{}')||{};state.secondaryOverridesByUser={...(fresh.secondaryOverridesByUser||{}),[userKey]:overrides};localStorage.setItem(key,JSON.stringify(state));feedback('Réglages de test enregistrés sur cet appareil.');}catch(_){feedback('Stockage local indisponible. Les réglages restent conservés dans cette page.');}};
+  $('#ct-reset').onclick=()=>guarded(async()=>{
+    const id=state.strategy,builtin=!!builtinNames[id];
+    if(!await J.confirm(builtin?'Restaurer les valeurs par défaut':'Annuler les modifications',builtin?`« ${names[id]} » reprendra ses valeurs d’origine (périodes, seuils, règles et filtres). Les autres stratégies ne changent pas.`:`« ${names[id]} » reviendra à sa dernière version enregistrée.`,builtin?'Restaurer':'Annuler les modifications'))return;
+    if(builtin){
+      if(serverOk)takeView(await post({action:'restore',id}));
+      state.profiles[id]=fresh(id);overrides={};ovBy[id]=overrides;
+    }else{state.profiles[id]=cloneJSON(saved[id].p);overrides=cloneJSON(saved[id].o);ovBy[id]=overrides;}
+    state.filters=filtersFor(overrides);tree();project();markSaved(id);state.selected=periods.find(([k])=>config().periods[k].enabled)?.[0]||'week';render();
+    feedback(builtin?'Valeurs par défaut restaurées.':'Modifications annulées.');
+  });
+  $('#ct-save').onclick=()=>guarded(async()=>{
+    const id=state.strategy;takeView(await post({action:'save',id,...currentPayload()}));markSaved(id);
+    try{localStorage.setItem(key,JSON.stringify({mode:state.mode,columns:state.columns}));}catch(_){/* préférences d'affichage seulement */}
+    feedback(`Stratégie « ${names[id]} » enregistrée.`);
+  });
+  $('#ct-duplicate').onclick=()=>guarded(async()=>{
+    const from=state.strategy,name=await askName('Dupliquer la stratégie',uniqueCopyName(names[from]),'Dupliquer');if(!name)return;
+    const payload=currentPayload(),view=await post({action:'create',name,...payload}),nid=view.selected;takeView(view);
+    state.profiles[nid]=cloneJSON(payload.config);ovBy[nid]=cloneJSON(payload.filters);markSaved(nid);switchTo(nid,false);
+    feedback(`« ${name} » créée à partir de « ${names[from]} ».`);
+  });
+  $('#ct-rename').onclick=()=>guarded(async()=>{
+    const id=state.strategy,name=await askName('Renommer la stratégie',names[id],'Renommer');if(!name)return;
+    takeView(await post({action:'rename',id,name}));feedback(`Stratégie renommée « ${names[id]} ».`);
+  });
+  $('#ct-delete').onclick=()=>guarded(async()=>{
+    const id=state.strategy;if(!await J.confirm('Supprimer la stratégie',`« ${names[id]} » sera supprimée définitivement. Les autres stratégies ne changent pas.`,'Supprimer'))return;
+    const label=names[id];takeView(await post({action:'delete',id}));delete state.profiles[id];delete ovBy[id];delete saved[id];
+    overrides=ovBy.fast;state.strategy='fast';switchTo('fast');feedback(`Stratégie « ${label} » supprimée.`);
+  });
   $('#ct-sort').onchange=e=>{tableState.sort=e.target.value;tableState.direction=e.target.value==='name'?'asc':'desc';tableState.page=1;renderRanking();};
   $('#ct-sort-direction').onclick=()=>{tableState.direction=tableState.direction==='desc'?'asc':'desc';tableState.page=1;renderRanking();};
   $('#ct-page-size').onchange=e=>{tableState.pageSize=Number(e.target.value);tableState.page=1;renderRanking();};

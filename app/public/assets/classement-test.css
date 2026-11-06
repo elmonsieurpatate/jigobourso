@@ -300,3 +300,8 @@
   .ct-config-footer{padding:8px 12px}
   .ct-config-footer .btn{padding:8px 6px;font-size:12px}
 }
+
+/* Gestion des stratégies : même ligne que le sélecteur, retour à la ligne sur mobile */
+.ct-strategy-tools{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px}
+.ct-strategy-state{font-size:11px;color:var(--muted)}
+@media(max-width:700px){.ct-strategy-tools{grid-column:1/-1;flex:1 1 100%}.ct-strategy select{flex:1 1 0;min-width:0}}
