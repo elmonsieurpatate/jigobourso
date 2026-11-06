@@ -14,6 +14,7 @@ const CT_BUILTIN = ['fast' => 'Croissance rapide', 'regular' => 'Croissance rég
 const CT_PERIODS = ['week', 'month', 'quarter', 'half', 'year', 'two_year'];
 const CT_METRICS = ['slope', 'r2', 'volatility', 'drawdown', 'return', 'volume'];
 const CT_MAX_CUSTOM = 30;
+const CT_ICONS = ['📈', '📉', '🚀', '🛡️', '⚖️', '🎯', '⚡', '🔥', '🌱', '💎', '⏳', '💰', '🏦', '🔍'];
 
 function ct_key(int $uid): string { return 'ct_strategies:' . $uid; }
 function ct_json($v): string { return json_encode($v, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR); }
@@ -83,11 +84,29 @@ function ct_name(string $name, array $doc, ?string $exceptId): string {
 }
 function ct_view(array $doc): array {
     if (!isset(CT_BUILTIN[$doc['selected']]) && !array_filter($doc['items'], fn($i) => $i['id'] === $doc['selected'])) $doc['selected'] = 'fast';
-    return ['schema' => 1, 'revision' => $doc['revision'], 'selected' => $doc['selected'], 'builtin' => CT_BUILTIN, 'max_custom' => CT_MAX_CUSTOM, 'items' => $doc['items']];
+    return ['schema' => 1, 'revision' => $doc['revision'], 'selected' => $doc['selected'], 'builtin' => CT_BUILTIN, 'max_custom' => CT_MAX_CUSTOM, 'items' => $doc['items'],
+            'meta' => (object)($doc['meta'] ?? []), 'icons' => CT_ICONS];
 }
 function ct_read(int $uid): array {
     $json = q('SELECT value_json FROM settings WHERE name=?', [ct_key($uid)])->fetchColumn();
     return ct_view($json === false ? ct_empty() : ct_decode($json));
+}
+/** Présentation d'une stratégie (icône, explications, active ou non), séparée de sa configuration. */
+function ct_meta(array $in, array $old): array {
+    $icon = $in['icon'] ?? $old['icon'] ?? CT_ICONS[0];
+    if (!is_string($icon) || !in_array($icon, CT_ICONS, true)) throw new ApiError('Icône inconnue.', 422);
+    $desc = $in['description'] ?? $old['description'] ?? '';
+    if (!is_string($desc)) throw new ApiError('Explications invalides.', 422);
+    $desc = trim(preg_replace('/[^\P{C}\n]/u', '', str_replace("\r", '', $desc)));
+    if (mb_strlen($desc) > 300) throw new ApiError('Explications de 300 caractères au maximum.', 422);
+    $en = $in['enabled'] ?? $old['enabled'] ?? true;
+    if (!is_bool($en)) throw new ApiError('État invalide.', 422);
+    return ['icon' => $icon, 'description' => $desc, 'enabled' => $en];
+}
+/** Identifiants actifs, dans l'ordre d'affichage. */
+function ct_enabled_ids(array $doc): array {
+    $ids = array_merge(array_keys(CT_BUILTIN), array_map(fn($i) => $i['id'], array_filter($doc['items'], fn($i) => !$i['builtin'])));
+    return array_values(array_filter($ids, fn($id) => ($doc['meta'][$id]['enabled'] ?? true) !== false));
 }
 function ct_write(int $uid, array $req): array {
     for ($attempt = 0; ; $attempt++) {
@@ -116,6 +135,7 @@ function ct_write_once(int $uid, array $req): array {
         $now = now_utc(); $changed = true;
         if ($action === 'select') {
             if (!is_string($id) || (!isset(CT_BUILTIN[$id]) && $find($id) === null)) throw new ApiError('Stratégie inconnue.', 404);
+            if (!in_array($id, ct_enabled_ids($doc), true)) throw new ApiError('Cette stratégie est désactivée.', 422);
             $changed = $doc['selected'] !== $id; $doc['selected'] = $id;
         } elseif ($action === 'save') {
             if (!is_string($id)) throw new ApiError('Identifiant requis.', 422);
@@ -129,7 +149,20 @@ function ct_write_once(int $uid, array $req): array {
             $nid = 'cs-' . bin2hex(random_bytes(8));
             $doc['items'][] = ['id' => $nid, 'name' => ct_name((string)($req['name'] ?? ''), $doc, null), 'builtin' => false,
                                'config' => ct_config($req['config'] ?? null), 'filters' => ct_filters($req['filters'] ?? null), 'updated_at' => $now];
+            $doc['meta'][$nid] = ct_meta(['icon' => $req['icon'] ?? null, 'description' => $req['description'] ?? null, 'enabled' => true], []);
             $doc['selected'] = $nid;
+        } elseif ($action === 'meta') {
+            $i = is_string($id) ? $find($id) : null;
+            if (!is_string($id) || ($i === null && !isset(CT_BUILTIN[$id]))) throw new ApiError('Stratégie inconnue.', 404);
+            if (isset($req['name']) && ($i === null || $doc['items'][$i]['builtin'])) {
+                if ($req['name'] !== CT_BUILTIN[$id] && !($i !== null && $req['name'] === $doc['items'][$i]['name'] && !$doc['items'][$i]['builtin'])) throw new ApiError('Le nom d’une stratégie d’origine ne change pas.', 422);
+            } elseif (isset($req['name'])) {
+                $doc['items'][$i]['name'] = ct_name((string)$req['name'], $doc, $id);
+            }
+            $in = array_intersect_key($req, ['icon' => 1, 'description' => 1, 'enabled' => 1]);
+            $doc['meta'][$id] = ct_meta($in, $doc['meta'][$id] ?? []);
+            if (!ct_enabled_ids($doc)) throw new ApiError('Au moins une stratégie doit rester active.', 422);
+            if ($i !== null && !$doc['items'][$i]['builtin']) $doc['items'][$i]['updated_at'] = $now;
         } elseif ($action === 'rename') {
             $i = is_string($id) ? $find($id) : null;
             if ($i === null || $doc['items'][$i]['builtin']) throw new ApiError('Seules les stratégies personnelles se renomment.', 422);
@@ -138,12 +171,13 @@ function ct_write_once(int $uid, array $req): array {
             $i = is_string($id) ? $find($id) : null;
             if (is_string($id) && isset(CT_BUILTIN[$id])) throw new ApiError('Les stratégies d’origine ne se suppriment pas : utilisez « Restaurer ».', 422);
             if ($i === null) throw new ApiError('Stratégie inconnue.', 404);
-            array_splice($doc['items'], $i, 1);
-            if ($doc['selected'] === $id) $doc['selected'] = 'fast';
+            array_splice($doc['items'], $i, 1); unset($doc['meta'][$id]);
+            if (!ct_enabled_ids($doc)) throw new ApiError('Au moins une stratégie doit rester active.', 422);
         } elseif ($action === 'restore') {
             if (!is_string($id) || !isset(CT_BUILTIN[$id])) throw new ApiError('Seules les stratégies d’origine ont des valeurs par défaut.', 422);
             $i = $find($id); if ($i === null) $changed = false; else array_splice($doc['items'], $i, 1);
         } else throw new ApiError('Action inconnue.', 422);
+        if ($action !== 'select') { $en = ct_enabled_ids($doc); if (!in_array($doc['selected'], $en, true)) { $doc['selected'] = $en[0]; $changed = true; } }
         if ($changed) {
             if ($action !== 'select') $doc['revision']++;
             $doc['items'] = array_values($doc['items']);

@@ -122,14 +122,16 @@
   // ───── Stratégies enregistrées (MariaDB) : une configuration et des choix de filtres propres à chacune ─────
   const builtinNames={fast:'Croissance rapide',regular:'Croissance régulière',calm:'Croissance calme'};
   const names={...builtinNames},ovBy={},saved={},cloneJSON=x=>JSON.parse(JSON.stringify(x));
-  let customIds=[],rev=serverView?serverView.revision:0,busy=false;
+  let customIds=[],rev=serverView?serverView.revision:0,busy=false,meta=cloneJSON(serverView?.meta||{});
+  const metaOf=id=>({icon:'📈',description:'',enabled:true,...(meta[id]||{})});
   const serverOk=!!serverView;
   const order=()=>[...Object.keys(builtinNames),...customIds];
   const seed=cloneJSON(overrides);
   for(const id of Object.keys(builtinNames)){if(serverOk)state.profiles[id]=fresh(id);ovBy[id]=cloneJSON(seed);}
   for(const it of serverView?.items||[]){names[it.id]=it.name;state.profiles[it.id]=cloneJSON(it.config);ovBy[it.id]=cloneJSON(it.filters||{});if(!it.builtin)customIds.push(it.id);}
-  if(serverOk&&order().includes(serverView.selected))state.strategy=serverView.selected;
-  {const want=new URLSearchParams(location.search).get('strategy');if(serverOk&&want&&order().includes(want))state.strategy=want;}
+  const enabledIds=()=>order().filter(id=>metaOf(id).enabled);
+  if(serverOk&&enabledIds().includes(serverView.selected))state.strategy=serverView.selected;else if(serverOk&&enabledIds().length)state.strategy=enabledIds()[0];
+  {const want=new URLSearchParams(location.search).get('strategy');if(serverOk&&want&&enabledIds().includes(want))state.strategy=want;}
   for(const id of order()){const s=state.strategy;state.strategy=id;tree();state.strategy=s;saved[id]={p:cloneJSON(state.profiles[id]),o:cloneJSON(ovBy[id])};}
   try{const l=JSON.parse(localStorage.getItem(key)||'{}')||{};if(['simple','expert'].includes(l.mode))state.mode=l.mode;if(Array.isArray(l.columns)&&l.columns.every(n=>Number.isInteger(n)&&n>=0&&n<columns.length))state.columns=l.columns;}catch(_){/* préférences d'affichage facultatives */}
   overrides=ovBy[state.strategy];state.filters=filtersFor(overrides);
@@ -138,7 +140,8 @@
   const anyDirty=()=>order().some(isDirty);
   function renderStrategies(){
     const sel=$('#ct-strategy');
-    sel.innerHTML=order().map(id=>`<option value="${esc(id)}">${esc(names[id])}${isDirty(id)?' •':''}</option>`).join('');
+    sel.innerHTML=order().filter(id=>metaOf(id).enabled||id===state.strategy).map(id=>`<option value="${esc(id)}">${esc(metaOf(id).icon+' '+names[id])}${isDirty(id)?' •':''}</option>`).join('');
+    const d=$('#ct-strategy-desc'),txt=metaOf(state.strategy).description;d.textContent=txt;d.hidden=!txt;
     sel.value=state.strategy;
     const builtin=!!builtinNames[state.strategy];
     $('#ct-rename').hidden=builtin;$('#ct-delete').hidden=builtin;
@@ -147,7 +150,7 @@
     $('#ct-save').disabled=!serverOk;$('#ct-duplicate').disabled=!serverOk;
   }
   const post=body=>J.post('classement-test/strategies/save',{revision:rev,...body});
-  function takeView(view){rev=view.revision;for(const it of view.items)names[it.id]=it.name;customIds=view.items.filter(i=>!i.builtin).map(i=>i.id);}
+  function takeView(view){rev=view.revision;meta=cloneJSON(view.meta||{});for(const it of view.items)names[it.id]=it.name;customIds=view.items.filter(i=>!i.builtin).map(i=>i.id);}
   function switchTo(id,remember=true){
     closeFilter();ovBy[state.strategy]=overrides;state.strategy=id;overrides=ovBy[id]||(ovBy[id]={});state.filters=filtersFor(overrides);
     tableState.page=1;tree();project();state.selected=periods.find(([k])=>config().periods[k].enabled)?.[0]||'week';render();
@@ -389,7 +392,7 @@
   $('#ct-delete').onclick=()=>guarded(async()=>{
     const id=state.strategy;if(!await J.confirm('Supprimer la stratégie',`« ${names[id]} » sera supprimée définitivement. Les autres stratégies ne changent pas.`,'Supprimer'))return;
     const label=names[id];takeView(await post({action:'delete',id}));delete state.profiles[id];delete ovBy[id];delete saved[id];
-    overrides=ovBy.fast;state.strategy='fast';switchTo('fast');feedback(`Stratégie « ${label} » supprimée.`);
+    const nxt=enabledIds().filter(x=>x!==id)[0]||'fast';overrides=ovBy[nxt];state.strategy=nxt;switchTo(nxt);feedback(`Stratégie « ${label} » supprimée.`);
   });
   $('#ct-sort').onchange=e=>{tableState.sort=e.target.value;tableState.direction=e.target.value==='name'?'asc':'desc';tableState.page=1;renderRanking();};
   $('#ct-sort-direction').onclick=()=>{tableState.direction=tableState.direction==='desc'?'asc':'desc';tableState.page=1;renderRanking();};
