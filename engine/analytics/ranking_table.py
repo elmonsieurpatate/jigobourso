@@ -42,7 +42,7 @@ def classify(cfg, which, raw, kind=None):
 
 
 def _num(v):
-    return None if v is None else float(v)
+    return None if v is None else round(float(v), 4)             # 4 décimales suffisent à l'affichage et aux catégories : réponse plus légère
 
 
 def _fetch(conn, ids):
@@ -95,21 +95,21 @@ def table(conn, request):
         quality = QUALITY.get(d.get('quality'))
         secondary = {
             'volatility': _num(mo.get('volatility')), 'turnover_eur': _num(d.get('turnover_eur')), 'avg_volume': _num(d.get('avg_volume_3m')),
-            'up_fraction': None if up is None else 100 * up, 'gain_share': None if spike is None else 100 * spike, 'drawdown': _num(mo.get('drawdown')),
+            'up_fraction': None if up is None else round(100 * up, 3), 'gain_share': None if spike is None else round(100 * spike, 3), 'drawdown': _num(mo.get('drawdown')),
             'perf-week': perf['week'], 'perf-month': perf['month'], 'perf-quarter': perf['quarter'], 'quality': quality,
-            'freshness': None, 'coverage': None if d.get('coverage_252') is None else 100 * float(d['coverage_252']),
-            'score_simple_v4': e['simple'], 'score_complex_v4': e['complex']}
+            'freshness': None, 'coverage': None if d.get('coverage_252') is None else round(100 * float(d['coverage_252']), 3),
+            'score_simple_v4': _num(e['simple']), 'score_complex_v4': _num(e['complex'])}
         rows.append({
             'id': lid, 'symbol': d['symbol'], 'name': d['name'], 'mic': d['mic'], 'currency': d.get('currency'), 'kind': d['kind'], 'isin': d.get('isin'),
             'country': d.get('country'), 'category': d.get('category'),
             'group': {'country': classify(groups, 'country', d.get('country')), 'market': classify(groups, 'market', d['mic']),
                       'sector': classify(groups, 'sector', d.get('category'), d['kind']), 'asset': 'asset:' + d['kind']},
-            'price': price, 'price_eur': None if price is None or not factor else price * factor, 'price_time': d['price_time'].isoformat() if d.get('price_time') else None,
+            'price': None if price is None else round(price, 4), 'price_eur': None if price is None or not factor else round(price * factor, 4), 'price_time': d['price_time'].isoformat() if d.get('price_time') else None,
             'last_close': d['last_close_date'].isoformat() if d.get('last_close_date') else None, 'change': _num(d.get('daily_change')),
             'periods': {str(n): {'slope': _num(v.get('slope')), 'r2': _num(v.get('r2'))} for n, v in m.items()},
             'slope': _num(mo.get('slope')), 'r2': _num(mo.get('r2')), 'perf': perf, 'volatility': _num(mo.get('volatility')), 'drawdown': _num(mo.get('drawdown')),
             'turnover_eur': _num(d.get('turnover_eur')), 'liquidity_source': d.get('liquidity_source'), 'avg_volume': _num(d.get('avg_volume_3m')),
             'analyst': d.get('analyst_rating'), 'quality': d.get('quality'),
-            'simple': e['simple'], 'complex': e['complex'], 'simple_status': e['simple_status'], 'complex_status': e['complex_status'],
-            'rank_simple': rank_s.get(lid), 'rank_complex': rank_c.get(lid), 'curve': curves.get(lid, []), 'secondary': secondary})
+            'simple': _num(e['simple']), 'complex': _num(e['complex']), 'simple_status': e['simple_status'], 'complex_status': e['complex_status'],
+            'rank_simple': rank_s.get(lid), 'rank_complex': rank_c.get(lid), 'curve': [round(x, 2) for x in curves.get(lid, [])], 'secondary': secondary})
     return {'strategy': name, 'reference_sessions': REFERENCE, 'universe': len(rows), 'scored': {'simple': len(simple), 'complex': len(complex_)}, 'rows': rows}
