@@ -275,3 +275,28 @@
   .ct-illustration svg{max-height:80px}
   .ct-config-footer{padding:10px 12px}
 }
+
+/* Mobile : réglages encore plus denses (valeur sur la ligne du titre, aide discrète). */
+@media(max-width:700px){
+  .ct-heading-actions>.btn{font-size:13px;padding:9px 8px}
+  .ct-segment button{padding:7px 14px;font-size:13px}
+  .ct-strategy-icon{display:none}
+  .ct-strategy{grid-template-columns:auto minmax(0,1fr)}
+  .ct-strategy label{display:block;font-size:13px}
+  .ct-strategy .ct-provisional{display:none}
+  .ct-period-heading span{display:none}
+  .ct-period-heading{padding:10px 12px 6px}
+  .ct-sliders{padding:10px 12px;gap:10px}
+  .ct-control{display:grid;grid-template-columns:36px minmax(0,1fr) 36px;gap:2px 6px;align-items:center}
+  .ct-control>label{grid-column:1/-1;grid-row:1;font-size:13px;padding-right:90px}
+  .ct-control .ct-slider-row{display:contents}
+  .ct-control .ct-number{grid-column:1/-1;grid-row:1;justify-self:end;display:flex;align-items:center;gap:4px}
+  .ct-control .ct-number input{width:76px;height:34px;font-size:16px}
+  .ct-control .ct-number span{display:inline;font-size:10px}
+  .ct-control .ct-slider-row>button{height:34px;width:36px}
+  .ct-control-help{grid-column:1/-1;font-size:11px;margin:0}
+  .ct-illustration{max-width:170px}
+  .ct-illustration svg{max-height:64px}
+  .ct-config-footer{padding:8px 12px}
+  .ct-config-footer .btn{padding:8px 6px;font-size:12px}
+}
