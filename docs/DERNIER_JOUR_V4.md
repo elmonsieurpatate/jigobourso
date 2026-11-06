@@ -1,3 +1,5 @@
+> **ABANDONNÉ (2026-11-06).** Décision de l'administrateur : le dernier jour ne reçoit aucun coefficient propre ; λ = 0,05 n'est pas implémenté. Document conservé pour mémoire uniquement.
+
 # Dernier jour dans les scores V4 — proposition chiffrée (NON implémentée)
 
 État : **aucune formule modifiée.** Les scores actuels ignorent le dernier jour ; seul le filtre facultatif « dernier jour positif » existe (administration → Profils → mode avancé), indépendant de la notation.

@@ -15,14 +15,14 @@
     ['Dynamique', 'Croissance lissée de chaque période, ramenée à une échelle de saturation (17 % × (séances/5)^0,52). 100 % = croissance saturée.', 'facteur de 0 à 1'],
     ['Régularité', 'R² (pleine fiabilité dès 21 séances) × (1 − ½ × part du plus gros pic) × (½ + ½ × séances positives). Pénalise les hausses en un seul saut.', 'facteur de 0 à 1'],
     ['Accélération', 'Écart de pente avec la fenêtre précédente, pondéré par la régularité. Indisponible : facteur neutre.', 'facteur de 0,90 à 1,10']];
-  const LASTDAY = 'Dernier jour : la variation de la dernière séance n’entre pas encore dans la note (intégration à valider). Le filtre facultatif « dernier jour positif » est indépendant de la notation (Profils de stratégies, mode avancé).';
+  const LASTDAY = 'Dernier jour : aucun coefficient propre. La dernière séance compte comme les autres séances dans les mesures de chaque période. Le filtre facultatif « dernier jour positif » est indépendant de la notation (Filtres de consultation, mode avancé).';
   const TABS = [['config', 'Configuration du moteur'], ['profils', 'Profils de stratégies'], ['simulation', 'Simulation & exemples'], ['suivi', 'Suivi des calculs']];
   const $ = (s, r) => (r || document).querySelector(s);
   const E = s => J.esc(String(s ?? ''));
   const fmt = (v, d = 1) => v === null || v === undefined ? '—' : J.num(v, d);
   const clone = o => JSON.parse(JSON.stringify(o));
 
-  let root, S, draft, savedJson, sel, adv = false, conf = null, confBusy = false, confFail = false, confStale = false, tab = 'config', scoreTab = 'simple', mon = null, monErr = null, sim = null, simBusy = false, simQ = '', useDraft = true, error = '';
+  let root, S, draft, savedJson, sel, adv = false, rank = null, confBusy = false, confFail = false, confStale = false, tab = 'config', scoreTab = 'simple', mon = null, monErr = null, sim = null, simBusy = false, simQ = '', useDraft = true, error = '';
   const autoCache = {};
 
   const v4 = () => S.strategies.filter(s => s.engine === 'v4');
@@ -75,7 +75,7 @@
   // seuls l'onglet courant et l'état de la barre sont mis à jour.
   function skeleton() {
     root.innerHTML = `<div class="as">
-      <div class="notice as-principle"><b>Principe V4 : un moteur unique pour toutes les stratégies.</b> Le score simple mesure la croissance et sa régularité (avec accélération) ; le score complexe ajoute risque, volatilité, concentration et liquidité. Chaque stratégie choisit ses périodes, ses seuils et ses pondérations, sans changer la méthode de calcul. Les seuils de conformité filtrent, ils n’entrent jamais dans une note.</div>
+      <div class="notice as-principle"><b>Principe V4 : un moteur unique pour toutes les stratégies.</b> Le score simple mesure la croissance et sa régularité (avec accélération) ; le score complexe ajoute risque, volatilité, concentration et liquidité. Chaque stratégie choisit ses périodes, ses seuils et ses pondérations, sans changer la méthode de calcul. Tous les titres évaluables sont notés et classés ; les seuils sont des filtres de consultation facultatifs, désactivés par défaut, qui n’entrent jamais dans une note.</div>
       <div class="tabs as-tabs" id="as-tabs"></div><div id="as-err"></div><div id="as-body"></div>
       <div class="as-bar"><div id="as-status"></div><div class="row gap-s">
         <button class="btn" data-a="cancel">Annuler les modifications</button>
@@ -97,7 +97,7 @@
     $('#as-err').innerHTML = error ? `<div class="notice err" style="margin-bottom:12px">${E(error)}</div>` : '';
     $('#as-body').innerHTML = tab === 'config' ? configView(st, isV4) : tab === 'profils' ? profilesView() : tab === 'simulation' ? simulationView(isV4) : monitorView();
     if (tab === 'suivi' && !mon && !monErr) loadMonitor();
-    if (tab === 'profils' && !conf && !confBusy && !confFail && st && st.engine === 'v4') runConf();
+    if (tab === 'profils' && !rank && !confBusy && !confFail && st && st.engine === 'v4') runConf();
   }
 
   function paint() { if (!$('#as-body')) skeleton(); paintBody(); paintBar(); }
@@ -130,7 +130,7 @@
       <div class="card"><h3 class="as-h">Paramètres généraux (moteur commun)</h3>
         <div class="as-field"><label>Priorité aux périodes courtes <span class="as-i" title="Symbole κ. À 0, chaque séance pèse pareil donc les longues périodes dominent. Plus la valeur est haute, plus la semaine et le mois pèsent. Ne sert qu’aux poids automatiques.">ⓘ</span></label><input type="number" class="as-num" data-a="kappa" min="0" max="0.95" step="0.05" value="${draft.global.kappa}"></div>
         <p class="as-hint">Valeur 0 à 0,95 · proposée : ${S.design.kappa}. Commun à toutes les stratégies.</p>
-        <div class="as-field"><label>Couverture minimale des données <span class="as-i" title="Part des mesures nécessaires pour noter un titre. En dessous, la note reste « inconnue » (jamais 0). Entre ce seuil et 100 %, elle est « partielle ».">ⓘ</span></label><input type="number" class="as-num" data-a="thr" min="0.1" max="1" step="0.05" value="${draft.global.threshold}"></div>
+        <div class="as-field"><label>Seuil de fiabilité (couverture) <span class="as-i" title="Information seulement : sous ce seuil, la note est calculée mais signalée « peu fiable ». Elle n’est jamais supprimée et ce seuil ne change aucune note.">ⓘ</span></label><input type="number" class="as-num" data-a="thr" min="0.1" max="1" step="0.05" value="${draft.global.threshold}"></div>
         <p class="as-hint">Valeur 0,1 à 1 · proposée : ${S.design.threshold}.</p></div></div>`;
   }
 
@@ -141,7 +141,7 @@
       <h3 class="as-h">Composantes (formule validée, non modifiable)</h3>
       ${SIMPLE.map(([n, d, e]) => `<div class="as-comp"><div class="row between"><b>${n}</b><span class="badge">${e}</span></div><p class="as-hint">${d}</p></div>`).join('')}
       <div class="notice warn as-lastday">${LASTDAY}</div>
-      <p class="as-hint">Les périodes sont combinées avec les poids de la colonne de gauche. Une période obligatoire sans historique rend le titre « inconnu » ; une période facultative absente baisse seulement la couverture (minimum ${fmt(f.min_sessions, 0)} séances par période).</p>`;
+      <p class="as-hint">Les périodes sont combinées avec les poids de la colonne de gauche. Si une période n’a pas assez d’historique, la note est calculée sur les périodes disponibles (poids renormalisés) et marquée « données incomplètes » : le titre reste classé (minimum ${fmt(f.min_sessions, 0)} séances par période).</p>`;
   }
 
   function complexView(p) {
@@ -178,47 +178,87 @@
   }
 
   function conformityCard(st, p) {
-    const th = (id, f, step) => { const x = p.periods[id]; return `<td><input type="number" class="as-num" data-a="thr-p" data-p="${id}" data-f="${f}" step="${step}" value="${PCT(x[f])}" ${x.enabled ? '' : 'disabled'} placeholder="aucun"></td>`; };
+    const on = !!(p.filters && p.filters.enabled), dis = on ? '' : 'disabled';
+    const th = (id, f, step) => { const x = p.periods[id]; return `<td><input type="number" class="as-num" data-a="thr-p" data-p="${id}" data-f="${f}" step="${step}" value="${PCT(x[f])}" ${x.enabled && on ? '' : 'disabled'} placeholder="aucun"></td>`; };
     const mm = (v) => v === null || v === undefined ? '' : v / 1e6;
-    return `<div class="card"><div class="row between" style="flex-wrap:wrap;gap:8px"><h3 class="as-h" style="margin:0">Conformité de « ${E(st.label)} »</h3>
-        <div class="row gap-s"><div class="seg"><button data-a="adv" data-v="0" class="${adv ? '' : 'on'}">Mode simple</button><button data-a="adv" data-v="1" class="${adv ? 'on' : ''}">Mode avancé</button></div></div></div>
-      <div class="notice as-sep" style="margin-top:10px">Ces seuils <b>filtrent</b> les titres (conformes / écartés). Ils ne modifient <b>jamais</b> une note : les valeurs réelles de pente, R² et des autres indicateurs alimentent les deux scores, que le titre soit conforme ou non. Une case vide = <b>aucun seuil</b>.</div>
-      <div class="row gap-s" style="margin:8px 0;flex-wrap:wrap"><button class="btn small" data-a="preset" data-v="balanced">Valeurs initiales « équilibré »</button><button class="btn small" data-a="preset" data-v="v1">Appliquer le préréglage de référence V1</button><span class="as-hint" style="margin:0">Un préréglage remplit les cases ; rien n’est enregistré tant que vous n’enregistrez pas.</span></div>
-      <div class="table-wrap"><table class="as-conf"><thead><tr><th>Granularité</th><th>Active</th><th>Pente minimale (%/séance)</th><th>R² minimal (0–1)</th>${adv ? '<th>Rendement minimal (%)</th><th>Concentration max (0–1)</th><th>Volatilité max (%/séance)</th><th>Séances positives min (0–1)</th><th>Drawdown max (%)</th>' : ''}</tr></thead><tbody>
+    return `<div class="card"><div class="row between" style="flex-wrap:wrap;gap:8px"><h3 class="as-h" style="margin:0">Filtres de consultation (facultatifs) — « ${E(st.label)} »</h3>
+        <label class="row gap-s as-chk"><input type="checkbox" data-a="filters-on" ${on ? 'checked' : ''}> <b>Activer ces filtres</b></label></div>
+      <div class="notice as-sep" style="margin-top:10px"><b>Ce ne sont pas des réglages de notation.</b> Tous les titres évaluables reçoivent leurs deux scores et sont classés, avec ou sans filtre. Activés, ces seuils servent seulement à <b>restreindre l’affichage</b> (conformes / écartés) ; ils ne modifient jamais une note ni le classement général. <b>${on ? 'Filtres activés.' : 'Filtres désactivés (par défaut) : aucun titre n’est écarté.'}</b> Une case vide = aucun seuil.</div>
+      <div class="row gap-s" style="margin:8px 0;flex-wrap:wrap"><button class="btn small" data-a="preset" data-v="balanced">Remplir avec les valeurs « équilibré »</button><button class="btn small" data-a="preset" data-v="v1">Remplir avec les seuils V1</button><span class="as-hint" style="margin:0">Un préréglage remplit seulement les cases ; il n’active rien et rien n’est enregistré tant que vous n’enregistrez pas.</span></div>
+      <div class="row gap-s" style="margin:6px 0"><div class="seg"><button data-a="adv" data-v="0" class="${adv ? '' : 'on'}">Mode simple</button><button data-a="adv" data-v="1" class="${adv ? 'on' : ''}">Mode avancé</button></div></div>
+      <div class="table-wrap"><table class="as-conf"><thead><tr><th>Granularité</th><th>Notée</th><th>Pente minimale (%/séance)</th><th>R² minimal (0–1)</th>${adv ? '<th>Rendement minimal (%)</th><th>Concentration max (0–1)</th><th>Volatilité max (%/séance)</th><th>Séances positives min (0–1)</th><th>Drawdown max (%)</th>' : ''}<th>Historique exigé</th></tr></thead><tbody>
         ${S.scoring_periods.map(id => { const x = p.periods[id]; return `<tr class="${x.enabled ? '' : 'as-off'}"><td>${E(labels()[id])} <span class="muted">(${x.sessions} s)</span></td><td><input type="checkbox" data-a="active" data-p="${id}" ${x.enabled ? 'checked' : ''}></td>
-          ${th(id, 'min_slope', 0.05)}${th(id, 'min_r2', 0.05)}${adv ? th(id, 'min_return', 0.5) + th(id, 'max_spike_share', 0.05) + th(id, 'max_volatility', 0.5) + th(id, 'min_up_fraction', 0.05) + th(id, 'max_drawdown', 1) : ''}</tr>`; }).join('')}</tbody></table></div>
+          ${th(id, 'min_slope', 0.05)}${th(id, 'min_r2', 0.05)}${adv ? th(id, 'min_return', 0.5) + th(id, 'max_spike_share', 0.05) + th(id, 'max_volatility', 0.5) + th(id, 'min_up_fraction', 0.05) + th(id, 'max_drawdown', 1) : ''}
+          <td><input type="checkbox" data-a="req" data-p="${id}" ${x.require_history ? 'checked' : ''} ${x.enabled && on ? '' : 'disabled'}></td></tr>`; }).join('')}</tbody></table></div>
       ${adv ? `<div class="as-adv"><h4 class="as-h">Dernier jour (filtre facultatif, indépendant de la notation)</h4>
-        <label class="row gap-s"><input type="checkbox" data-a="day-on" ${p.day_filter.enabled ? 'checked' : ''}> Exiger un dernier jour positif : variation de la dernière séance clôturée ≥</label>
-        <input type="number" class="as-num" data-a="day-min" step="0.1" value="${p.day_filter.min_return}" ${p.day_filter.enabled ? '' : 'disabled'}> %
-        <p class="as-hint">Écarte le titre de la sélection sans changer sa note. La dernière séance est la dernière séance boursière clôturée.</p>
+        <label class="row gap-s"><input type="checkbox" data-a="day-on" ${p.day_filter.enabled ? 'checked' : ''} ${dis}> Exiger un dernier jour positif : variation de la dernière séance clôturée ≥</label>
+        <input type="number" class="as-num" data-a="day-min" step="0.1" value="${p.day_filter.min_return}" ${p.day_filter.enabled && on ? '' : 'disabled'}> %
+        <p class="as-hint">Masque le titre de la sélection sans changer sa note ni son rang général.</p>
         <h4 class="as-h">Liquidité minimale (valeur échangée par jour)</h4>
-        <div class="row gap-s" style="flex-wrap:wrap"><label>Hors États-Unis <input type="number" class="as-num" data-a="liq" data-f="min_turnover_eur" step="0.5" value="${mm(p.liquidity.min_turnover_eur)}" placeholder="aucun"> M€</label>
-        <label>Places américaines <input type="number" class="as-num" data-a="liq" data-f="min_turnover_eur_us" step="0.5" value="${mm(p.liquidity.min_turnover_eur_us)}" placeholder="aucun"> M€</label></div></div>` : '<p class="as-hint">Mode simple : exactement deux réglages par granularité active. Les critères facultatifs (rendement, concentration, volatilité, séances positives, drawdown, dernier jour, liquidité) sont en mode avancé.</p>'}</div>`;
+        <div class="row gap-s" style="flex-wrap:wrap"><label>Hors États-Unis <input type="number" class="as-num" data-a="liq" data-f="min_turnover_eur" step="0.5" value="${mm(p.liquidity.min_turnover_eur)}" placeholder="aucun" ${dis}> M€</label>
+        <label>Places américaines <input type="number" class="as-num" data-a="liq" data-f="min_turnover_eur_us" step="0.5" value="${mm(p.liquidity.min_turnover_eur_us)}" placeholder="aucun" ${dis}> M€</label></div>
+        <p class="as-hint">Une mauvaise liquidité baisse la note complexe (poids « Liquidité ») ; ce seuil, lui, ne fait que filtrer l’affichage.</p></div>` : '<p class="as-hint">Mode simple : exactement deux seuils par granularité (pente et R²). Les critères facultatifs (rendement, concentration, volatilité, séances positives, drawdown, dernier jour, liquidité) sont en mode avancé.</p>'}</div>`;
   }
 
   function technicalCard(p) {
     return `<div class="card"><h3 class="as-h">Données et exclusions techniques</h3>
-      <p class="as-hint">Ce ne sont pas des critères de croissance : ils décident si un titre est <b>évaluable</b>. Un titre non évaluable est signalé « inconnu » (jamais noté 0) ; un titre simplement non conforme garde ses deux scores.</p>
-      <table class="as-mini"><thead><tr><th>Période</th><th>Historique exigé (période obligatoire)</th></tr></thead><tbody>${S.scoring_periods.map(id => `<tr class="${p.periods[id].enabled ? '' : 'as-off'}"><td>${E(labels()[id])} <span class="muted">(${p.periods[id].sessions} séances)</span></td><td><input type="checkbox" data-a="req" data-p="${id}" ${p.periods[id].require_history ? 'checked' : ''} ${p.periods[id].enabled ? '' : 'disabled'}></td></tr>`).join('')}</tbody></table>
-      <label class="row gap-s" style="margin-top:8px"><input type="checkbox" data-a="fresh" ${p.technical.require_fresh ? 'checked' : ''}> Exiger des cours récents (sinon le titre n’est pas évaluable)</label>
-      <p class="as-hint">Couverture minimale des données : <b>${fmt(100 * draft.global.threshold, 0)} %</b> (réglage commun, onglet « Configuration du moteur »). Période obligatoire sans historique suffisant : titre non évaluable. Période facultative absente : seule la couverture baisse.</p></div>`;
+      <p class="as-hint">Politique des données manquantes (moteur V4.2), sans effet de seuil :</p>
+      <ul class="as-hint as-list"><li><b>Historique suffisant</b> : note normale.</li>
+        <li><b>Données incomplètes ou historique réduit</b> (une période, une mesure ou la liquidité manque) : la note est calculée sur les composantes disponibles, dont les poids sont renormalisés — sans bonus ni pénalité. Le titre est classé et marqué « incomplet » avec sa couverture.</li>
+        <li><b>Calcul impossible</b> (aucune période mesurable, ou aucune régularité mesurable) : note « indisponible » avec la raison ; jamais un zéro ni une note favorable inventés.</li></ul>
+      <label class="row gap-s" style="margin-top:8px"><input type="checkbox" data-a="fresh" ${p.technical.require_fresh ? 'checked' : ''}> Exiger des cours récents (contrôle technique : un cours périmé rend le titre non évaluable)</label>
+      <p class="as-hint">Seuil de fiabilité : <b>${fmt(100 * draft.global.threshold, 0)} %</b> de couverture (réglage commun, onglet « Configuration du moteur »). En dessous, la note est calculée mais signalée « peu fiable » ; aucun titre n’est supprimé.</p></div>`;
+  }
+
+  function dist(d) {
+    const max = Math.max(1, ...d.histogram);
+    return `<div class="as-hist">${d.histogram.map((n, i) => `<span title="${i * 10}–${i * 10 + 10} : ${n} titres"><i style="height:${Math.round(100 * n / max)}%"></i><small>${i * 10}</small></span>`).join('')}</div>
+      <p class="as-hint">Médiane <b>${fmt(d.median, 1)}</b> · quartiles ${fmt(d.p25, 1)} – ${fmt(d.p75, 1)} · 90e centile ${fmt(d.p90, 1)} · maximum ${fmt(d.max, 1)}</p>`;
+  }
+
+  function rankTop(rows) {
+    return rows.length ? `<table class="as-mini"><tbody>${rows.map(r => `<tr><td class="num">${r.rank}</td><td><b>${E(r.symbol)}</b> <span class="muted">${E(r.name)}</span></td><td class="num">${fmt(r.score, 1)}</td><td>${r.status === 'partiel' ? '<span class="badge wait">incomplet</span>' : ''}</td></tr>`).join('')}</tbody></table>` : '<p class="muted">Aucun titre noté.</p>';
   }
 
   function previewCard() {
-    const c = conf, t = c ? c.counts : null;
-    return `<div class="card"><div class="row between"><h3 class="as-h" style="margin:0">Effet sur la base actuelle</h3><button class="btn small" data-a="conf-run">${confBusy ? 'Calcul…' : 'Recalculer'}</button></div>
+    const c = rank, s = c ? c.summary : null;
+    const block = (key, label) => { const x = s[key], rel = c.compared && c.compared[key]; return `<div class="as-rankcol"><h4 class="as-h">${label}</h4>
+        <div class="as-tiles as-tiles3"><div class="as-tile"><span>Notés et classés</span><b>${J.num(x.ranked, 0)}</b><small>sur ${J.num(s.universe, 0)} titres</small></div>
+          <div class="as-tile"><span>Note indisponible</span><b>${J.num(x.unavailable, 0)}</b><small>calcul impossible ou mesures absentes</small></div>
+          <div class="as-tile"><span>Données incomplètes</span><b>${J.num(x.reduced_history, 0)}</b><small>${J.num(x.unreliable, 0)} sous le seuil de fiabilité</small></div></div>
+        ${dist(x.distribution)}
+        ${rel ? `<p class="as-hint"><b>Effet de vos modifications :</b> ${J.num(rel.score_changed, 0)} notes changent ; rang médian déplacé de ${J.num(rel.median_shift, 0)} ; ${J.num(rel.moved_over_10, 0)} titres bougent de plus de 10 places ; dans le top ${rel.top} : ${rel.top_entered} entrée${rel.top_entered > 1 ? 's' : ''}, ${rel.top_left} sortie${rel.top_left > 1 ? 's' : ''}.</p>` : '<p class="as-hint">Aucune modification en cours : comparaison indisponible.</p>'}
+        <h5 class="as-h">Dix premiers</h5>${rankTop(c.top[key])}</div>`; };
+    return `<div class="card"><div class="row between"><h3 class="as-h" style="margin:0">Classement général sur la base actuelle</h3><button class="btn small" data-a="conf-run">${confBusy ? 'Calcul…' : 'Recalculer'}</button></div>
       ${confStale ? '<p class="as-hint" style="color:var(--warn)">Réglages modifiés depuis ce calcul : cliquez sur « Recalculer ».</p>' : ''}
-      ${confBusy && !c ? '<div class="empty"><span class="spinner"></span></div>' : !c ? `<p class="muted">${confFail ? 'Calcul impossible : voir le message ci-dessus.' : 'Calcul au premier affichage.'}</p>` : c.universe === 0 ? '<div class="notice warn" style="margin-top:8px">Aucun titre dans cette base : rien à évaluer. Aucune valeur d’exemple n’est affichée.</div>' : `<div class="as-tiles as-tiles3" style="margin-top:10px">
-        <div class="as-tile"><span>Conformes</span><b>${J.num(t.retained, 0)}</b><small>sur ${J.num(c.universe, 0)} titres</small></div>
-        <div class="as-tile"><span>Écartés par un seuil</span><b>${J.num(t.rejected, 0)}</b><small>${J.num(c.rejected_with_both_scores, 0)} gardent leurs deux scores</small></div>
-        <div class="as-tile"><span>Non évaluables</span><b>${J.num(t.unknown, 0)}</b><small>exclusion technique ou données insuffisantes</small></div></div>
-        <p class="as-hint">Mesuré avec les réglages affichés (y compris les modifications non enregistrées). Les écartés restent accessibles dans la vue des écartés avec leurs scores.</p>`}</div>`;
+      ${confBusy && !c ? '<div class="empty"><span class="spinner"></span></div>' : !c ? `<p class="muted">${confFail ? 'Calcul impossible : voir le message ci-dessus.' : 'Calcul au premier affichage.'}</p>` : s.universe === 0 ? '<div class="notice warn" style="margin-top:8px">Aucun titre dans cette base : rien à noter. Aucune valeur d’exemple n’est affichée.</div>' : `
+        <p class="as-hint">Tous les titres évaluables sont notés et classés, du meilleur au moins bon, sans quota ni seuil. Les filtres facultatifs ne retirent rien d’ici.</p>
+        <div class="as-ranks">${block('simple', 'Score simple')}${block('complex', 'Score complexe')}</div>
+        ${s.unavailable_reasons.length ? `<p class="as-hint"><b>Pourquoi une note est indisponible :</b> ${s.unavailable_reasons.map(r => `${E(r.reason)} (${J.num(r.count, 0)})`).join(' · ')}${s.no_inputs ? ` · ${J.num(s.no_inputs, 0)} titres sans mesures de score calculées` : ''}.</p>` : s.no_inputs ? `<p class="as-hint">${J.num(s.no_inputs, 0)} titres sans mesures de score calculées.</p>` : ''}
+        <p class="as-hint">Moteur de notation version ${c.engine_version}. Poids réels des périodes : ${c.weights.map(w => `${E(labels()[w.id])} <b>${fmt(100 * w.weight, 1)} %</b>`).join(' · ')} (κ = ${fmt(c.kappa, 2)}${c.weights.some(w => w.custom) ? ', poids personnalisés' : ', automatiques'}).</p>`}
+      ${confFilter(c)}</div>`;
+  }
+
+  function confFilter(c) {
+    const p = prof();
+    if (!p || !p.filters || !p.filters.enabled) return '<p class="as-hint">Filtres facultatifs désactivés : aucun titre n’est écarté de la consultation.</p>';
+    if (!c || !c.filters) return '';
+    const t = c.filters.counts;
+    return `<h4 class="as-h">Effet des filtres facultatifs (consultation seulement)</h4><div class="as-tiles as-tiles3"><div class="as-tile"><span>Conformes</span><b>${J.num(t.retained, 0)}</b><small>sur ${J.num(c.filters.universe, 0)} titres</small></div>
+      <div class="as-tile"><span>Masqués par un filtre</span><b>${J.num(t.rejected, 0)}</b><small>${J.num(c.filters.rejected_with_both_scores, 0)} gardent leurs deux scores</small></div>
+      <div class="as-tile"><span>Non évaluables</span><b>${J.num(t.unknown, 0)}</b><small>contrôle technique</small></div></div>`;
   }
 
   async function runConf() {
     confBusy = true; confFail = false; confStale = false; paintBody();
-    try { const body = { strategy: sel }; if (dirty()) body.draft = { global: draft.global, profile: payload() }; conf = await J.post('admin/scores/conformity', body); error = ''; }
-    catch (e) { conf = null; confFail = true; error = e.message; }
+    try {
+      const body = { strategy: sel }; if (dirty()) body.draft = { global: draft.global, profile: payload() };
+      rank = await J.post('admin/scores/ranking', body);
+      const p = prof();
+      if (p && p.filters && p.filters.enabled) { const f = await J.post('admin/scores/conformity', body); rank.filters = f; }
+      error = '';
+    }
+    catch (e) { rank = null; confFail = true; error = e.message; }
     confBusy = false; paint();
   }
 
@@ -237,17 +277,17 @@
     if (sim.not_found) return '<div class="card"><div class="notice warn">Aucun titre noté ne correspond à cette recherche.</div></div>';
     if (!sim.result) return `<div class="card"><p class="muted">${sim.candidates && sim.candidates.length ? 'Plusieurs titres correspondent.' : 'Choisissez un titre parmi les mieux notés ci-dessus.'}</p></div>`;
     const r = sim.result, ids = sim.periods.map(x => x.id), L = labels();
-    const sc = (o, cls) => `<div class="as-score ${cls}"><span>${cls === 's' ? 'Score simple' : 'Score complexe'}</span><b>${o.score === null ? 'inconnu' : fmt(o.score, 1)}</b>${o.score === null ? '' : ' / 100'}<small>${o.status === 'ok' ? 'données complètes' : o.status === 'partiel' ? 'données partielles' : E(o.why || '')} · couverture ${fmt(100 * (o.coverage || 0), 0)} %</small></div>`;
+    const sc = (o, cls) => `<div class="as-score ${cls}"><span>${cls === 's' ? 'Score simple' : 'Score complexe'}</span><b>${o.score === null ? 'inconnu' : fmt(o.score, 1)}</b>${o.score === null ? '' : ' / 100'}<small>${o.status === 'ok' ? 'données complètes' : o.status === 'partiel' ? 'données incomplètes' : E(o.why || '')} · couverture ${fmt(100 * (o.coverage || 0), 0)} %${o.score !== null && o.reliable === false ? ' · peu fiable' : ''}</small></div>`;
     const cell = (c, key, unit, d) => { if (!c) return '<td class="num muted">—</td>'; const raw = c.raw || {}; const val = key === 'growth' ? c.growth : raw[key]; const note = c[key === 'growth' ? 'dynamics' : { r2: 'r2', up_fraction: 'up_days', spike_share: 'concentration', accel: 'acceleration', volatility: 'volatility', drawdown: 'drawdown' }[key]];
       return `<td class="num">${val === null || val === undefined ? '<span class="muted">indisponible</span>' : fmt(unit === '%' ? val * (['up_fraction', 'spike_share'].includes(key) ? 100 : 1) : val, d) + (unit ? ' ' + unit : '')}${note === null || note === undefined ? '' : `<br><small class="muted">note ${fmt(note, 0)}</small>`}</td>`; };
     const rows = [['Croissance (Dynamique)', 'growth', '%', 2], ['Régularité (R²)', 'r2', '', 2], ['Séances positives', 'up_fraction', '%', 0], ['Plus gros pic ÷ hausse nette', 'spike_share', '%', 0], ['Accélération (écart de pente)', 'accel', '', 3], ['Volatilité (par séance)', 'volatility', '%', 2], ['Drawdown', 'drawdown', '%', 1]];
     const s = r.simple, c = r.complex, liq = r.liquidity || {};
     return `<div class="card"><div class="row between" style="flex-wrap:wrap;gap:12px"><div><h3 class="as-h" style="margin:0">${E(sim.title.name)}</h3><span class="muted">${E(sim.title.symbol)} · ${E(sim.title.mic)} · ${sim.title.kind === 'etf' ? 'ETF' : 'Action'}</span></div><div class="row gap-s">${sc(s, 's')}${sc(c, 'c')}</div></div>
-      <div class="table-wrap"><table class="as-dec"><thead><tr><th>Mesure</th>${ids.map(i => `<th class="num">${E(L[i])}<br><small class="muted">poids ${fmt(100 * (r.weights[i] || 0), 1)} %</small></th>`).join('')}</tr></thead><tbody>
+      <div class="table-wrap"><table class="as-dec"><thead><tr><th>Mesure</th>${ids.map(i => `<th class="num">${E(L[i])}<br><small class="muted">poids réel ${fmt(100 * ((r.weights_effective || {})[i] || 0), 1)} %${r.periods[i] ? '' : ' (période sans données)'}</small></th>`).join('')}</tr></thead><tbody>
         ${rows.map(([n, k, u, d]) => `<tr><td>${n}</td>${ids.map(i => cell(r.periods[i], k, u, d)).join('')}</tr>`).join('')}</tbody></table></div>
       <div class="as-two"><div><h4 class="as-h">Score simple (produit)</h4>${s.score === null ? `<p class="muted">${E(s.why || '')}</p>` : `<p>100 × Dynamique <b>${fmt(s.dynamics, 2)}</b> × Régularité <b>${fmt(s.quality, 2)}</b> × accélération <b>${fmt(s.acceleration_factor, 2)}</b> = <b>${fmt(s.score, 1)}</b></p><p class="as-hint">Chaque facteur est un multiplicateur : un seul maillon faible tire tout le score vers le bas.</p>`}</div>
-        <div><h4 class="as-h">Score complexe (somme pondérée)</h4>${c.score === null ? `<p class="muted">${E(c.why || '')}</p>` : `<table class="as-mini"><tbody>${Object.entries(c.contributions).map(([k, v]) => `<tr><td>${E(CLABEL[k] || k)}</td><td class="num">poids ${fmt(100 * v.weight, 1)} %</td><td class="num">note ${fmt(v.value, 0)}</td><td class="num"><b>+${fmt(v.points, 1)}</b></td></tr>`).join('')}</tbody></table><p class="as-hint">Total ${fmt(c.raw_total, 1)} × ancrage récent ${fmt(c.anchor, 2)} = <b>${fmt(c.score, 1)}</b></p>`}</div></div>
-      <p class="as-hint">Liquidité : ${liq.turnover_eur ? fmt(liq.turnover_eur / 1e6, 1) + ' M€/jour (' + (liq.source === 'daily' ? 'volumes quotidiens réels' : 'estimée, moyenne trimestrielle') + ') · note ' + fmt(liq.note, 0) : 'indisponible'}. ${r.missing && (r.missing.secondary.length || r.missing.optional_periods.length) ? 'Mesures absentes : ' + E(r.missing.optional_periods.concat(r.missing.secondary).join(', ')) + '.' : ''}</p></div>`;
+        <div><h4 class="as-h">Score complexe (somme pondérée)</h4>${c.score === null ? `<p class="muted">${E(c.why || '')}</p>` : `<table class="as-mini"><tbody>${Object.entries(c.contributions).map(([k, v]) => `<tr><td>${E(CLABEL[k] || k)}</td><td class="num">${v.value === null ? '<span class="muted">indisponible — hors calcul</span>' : `poids ${fmt(100 * v.weight, 1)} %${Math.abs(v.weight_effective - v.weight) > 0.0005 ? ' → réel ' + fmt(100 * v.weight_effective, 1) + ' %' : ''}`}</td><td class="num">${v.value === null ? '' : 'note ' + fmt(v.value, 0)}</td><td class="num">${v.points === null ? '' : '<b>+' + fmt(v.points_effective, 1) + '</b>'}</td></tr>`).join('')}</tbody></table><p class="as-hint">Total ${fmt(c.raw_total, 1)} × ancrage récent ${fmt(c.anchor, 2)} = <b>${fmt(c.score, 1)}</b></p>`}</div></div>
+      <p class="as-hint">Liquidité : ${liq.turnover_eur ? fmt(liq.turnover_eur / 1e6, 1) + ' M€/jour (' + (liq.source === 'daily' ? 'volumes quotidiens réels' : 'estimée, moyenne trimestrielle') + ') · note ' + fmt(liq.note, 0) : 'indisponible'}. ${r.missing && (r.missing.secondary.length || r.missing.optional_periods.length || r.missing.required_periods.length) ? '<b>Qualité des données :</b> périodes sans historique : ' + (E(r.missing.required_periods.concat(r.missing.optional_periods).join(', ')) || 'aucune') + ' · mesures indisponibles : ' + (E(r.missing.secondary.join(', ')) || 'aucune') + '. Elles sortent du calcul et les poids restants sont renormalisés (ni bonus ni pénalité).' : '<b>Qualité des données :</b> complète.'}</p></div>`;
   }
 
   async function runSim(id) {
@@ -269,7 +309,7 @@
     if (monErr) return `<div class="notice err">${E(monErr)}</div>`;
     if (!mon) return '<div class="empty"><span class="spinner"></span></div>';
     const m = mon, l = m.liquidity, n = m.rated, pct = (a, b) => b ? fmt(100 * a / b, 0) + ' %' : '—';
-    const stat = k => `<div class="as-tile"><span>${k === 'simple' ? 'Score simple' : 'Score complexe'}</span><b>${J.num(m.counts[k].ok + m.counts[k].partiel, 0)}</b><small>notés · ${J.num(m.counts[k].ok, 0)} complets · ${J.num(m.counts[k].partiel, 0)} partiels · ${J.num(m.counts[k].inconnu, 0)} inconnus</small></div>`;
+    const stat = k => `<div class="as-tile"><span>${k === 'simple' ? 'Score simple' : 'Score complexe'}</span><b>${J.num(m.counts[k].ok + m.counts[k].partiel, 0)}</b><small>notés et classés · ${J.num(m.counts[k].ok, 0)} complets · ${J.num(m.counts[k].partiel, 0)} incomplets · ${J.num(m.counts[k].inconnu + Math.max(0, l.universe - n), 0)} indisponibles</small></div>`;
     return `${n === 0 ? '<div class="notice warn" style="margin-bottom:12px"><b>Aucun titre noté.</b> Les mesures de score se remplissent au calcul nocturne ; cette base n’en contient pas encore. Aucune valeur d’exemple n’est affichée.</div>' : ''}
       <div class="as-tiles"><div class="as-tile"><span>Titres notés</span><b>${J.num(n, 0)}</b><small>sur ${J.num(l.universe, 0)} titres recommandables</small></div>${stat('simple')}${stat('complex')}
         <div class="as-tile"><span>Couverture des données</span><b>${m.coverage.median === null ? '—' : fmt(100 * m.coverage.median, 0) + ' %'}</b><small>médiane · minimum ${m.coverage.min === null ? '—' : fmt(100 * m.coverage.min, 0) + ' %'} · ${J.num(m.coverage.full, 0)} complets</small></div></div>
@@ -305,14 +345,15 @@
 
   function onChange(e) {
     const t = e.target, a = t.dataset.a, p = sel && draft.profiles[sel];
-    if (a === 'strategy') { sel = t.value; sim = null; conf = null; later(); }
+    if (a === 'strategy') { sel = t.value; sim = null; rank = null; later(); }
     else if (a === 'active') {
       const on = t.checked, q = prof();
       if (!on && active(q).length <= 1) { t.checked = true; J.toast('Au moins une granularité doit rester active'); return; }
       q.periods[t.dataset.p].enabled = on;
       if (q.weights_mode === 'custom') { if (on) q.weights[t.dataset.p] = 0; else delete q.weights[t.dataset.p]; }
       later();
-    } else if (a === 'req') { p.periods[t.dataset.p].require_history = t.checked; confStale = true; paintBar(); }
+    } else if (a === 'filters-on') { p.filters = { enabled: t.checked }; if (rank) rank.filters = null; confStale = true; paint(); }
+    else if (a === 'req') { p.periods[t.dataset.p].require_history = t.checked; confStale = true; paintBar(); }
     else if (a === 'pw') {
       p.weights[t.dataset.p] = +t.value || 0;
       const tot = sum(Object.fromEntries(active(p).map(i => [i, p.weights[i]]))), el = $('#pw-total');
@@ -335,7 +376,7 @@
     S.scoring_periods.forEach(id => { Object.assign(p.periods[id], ref.periods[id], { sessions: p.periods[id].sessions }); });
     p.day_filter = ref.day_filter; p.liquidity = ref.liquidity; p.technical = ref.technical;
     if (before !== active(p).join()) { p.weights_mode = 'auto'; p.weights = {}; }
-    conf = null; J.toast(kind === 'v1' ? 'Préréglage V1 appliqué (non enregistré)' : 'Valeurs initiales appliquées (non enregistrées)'); paint();
+    rank = null; J.toast(kind === 'v1' ? 'Préréglage V1 appliqué (non enregistré)' : 'Valeurs initiales appliquées (non enregistrées)'); paint();
   }
 
   function toCustom() {
@@ -353,11 +394,11 @@
     else if (a === 'pw-auto') { prof().weights_mode = 'auto'; prof().weights = {}; paint(); }
     else if (a === 'cw-norm') { const p = prof(), tot = sum(p.complex_weights) || 1; let acc = 0; const keys = Object.keys(p.complex_weights); keys.forEach((k, i) => { const x = i === keys.length - 1 ? Math.round((100 - acc) * 10) / 10 : Math.round(p.complex_weights[k] / tot * 1000) / 10; p.complex_weights[k] = x; acc += x; }); paint(); }
     else if (a === 'cw-ref') { prof().complex_weights = clone(S.design.complex_weights); paint(); }
-    else if (a === 'open') { sel = v; tab = 'profils'; sim = null; conf = null; paint(); }
+    else if (a === 'open') { sel = v; tab = 'profils'; sim = null; rank = null; paint(); }
     else if (a === 'adv') { adv = v === '1'; paint(); }
     else if (a === 'preset') { applyPreset(v); }
     else if (a === 'conf-run') { runConf(); }
-    else if (a === 'cancel') { reset(); conf = null; paint(); }
+    else if (a === 'cancel') { reset(); rank = null; paint(); }
     else if (a === 'save') save();
     else if (a === 'restore') restore();
     else if (a === 'sim-run') { simQ = ($('#as-q') || {}).value || ''; runSim(null); }
@@ -370,7 +411,7 @@
       const before = savedProfiles(), changed = v4().map(s => s.name).filter(n => JSON.stringify(draft.profiles[n]) !== JSON.stringify(before[n]));
       if (!changed.length) S = await J.post('admin/scores/save', { global: draft.global });
       for (const [i, n] of changed.entries()) S = await J.post('admin/scores/save', i === 0 ? { global: draft.global, profile: payloadFor(n) } : { profile: payloadFor(n) });
-      reset(); Object.keys(autoCache).forEach(k => delete autoCache[k]); mon = null; sim = null; conf = null; J.toast('Configuration enregistrée');
+      reset(); Object.keys(autoCache).forEach(k => delete autoCache[k]); mon = null; sim = null; rank = null; J.toast('Configuration enregistrée');
     } catch (e) { error = e.message; J.toast(e.message); }
     paint();
   }
@@ -383,7 +424,7 @@
       <label class="as-rad"><input type="radio" name="rs" value="all"> Tout (communs et tous les profils V4)</label>`,
       actions: [{ label: 'Annuler', run: () => { } }, { label: 'Restaurer', cls: 'primary', run: async d => {
         const scope = ($('input[name=rs]:checked', d) || {}).value || 'profile';
-        try { S = await J.post('admin/scores/save', scope === 'profile' ? { reset: 'profile', name: st && st.engine === 'v4' ? sel : v4()[0].name } : { reset: scope }); reset(); Object.keys(autoCache).forEach(k => delete autoCache[k]); sim = null; conf = null; J.toast('Valeurs par défaut rétablies'); } catch (e) { J.toast(e.message); }
+        try { S = await J.post('admin/scores/save', scope === 'profile' ? { reset: 'profile', name: st && st.engine === 'v4' ? sel : v4()[0].name } : { reset: scope }); reset(); Object.keys(autoCache).forEach(k => delete autoCache[k]); sim = null; rank = null; J.toast('Valeurs par défaut rétablies'); } catch (e) { J.toast(e.message); }
         paint(); } }] });
   }
 

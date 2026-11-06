@@ -63,3 +63,36 @@ def test_simulation_monitor_and_profiles_use_real_data_and_stay_independent_of_c
     assert [x['id'] for x in A.simulate(conn, {'strategy': 'growth_v1', 'q': 'UP.DE'})['periods']] == ['week', 'month']
     A.save(conn, {'reset': 'all'})
     assert not [s for s in A.state(conn)['strategies'] if s['name'] == 'growth_v1'][0]['customised']
+
+
+def test_general_ranking_rates_every_evaluable_title_and_filters_remove_none():
+    from engine.analytics import service
+    conn = connect()
+    reset_data(conn)
+    seed(conn)
+    r = A.ranking(conn, {'strategy': 'growth_v4'})
+    s = r['summary']
+    assert s['universe'] == 2 and s['simple']['ranked'] == 2 and s['complex']['ranked'] == 2 and s['simple']['unavailable'] == 0      # tous notés, aucun quota
+    assert sum(s['simple']['distribution']['histogram']) == 2 and [x['symbol'] for x in r['top']['simple']][0] == 'UP.DE'
+    assert abs(sum(w['weight'] for w in r['weights']) - 1) < 1e-9 and r['compared'] is None
+    # seuils extrêmes SANS activer les filtres : ni notes ni classement ne bougent, et l'Explorer ne retire aucun titre
+    p = A.profile_of(A.base_config('growth_v4'))
+    for x in p['periods'].values():
+        x.pop('sessions')
+    p['periods']['week']['min_slope'] = 50
+    p['periods']['month']['min_r2'] = 0.999
+    A.save(conn, {'profile': dict(p, name='growth_v4')})
+    assert A.ranking(conn, {'strategy': 'growth_v4'})['summary'] == s
+    cfg = A.build_config(conn, 'growth_v4')
+    verdicts = service.judge_universe(conn, cfg)
+    assert {v['status'] for v in verdicts} == {'retained'}
+    # filtres activés : le verdict peut écarter, mais le classement général garde les deux titres
+    p['filters'] = {'enabled': True}
+    A.save(conn, {'profile': dict(p, name='growth_v4')})
+    assert {v['status'] for v in service.judge_universe(conn, A.build_config(conn, 'growth_v4'))} == {'rejected'}
+    assert A.ranking(conn, {'strategy': 'growth_v4'})['summary'] == s
+    # effet d'un changement de poids : comparaison avec le réglage enregistré
+    p['weights_mode'], p['weights'] = 'custom', {'week': 90, 'month': 10}
+    moved = A.ranking(conn, {'strategy': 'growth_v4', 'draft': {'profile': dict(p, name='growth_v4')}})
+    assert moved['compared']['simple']['compared'] == 2 and moved['weights'][0]['weight'] == pytest.approx(0.9)
+    A.save(conn, {'reset': 'all'})

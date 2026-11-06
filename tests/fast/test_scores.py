@@ -23,9 +23,9 @@ GOLDEN = {
                                   126: M(.25, .8, .58, .3, 2.4, 14.0, .05, .6)}, turn=3e6), (5, 21, 63, 126), (5, 21),
                      dict(simple=24.20505960412955, complex=49.64925352715027, ss='ok', cs='ok')),
     'declining_no_liquidity': (dict(inputs={5: M(-.5, .4, .4, 1.0, 3.5, 6.0, -.8, .5), 21: M(.05, .3, .5, .6, 3.1, 10.0, -.2, .4)}, turn=None), (5, 21), (5, 21),
-                               dict(simple=0.23718314813635621, complex=0.6405320276935309, ss='ok', cs='partiel')),
+                               dict(simple=0.23718314813635621, complex=0.711702252992812, ss='ok', cs='partiel')),   # liquidité inconnue : poids renormalisés (V4.2), ni zéro ni bonus,
     'optional_week_missing': (dict(inputs={5: None, 21: M(.6, .88, .65, .25, 1.8, 5.0, .1, .8), 63: M(.35, .7, .58, .3, 2.0, 12.0, .05, .6)}, turn=30e6), (5, 21, 63), (21,),
-                              dict(simple=None, complex=21.756008660860772, ss='inconnu', cs='partiel')),
+                              dict(simple=21.07068751413848, complex=55.31844002403962, ss='partiel', cs='partiel')),   # semaine sans historique : calculé sur mois + trimestre (V4.2),
 }
 
 
@@ -73,13 +73,32 @@ def test_custom_weights_are_normalised_and_override_automatic():
 
 def test_day_granularity_is_never_scored():
     r = SC.score_title({1: M(3, None, 1, 1, None, 0)}, {'turnover_eur': 10e6}, P(1))
-    assert r['simple']['status'] == 'inconnu' and 'aucune granularité' in r['simple']['why']
+    assert r['simple']['status'] == 'inconnu' and 'aucune période active' in r['simple']['why']
 
 
-def test_required_period_missing_makes_both_scores_unknown():
+def test_required_period_missing_no_longer_blocks_the_score():
+    """V4.2 : une période « obligatoire » manquante ne supprime plus la note ; elle est calculée sur ce qui existe et signalée."""
     r = SC.score_title({5: None, 21: M(.7, .9, .6, .3, 2, 5)}, {'turnover_eur': 10e6}, P(5, 21), required=['week'])
-    assert r['simple']['status'] == r['complex']['status'] == 'inconnu' and 'week' in r['simple']['why']
-    assert r['missing']['required_periods'] == ['week']
+    assert r['simple']['score'] is not None and r['complex']['score'] is not None
+    assert r['simple']['status'] == r['complex']['status'] == 'partiel' and r['complex']['reliable'] is False
+    assert r['missing']['required_periods'] == ['week'] and r['weights_effective'] == pytest.approx({'month': 1.0})
+
+
+def test_impossible_computation_is_unknown_with_explicit_reason():
+    r = SC.score_title({5: None, 21: None}, {'turnover_eur': 10e6}, P(5, 21))
+    assert r['simple']['score'] is None and r['complex']['score'] is None and 'impossible' in r['simple']['why']
+    nor2 = SC.score_title({21: M(.7, None, .6, .3, 2, 5)}, {'turnover_eur': 10e6}, P(21))
+    assert nor2['simple']['score'] is None and 'R²' in nor2['simple']['why']       # jamais un 0 inventé
+    assert nor2['complex']['score'] is not None                                      # le complexe existe : composantes disponibles renormalisées
+
+
+def test_missing_component_is_neutral_not_a_penalty():
+    """Renormalisation : une composante absente ne vaut ni 0 (pénalité) ni un bonus. Titre à notes uniformes = même note avec ou sans la composante manquante."""
+    full = {21: M(.7, .9, .6, .3, 2, 5, None, None)}
+    a = SC.score_title(full, {'turnover_eur': 20e6}, P(21), complex_weights={'liquidity': 0})
+    b = SC.score_title(full, {'turnover_eur': None}, P(21))
+    assert b['complex']['score'] == pytest.approx(a['complex']['score'])
+    assert b['complex']['contributions']['liquidity']['unavailable'] is True and b['complex']['status'] == 'partiel'
 
 
 def test_optional_period_missing_is_partial_and_distinct_from_secondary_missing():
@@ -101,19 +120,15 @@ def test_unknown_value_is_never_a_measured_zero():
     assert no_liq['complex']['status'] == 'partiel' and zero_liq['complex']['status'] == 'ok'        # liquidité inconnue ≠ liquidité mesurée très faible
 
 
-def test_coverage_threshold_is_tested_at_75_percent():
-    inputs = {5: None, 21: M(.7, .9, .6, .3, 2, 5, .1, .8)}            # la semaine (41,6 %) est facultative et sans historique
+def test_coverage_threshold_is_a_reliability_flag_not_a_filter():
+    inputs = {5: None, 21: M(.7, .9, .6, .3, 2, 5, .1, .8)}            # la semaine (41,6 %) n'a pas d'historique
     strict = SC.score_title(inputs, {'turnover_eur': 10e6}, P(5, 21), threshold=0.75)
-    assert strict['simple']['status'] == 'inconnu' and strict['simple']['coverage'] == pytest.approx(0.584, abs=0.001)
-    assert strict['complex']['status'] == 'inconnu' and strict['complex']['coverage'] < 0.75
+    assert strict['simple']['score'] is not None and strict['complex']['score'] is not None            # jamais écarté
+    assert strict['simple']['status'] == strict['complex']['status'] == 'partiel'
+    assert strict['simple']['reliable'] is False and strict['complex']['reliable'] is False
+    assert strict['simple']['coverage'] == pytest.approx(0.584, abs=0.001)
     lenient = SC.score_title(inputs, {'turnover_eur': 10e6}, P(5, 21), threshold=0.5)
-    assert lenient['simple']['status'] == lenient['complex']['status'] == 'partiel' and lenient['simple']['score'] is not None
-    four = {5: M(1, .8, .7, .3, 2, 3, .1, .8), 21: M(.7, .9, .6, .3, 2, 5, .1, .8), 63: M(.4, .8, .6, .3, 2, 7, .1, .7), 126: M(.3, .8, .6, .3, 2, 9, .1, .7)}
-    no_quarter = {**four, 63: None}                              # le trimestre pèse 29,8 % : couverture 70,2 % < 75 %
-    no_half = {**four, 126: None}                                # les six mois pèsent 24,5 % : couverture 75,5 % ≥ 75 %
-    assert SC.score_title(no_quarter, {'turnover_eur': 10e6}, P(5, 21, 63, 126))['complex']['status'] == 'inconnu'
-    kept = SC.score_title(no_half, {'turnover_eur': 10e6}, P(5, 21, 63, 126))
-    assert kept['complex']['status'] == 'partiel' and 0.75 <= kept['complex']['coverage'] < 1 and kept['complex']['score'] is not None
+    assert lenient['simple']['reliable'] is True and lenient['simple']['score'] == pytest.approx(strict['simple']['score'])   # le seuil ne change aucune note
 
 
 def test_liquidity_is_a_global_indicator_counted_once():

@@ -76,7 +76,9 @@ def _score_all(data, config):
 
 
 def _key(config, version):
-    payload = {'format': CACHE_FORMAT, 'score_version': SC.VERSION, 'params': {k: params_for(config, k) for k in ('equity', 'etf')}}
+    # `required` (périodes obligatoires) et `threshold` (fiabilité) n'ont plus d'effet sur les notes (V4.2) : ils ne font pas partie de la clé
+    payload = {'format': CACHE_FORMAT, 'score_version': SC.VERSION,
+               'params': {k: {f: v for f, v in params_for(config, k).items() if f not in ('required', 'threshold')} for k in ('equity', 'etf')}}
     return hashlib.sha1(('scores-v1:' + json.dumps(payload, sort_keys=True, separators=(',', ':'))).encode()).hexdigest()
 
 
@@ -181,7 +183,7 @@ def apply_admin(conn, config):
         return config
     if config.get('ranking', {}).get('mode') == C.SCORES_MODE:
         from . import scores_admin
-        prof = scores_admin.stored_profiles(conn).get(config.get('name'))
-        if prof and config.get('name') in scores_admin.V4_STRATEGIES:
-            config = scores_admin.apply_profile(config, scores_admin.clean_profile(prof))
+        if config.get('name') in scores_admin.V4_STRATEGIES:
+            prof = scores_admin.stored_profiles(conn).get(config['name'])
+            config = scores_admin.apply_profile(config, scores_admin.clean_profile(prof)) if prof else scores_admin.neutral(config)
     return apply_global(conn, config)

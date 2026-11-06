@@ -175,6 +175,7 @@ def test_advanced_criteria_and_day_filter_roundtrip_and_never_change_scores(memo
     p['periods']['month'].update(min_return=8.0, max_spike_share=0.45, max_volatility=7.0, min_up_fraction=0.5, max_drawdown=20.0)
     p['day_filter'] = {'enabled': True, 'min_return': 0.0}
     p['liquidity'] = {'min_turnover_eur': 2e6, 'min_turnover_eur_us': 5e6}
+    p['filters'] = {'enabled': True}
     A.save(None, {'profile': p})
     cur = row(A.state(None))['current']
     assert cur['periods']['month']['max_drawdown'] == 20.0 and cur['day_filter']['enabled'] and cur['liquidity']['min_turnover_eur_us'] == 5e6
@@ -211,7 +212,30 @@ def test_technical_settings_are_separate_from_thresholds(memory):
     p = profile()
     p['technical']['require_fresh'] = False
     p['periods']['month']['require_history'] = False
+    p['filters'] = {'enabled': True}
     A.save(None, {'profile': p})
     cfg = S.apply_admin(None, A.growth_v4())
     assert cfg['selection']['require_fresh'] is False
     assert S.params_for(cfg, 'equity')['required'] == ['week']                    # la période obligatoire est un réglage technique, pas un seuil de croissance
+
+
+def test_filters_are_off_by_default_and_remove_no_title_from_the_ranking():
+    cfg = S.apply_admin(None, A.growth_v4())
+    for pid in ('week', 'month'):
+        x = next(p for p in cfg['periods'] if p['id'] == pid)
+        assert x['enabled'] and not x['require_history'] and all(x[f] is None for f in A.THRESHOLDS)       # notées, jamais filtrées
+    assert not next(p for p in cfg['periods'] if p['id'] == 'day')['enabled']
+    assert cfg['liquidity']['min_turnover_eur'] is None and cfg['liquidity']['min_turnover_eur_us'] is None
+    cur = row(A.state(None))['current']
+    assert cur['filters'] == {'enabled': False} and cur['periods']['week']['min_slope'] == 0.30       # valeurs conservées, prêtes à être activées
+
+
+def test_enabling_filters_applies_thresholds_but_never_changes_scores():
+    p = profile()
+    p['filters'] = {'enabled': True}
+    A.save(None, {'profile': p})
+    cfg = S.apply_admin(None, A.growth_v4())
+    wk = next(x for x in cfg['periods'] if x['id'] == 'week')
+    assert wk['min_slope'] == 0.30 and wk['require_history']
+    assert S._key(cfg, 1) == S._key(S.apply_admin(None, A.growth_v4()), 1)
+    assert S._key(cfg, 1) == S._key(A.neutral(A.growth_v4()), 1)          # même notation avec ou sans filtres

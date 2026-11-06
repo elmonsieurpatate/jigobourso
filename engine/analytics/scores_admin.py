@@ -69,6 +69,7 @@ def profile_of(config):
             'day_filter': {'enabled': bool(day['enabled']), 'min_return': day['min_return'] if day['min_return'] is not None else 0.0},
             'liquidity': {f: liq.get(f) for f in LIQUIDITY},
             'technical': {'require_fresh': bool((config.get('selection') or {}).get('require_fresh'))},
+            'filters': {'enabled': False},                      # filtres de consultation : désactivés par défaut, jamais appliqués aux notes
             'weights_mode': 'custom' if weights else 'auto', 'weights': dict(weights),
             'complex_weights': dict(SC.COMPLEX_WEIGHTS, **(sc.get('complex_weights') or {}))}
 
@@ -98,6 +99,24 @@ def apply_profile(config, profile):
     if profile.get('complex_weights'):
         sc['complex_weights'] = dict(profile['complex_weights'])
     c['scoring'] = sc
+    if not (profile.get('filters') or {}).get('enabled'):
+        return neutral(c)
+    return C.validate(c)
+
+
+def neutral(config):
+    """Configuration sans aucun filtre de consultation : seuils, historique exigé, filtre du dernier jour et liquidité minimale sont retirés.
+    Les notes ne les utilisent jamais ; ce sont eux qui écartaient des titres du classement général. Les valeurs restent dans le profil, prêtes à être activées.
+    Reste seul le contrôle technique (fraîcheur) du profil."""
+    c = copy.deepcopy(config)
+    for p in c['periods']:
+        if p['id'] in SCORING_PERIODS:
+            p['require_history'] = False
+            for f in THRESHOLDS:
+                p[f] = None
+        elif p['id'] == 'day':
+            p['enabled'], p['min_return'] = False, None
+    c['liquidity'] = dict(c.get('liquidity') or {}, **{f: None for f in LIQUIDITY})
     return C.validate(c)
 
 
@@ -125,6 +144,7 @@ def clean_profile(raw):
     liq = raw.get('liquidity') or {}
     out['liquidity'] = {f: C.number(liq.get(f), lo, hi, f) for f, (lo, hi) in LIQUIDITY.items()}
     out['technical'] = {'require_fresh': bool((raw.get('technical') or {}).get('require_fresh'))}
+    out['filters'] = {'enabled': bool((raw.get('filters') or {}).get('enabled'))}
     mode = raw.get('weights_mode', 'auto')
     if mode not in ('auto', 'custom'):
         raise ValueError('Mode de pondération inconnu')
@@ -162,8 +182,7 @@ def build_config(conn, name, profile=None, glob=None):
     """Configuration effective d'une stratégie V4. `profile` / `glob` : brouillon non enregistré (simulation) ; absents : réglages enregistrés."""
     cfg = base_config(name)
     prof = profile if profile is not None else stored_profiles(conn).get(name)
-    if prof:
-        cfg = apply_profile(cfg, clean_profile(prof))
+    cfg = apply_profile(cfg, clean_profile(prof)) if prof else neutral(cfg)
     cfg = score_service.apply_global(conn, cfg) if glob is None else _with_global(cfg, glob)
     return cfg
 
@@ -193,7 +212,7 @@ def strategies(conn):
     for name, spec in V4_STRATEGIES.items():
         base = base_config(name)
         cfg = build_config(conn, name)
-        current = profile_of(cfg)
+        current = clean_profile(stored[name]) if name in stored else profile_of(base)       # valeurs saisies (seuils conservés même si les filtres sont désactivés)
         active = [p for p in SCORING_PERIODS if current['periods'][p]['enabled']]
         out.append({'name': name, 'label': spec['label'], 'note': spec['note'], 'engine': 'v4', 'sort': cfg['ranking'].get('sort'), 'defaults': profile_of(base), 'current': current,
                     'customised': name in stored, 'auto_weights': auto_weights(glob['kappa'], active), 'saved_at': _iso(settings.saved_at(conn, PROFILES)) if name in stored else None})
@@ -422,3 +441,90 @@ def conformity(conn, request):
         if v['status'] == 'rejected' and b and b['simple'] is not None and b['complex'] is not None:
             kept += 1
     return {'universe': len(verdicts), 'counts': counts, 'rejected_with_both_scores': kept, 'rated': len(book)}
+
+
+# ───────────── classement général (résultat principal du moteur) ─────────────
+
+BUCKETS = 10
+
+
+def _distribution(values):
+    """Histogramme en 10 tranches de 10 points et quantiles d'une liste de notes."""
+    hist = [0] * BUCKETS
+    for v in values:
+        hist[min(BUCKETS - 1, int(v // (100 / BUCKETS)))] += 1
+    vals = sorted(values)
+    def q(f):
+        return None if not vals else round(vals[min(len(vals) - 1, int(f * len(vals)))], 2)
+    return {'histogram': hist, 'min': q(0), 'p25': q(0.25), 'median': q(0.5), 'p75': q(0.75), 'p90': q(0.9), 'max': None if not vals else round(vals[-1], 2)}
+
+
+def _book_summary(book, threshold, universe):
+    """Ce que le moteur produit : combien de titres sont notés et classés, combien sont indisponibles (et pourquoi), comment les notes se répartissent."""
+    out = {'universe': universe, 'with_inputs': len(book)}
+    for key in ('simple', 'complex'):
+        rated = [e[key] for e in book.values() if e[key] is not None]
+        statuses = {'ok': 0, 'partiel': 0, 'inconnu': 0}
+        unreliable = 0
+        for e in book.values():
+            statuses[e[key + '_status']] = statuses.get(e[key + '_status'], 0) + 1
+            if e[key] is not None and (e[key + '_coverage'] or 0) < threshold - 1e-12:
+                unreliable += 1
+        out[key] = {'rated': len(rated), 'ranked': len(rated), 'unavailable': universe - len(rated), 'complete': statuses['ok'], 'reduced_history': statuses['partiel'],
+                    'unreliable': unreliable, 'distribution': _distribution(rated)}
+    reasons = {}
+    for e in book.values():
+        if e['simple'] is None or e['complex'] is None:
+            why = e.get('why') or 'raison non renseignée'
+            reasons[why] = reasons.get(why, 0) + 1
+    out['unavailable_reasons'] = sorted(({'reason': k, 'count': v} for k, v in reasons.items()), key=lambda x: -x['count'])[:6]
+    out['no_inputs'] = max(0, universe - len(book))
+    return out
+
+
+def _ranks(book, key):
+    return {lid: i for i, lid in enumerate(sorted((l for l, e in book.items() if e[key] is not None), key=lambda l: (-book[l][key], l)), 1)}
+
+
+def _movement(saved, draft, key, top=20):
+    """Effet d'un changement de réglage sur le classement général : titres qui bougent, entrées / sorties du haut du classement."""
+    a, b = _ranks(saved, key), _ranks(draft, key)
+    both = [l for l in b if l in a]
+    shifts = sorted(abs(a[l] - b[l]) for l in both)
+    ta, tb = {l for l, r in a.items() if r <= top}, {l for l, r in b.items() if r <= top}
+    return {'compared': len(both), 'median_shift': shifts[len(shifts) // 2] if shifts else 0, 'moved_over_10': sum(1 for x in shifts if x > 10),
+            'top': top, 'top_kept': len(ta & tb), 'top_entered': len(tb - ta), 'top_left': len(ta - tb),
+            'score_changed': sum(1 for l in both if abs((saved[l][key] or 0) - (draft[l][key] or 0)) > 0.005)}
+
+
+def _top(conn, book, key, n=10):
+    ranked = sorted((e for e in book.values() if e[key] is not None), key=lambda e: (-e[key], e['id']))[:n]
+    info = _titles(conn, [e['id'] for e in ranked])
+    return [dict(rank=i, id=e['id'], symbol=info[e['id']]['symbol'], name=info[e['id']]['name'], score=e[key], other=e['complex' if key == 'simple' else 'simple'],
+                 status=e[key + '_status']) for i, e in enumerate(ranked, 1) if e['id'] in info]
+
+
+def ranking(conn, request):
+    """Résultat principal d'un réglage : titres notés et classés, indisponibles, répartition des notes, poids réels des périodes et effet par rapport au réglage enregistré.
+    Aucun filtre n'intervient : les seuils facultatifs ne retirent aucun titre de ce classement."""
+    from . import service
+    name = request.get('strategy')
+    if name not in V4_STRATEGIES:
+        raise ValueError('Stratégie V4 inconnue')
+    draft = request.get('draft') or {}
+    cfg = build_config(conn, name, draft.get('profile'), draft.get('global'))
+    version = service.data_version(conn)
+    book = score_service.score_book(conn, cfg, version)
+    with conn.cursor() as cur:
+        cur.execute('SELECT COUNT(*) AS n FROM v_recommendable')
+        universe = int(cur.fetchone()['n'])
+    params = score_service.params_for(cfg, 'equity')
+    weights = SC.resolve_weights(params['periods'], params['kappa'])
+    out = {'strategy': name, 'engine_version': SC.VERSION, 'summary': _book_summary(book, params['threshold'], universe),
+           'weights': [dict(id=p['id'], sessions=p['sessions'], weight=weights[p['id']], custom='weight' in p) for p in params['periods']],
+           'kappa': params['kappa'], 'reliability_threshold': params['threshold'],
+           'top': {k: _top(conn, book, k) for k in ('simple', 'complex')}, 'compared': None}
+    if draft:
+        saved_book = score_service.score_book(conn, build_config(conn, name), version)
+        out['compared'] = {k: _movement(saved_book, book, k) for k in ('simple', 'complex')}
+    return out

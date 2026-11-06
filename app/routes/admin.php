@@ -158,6 +158,10 @@ return [
         need_post(); require_admin(); $b = body();
         return engine_call('scores-conformity', ['strategy' => str_in($b, 'strategy', 40), 'draft' => is_array($b['draft'] ?? null) ? $b['draft'] : null]);
     },
+    'admin/scores/ranking' => function () {
+        need_post(); require_admin(); $b = body();
+        return engine_call('scores-ranking', ['strategy' => str_in($b, 'strategy', 40), 'draft' => is_array($b['draft'] ?? null) ? $b['draft'] : null]);
+    },
     'admin/scores/monitor' => function () { require_admin(); return engine_call('scores-monitor', []); },
     'admin/run' => function () {
         need_post(); require_admin();

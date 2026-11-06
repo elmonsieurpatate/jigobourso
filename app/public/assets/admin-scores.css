@@ -42,3 +42,11 @@
 .as-legacy td { opacity: .8; } .as-adv { margin-top: 12px; } .as-tiles3 { grid-template-columns: repeat(3, 1fr); }
 .as-lastday { margin-top: 10px; font-size: .84rem; }
 @media (max-width: 760px) { .as-tiles3 { grid-template-columns: 1fr; } }
+
+.as-ranks { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 10px; }
+@media (max-width: 900px) { .as-ranks { grid-template-columns: 1fr; } }
+.as-hist { display: flex; align-items: flex-end; gap: 3px; height: 70px; margin: 10px 0 4px; }
+.as-hist span { flex: 1; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; }
+.as-hist i { display: block; width: 100%; background: var(--accent, #2f6fed); border-radius: 2px 2px 0 0; min-height: 1px; opacity: .8; }
+.as-hist small { font-size: 10px; color: var(--muted, #888); }
+.as-list { margin: 4px 0 4px 18px; padding: 0; } .as-list li { margin-bottom: 4px; }

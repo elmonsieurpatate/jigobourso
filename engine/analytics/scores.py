@@ -5,8 +5,9 @@ Principes (validés le 2026-11-06, voir docs/SCORES_V4.md) :
     conformité, ni des seuils de la stratégie, ni des autres titres de l'univers (aucun percentile) : changer un critère ne change aucune note.
   * Chaque mesure est calculée par granularité (fenêtres cumulées de n séances), notée sur une échelle absolue, puis agrégée avec des poids
     qui somment à 1 sur les seules granularités actives. De 1 à 6 granularités : rien n'est codé pour deux ou trois périodes.
-  * Donnée absente : jamais zéro « mesuré ». Elle contribue 0 ET réduit la couverture ; période obligatoire non évaluable ou couverture
-    inférieure au seuil → « inconnu » ; couverture partielle suffisante → « partiel ». Trois cas distincts, tracés dans `missing`.
+  * Donnée absente : jamais zéro « mesuré » ni note favorable. La composante manquante sort du calcul et les poids restants sont renormalisés
+    (V4.2). Trois cas : historique suffisant (« ok »), historique réduit (note calculée, « partiel », couverture et fiabilité indiquées),
+    calcul impossible (« inconnu », raison explicite). Le seuil de couverture n'élimine plus aucun titre.
   * Une mesure globale (liquidité) est comptée une seule fois, pas par granularité.
   * Les événements externes (résultats, rachat) n'entrent jamais dans les scores.
 
@@ -14,9 +15,9 @@ Le module ne connaît ni la base ni le réseau.
 """
 import math
 
-VERSION = 1
+VERSION = 2
 KAPPA = 0.7                  # poids automatiques : ω_p ∝ n_p^(1−κ) − n_{p−1}^(1−κ) ; κ = 0,7 redonne les 41,6 % / 58,4 % semaine / mois de V1
-COVERAGE_THRESHOLD = 0.75    # en dessous, le score est « inconnu »
+COVERAGE_THRESHOLD = 0.75    # seuil de FIABILITÉ (information) : ne supprime plus aucune note
 MIN_SESSIONS = 3             # R² et volatilité n'existent pas sous 3 séances : la granularité « jour » n'entre jamais dans un score
 SAT_A, SAT_B = 17.0, 0.52    # croissance lissée qui sature la note de dynamique : 17·(n/5)^0,52 % (90e percentile observé, titres admis V1)
 GATE_FLOOR = 32.0            # note de dynamique (0-100) en dessous de laquelle régularité et risque d'une période sont amortis
@@ -131,75 +132,84 @@ def score_title(inputs, liquidity, periods, weights=None, kappa=KAPPA, required=
     inputs     {sessions: mesures brutes de la fenêtre | None}
     liquidity  {'turnover_eur': float|None, 'source': 'daily'|'estimated'|None}
     periods    granularités ACTIVES : [{'id','sessions','weight'?}], de la plus courte à la plus longue (trié ici)
-    required   ids des périodes obligatoires (leur absence rend les deux scores « inconnu »)
-    Renvoie {'simple': {...}, 'complex': {...}, 'weights', 'periods', 'missing', 'liquidity'} ; un score vaut None si 'inconnu'.
+    required   conservé pour compatibilité et pour l'information (`missing`) : une période obligatoire manquante n'annule plus la note
+    threshold  seuil de FIABILITÉ (information) : en dessous, la note est calculée mais marquée « peu fiable »
+    Politique des données absentes (V4.2) : trois cas.
+      * historique suffisant      → status 'ok'
+      * historique réduit         → note calculée sur les seules composantes disponibles, poids renormalisés (ni bonus ni pénalité), status 'partiel'
+      * calcul mathématiquement impossible (aucune période mesurable, ou aucune régularité mesurable) → score None, status 'inconnu', raison explicite
+    Renvoie {'simple': {...}, 'complex': {...}, 'weights', 'weights_effective', 'periods', 'missing', 'liquidity'}.
     """
     periods = sorted([dict(p) for p in periods if p['sessions'] >= MIN_SESSIONS], key=lambda p: p['sessions'])
     if weights is None:
         weights = resolve_weights(periods, kappa)
     comps = {p['id']: period_components(inputs.get(p['sessions']), p['sessions']) for p in periods}
     miss = _missing_taxonomy(periods, comps, set(required))
-    res = {'weights': weights, 'missing': miss, 'version': VERSION,
+    avail = [p for p in periods if comps[p['id']] is not None and weights.get(p['id'], 0.0) > 0]
+    wtot = sum(weights[p['id']] for p in avail)
+    eff = {p['id']: weights[p['id']] / wtot for p in avail} if wtot > 0 else {}
+    res = {'weights': weights, 'weights_effective': eff, 'missing': miss, 'version': VERSION,
            'periods': {p['id']: None if comps[p['id']] is None else {k: v for k, v in comps[p['id']].items()} for p in periods},
            'liquidity': {'turnover_eur': (liquidity or {}).get('turnover_eur'), 'source': (liquidity or {}).get('source'),
                          'note': liquidity_note((liquidity or {}).get('turnover_eur'))}}
-    if not periods:
-        dead = {'score': None, 'status': 'inconnu', 'coverage': 0.0, 'why': 'aucune granularité active évaluable'}
+    if not avail:
+        dead = {'score': None, 'status': 'inconnu', 'coverage': 0.0, 'reliable': False,
+                'why': 'calcul impossible : aucune période active mesurable' if periods else 'aucune période active'}
         res.update(simple=dead, complex=dict(dead))
         return res
-    blocked = [i for i in miss['required_periods']]
-    if blocked:
-        dead = {'score': None, 'status': 'inconnu', 'coverage': 0.0, 'why': 'période obligatoire non évaluable : ' + ', '.join(blocked)}
-        res.update(simple=dead, complex=dict(dead))
-        return res
-    res['simple'] = _simple(periods, comps, weights, threshold)
-    res['complex'] = _complex(periods, comps, weights, res['liquidity']['note'], threshold, dict(COMPLEX_WEIGHTS, **(complex_weights or {})), anchor)
+    res['simple'] = _simple(periods, comps, weights, eff, threshold)
+    period_cover = wtot / (sum(weights.get(p['id'], 0.0) for p in periods) or 1.0)
+    res['complex'] = _complex(avail, comps, weights, eff, period_cover, res['liquidity']['note'], threshold, dict(COMPLEX_WEIGHTS, **(complex_weights or {})), anchor)
     return res
 
 
-def _status(coverage, threshold):
-    if coverage < threshold - 1e-12:
-        return 'inconnu'
+def _status(coverage):
     return 'ok' if coverage >= 0.999 else 'partiel'
 
 
-def _simple(periods, comps, weights, threshold):
-    """Score simple = 100 × Dynamique × Régularité × facteur d'accélération (0,90 à 1,10), plafonné à 100."""
+def _simple(periods, comps, weights, eff, threshold):
+    """Score simple = 100 × Dynamique × Régularité × facteur d'accélération (0,90 à 1,10), plafonné à 100.
+    Dynamique : moyenne des périodes mesurables (poids renormalisés). Régularité, pics, séances positives : moyennes sur les seules périodes où la mesure existe."""
     D = cd = 0.0
-    r_num = r_den = sp_num = up_num = q_w = 0.0
-    a_num = a_w = 0.0
+    r_num = r_den = sp_num = sp_w = up_num = up_w = 0.0
+    a_num = a_w = a0 = 0.0
     parts = {}
     for p in periods:
-        c, w = comps[p['id']], weights.get(p['id'], 0.0)
+        c = comps[p['id']]
+        w0, w = weights.get(p['id'], 0.0), eff.get(p['id'], 0.0)
         if c is None or w <= 0:
             continue
         D += w * c['dynamics'] / 100
-        cd_here = c['r2'] is not None
-        if cd_here:
+        if c['r2'] is not None:
             rel = min(1.0, p['sessions'] / RELIABILITY_SESSIONS)
-            r2 = c['raw']['r2']
-            r_num += w * rel * max(r2, 0.0); r_den += w * rel
-            sp_num += w * (c['spike_factor'] if c['spike_factor'] is not None else 1.0)
-            up_num += w * (c['up_factor'] if c['up_factor'] is not None else 1.0)
-            q_w += w; cd += w
+            r_num += w * rel * max(c['raw']['r2'], 0.0); r_den += w * rel
+            cd += w0
+        if c['spike_factor'] is not None:
+            sp_num += w * c['spike_factor']; sp_w += w
+        if c['up_factor'] is not None:
+            up_num += w * c['up_factor']; up_w += w
         if c['acceleration'] is not None:
-            a_num += w * c['acceleration']; a_w += w
+            a_num += w * c['acceleration']; a_w += w; a0 += w0
         parts[p['id']] = {'weight': w, 'dynamics': c['dynamics'], 'r2': c['raw']['r2'], 'acceleration': c['acceleration']}
-    coverage = (1 - ACC_WEIGHT_IN_COVERAGE) * cd + ACC_WEIGHT_IN_COVERAGE * a_w
-    if coverage < threshold - 1e-12:
-        return {'score': None, 'status': 'inconnu', 'coverage': coverage, 'why': f'couverture {coverage:.0%} inférieure à {threshold:.0%}', 'parts': parts}
-    Q = (r_num / r_den if r_den else 0.0) * (sp_num / q_w if q_w else 0.0) * (up_num / q_w if q_w else 0.0)
+    cover_w = sum(weights.get(p['id'], 0.0) for p in periods) or 1.0
+    coverage = ((1 - ACC_WEIGHT_IN_COVERAGE) * cd + ACC_WEIGHT_IN_COVERAGE * a0) / cover_w
+    if r_den <= 0:
+        return {'score': None, 'status': 'inconnu', 'coverage': coverage, 'reliable': False, 'why': 'calcul impossible : régularité (R²) non mesurable sur aucune période', 'parts': parts}
+    Q = (r_num / r_den) * (sp_num / sp_w if sp_w else 1.0) * (up_num / up_w if up_w else 1.0)
     acc = a_num / a_w if a_w else None
     factor = 1.0 if acc is None else (1 - ACC_AMPLITUDE) + 2 * ACC_AMPLITUDE * acc / 100
-    return {'score': min(100.0, 100 * D * Q * factor), 'status': _status(coverage, threshold), 'coverage': coverage, 'dynamics': D, 'quality': Q,
-            'acceleration': acc, 'acceleration_factor': factor, 'parts': parts}
+    return {'score': min(100.0, 100 * D * Q * factor), 'status': _status(coverage), 'coverage': coverage, 'reliable': coverage >= threshold - 1e-12,
+            'dynamics': D, 'quality': Q, 'acceleration': acc, 'acceleration_factor': factor, 'parts': parts}
 
 
-def _complex(periods, comps, weights, liquidity_score, threshold, cw, anchor):
-    """Score complexe = somme pondérée de notes 0-100 : dynamique, régularité, séances positives, concentration, volatilité, drawdown, liquidité (+ accélération si pondérée)."""
+def _complex(avail, comps, weights, eff, period_cover, liquidity_score, threshold, cw, anchor):
+    """Score complexe = moyenne pondérée de notes 0-100 : dynamique, régularité, séances positives, concentration, volatilité, drawdown, liquidité (+ accélération si pondérée).
+    Une composante indisponible sort du calcul et les poids restants sont renormalisés : elle ne vaut ni zéro ni note favorable.
+    `coverage` = part du poids de référence réellement disponible (composantes × périodes ; information de fiabilité)."""
     total = coverage = 0.0
     contributions = {}
     wsum = float(sum(cw.values())) or 1.0
+    ref_w = sum(weights.get(p['id'], 0.0) for p in avail) or 1.0
     for key, weight in cw.items():
         if weight <= 0:
             continue
@@ -208,22 +218,34 @@ def _complex(periods, comps, weights, liquidity_score, threshold, cw, anchor):
             if liquidity_score is not None:
                 total += w * liquidity_score / 100; coverage += w
                 contributions[key] = {'weight': w, 'value': liquidity_score, 'points': w * liquidity_score}
+            else:
+                contributions[key] = {'weight': w, 'value': None, 'points': None, 'unavailable': True}
             continue
         s = cv = 0.0
-        for p in periods:
-            c, pw = comps[p['id']], weights.get(p['id'], 0.0)
-            if c is None or c.get(key) is None or pw <= 0:
+        for p in avail:
+            c, pw = comps[p['id']], eff.get(p['id'], 0.0)
+            if c.get(key) is None or pw <= 0:
                 continue
             gate = 1.0 if key in ('dynamics', 'acceleration') else c['gate']
             s += pw * gate * c[key]; cv += pw
+        if cv <= 0:
+            contributions[key] = {'weight': w, 'value': None, 'points': None, 'unavailable': True}
+            continue
+        s /= cv                                   # moyenne sur les seules périodes où la mesure existe
         total += w * s / 100; coverage += w * cv
         contributions[key] = {'weight': w, 'value': s, 'points': w * s, 'coverage': cv}
-    if coverage < threshold - 1e-12:
-        return {'score': None, 'status': 'inconnu', 'coverage': coverage, 'why': f'couverture {coverage:.0%} inférieure à {threshold:.0%}', 'contributions': contributions}
-    short = comps[periods[0]['id']]
-    g_short = short['gate'] if short else 0.0
-    mult = 1 - anchor * (1 - g_short)         # ralentissement ou retournement récent : pénalité progressive, jamais une multiplication brutale
-    return {'score': 100 * total * mult, 'status': _status(coverage, threshold), 'coverage': coverage, 'anchor': mult, 'raw_total': 100 * total, 'contributions': contributions}
+    if coverage <= 1e-12:
+        return {'score': None, 'status': 'inconnu', 'coverage': 0.0, 'reliable': False, 'why': 'calcul impossible : aucune composante mesurable', 'contributions': contributions}
+    for k, v in contributions.items():            # poids effectif après renormalisation sur les composantes disponibles
+        if v.get('value') is not None:
+            v['weight_effective'] = v['weight'] / coverage
+            v['points_effective'] = v['weight_effective'] * v['value']      # somme = note brute avant ancrage
+    base = total / coverage
+    coverage *= period_cover
+    short = comps[avail[0]['id']]                  # période la plus courte réellement mesurable (pas de pénalité si la plus courte n'existe pas)
+    mult = 1 - anchor * (1 - short['gate'])        # ralentissement ou retournement récent : pénalité progressive, jamais une multiplication brutale
+    return {'score': 100 * base * mult, 'status': _status(coverage), 'coverage': coverage, 'reliable': coverage >= threshold - 1e-12, 'anchor': mult,
+            'raw_total': 100 * base, 'contributions': contributions}
 
 
 def rank_positions(scores):
