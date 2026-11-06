@@ -30,7 +30,7 @@ def test_secondary_filters_persistence_and_preservation():
     workers = [subprocess.Popen(['php', '-r', code], cwd=root, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True) for _ in range(4)]
     for process in workers:
         out, err = process.communicate(timeout=30)
-        assert process.returncode == 0 and out == '13', out + err
+        assert process.returncode == 0 and out == '15', out + err
     result = subprocess.run(['php', str(script)], cwd=root, capture_output=True, text=True, timeout=45)
     assert result.returncode == 0, result.stdout + result.stderr
     assert 'PASS:' in result.stdout

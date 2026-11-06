@@ -1378,6 +1378,204 @@
       "group": "other"
     },
     {
+      "id": "score_simple",
+      "name": "Score simple V4",
+      "description": "Note sur 100 issue de la pente et du R² des périodes sélectionnées. Les catégories filtrent l’affichage : elles ne modifient ni la note ni le rang.",
+      "editable": true,
+      "enabled": true,
+      "measures": [
+        {
+          "id": "score_simple_v4",
+          "name": "Score simple V4",
+          "description": "Note sur 100 = dynamique (pente) × régularité (R²) des périodes sélectionnées. Un score partiel reste une note et appartient à sa catégorie.",
+          "unit": "/100",
+          "kind": "numeric",
+          "domain": [],
+          "supportsUnknown": true,
+          "categories": [
+            {
+              "id": "score_simple-c0",
+              "name": "Très faible",
+              "min": null,
+              "max": 1,
+              "minIncluded": false,
+              "maxIncluded": true,
+              "color": "#f04452",
+              "active": true,
+              "unknown": false,
+              "values": [],
+              "description": "Pas de tendance haussière mesurable : note nulle ou quasi nulle."
+            },
+            {
+              "id": "score_simple-c1",
+              "name": "Faible",
+              "min": 1,
+              "max": 5,
+              "minIncluded": false,
+              "maxIncluded": true,
+              "color": "#ff9c28",
+              "active": true,
+              "unknown": false,
+              "values": [],
+              "description": "Tendance haussière faible ou peu régulière."
+            },
+            {
+              "id": "score_simple-c2",
+              "name": "Modéré",
+              "min": 5,
+              "max": 15,
+              "minIncluded": false,
+              "maxIncluded": true,
+              "color": "#f7d400",
+              "active": true,
+              "unknown": false,
+              "values": [],
+              "description": "Tendance haussière nette."
+            },
+            {
+              "id": "score_simple-c3",
+              "name": "Élevé",
+              "min": 15,
+              "max": 30,
+              "minIncluded": false,
+              "maxIncluded": true,
+              "color": "#a8db6c",
+              "active": true,
+              "unknown": false,
+              "values": [],
+              "description": "Tendance forte et régulière."
+            },
+            {
+              "id": "score_simple-c4",
+              "name": "Très élevé",
+              "min": 30,
+              "max": null,
+              "minIncluded": false,
+              "maxIncluded": false,
+              "color": "#08a02f",
+              "active": true,
+              "unknown": false,
+              "values": [],
+              "description": "Croissance rapide et très régulière : le haut du classement."
+            },
+            {
+              "id": "score_simple-unknown",
+              "name": "Inconnu",
+              "min": null,
+              "max": null,
+              "minIncluded": false,
+              "maxIncluded": false,
+              "color": "#a5afbf",
+              "active": true,
+              "unknown": true,
+              "values": [],
+              "description": "Score indisponible : calcul impossible, jamais une note de zéro."
+            }
+          ]
+        }
+      ],
+      "group": "main"
+    },
+    {
+      "id": "score_complex",
+      "name": "Score complexe V4",
+      "description": "Note sur 100 issue des sept composantes pondérées du moteur V4. Les catégories filtrent l’affichage : elles ne modifient ni la note ni le rang.",
+      "editable": true,
+      "enabled": true,
+      "measures": [
+        {
+          "id": "score_complex_v4",
+          "name": "Score complexe V4",
+          "description": "Note sur 100 : dynamique, régularité, séances positives, concentration, volatilité, drawdown et liquidité, avec ancrage récent. Un score partiel reste une note.",
+          "unit": "/100",
+          "kind": "numeric",
+          "domain": [],
+          "supportsUnknown": true,
+          "categories": [
+            {
+              "id": "score_complex-c0",
+              "name": "Très faible",
+              "min": null,
+              "max": 2,
+              "minIncluded": false,
+              "maxIncluded": true,
+              "color": "#f04452",
+              "active": true,
+              "unknown": false,
+              "values": [],
+              "description": "Qualité globale très faible : peu ou pas de croissance, ou profil de risque défavorable."
+            },
+            {
+              "id": "score_complex-c1",
+              "name": "Faible",
+              "min": 2,
+              "max": 10,
+              "minIncluded": false,
+              "maxIncluded": true,
+              "color": "#ff9c28",
+              "active": true,
+              "unknown": false,
+              "values": [],
+              "description": "Qualité globale faible."
+            },
+            {
+              "id": "score_complex-c2",
+              "name": "Modéré",
+              "min": 10,
+              "max": 25,
+              "minIncluded": false,
+              "maxIncluded": true,
+              "color": "#f7d400",
+              "active": true,
+              "unknown": false,
+              "values": [],
+              "description": "Qualité globale moyenne."
+            },
+            {
+              "id": "score_complex-c3",
+              "name": "Élevé",
+              "min": 25,
+              "max": 45,
+              "minIncluded": false,
+              "maxIncluded": true,
+              "color": "#a8db6c",
+              "active": true,
+              "unknown": false,
+              "values": [],
+              "description": "Bonne qualité globale : croissance régulière et risque maîtrisé."
+            },
+            {
+              "id": "score_complex-c4",
+              "name": "Très élevé",
+              "min": 45,
+              "max": null,
+              "minIncluded": false,
+              "maxIncluded": false,
+              "color": "#08a02f",
+              "active": true,
+              "unknown": false,
+              "values": [],
+              "description": "Excellente qualité globale : le haut du classement."
+            },
+            {
+              "id": "score_complex-unknown",
+              "name": "Inconnu",
+              "min": null,
+              "max": null,
+              "minIncluded": false,
+              "maxIncluded": false,
+              "color": "#a5afbf",
+              "active": true,
+              "unknown": true,
+              "values": [],
+              "description": "Score indisponible : calcul impossible, jamais une note de zéro."
+            }
+          ]
+        }
+      ],
+      "group": "main"
+    },
+    {
       "id": "country",
       "name": "Zone géographique",
       "description": "Zone du pays de rattachement de l’instrument, indépendante de sa cotation.",
