@@ -136,11 +136,11 @@ J.ICONS = {
 J.icon = (n, cls = 'ic') => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">${J.ICONS[n]}</svg>`;
 J.NAV = (admin) => [
   { sec: 'Marchés' },
-  { id: 'classement-test', label: 'Classement test', icon: 'chart', file: ['classement-test.html'], href: 'classement-test.html' },
-  { id: 'explorer', label: 'Explorer', icon: 'compass', file: ['index.html', 'titre.html', 'mes-filtres.html', 'mes-strategies.html'], children: [
+  { id: 'explorer', label: 'Explorer', icon: 'compass', file: ['index.html', 'titre.html', 'mes-filtres.html', 'mes-strategies.html', 'classement-test.html'], children: [
     { label: 'Classement', href: 'index.html', on: q => !q.has('kind') && !q.has('compare') && !q.has('preset') && !q.has('manage') && !q.has('edit') },
     { label: 'Comparer actions / ETF', href: 'index.html?compare=1', on: q => q.has('compare') },
     { label: 'Recherche libre', href: 'index.html?preset=free', on: q => q.get('preset') === 'free' },
+    { label: 'Classement test', href: 'classement-test.html', on: () => true },
     { label: 'Mes stratégies', href: 'mes-strategies.html', on: () => location.pathname.endsWith('mes-strategies.html') }] },
   { sec: 'Mon patrimoine' },
   { id: 'portefeuilles', label: 'Portefeuilles', icon: 'wallet', file: ['portefeuilles.html'], dynamic: 'portfolios', children: [{ label: 'Vue d’ensemble', href: 'portefeuilles.html', on: q => !q.has('id') }] },

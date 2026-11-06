@@ -17,7 +17,7 @@
       <label class="field">Nom<input name="name" maxlength="60" value="${esc(r.name)}" ${r.builtin ? 'readonly title="Le nom d’une stratégie fournie ne change pas"' : ''} autocomplete="off"></label>
       <fieldset style="border:0;padding:0;margin:0"><legend class="small muted" style="margin-bottom:6px">Icône</legend><div class="row gap-s" role="radiogroup" aria-label="Icône">${view.icons.map(ic => `<label style="cursor:pointer"><input type="radio" name="icon" value="${esc(ic)}" ${ic === m.icon ? 'checked' : ''} style="position:absolute;opacity:0"><span class="ms-ic" style="display:inline-flex;width:38px;height:38px;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:10px;font-size:1.2rem">${ic}</span></label>`).join('')}</div></fieldset>
       <label class="field">Explications <span class="small muted">(300 caractères max)</span><textarea name="description" rows="3" maxlength="300">${esc(m.description)}</textarea></label>
-      <div class="row gap-s"><button type="submit" class="btn small primary">Enregistrer</button><button type="button" class="btn small" data-act="cancel">Annuler</button></div></form>`;
+      <div class="row gap-s"><button type="submit" class="btn small primary">Enregistrer</button><button type="button" class="btn small" data-act="cancel">Annuler</button>${r.builtin ? `<button type="button" class="btn small" data-act="restore" data-id="${esc(r.id)}" title="Remet les réglages d’origine (seuils, périodes, filtres)" style="margin-left:auto">Restaurer par défaut</button>` : ''}</div></form>`;
   }
   function render(msg, err) {
     const custom = view.items.filter(i => !i.builtin).length;
@@ -32,7 +32,7 @@
           <div class="row gap-s"><label class="row gap-s small" style="cursor:pointer"><input type="checkbox" data-act="toggle" data-id="${esc(r.id)}" ${m.enabled ? 'checked' : ''}> Active</label>
           <button class="btn small" data-act="edit" data-id="${esc(r.id)}">Modifier</button>
           ${m.enabled ? `<a class="btn small primary" href="classement-test.html?strategy=${encodeURIComponent(r.id)}">Ouvrir</a>` : ''}
-          ${r.builtin ? `<button class="btn small" data-act="restore" data-id="${esc(r.id)}" title="Remet les réglages d’origine">Restaurer par défaut</button>` : `<button class="btn small" data-act="copy" data-id="${esc(r.id)}">Dupliquer</button><button class="btn small danger" data-act="delete" data-id="${esc(r.id)}">Supprimer</button>`}</div></div>
+          ${r.builtin ? '' : `<button class="btn small" data-act="copy" data-id="${esc(r.id)}">Dupliquer</button><button class="btn small danger" data-act="delete" data-id="${esc(r.id)}">Supprimer</button>`}</div></div>
           ${editing === r.id ? form(r) : ''}</div>`;
       }).join('');
     J.$$('[data-act]', page).forEach(b => { const a = b.dataset.act; if (a === 'toggle') b.onchange = () => act(a, b.dataset.id, b.checked); else b.onclick = () => a === 'cancel' ? (editing = null, render()) : act(a, b.dataset.id); });
