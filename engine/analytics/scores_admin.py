@@ -12,12 +12,36 @@ from . import explorer_config as C, score_service, scores as SC
 
 PROFILES = 'scores_profiles'
 SCORING_PERIODS = tuple(p for p in C.PERIODS if C.SESSIONS[p] >= SC.MIN_SESSIONS)
-THRESHOLDS = {'min_slope': (-100, 100), 'min_r2': (0, 1), 'min_return': (-100, 10000)}
-V4_STRATEGIES = {'growth_v1': {'label': 'Croissance rapide (V4)', 'build': C.growth_v1}}
+SIMPLE = {'min_slope': (-100, 100), 'min_r2': (0, 1)}                      # mode simple : exactement deux seuils par granularité
+ADVANCED = {'min_return': (-100, 10000), 'max_spike_share': (0, 1), 'max_volatility': (0, 100), 'min_up_fraction': (0, 1), 'max_drawdown': (0, 100)}
+THRESHOLDS = {**SIMPLE, **ADVANCED}
+LIQUIDITY = {'min_turnover_eur': (0, 1e12), 'min_turnover_eur_us': (0, 1e12)}
+TOLERANCE = 0.05
+
+
+def growth_v4():
+    """« Croissance rapide » V4, mode simple : semaine et mois obligatoires, pente et R² minimaux « Équilibré » (valeurs initiales à éprouver, cahier des charges V4 §2).
+    Aucun critère avancé, aucune liquidité minimale, aucun filtre sur le dernier jour : rien n'est imposé en silence. Les seuils historiques V1 sont un préréglage séparé (`growth_v1`)."""
+    c = C.empty()
+    c['name'] = 'growth_v4'
+    by = {p['id']: p for p in c['periods']}
+    by['week'].update(enabled=True, require_history=True, min_slope=0.30, min_r2=0.60)
+    by['month'].update(enabled=True, require_history=True, min_slope=0.20, min_r2=0.60)
+    c['selection'] = {'combine': 'all', 'missing': 'unknown', 'require_fresh': True}
+    c['ranking'] = {'mode': C.SCORES_MODE, 'sort': 'simple'}
+    c['scoring'] = {'kappa': SC.KAPPA, 'weights': {}, 'complex_weights': {}, 'threshold': SC.COVERAGE_THRESHOLD}
+    return C.validate(c)
+
+
+V4_STRATEGIES = {
+    'growth_v4': {'label': 'Croissance rapide — V4 (moteur commun)', 'build': growth_v4,
+                  'note': 'Mode simple : pente et R² par granularité, aucun autre filtre imposé.'},
+    'growth_v1': {'label': 'Croissance rapide — référence V1 (seuils historiques)', 'build': C.growth_v1,
+                  'note': 'Mêmes calculs de score ; seuils de conformité historiques de V1 (3 % semaine, 8 % mois, concentration, volatilité, liquidité).'}}
 LEGACY_LABELS = {'regular': 'Croissance régulière', 'fast': 'Croissance rapide', 'recovery': 'Rebond', 'low_volatility': 'Hausse calme',
                  'momentum': 'Momentum 6 mois (expérimental)', 'momentum12': 'Momentum 12 mois (expérimental)', 'momentum_risk': 'Momentum ajusté du risque (expérimental)'}
+LEGACY_SUFFIX = ' — ancien moteur'
 PERIOD_LABELS = {'week': 'Semaine', 'month': 'Mois', 'quarter': 'Trimestre', 'half': 'Semestre', 'year': 'Année'}
-TOLERANCE = 0.05
 
 
 def design():
@@ -37,26 +61,38 @@ def profile_of(config):
     """Forme éditable d'un profil, lue dans une configuration V4."""
     sc = config.get('scoring') or {}
     weights = sc.get('weights') or {}
-    return {'periods': {p['id']: {'sessions': p['sessions'], 'enabled': p['enabled'], 'require_history': p['require_history'],
-                                  'min_slope': p['min_slope'], 'min_r2': p['min_r2'], 'min_return': p['min_return']}
-                        for p in config['periods'] if p['id'] in SCORING_PERIODS},
+    by = {p['id']: p for p in config['periods']}
+    liq = config.get('liquidity') or {}
+    day = by['day']
+    return {'periods': {pid: dict({'sessions': by[pid]['sessions'], 'enabled': by[pid]['enabled'], 'require_history': by[pid]['require_history']},
+                                  **{f: by[pid][f] for f in THRESHOLDS}) for pid in SCORING_PERIODS},
+            'day_filter': {'enabled': bool(day['enabled']), 'min_return': day['min_return'] if day['min_return'] is not None else 0.0},
+            'liquidity': {f: liq.get(f) for f in LIQUIDITY},
+            'technical': {'require_fresh': bool((config.get('selection') or {}).get('require_fresh'))},
             'weights_mode': 'custom' if weights else 'auto', 'weights': dict(weights),
             'complex_weights': dict(SC.COMPLEX_WEIGHTS, **(sc.get('complex_weights') or {}))}
 
 
 def apply_profile(config, profile):
-    """Superpose un profil enregistré à la configuration de base de la stratégie ; le résultat est revalidé."""
+    """Superpose un profil enregistré à la configuration de base de la stratégie ; le résultat est revalidé.
+    Les seuils filtrent (conformité) ; seuls granularités actives, poids et κ/couverture touchent aux notes."""
     c = copy.deepcopy(config)
     for p in c['periods']:
         pp = (profile.get('periods') or {}).get(p['id'])
-        if pp is None or p['id'] not in SCORING_PERIODS:
-            continue
-        for f in ('enabled', 'require_history'):
-            if f in pp:
-                p[f] = bool(pp[f])
-        for f in THRESHOLDS:
-            if f in pp:
-                p[f] = pp[f]
+        if pp is not None and p['id'] in SCORING_PERIODS:
+            for f in ('enabled', 'require_history'):
+                if f in pp:
+                    p[f] = bool(pp[f])
+            for f in THRESHOLDS:
+                if f in pp:
+                    p[f] = pp[f]
+        if p['id'] == 'day' and isinstance(profile.get('day_filter'), dict):               # filtre facultatif « dernier jour positif » : indépendant de la notation
+            p['enabled'] = bool(profile['day_filter'].get('enabled'))
+            p['min_return'] = profile['day_filter'].get('min_return', 0.0) if p['enabled'] else None
+    if isinstance(profile.get('liquidity'), dict):
+        c['liquidity'] = dict(c.get('liquidity') or {}, **{f: profile['liquidity'].get(f) for f in LIQUIDITY})
+    if isinstance(profile.get('technical'), dict):
+        c['selection'] = dict(c.get('selection') or {}, require_fresh=bool(profile['technical'].get('require_fresh')))
     sc = dict(c.get('scoring') or {})
     sc['weights'] = dict(profile.get('weights') or {}) if profile.get('weights_mode') == 'custom' else {}
     if profile.get('complex_weights'):
@@ -66,7 +102,7 @@ def apply_profile(config, profile):
 
 
 def clean_profile(raw):
-    """Valide un profil saisi dans l'administration. ValueError avec un message lisible."""
+    """Valide un profil saisi dans l'administration. ValueError avec un message lisible. Les champs absents prennent la valeur « non renseigné » (aucun seuil)."""
     if not isinstance(raw, dict):
         raise ValueError('Profil invalide')
     periods = raw.get('periods') or {}
@@ -82,6 +118,13 @@ def clean_profile(raw):
     active = [pid for pid in SCORING_PERIODS if out['periods'][pid]['enabled']]
     if not active:
         raise ValueError('Au moins une granularité doit rester active')
+    day = raw.get('day_filter') or {}
+    out['day_filter'] = {'enabled': bool(day.get('enabled')), 'min_return': C.number(day.get('min_return', 0.0), -100, 100, 'Dernier jour : rendement minimal')}
+    if out['day_filter']['min_return'] is None:
+        out['day_filter']['min_return'] = 0.0
+    liq = raw.get('liquidity') or {}
+    out['liquidity'] = {f: C.number(liq.get(f), lo, hi, f) for f, (lo, hi) in LIQUIDITY.items()}
+    out['technical'] = {'require_fresh': bool((raw.get('technical') or {}).get('require_fresh'))}
     mode = raw.get('weights_mode', 'auto')
     if mode not in ('auto', 'custom'):
         raise ValueError('Mode de pondération inconnu')
@@ -152,13 +195,43 @@ def strategies(conn):
         cfg = build_config(conn, name)
         current = profile_of(cfg)
         active = [p for p in SCORING_PERIODS if current['periods'][p]['enabled']]
-        auto = auto_weights(glob['kappa'], active)
-        out.append({'name': name, 'label': spec['label'], 'engine': 'v4', 'sort': cfg['ranking'].get('sort'), 'defaults': profile_of(base), 'current': current,
-                    'customised': name in stored, 'auto_weights': auto, 'saved_at': _iso(settings.saved_at(conn, PROFILES)) if name in stored else None})
+        out.append({'name': name, 'label': spec['label'], 'note': spec['note'], 'engine': 'v4', 'sort': cfg['ranking'].get('sort'), 'defaults': profile_of(base), 'current': current,
+                    'customised': name in stored, 'auto_weights': auto_weights(glob['kappa'], active), 'saved_at': _iso(settings.saved_at(conn, PROFILES)) if name in stored else None})
     for name in strategy.PRESETS:
         cfg = C.editable(strategy.preset(name))
         comps = [dict(id=c['id'], metric=c['metric'], period=c['period'], weight=c['weight']) for c in (cfg['ranking'].get('components') or []) if c.get('enabled', True) and c.get('weight')]
-        out.append({'name': name, 'label': LEGACY_LABELS.get(name, name), 'engine': 'historic', 'periods': [p['id'] for p in cfg['periods'] if p['enabled']], 'components': comps})
+        out.append({'name': name, 'label': LEGACY_LABELS.get(name, name) + LEGACY_SUFFIX, 'engine': 'historic', 'periods': [p['id'] for p in cfg['periods'] if p['enabled']], 'components': comps})
+    return out
+
+
+def references():
+    """Préréglages applicables à un profil V4 (jamais appliqués sans action de l'administrateur)."""
+    return {'v1': profile_of(base_config('growth_v1')), 'balanced': profile_of(base_config('growth_v4'))}
+
+
+def personal(conn):
+    """Stratégies personnelles : combien utilisent déjà le moteur commun (mode « scores »), combien gardent un ancien moteur. Lecture seule, aucune migration."""
+    import json
+    out = {'total': 0, 'common_engine': 0, 'historic': 0, 'configurable': []}
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id, user_id, name, payload, active FROM explorer_saved WHERE kind='strategy'")
+            rows = cur.fetchall()
+    except Exception:                                     # noqa: BLE001 : table absente sur une très ancienne base
+        return out
+    for r in rows:
+        out['total'] += 1
+        try:
+            payload = r['payload'] if isinstance(r['payload'], dict) else json.loads(r['payload'])
+            cfg = payload.get('config') if isinstance(payload.get('config'), dict) else payload
+            engine = (cfg.get('ranking') or {}).get('mode')
+        except (ValueError, TypeError, AttributeError):
+            engine = None
+        if engine == C.SCORES_MODE:
+            out['common_engine'] += 1
+            out['configurable'].append({'id': r['id'], 'name': r['name'], 'active': bool(r['active'])})
+        else:
+            out['historic'] += 1
     return out
 
 
@@ -174,7 +247,7 @@ def state(conn):
     stored = settings.get(conn, score_service.SETTING, None)
     return {'design': design(), 'formula': formula(), 'version': SC.VERSION, 'period_labels': PERIOD_LABELS, 'scoring_periods': list(SCORING_PERIODS),
             'global': {'kappa': cur['kappa'], 'threshold': cur['threshold'], 'customised': bool(stored), 'saved_at': _iso(settings.saved_at(conn, score_service.SETTING)) if stored else None},
-            'strategies': strategies(conn), 'volume_collection': bool(settings.get(conn, 'volume_collection', False))}
+            'strategies': strategies(conn), 'references': references(), 'personal': personal(conn), 'volume_collection': bool(settings.get(conn, 'volume_collection', False))}
 
 
 def save(conn, request):
@@ -327,3 +400,25 @@ def monitor(conn):
             'freshness': {'last_close': _iso(fresh.get('last_close')), 'computed_at': _iso(fresh.get('computed_at')), 'stale_titles': stale},
             'last_success': None if not last_ok else dict(type=last_ok['job_type'], at=_iso(last_ok['finished_at'] or last_ok['started_at'])),
             'liquidity': coverage(conn), 'problems': problems, 'volume_collection': bool(settings.get(conn, 'volume_collection', False))}
+
+
+# ───────────── conformité (aperçu sur les données réelles) ─────────────
+
+def conformity(conn, request):
+    """Effet des seuils d'un profil sur les titres réels : conformes / écartés / non évaluables. Les titres écartés gardent leurs deux scores (calculés hors filtres)."""
+    from . import service
+    name = request.get('strategy')
+    if name not in V4_STRATEGIES:
+        raise ValueError('Stratégie V4 inconnue')
+    draft = request.get('draft') or {}
+    cfg = build_config(conn, name, draft.get('profile'), draft.get('global'))
+    verdicts = service.judge_universe(conn, cfg)
+    book = score_service.score_book(conn, cfg, service.data_version(conn))
+    counts = {'retained': 0, 'rejected': 0, 'unknown': 0}
+    kept = 0
+    for v in verdicts:
+        counts[v['status']] = counts.get(v['status'], 0) + 1
+        b = book.get(v['key'])
+        if v['status'] == 'rejected' and b and b['simple'] is not None and b['complex'] is not None:
+            kept += 1
+    return {'universe': len(verdicts), 'counts': counts, 'rejected_with_both_scores': kept, 'rated': len(book)}

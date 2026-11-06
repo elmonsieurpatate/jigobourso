@@ -13,6 +13,13 @@ Page : **Administration → Scores** (`admin.html#scores`). Un moteur de notatio
 - `scores_profiles` : `{<stratégie V4>: {periods, weights_mode, weights, complex_weights}}`.
 - Un profil enregistré se superpose à la configuration de base de la stratégie (`scores_admin.apply_profile`) ; une valeur propre à la stratégie différente de la conception l'emporte sur les réglages communs.
 
+## Profils V4 (correction du 06/11)
+- Deux profils V4 distincts : **« Croissance rapide — V4 (moteur commun) »** (mode simple : pente et R² par granularité, rien d'autre imposé) et **« Croissance rapide — référence V1 (seuils historiques) »**. Les anciens moteurs sont libellés « … — ancien moteur », séparés, en lecture seule et non migrés.
+- **Mode simple** : exactement deux réglages par granularité active (pente minimale, R² minimal). **Mode avancé** : rendement minimal, concentration, volatilité, séances positives, drawdown, filtre facultatif « dernier jour positif », liquidité minimale. Case vide = aucun seuil.
+- Préréglages (jamais appliqués sans action) : « valeurs initiales équilibrées » et « référence V1 ».
+- **Données et exclusions techniques**, section distincte : historique exigé par période, cours récents, couverture minimale (réglage commun). Un titre non évaluable est « inconnu » ; un titre non conforme garde ses deux scores (aperçu chiffré sur les données réelles dans l'écran).
+- Le dernier jour **n'entre pas dans les notes** : voir `docs/DERNIER_JOUR_V4.md` (proposition, non implémentée).
+
 ## Séparation conformité / notation
 Les seuils de conformité filtrent ; ils n'entrent jamais dans une note. La clé du cache des scores (`score_service._key`) ne contient que les paramètres de notation (granularités actives, poids, κ, couverture) : changer un seuil ne recalcule rien et ne change aucune note (tests : `tests/fast/test_scores_admin.py`, `tests/integ/test_scores_admin.py`).
 
@@ -20,6 +27,6 @@ Les seuils de conformité filtrent ; ils n'entrent jamais dans une note. La clé
 `admin/scores` (lecture), `admin/scores/save` (global, profil, `reset` = `global` | `profile` | `all`), `admin/scores/preview` (poids automatiques calculés par le moteur), `admin/scores/simulate`, `admin/scores/monitor` → commandes moteur `scores-state`, `scores-save`, `scores-preview`, `scores-simulate`, `scores-monitor`.
 
 ## Limites
-- Une seule stratégie utilise le moteur commun (`growth_v1`, « Croissance rapide (V4) ») ; les stratégies historiques restent en lecture seule, les stratégies enregistrées par les utilisateurs ne sont pas listées.
+- Deux profils utilisent le moteur commun (`growth_v4` et `growth_v1`) ; les stratégies historiques restent en lecture seule, les stratégies enregistrées par les utilisateurs ne sont pas listées.
 - Le « dernier jour » n'est pas une granularité de notation (moins de 3 séances : ni R² ni volatilité) : cinq granularités notables au maximum.
 - Explorer n'affiche pas encore ces scores. La collecte des volumes quotidiens réels n'est pas codée (liquidité estimée).

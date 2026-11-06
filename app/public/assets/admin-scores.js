@@ -15,13 +15,14 @@
     ['Dynamique', 'Croissance lissée de chaque période, ramenée à une échelle de saturation (17 % × (séances/5)^0,52). 100 % = croissance saturée.', 'facteur de 0 à 1'],
     ['Régularité', 'R² (pleine fiabilité dès 21 séances) × (1 − ½ × part du plus gros pic) × (½ + ½ × séances positives). Pénalise les hausses en un seul saut.', 'facteur de 0 à 1'],
     ['Accélération', 'Écart de pente avec la fenêtre précédente, pondéré par la régularité. Indisponible : facteur neutre.', 'facteur de 0,90 à 1,10']];
+  const LASTDAY = 'Dernier jour : la variation de la dernière séance n’entre pas encore dans la note (intégration à valider). Le filtre facultatif « dernier jour positif » est indépendant de la notation (Profils de stratégies, mode avancé).';
   const TABS = [['config', 'Configuration du moteur'], ['profils', 'Profils de stratégies'], ['simulation', 'Simulation & exemples'], ['suivi', 'Suivi des calculs']];
   const $ = (s, r) => (r || document).querySelector(s);
   const E = s => J.esc(String(s ?? ''));
   const fmt = (v, d = 1) => v === null || v === undefined ? '—' : J.num(v, d);
   const clone = o => JSON.parse(JSON.stringify(o));
 
-  let root, S, draft, savedJson, sel, tab = 'config', scoreTab = 'simple', mon = null, monErr = null, sim = null, simBusy = false, simQ = '', useDraft = true, error = '';
+  let root, S, draft, savedJson, sel, adv = false, conf = null, confBusy = false, confFail = false, confStale = false, tab = 'config', scoreTab = 'simple', mon = null, monErr = null, sim = null, simBusy = false, simQ = '', useDraft = true, error = '';
   const autoCache = {};
 
   const v4 = () => S.strategies.filter(s => s.engine === 'v4');
@@ -96,6 +97,7 @@
     $('#as-err').innerHTML = error ? `<div class="notice err" style="margin-bottom:12px">${E(error)}</div>` : '';
     $('#as-body').innerHTML = tab === 'config' ? configView(st, isV4) : tab === 'profils' ? profilesView() : tab === 'simulation' ? simulationView(isV4) : monitorView();
     if (tab === 'suivi' && !mon && !monErr) loadMonitor();
+    if (tab === 'profils' && !conf && !confBusy && !confFail && st && st.engine === 'v4') runConf();
   }
 
   function paint() { if (!$('#as-body')) skeleton(); paintBody(); paintBar(); }
@@ -103,8 +105,8 @@
 
   function strategyPicker() {
     return `<label class="as-lbl">Stratégie sélectionnée</label><select data-a="strategy" class="as-select">
-      <optgroup label="Scores V4 (moteur commun)">${v4().map(s => `<option value="${E(s.name)}" ${s.name === sel ? 'selected' : ''}>${E(s.label)}</option>`).join('')}</optgroup>
-      <optgroup label="Moteur historique (lecture seule)">${S.strategies.filter(s => s.engine === 'historic').map(s => `<option value="${E(s.name)}" ${s.name === sel ? 'selected' : ''}>${E(s.label)}</option>`).join('')}</optgroup></select>`;
+      <optgroup label="Moteur commun V4">${v4().map(s => `<option value="${E(s.name)}" ${s.name === sel ? 'selected' : ''}>${E(s.label)}</option>`).join('')}</optgroup>
+      <optgroup label="Anciens moteurs (préservés, lecture seule)">${S.strategies.filter(s => s.engine === 'historic').map(s => `<option value="${E(s.name)}" ${s.name === sel ? 'selected' : ''}>${E(s.label)}</option>`).join('')}</optgroup></select>`;
   }
 
   function configView(st, isV4) {
@@ -138,6 +140,7 @@
       <div class="as-formula">Score simple = 100 × <b>Dynamique</b> × <b>Régularité</b> × <b>facteur d’accélération</b> <span class="muted">(plafonné à 100)</span></div>
       <h3 class="as-h">Composantes (formule validée, non modifiable)</h3>
       ${SIMPLE.map(([n, d, e]) => `<div class="as-comp"><div class="row between"><b>${n}</b><span class="badge">${e}</span></div><p class="as-hint">${d}</p></div>`).join('')}
+      <div class="notice warn as-lastday">${LASTDAY}</div>
       <p class="as-hint">Les périodes sont combinées avec les poids de la colonne de gauche. Une période obligatoire sans historique rend le titre « inconnu » ; une période facultative absente baisse seulement la couverture (minimum ${fmt(f.min_sessions, 0)} séances par période).</p>`;
   }
 
@@ -156,23 +159,67 @@
       ${st.components.length ? `<div class="table-wrap"><table><thead><tr><th>Composante</th><th>Période</th><th class="num">Poids</th></tr></thead><tbody>${st.components.map(c => `<tr><td>${E(c.metric)}</td><td>${E(labels()[c.period] || c.period)}</td><td class="num">${fmt(c.weight, 2)}</td></tr>`).join('')}</tbody></table></div>` : '<p class="muted">Aucune composante de score pondérée.</p>'}`;
   }
 
+  const PCT = (v, d = 1) => v === null || v === undefined ? '' : v;
   function profilesView() {
-    const rows = S.strategies.map(s => {
+    const row = s => {
       if (s.engine === 'v4') {
         const p = draft.profiles[s.name], ids = active(p), w = p.weights_mode === 'custom' ? p.weights : (s.name === sel ? autoWeights(p) : s.auto_weights);
-        return `<tr><td><b>${E(s.label)}</b></td><td><span class="badge ok">Scores V4</span></td><td>${ids.map(i => `${E(labels()[i])}${w && w[i] !== undefined ? ' <b>' + fmt(w[i], 1) + ' %</b>' : ''}`).join('<br>') || '—'}</td><td>${p.weights_mode === 'custom' ? 'Personnalisée' : 'Automatique'}</td><td>${s.customised ? '<span class="badge wait">Modifié</span>' : 'Valeurs par défaut'}</td><td class="num"><button class="btn small" data-a="open" data-v="${E(s.name)}">Configurer</button></td></tr>`;
+        return `<tr><td><b>${E(s.label)}</b><br><small class="muted">${E(s.note)}</small></td><td><span class="badge ok">Moteur commun V4</span></td><td>${ids.map(i => `${E(labels()[i])}${w && w[i] !== undefined ? ' <b>' + fmt(w[i], 1) + ' %</b>' : ''}`).join('<br>') || '—'}</td><td>${p.weights_mode === 'custom' ? 'Personnalisée' : 'Automatique'}</td><td>${s.customised ? '<span class="badge wait">Modifié</span>' : 'Valeurs initiales'}</td><td class="num"><button class="btn small" data-a="open" data-v="${E(s.name)}">Configurer</button></td></tr>`;
       }
-      return `<tr><td>${E(s.label)}</td><td><span class="badge">Moteur historique</span></td><td>${s.periods.map(i => E(labels()[i] || i)).join('<br>') || '—'}</td><td>Percentiles</td><td>Lecture seule</td><td></td></tr>`;
-    }).join('');
-    const st = strat(), p = st && st.engine === 'v4' ? prof() : null;
-    return `<div class="card"><h3 class="as-h">Profils de stratégies</h3><p class="as-hint">Les stratégies « Scores V4 » utilisent le moteur commun ; les stratégies historiques gardent leur calcul actuel. Les stratégies créées par les utilisateurs ne sont pas listées ici.</p>
-      <div class="table-wrap"><table><thead><tr><th>Stratégie</th><th>Moteur</th><th>Granularités et poids</th><th>Pondération</th><th>État</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></div>
-      ${p ? `<div class="card"><h3 class="as-h">Conformité de « ${E(st.label)} » par granularité</h3><div class="notice as-sep">Ces seuils <b>filtrent</b> les titres (conformes / écartés). Ils ne modifient <b>jamais</b> une note : les deux scores restent identiques quand on les change. Une case vide = pas de seuil.</div>
-        <div class="table-wrap"><table class="as-conf"><thead><tr><th>Granularité</th><th>Active</th><th>Historique exigé</th><th>Pente minimale (%/séance)</th><th>R² minimal (0–1)</th><th>Rendement minimal (%)</th></tr></thead><tbody>
-        ${S.scoring_periods.map(id => { const x = p.periods[id], off = x.enabled ? '' : 'disabled'; return `<tr class="${x.enabled ? '' : 'as-off'}"><td>${E(labels()[id])} <span class="muted">(${x.sessions} s)</span></td>
-          <td><input type="checkbox" data-a="active" data-p="${id}" ${x.enabled ? 'checked' : ''}></td><td><input type="checkbox" data-a="req" data-p="${id}" ${x.require_history ? 'checked' : ''} ${off}></td>
-          ${['min_slope', 'min_r2', 'min_return'].map(f => `<td><input type="number" class="as-num" data-a="thr-p" data-p="${id}" data-f="${f}" step="${f === 'min_r2' ? 0.05 : 0.1}" value="${x[f] ?? ''}" ${off}></td>`).join('')}</tr>`; }).join('')}</tbody></table></div>
-        <p class="as-hint">« Historique exigé » : sans assez de cours sur cette période, le titre est écarté et non noté. Une période non exigée absente baisse seulement la couverture.</p></div>` : ''}`;
+      return `<tr class="as-legacy"><td>${E(s.label)}</td><td><span class="badge">Ancien moteur</span></td><td>${s.periods.map(i => E(labels()[i] || i)).join('<br>') || '—'}</td><td>Percentiles</td><td>Préservé</td><td></td></tr>`;
+    };
+    const pe = S.personal, st = strat(), p = st && st.engine === 'v4' ? prof() : null;
+    return `<div class="card"><h3 class="as-h">Profils de stratégies</h3>
+      <div class="table-wrap"><table><thead><tr><th>Stratégie</th><th>Moteur</th><th>Granularités et poids</th><th>Pondération</th><th>État</th><th></th></tr></thead><tbody>
+      <tr class="as-group"><td colspan="6">Moteur commun V4 — mêmes calculs de score, seuls les réglages changent</td></tr>${v4().map(row).join('')}
+      <tr class="as-group"><td colspan="6">Anciens moteurs — comportement préservé tant qu’aucune migration n’est validée</td></tr>${S.strategies.filter(s => s.engine === 'historic').map(row).join('')}</tbody></table></div>
+      <p class="as-hint">Stratégies personnelles : ${pe.total ? `${pe.total} enregistrée${pe.total > 1 ? 's' : ''}, dont ${pe.common_engine} sur le moteur commun et ${pe.historic} sur un ancien moteur (non migrées).` : 'aucune enregistrée sur cette base.'}${pe.configurable.length ? ' Configurables ici : ' + pe.configurable.map(c => E(c.name)).join(', ') + '.' : ''}</p></div>
+      ${p ? conformityCard(st, p) + technicalCard(p) + previewCard() : ''}`;
+  }
+
+  function conformityCard(st, p) {
+    const th = (id, f, step) => { const x = p.periods[id]; return `<td><input type="number" class="as-num" data-a="thr-p" data-p="${id}" data-f="${f}" step="${step}" value="${PCT(x[f])}" ${x.enabled ? '' : 'disabled'} placeholder="aucun"></td>`; };
+    const mm = (v) => v === null || v === undefined ? '' : v / 1e6;
+    return `<div class="card"><div class="row between" style="flex-wrap:wrap;gap:8px"><h3 class="as-h" style="margin:0">Conformité de « ${E(st.label)} »</h3>
+        <div class="row gap-s"><div class="seg"><button data-a="adv" data-v="0" class="${adv ? '' : 'on'}">Mode simple</button><button data-a="adv" data-v="1" class="${adv ? 'on' : ''}">Mode avancé</button></div></div></div>
+      <div class="notice as-sep" style="margin-top:10px">Ces seuils <b>filtrent</b> les titres (conformes / écartés). Ils ne modifient <b>jamais</b> une note : les valeurs réelles de pente, R² et des autres indicateurs alimentent les deux scores, que le titre soit conforme ou non. Une case vide = <b>aucun seuil</b>.</div>
+      <div class="row gap-s" style="margin:8px 0;flex-wrap:wrap"><button class="btn small" data-a="preset" data-v="balanced">Valeurs initiales « équilibré »</button><button class="btn small" data-a="preset" data-v="v1">Appliquer le préréglage de référence V1</button><span class="as-hint" style="margin:0">Un préréglage remplit les cases ; rien n’est enregistré tant que vous n’enregistrez pas.</span></div>
+      <div class="table-wrap"><table class="as-conf"><thead><tr><th>Granularité</th><th>Active</th><th>Pente minimale (%/séance)</th><th>R² minimal (0–1)</th>${adv ? '<th>Rendement minimal (%)</th><th>Concentration max (0–1)</th><th>Volatilité max (%/séance)</th><th>Séances positives min (0–1)</th><th>Drawdown max (%)</th>' : ''}</tr></thead><tbody>
+        ${S.scoring_periods.map(id => { const x = p.periods[id]; return `<tr class="${x.enabled ? '' : 'as-off'}"><td>${E(labels()[id])} <span class="muted">(${x.sessions} s)</span></td><td><input type="checkbox" data-a="active" data-p="${id}" ${x.enabled ? 'checked' : ''}></td>
+          ${th(id, 'min_slope', 0.05)}${th(id, 'min_r2', 0.05)}${adv ? th(id, 'min_return', 0.5) + th(id, 'max_spike_share', 0.05) + th(id, 'max_volatility', 0.5) + th(id, 'min_up_fraction', 0.05) + th(id, 'max_drawdown', 1) : ''}</tr>`; }).join('')}</tbody></table></div>
+      ${adv ? `<div class="as-adv"><h4 class="as-h">Dernier jour (filtre facultatif, indépendant de la notation)</h4>
+        <label class="row gap-s"><input type="checkbox" data-a="day-on" ${p.day_filter.enabled ? 'checked' : ''}> Exiger un dernier jour positif : variation de la dernière séance clôturée ≥</label>
+        <input type="number" class="as-num" data-a="day-min" step="0.1" value="${p.day_filter.min_return}" ${p.day_filter.enabled ? '' : 'disabled'}> %
+        <p class="as-hint">Écarte le titre de la sélection sans changer sa note. La dernière séance est la dernière séance boursière clôturée.</p>
+        <h4 class="as-h">Liquidité minimale (valeur échangée par jour)</h4>
+        <div class="row gap-s" style="flex-wrap:wrap"><label>Hors États-Unis <input type="number" class="as-num" data-a="liq" data-f="min_turnover_eur" step="0.5" value="${mm(p.liquidity.min_turnover_eur)}" placeholder="aucun"> M€</label>
+        <label>Places américaines <input type="number" class="as-num" data-a="liq" data-f="min_turnover_eur_us" step="0.5" value="${mm(p.liquidity.min_turnover_eur_us)}" placeholder="aucun"> M€</label></div></div>` : '<p class="as-hint">Mode simple : exactement deux réglages par granularité active. Les critères facultatifs (rendement, concentration, volatilité, séances positives, drawdown, dernier jour, liquidité) sont en mode avancé.</p>'}</div>`;
+  }
+
+  function technicalCard(p) {
+    return `<div class="card"><h3 class="as-h">Données et exclusions techniques</h3>
+      <p class="as-hint">Ce ne sont pas des critères de croissance : ils décident si un titre est <b>évaluable</b>. Un titre non évaluable est signalé « inconnu » (jamais noté 0) ; un titre simplement non conforme garde ses deux scores.</p>
+      <table class="as-mini"><thead><tr><th>Période</th><th>Historique exigé (période obligatoire)</th></tr></thead><tbody>${S.scoring_periods.map(id => `<tr class="${p.periods[id].enabled ? '' : 'as-off'}"><td>${E(labels()[id])} <span class="muted">(${p.periods[id].sessions} séances)</span></td><td><input type="checkbox" data-a="req" data-p="${id}" ${p.periods[id].require_history ? 'checked' : ''} ${p.periods[id].enabled ? '' : 'disabled'}></td></tr>`).join('')}</tbody></table>
+      <label class="row gap-s" style="margin-top:8px"><input type="checkbox" data-a="fresh" ${p.technical.require_fresh ? 'checked' : ''}> Exiger des cours récents (sinon le titre n’est pas évaluable)</label>
+      <p class="as-hint">Couverture minimale des données : <b>${fmt(100 * draft.global.threshold, 0)} %</b> (réglage commun, onglet « Configuration du moteur »). Période obligatoire sans historique suffisant : titre non évaluable. Période facultative absente : seule la couverture baisse.</p></div>`;
+  }
+
+  function previewCard() {
+    const c = conf, t = c ? c.counts : null;
+    return `<div class="card"><div class="row between"><h3 class="as-h" style="margin:0">Effet sur la base actuelle</h3><button class="btn small" data-a="conf-run">${confBusy ? 'Calcul…' : 'Recalculer'}</button></div>
+      ${confStale ? '<p class="as-hint" style="color:var(--warn)">Réglages modifiés depuis ce calcul : cliquez sur « Recalculer ».</p>' : ''}
+      ${confBusy && !c ? '<div class="empty"><span class="spinner"></span></div>' : !c ? `<p class="muted">${confFail ? 'Calcul impossible : voir le message ci-dessus.' : 'Calcul au premier affichage.'}</p>` : c.universe === 0 ? '<div class="notice warn" style="margin-top:8px">Aucun titre dans cette base : rien à évaluer. Aucune valeur d’exemple n’est affichée.</div>' : `<div class="as-tiles as-tiles3" style="margin-top:10px">
+        <div class="as-tile"><span>Conformes</span><b>${J.num(t.retained, 0)}</b><small>sur ${J.num(c.universe, 0)} titres</small></div>
+        <div class="as-tile"><span>Écartés par un seuil</span><b>${J.num(t.rejected, 0)}</b><small>${J.num(c.rejected_with_both_scores, 0)} gardent leurs deux scores</small></div>
+        <div class="as-tile"><span>Non évaluables</span><b>${J.num(t.unknown, 0)}</b><small>exclusion technique ou données insuffisantes</small></div></div>
+        <p class="as-hint">Mesuré avec les réglages affichés (y compris les modifications non enregistrées). Les écartés restent accessibles dans la vue des écartés avec leurs scores.</p>`}</div>`;
+  }
+
+  async function runConf() {
+    confBusy = true; confFail = false; confStale = false; paintBody();
+    try { const body = { strategy: sel }; if (dirty()) body.draft = { global: draft.global, profile: payload() }; conf = await J.post('admin/scores/conformity', body); error = ''; }
+    catch (e) { conf = null; confFail = true; error = e.message; }
+    confBusy = false; paint();
   }
 
   // ───────────── simulation ─────────────
@@ -258,14 +305,14 @@
 
   function onChange(e) {
     const t = e.target, a = t.dataset.a, p = sel && draft.profiles[sel];
-    if (a === 'strategy') { sel = t.value; sim = null; later(); }
+    if (a === 'strategy') { sel = t.value; sim = null; conf = null; later(); }
     else if (a === 'active') {
       const on = t.checked, q = prof();
       if (!on && active(q).length <= 1) { t.checked = true; J.toast('Au moins une granularité doit rester active'); return; }
       q.periods[t.dataset.p].enabled = on;
       if (q.weights_mode === 'custom') { if (on) q.weights[t.dataset.p] = 0; else delete q.weights[t.dataset.p]; }
       later();
-    } else if (a === 'req') { p.periods[t.dataset.p].require_history = t.checked; paintBar(); }
+    } else if (a === 'req') { p.periods[t.dataset.p].require_history = t.checked; confStale = true; paintBar(); }
     else if (a === 'pw') {
       p.weights[t.dataset.p] = +t.value || 0;
       const tot = sum(Object.fromEntries(active(p).map(i => [i, p.weights[i]]))), el = $('#pw-total');
@@ -275,8 +322,20 @@
     else if (a === 'cw') { p.complex_weights[t.dataset.k] = +t.value || 0; paintBar(); }
     else if (a === 'kappa') { draft.global.kappa = +t.value; paintBar(); later(); }
     else if (a === 'thr') { draft.global.threshold = +t.value; paintBar(); }
-    else if (a === 'thr-p') { p.periods[t.dataset.p][t.dataset.f] = t.value === '' ? null : +t.value; paintBar(); }
+    else if (a === 'thr-p') { p.periods[t.dataset.p][t.dataset.f] = t.value === '' ? null : +t.value; confStale = true; paintBar(); }
+    else if (a === 'day-on') { p.day_filter.enabled = t.checked; confStale = true; paint(); }
+    else if (a === 'day-min') { p.day_filter.min_return = +t.value || 0; confStale = true; paintBar(); }
+    else if (a === 'liq') { p.liquidity[t.dataset.f] = t.value === '' ? null : Math.round(+t.value * 1e6); confStale = true; paintBar(); }
+    else if (a === 'fresh') { p.technical.require_fresh = t.checked; confStale = true; paintBar(); }
     else if (a === 'use-draft') { useDraft = t.checked; }
+  }
+
+  function applyPreset(kind) {
+    const ref = clone(S.references[kind]), p = prof(), before = active(p).join();
+    S.scoring_periods.forEach(id => { Object.assign(p.periods[id], ref.periods[id], { sessions: p.periods[id].sessions }); });
+    p.day_filter = ref.day_filter; p.liquidity = ref.liquidity; p.technical = ref.technical;
+    if (before !== active(p).join()) { p.weights_mode = 'auto'; p.weights = {}; }
+    conf = null; J.toast(kind === 'v1' ? 'Préréglage V1 appliqué (non enregistré)' : 'Valeurs initiales appliquées (non enregistrées)'); paint();
   }
 
   function toCustom() {
@@ -294,8 +353,11 @@
     else if (a === 'pw-auto') { prof().weights_mode = 'auto'; prof().weights = {}; paint(); }
     else if (a === 'cw-norm') { const p = prof(), tot = sum(p.complex_weights) || 1; let acc = 0; const keys = Object.keys(p.complex_weights); keys.forEach((k, i) => { const x = i === keys.length - 1 ? Math.round((100 - acc) * 10) / 10 : Math.round(p.complex_weights[k] / tot * 1000) / 10; p.complex_weights[k] = x; acc += x; }); paint(); }
     else if (a === 'cw-ref') { prof().complex_weights = clone(S.design.complex_weights); paint(); }
-    else if (a === 'open') { sel = v; tab = 'config'; sim = null; paint(); }
-    else if (a === 'cancel') { reset(); paint(); }
+    else if (a === 'open') { sel = v; tab = 'profils'; sim = null; conf = null; paint(); }
+    else if (a === 'adv') { adv = v === '1'; paint(); }
+    else if (a === 'preset') { applyPreset(v); }
+    else if (a === 'conf-run') { runConf(); }
+    else if (a === 'cancel') { reset(); conf = null; paint(); }
     else if (a === 'save') save();
     else if (a === 'restore') restore();
     else if (a === 'sim-run') { simQ = ($('#as-q') || {}).value || ''; runSim(null); }
@@ -308,7 +370,7 @@
       const before = savedProfiles(), changed = v4().map(s => s.name).filter(n => JSON.stringify(draft.profiles[n]) !== JSON.stringify(before[n]));
       if (!changed.length) S = await J.post('admin/scores/save', { global: draft.global });
       for (const [i, n] of changed.entries()) S = await J.post('admin/scores/save', i === 0 ? { global: draft.global, profile: payloadFor(n) } : { profile: payloadFor(n) });
-      reset(); Object.keys(autoCache).forEach(k => delete autoCache[k]); mon = null; sim = null; J.toast('Configuration enregistrée');
+      reset(); Object.keys(autoCache).forEach(k => delete autoCache[k]); mon = null; sim = null; conf = null; J.toast('Configuration enregistrée');
     } catch (e) { error = e.message; J.toast(e.message); }
     paint();
   }
@@ -321,7 +383,7 @@
       <label class="as-rad"><input type="radio" name="rs" value="all"> Tout (communs et tous les profils V4)</label>`,
       actions: [{ label: 'Annuler', run: () => { } }, { label: 'Restaurer', cls: 'primary', run: async d => {
         const scope = ($('input[name=rs]:checked', d) || {}).value || 'profile';
-        try { S = await J.post('admin/scores/save', scope === 'profile' ? { reset: 'profile', name: st && st.engine === 'v4' ? sel : v4()[0].name } : { reset: scope }); reset(); Object.keys(autoCache).forEach(k => delete autoCache[k]); sim = null; J.toast('Valeurs par défaut rétablies'); } catch (e) { J.toast(e.message); }
+        try { S = await J.post('admin/scores/save', scope === 'profile' ? { reset: 'profile', name: st && st.engine === 'v4' ? sel : v4()[0].name } : { reset: scope }); reset(); Object.keys(autoCache).forEach(k => delete autoCache[k]); sim = null; conf = null; J.toast('Valeurs par défaut rétablies'); } catch (e) { J.toast(e.message); }
         paint(); } }] });
   }
 

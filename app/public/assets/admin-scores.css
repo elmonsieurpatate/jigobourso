@@ -37,3 +37,8 @@
 .as-saved { color: var(--up); font-weight: 600; } .as-dirty { color: var(--warn); font-weight: 700; }
 @media (max-width: 1100px) { .as-grid { grid-template-columns: 1fr 1fr; } .as-span2 { grid-column: span 2; } .as-tiles { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 760px) { .as-grid, .as-grid2, .as-two { grid-template-columns: 1fr; } .as-span2 { grid-column: auto; } .as-bar { left: 0; padding: 8px 12px; } .as-cw { grid-template-columns: 1fr 70px 40px; } .as-cw .as-bar-bg { display: none; } }
+
+.as-group td { background: var(--surface-2); font-weight: 700; font-size: .82rem; color: var(--muted); }
+.as-legacy td { opacity: .8; } .as-adv { margin-top: 12px; } .as-tiles3 { grid-template-columns: repeat(3, 1fr); }
+.as-lastday { margin-top: 10px; font-size: .84rem; }
+@media (max-width: 760px) { .as-tiles3 { grid-template-columns: 1fr; } }
