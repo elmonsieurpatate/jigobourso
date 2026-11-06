@@ -11,6 +11,13 @@ def get(conn, name, default=None):
     return json.loads(row['value_json']) if row else default
 
 
+def saved_at(conn, name):
+    with conn.cursor() as cur:
+        cur.execute('SELECT updated_at FROM settings WHERE name=%s', (name,))
+        row = cur.fetchone()
+    return row['updated_at'] if row else None
+
+
 def put(conn, name, value):
     with conn.cursor() as cur:
         cur.execute('INSERT INTO settings(name, value_json, updated_at) VALUES (%s,%s,%s) ON DUPLICATE KEY UPDATE value_json=VALUES(value_json), updated_at=VALUES(updated_at)',

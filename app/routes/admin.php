@@ -141,11 +141,20 @@ return [
     'admin/scores' => function () { require_admin(); return engine_call('scores-state', []); },
     'admin/scores/save' => function () {
         need_post(); require_admin(); $b = body();
-        if (!empty($b['reset'])) return engine_call('scores-save', ['reset' => true]);
-        $cw = $b['complex_weights'] ?? [];
-        if (!is_array($cw)) throw new ApiError('Poids du score complexe invalides');
-        return engine_call('scores-save', ['kappa' => $b['kappa'] ?? null, 'threshold' => $b['threshold'] ?? null, 'complex_weights' => $cw]);
+        $req = [];
+        foreach (['reset', 'name', 'global', 'profile', 'kappa', 'threshold', 'complex_weights'] as $k) if (array_key_exists($k, $b)) $req[$k] = $b[$k];
+        return engine_call('scores-save', $req);
     },
+    'admin/scores/preview' => function () {
+        need_post(); require_admin(); $b = body();
+        return engine_call('scores-preview', ['kappa' => $b['kappa'] ?? null, 'periods' => is_array($b['periods'] ?? null) ? $b['periods'] : []]);
+    },
+    'admin/scores/simulate' => function () {
+        need_post(); require_admin(); $b = body();
+        return engine_call('scores-simulate', ['strategy' => str_in($b, 'strategy', 40), 'q' => isset($b['q']) ? mb_substr((string)$b['q'], 0, 80) : '',
+                                              'listing_id' => isset($b['listing_id']) ? (int)$b['listing_id'] : null, 'draft' => is_array($b['draft'] ?? null) ? $b['draft'] : null]);
+    },
+    'admin/scores/monitor' => function () { require_admin(); return engine_call('scores-monitor', []); },
     'admin/run' => function () {
         need_post(); require_admin();
         $job = str_in(body(), 'job', 24);

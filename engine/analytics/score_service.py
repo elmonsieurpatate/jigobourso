@@ -32,9 +32,9 @@ def params_for(config, kind):
     custom = sc['weights']
     if custom and active and all(custom.get(p['id']) is not None for p in active):
         for p in active:
-            p['weight'] = custom[p['id']]
+            p['weight'] = float(custom[p['id']])
     return {'periods': active, 'required': [p['id'] for p in cfg['periods'] if p['enabled'] and p.get('require_history') and p['sessions'] >= SC.MIN_SESSIONS],
-            'kappa': sc['kappa'], 'complex_weights': sc['complex_weights'], 'threshold': sc['threshold']}
+            'kappa': float(sc['kappa']), 'complex_weights': {k: float(v) for k, v in dict(SC.COMPLEX_WEIGHTS, **sc['complex_weights']).items()}, 'threshold': float(sc['threshold'])}
 
 
 def _f(v):
@@ -161,8 +161,8 @@ def admin_defaults(conn):
     return C.validate_scoring(raw, [])
 
 
-def apply_admin(conn, config):
-    """Superpose les réglages d'administration aux paramètres de score d'une stratégie qui ont gardé leur valeur de conception.
+def apply_global(conn, config):
+    """Superpose les réglages communs (κ, seuil de couverture, poids complexes hérités) aux paramètres de score restés à leur valeur de conception.
     Une valeur propre à la stratégie (différente de la conception) l'emporte. Ne concerne jamais les seuils de conformité."""
     if config.get('version') != 4:
         return config
@@ -173,3 +173,15 @@ def apply_admin(conn, config):
         if sc.get(field) == base[field]:
             sc[field] = admin[field]
     return dict(config, scoring=sc)
+
+
+def apply_admin(conn, config):
+    """Configuration d'une stratégie avec les réglages d'administration : profil de la stratégie (si V4 et enregistré), puis réglages communs."""
+    if config.get('version') != 4:
+        return config
+    if config.get('ranking', {}).get('mode') == C.SCORES_MODE:
+        from . import scores_admin
+        prof = scores_admin.stored_profiles(conn).get(config.get('name'))
+        if prof and config.get('name') in scores_admin.V4_STRATEGIES:
+            config = scores_admin.apply_profile(config, scores_admin.clean_profile(prof))
+    return apply_global(conn, config)
