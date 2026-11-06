@@ -183,7 +183,7 @@ def apply_admin(conn, config):
         return config
     if config.get('ranking', {}).get('mode') == C.SCORES_MODE:
         from . import scores_admin
-        if config.get('name') in scores_admin.V4_STRATEGIES:
+        if scores_admin.known(config.get('name')):
             prof = scores_admin.stored_profiles(conn).get(config['name'])
             config = scores_admin.apply_profile(config, scores_admin.clean_profile(prof)) if prof else scores_admin.neutral(config)
     return apply_global(conn, config)

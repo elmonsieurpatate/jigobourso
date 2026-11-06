@@ -1,7 +1,7 @@
 /* Classement : titres réels notés par le moteur V4 ; la stratégie et les filtres choisis ici ne modifient jamais les scores. */
 (async () => {
   'use strict';
-  const user = await J.init('classement-test'); if (!user) return;
+  const user = await J.init('explorer'); if (!user) return;
   const $ = s => document.querySelector(s), esc = J.esc;
   const periods = [['week','Semaine',5],['month','Mois',21],['quarter','Trimestre',63],['half','6 mois',126],['year','1 an',252],['two_year','2 ans',504]];
   const profiles = {
@@ -69,8 +69,8 @@
   const categorySignature=JSON.stringify(categoryPayload.definitions||categoryPayload.categories);
   state.categorySignature=categorySignature;
   // Jeu fictif immuable. Le formulaire de stratégie n'entre jamais dans son calcul.
-  let intrinsicRows=[],loadError=null;
-  const tableState={sort:'complex',direction:'desc',page:1,pageSize:50,outside:false};
+  let intrinsicRows=[],loadError=null,scoreLabel='',loading=true;
+  const tableState={sort:'complex',direction:'desc',page:1,pageSize:50,outside:false,query:new URLSearchParams(location.search).get('q')||''};
   let activeFilter=null, filterQuery='';
   const config = () => state.profiles[state.strategy];
   const isPrimary = r => r.metric === 'slope' || r.metric === 'r2';
@@ -153,7 +153,7 @@
   function takeView(view){rev=view.revision;meta=cloneJSON(view.meta||{});for(const it of view.items)names[it.id]=it.name;customIds=view.items.filter(i=>!i.builtin).map(i=>i.id);}
   function switchTo(id,remember=true){
     closeFilter();ovBy[state.strategy]=overrides;state.strategy=id;overrides=ovBy[id]||(ovBy[id]={});state.filters=filtersFor(overrides);
-    tableState.page=1;tree();project();state.selected=periods.find(([k])=>config().periods[k].enabled)?.[0]||'week';render();
+    tableState.page=1;tree();project();state.selected=periods.find(([k])=>config().periods[k].enabled)?.[0]||'week';render();loadRows();
     if(remember&&serverOk)J.post('classement-test/strategies/save',{action:'select',id}).catch(()=>{});
   }
   function currentPayload(){tree();project();return {config:cloneJSON(state.profiles[state.strategy]),filters:cloneJSON(overrides)};}
@@ -291,7 +291,7 @@
     return {id:r.id,rank:r.rank_complex,rankSimple:r.rank_simple,rankComplex:r.rank_complex,symbol:r.symbol,name:r.name,mic:r.mic,currency:r.currency,kind:r.kind,country:r.country,category:r.category,group:r.group,
       price:r.price_eur,priceNative:r.price,change:r.change,slope:r.slope,r2:r.r2,volatility:r.volatility,drawdown:r.drawdown,turnover:r.turnover_eur,liquiditySource:r.liquidity_source,avgVolume:r.avg_volume,
       perfMonth:r.perf&&r.perf.month!==undefined?r.perf.month:null,simple:r.simple,complex:r.complex,simpleStatus:r.simple_status,complexStatus:r.complex_status,score:r.complex,
-      points:r.curve||[],color:hue(r.symbol),secondary:secondaryOf(r),periods:r.periods||{},held:!!r.held,lastClose:r.last_close,quality:r.quality};
+      isin:r.isin,points:r.curve||[],color:hue(r.symbol),secondary:secondaryOf(r),periods:r.periods||{},held:!!r.held,lastClose:r.last_close,quality:r.quality};
   }
   // Une ligne appartient à une catégorie par mesure (filtres à seuils) ou par groupe (pays, secteur, place, type). Un filtre retient la ligne si l'une de ses catégories est cochée (OU) ; les filtres se combinent en ET.
   function rowOptions(row,k){
@@ -314,7 +314,9 @@
     return periods.every(([k,,n])=>{const p=config().periods[k];if(!p.enabled)return true;const m=row.periods[String(n)];return !!m&&m.slope!==null&&m.r2!==null&&m.slope>=p.slope&&m.r2>=p.r2;});
   }
   function visibleRows(){
-    const base=tableState.outside?intrinsicRows:intrinsicRows.filter(admitted);
+    const needle=tableState.query.trim().toLocaleLowerCase('fr');
+    const found=needle?intrinsicRows.filter(r=>(r.symbol+' '+r.name+' '+(r.isin||'')).toLocaleLowerCase('fr').includes(needle)):intrinsicRows;
+    const base=tableState.outside||needle?found:found.filter(admitted);          // une recherche porte sur tous les titres notés, hors stratégie compris
     return {base,rows:applySecondary(base)};
   }
   function spark(row){
@@ -348,6 +350,7 @@
   }
   const rankKey=()=>tableState.sort==='simple'?'rankSimple':'rankComplex';
   function renderRanking(){
+    if(loading){$('#ct-table-body').innerHTML='<tr class="ct-loading"><td colspan="20"><span class="spinner"></span> Chargement des titres…</td></tr>';$('#ct-empty-results').hidden=true;$('#ct-result-count').textContent='';return;}
     const selected=columnKeys.map((key,i)=>({key,i,label:columnTitles[i]})).filter(x=>state.columns.includes(x.i));
     const {base,rows:filtered}=visibleRows();
     const rows=[...filtered].sort((a,b)=>{
@@ -363,7 +366,8 @@
     $('#ct-table-body').innerHTML=pageRows.map(row=>`<tr data-row="${row.id}"><td class="ct-rank-cell" data-label="Rang">${row[rankKey()]??'—'}</td>${selected.map(({key,label})=>`<td class="ct-cell-${key}" data-label="${esc(label)}">${rowCell(row,key)}</td>`).join('')}</tr>`).join('');
     $('#ct-empty-results').hidden=rows.length!==0||!!loadError;
     const hiddenByStrategy=intrinsicRows.length-base.length;
-    $('#ct-strategy-count').textContent=loadError?'':tableState.outside?`Tous les titres notés sont affichés (${num0(base.length)}).`:`${num0(base.length)} titres répondent à la stratégie « ${names[state.strategy]||''} » ; ${num0(hiddenByStrategy)} ne la satisfont pas ou n’ont pas assez de données.`;
+    $('#ct-strategy-count').textContent=loadError?'':tableState.query.trim()?`Recherche sur tous les titres notés, stratégie non appliquée : ${num0(base.length)} correspondance${base.length>1?'s':''}.`:tableState.outside?`Tous les titres notés sont affichés (${num0(base.length)}).`:`${num0(base.length)} titres répondent à la stratégie « ${names[state.strategy]||''} » ; ${num0(hiddenByStrategy)} ne la satisfont pas ou n’ont pas assez de données.`;
+    if(!loadError&&scoreLabel)$('#ct-strategy-count').textContent+=` Scores : ${scoreLabel}.`;
     $('#ct-page-range').textContent=loadError?loadError:rows.length?`Affichage de ${start+1} à ${Math.min(start+tableState.pageSize,rows.length)} sur ${rows.length} titres`:'Aucun titre visible';
     $('#ct-pages').innerHTML=`<button type="button" data-demo-page="${tableState.page-1}" ${tableState.page===1?'disabled':''} aria-label="Page précédente">‹</button>${Array.from({length:Math.min(pages,9)},(_,i)=>{const n=pages<=9?i+1:Math.min(Math.max(1,tableState.page-4),pages-8)+i;return `<button type="button" data-demo-page="${n}" ${tableState.page===n?'aria-current="page"':''} aria-label="Page ${n}">${n}</button>`;}).join('')}<button type="button" data-demo-page="${tableState.page+1}" ${tableState.page===pages?'disabled':''} aria-label="Page suivante">›</button>`;
     $('#ct-sort').value=tableState.sort;$('#ct-page-size').value=String(tableState.pageSize);$('#ct-show-outside').checked=tableState.outside;
@@ -453,14 +457,22 @@
     const label=names[id];takeView(await post({action:'delete',id}));delete state.profiles[id];delete ovBy[id];delete saved[id];
     const nxt=enabledIds().filter(x=>x!==id)[0]||'fast';overrides=ovBy[nxt];state.strategy=nxt;switchTo(nxt);feedback(`Stratégie « ${label} » supprimée.`);
   });
+  $('#ct-search').value=tableState.query;$('#ct-search').oninput=e=>{tableState.query=e.target.value;tableState.page=1;renderRanking();};
   $('#ct-show-outside').onchange=e=>{tableState.outside=e.target.checked;tableState.page=1;renderRanking();};
   $('#ct-sort').onchange=e=>{tableState.sort=e.target.value;tableState.direction=['name','market','sector'].includes(e.target.value)?'asc':'desc';tableState.page=1;renderRanking();};
   $('#ct-sort-direction').onclick=()=>{tableState.direction=tableState.direction==='desc'?'asc':'desc';tableState.page=1;renderRanking();};
   $('#ct-page-size').onchange=e=>{tableState.pageSize=Number(e.target.value);tableState.page=1;renderRanking();};
   $('#ct-show-demo-all').onclick=()=>{tableState.outside=true;tableState.page=1;state.filters=secondary.all(categories);for(const k of Object.keys(categories))saveLocalSelection(k);renderFilters();};
   $('#ct-apply').onclick=()=>feedback('Réglages conservés. Le tableau présente des données fictives, indépendantes de la stratégie.');
-  try{const data=await J.api('ranking/table');intrinsicRows=data.rows.map(toRow);}catch(e){loadError='Classement indisponible : '+(e.message||'erreur de chargement');}
-  tree();project();render();
+  let loadSeq=0;
+  async function loadRows(){
+    const my=++loadSeq,want=state.strategy;loading=true;
+    $('#ct-table-body').innerHTML='<tr class="ct-loading"><td colspan="20"><span class="spinner"></span> Chargement des titres…</td></tr>';
+    try{const data=await J.api('ranking/table',{params:{strategy:want}});if(my!==loadSeq)return;intrinsicRows=data.rows.map(toRow);loadError=null;scoreLabel=data.label||'';loading=false;}
+    catch(e){if(my!==loadSeq)return;intrinsicRows=[];loadError='Classement indisponible : '+(e.message||'erreur de chargement');loading=false;}
+    renderRanking();
+  }
+  tree();project();render();loadRows();
 })().catch(error=>{const p=document.querySelector('#ct-feedback');p.textContent='Impossible d’ouvrir la page de test : '+error.message;});
 
 // Bloc « Stratégie » : réglages repliés par défaut (Afficher / Masquer), choix mémorisé dans ce navigateur.

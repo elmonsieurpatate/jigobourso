@@ -66,7 +66,13 @@ def _fetch(conn, ids):
 
 def table(conn, request):
     """Toutes les lignes du classement, avec scores et rangs généraux (indépendants des filtres, du tri et de la page)."""
-    name = request.get('strategy') or 'growth_v4'
+    scores_admin.refresh(conn)
+    if request.get('ct_id'):                                                       # stratégie du Classement : ses propres réglages de scores
+        name = scores_admin.resolve(conn, request['ct_id'], request.get('user_id') or 0)
+    else:
+        name = request.get('strategy') or 'growth_v4'
+    if not scores_admin.known(name):
+        name = 'growth_v4'
     cfg = scores_admin.build_config(conn, name)
     book = score_service.score_book(conn, cfg, service.data_version(conn))
     ids = sorted(book)
@@ -108,4 +114,4 @@ def table(conn, request):
             'analyst': d.get('analyst_rating'), 'quality': d.get('quality'),
             'simple': _num(e['simple']), 'complex': _num(e['complex']), 'simple_status': e['simple_status'], 'complex_status': e['complex_status'],
             'rank_simple': rank_s.get(lid), 'rank_complex': rank_c.get(lid), 'curve': [round(x, 2) for x in curves.get(lid, [])], 'extra': extra})
-    return {'strategy': name, 'reference_sessions': REFERENCE, 'universe': len(rows), 'scored': {'simple': len(simple), 'complex': len(complex_)}, 'rows': rows}
+    return {'strategy': name, 'label': scores_admin.spec(name)['label'], 'reference_sessions': REFERENCE, 'universe': len(rows), 'scored': {'simple': len(simple), 'complex': len(complex_)}, 'rows': rows}

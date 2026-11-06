@@ -38,6 +38,75 @@ V4_STRATEGIES = {
                   'note': 'Mode simple : pente et R² par granularité, aucun autre filtre imposé.'},
     'growth_v1': {'label': 'Croissance rapide — référence V1 (seuils historiques)', 'build': C.growth_v1,
                   'note': 'Mêmes calculs de score ; seuils de conformité historiques de V1 (3 % semaine, 8 % mois, concentration, volatilité, liquidité).'}}
+# ───────────── stratégies du Classement (« Blou », Croissance régulière…) : chacune a son propre profil de scores ─────────────
+CT_BUILTIN = {'fast': ('growth_v4', None), 'regular': ('ct:regular', ('Croissance régulière', ('month', 'quarter'))), 'calm': ('ct:calm', ('Croissance calme', ('month', 'quarter', 'half')))}
+DYNAMIC = {}                                          # nom -> spécification ; rempli par refresh(conn) en tête de chaque appel
+
+
+def _ct_builder(label, periods, thresholds=None):
+    def build():
+        c = growth_v4()
+        c['name'] = label
+        by = {p['id']: p for p in c['periods']}
+        for pid in SCORING_PERIODS:
+            on = pid in periods
+            by[pid]['enabled'] = on
+            if on:
+                by[pid]['require_history'] = True
+                t = (thresholds or {}).get(pid) or {}
+                for f, key in (('min_slope', 'slope'), ('min_r2', 'r2')):
+                    if isinstance(t.get(key), (int, float)) and not isinstance(t.get(key), bool) and t[key] > 0:
+                        by[pid][f] = float(t[key])
+        return C.validate(c)
+    return build
+
+
+def refresh(conn):
+    """Recense les stratégies du Classement : les deux d'origine (hors Croissance rapide = moteur commun) et les stratégies personnelles de chaque utilisateur."""
+    import json
+    DYNAMIC.clear()
+    for key, (name, meta) in CT_BUILTIN.items():
+        if meta:
+            DYNAMIC[name] = {'label': meta[0] + ' (Classement)', 'build': _ct_builder(name, meta[1]), 'note': 'Stratégie du Classement : granularités actives de cette stratégie, notes réglées ici.'}
+    if conn is None:
+        return
+    with conn.cursor() as cur:
+        cur.execute("SELECT name, value_json FROM settings WHERE name LIKE 'ct\\_strategies:%'")
+        docs = cur.fetchall()
+    for row in docs:
+        try:
+            uid = row['name'].split(':', 1)[1]
+            doc = json.loads(row['value_json'])
+            for it in doc.get('items') or []:
+                if it.get('builtin') or not isinstance(it.get('config'), dict) or not it.get('id'):
+                    continue
+                per = it['config'].get('periods') or {}
+                active = tuple(pid for pid in SCORING_PERIODS if (per.get(pid) or {}).get('enabled'))
+                if not active:
+                    continue
+                name = f'ct:{uid}:{it["id"]}'
+                DYNAMIC[name] = {'label': it.get('name') or name, 'build': _ct_builder(name, active, per), 'note': 'Stratégie personnelle du Classement : granularités actives de cette stratégie, notes réglées ici.'}
+        except (ValueError, KeyError, TypeError, AttributeError):
+            continue                                                                      # document illisible : ignoré, jamais bloquant
+
+
+def known(name):
+    return name in V4_STRATEGIES or name in DYNAMIC
+
+
+def spec(name):
+    return V4_STRATEGIES.get(name) or DYNAMIC[name]
+
+
+def resolve(conn, ct_id, user_id):
+    """Nom de la stratégie de scores d'une stratégie du Classement (identifiant de la page) pour un utilisateur."""
+    refresh(conn)
+    if ct_id in CT_BUILTIN:
+        return CT_BUILTIN[ct_id][0]
+    name = f'ct:{int(user_id)}:{ct_id}'
+    return name if name in DYNAMIC else 'growth_v4'
+
+
 LEGACY_LABELS = {'regular': 'Croissance régulière', 'fast': 'Croissance rapide', 'recovery': 'Rebond', 'low_volatility': 'Hausse calme',
                  'momentum': 'Momentum 6 mois (expérimental)', 'momentum12': 'Momentum 12 mois (expérimental)', 'momentum_risk': 'Momentum ajusté du risque (expérimental)'}
 LEGACY_SUFFIX = ' — ancien moteur'
@@ -175,7 +244,7 @@ def stored_profiles(conn):
 
 
 def base_config(name):
-    return V4_STRATEGIES[name]['build']()
+    return spec(name)['build']()
 
 
 def build_config(conn, name, profile=None, glob=None):
@@ -205,16 +274,17 @@ def auto_weights(kappa, period_ids):
 # ───────────── état et enregistrement ─────────────
 
 def strategies(conn):
+    refresh(conn)
     from . import strategy
     glob = score_service.admin_defaults(conn)
     stored = stored_profiles(conn)
     out = []
-    for name, spec in V4_STRATEGIES.items():
+    for name, sp in list(V4_STRATEGIES.items()) + list(DYNAMIC.items()):
         base = base_config(name)
         cfg = build_config(conn, name)
         current = clean_profile(stored[name]) if name in stored else profile_of(base)       # valeurs saisies (seuils conservés même si les filtres sont désactivés)
         active = [p for p in SCORING_PERIODS if current['periods'][p]['enabled']]
-        out.append({'name': name, 'label': spec['label'], 'note': spec['note'], 'engine': 'v4', 'sort': cfg['ranking'].get('sort'), 'defaults': profile_of(base), 'current': current,
+        out.append({'name': name, 'label': sp['label'], 'note': sp['note'], 'engine': 'v4', 'sort': cfg['ranking'].get('sort'), 'defaults': profile_of(base), 'current': current,
                     'customised': name in stored, 'auto_weights': auto_weights(glob['kappa'], active), 'saved_at': _iso(settings.saved_at(conn, PROFILES)) if name in stored else None})
     for name in strategy.PRESETS:
         cfg = C.editable(strategy.preset(name))
@@ -271,6 +341,7 @@ def state(conn):
 
 def save(conn, request):
     """Enregistre les réglages communs et/ou le profil d'une stratégie V4 ; `reset` : 'global', 'profile' (avec `name`) ou 'all'."""
+    refresh(conn)
     reset = request.get('reset')
     if reset in ('global', 'all'):
         settings.put(conn, score_service.SETTING, {})
@@ -278,7 +349,7 @@ def save(conn, request):
         profiles = stored_profiles(conn)
         if reset == 'profile':
             name = request.get('name')
-            if name not in V4_STRATEGIES:
+            if not known(name):
                 raise ValueError('Stratégie V4 inconnue')
             profiles.pop(name, None)
         else:
@@ -297,7 +368,7 @@ def save(conn, request):
         settings.put(conn, score_service.SETTING, clean)
     if isinstance(request.get('profile'), dict):
         name = request['profile'].get('name')
-        if name not in V4_STRATEGIES:
+        if not known(name):
             raise ValueError('Stratégie V4 inconnue')
         clean = clean_profile(request['profile'])
         apply_profile(base_config(name), clean)                                   # revalidation complète de la configuration résultante
@@ -333,9 +404,10 @@ def _search(conn, q):
 
 def simulate(conn, request):
     """Décomposition des deux scores d'un titre réel avec la configuration enregistrée ou un brouillon. Aucune donnée n'est inventée : sans données, la réponse le dit."""
+    refresh(conn)
     from . import service
     name = request.get('strategy')
-    if name not in V4_STRATEGIES:
+    if not known(name):
         raise ValueError('Stratégie V4 inconnue')
     draft = request.get('draft') or {}
     cfg = build_config(conn, name, draft.get('profile'), draft.get('global'))
@@ -443,9 +515,10 @@ def monitor(conn):
 
 def conformity(conn, request):
     """Effet des seuils d'un profil sur les titres réels : conformes / écartés / non évaluables. Les titres écartés gardent leurs deux scores (calculés hors filtres)."""
+    refresh(conn)
     from . import service
     name = request.get('strategy')
-    if name not in V4_STRATEGIES:
+    if not known(name):
         raise ValueError('Stratégie V4 inconnue')
     draft = request.get('draft') or {}
     cfg = build_config(conn, name, draft.get('profile'), draft.get('global'))
@@ -600,9 +673,10 @@ def _listing(conn, book, which, category, offset, limit, cats, sessions):
 def ranking(conn, request):
     """Résultat principal d'un réglage : titres notés et classés, indisponibles, répartition des notes, poids réels des périodes et effet par rapport au réglage enregistré.
     Aucun filtre n'intervient : les seuils facultatifs ne retirent aucun titre de ce classement."""
+    refresh(conn)
     from . import service
     name = request.get('strategy')
-    if name not in V4_STRATEGIES:
+    if not known(name):
         raise ValueError('Stratégie V4 inconnue')
     draft = request.get('draft') or {}
     cfg = build_config(conn, name, draft.get('profile'), draft.get('global'))

@@ -71,7 +71,8 @@ return [
     },
     'ranking/table' => function () {          // tous les titres notés (scores V4, rangs, valeurs des filtres) : tri, filtres et pages se font dans la page
         $u = require_user();
-        $res = engine_call('ranking-table', ['strategy' => 'growth_v4']);
+        $ct = (string)($_GET['strategy'] ?? '');
+        $res = engine_call('ranking-table', ['ct_id' => preg_match('/^[a-z0-9-]{1,40}$/', $ct) ? $ct : 'fast', 'user_id' => (int)$u['id']]);
         $held = held_listing_ids((int)$u['id']);
         foreach ($res['rows'] as &$r) $r['held'] = in_array($r['id'], $held, true);
         return $res;

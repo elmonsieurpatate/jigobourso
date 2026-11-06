@@ -324,3 +324,6 @@ a.ct-company:hover b,a.ct-company:focus-visible b{text-decoration:underline}
 .ct-outside{display:inline-flex;gap:6px;align-items:center;margin:0 10px;white-space:nowrap}
 #ct-strategy-count{font-weight:600}
 .ct table td.ct-cell-market,.ct table td.ct-cell-sector{text-align:left}
+.ct-search input{min-width:240px;max-width:100%;background:var(--surface);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:9px 12px}
+.ct-loading td{text-align:center;padding:36px 12px;color:var(--muted)}
+@media(max-width:700px){.ct-search{flex:1 1 100%}.ct-search input{width:100%}}

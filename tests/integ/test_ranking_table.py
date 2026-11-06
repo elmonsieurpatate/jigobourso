@@ -46,3 +46,32 @@ def test_sheet_carries_the_same_v4_scores_as_the_ranking():
     v4 = sheet['scores_v4']
     assert v4['simple']['score'] == pytest.approx(t['UP.DE']['simple'], abs=1e-3) and v4['complex']['score'] == pytest.approx(t['UP.DE']['complex'], abs=1e-3)
     assert v4['ranks']['simple']['rank'] == t['UP.DE']['rank_simple']
+
+
+def test_personal_classement_strategies_get_their_own_score_profile_and_ranking():
+    import json
+    from engine.analytics import scores_admin as A
+    conn = connect()
+    reset_data(conn)
+    seed(conn)
+    doc = {'schema': 1, 'revision': 1, 'selected': 'cs-aaa', 'items': [
+        {'id': 'cs-aaa', 'name': 'Blou', 'builtin': False, 'filters': [], 'config': {'periods': {
+            'week': {'enabled': False, 'slope': .08, 'r2': .65}, 'month': {'enabled': True, 'slope': .08, 'r2': .65}, 'quarter': {'enabled': True, 'slope': .05, 'r2': .6},
+            'half': {'enabled': False, 'slope': .05, 'r2': .6}, 'year': {'enabled': False, 'slope': .05, 'r2': .6}, 'two_year': {'enabled': False, 'slope': .05, 'r2': .6}}, 'extra': [], 'join': 'and'}}]}
+    with conn.cursor() as cur:
+        cur.execute("INSERT INTO settings(name,value_json,updated_at) VALUES ('ct_strategies:7',%s,NOW())", (json.dumps(doc),))
+    conn.commit()
+    names = [s['name'] for s in A.state(conn)['strategies'] if s['engine'] == 'v4']
+    assert 'ct:7:cs-aaa' in names and 'ct:regular' in names and 'ct:calm' in names and 'growth_v4' in names        # « Blou » est dans l'interface des scores
+    blou = [s for s in A.state(conn)['strategies'] if s['name'] == 'ct:7:cs-aaa'][0]
+    assert blou['label'] == 'Blou' and [p for p, v in blou['current']['periods'].items() if v['enabled']] == ['month', 'quarter']
+    # son propre profil : des poids complexes différents changent SES notes, pas celles des autres stratégies
+    base_fast = {r['symbol']: r['complex'] for r in R.table(conn, {'ct_id': 'fast', 'user_id': 7})['rows']}
+    prof = dict(blou['current'], name='ct:7:cs-aaa')
+    prof['complex_weights'] = dict(prof['complex_weights'], dynamics=10, liquidity=40)      # total inchangé (100 %)
+    A.save(conn, {'profile': prof})
+    t = R.table(conn, {'ct_id': 'cs-aaa', 'user_id': 7})
+    assert t['strategy'] == 'ct:7:cs-aaa' and t['label'] == 'Blou' and t['universe'] == 2
+    assert {r['symbol']: r['complex'] for r in R.table(conn, {'ct_id': 'fast', 'user_id': 7})['rows']} == base_fast
+    assert R.table(conn, {'ct_id': 'cs-inconnu', 'user_id': 7})['strategy'] == 'growth_v4'                      # identifiant inconnu : stratégie commune
+    assert R.table(conn, {'ct_id': 'cs-aaa', 'user_id': 8})['strategy'] == 'growth_v4'                          # la stratégie d'un autre utilisateur n'est pas la sienne
