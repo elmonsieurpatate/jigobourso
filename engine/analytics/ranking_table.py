@@ -93,12 +93,8 @@ def table(conn, request):
         spike = _num((d.get('x') or {}).get('spike_share'))
         perf = {k: _num((m.get(n) or {}).get('perf')) for k, n in WINDOWS.items()}
         quality = QUALITY.get(d.get('quality'))
-        secondary = {
-            'volatility': _num(mo.get('volatility')), 'turnover_eur': _num(d.get('turnover_eur')), 'avg_volume': _num(d.get('avg_volume_3m')),
-            'up_fraction': None if up is None else round(100 * up, 3), 'gain_share': None if spike is None else round(100 * spike, 3), 'drawdown': _num(mo.get('drawdown')),
-            'perf-week': perf['week'], 'perf-month': perf['month'], 'perf-quarter': perf['quarter'], 'quality': quality,
-            'freshness': None, 'coverage': None if d.get('coverage_252') is None else round(100 * float(d['coverage_252']), 3),
-            'score_simple_v4': _num(e['simple']), 'score_complex_v4': _num(e['complex'])}
+        extra = {'up_fraction': None if up is None else round(100 * up, 3), 'gain_share': None if spike is None else round(100 * spike, 3), 'quality': quality,
+                 'coverage': None if d.get('coverage_252') is None else round(100 * float(d['coverage_252']), 3)}
         rows.append({
             'id': lid, 'symbol': d['symbol'], 'name': d['name'], 'mic': d['mic'], 'currency': d.get('currency'), 'kind': d['kind'], 'isin': d.get('isin'),
             'country': d.get('country'), 'category': d.get('category'),
@@ -111,5 +107,5 @@ def table(conn, request):
             'turnover_eur': _num(d.get('turnover_eur')), 'liquidity_source': d.get('liquidity_source'), 'avg_volume': _num(d.get('avg_volume_3m')),
             'analyst': d.get('analyst_rating'), 'quality': d.get('quality'),
             'simple': _num(e['simple']), 'complex': _num(e['complex']), 'simple_status': e['simple_status'], 'complex_status': e['complex_status'],
-            'rank_simple': rank_s.get(lid), 'rank_complex': rank_c.get(lid), 'curve': [round(x, 2) for x in curves.get(lid, [])], 'secondary': secondary})
+            'rank_simple': rank_s.get(lid), 'rank_complex': rank_c.get(lid), 'curve': [round(x, 2) for x in curves.get(lid, [])], 'extra': extra})
     return {'strategy': name, 'reference_sessions': REFERENCE, 'universe': len(rows), 'scored': {'simple': len(simple), 'complex': len(complex_)}, 'rows': rows}

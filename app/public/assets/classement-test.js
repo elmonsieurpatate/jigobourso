@@ -280,11 +280,18 @@
   const tinted=(measureId,value,text)=>{const c=categoryOf(measureId,value);return c&&c.color?`<span class="ct-cat" style="--cat:${esc(c.color)}" title="${esc(c.name)}">${text}</span>`:text;};
   const hue=s=>{let h=0;for(const ch of s)h=(h*31+ch.charCodeAt(0))%360;return `hsl(${h} 45% 42%)`;};
   const sheetHref=id=>'titre.html?src=explorer&id='+encodeURIComponent(id);
+  // Valeurs des mesures de filtres : reconstituées depuis les champs de la ligne (une valeur absente reste null, jamais 0).
+  function secondaryOf(r){
+    const x=r.extra||{},perf=r.perf||{};
+    return {volatility:r.volatility,turnover_eur:r.turnover_eur,avg_volume:r.avg_volume,up_fraction:x.up_fraction??null,gain_share:x.gain_share??null,drawdown:r.drawdown,
+      'perf-week':perf.week??null,'perf-month':perf.month??null,'perf-quarter':perf.quarter??null,quality:x.quality??null,freshness:null,coverage:x.coverage??null,
+      score_simple_v4:r.simple,score_complex_v4:r.complex};
+  }
   function toRow(r){
     return {id:r.id,rank:r.rank_complex,rankSimple:r.rank_simple,rankComplex:r.rank_complex,symbol:r.symbol,name:r.name,mic:r.mic,currency:r.currency,kind:r.kind,country:r.country,category:r.category,group:r.group,
       price:r.price_eur,priceNative:r.price,change:r.change,slope:r.slope,r2:r.r2,volatility:r.volatility,drawdown:r.drawdown,turnover:r.turnover_eur,liquiditySource:r.liquidity_source,avgVolume:r.avg_volume,
       perfMonth:r.perf&&r.perf.month!==undefined?r.perf.month:null,simple:r.simple,complex:r.complex,simpleStatus:r.simple_status,complexStatus:r.complex_status,score:r.complex,
-      points:r.curve||[],color:hue(r.symbol),secondary:r.secondary||{},periods:r.periods||{},held:!!r.held,lastClose:r.last_close,quality:r.quality};
+      points:r.curve||[],color:hue(r.symbol),secondary:secondaryOf(r),periods:r.periods||{},held:!!r.held,lastClose:r.last_close,quality:r.quality};
   }
   // Une ligne appartient à une catégorie par mesure (filtres à seuils) ou par groupe (pays, secteur, place, type). Un filtre retient la ligne si l'une de ses catégories est cochée (OU) ; les filtres se combinent en ET.
   function rowOptions(row,k){
