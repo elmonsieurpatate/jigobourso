@@ -10,7 +10,7 @@
         const options=[];
         if(f.editable)for(const m of f.measures)for(const c of m.categories){
           const lo=c.min===null?'−∞':format(c.min),hi=c.max===null?'+∞':format(c.max);
-          const interval=c.unknown?'Donnée indisponible':m.kind==='enum'?c.values.map(v=>m.domain.find(d=>d.value===v)?.label||v).join(', '):`${c.min!==null&&c.minIncluded?'[':']'} ${lo} ; ${hi} ${c.max!==null&&c.maxIncluded?']':'['} ${m.unit}`;
+          const interval=c.unknown?'Donnée indisponible':m.kind==='enum'?c.values.map(v=>m.domain.find(d=>d.value===v)?.label||v).join(', '):(c.min===null&&c.max===null?'Toutes les valeurs connues':c.min===null?`${c.maxIncluded?'Jusqu’à':'Moins de'} ${hi} ${m.unit}`:c.max===null?`${c.minIncluded?'À partir de':'Plus de'} ${lo} ${m.unit}`:`${c.minIncluded?'À partir de':'Plus de'} ${lo} ${m.unit} · ${c.maxIncluded?'jusqu’à':'moins de'} ${hi} ${m.unit}`);
           options.push({id:m.id+'::'+c.id,categoryId:c.id,measure:m.id,label:(f.measures.length>1?m.name+' · ':'')+c.name,color:c.color,range:interval,description:c.description||''});
         }
         else for(const v of f.values)options.push({id:v.id,categoryId:v.id,measure:'values',label:v.label,color:'#64748b',range:v.value===null?'Donnée indisponible':f.provenance,description:f.provenance});

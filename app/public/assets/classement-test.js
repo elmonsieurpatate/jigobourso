@@ -13,7 +13,7 @@
   const categoryPayload=window.ClassementTestCategoryConfig || await J.api('explorer/secondary-filters');
   const categories=secondary.normalize(categoryPayload);
   const filters=Object.fromEntries(Object.entries(categories).map(([k,c])=>[k,[c.label,c.options]]));
-  const columns = ['Titre','Cours','Variation %','Pente % / séance','R²','Volatilité','Liquidité','Volume','Recul maximal','Score','Tendance'];
+  const columns = ['Titre','Cours','Variation %','Pente % / séance','R²','Volatilité','Liquidité','Volume','Recul maximal','Score','Courbe 1M'];
   const metrics = { slope:['Pente (% / séance)','% / séance'], r2:['R² (régression)',''], volatility:['Volatilité quotidienne','%'], drawdown:['Recul maximal','%'], return:['Rendement observé','%'], volume:['Volume moyen','titres / séance'] };
   const key = 'jigo_classement_test_v1';
   const fresh = id => ({ periods:Object.fromEntries(periods.map(([k],i) => [k,{enabled:profiles[id].active.includes(k),slope:profiles[id].slope,r2:Number(Math.min(.99,profiles[id].r2 + i*.025).toFixed(3))}])), extra:[], join:'and' });
@@ -22,7 +22,7 @@
   try {
     const saved = JSON.parse(localStorage.getItem(key));
     if (saved && ['simple','expert'].includes(saved.mode) && profiles[saved.strategy] && periods.some(([k])=>k===saved.selected) && Object.keys(profiles).every(id => {
-      const p=saved.profiles?.[id]; return p && ['and','or'].includes(p.join) && Array.isArray(p.extra) && p.extra.every(x=>metrics[x.metric] && ['>=','<='].includes(x.op) && Number.isFinite(x.value) && x.value>=0) && periods.every(([k])=>typeof p.periods?.[k]?.enabled==='boolean' && Number.isFinite(p.periods[k].slope) && p.periods[k].slope>=.01 && p.periods[k].slope<=2 && Number.isFinite(p.periods[k].r2) && p.periods[k].r2>=0 && p.periods[k].r2<=1);
+      const p=saved.profiles?.[id]; return p && ['and','or'].includes(p.join) && Array.isArray(p.extra) && p.extra.every(x=>metrics[x.metric] && ['>=','<='].includes(x.op) && Number.isFinite(x.value) && x.value>=0) && periods.every(([k])=>typeof p.periods?.[k]?.enabled==='boolean' && Number.isFinite(p.periods[k].slope) && Number.isFinite(p.periods[k].r2) && p.periods[k].r2>=0 && p.periods[k].r2<=1);
     }) && saved.filters && typeof saved.filters==='object' && Array.isArray(saved.columns) && saved.columns.every(n=>Number.isInteger(n)&&n>=0&&n<columns.length)) state=saved;
   } catch (_) { /* Stockage absent ou ancien : valeurs de démonstration. */ }
   const adminSelections=secondary.defaults(categoryPayload,categories);
@@ -61,6 +61,8 @@
   function saveLocalSelection(id){
     if(id)overrides[id]={selected:[...state.filters[id]],known:categories[id].options.map(o=>o.id)};
     state.secondaryOverridesByUser[userKey]=overrides;
+    if(drawer.open)return;
+    appliedFilters=copy(state.filters);if(appliedSettings){appliedSettings.filters=copy(state.filters);appliedSettings.overrides=copy(overrides);}
     try{const saved=JSON.parse(localStorage.getItem(key)||'{}')||{};saved.secondaryOverridesByUser={...(saved.secondaryOverridesByUser||{}),[userKey]:overrides};state.secondaryOverridesByUser=saved.secondaryOverridesByUser;localStorage.setItem(key,JSON.stringify(saved));}catch(_){feedback('Stockage local indisponible : les sélections restent dans cette page.');}
   }
   if(metadataMigration.notices.length)queueMicrotask(()=>feedback('Préférences regroupées : vérifiez les filtres géographiques, sectoriels et de places. Les anciennes sélections sont conservées sur cet appareil.'));
@@ -68,7 +70,20 @@
   state.categorySignature=categorySignature;
   // Jeu fictif immuable. Le formulaire de stratégie n'entre jamais dans son calcul.
   const intrinsicRows=window.ClassementTestDemo.rows(categoryPayload.schema===2?{categories:{}}:categoryPayload);
-  const tableState={sort:'score',direction:'desc',page:1,pageSize:10};
+  const tableState={sort:'score',direction:'desc',page:1,pageSize:10,query:''};
+  const copy=x=>JSON.parse(JSON.stringify(x));
+  const drawer=$('#ct-settings-panel'),mobileQuery=matchMedia('(max-width:700px)');
+  let appliedSettings=null,appliedFilters=copy(state.filters),drawerTrigger=null,returnScroll=0,bodyStyles=null;
+  state.mobileFull=!!state.mobileFull;
+  const snapshot=()=>copy({strategy:state.strategy,selected:state.selected,profiles:state.profiles,filters:state.filters,overrides});
+  function persistPreferences(){try{const saved=JSON.parse(localStorage.getItem(key)||'{}')||{},stored=appliedSettings||snapshot();state.secondaryOverridesByUser={...(saved.secondaryOverridesByUser||{}),[userKey]:stored.overrides};localStorage.setItem(key,JSON.stringify({...saved,...state,strategy:stored.strategy,selected:stored.selected,profiles:stored.profiles,filters:stored.filters}));}catch(_){feedback('Stockage local indisponible : les réglages restent dans cette page.');}}
+
+  function viewport(){if(!drawer.open)return;const v=window.visualViewport;drawer.style.setProperty('--ct-visible-height',(v?.height||innerHeight)+'px');drawer.style.setProperty('--ct-visible-top',(v?.offsetTop||0)+'px');}
+  function context(){if(!appliedSettings)return;const p=appliedSettings.profiles[appliedSettings.strategy];$('#ct-context-name').textContent=$('#ct-strategy option[value="'+appliedSettings.strategy+'"]').textContent;$('#ct-context-periods').textContent=periods.filter(([k])=>p.periods[k].enabled).map(([,label])=>label).join(' + ')||'Aucune période';const relevant=x=>({strategy:x.strategy,profiles:x.profiles,filters:x.filters,overrides:x.overrides});const dirty=JSON.stringify(relevant(snapshot()))!==JSON.stringify(relevant(appliedSettings));$('#ct-draft-mark').hidden=!dirty;$('#ct-draft-status').textContent=dirty?'Modifications non appliquées. Le classement reste inchangé.':'Le classement fictif reste indépendant des réglages.';const count=Object.keys(categories).filter(k=>appliedFilters[k].length!==categories[k].options.length).length;$('#ct-applied-filter-count').textContent=count?'('+count+')':'';$('#ct-applied-filter-count').hidden=!count;}
+  function settingsTab(tab){const filtersOpen=tab==='filters';$('#ct-strategy-section').hidden=filtersOpen;$('#ct-filters-section').hidden=!filtersOpen;document.querySelectorAll('[data-settings-tab]').forEach(el=>el.setAttribute('aria-pressed',String(el.dataset.settingsTab===tab)));$('#ct-settings-title').textContent=filtersOpen?'Filtres':'Réglages';if(filtersOpen)$('#ct-filter-panel').open=true;closeFilter();$('.ct-settings-body').scrollTop=0;}
+  function openSettings(tab='strategy',trigger=document.activeElement){$('.ct-options').open=false;if(!drawer.open){returnScroll=scrollY;drawerTrigger=trigger;bodyStyles=Object.fromEntries(['overflow','position','top','width'].map(k=>[k,document.body.style[k]]));Object.assign(document.body.style,{overflow:'hidden',position:'fixed',top:-returnScroll+'px',width:'100%'});drawer.showModal();}settingsTab(tab);viewport();$('#ct-settings-close').focus({preventScroll:true});}
+  function closeSettings(){closeFilter();drawer.close();if(bodyStyles)Object.assign(document.body.style,bodyStyles);bodyStyles=null;window.scrollTo({top:returnScroll,behavior:'instant'});(drawerTrigger?.getClientRects().length?drawerTrigger:$('#ct-settings-open')).focus({preventScroll:true});context();}
+  function applySettings(){appliedFilters=copy(state.filters);appliedSettings=snapshot();persistPreferences();renderRanking();closeSettings();feedback('Réglages enregistrés. Les chiffres restent des exemples indépendants de la stratégie.');}
   let activeFilter=null, filterQuery='';
   const config = () => state.profiles[state.strategy];
   const isPrimary = r => r.metric === 'slope' || r.metric === 'r2';
@@ -143,9 +158,12 @@
     $('#ct-extra-note').textContent=compatible?`${advanced} critère(s) avancé(s) conservé(s). Consultez le mode Expert pour les modifier.`:'Règles avancées conservées : cette combinaison ne peut pas être représentée fidèlement par deux minimums. Modifiez-la en mode Expert ; les curseurs simples sont verrouillés.';
   }
   function renderSimple() {
-    $('#ct-periods').innerHTML=periods.map(([k,label,n])=>`<div class="ct-period ${config().periods[k].enabled?'active':''} ${state.selected===k?'selected':''}"><button type="button" data-period="${k}" aria-pressed="${state.selected===k}">${label}<small>≈ ${n} séances</small></button><label><input type="checkbox" data-enabled="${k}" ${config().periods[k].enabled?'checked':''}>Activée</label></div>`).join('');
+    const extraOpen=$('#ct-more-periods')?.open||false;
+    const drawPeriod=([k,label,n])=>`<div class="ct-period ${config().periods[k].enabled?'active':''} ${state.selected===k?'selected':''}"><button type="button" data-period="${k}" aria-pressed="${state.selected===k}">${label}<small>≈ ${n} séances</small></button><label><input type="checkbox" data-enabled="${k}" ${config().periods[k].enabled?'checked':''}>Activée</label></div>`;
+    const shown=periods.filter(([k])=>config().periods[k].enabled||state.selected===k),other=periods.filter(([k])=>!config().periods[k].enabled&&state.selected!==k);
+    $('#ct-periods').innerHTML=shown.map(drawPeriod).join('')+(other.length?`<details id="ct-more-periods" ${extraOpen?'open':''}><summary>Autres périodes (${other.length})</summary><div class="ct-periods">${other.map(drawPeriod).join('')}</div></details>`:'');
     const p=config().periods[state.selected];
-    $('#ct-sliders').innerHTML=[['slope','Pente minimale',.01,2,.001,'% / séance','Progression moyenne modélisée par séance.'],['r2','R² minimal',0,1,.001,'','Régularité : de 0 (dispersé) à 1 (aligné).']].map(([id,label,min,max,step,unit,help])=>`<div class="ct-control"><label for="ct-range-${id}">${label} · ${periods.find(([k])=>k===state.selected)[1]}</label><div class="ct-slider-row"><button type="button" data-step="${id}" data-delta="-${step}" aria-label="Diminuer ${label}">−</button><input id="ct-range-${id}" type="range" data-simple="${id}" min="${min}" max="${max}" step="${step}" value="${p[id]}" aria-label="${label}"><button type="button" data-step="${id}" data-delta="${step}" aria-label="Augmenter ${label}">+</button><div class="ct-number"><input id="ct-value-${id}" type="number" data-simple="${id}" min="${min}" max="${max}" step="${step}" value="${p[id]}" aria-label="Valeur ${label}"><span>${unit}</span></div></div><p class="ct-control-help">${help}</p></div>`).join('');
+    $('#ct-sliders').innerHTML=[['slope','Progression minimale',.01,2,.001,'% / séance','Progression moyenne modélisée par séance.'],['r2','Régularité minimale',0,1,.001,'','R² : de 0 (trajectoire dispersée) à 1 (alignée). Ce n’est pas une probabilité.']].map(([id,label,min,max,step,unit,help])=>`<div class="ct-control"><label for="ct-range-${id}">${label} · ${periods.find(([k])=>k===state.selected)[1]}</label><div class="ct-slider-row"><button type="button" data-step="${id}" data-delta="-${step}" aria-label="Diminuer ${label}">−</button><input id="ct-range-${id}" type="range" data-simple="${id}" min="${min}" max="${max}" step="${step}" value="${p[id]}" aria-label="${label}"><button type="button" data-step="${id}" data-delta="${step}" aria-label="Augmenter ${label}">+</button><div class="ct-number"><input id="ct-value-${id}" type="number" data-simple="${id}" min="${min}" max="${max}" step="${step}" value="${p[id]}" aria-label="Valeur ${label}"><span>${unit}</span></div></div><p class="ct-control-help">${help}</p></div>`).join('');
     const compatible=simpleCompatible();
     $('#ct-simple').querySelectorAll('input,button[data-step]').forEach(el=>el.disabled=!compatible);
     chart();preview();
@@ -157,7 +175,7 @@
         <select data-rule-field="metric" aria-label="Indicateur ${p}">${Object.entries(metrics).map(([k,[l]])=>`<option value="${k}" ${n.metric===k?'selected':''}>${l}</option>`).join('')}</select>
         <select data-rule-field="op" aria-label="Opérateur ${p}">${[['>=','≥'],['<=','≤'],['>','>'],['<','<'],['=','=']].map(([v,l])=>`<option value="${esc(v)}" ${n.op===v?'selected':''}>${esc(l)}</option>`).join('')}</select>
         <input type="number" step="any" value="${Number(n.value.toFixed(3))}" data-rule-field="value" aria-label="Valeur ${p}">
-        <select data-rule-field="period" aria-label="Période ${p}">${periods.map(([k,l,count])=>`<option value="${k}" ${n.period===k?'selected':''}>sur ${l.toLowerCase()} (≈ ${count} s.)</option>`).join('')}</select>
+        <select data-rule-field="period" aria-label="Période ${p}">${periods.map(([k,l,count])=>`<option value="${k}" ${n.period===k?'selected':''}>${l}</option>`).join('')}</select>
         <button type="button" class="ct-rule-remove" data-remove-node="${p}" aria-label="Supprimer le critère ${p}">×</button>
       </div>`;
       return `<div class="ct-builder-group ${depth?'nested':''}" data-group-path="${p}"><div class="ct-group-operator"><select data-group-join="${p}" aria-label="Combinaison ${depth?'du groupe '+p:'principale'}"><option value="and" ${n.join==='and'?'selected':''}>ET</option><option value="or" ${n.join==='or'?'selected':''}>OU</option></select></div><div class="ct-group-content">${n.children.map((x,i)=>draw(x,[...path,i],depth+1)).join('')||'<p class="ct-no-rules">Aucun critère dans ce groupe.</p>'}<div class="ct-group-actions"><button type="button" data-add-node="${p}">＋ Ajouter un critère</button>${depth<4?`<button type="button" data-add-group="${p}">＋ Groupe ET / OU</button>`:''}${depth?`<button type="button" data-remove-node="${p}" class="ct-delete-group">Supprimer le groupe</button>`:''}</div></div></div>`;
@@ -208,7 +226,7 @@
     if(old){$(`#ct-list-${old}`).hidden=true;$(`[data-open-filter="${old}"]`).setAttribute('aria-expanded','false');if(restoreFocus)$(`[data-open-filter="${old}"]`).focus();}
   }
   const columnKeys=['name','price','change','slope','r2','volatility','turnover','avgVolume','drawdown','score','trend'];
-  const columnTitles=['Titre','Cours','Var. %','Pente %/s.','R²','Volatilité','Liquidité','Volume','Drawdown','Score','Tendance'];
+  const columnTitles=['Titre','Cours','Var. 1J','Pente %/s.','R²','Volatilité','Liquidité','Volume','Drawdown','Score','Courbe 1M'];
   function money(n){return n===null?'—':new Intl.NumberFormat('fr-FR',{style:'currency',currency:'EUR'}).format(n);}
   function percent(n,sign=false){return n===null?'—':new Intl.NumberFormat('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2,signDisplay:sign?'exceptZero':'auto'}).format(n)+' %';}
   function spark(row){
@@ -218,7 +236,7 @@
     return `<svg class="ct-mini-curve ${row.slope<0?'negative':'positive'}" viewBox="0 0 104 30" role="img" aria-label="Trajectoire fictive sur un mois : ${row.slope<0?'baisse':'hausse'}"><polyline points="${pts.map(p=>p.map(n=>n.toFixed(1)).join(',')).join(' ')}"/><circle cx="${pts.at(-1)[0]}" cy="${pts.at(-1)[1]}" r="2"/></svg>`;
   }
   function rowCell(row,key){
-    if(key==='name')return `<span class="ct-company"><span class="ct-company-mark" style="--mark:${row.color}" aria-hidden="true">${esc(row.symbol.slice(0,2))}</span><span class="ct-company-text"><b>${esc(row.symbol)}</b><span>${esc(row.name)}</span></span></span>`;
+    if(key==='name')return `<button type="button" class="ct-title-button" data-demo-details="${row.id}" aria-label="Détails fictifs de ${esc(row.symbol)}"><span class="ct-company"><span class="ct-company-mark" style="--mark:${row.color}" aria-hidden="true">${esc(row.symbol.slice(0,2))}</span><span class="ct-company-text"><b>${esc(row.symbol)}</b><span>${esc(row.name)}</span></span></span></button>`;
     if(key==='price')return money(row.price);
     if(key==='change')return `<span class="${row.change>0?'up':row.change<0?'down':''}">${percent(row.change,true)}</span>`;
     if(key==='slope')return `<span class="${row.slope>0?'up':row.slope<0?'down':''}">${percent(row.slope,true)}</span>`;
@@ -236,8 +254,14 @@
     renderRanking();
   }
   function renderRanking(){
-    const selected=columnKeys.map((key,i)=>({key,i,label:columnTitles[i]})).filter(x=>state.columns.includes(x.i));
-    const filtered=secondary.apply(intrinsicRows,state.filters,categories);
+    const compact=mobileQuery.matches&&!state.mobileFull;
+    const order=[0,9,10,2,4,1,3,5,8,6,7];
+    const displayed=compact?[0,9,10,2]:order.filter(i=>state.columns.includes(i));
+    const selected=displayed.map(i=>({key:columnKeys[i],i,label:columnTitles[i]}));
+    const allRows=secondary.apply(intrinsicRows,appliedFilters,categories);
+    const needle=tableState.query.trim().toLocaleLowerCase('fr');
+    const filtered=allRows.filter(r=>!needle||[r.symbol,r.name,r.isin].filter(Boolean).some(v=>v.toLocaleLowerCase('fr').includes(needle)));
+    const table=$('.ct-ranking table');table.className=compact?'ct-essential':'ct-complete';$('.ct-table-wrap').classList.toggle('ct-complete-wrap',!compact);$('#ct-full-view').checked=state.mobileFull;$('#ct-layout-note').textContent=mobileQuery.matches&&state.mobileFull?'· Vue complète : glissez pour les autres colonnes.':'';
     const rows=[...filtered].sort((a,b)=>{
       const av=a[tableState.sort],bv=b[tableState.sort];
       if(av===null&&bv!==null)return 1;if(bv===null&&av!==null)return -1;
@@ -247,9 +271,9 @@
     const pages=Math.max(1,Math.ceil(rows.length/tableState.pageSize));tableState.page=Math.min(Math.max(1,tableState.page),pages);
     const start=(tableState.page-1)*tableState.pageSize,pageRows=rows.slice(start,start+tableState.pageSize);
     $('#ct-result-count').textContent=`${rows.length} titres`;
-    $('#ct-table-head').innerHTML='<th scope="col" class="ct-rank-cell" title="Rang initial de démonstration, conservé lors du filtrage">#</th>'+selected.map(({key,label})=>`<th scope="col" class="${key==='name'?'ct-name-heading':''}" ${key!=='trend'?`aria-sort="${key===tableState.sort?(tableState.direction==='asc'?'ascending':'descending'):'none'}"`:''}>${key!=='trend'?`<button type="button" data-sort-column="${key}" aria-label="Trier par ${esc(label)}">${label}${key===tableState.sort?(tableState.direction==='asc'?' ↑':' ↓'):''}</button>`:label}</th>`).join('')+'<th scope="col"><span class="sr-only">Détails</span></th>';
-    $('#ct-table-body').innerHTML=pageRows.map(row=>`<tr data-demo-row="${row.id}"><td class="ct-rank-cell" data-label="Rang initial">${row.rank}</td>${selected.map(({key,label})=>`<td class="ct-cell-${key}" data-label="${esc(label)}">${rowCell(row,key)}</td>`).join('')}<td class="ct-row-actions"><button type="button" data-demo-details="${row.id}" aria-label="Détails fictifs de ${esc(row.symbol)}">⋯</button></td></tr>`).join('');
-    $('#ct-empty-results').hidden=rows.length!==0;
+    $('#ct-table-head').innerHTML='<th scope="col" class="ct-rank-cell" title="Rang initial de démonstration, conservé lors du filtrage">#</th>'+selected.map(({key,label})=>`<th scope="col" class="ct-${key}-heading" ${key!=='trend'?`aria-sort="${key===tableState.sort?(tableState.direction==='asc'?'ascending':'descending'):'none'}"`:''}>${key!=='trend'?`<button type="button" data-sort-column="${key}" aria-label="Trier par ${esc(label)}">${label}${key===tableState.sort?(tableState.direction==='asc'?' ↑':' ↓'):''}</button>`:label}</th>`).join('');
+    $('#ct-table-body').innerHTML=pageRows.map(row=>`<tr data-demo-row="${row.id}"><td class="ct-rank-cell" data-label="Rang initial">${row.rank}</td>${selected.map(({key,label})=>`<td class="ct-cell-${key}" data-label="${esc(label)}">${rowCell(row,key)}</td>`).join('')}</tr>`).join('');
+    $('#ct-empty-results').hidden=rows.length!==0;$('#ct-empty-results h3').textContent=tableState.query?'Aucun exemple pour cette recherche':'Aucun exemple visible';$('#ct-empty-results p').textContent=tableState.query?'Essayez un autre nom ou symbole.':'Les sélections masquent les lignes de démonstration.';
     $('#ct-page-range').textContent=rows.length?`Affichage de ${start+1} à ${Math.min(start+tableState.pageSize,rows.length)} sur ${rows.length} titres fictifs`:'Aucun titre fictif visible';
     $('#ct-pages').innerHTML=`<button type="button" data-demo-page="${tableState.page-1}" ${tableState.page===1?'disabled':''} aria-label="Page précédente">‹</button>${Array.from({length:pages},(_,i)=>`<button type="button" data-demo-page="${i+1}" ${tableState.page===i+1?'aria-current="page"':''} aria-label="Page ${i+1}">${i+1}</button>`).join('')}<button type="button" data-demo-page="${tableState.page+1}" ${tableState.page===pages?'disabled':''} aria-label="Page suivante">›</button>`;
     $('#ct-sort').value=tableState.sort;$('#ct-page-size').value=String(tableState.pageSize);
@@ -258,13 +282,14 @@
   function sortBy(key){tableState.direction=tableState.sort===key?(tableState.direction==='desc'?'asc':'desc'):(key==='name'?'asc':'desc');tableState.sort=key;tableState.page=1;renderRanking();}
   function showDetails(id){
     const row=intrinsicRows.find(r=>r.id===Number(id));if(!row)return;
-    J.dialog({title:row.symbol+' · démonstration',body:`<p class="ct-demo-dialog-note">Toutes les valeurs de cette fiche sont inventées. Aucune cotation réelle, aucun conseil financier.</p><h3>${esc(row.name)}</h3><div class="ct-demo-detail-chart">${spark(row)}</div><dl class="ct-demo-detail"><dt>Cours fictif</dt><dd>${money(row.price)}</dd><dt>Variation fictive du jour</dt><dd>${percent(row.change,true)}</dd><dt>Pente fictive · un mois</dt><dd>${percent(row.slope,true)} / séance</dd><dt>R² fictif · un mois</dt><dd>${row.r2===null?'Indisponible':fmt(row.r2)}</dd><dt>Score d’exemple /100</dt><dd>${row.score}</dd><dt>Rang initial</dt><dd>${row.rank}</dd></dl>`,actions:[{label:'Fermer',run:()=>{}}]});
+    const detailScroll=scrollY,detailTrigger=document.activeElement;
+    const detail=J.dialog({title:row.symbol+' · démonstration',body:`<p class="ct-demo-dialog-note">Toutes les valeurs de cette fiche sont inventées. Aucune cotation réelle, aucun conseil financier.</p><h3>${esc(row.name)}</h3><div class="ct-demo-detail-chart">${spark(row)}</div><dl class="ct-demo-detail"><dt>Cours fictif</dt><dd>${money(row.price)}</dd><dt>Variation fictive du jour</dt><dd>${percent(row.change,true)}</dd><dt>Pente fictive · un mois</dt><dd>${percent(row.slope,true)} / séance</dd><dt>R² fictif · un mois</dt><dd>${row.r2===null?'Indisponible':fmt(row.r2)}</dd><dt>Score d’exemple /100</dt><dd>${row.score}</dd><dt>Rang initial</dt><dd>${row.rank}</dd></dl>`,actions:[{label:'Fermer',run:()=>{}}]});detail.classList.add('ct-detail-dialog');detail.setAttribute('aria-label',row.symbol+' · démonstration');detail.addEventListener('close',()=>requestAnimationFrame(()=>{window.scrollTo({top:detailScroll,behavior:'instant'});if(detailTrigger?.isConnected)detailTrigger.focus({preventScroll:true});}));
   }
   function render() {
     $('#ct-strategy').value=state.strategy;
     document.querySelectorAll('[data-mode]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.mode===state.mode));
     $('#ct-simple').hidden=state.mode!=='simple';$('#ct-expert').hidden=state.mode!=='expert';
-    renderSimple();renderExpert();renderFilters();renderColumns();
+    renderSimple();renderExpert();renderFilters();renderColumns();context();
   }
   $('#ct-page').addEventListener('click',e=>{
     const b=e.target.closest('button');if(!b)return;
@@ -292,21 +317,23 @@
   $('#ct-page').addEventListener('change',e=>{
     const el=e.target;
     if(el.dataset.simple) el.value=config().periods[state.selected][el.dataset.simple];
-    if(el.dataset.enabled){activatePeriod(el.dataset.enabled,el.checked);renderSimple();renderExpert();}
+    if(el.dataset.enabled){const id=el.dataset.enabled;activatePeriod(id,el.checked);renderSimple();renderExpert();$(`[data-enabled="${id}"]`)?.focus({preventScroll:true});}
     if(el.dataset.filter){tableState.page=1;const list=state.filters[el.dataset.filter],id=el.dataset.category;state.filters[el.dataset.filter]=el.checked?[...new Set([...list,id])]:list.filter(v=>v!==id);saveLocalSelection(el.dataset.filter);filterSummary();}
-    if(el.dataset.column!==undefined){const n=Number(el.dataset.column);state.columns=el.checked?[...new Set([...state.columns,n])]:state.columns.filter(v=>v!==n);renderColumns();}
+    if(el.dataset.column!==undefined){const n=Number(el.dataset.column);state.columns=el.checked?[...new Set([...state.columns,n])]:state.columns.filter(v=>v!==n);renderColumns();persistPreferences();}
     if(el.dataset.ruleField){const r=at(el.closest('[data-path]').dataset.path),f=el.dataset.ruleField;r[f]=f==='value'?number(el.value,-1e12,1e12,r.value):el.value;if(f==='value')el.value=r.value;project();preview();}
     if(el.dataset.groupJoin!==undefined){at(el.dataset.groupJoin).join=el.value;project();preview();}
+    context();
   });
   $('#ct-strategy').onchange=e=>{state.strategy=e.target.value;tree();project();state.selected=periods.find(([k])=>config().periods[k].enabled)?.[0]||'week';render();};
   $('#ct-tab-rules').onclick=()=>$('#ct-rules').scrollIntoView({behavior:'smooth',block:'nearest'});
-  $('#ct-tab-manage').onclick=()=>{$('#ct-filter-panel').open=true;$('#ct-filter-panel').scrollIntoView({behavior:'smooth',block:'start'});};
+  $('#ct-tab-manage').onclick=()=>settingsTab('filters');
   $('#ct-tab-queries').onclick=()=>{
     const has=localStorage.getItem(key)!==null;
-    J.dialog({title:'Requêtes locales de test',body:`<p>${has?'Un état de recherche est enregistré sur cet appareil.':'Aucune recherche enregistrée sur cet appareil.'}</p><p>Le bouton Enregistrer mémorise les profils, leurs règles et les filtres. Aucun enregistrement serveur.</p>`,actions:[{label:'Fermer',run:()=>{}},...(has?[{label:'Recharger la sauvegarde',run:()=>location.reload()}]:[])]});
+    const queries=J.dialog({title:'Requêtes locales de test',body:`<p>${has?'Un état de recherche est enregistré sur cet appareil.':'Aucune recherche enregistrée sur cet appareil.'}</p><p>Le bouton Enregistrer mémorise les profils, leurs règles et les filtres. Aucun enregistrement serveur.</p>`,actions:[{label:'Fermer',run:()=>{}},...(has?[{label:'Recharger la sauvegarde',run:()=>location.reload()}]:[])]});queries.setAttribute('aria-label','Requêtes locales de test');
   };
   document.addEventListener('click',e=>{if(activeFilter&&!e.target.closest('.ct-multi'))closeFilter();});
-  window.addEventListener('resize',()=>closeFilter());
+  window.addEventListener('resize',()=>{closeFilter();viewport();renderRanking();});
+  window.visualViewport?.addEventListener('resize',viewport);window.visualViewport?.addEventListener('scroll',viewport);
   document.addEventListener('keydown',e=>{if(e.key==='Escape'&&activeFilter){e.preventDefault();closeFilter(true);}});
   $('#ct-filter-panel').addEventListener('toggle',()=>{if(!$('#ct-filter-panel').open)closeFilter();});
   for(const id of ['ct-all-filters','ct-reset-filters']) $('#'+id).onclick=e=>{e.preventDefault();e.stopPropagation();tableState.page=1;if(id==='ct-reset-filters'){overrides={};state.filters=secondary.defaults(categoryPayload,categories);saveLocalSelection();}else{state.filters=secondary.all(categories);for(const k of Object.keys(categories))saveLocalSelection(k);}renderFilters();};
@@ -315,7 +342,15 @@
   $('#ct-sort').onchange=e=>{tableState.sort=e.target.value;tableState.direction=e.target.value==='name'?'asc':'desc';tableState.page=1;renderRanking();};
   $('#ct-sort-direction').onclick=()=>{tableState.direction=tableState.direction==='desc'?'asc':'desc';tableState.page=1;renderRanking();};
   $('#ct-page-size').onchange=e=>{tableState.pageSize=Number(e.target.value);tableState.page=1;renderRanking();};
-  $('#ct-show-demo-all').onclick=()=>{tableState.page=1;state.filters=secondary.all(categories);for(const k of Object.keys(categories))saveLocalSelection(k);renderFilters();};
-  $('#ct-apply').onclick=()=>feedback('Réglages conservés. Le tableau présente des données fictives, indépendantes de la stratégie.');
-  tree();project();render();
+  $('#ct-show-demo-all').onclick=()=>{if(tableState.query){tableState.query='';$('#ct-search').value='';tableState.page=1;renderRanking();return;}tableState.page=1;state.filters=secondary.all(categories);for(const k of Object.keys(categories))saveLocalSelection(k);renderFilters();};
+  $('#ct-apply').onclick=applySettings;
+  $('#ct-settings-open').onclick=e=>openSettings('strategy',e.currentTarget);$('#ct-settings-context').onclick=e=>openSettings('strategy',e.currentTarget);$('#ct-filters-open').onclick=e=>openSettings('filters',e.currentTarget);$('#ct-settings-close').onclick=closeSettings;
+  $('#ct-settings-cancel').onclick=()=>{if(appliedSettings){state.strategy=appliedSettings.strategy;state.selected=appliedSettings.selected;state.profiles=copy(appliedSettings.profiles);state.filters=copy(appliedSettings.filters);overrides=copy(appliedSettings.overrides);}render();closeSettings();};
+  drawer.addEventListener('cancel',e=>{e.preventDefault();closeSettings();});
+  document.querySelectorAll('[data-settings-tab]').forEach(el=>el.onclick=()=>settingsTab(el.dataset.settingsTab));
+  $('#ct-full-view').onchange=e=>{state.mobileFull=e.target.checked;renderRanking();persistPreferences();};
+  $('#ct-search').oninput=e=>{tableState.query=e.target.value;tableState.page=1;renderRanking();};
+  $('#ct-open-saved').onclick=()=>{openSettings();$('#ct-tab-queries').click();};
+  $('#ct-page').addEventListener('input',context);$('#ct-page').addEventListener('change',context);$('#ct-page').addEventListener('click',()=>queueMicrotask(context));
+  tree();project();appliedSettings=snapshot();render();
 })().catch(error=>{const p=document.querySelector('#ct-feedback');p.textContent='Impossible d’ouvrir la page de test : '+error.message;});
