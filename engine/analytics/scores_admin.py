@@ -22,11 +22,36 @@ def coverage(conn):
             'computed_at': max((r['at'] for r in rows if r['at']), default=None), 'volume_checked_at': max((r['checked'] for r in rows if r['checked']), default=None), 'score_inputs': inputs}
 
 
+def formula():
+    """Constantes de conception des deux scores (lecture seule : changer une formule est une décision de conception, pas un réglage)."""
+    return {'saturation': {'a': SC.SAT_A, 'b': SC.SAT_B}, 'gate_floor': SC.GATE_FLOOR, 'acceleration_amplitude': SC.ACC_AMPLITUDE,
+            'reliability_sessions': SC.RELIABILITY_SESSIONS, 'min_sessions': SC.MIN_SESSIONS, 'anchor': SC.ANCHOR_LAMBDA}
+
+
+def strategies(conn):
+    """Pondération automatique des granularités de chaque stratégie de départ, avec les réglages d'administration en vigueur."""
+    from . import strategy
+    out = []
+    configs = [(name, C.editable(strategy.preset(name))) for name in strategy.PRESETS] + [('growth_v1', C.growth_v1())]
+    for name, config in configs:
+        cfg = score_service.apply_admin(conn, config)
+        if cfg.get('version') != 4:
+            out.append({'name': name, 'scores': False})
+            continue
+        kinds = {}
+        for kind in ('equity', 'etf'):
+            p = score_service.params_for(cfg, kind)
+            w = SC.resolve_weights(p['periods'], p['kappa']) if p['periods'] else {}
+            kinds[kind] = {'periods': [{'id': x['id'], 'sessions': x['sessions'], 'weight': w.get(x['id']), 'required': x['id'] in p['required'], 'custom': 'weight' in x} for x in p['periods']], 'kappa': p['kappa']}
+        out.append({'name': name, 'scores': cfg['ranking'].get('mode') == C.SCORES_MODE, 'sort': cfg['ranking'].get('sort'), 'kinds': kinds})
+    return out
+
+
 def state(conn):
     cur = score_service.admin_defaults(conn)
     stored = settings.get(conn, score_service.SETTING, None)
     return {'design': design(), 'current': {'kappa': cur['kappa'], 'threshold': cur['threshold'], 'complex_weights': dict(SC.COMPLEX_WEIGHTS, **cur['complex_weights'])},
-            'customised': bool(stored), 'coverage': coverage(conn), 'volume_collection': bool(settings.get(conn, 'volume_collection', False)), 'version': SC.VERSION}
+            'customised': bool(stored), 'coverage': coverage(conn), 'volume_collection': bool(settings.get(conn, 'volume_collection', False)), 'version': SC.VERSION, 'formula': formula(), 'strategies': strategies(conn)}
 
 
 def save(conn, request):

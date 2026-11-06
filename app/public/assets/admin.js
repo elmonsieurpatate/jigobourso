@@ -341,7 +341,7 @@
   }
   const COMPLEX_LABELS = { dynamics: 'Dynamique', r2: 'Régularité (R²)', up_days: 'Séances positives', concentration: 'Concentration des gains', volatility: 'Volatilité', drawdown: 'Drawdown', liquidity: 'Liquidité', acceleration: 'Accélération' };
   async function scores() {
-    const s = await J.api('admin/scores'); const c = s.coverage; const cur = s.current; const d = s.design;
+    const s = await J.api('admin/scores'); const c = s.coverage; const cur = s.current; const d = s.design; const f = s.formula;
     const pct = n => c.universe ? J.num(100 * n / c.universe, 1) + ' %' : '–';
     const total = Object.values(cur.complex_weights).reduce((a, b) => a + (+b || 0), 0);
     page.innerHTML = `<div class="notice">Ces réglages valent pour tous les classements. Ils ne contiennent aucun critère de conformité : changer un filtre ne modifie jamais une note. Les événements externes (résultats, rachat probable) restent hors des scores. ${s.customised ? '<b>Valeurs modifiées.</b>' : 'Valeurs de conception.'}</div>
@@ -351,8 +351,14 @@
           ${J.field('Seuil de couverture (0,1 à 1)', `<input id="sc-t" type="number" step="0.05" min="0.1" max="1" value="${cur.threshold}">`)}
           <p class="muted small">En dessous du seuil, la note est « inconnu » ; entre le seuil et 1, « partiel ». Zéro n’est jamais confondu avec une donnée absente.</p></div>
         <div class="card"><h2>Poids du score complexe</h2><p class="muted small">Total actuel : <b id="sc-sum">${J.num(total, 0)}</b> (normalisé à 100 au calcul).</p>
-          ${Object.keys(d.complex_weights).map(k => J.field(`${COMPLEX_LABELS[k] || k} <span class="muted">(conception ${d.complex_weights[k]})</span>`, `<input class="sc-w" data-k="${k}" type="number" step="1" min="0" max="1000" value="${cur.complex_weights[k] ?? 0}">`)).join('')}</div></div>
+          ${Object.keys(d.complex_weights).map(k => J.field(`${COMPLEX_LABELS[k] || k} (conception ${d.complex_weights[k]})`, `<input class="sc-w" data-k="${k}" type="number" step="1" min="0" max="1000" value="${cur.complex_weights[k] ?? 0}">`)).join('')}</div></div>
       <div class="row gap-s" style="margin-top:14px"><button class="btn primary" id="sc-save">Enregistrer</button><button class="btn" id="sc-reset">Revenir aux valeurs de conception</button></div>
+      <div class="card" style="margin-top:16px"><h2>Pondération automatique par stratégie</h2>
+        <p class="muted small">Poids de chaque granularité active, calculés avec κ = ${cur.kappa} (recalculés à l’enregistrement). « Perso » = poids fixés dans la stratégie elle-même. Le tri par score ne s’applique qu’aux stratégies marquées « Scores ».</p>
+        <div class="table-wrap"><table><thead><tr><th>Stratégie</th><th>Mode</th><th>Actions</th><th>ETF</th></tr></thead><tbody>
+          ${s.strategies.map(t => `<tr><td><b>${J.esc(t.name)}</b></td><td>${t.scores ? 'Scores · tri ' + J.esc(t.sort || 'simple') : 'Classement historique'}</td>${['equity', 'etf'].map(k => `<td>${t.kinds[k].periods.length ? t.kinds[k].periods.map(x => `${J.esc(x.id)} (${x.sessions} s) <b>${J.num(100 * x.weight, 1)} %</b>${x.required ? '' : ' <span class="muted">indicative</span>'}${x.custom ? ' <span class="badge">Perso</span>' : ''}`).join('<br>') : '–'}</td>`).join('')}</tr>`).join('')}</tbody></table></div></div>
+      <div class="card" style="margin-top:16px"><h2>Formules de conception (lecture seule)</h2>
+        <p class="small muted">Score simple : Dynamique × Régularité × facteur d’accélération (${J.num(1 - f.acceleration_amplitude, 2)} à ${J.num(1 + f.acceleration_amplitude, 2)}), plafonné à 100. Score complexe : somme pondérée ci-dessus. Saturation de la dynamique : ${f.saturation.a} · (n/5)<sup>${f.saturation.b}</sup> % ; porte de régularité sous ${f.gate_floor} de dynamique ; fiabilité R² pleine à ${f.reliability_sessions} séances ; granularités de ${f.min_sessions} séances minimum. Ces constantes se changent dans le code, pas ici.</p></div>
       <div class="card" style="margin-top:16px"><h2>Liquidité et volumes</h2>
         <p class="muted small">Source de la valeur échangée par titre noté. « Quotidienne » = volumes réels × cours sur 20 séances ; « estimée » = moyenne trimestrielle × cours (surestime d’environ 12 % en médiane).</p>
         <div class="table-wrap"><table><tbody>
