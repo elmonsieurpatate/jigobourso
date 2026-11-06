@@ -21,7 +21,7 @@
   const fmt = (v, d = 1) => v === null || v === undefined ? '—' : J.num(v, d);
   const clone = o => JSON.parse(JSON.stringify(o));
 
-  let root, S, draft, savedJson, sel, rkWhich = 'simple', rkCat = null, rkMore = false, rank = null, confBusy = false, confFail = false, confStale = false, tab = 'config', scoreTab = 'simple', mon = null, monErr = null, sim = null, simBusy = false, simQ = '', useDraft = true, error = '';
+  let root, S, draft, savedJson, sel, rkWhich = 'simple', rkCat = null, rkMore = false, rank = null, confBusy = false, confFail = false, confStale = false, tab = 'config', scoreTab = 'simple', mon = null, monErr = null, sim = null, simWin = 0, simBusy = false, simQ = '', useDraft = true, error = '';
   const autoCache = {};
 
   const v4 = () => S.strategies.filter(s => s.engine === 'v4');
@@ -66,6 +66,9 @@
     root.innerHTML = '<div class="empty"><span class="spinner"></span></div>';
     await load();
     root.onchange = onChange; root.oninput = onInput; root.onclick = onClick;
+    root.onpointermove = chartMove; root.onpointerdown = chartMove; root.onpointerleave = chartLeave; root.onpointerup = e => { if (e.pointerType === 'touch') setTimeout(chartLeave, 2500); };
+    root.onkeydown = e => { if (e.key === 'Enter' && e.target.id === 'as-q') { simQ = e.target.value; runSim(null); } };
+    if (!window.__asResize) { window.__asResize = true; let tm; window.addEventListener('resize', () => { clearTimeout(tm); tm = setTimeout(() => { if (tab === 'simulation' && sim && sim.result && $('#as-ch')) { const w = $('#as-body').clientWidth; if (chart && Math.abs(w - 40 - chart.W) > 8) paint(); } }, 200); }); }
     skeleton(); paint();
   }
 
@@ -96,7 +99,6 @@
     $('#as-err').innerHTML = error ? `<div class="notice err" style="margin-bottom:12px">${E(error)}</div>` : '';
     $('#as-body').innerHTML = tab === 'config' ? configView(st, isV4) : tab === 'profils' ? profilesView() : tab === 'simulation' ? simulationView(isV4) : monitorView();
     if (tab === 'suivi' && !mon && !monErr) loadMonitor();
-    if (tab === 'simulation' && !sim && !simBusy && !error && isV4) runSim(null);
     if (tab === 'profils' && !rank && !confBusy && !confFail && st && st.engine === 'v4') runConf();
   }
 
@@ -207,18 +209,52 @@
     if (!vals || vals.length < 2) return `<span class="as-nocurve muted" title="Historique insuffisant">—</span>`;
     const lo = Math.min(...vals), hi = Math.max(...vals), span = hi - lo || 1, n = vals.length - 1;
     const pts = vals.map((v, i) => `${(i * (w - 2) / n + 1).toFixed(1)},${(h - 2 - (v - lo) / span * (h - 4)).toFixed(1)}`).join(' ');
-    const up = vals[vals.length - 1] >= vals[0];
-    return `<svg class="as-spark ${up ? 'up' : 'dn'}" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="Cours sur ${n} séances"><polyline points="${pts}" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>`;
+    const up = vals[vals.length - 1] >= vals[0], chg = vals[0] ? (vals[n] / vals[0] - 1) * 100 : null;
+    const tip = `${n} séances : ${fmt(vals[0], 2)} → ${fmt(vals[n], 2)}${chg === null ? '' : ' (' + (chg >= 0 ? '+' : '') + fmt(chg, 1) + ' %)'}`;
+    return `<svg class="as-spark ${up ? 'up' : 'dn'}" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="${tip}"><title>${tip}</title><polyline points="${pts}" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>`;
   }
-  function bigCurve(vals) {
-    if (!vals || vals.length < 2) return '<p class="muted">Pas assez d’historique pour tracer la courbe.</p>';
-    const w = 520, h = 140, lo = Math.min(...vals), hi = Math.max(...vals), span = hi - lo || 1, n = vals.length - 1;
-    const pts = vals.map((v, i) => `${(40 + i * (w - 48) / n).toFixed(1)},${(h - 14 - (v - lo) / span * (h - 28)).toFixed(1)}`).join(' ');
-    const up = vals[n] >= vals[0], chg = vals[0] ? (vals[n] / vals[0] - 1) * 100 : null;
-    return `<div class="as-bigcurve"><svg class="as-spark ${up ? 'up' : 'dn'}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="Courbe des cours"><polyline points="${pts}" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>
-      <span class="as-ax hi">${fmt(hi, 2)}</span><span class="as-ax lo">${fmt(lo, 2)}</span></div>
-      <p class="as-hint">Cours sur les ${n} dernières séances (granularité de la stratégie)${chg === null ? '' : ' · variation <b>' + (chg >= 0 ? '+' : '') + fmt(chg, 1) + ' %</b>'}.</p>`;
+  // Graphique interactif : cours réels, axes datés, fenêtre au choix (granularités de notation), lecture au survol ou au toucher.
+  let chart = null;
+  const dFull = d => new Date(d + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+  const dShort = d => new Date(d + 'T00:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+  const winSessions = () => { const w = (sim.windows || []), act = w.filter(x => x.active).map(x => x.sessions); return w.some(x => x.sessions === simWin) ? simWin : (act.length ? Math.max(...act) : (w.length ? w[w.length - 1].sessions : 0)); };
+  function chartCard() {
+    const all = sim.curve || [], wins = sim.windows || [], L = labels();
+    if (all.length < 2) return '<p class="muted">Pas assez d’historique pour tracer la courbe.</p>';
+    const n = Math.min(winSessions(), all.length - 1), pts = all.slice(-(n + 1)), W = Math.max(260, Math.floor(((root && $('#as-body')) ? $('#as-body').clientWidth : 360) - 40)), H = W < 480 ? 210 : 250;
+    const m = { l: 50, r: 10, t: 14, b: 26 }, iw = W - m.l - m.r, ih = H - m.t - m.b;
+    const ps = pts.map(x => x.p), lo0 = Math.min(...ps), hi0 = Math.max(...ps), pad = (hi0 - lo0) * 0.08 || hi0 * 0.01 || 1, lo = lo0 - pad, hi = hi0 + pad;
+    const X = i => m.l + i * iw / (pts.length - 1), Y = v => m.t + (hi - v) / (hi - lo) * ih;
+    const yt = [0, 1, 2, 3].map(k => lo + (hi - lo) * k / 3), nt = Math.min(pts.length, W < 480 ? 3 : 5);
+    const xt = [...new Set(Array.from({ length: nt }, (_, j) => Math.round(j * (pts.length - 1) / Math.max(1, nt - 1))))];
+    const up = ps[ps.length - 1] >= ps[0], chg = ps[0] ? (ps[ps.length - 1] / ps[0] - 1) * 100 : null;
+    const marks = wins.filter(x => x.active && x.sessions < n).map(x => ({ i: pts.length - 1 - x.sessions, lab: L[x.id] || x.id }));
+    chart = { pts, X, Y, m, W, H, ih, first: ps[0] };
+    const line = pts.map((x, i) => `${X(i).toFixed(1)},${Y(x.p).toFixed(1)}`).join(' ');
+    return `<div class="as-chart"><div class="as-win" role="group" aria-label="Fenêtre du graphique">${wins.map(x => `<button class="${x.sessions === n ? 'on' : ''}" data-a="sim-win" data-v="${x.sessions}">${E(L[x.id] || x.id)}<small>${x.sessions} séances${x.active ? ' · stratégie' : ''}</small></button>`).join('')}</div>
+      <div class="as-read" id="as-read" aria-live="polite">${readout(pts.length - 1)}</div>
+      <svg id="as-ch" class="as-ch ${up ? 'up' : 'dn'}" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Courbe des cours sur ${n} séances">
+        ${yt.map(v => `<line class="g" x1="${m.l}" x2="${W - m.r}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}"/><text class="t" x="${m.l - 6}" y="${(Y(v) + 4).toFixed(1)}" text-anchor="end">${fmt(v, hi - lo < 5 ? 2 : hi - lo < 50 ? 1 : 0)}</text>`).join('')}
+        ${marks.map(k => `<line class="mk" x1="${X(k.i).toFixed(1)}" x2="${X(k.i).toFixed(1)}" y1="${m.t}" y2="${m.t + ih}"/><text class="t mkt" x="${(X(k.i) + 3).toFixed(1)}" y="${m.t + 10}">début ${E(k.lab.toLowerCase())}</text>`).join('')}
+        ${xt.map((i, k) => `<text class="t" x="${X(i).toFixed(1)}" y="${H - 7}" text-anchor="${i === 0 ? 'start' : i === pts.length - 1 ? 'end' : 'middle'}">${dShort(pts[i].d)}</text>`).join('')}
+        <polyline points="${line}" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+        <line id="as-cur" class="cur" x1="0" x2="0" y1="${m.t}" y2="${m.t + ih}" style="display:none"/><circle id="as-dot" r="4.5" cx="0" cy="0" style="display:none"/>
+        <rect id="as-hit" x="${m.l}" y="${m.t}" width="${iw}" height="${ih}" fill="transparent"/></svg>
+      <p class="as-hint">Cours de clôture réels sur les ${n} dernières séances (du ${dShort(pts[0].d)} au ${dShort(pts[pts.length - 1].d)})${chg === null ? '' : ' · <b>' + (chg >= 0 ? '+' : '') + fmt(chg, 1) + ' %</b>'}. Survolez ou touchez le graphique pour lire le cours de chaque séance.</p></div>`;
   }
+  function readout(i) {
+    if (!chart) return '';
+    const x = chart.pts[i], prev = chart.pts[i - 1], since = chart.first ? (x.p / chart.first - 1) * 100 : null, day = prev && prev.p ? (x.p / prev.p - 1) * 100 : null, sg = v => (v >= 0 ? '+' : '') + fmt(v, 1) + ' %';
+    return `<b>${E(dFull(x.d))}</b> · cours <b>${fmt(x.p, 2)}</b>${since === null ? '' : ` · <span class="${since >= 0 ? 'pos' : 'neg'}">${sg(since)}</span> depuis le début`}${day === null ? '' : ` · <span class="${day >= 0 ? 'pos' : 'neg'}">${sg(day)}</span> sur la séance`}`;
+  }
+  function chartMove(e) {
+    const hit = e.target.closest && e.target.closest('#as-hit'); if (!hit || !chart) return;
+    const r = hit.getBoundingClientRect(), f = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), i = Math.round(f * (chart.pts.length - 1));
+    const cur = $('#as-cur'), dot = $('#as-dot'), x = chart.X(i), y = chart.Y(chart.pts[i].p);
+    cur.setAttribute('x1', x); cur.setAttribute('x2', x); dot.setAttribute('cx', x); dot.setAttribute('cy', y); cur.style.display = dot.style.display = '';
+    $('#as-read').innerHTML = readout(i);
+  }
+  function chartLeave() { if (!chart || !$('#as-cur')) return; $('#as-cur').style.display = $('#as-dot').style.display = 'none'; $('#as-read').innerHTML = readout(chart.pts.length - 1); }
   const scoreCell = (v, st, main) => `<span class="as-sc ${main ? 'main' : ''}">${v === null || v === undefined ? '<span class="muted">inconnu</span>' : `<b>${fmt(v, 1)}</b>`}${st === 'partiel' ? ' <span class="badge wait" title="Données incomplètes">inc.</span>' : ''}</span>`;
   // Une ligne de classement : rang, nom, courbe, scores à droite. `which` met en avant le score qui sert au classement.
   function rowHtml(r, which, pick) {
@@ -269,18 +305,19 @@
   // ───────────── simulation ─────────────
   function simulationView(isV4) {
     if (!isV4) return `<div class="notice warn">La simulation porte sur une stratégie V4. Choisissez-en une ci-dessous.<div style="margin-top:8px">${stratPicker()}</div></div>`;
-    const sg = sim && sim.suggestions && sim.suggestions.length ? `<h4 class="as-h" style="margin-top:12px">Mieux classés — score simple</h4><div class="as-rklist">${sim.suggestions.map(r => rowHtml(r, 'simple', true)).join('')}</div>` : '';
-    return `<div class="card"><div class="row gap-s" style="flex-wrap:wrap;margin-bottom:8px"><span class="muted">Stratégie :</span> ${stratPicker()}<span class="as-hint" style="margin:0">${sim && sim.granularity ? granText({ periods: sim.periods, sessions: sim.granularity }) : ''}</span></div>
-        <div class="row gap-s" style="flex-wrap:wrap"><input id="as-q" class="as-search" placeholder="Symbole, nom ou ISIN d’un titre noté" value="${E(simQ)}"><button class="btn primary" data-a="sim-run">Décomposer</button>
-        <label class="row gap-s as-chk"><input type="checkbox" data-a="use-draft" ${useDraft ? 'checked' : ''}> avec mes modifications non enregistrées</label></div>${sg}</div>
+    const cands = sim && sim.candidates && sim.candidates.length > 1 ? `<div class="as-chips"><span class="muted">Autres correspondances :</span> ${sim.candidates.map(c => `<button class="btn small" data-a="sim-pick" data-id="${c.id}">${E(c.symbol)} <span class="muted">${E(c.name)}</span></button>`).join(' ')}</div>` : '';
+    return `<div class="card"><div class="row gap-s" style="flex-wrap:wrap;margin-bottom:8px"><span class="muted">Stratégie :</span> ${stratPicker()}</div>
+        ${sim && sim.granularity ? `<p class="as-hint" style="margin:0 0 8px">${granText({ periods: sim.periods, sessions: sim.granularity })}</p>` : ''}
+        <div class="as-searchrow"><input id="as-q" class="as-search" type="search" enterkeyhint="search" placeholder="Symbole, nom ou ISIN d’un titre noté" value="${E(simQ)}"><button class="btn primary" data-a="sim-run">Décomposer</button></div>
+        <label class="row gap-s as-chk" style="margin-top:8px"><input type="checkbox" data-a="use-draft" ${useDraft ? 'checked' : ''}> avec mes modifications non enregistrées</label>${cands}</div>
       <div id="as-sim">${simBusy ? '<div class="empty"><span class="spinner"></span></div>' : simBody()}</div>`;
   }
 
   function simBody() {
-    if (!sim) return '<div class="empty">Lancez une décomposition pour un titre réel, ou laissez vide pour voir les titres les mieux notés.</div>';
+    if (!sim) return '<div class="empty">Cherchez un titre réel (symbole, nom ou ISIN) puis cliquez sur « Décomposer ».</div>';
     if (sim.empty) return `<div class="card"><div class="notice warn"><b>Aucune donnée à décomposer.</b> ${E(sim.reason)} Rien n’est remplacé par des exemples fictifs.</div></div>`;
     if (sim.not_found) return '<div class="card"><div class="notice warn">Aucun titre noté ne correspond à cette recherche.</div></div>';
-    if (!sim.result) return `<div class="card"><p class="muted">${sim.candidates && sim.candidates.length ? 'Plusieurs titres correspondent.' : 'Choisissez un titre parmi les mieux notés ci-dessus.'}</p></div>`;
+    if (!sim.result) return '<div class="empty">Cherchez un titre réel (symbole, nom ou ISIN) puis cliquez sur « Décomposer ».</div>';
     const r = sim.result, ids = sim.periods.map(x => x.id), L = labels();
     const rk = sim.ranks || {}, rkOf = cls => { const x = rk[cls === 's' ? 'simple' : 'complex']; return x && x.rank ? `rang <b>${x.rank}</b> sur ${J.num(x.of, 0)} · ` : ''; };
     const sc = (o, cls) => `<div class="as-score ${cls}"><span>${cls === 's' ? 'Score simple' : 'Score complexe'}</span><b>${o.score === null ? 'inconnu' : fmt(o.score, 1)}</b>${o.score === null ? '' : ' / 100'}<small>${rkOf(cls)}${o.status === 'ok' ? 'données complètes' : o.status === 'partiel' ? 'données incomplètes' : E(o.why || '')} · couverture ${fmt(100 * (o.coverage || 0), 0)} %${o.score !== null && o.reliable === false ? ' · peu fiable' : ''}</small></div>`;
@@ -288,8 +325,8 @@
       return `<td class="num">${val === null || val === undefined ? '<span class="muted">indisponible</span>' : fmt(unit === '%' ? val * (['up_fraction', 'spike_share'].includes(key) ? 100 : 1) : val, d) + (unit ? ' ' + unit : '')}${note === null || note === undefined ? '' : `<br><small class="muted">note ${fmt(note, 0)}</small>`}</td>`; };
     const rows = [['Croissance (Dynamique)', 'growth', '%', 2], ['Régularité (R²)', 'r2', '', 2], ['Séances positives', 'up_fraction', '%', 0], ['Plus gros pic ÷ hausse nette', 'spike_share', '%', 0], ['Accélération (écart de pente)', 'accel', '', 3], ['Volatilité (par séance)', 'volatility', '%', 2], ['Drawdown', 'drawdown', '%', 1]];
     const s = r.simple, c = r.complex, liq = r.liquidity || {};
-    return `<div class="card"><div class="row between" style="flex-wrap:wrap;gap:12px"><div><h3 class="as-h" style="margin:0">${E(sim.title.name)}</h3><span class="muted">${E(sim.title.symbol)} · ${E(sim.title.mic)} · ${sim.title.kind === 'etf' ? 'ETF' : 'Action'}</span></div><div class="row gap-s">${sc(s, 's')}${sc(c, 'c')}</div></div>
-      ${bigCurve(sim.curve)}
+    return `<div class="card"><div class="row between" style="flex-wrap:wrap;gap:12px"><div><h3 class="as-h" style="margin:0">${E(sim.title.name)}</h3><span class="muted">${E(sim.title.symbol)} · ${E(sim.title.mic)} · ${sim.title.kind === 'etf' ? 'ETF' : 'Action'}</span></div><div class="as-scores">${sc(s, 's')}${sc(c, 'c')}</div></div>
+      ${chartCard()}
       <div class="table-wrap"><table class="as-dec"><thead><tr><th>Mesure</th>${ids.map(i => `<th class="num">${E(L[i])}<br><small class="muted">poids réel ${fmt(100 * ((r.weights_effective || {})[i] || 0), 1)} %${r.periods[i] ? '' : ' (période sans données)'}</small></th>`).join('')}</tr></thead><tbody>
         ${rows.map(([n, k, u, d]) => `<tr><td>${n}</td>${ids.map(i => cell(r.periods[i], k, u, d)).join('')}</tr>`).join('')}</tbody></table></div>
       <div class="as-two"><div><h4 class="as-h">Score simple (pente × R²)</h4>${s.score === null ? `<p class="muted">${E(s.why || '')}</p>` : `<p>100 × Dynamique <b>${fmt(s.dynamics, 2)}</b> × Régularité <b>${fmt(s.quality, 2)}</b> = <b>${fmt(s.score, 1)}</b></p>
@@ -354,7 +391,7 @@
 
   function onChange(e) {
     const t = e.target, a = t.dataset.a, p = sel && draft.profiles[sel];
-    if (a === 'strategy') { sel = t.value; sim = null; rank = null; later(); }
+    if (a === 'strategy') { const keep = tab === 'simulation' && sim && sim.title ? sim.title.id : null; sel = t.value; rank = null; if (keep) { runSim(keep); return; } sim = null; later(); }
     else if (a === 'active') {
       const on = t.checked, q = prof();
       if (!on && active(q).length <= 1) { t.checked = true; J.toast('Au moins une granularité doit rester active'); return; }
@@ -406,6 +443,7 @@
     else if (a === 'restore') restore();
     else if (a === 'sim-run') { simQ = ($('#as-q') || {}).value || ''; runSim(null); }
     else if (a === 'sim-pick') runSim(+t.dataset.id);
+    else if (a === 'sim-win') { simWin = +v; paint(); }
     else if (a === 'mon-refresh') { mon = null; monErr = null; paint(); }
   }
 

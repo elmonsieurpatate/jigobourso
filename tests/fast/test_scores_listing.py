@@ -15,7 +15,8 @@ class Cur:
         self.c.sql = sql
         if 'daily_prices' in sql:
             ids = [a for a in args if isinstance(a, int)]
-            self.rows = [{'listing_id': i, 'px': 100 + k} for i in ids for k in range(self.c.points)]
+            import datetime
+            self.rows = [{'listing_id': i, 'price_date': datetime.date(2026, 9, 1) + datetime.timedelta(days=k), 'px': 100 + k} for i in ids for k in range(self.c.points)]
         else:
             ids = list(args)
             self.rows = [{'id': i, 'symbol': 'S%d' % i, 'mic': 'XPAR', 'name': 'N%d' % i, 'kind': 'equity', 'isin': None} for i in ids]
@@ -68,3 +69,20 @@ def test_rank_of_and_suggestions_carry_scores_and_curve():
     assert A._rank_of(b, 2)['simple'] == {'rank': 1, 'of': 3}
     s = A._suggestions(Conn(), b, n=2, sessions=5)
     assert [x['id'] for x in s] == [2, 3] and s[0]['rank'] == 1 and s[0]['complex'] == 15 and len(s[0]['curve']) == 6
+
+
+def test_dated_series_has_iso_dates_and_prices():
+    import datetime
+    class C2(Conn):
+        def cursor(self):
+            c = Cur(self)
+            orig = c.execute
+            def ex(sql, args=()):
+                orig(sql, args)
+                if 'daily_prices' in sql:
+                    c.rows = [{'listing_id': 1, 'price_date': datetime.date(2026, 10, 1) + datetime.timedelta(days=k), 'px': 100 + k} for k in range(30)]
+            c.execute = ex
+            return c
+    out = A.dated_series(C2(), 1, 21)
+    assert len(out) == 22 and out[-1] == {'d': '2026-10-30', 'p': 129.0} and out[0]['d'] == '2026-10-09'
+    assert A.dated_series(C2(), 1, 0) == []

@@ -366,7 +366,8 @@ def simulate(conn, request):
     return {'empty': False, 'title': dict(id=lid, symbol=info['symbol'], mic=info['mic'], name=info['name'], kind=info['kind'], isin=info['isin']),
             'candidates': candidates, 'result': scored, 'periods': [dict(id=p['id'], sessions=p['sessions']) for p in params['periods']],
             'kappa': params['kappa'], 'suggestions': _suggestions(conn, book, sessions=gran),
-            'curve': series(conn, [lid], _granularity(params)).get(lid, []), 'granularity': _granularity(params), 'ranks': _rank_of(book, lid)}
+            'curve': dated_series(conn, lid, max(CURVE_SESSIONS, _granularity(params))),
+            'windows': [dict(id=x, sessions=C.SESSIONS[x], active=any(q['id'] == x for q in params['periods'])) for x in SCORING_PERIODS if C.SESSIONS[x] <= max(CURVE_SESSIONS, _granularity(params))], 'granularity': _granularity(params), 'ranks': _rank_of(book, lid)}
 
 
 def _rank_of(book, lid):
@@ -522,6 +523,7 @@ def _top(conn, book, key, n=10):
 
 
 PAGE = 25
+CURVE_SESSIONS = max(C.SESSIONS[p] for p in C.PERIODS if p in ('week', 'month', 'quarter'))   # la courbe de simulation couvre la plus longue granularité de notation
 CATEGORY_FILE = 'app/config/explorer_secondary_filters.json'
 
 
@@ -540,9 +542,8 @@ def _definitions(conn):
         return {'filters': []}
 
 
-def series(conn, ids, sessions):
-    """Dernières clôtures (sessions + 1 points) de chaque titre, pour tracer la courbe sur la granularité de la stratégie. Données réelles uniquement :
-    un titre sans historique n'a pas de courbe (liste vide), rien n'est interpolé."""
+def _closes(conn, ids, sessions):
+    """{listing_id: [(date, cours)]} : les sessions + 1 dernières clôtures réelles de chaque titre (rien d'interpolé)."""
     ids = list(ids)
     out = {i: [] for i in ids}
     if not ids or sessions < 1:
@@ -552,12 +553,22 @@ def series(conn, ids, sessions):
     with conn.cursor() as cur:
         for k in range(0, len(ids), 200):
             part = ids[k:k + 200]
-            cur.execute(f"""SELECT listing_id, COALESCE(adj_close_px, close_px) AS px FROM daily_prices
+            cur.execute(f"""SELECT listing_id, price_date, COALESCE(adj_close_px, close_px) AS px FROM daily_prices
                             WHERE listing_id IN ({','.join(['%s'] * len(part))}) AND price_date>=%s AND COALESCE(adj_close_px, close_px) IS NOT NULL
                             ORDER BY listing_id, price_date""", part + [since])
             for r in cur.fetchall():
-                out[r['listing_id']].append(float(r['px']))
-    return {i: [round(v, 4) for v in vals[-(sessions + 1):]] for i, vals in out.items()}
+                out[r['listing_id']].append((r['price_date'], float(r['px'])))
+    return {i: v[-(sessions + 1):] for i, v in out.items()}
+
+
+def series(conn, ids, sessions):
+    """Dernières clôtures (sessions + 1 points) de chaque titre : petites courbes du classement. Un titre sans historique n'a pas de courbe (liste vide)."""
+    return {i: [round(px, 4) for _, px in v] for i, v in _closes(conn, ids, sessions).items()}
+
+
+def dated_series(conn, lid, sessions):
+    """Courbe détaillée d'un titre : date ISO et cours de chaque séance, pour l'infobulle de la simulation."""
+    return [{'d': d.isoformat() if hasattr(d, 'isoformat') else str(d), 'p': round(px, 4)} for d, px in _closes(conn, [lid], sessions).get(lid, [])]
 
 
 def _granularity(params):
