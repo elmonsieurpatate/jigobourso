@@ -196,7 +196,7 @@
   .ct-strategy select{width:100%;min-width:0}
   .ct-strategy .ct-provisional{grid-column:1/-1}
   .ct-periods{gap:8px}
-  .ct-illustration{display:none}
+  .ct-illustration{max-width:260px;justify-self:center}
   .ct-slider-row{display:grid;grid-template-columns:36px minmax(0,1fr) 36px;gap:8px}
   .ct-slider-row .ct-number{grid-column:1/-1;justify-content:flex-start}
   .ct-slider-row button{width:36px;height:40px}
