@@ -113,7 +113,7 @@
   }
   function simpleCompatible() {
     const all=leaves().filter(x=>isPrimary(x.node));
-    return all.every(({node:r,joins})=>r.op==='>=' && joins.every(j=>j==='and') && r.value>=(r.metric==='slope'?.01:0) && r.value<=(r.metric==='slope'?2:1)) && periods.every(([k])=>{
+    return all.every(({node:r,joins})=>r.op==='>=' && joins.every(j=>j==='and') && r.value>=0 && r.value<=(r.metric==='slope'?2:1)) && periods.every(([k])=>{
       const own=all.filter(x=>x.node.period===k);return !own.length || (own.length===2 && new Set(own.map(x=>x.node.metric)).size===2);
     });
   }
@@ -143,7 +143,7 @@
   {const want=new URLSearchParams(location.search).get('strategy');if(serverOk&&want&&enabledIds().includes(want))state.strategy=want;}
   for(const id of order()){const s=state.strategy;state.strategy=id;tree();state.strategy=s;saved[id]={p:cloneJSON(state.profiles[id]),o:cloneJSON(ovBy[id])};}
   try{const l=JSON.parse(localStorage.getItem(key)||'{}')||{};if(['simple','expert'].includes(l.mode))state.mode=l.mode;if(Array.isArray(l.cols)&&l.cols.every(n=>Number.isInteger(n)&&n>=0&&n<columns.length))state.columns=l.cols;}catch(_){/* préférences d'affichage facultatives */}
-  try{if(!localStorage.getItem('jigo_ct_cols_v3')){state.columns=window.matchMedia('(max-width:700px)').matches?[0,3,4,12,13]:[0,3,4,5,6,7,8,12,13,14];localStorage.setItem('jigo_ct_cols_v3','1');}}catch(_){/* préférence facultative */}   // colonnes essentielles par défaut (place, secteur, recul… via « Colonnes ») : pas de défilement horizontal inutile
+  try{if(!localStorage.getItem('jigo_ct_cols_v4')){state.columns=window.matchMedia('(max-width:700px)').matches?[0,3,4,5,12,13]:[0,3,4,5,6,7,8,12,13,14];localStorage.setItem('jigo_ct_cols_v3','1');}}catch(_){/* préférence facultative */}   // colonnes essentielles par défaut (place, secteur, recul… via « Colonnes ») : pas de défilement horizontal inutile
   overrides=ovBy[state.strategy];state.filters=filtersFor(overrides);
   state.selected=periods.find(([k])=>config().periods[k].enabled)?.[0]||state.selected;
   const isDirty=id=>JSON.stringify([state.profiles[id],id===state.strategy?overrides:ovBy[id]])!==JSON.stringify([saved[id].p,saved[id].o]);
@@ -193,6 +193,7 @@
       return `<div class="ct-preview-group"><b>${n.join==='and'?'TOUTES (ET)':'AU MOINS UNE (OU)'}</b>${n.children.map(x=>`<div>${text(x)}</div>`).join('')||'<span>Aucun critère</span>'}</div>`;
     }
     $('#ct-preview').innerHTML=text(tree());
+    if(!loading&&typeof renderRanking==='function')renderRanking();                 // le tableau suit immédiatement les seuils / règles (affichage seulement)
     const hasEmpty = n => n.kind==='group' && (!n.children.length || n.children.some(hasEmpty));
     const valid=leaves().length>0 && !hasEmpty(tree()) && leaves().every(({node:r})=>Number.isFinite(r.value) && (r.metric!=='r2'||(r.value>=0&&r.value<=1)) && (!['volatility','drawdown','volume'].includes(r.metric)||r.value>=0));
     const badge=$('.ct-valid');badge.textContent=valid?'✓ Filtre valide':'⚠ Filtre à compléter';badge.classList.toggle('invalid',!valid);
@@ -204,7 +205,7 @@
   function renderSimple() {
     $('#ct-periods').innerHTML=periods.map(([k,label,n])=>`<div class="ct-period ${config().periods[k].enabled?'active':''} ${state.selected===k?'selected':''}"><button type="button" data-period="${k}" aria-pressed="${state.selected===k}">${label}<small>≈ ${n} séances</small></button><label><input type="checkbox" data-enabled="${k}" ${config().periods[k].enabled?'checked':''}>Activée</label></div>`).join('');
     const p=config().periods[state.selected];
-    $('#ct-sliders').innerHTML=[['slope','Pente minimale',.01,2,.001,'% / séance','Progression moyenne modélisée par séance.'],['r2','R² minimal',0,1,.001,'','Régularité : de 0 (dispersé) à 1 (aligné).']].map(([id,label,min,max,step,unit,help])=>`<div class="ct-control"><label for="ct-range-${id}">${label} · ${periods.find(([k])=>k===state.selected)[1]}</label><div class="ct-slider-row"><button type="button" data-step="${id}" data-delta="-${step}" aria-label="Diminuer ${label}">−</button><input id="ct-range-${id}" type="range" data-simple="${id}" min="${min}" max="${max}" step="${step}" value="${p[id]}" aria-label="${label}"><button type="button" data-step="${id}" data-delta="${step}" aria-label="Augmenter ${label}">+</button><div class="ct-number"><input id="ct-value-${id}" type="number" data-simple="${id}" min="${min}" max="${max}" step="${step}" value="${p[id]}" aria-label="Valeur ${label}"><span>${unit}</span></div></div><p class="ct-control-help">${help}</p></div>`).join('');
+    $('#ct-sliders').innerHTML=[['slope','Pente minimale',0,2,.001,'% / séance','Progression moyenne modélisée par séance. À 0 : aucun seuil. Masque seulement des lignes : notes et rangs ne changent pas.'],['r2','R² minimal',0,1,.001,'','Régularité : de 0 (dispersé) à 1 (aligné).']].map(([id,label,min,max,step,unit,help])=>`<div class="ct-control"><label for="ct-range-${id}">${label} · ${periods.find(([k])=>k===state.selected)[1]}</label><div class="ct-slider-row"><button type="button" data-step="${id}" data-delta="-${step}" aria-label="Diminuer ${label}">−</button><input id="ct-range-${id}" type="range" data-simple="${id}" min="${min}" max="${max}" step="${step}" value="${p[id]}" aria-label="${label}"><button type="button" data-step="${id}" data-delta="${step}" aria-label="Augmenter ${label}">+</button><div class="ct-number"><input id="ct-value-${id}" type="number" data-simple="${id}" min="${min}" max="${max}" step="${step}" value="${p[id]}" aria-label="Valeur ${label}"><span>${unit}</span></div></div><p class="ct-control-help">${help}</p></div>`).join('');
     const compatible=simpleCompatible();
     $('#ct-simple').querySelectorAll('input,button[data-step]').forEach(el=>el.disabled=!compatible);
     chart();preview();
@@ -317,10 +318,27 @@
     return rows.filter(row=>active.every(([k])=>rowOptions(row,k).some(id=>state.filters[k].includes(id))));
   }
   // Aucune admission : tous les titres évalués sont classés. Seuls les filtres secondaires masquent des lignes (affichage), sans toucher aux scores ni aux rangs.
+  // Seuils de pente / R² (Simple) et règles (Expert) : filtres d'AFFICHAGE. Un seuil à 0 est inactif ; ils masquent des lignes, jamais ne changent une note ou un rang.
+  const extraValue=(row,m)=>m==='slope'?row.slope:m==='r2'?row.r2:m==='volatility'?row.volatility:m==='drawdown'?row.drawdown:m==='return'?row.perfMonth:m==='volume'?row.avgVolume:null;
+  const cmp={'>=':(a,b)=>a>=b,'<=':(a,b)=>a<=b,'>':(a,b)=>a>b,'<':(a,b)=>a<b,'=':(a,b)=>a===b};
+  function thresholdTest(){
+    const c=config(),extra=leaves().map(x=>x.node).filter(r=>!isPrimary(r)),active=periods.filter(([k])=>c.periods[k].enabled&&(c.periods[k].slope>0||c.periods[k].r2>0));
+    if(!active.length&&!extra.length)return ()=>true;
+    const test=(row,r)=>{const v=extraValue(row,r.metric);return v!=null&&cmp[r.op](v,r.value);};
+    return row=>{
+      const periodsOk=active.every(([k,,n])=>{const p=c.periods[k],m=row.periods[String(n)]||{};return (!(p.slope>0)||(m.slope!=null&&m.slope>=p.slope))&&(!(p.r2>0)||(m.r2!=null&&m.r2>=p.r2));});
+      if(!periodsOk)return false;
+      return !extra.length||(c.join==='or'?extra.some(r=>test(row,r)):extra.every(r=>test(row,r)));
+    };
+  }
+  function clearThresholds(){
+    for(const [k] of periods){const p=config().periods[k];p.slope=0;p.r2=0;}
+    leaves().filter(x=>isPrimary(x.node)&&x.node.op==='>=').forEach(x=>{x.node.value=0;});
+  }
   function visibleRows(){
     const needle=tableState.query.trim().toLocaleLowerCase('fr');
     const base=needle?intrinsicRows.filter(r=>(r.symbol+' '+r.name+' '+(r.isin||'')).toLocaleLowerCase('fr').includes(needle)):intrinsicRows;
-    return {base,rows:applySecondary(base)};
+    return {base,rows:applySecondary(base).filter(thresholdTest())};
   }
   function spark(row){
     if(!row.points.length)return '<span class="ct-missing">Indisponible</span>';
@@ -374,7 +392,7 @@
     $('#ct-table-body').innerHTML=pageRows.map(row=>`<tr data-row="${row.id}"><td class="ct-rank-cell" data-label="Rang">${rankCell(row)}</td>${selected.map(({key,label})=>`<td class="ct-cell-${key}" data-label="${esc(label)}">${rowCell(row,key)}</td>`).join('')}</tr>`).join('');
     $('#ct-empty-results').hidden=rows.length!==0||!!loadError;
     const searched=!!tableState.query.trim(),masked=base.length-filtered.length,unevaluated=Math.max(0,universe-intrinsicRows.length);
-    $('#ct-strategy-count').textContent=loadError?'':`${num0(intrinsicRows.length)} titres évalués · ${num0(unevaluated)} non évaluables (données insuffisantes) · ${num0(masked)} masqués par vos filtres · ${num0(filtered.length)} affichés${searched?` (recherche : ${num0(base.length)} correspondances)`:''}. Aucun titre n’est exclu par la stratégie.${scoreLabel?` Stratégie : ${scoreLabel}.`:''}`;
+    $('#ct-strategy-count').textContent=loadError?'':`${num0(intrinsicRows.length)} titres évalués · ${num0(unevaluated)} non évaluables (données insuffisantes) · ${num0(masked)} masqués par vos filtres · ${num0(filtered.length)} affichés${searched?` (recherche : ${num0(base.length)} correspondances)`:''}. Les seuils et filtres ne masquent que l’affichage : notes et rangs ne changent pas.${scoreLabel?` Stratégie : ${scoreLabel}.`:''}`;
     $('#ct-masked-count').textContent=`${num0(masked)} titre${masked>1?'s':''} masqué${masked>1?'s':''}`;
     $('#ct-masked-count').classList.toggle('has-hidden',masked>0);
     $('#ct-page-range').textContent=loadError?loadError:rows.length?`Affichage de ${start+1} à ${Math.min(start+tableState.pageSize,rows.length)} sur ${rows.length} titres`:'Aucun titre visible';
@@ -408,7 +426,7 @@
   $('#ct-page').addEventListener('input',e=>{
     const el=e.target;
     if(el.dataset.categorySearch){filterQuery=el.value;searchCategories(el.dataset.categorySearch,el.value);}
-    if(el.dataset.simple){const f=el.dataset.simple,p=config().periods[state.selected];setSimpleValue(f,number(el.value,f==='slope'?.01:0,f==='slope'?2:1,p[f]));$(`#ct-${el.type==='range'?'value':'range'}-${f}`).value=p[f];chart();preview();}
+    if(el.dataset.simple){const f=el.dataset.simple,p=config().periods[state.selected];setSimpleValue(f,number(el.value,0,f==='slope'?2:1,p[f]));$(`#ct-${el.type==='range'?'value':'range'}-${f}`).value=p[f];chart();preview();}
     if(el.dataset.ruleField==='value'){const r=at(el.closest('[data-path]').dataset.path);r.value=number(el.value,-1e12,1e12,r.value);project();preview();}
   });
   $('#ct-page').addEventListener('change',e=>{
@@ -432,7 +450,7 @@
   window.addEventListener('resize',()=>closeFilter());
   document.addEventListener('keydown',e=>{if(e.key==='Escape'&&activeFilter){e.preventDefault();closeFilter(true);}});
   $('#ct-filter-panel').addEventListener('toggle',()=>{if(!$('#ct-filter-panel').open)closeFilter();});
-  for(const id of ['ct-all-filters','ct-reset-filters']) $('#'+id).onclick=e=>{e.preventDefault();e.stopPropagation();tableState.page=1;if(id==='ct-reset-filters'){overrides={};state.filters=secondary.defaults(categoryPayload,categories);saveLocalSelection();}else{state.filters=secondary.all(categories);for(const k of Object.keys(categories))saveLocalSelection(k);}renderFilters();};
+  for(const id of ['ct-all-filters','ct-reset-filters']) $('#'+id).onclick=e=>{e.preventDefault();e.stopPropagation();const panel=$('#ct-filter-panel'),was=panel.open;tableState.page=1;if(id==='ct-reset-filters'){overrides={};state.filters=secondary.defaults(categoryPayload,categories);saveLocalSelection();}else{clearThresholds();state.filters=secondary.all(categories);for(const k of Object.keys(categories))saveLocalSelection(k);}renderFilters();render();panel.open=was;queueMicrotask(()=>{panel.open=was;});const m=$('#ct-masked-count');m.textContent=id==='ct-all-filters'?'Tout est affiché ✓':'Filtres réinitialisés ✓';setTimeout(()=>filterSummary(),1600);};
   $('#ct-reset').onclick=()=>guarded(async()=>{
     const id=state.strategy,builtin=!!builtinNames[id];
     if(!await J.confirm(builtin?'Restaurer les valeurs par défaut':'Annuler les modifications',builtin?`« ${names[id]} » reprendra ses valeurs d’origine (périodes, seuils, règles et filtres). Les autres stratégies ne changent pas.`:`« ${names[id]} » reviendra à sa dernière version enregistrée.`,builtin?'Restaurer':'Annuler les modifications'))return;
@@ -470,7 +488,7 @@
   $('#ct-sort').onchange=e=>{tableState.userSorted=true;tableState.sort=e.target.value;tableState.direction=['name','market','sector'].includes(e.target.value)?'asc':'desc';tableState.page=1;renderRanking();};
   $('#ct-sort-direction').onclick=()=>{tableState.direction=tableState.direction==='desc'?'asc':'desc';tableState.page=1;renderRanking();};
   $('#ct-page-size').onchange=e=>{tableState.pageSize=Number(e.target.value);tableState.page=1;renderRanking();};
-  $('#ct-show-demo-all').onclick=()=>{tableState.query='';const q=$('#ct-search');if(q)q.value='';tableState.page=1;state.filters=secondary.all(categories);for(const k of Object.keys(categories))saveLocalSelection(k);renderFilters();};
+  $('#ct-show-demo-all').onclick=()=>{clearThresholds();tableState.query='';const q=$('#ct-search');if(q)q.value='';tableState.page=1;state.filters=secondary.all(categories);for(const k of Object.keys(categories))saveLocalSelection(k);renderFilters();render();};
   $('#ct-apply').onclick=()=>feedback('Réglages conservés. Le tableau présente des données fictives, indépendantes de la stratégie.');
   let loadSeq=0;
   async function loadRows(){
