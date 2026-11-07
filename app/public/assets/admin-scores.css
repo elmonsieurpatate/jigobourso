@@ -94,3 +94,14 @@
 /* Simulation : le bloc de recherche et le bloc du résultat ne se touchent plus */
 #as-sim{margin-top:16px}
 #as-sim>.card+.card{margin-top:16px}
+
+/* Normalisations par stratégie : bloc empilé (libellé, réglage, explication), jamais tronqué */
+.as-tune { padding: 12px 0; border-top: 1px solid var(--line, #e4e4ee); }
+.as-tune-head { font-size: .95rem; }
+.as-tune-ctl { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 8px 0 2px; }
+.as-tune .as-num { width: 110px; min-width: 90px; font-size: 1rem; }
+.as-tune .as-tsel { width: 100%; max-width: 480px; height: auto; min-height: 40px; white-space: normal; text-overflow: clip; }
+.as-tune .as-unit { font-size: .88rem; }
+.as-tune-def .btn { margin-left: 6px; }
+@media (max-width: 640px) { .as-tune .as-tsel { max-width: 100%; } .as-tune .as-num { width: 100%; max-width: 160px; min-height: 44px; } .as-tune-def .btn { min-height: 40px; } }
+@media (max-width: 760px) { .as-bar { overflow-x: visible; } .as-bar .row { flex-wrap: wrap; width: 100%; } .as-bar .btn { flex: 1 1 auto; white-space: normal; } }

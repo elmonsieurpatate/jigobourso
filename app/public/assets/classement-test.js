@@ -484,10 +484,9 @@
 (function(){
   const panel=document.querySelector('.ct-panel[aria-label="Stratégie et critères"]'),head=panel&&panel.querySelector('.ct-strategy');
   if(!head||head.querySelector('.ct-fold'))return;
-  const KEY='jigobourso.ct.strategy-open';let open=false;
-  try{open=localStorage.getItem(KEY)==='1';}catch(_){/* préférence facultative */}
+  let open=false;                                   // toujours masqués à l'ouverture de la page
   const b=document.createElement('button');b.type='button';b.className='btn small ct-fold';b.setAttribute('aria-controls','ct-simple ct-expert');
   const apply=()=>{panel.classList.toggle('ct-collapsed',!open);b.setAttribute('aria-expanded',String(open));b.textContent=open?'Masquer les réglages':'Afficher les réglages';};
-  b.onclick=()=>{open=!open;apply();try{localStorage.setItem(KEY,open?'1':'0');}catch(_){/* préférence facultative */}};
+  b.onclick=()=>{open=!open;apply();};
   head.appendChild(b);apply();
 })();

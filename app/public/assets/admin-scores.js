@@ -174,12 +174,12 @@
     const t = p.tuning || S.design.tuning, d = S.design.tuning, R = S.design.tuning_ranges;
     const field = ([k, n, unit, help]) => {
       const dflt = d[k], cur = t[k], same = cur === dflt;
-      const input = k === 'vol_mode' ? `<select class="as-select" data-a="tune" data-k="${k}">${S.design.vol_modes.map(v => `<option value="${v}" ${v === cur ? 'selected' : ''}>${E(VOLMODES[v])}</option>`).join('')}</select>`
-        : k === 'momentum_horizon' ? `<select class="as-select" data-a="tune" data-k="${k}">${S.design.momentum_horizons.map(v => `<option value="${v}" ${v === cur ? 'selected' : ''}>${E(HORIZONS[v])}</option>`).join('')}</select>`
-        : `<input type="number" class="as-num" data-a="tune" data-k="${k}" min="${R[k][0]}" max="${R[k][1]}" step="${k === 'sat_a' ? 1 : 0.05}" value="${cur}"> <span class="muted">${unit}</span>`;
+      const input = k === 'vol_mode' ? `<select class="as-select as-tsel" data-a="tune" data-k="${k}">${S.design.vol_modes.map(v => `<option value="${v}" ${v === cur ? 'selected' : ''}>${E(VOLMODES[v])}</option>`).join('')}</select>`
+        : k === 'momentum_horizon' ? `<select class="as-select as-tsel" data-a="tune" data-k="${k}">${S.design.momentum_horizons.map(v => `<option value="${v}" ${v === cur ? 'selected' : ''}>${E(HORIZONS[v])}</option>`).join('')}</select>`
+        : `<input type="number" class="as-num" data-a="tune" data-k="${k}" min="${R[k][0]}" max="${R[k][1]}" step="${k === 'sat_a' ? 1 : 0.05}" value="${cur}"> <span class="muted as-unit">${unit}</span>`;
       const shown = k === 'vol_mode' ? VOLMODES[dflt] : k === 'momentum_horizon' ? HORIZONS[dflt] : dflt;
-      return `<div class="as-field"><label>${n} <span class="as-i" title="${E(help)}">ⓘ</span></label>${input}
-        <p class="as-hint">${E(help)}<br>Valeur par défaut : <b>${E(shown)}</b>${k in R ? ` · bornes ${R[k][0]} à ${R[k][1]}` : ''} ${same ? '' : `<button class="btn small" data-a="tune-reset" data-k="${k}">Valeur par défaut</button>`}</p></div>`;
+      return `<div class="as-tune"><div class="as-tune-head"><b>${n}</b> <span class="as-i" title="${E(help)}">ⓘ</span></div><div class="as-tune-ctl">${input}</div>
+        <p class="as-hint">${E(help)}</p><p class="as-hint as-tune-def">Valeur par défaut : <b>${E(shown)}</b>${k in R ? ` · bornes ${R[k][0]} à ${R[k][1]}` : ''} ${same ? '' : `<button class="btn small" data-a="tune-reset" data-k="${k}">Valeur par défaut</button>`}</p></div>`;
     };
     return `<h3 class="as-h" style="margin-top:14px">Normalisations de cette stratégie (réglages avancés)</h3>
       <p class="as-hint">Propres à la stratégie sélectionnée : elles changent les notes de cette stratégie et d’aucune autre.</p>${TUNING.map(field).join('')}`;
