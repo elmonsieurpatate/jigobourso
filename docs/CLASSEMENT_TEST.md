@@ -17,7 +17,7 @@ L’Explorer existant, ses préférences, ses appels API et les calculs financie
 
 ## Valeurs illustratives
 
-Croissance rapide : semaine et mois actifs, pente 0,08 %/séance. Croissance régulière : mois et trimestre actifs, pente 0,05 %. Hausse calme : mois, trimestre et six mois actifs, pente 0,03 %. Rebond : semaine et mois, pente 0,07 %, R² 0,56. Momentum 6 mois : trimestre et six mois ; Momentum 12 mois et ajusté du risque : six mois et un an ; pente 0,01 %, R² 0,3 (filtre d’affichage seulement : le classement vient du score). Les sept stratégies d’origine sont celles des scores V4 de l’administration, avec les mêmes noms. R² initial de base respectif 0,65 / 0,80 / 0,85, augmenté de 0,025 par horizon, plafonné à 0,99. Ces profils n’interprètent pas les configurations du moteur.
+Admission par défaut des sept stratégies d’origine : mêmes seuils que la stratégie de scores du même nom (un test le vérifie). Croissance rapide : semaine (pente 0,3 %/séance, R² 0,6) et mois (0,2 %, 0,6). Croissance régulière : mois et trimestre, 0,07 % et R² 0,56. Hausse calme : idem, avec volatilité ≤ 1,5 % et recul ≤ 20 % sur un mois. Rebond : semaine et mois, 0,07 % et 0,56. Momentum 6 mois : trimestre et semestre ; Momentum 12 mois et ajusté du risque : semestre et un an ; pente ≥ 0,01 %, sans minimum de R². Le rang et les notes affichés sont ceux du classement général des scores : la page n’en montre que les titres admis par défaut (« Titres hors stratégie » affiche les autres).
 
 La pente du prototype est réglable de 0,01 à 2 %/séance et le R² de 0 à 1. Ces limites concernent uniquement ce formulaire. Les catégories ne sont plus définies dans le JavaScript du formulaire : voir la provenance ci-dessous. Elles ne classent aucune donnée réelle à ce stade.
 

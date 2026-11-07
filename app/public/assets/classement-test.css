@@ -334,3 +334,23 @@ a.ct-company:hover b,a.ct-company:focus-visible b{text-decoration:underline}
 .ct-search input{min-width:240px;max-width:100%;background:var(--surface);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:9px 12px}
 .ct-loading td{text-align:center;padding:36px 12px;color:var(--muted)}
 @media(max-width:700px){.ct-search{flex:1 1 100%}.ct-search input{width:100%}}
+
+/* Bloc « Stratégie » : une ligne claire (choix) + une ligne d'actions discrètes ; jamais de menu étroit ni de boutons en vrac */
+.ct .ct-strategy{display:grid;grid-template-columns:auto auto minmax(180px,380px) 1fr;grid-template-areas:"icon label select tools";align-items:center;gap:8px 12px;padding:14px 16px}
+.ct .ct-strategy .ct-strategy-icon{grid-area:icon;display:grid}
+.ct .ct-strategy label{grid-area:label;display:block;font-weight:700;font-size:14px;margin:0;justify-self:start}
+.ct .ct-strategy select{grid-area:select;width:100%;min-width:0;height:42px;font-size:15px;font-weight:600;border-radius:10px;padding:0 34px 0 12px}
+.ct .ct-strategy .ct-strategy-tools{grid-area:tools;display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:8px;margin:0}
+.ct .ct-strategy .ct-strategy-tools .btn,.ct .ct-strategy .ct-fold{height:34px;font-size:12px;padding:0 12px;border-radius:8px}
+.ct .ct-strategy .ct-fold{margin:0 0 0 4px;background:var(--ct-soft);color:var(--ct-accent);border-color:transparent;font-weight:700}
+@media(max-width:900px){
+  .ct .ct-strategy{grid-template-columns:auto minmax(0,1fr);grid-template-areas:"label select" "tools tools";padding:12px}
+  .ct .ct-strategy .ct-strategy-icon{display:none}
+  .ct .ct-strategy .ct-strategy-tools{justify-content:flex-start}
+}
+@media(max-width:700px){
+  .ct .ct-strategy select{height:46px;font-size:16px}
+  .ct .ct-strategy .ct-strategy-state{flex:1 1 100%}
+  .ct .ct-strategy .ct-strategy-tools .btn,.ct .ct-strategy .ct-fold{flex:1 1 calc(50% - 8px);height:42px;font-size:13px;margin:0}
+  .ct .ct-strategy .ct-fold{flex-basis:100%}
+}

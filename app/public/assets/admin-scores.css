@@ -105,3 +105,7 @@
 .as-tune-def .btn { margin-left: 6px; }
 @media (max-width: 640px) { .as-tune .as-tsel { max-width: 100%; } .as-tune .as-num { width: 100%; max-width: 160px; min-height: 44px; } .as-tune-def .btn { min-height: 40px; } }
 @media (max-width: 760px) { .as-bar { overflow-x: visible; } .as-bar .row { flex-wrap: wrap; width: 100%; } .as-bar .btn { flex: 1 1 auto; white-space: normal; } }
+
+/* Notes : colonne d'alignement fixe ; « * » = note calculée sur des données incomplètes (plus de pastille qui décale les colonnes) */
+.as-sc { display: inline-flex; align-items: baseline; justify-content: flex-end; gap: 2px; }
+.as-flag { display: inline-block; width: 1ch; color: var(--warn, #b26a00); font-weight: 700; text-align: left; cursor: help; }

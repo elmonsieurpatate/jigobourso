@@ -279,7 +279,7 @@
     $('#as-read').innerHTML = readout(i);
   }
   function chartLeave() { if (!chart || !$('#as-cur')) return; $('#as-cur').style.display = $('#as-dot').style.display = 'none'; $('#as-read').innerHTML = readout(chart.pts.length - 1); }
-  const scoreCell = (v, st, main) => `<span class="as-sc ${main ? 'main' : ''}">${v === null || v === undefined ? '<span class="muted">inconnu</span>' : `<b>${fmt(v, 1)}</b>`}${st === 'partiel' ? ' <span class="badge wait" title="Données incomplètes">inc.</span>' : ''}</span>`;
+  const scoreCell = (v, st, main) => `<span class="as-sc ${main ? 'main' : ''}">${v === null || v === undefined ? '<span class="muted">inconnu</span>' : `<b>${fmt(v, 1)}</b>`}<span class="as-flag" ${st === 'partiel' ? 'title="Note calculée sur des données incomplètes (une période ou une mesure manque) : les poids restent répartis sur les composantes disponibles." aria-label="données incomplètes"' : 'aria-hidden="true"'}>${st === 'partiel' ? '*' : ''}</span></span>`;
   // Une ligne de classement : rang, nom, courbe, scores à droite. `which` met en avant le score qui sert au classement.
   function rowHtml(r, which, pick) {
     return `<div class="as-rk ${pick ? 'pick' : ''}" ${pick ? `data-a="sim-pick" data-id="${r.id}" tabindex="0" role="button"` : ''}><span class="as-rk-n">${r.rank ?? '—'}</span>
@@ -306,6 +306,7 @@
         <div class="as-chips" style="margin:8px 0"><button class="btn small ${rkCat ? '' : 'primary'}" data-a="rk-cat" data-v="">Toutes <b>${J.num(c.listing.categories.reduce((a, x) => a + x.count, 0), 0)}</b></button>
           ${c.listing.categories.map(k => `<button class="btn small ${rkCat === k.id ? 'primary' : ''}" data-a="rk-cat" data-v="${E(k.id)}"><i class="as-dot" style="background:${E(k.color || '#999')}"></i> ${E(k.name)} <b>${J.num(k.count, 0)}</b></button>`).join('')}</div>
         <div class="as-rklist">${c.listing.rows.length ? c.listing.rows.map(r => rowHtml(r, rkWhich)).join('') : '<p class="muted">Aucun titre dans cette catégorie.</p>'}</div>
+        <p class="as-hint">* note calculée sur des données incomplètes. Ce classement porte sur tous les titres notés ; la page Classement n’affiche par défaut que ceux admis par les seuils de la stratégie, avec exactement les mêmes rangs et les mêmes notes (« Titres hors stratégie » affiche le reste).</p>
         ${c.listing.rows.length < c.listing.total ? `<div style="margin-top:8px"><button class="btn small" data-a="rk-more" ${rkMore ? 'disabled' : ''}>${rkMore ? 'Chargement…' : `Afficher la suite (${c.listing.rows.length} sur ${J.num(c.listing.total, 0)})`}</button></div>` : `<p class="as-hint">${J.num(c.listing.total, 0)} titre${c.listing.total > 1 ? 's' : ''}.</p>`}
         <div class="as-ranks" style="margin-top:14px">${block('simple', 'Score simple')}${block('complex', 'Score complexe')}</div>
         ${s.unavailable_reasons.length ? `<p class="as-hint"><b>Pourquoi une note est indisponible :</b> ${s.unavailable_reasons.map(r => `${E(r.reason)} (${J.num(r.count, 0)})`).join(' · ')}${s.no_inputs ? ` · ${J.num(s.no_inputs, 0)} titres sans mesures de score calculées` : ''}.</p>` : s.no_inputs ? `<p class="as-hint">${J.num(s.no_inputs, 0)} titres sans mesures de score calculées.</p>` : ''}

@@ -280,7 +280,7 @@ def test_strategies_current_profile_always_carries_sessions():
 
 
 def test_classement_proposes_every_v4_strategy():
-    """Chaque stratégie V4 de l'administration a son entrée dans le Classement (PHP, JS et correspondance moteur alignés)."""
+    """Chaque stratégie V4 de l'administration a son entrée dans le Classement, avec la même admission que le moteur."""
     import os
     import re
     root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -291,4 +291,11 @@ def test_classement_proposes_every_v4_strategy():
         label = A.V4_STRATEGIES[name]['label']
         assert f"'{ct_id}' => '{label}'" in php
         assert f"{ct_id}:'{label}'" in js
-        assert re.search(rf"\b{ct_id}: \{{ active", js)
+        m = re.search(rf"^\s+{ct_id}: \{{ per:\{{(.*?)\}}(?:, extra|\s*\}})", js, re.M)
+        assert m, ct_id
+        per = {k: [float(x) for x in v.split(',')] for k, v in re.findall(r"(\w+):\[([^\]]*)\]", m.group(1))}
+        engine = {p['id']: p for p in A.V4_STRATEGIES[name]['build']()['periods'] if p['enabled']}
+        assert set(per) == set(engine) - ({'half'} if name == 'rebound' else set()), ct_id          # mêmes périodes (Rebond : le semestre n'est qu'un contexte)
+        for k, (slope, r2) in per.items():
+            if engine[k].get('min_slope') is not None:
+                assert (slope, r2) == (engine[k]['min_slope'], engine[k]['min_r2']), (ct_id, k)       # mêmes seuils d'admission que la stratégie de scores

@@ -4,14 +4,16 @@
   const user = await J.init('explorer'); if (!user) return;
   const $ = s => document.querySelector(s), esc = J.esc;
   const periods = [['week','Semaine',5],['month','Mois',21],['quarter','Trimestre',63],['half','6 mois',126],['year','1 an',252],['two_year','2 ans',504]];
+  // Admission par défaut de chaque stratégie d'origine : mêmes seuils que la stratégie de scores du même nom (scores_admin.V4_STRATEGIES).
+  // per = {période:[pente min %/séance, R² min]} ; extra = seuils facultatifs sur 1 mois [mesure, sens, valeur].
   const profiles = {
-    fast: { active:['week','month'], slope:.08, r2:.65 },
-    regular: { active:['month','quarter'], slope:.05, r2:.8 },
-    calm: { active:['month','quarter','half'], slope:.03, r2:.85 },
-    rebound: { active:['week','month'], slope:.07, r2:.56 },
-    mom6: { active:['quarter','half'], slope:.01, r2:.3 },
-    mom12: { active:['half','year'], slope:.01, r2:.3 },
-    momrisk: { active:['half','year'], slope:.01, r2:.3 }
+    fast: { per:{week:[.3,.6],month:[.2,.6]} },
+    regular: { per:{month:[.07,.56],quarter:[.07,.56]} },
+    calm: { per:{month:[.07,.56],quarter:[.07,.56]}, extra:[['volatility','<=',1.5],['drawdown','<=',20]] },
+    rebound: { per:{week:[.07,.56],month:[.07,.56]} },
+    mom6: { per:{quarter:[.01,0],half:[.01,0]} },
+    mom12: { per:{half:[.01,0],year:[.01,0]} },
+    momrisk: { per:{half:[.01,0],year:[.01,0]} }
   };
   const secondary=window.ClassementTestSecondary;
   const categoryPayload=window.ClassementTestCategoryConfig || await J.api('explorer/secondary-filters');
@@ -21,8 +23,8 @@
   const columns = ['Titre','Place','Secteur','Cours','Var. %','Pente %/séance','R²','Volatilité','Liquidité','Volume','Recul max.','Perf. 1 mois','Score simple','Score complexe','Tendance'];
   const metrics = { slope:['Pente (% / séance)','% / séance'], r2:['R² (régression)',''], volatility:['Volatilité quotidienne','%'], drawdown:['Recul maximal','%'], return:['Rendement observé','%'], volume:['Volume moyen','titres / séance'] };
   const key = 'jigo_classement_test_v1';
-  const fresh = id => ({ periods:Object.fromEntries(periods.map(([k],i) => [k,{enabled:profiles[id].active.includes(k),slope:profiles[id].slope,r2:Number(Math.min(.99,profiles[id].r2 + i*.025).toFixed(3))}])), extra:[], join:'and' });
-  let state = { mode:'simple',strategy:'fast',selected:'week',profiles:Object.fromEntries(Object.keys(profiles).map(id=>[id,fresh(id)])),filters:secondary.all(categories),columns:[0,1,2,3,4,5,6,7,8,10,12,13,14] };
+  const fresh = id => { const pr=profiles[id],first=Object.values(pr.per)[0]; return { periods:Object.fromEntries(periods.map(([k]) => { const v=pr.per[k]; return [k,{enabled:!!v,slope:v?v[0]:first[0],r2:v?v[1]:first[1]}]; })), extra:(pr.extra||[]).map(([metric,op,value])=>({metric,op,value})), join:'and' }; };
+  let state = { mode:'simple',strategy:'fast',selected:'week',profiles:Object.fromEntries(Object.keys(profiles).map(id=>[id,fresh(id)])),filters:secondary.all(categories),columns:[0,3,4,5,6,7,8,12,13,14] };
   // Seules les sauvegardes explicites de cette page sont relues. Les préférences Explorer restent séparées.
   try {
     const saved = JSON.parse(localStorage.getItem(key));
@@ -139,15 +141,17 @@
   {const want=new URLSearchParams(location.search).get('strategy');if(serverOk&&want&&enabledIds().includes(want))state.strategy=want;}
   for(const id of order()){const s=state.strategy;state.strategy=id;tree();state.strategy=s;saved[id]={p:cloneJSON(state.profiles[id]),o:cloneJSON(ovBy[id])};}
   try{const l=JSON.parse(localStorage.getItem(key)||'{}')||{};if(['simple','expert'].includes(l.mode))state.mode=l.mode;if(Array.isArray(l.cols)&&l.cols.every(n=>Number.isInteger(n)&&n>=0&&n<columns.length))state.columns=l.cols;}catch(_){/* préférences d'affichage facultatives */}
+  try{if(!localStorage.getItem('jigo_ct_cols_v3')){state.columns=window.matchMedia('(max-width:700px)').matches?[0,3,4,12,13]:[0,3,4,5,6,7,8,12,13,14];localStorage.setItem('jigo_ct_cols_v3','1');}}catch(_){/* préférence facultative */}   // colonnes essentielles par défaut (place, secteur, recul… via « Colonnes ») : pas de défilement horizontal inutile
   overrides=ovBy[state.strategy];state.filters=filtersFor(overrides);
   state.selected=periods.find(([k])=>config().periods[k].enabled)?.[0]||state.selected;
   const isDirty=id=>JSON.stringify([state.profiles[id],id===state.strategy?overrides:ovBy[id]])!==JSON.stringify([saved[id].p,saved[id].o]);
   const anyDirty=()=>order().some(isDirty);
   function renderStrategies(){
     const sel=$('#ct-strategy');
-    sel.innerHTML=order().filter(id=>metaOf(id).enabled||id===state.strategy).map(id=>`<option value="${esc(id)}">${esc(metaOf(id).icon+' '+names[id])}${isDirty(id)?' •':''}</option>`).join('');
+    const html=order().filter(id=>metaOf(id).enabled||id===state.strategy).map(id=>`<option value="${esc(id)}">${esc(metaOf(id).icon+' '+names[id])}${isDirty(id)?' •':''}</option>`).join('');
+    if(sel.dataset.html!==html){sel.innerHTML=html;sel.dataset.html=html;}      // ne jamais reconstruire le menu à chaque clic : il se refermerait (iPhone)
     const d=$('#ct-strategy-desc'),txt=metaOf(state.strategy).description;d.textContent=txt;d.hidden=!txt;
-    sel.value=state.strategy;
+    if(sel.value!==state.strategy)sel.value=state.strategy;
     const builtin=!!builtinNames[state.strategy];
     $('#ct-rename').hidden=builtin;$('#ct-delete').hidden=builtin;
     $('#ct-reset').textContent=builtin?'Restaurer les valeurs par défaut':'Annuler les modifications';
@@ -417,7 +421,7 @@
     if(el.dataset.groupJoin!==undefined){at(el.dataset.groupJoin).join=el.value;project();preview();}
   });
   $('#ct-strategy').onchange=e=>switchTo(e.target.value);
-  for(const t of ['input','change','click'])$('#ct-page').addEventListener(t,()=>queueMicrotask(renderStrategies));
+  for(const t of ['input','change','click'])$('#ct-page').addEventListener(t,e=>{if(e.target.id!=='ct-strategy')queueMicrotask(renderStrategies);});
   $('#ct-tab-rules').onclick=()=>$('#ct-rules').scrollIntoView({behavior:'smooth',block:'nearest'});
   $('#ct-tab-manage').onclick=()=>{$('#ct-filter-panel').open=true;$('#ct-filter-panel').scrollIntoView({behavior:'smooth',block:'start'});};
   $('#ct-tab-queries').onclick=()=>{
@@ -488,5 +492,5 @@
   const b=document.createElement('button');b.type='button';b.className='btn small ct-fold';b.setAttribute('aria-controls','ct-simple ct-expert');
   const apply=()=>{panel.classList.toggle('ct-collapsed',!open);b.setAttribute('aria-expanded',String(open));b.textContent=open?'Masquer les réglages':'Afficher les réglages';};
   b.onclick=()=>{open=!open;apply();};
-  head.appendChild(b);apply();
+  (head.querySelector('.ct-strategy-tools')||head).appendChild(b);apply();
 })();
