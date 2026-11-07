@@ -451,3 +451,95 @@ def test_recovery_note_rewards_a_half_year_that_has_not_progressed():
     ran = SC.score_title(inputs, {'turnover_eur': 2e7}, P(5, 21), complex_weights=cw, recovery_perf=40.0)['complex']
     assert flat["score"] > ran["score"] and flat["contributions"]["recovery"]["value"] == pytest.approx(SC.recovery_note(-5.0))
     assert SC.score_title(inputs, {'turnover_eur': 2e7}, P(5, 21), complex_weights=cw)['complex']['contributions']['recovery'].get('unavailable')
+
+
+# ───────────── score complexe : dénominateur cohérent avec le numérateur (V4.5) ─────────────
+
+LIQ = {'turnover_eur': 20e6, 'source': 'daily'}
+
+
+def legacy_complex(res):
+    """Ancienne normalisation (≤ V4.4), reconstruite depuis les contributions : le dénominateur pondérait chaque composante par la part de périodes mesurées,
+    le numérateur non. Sert uniquement à prouver la différence de rang avec la version corrigée."""
+    ct = res['complex']['contributions']
+    av = [v for v in ct.values() if v.get('value') is not None]
+    return sum(v['points'] for v in av) / sum(v['weight'] * v.get('coverage', 1.0) for v in av) * res['complex']['anchor']
+
+
+def test_complex_with_partial_components_is_a_plain_weighted_average():
+    inputs = {5: M(.7, .85, None, None, None, None, .1, .8), 21: M(.8, .88, .8, .1, 1.2, 2.0, .1, .8)}      # séances positives, pics, volatilité, drawdown : mois seulement
+    r = SC.score_title(inputs, LIQ, P(5, 21))
+    c = r['complex']
+    eff, per, ct = r['weights_effective'], r['periods'], c['contributions']
+    notes = {}
+    for key, v in ct.items():
+        if v.get('value') is None:
+            continue
+        if key == 'liquidity':
+            notes[key] = (v['weight'], r['liquidity']['note'])
+            continue
+        num = den = 0.0
+        for pid, comp in per.items():
+            if comp is None or comp.get(key) is None:
+                continue
+            gate = 1.0 if key in ('dynamics', 'acceleration') else comp['gate']
+            num += eff[pid] * gate * comp[key]; den += eff[pid]
+        notes[key] = (v['weight'], num / den)                      # note de la composante = moyenne sur les seules périodes mesurées
+    expected = sum(w * s for w, s in notes.values()) / sum(w for w, _ in notes.values())          # puis moyenne pondérée par le poids ENTIER de chaque composante
+    assert c['raw_total'] == pytest.approx(expected, rel=1e-12)
+    assert c['score'] == pytest.approx(expected * c['anchor'], rel=1e-12)
+    assert c['status'] == 'partiel' and c['coverage'] < 1                # la fiabilité continue de signaler les données partielles
+
+
+def test_effective_weights_and_points_add_up_to_the_raw_total():
+    r = SC.score_title({5: M(.7, .85, None, None, None, None, .1, .8), 21: M(.8, .88, .8, .1, 1.2, 2.0, .1, .8)}, LIQ, P(5, 21))
+    ct = [v for v in r['complex']['contributions'].values() if v.get('value') is not None]
+    assert sum(v['weight_effective'] for v in ct) == pytest.approx(1.0)
+    assert sum(v['points_effective'] for v in ct) == pytest.approx(r['complex']['raw_total'])
+
+
+def test_full_data_scores_are_unchanged_by_the_correction():
+    inputs = {5: M(1.0, .85, .6, .3, 2.2, 6.0, .1, .8), 21: M(.8, .88, .62, .3, 2.0, 7.0, .1, .8)}
+    r = SC.score_title(inputs, LIQ, P(5, 21))
+    assert r['complex']['score'] == pytest.approx(legacy_complex(r), rel=1e-12)
+
+
+def test_partial_data_can_no_longer_outrank_a_complete_title_by_inflation():
+    complete = SC.score_title({5: M(1.0, .85, .6, .3, 2.2, 6.0, .1, .8), 21: M(.8, .88, .62, .3, 2.0, 7.0, .1, .8)}, LIQ, P(5, 21))
+    partial = SC.score_title({5: M(.7, .85, None, None, None, None, .1, .8), 21: M(.8, .88, .8, .1, 1.2, 2.0, .1, .8)}, LIQ, P(5, 21))
+    assert legacy_complex(partial) > complete['complex']['score']                  # avant : le titre incomplet passait devant (64,1 contre 55,9)
+    assert partial['complex']['score'] < complete['complex']['score']              # après : l'ordre des deux titres s'inverse (54,7 contre 55,9)
+    assert partial['complex']['score'] == pytest.approx(54.73, abs=0.01) and legacy_complex(partial) == pytest.approx(64.06, abs=0.01)
+
+
+def test_complex_score_stays_within_0_and_100_whatever_data_is_missing():
+    import random
+    rng = random.Random(20261107)
+    keys = list(SC.COMPLEX_WEIGHTS)
+    worst = 0.0
+    for _ in range(4000):
+        sessions = rng.choice([(5, 21), (21, 63), (5, 21, 63), (126, 252), (5, 21, 63, 126, 252)])
+        inputs = {}
+        for n in sessions:
+            if rng.random() < .1:
+                inputs[n] = None
+                continue
+            m = M(rng.uniform(-1.5, 12), rng.uniform(0, 1), rng.uniform(0, 1), rng.uniform(0, 1), rng.uniform(.1, 8), rng.uniform(0, 40), rng.uniform(-3, 3), rng.uniform(0, 1))
+            for k in ('r2', 'up_fraction', 'spike_share', 'volatility', 'drawdown', 'accel', 'r2_prev'):
+                if rng.random() < .3:
+                    m[k] = None
+            inputs[n] = m
+        cw = {k: rng.choice([0, 0, 5, 10, 40, 80]) for k in keys}
+        r = SC.score_title(inputs, {'turnover_eur': rng.choice([None, 0, 3e6, 80e6]), 'source': 'daily'}, P(*sessions), complex_weights=cw,
+                           momentum=rng.choice([None, {'6m': rng.uniform(-30, 80), '12m': rng.uniform(-30, 150)}]), momentum_horizon=rng.choice(['6m', '12m', 'blend']),
+                           recovery_perf=rng.choice([None, rng.uniform(-40, 60)]), vol_mode=rng.choice(['absolute', 'relative']))
+        s = r['complex']['score']
+        if s is None:
+            continue
+        assert math.isfinite(s) and -1e-9 <= s <= 100 + 1e-9, (sessions, inputs, cw, s)
+        worst = max(worst, s)
+    assert worst > 50          # le test a bien exercé des scores élevés
+
+
+def test_score_version_changes_so_cached_scores_are_recomputed():
+    assert SC.VERSION >= 5

@@ -15,7 +15,7 @@ Le module ne connaît ni la base ni le réseau.
 """
 import math
 
-VERSION = 4
+VERSION = 5   # 5 : dénominateur du score complexe aligné sur son numérateur (composantes mesurables sur une partie seulement des périodes)
 KAPPA = 0.7                  # poids automatiques : ω_p ∝ n_p^(1−κ) − n_{p−1}^(1−κ) ; κ = 0,7 redonne les 41,6 % / 58,4 % semaine / mois de V1
 COVERAGE_THRESHOLD = 0.75    # seuil de FIABILITÉ (information) : ne supprime plus aucune note
 MIN_SESSIONS = 3             # R² et volatilité n'existent pas sous 3 séances : la granularité « jour » n'entre jamais dans un score
@@ -243,7 +243,7 @@ def _complex(avail, comps, weights, eff, period_cover, liquidity_score, threshol
     """Score complexe = moyenne pondérée de notes 0-100 : dynamique, régularité, séances positives, concentration, volatilité, drawdown, liquidité (+ accélération si pondérée).
     Une composante indisponible sort du calcul et les poids restants sont renormalisés : elle ne vaut ni zéro ni note favorable.
     `coverage` = part du poids de référence réellement disponible (composantes × périodes ; information de fiabilité)."""
-    total = coverage = 0.0
+    total = coverage = avail_w = 0.0                # avail_w : poids des composantes disponibles = dénominateur de la moyenne (cohérent avec `total`) ; coverage : fiabilité, information seulement
     contributions = {}
     wsum = float(sum(cw.values())) or 1.0
     ref_w = sum(weights.get(p['id'], 0.0) for p in avail) or 1.0
@@ -254,7 +254,7 @@ def _complex(avail, comps, weights, eff, period_cover, liquidity_score, threshol
         if key in ('liquidity', 'momentum', 'recovery'):           # composantes du titre (pas par période)
             score = liquidity_score if key == 'liquidity' else (extras or {}).get(key)
             if score is not None:
-                total += w * score / 100; coverage += w
+                total += w * score / 100; coverage += w; avail_w += w
                 contributions[key] = {'weight': w, 'value': score, 'points': w * score}
             else:
                 contributions[key] = {'weight': w, 'value': None, 'points': None, 'unavailable': True}
@@ -270,15 +270,15 @@ def _complex(avail, comps, weights, eff, period_cover, liquidity_score, threshol
             contributions[key] = {'weight': w, 'value': None, 'points': None, 'unavailable': True}
             continue
         s /= cv                                   # moyenne sur les seules périodes où la mesure existe
-        total += w * s / 100; coverage += w * cv
+        total += w * s / 100; coverage += w * cv; avail_w += w      # la composante compte pour son poids entier (sa note est déjà la moyenne des périodes mesurées) ; cv n'alimente que la fiabilité
         contributions[key] = {'weight': w, 'value': s, 'points': w * s, 'coverage': cv}
-    if coverage <= 1e-12:
+    if avail_w <= 1e-12:
         return {'score': None, 'status': 'inconnu', 'coverage': 0.0, 'reliable': False, 'why': 'calcul impossible : aucune composante mesurable', 'contributions': contributions}
     for k, v in contributions.items():            # poids effectif après renormalisation sur les composantes disponibles
         if v.get('value') is not None:
-            v['weight_effective'] = v['weight'] / coverage
+            v['weight_effective'] = v['weight'] / avail_w
             v['points_effective'] = v['weight_effective'] * v['value']      # somme = note brute avant ancrage
-    base = total / coverage
+    base = total / avail_w
     coverage *= period_cover
     short = comps[avail[0]['id']]                  # période la plus courte réellement mesurable (pas de pénalité si la plus courte n'existe pas)
     mult = 1 - anchor * (1 - short['gate'])        # ralentissement ou retournement récent : pénalité progressive, jamais une multiplication brutale
