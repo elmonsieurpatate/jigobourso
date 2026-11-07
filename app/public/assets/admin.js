@@ -1,11 +1,11 @@
 /* Administration : construire le catalogue à la main, dans l'ordre (FinanceDatabase → Yahoo → historiques), consulter les titres, suivre le cron. */
 (async () => {
   if (!await J.init('admin', { admin: true })) return;
-  const page = J.$('#page'); const TABS = ['fdb', 'yahoo', 'titres', 'cron', 'logs', 'users', 'scores', 'settings'];
+  const page = J.$('#page'); const TABS = ['fdb', 'yahoo', 'titres', 'cron', 'logs', 'users', 'scores', 'colonnes', 'settings'];
   const LEGACY = { data: 'fdb', catalogue: 'fdb', overview: 'fdb', jobs: 'logs', run: 'logs', schedule: 'cron' };
   const hashTab = () => { const h = location.hash.slice(1); return TABS.includes(h) ? h : (LEGACY[h] || 'fdb'); };
   let tab = hashTab();
-  const TITLES = { fdb: 'FinanceDatabase', yahoo: 'Yahoo Finance', titres: 'Actions / ETF', cron: 'Cron', logs: 'Journaux', users: 'Utilisateurs', scores: 'Configuration des scores (V4)', settings: 'Réglages' };
+  const TITLES = { fdb: 'FinanceDatabase', yahoo: 'Yahoo Finance', titres: 'Actions / ETF', cron: 'Cron', logs: 'Journaux', users: 'Utilisateurs', scores: 'Configuration des scores (V4)', colonnes: 'Colonnes, tris et affichage des tableaux', settings: 'Réglages' };
   const STATE = { completed: ['ok', 'Terminé'], completed_with_errors: ['wait', 'Terminé avec erreurs'], failed: ['ko', 'Échec'], running: ['info', 'En cours'], queued: ['info', 'En attente'], paused: ['wait', 'En pause'], interrupted: ['ko', 'Interrompu'] };
   const TSTATE = { ok: ['ok', 'Fonctionne'], late: ['wait', 'En retard'], error: ['ko', 'En erreur'], inactive: ['', 'Désactivée'], never: ['wait', 'Jamais exécutée'], running: ['info', 'En cours'] };
   const JOBNAME = { fdb_import: 'Import FinanceDatabase', fdb_filter: 'Filtrage FinanceDatabase', yahoo_info: 'Import des informations Yahoo', yahoo_filter: 'Filtrage Yahoo', history: 'Import / mise à jour des historiques', gaps: 'Clôtures manquantes', volumes: 'Volumes quotidiens',
@@ -19,7 +19,7 @@
     page.innerHTML = '<div class="empty"><span class="spinner"></span></div>';
     J.$('.page-head h1').textContent = 'Administration · ' + TITLES[tab];
     J.$('.page-head p').textContent = 'Règles de filtrage, entonnoirs, traitements, planification, journaux, comptes.';
-    try { await ({ fdb, yahoo, titres, cron, logs, users, scores, settings })[tab](); } catch (e) { page.innerHTML = `<div class="notice err">${J.esc(e.message)}</div>`; }
+    try { await ({ fdb, yahoo, titres, cron, logs, users, scores, colonnes, settings })[tab](); } catch (e) { page.innerHTML = `<div class="notice err">${J.esc(e.message)}</div>`; }
   }
   window.addEventListener('hashchange', () => { const t = hashTab(); if (t !== tab) { tab = t; render(); } });
 
@@ -344,6 +344,7 @@
     J.$$('[data-pw]').forEach(b => b.onclick = () => J.dialog({ title: 'Nouveau mot de passe', body: J.field('Mot de passe (10 caractères minimum)', '<input id="pw" type="password" autocomplete="new-password">') + '<p class="small muted">Ses sessions ouvertes seront fermées.</p>', actions: [{ label: 'Annuler', run: () => { } }, { label: 'Enregistrer', cls: 'primary', run: async d => { await J.post('admin/user/update', { id: +b.dataset.pw, password: J.$('#pw', d).value }); J.toast('Mot de passe modifié'); } }] }));
   }
   async function scores() { J.$('.page-head p').textContent = 'Méthode de notation commune (scores simple et complexe) et ses paramètres par stratégie.'; await AdminScores.render(page); }
+  async function colonnes() { J.$('.page-head p').textContent = 'Colonnes visibles, ordre, largeurs, tri et filtres initiaux des tableaux Explorer et Scores, sur ordinateur et mobile.'; await AdminColumns.render(page); }
   async function settings() {
     const s = (await J.api('admin/system')).settings;
     page.innerHTML = `<div class="notice">Les seuils du catalogue et du préfiltre Yahoo se règlent désormais dans <a href="#fdb">FinanceDatabase</a> et <a href="#yahoo">Yahoo Finance</a>.</div>

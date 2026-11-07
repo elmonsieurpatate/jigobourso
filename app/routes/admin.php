@@ -158,7 +158,7 @@ return [
     'admin/scores/ranking' => function () {
         need_post(); $adm = require_admin(); $b = body();
         $specs = []; foreach ((ct_all((int)$adm['id'])['items'] ?? []) as $it) if (is_array($it['config'] ?? null)) $specs[$it['id']] = $it['config'];
-        return engine_call('scores-ranking', ['strategy' => str_in($b, 'strategy', 40), 'ct_specs' => (object)$specs, 'verdict' => in_array($b['verdict'] ?? '', ['retained', 'excluded', 'undetermined'], true) ? $b['verdict'] : 'all', 'draft' => is_array($b['draft'] ?? null) ? $b['draft'] : null,
+        return engine_call('scores-ranking', ['strategy' => str_in($b, 'strategy', 40), 'ct_specs' => (object)$specs, 'sort' => is_array($b['sort'] ?? null) ? array_slice($b['sort'], 0, 3) : [], 'verdict' => in_array($b['verdict'] ?? '', ['retained', 'excluded', 'undetermined'], true) ? $b['verdict'] : 'all', 'draft' => is_array($b['draft'] ?? null) ? $b['draft'] : null,
             'which' => ($b['which'] ?? '') === 'complex' ? 'complex' : 'simple', 'category' => isset($b['category']) && is_string($b['category']) ? mb_substr($b['category'], 0, 60) : null,
             'offset' => max(0, (int)($b['offset'] ?? 0)), 'limit' => max(1, min(100, (int)($b['limit'] ?? 25)))]);
     },

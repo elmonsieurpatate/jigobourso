@@ -697,7 +697,37 @@ def _granularity(params):
     return max((p['sessions'] for p in params['periods']), default=0)
 
 
-def _listing(conn, book, which, category, offset, limit, cats, sessions, statuses=None, verdict='all'):
+SORT_KEYS = ('rank', 'simple', 'complex', 'name', 'status', 'kind', 'market')
+STATUS_ORDER = {'retained': 0, 'undetermined': 1, 'excluded': 2}
+
+
+def _sorted(conn, entries, sort, key, rank_of, statuses):
+    """Tri complet de la liste (pas seulement de la page) : jusqu'à trois critères, valeurs absentes toujours en dernier, repli stable sur l'ordre général du classement puis l'identifiant.
+    Le rang affiché reste le rang général : il ne dépend pas de ce tri."""
+    info = _titles(conn, [e['id'] for e in entries]) if any(s['key'] in ('name', 'kind', 'market') for s in sort) else {}
+    def value(e, k):
+        if k == 'rank':
+            return rank_of.get(e['id'])
+        if k in ('simple', 'complex'):
+            return e[k]
+        if k == 'status':
+            return STATUS_ORDER.get((statuses or {}).get(e['id'], 'undetermined'))
+        t = info.get(e['id']) or {}
+        v = {'name': t.get('name'), 'kind': t.get('kind'), 'market': t.get('mic')}[k]
+        return None if v is None else str(v).casefold()
+    base = {e['id']: i for i, e in enumerate(entries)}
+    out = list(entries)
+    out.sort(key=lambda e: base[e['id']])
+    for s in reversed(sort):                                        # tris successifs stables : le dernier critère est appliqué en premier
+        k, desc = s['key'], s['dir'] == 'desc'
+        present = [e for e in out if value(e, k) is not None]
+        absent = [e for e in out if value(e, k) is None]
+        present.sort(key=lambda e: value(e, k), reverse=desc)
+        out = present + absent
+    return out
+
+
+def _listing(conn, book, which, category, offset, limit, cats, sessions, statuses=None, verdict='all', sort=None, info_all=None):
     """Classement d'un score, éventuellement restreint à une catégorie de note. Le rang est le rang GÉNÉRAL (sur tous les titres notés) : une catégorie ne le change pas."""
     key = 'simple' if which == 'simple' else 'complex'
     ranked, rank_of, _ = ordered(book, key)
@@ -709,6 +739,8 @@ def _listing(conn, book, which, category, offset, limit, cats, sessions, statuse
     scoped = [e for e in ranked if category in (None, '') or score_categories.assign(e[key], cats) == category]
     scope_counts = _CR.counts((statuses or {}).get(e['id'], _CR.UNDETERMINED) for e in scoped) if statuses is not None else None
     chosen = [e for e in scoped if verdict == 'all' or statuses is None or statuses.get(e['id'], _CR.UNDETERMINED) == verdict]
+    if sort:
+        chosen = _sorted(conn, chosen, sort, key, rank_of, statuses)
     page = chosen[offset:offset + limit]
     info = _titles(conn, [e['id'] for e in page])
     curves = series(conn, [e['id'] for e in page], sessions)
@@ -770,8 +802,9 @@ def ranking(conn, request):
     lim = max(1, min(100, int(request.get('limit') or PAGE)))
     out['granularity'] = {'sessions': sessions, 'periods': [dict(id=p['id'], sessions=p['sessions']) for p in params['periods']]}
     statuses, context = _statuses(conn, book, name, request)
+    sort = [x for x in (request.get('sort') or []) if isinstance(x, dict) and x.get('key') in SORT_KEYS and x.get('dir') in ('asc', 'desc')][:3]
     verdict = request.get('verdict') if request.get('verdict') in (_CR.RETAINED, _CR.EXCLUDED, _CR.UNDETERMINED) else 'all'
-    out['listing'] = _listing(conn, book, which, cat if isinstance(cat, str) else None, off, lim, cats, sessions, statuses, verdict)
+    out['listing'] = _listing(conn, book, which, cat if isinstance(cat, str) else None, off, lim, cats, sessions, statuses, verdict, sort)
     out['listing']['context'] = context
     if draft:
         saved_book = score_service.score_book(conn, build_config(conn, name), version)

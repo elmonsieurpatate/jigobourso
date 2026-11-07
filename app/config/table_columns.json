@@ -1,0 +1,320 @@
+{
+ "schema": 1,
+ "pages": {
+  "explorer": {
+   "label": "Explorer / Stratégie",
+   "columns": [
+    {
+     "id": "rank",
+     "label": "Rang",
+     "group": "Identification",
+     "sortable": true
+    },
+    {
+     "id": "name",
+     "label": "Titre",
+     "group": "Identification",
+     "sortable": true,
+     "width": 220
+    },
+    {
+     "id": "status",
+     "label": "Statut stratégie",
+     "group": "Stratégie",
+     "sortable": true
+    },
+    {
+     "id": "market",
+     "label": "Place",
+     "group": "Identification",
+     "sortable": true
+    },
+    {
+     "id": "sector",
+     "label": "Secteur",
+     "group": "Identification",
+     "sortable": true
+    },
+    {
+     "id": "price",
+     "label": "Cours",
+     "group": "Marché",
+     "sortable": true
+    },
+    {
+     "id": "change",
+     "label": "Var. % du jour",
+     "group": "Performances",
+     "sortable": true
+    },
+    {
+     "id": "slope",
+     "label": "Pente · mois",
+     "group": "Pentes (% par séance)",
+     "sortable": true
+    },
+    {
+     "id": "r2",
+     "label": "R² · mois",
+     "group": "R²",
+     "sortable": true
+    },
+    {
+     "id": "volatility",
+     "label": "Volatilité",
+     "group": "Risque",
+     "sortable": true
+    },
+    {
+     "id": "turnover",
+     "label": "Liquidité",
+     "group": "Liquidité",
+     "sortable": true
+    },
+    {
+     "id": "avgVolume",
+     "label": "Volume moyen",
+     "group": "Liquidité",
+     "sortable": true
+    },
+    {
+     "id": "drawdown",
+     "label": "Recul maximal",
+     "group": "Risque",
+     "sortable": true
+    },
+    {
+     "id": "perfMonth",
+     "label": "Perf. · mois",
+     "group": "Performances",
+     "sortable": true
+    },
+    {
+     "id": "simple",
+     "label": "Score simple",
+     "group": "Scores",
+     "sortable": true
+    },
+    {
+     "id": "complex",
+     "label": "Score complexe",
+     "group": "Scores",
+     "sortable": true
+    },
+    {
+     "id": "trend",
+     "label": "Tendance (courbe)",
+     "group": "Identification",
+     "sortable": false
+    },
+    {
+     "id": "kind",
+     "label": "Type",
+     "group": "Identification",
+     "sortable": true
+    },
+    {
+     "id": "rank_simple",
+     "label": "Rang simple",
+     "group": "Classements",
+     "sortable": true
+    },
+    {
+     "id": "rank_complex",
+     "label": "Rang complexe",
+     "group": "Classements",
+     "sortable": true
+    },
+    {
+     "id": "perf_week",
+     "label": "Perf. · semaine",
+     "group": "Performances",
+     "sortable": true
+    },
+    {
+     "id": "perf_quarter",
+     "label": "Perf. · trimestre",
+     "group": "Performances",
+     "sortable": true
+    },
+    {
+     "id": "perf_half",
+     "label": "Perf. · semestre",
+     "group": "Performances",
+     "sortable": true
+    },
+    {
+     "id": "slope_week",
+     "label": "Pente · semaine",
+     "group": "Pentes (% par séance)",
+     "sortable": true
+    },
+    {
+     "id": "slope_quarter",
+     "label": "Pente · trimestre",
+     "group": "Pentes (% par séance)",
+     "sortable": true
+    },
+    {
+     "id": "slope_half",
+     "label": "Pente · semestre",
+     "group": "Pentes (% par séance)",
+     "sortable": true
+    },
+    {
+     "id": "slope_year",
+     "label": "Pente · année",
+     "group": "Pentes (% par séance)",
+     "sortable": true
+    },
+    {
+     "id": "r2_week",
+     "label": "R² · semaine",
+     "group": "R²",
+     "sortable": true
+    },
+    {
+     "id": "r2_quarter",
+     "label": "R² · trimestre",
+     "group": "R²",
+     "sortable": true
+    },
+    {
+     "id": "r2_half",
+     "label": "R² · semestre",
+     "group": "R²",
+     "sortable": true
+    },
+    {
+     "id": "r2_year",
+     "label": "R² · année",
+     "group": "R²",
+     "sortable": true
+    }
+   ],
+   "defaults": {
+    "desktop": {
+     "visible": [
+      "rank",
+      "name",
+      "status",
+      "price",
+      "change",
+      "slope",
+      "r2",
+      "volatility",
+      "turnover",
+      "simple",
+      "complex",
+      "trend"
+     ],
+     "sort": [],
+     "filters": {
+      "verdict": "retained",
+      "page_size": 50
+     }
+    },
+    "mobile": {
+     "visible": [
+      "rank",
+      "name",
+      "status",
+      "price",
+      "change",
+      "slope",
+      "simple",
+      "complex"
+     ],
+     "sort": [],
+     "filters": {
+      "verdict": "retained",
+      "page_size": 50
+     }
+    }
+   }
+  },
+  "scores": {
+   "label": "Scores / Classement",
+   "columns": [
+    {
+     "id": "rank",
+     "label": "Rang",
+     "group": "Identification",
+     "sortable": true
+    },
+    {
+     "id": "name",
+     "label": "Titre",
+     "group": "Identification",
+     "sortable": true,
+     "width": 220
+    },
+    {
+     "id": "status",
+     "label": "Statut stratégie",
+     "group": "Stratégie",
+     "sortable": true
+    },
+    {
+     "id": "kind",
+     "label": "Type",
+     "group": "Identification",
+     "sortable": true
+    },
+    {
+     "id": "market",
+     "label": "Place",
+     "group": "Identification",
+     "sortable": true
+    },
+    {
+     "id": "trend",
+     "label": "Tendance (courbe)",
+     "group": "Identification",
+     "sortable": false
+    },
+    {
+     "id": "simple",
+     "label": "Score simple",
+     "group": "Scores",
+     "sortable": true
+    },
+    {
+     "id": "complex",
+     "label": "Score complexe",
+     "group": "Scores",
+     "sortable": true
+    }
+   ],
+   "defaults": {
+    "desktop": {
+     "visible": [
+      "rank",
+      "name",
+      "status",
+      "trend",
+      "simple",
+      "complex"
+     ],
+     "sort": [],
+     "filters": {
+      "verdict": "all"
+     }
+    },
+    "mobile": {
+     "visible": [
+      "rank",
+      "name",
+      "status",
+      "simple",
+      "complex"
+     ],
+     "sort": [],
+     "filters": {
+      "verdict": "all"
+     }
+    }
+   }
+  }
+ }
+}

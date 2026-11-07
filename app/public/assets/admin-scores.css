@@ -113,3 +113,11 @@
 .as-status{font-style:normal;font-size:.7rem;font-weight:700;padding:1px 6px;border-radius:999px;border:1px solid var(--line);white-space:nowrap}
 .as-status.ok{color:var(--good,#16803c);border-color:currentColor}.as-status.no{color:var(--bad,#b42318);border-color:currentColor}.as-status.na{color:var(--muted,#6b7280)}
 .seg button b{margin-left:4px;font-variant-numeric:tabular-nums;opacity:.75}
+
+.as-rkwrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); }
+.as-rktable { width: 100%; border-collapse: collapse; font-size: .9rem; }
+.as-rktable th, .as-rktable td { padding: 7px 10px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; vertical-align: middle; }
+.as-rktable th { background: var(--surface-2, rgba(127,127,127,.08)); font-size: .78rem; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); }
+.as-rktable th button { all: unset; cursor: pointer; text-transform: inherit; letter-spacing: inherit; } .as-rktable th button:focus-visible { outline: 2px solid var(--accent, #4f46e5); }
+.as-rktable tr:last-child td { border-bottom: 0; } .as-rktable .as-c-rank, .as-rktable .as-c-num { text-align: right; font-variant-numeric: tabular-nums; }
+.as-rktable .as-c-name { min-width: 180px; }

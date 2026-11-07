@@ -186,3 +186,12 @@ Pages : sélecteur **Retenues | Exclues | Toutes** (Classement : Retenues par d�
 Fiche : le lien du Classement porte `ct=<stratégie>` ; des réglages non enregistrés sont déposés sous `ctx=<clé>` (localStorage, même origine). Brouillon introuvable ou stratégie inconnue : la fiche le dit et ne rend aucun verdict (indéterminée), jamais « retenue ». Scores et rangs de la fiche viennent de la stratégie V4 du contexte : mêmes valeurs que dans le Classement.
 
 Unités : seuils et mesures de pente en % par séance ; la pente « sur période » (composée) n'est qu'une lecture et ne se compare jamais à un seuil par séance.
+
+## Colonnes, tris et affichage des tableaux (Administration → Colonnes)
+
+Préférences d'affichage uniquement : aucun calcul, aucun réglage de stratégie ou de score. Quatre configurations indépendantes : Explorer / Scores × ordinateur / mobile (mobile = largeur ≤ 700 px, suivie en direct).
+Catalogue unique : `app/config/table_columns.json` (identifiants, libellés, tri possible, valeurs par défaut). Stockage : `settings.table_layouts` (révision optimiste), service `app/services/table_layouts.php`, routes `table-layouts`, `admin/table-layouts[/save]`.
+Chaque configuration enregistre l'ordre complet des colonnes (masquées comprises : elles gardent leur position), visibilité, largeur (auto ou 48–480 px), jusqu'à trois tris, statut de stratégie initial et, pour Explorer, lignes par page. Colonne Titre toujours visible.
+Compatibilité : identifiant inconnu ignoré à la lecture ; colonne ajoutée au catalogue rangée en fin avec sa visibilité par défaut ; enregistrement strict (jamais de sauvegarde silencieuse d'une configuration invalide).
+Priorité : adresse (`?verdict=`, `?sort=colonne:sens`, `?page_size=`) > choix de l'utilisateur pendant la consultation > valeurs de l'administration. Tri Explorer : sur tous les résultats, valeurs absentes en dernier, égalités par rang général puis identifiant. Tri Scores : fait côté serveur sur toute la liste. Le rang global n'est jamais recalculé par un tri.
+Les catégories des filtres secondaires restent dans « Filtres et catégories ».

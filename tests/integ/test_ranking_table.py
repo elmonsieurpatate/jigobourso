@@ -231,3 +231,27 @@ def test_sheet_measures_use_the_units_of_the_criteria():
     t = next(r for r in R.table(conn, {})['rows'] if r['id'] == 1)
     assert m['slope'] == pytest.approx(t['periods']['21']['slope'], abs=1e-3)                    # % par séance : même valeur que celle comparée aux seuils
     assert m['slope_period'] > m['slope'] * 15                                                   # pente composée sur 21 séances : plus grande, jamais comparée au seuil par séance
+
+
+def test_scores_listing_sort_covers_the_whole_list_and_never_changes_global_ranks():
+    from engine.analytics import scores_admin as A
+    conn = connect()
+    reset_data(conn)
+    seed(conn)
+    _extra_titles(conn)
+    def rows(sort, limit=100, offset=0, which='simple'):
+        return A.ranking(conn, {'strategy': 'growth_v4', 'which': which, 'limit': limit, 'offset': offset, 'sort': sort})['listing']['rows']
+    default = rows([])
+    rank = {r['id']: r['rank'] for r in default}
+    asc, desc = rows([{'key': 'simple', 'dir': 'asc'}]), rows([{'key': 'simple', 'dir': 'desc'}])
+    assert [r['id'] for r in desc] == [r['id'] for r in default] and sorted(r['id'] for r in asc) == sorted(rank)
+    assert [r['simple'] for r in asc] == sorted(r['simple'] for r in asc)                                           # numérique, jamais alphabétique
+    names = rows([{'key': 'name', 'dir': 'asc'}])
+    assert [r['name'].casefold() for r in names] == sorted(r['name'].casefold() for r in names)
+    assert all(r['rank'] == rank[r['id']] for r in asc + names + rows([{'key': 'kind', 'dir': 'desc'}]))           # le rang global ne dépend pas du tri
+    pages = rows([{'key': 'name', 'dir': 'desc'}], limit=2, offset=0) + rows([{'key': 'name', 'dir': 'desc'}], limit=2, offset=2) + rows([{'key': 'name', 'dir': 'desc'}], limit=2, offset=4)
+    assert [r['id'] for r in pages] == [r['id'] for r in rows([{'key': 'name', 'dir': 'desc'}])][:len(pages)]       # tri complet, puis pagination
+    multi = rows([{'key': 'kind', 'dir': 'asc'}, {'key': 'simple', 'dir': 'desc'}])
+    assert [r['kind'] for r in multi] == sorted(r['kind'] for r in multi)
+    assert multi == rows([{'key': 'kind', 'dir': 'asc'}, {'key': 'simple', 'dir': 'desc'}])                          # déterministe
+    assert [r['id'] for r in rows([{'key': 'inconnue', 'dir': 'asc'}])] == [r['id'] for r in default]              # clé inconnue ignorée

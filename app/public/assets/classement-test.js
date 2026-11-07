@@ -25,18 +25,17 @@
   const categories=secondary.normalize(categoryPayload);
   let serverView=null;try{serverView=await J.api('classement-test/strategies');}catch(_){/* page utilisable, enregistrement serveur indisponible */}
   const filters=Object.fromEntries(Object.entries(categories).map(([k,c])=>[k,[c.label,c.options]]));
-  const columns = ['Titre','Place','Secteur','Cours','Var. %','Pente %/séance','R²','Volatilité','Liquidité','Volume','Recul max.','Perf. 1 mois','Score simple','Score complexe','Tendance'];
   const metrics = { slope:['Pente (% / séance)','% / séance'], r2:['R² (régression)',''], volatility:['Volatilité quotidienne','%'], drawdown:['Recul maximal','%'], return:['Rendement observé','%'], volume:['Volume moyen','titres / séance'] };
   const key = 'jigo_classement_test_v1';
   const fresh = id => { const pr=profiles[id],first=Object.values(pr.per)[0]; return { periods:Object.fromEntries(periods.map(([k]) => { const v=pr.per[k]; return [k,{enabled:!!v,slope:v?v[0]:first[0],r2:v?v[1]:first[1]}]; })), extra:(pr.extra||[]).map(([metric,op,value,period])=>({metric,op,value,period:period||'month'})), join:'and' }; };
-  let state = { mode:'simple',strategy:'fast',selected:'week',profiles:Object.fromEntries(Object.keys(profiles).map(id=>[id,fresh(id)])),filters:secondary.all(categories),columns:[0,3,4,5,6,7,8,12,13,14] };
+  let state = { mode:'simple',strategy:'fast',selected:'week',profiles:Object.fromEntries(Object.keys(profiles).map(id=>[id,fresh(id)])),filters:secondary.all(categories) };
   // Seules les sauvegardes explicites de cette page sont relues. Les préférences Explorer restent séparées.
   try {
     const saved = JSON.parse(localStorage.getItem(key));
     if (saved && saved.profiles && typeof saved.profiles==='object') for (const id of Object.keys(profiles)) if (!saved.profiles[id]) saved.profiles[id]=fresh(id);     // stratégies ajoutées depuis la sauvegarde
     if (saved && ['simple','expert'].includes(saved.mode) && profiles[saved.strategy] && periods.some(([k])=>k===saved.selected) && Object.keys(profiles).every(id => {
       const p=saved.profiles?.[id]; return p && ['and','or'].includes(p.join) && Array.isArray(p.extra) && p.extra.every(x=>metrics[x.metric] && ['>=','<='].includes(x.op) && Number.isFinite(x.value) && x.value>=0) && periods.every(([k])=>typeof p.periods?.[k]?.enabled==='boolean' && Number.isFinite(p.periods[k].slope) && p.periods[k].slope>=.01 && p.periods[k].slope<=2 && Number.isFinite(p.periods[k].r2) && p.periods[k].r2>=0 && p.periods[k].r2<=1);
-    }) && saved.filters && typeof saved.filters==='object' && Array.isArray(saved.cols) && saved.cols.every(n=>Number.isInteger(n)&&n>=0&&n<columns.length)) state=saved;
+    }) && saved.filters && typeof saved.filters==='object') state=saved;
   } catch (_) { /* Stockage absent ou ancien : valeurs de démonstration. */ }
   const adminSelections=secondary.defaults(categoryPayload,categories);
   const userKey=String(user.id??'offline');
@@ -81,8 +80,33 @@
   const categorySignature=JSON.stringify(categoryPayload.definitions||categoryPayload.categories);
   state.categorySignature=categorySignature;
   // Jeu fictif immuable. Le formulaire de stratégie n'entre jamais dans son calcul.
+  // Colonnes : identifiants et libellés viennent du catalogue de l'administration (app/config/table_columns.json) ; ici, seulement la valeur de tri et le rendu de chaque identifiant.
+  const SESS={week:'5',month:'21',quarter:'63',half:'126',year:'252'},STATUS_ORDER={retained:0,undetermined:1,excluded:2};
+  const REG={rank:{val:r=>r[rankKey()],dir:'asc'},name:{val:r=>r.name,dir:'asc'},status:{val:r=>STATUS_ORDER[r.status]??1,dir:'asc'},market:{val:r=>r.mic,dir:'asc'},sector:{val:r=>r.category,dir:'asc'},kind:{val:r=>r.kind,dir:'asc'},
+    price:{val:r=>r.price},change:{val:r=>r.change},slope:{val:r=>r.slope},r2:{val:r=>r.r2},volatility:{val:r=>r.volatility},turnover:{val:r=>r.turnover},avgVolume:{val:r=>r.avgVolume},drawdown:{val:r=>r.drawdown},perfMonth:{val:r=>r.perfMonth},
+    simple:{val:r=>r.posSimple==null?null:-r.posSimple},complex:{val:r=>r.posComplex==null?null:-r.posComplex},rank_simple:{val:r=>r.rankSimple,dir:'asc'},rank_complex:{val:r=>r.rankComplex,dir:'asc'},trend:{val:()=>null,nosort:true}};
+  for(const k of ['week','quarter','half'])REG['perf_'+k]={val:r=>(r.perf||{})[k]};
+  for(const k of ['week','quarter','half','year']){REG['slope_'+k]={val:r=>(r.periods[SESS[k]]||{}).slope};REG['r2_'+k]={val:r=>(r.periods[SESS[k]]||{}).r2};}
+  const LEGACY_LABELS={rank:'Rang',name:'Titre',status:'Statut stratégie',market:'Place',sector:'Secteur',price:'Cours',change:'Var. %',slope:'Pente · mois',r2:'R² · mois',volatility:'Volatilité',turnover:'Liquidité',avgVolume:'Volume',drawdown:'Recul max.',perfMonth:'Perf. 1 mois',simple:'Score simple',complex:'Score complexe',trend:'Tendance'};
+  const LEGACY_VISIBLE=()=>Object.keys(REG).map(id=>[id,(window.matchMedia('(max-width:700px)').matches?['rank','name','status','price','change','slope','simple','complex']:['rank','name','status','price','change','slope','r2','volatility','turnover','simple','complex','trend']).includes(id)]);
+  const tl=await TableLayout.load();
+  let layout=TableLayout.get(tl,'explorer',TableLayout.device(),LEGACY_VISIBLE());
+  const catalogOf=()=>layout.catalog||Object.keys(REG).map(id=>({id,label:LEGACY_LABELS[id]||id,sortable:!REG[id].nosort}));
+  const labelOf=id=>(catalogOf().find(c=>c.id===id)||{}).label||LEGACY_LABELS[id]||id;
+  // Préférences personnelles de visibilité (sélecteur « Colonnes ») : valables tant que l'administrateur n'a pas modifié cette configuration.
+  const visKey='jigo_ct_vis_v5';
+  const personal=()=>{try{const v=JSON.parse(localStorage.getItem(visKey)||'null');return v&&v.rev===layout.revision&&v.dev===TableLayout.device()?v.vis:{};}catch(_){return {};}};
+  let vis=personal();
+  const shownColumns=()=>layout.columns.filter(c=>REG[c.id]&&(c.id==='name'||(c.id in vis?vis[c.id]:c.visible)));
   let intrinsicRows=[],loadError=null,scoreLabel='',loading=true,universe=0,defaultSort='simple';
-  const tableState={sort:'simple',direction:'desc',page:1,pageSize:50,userSorted:false,verdict:'retained',query:new URLSearchParams(location.search).get('q')||''};
+  // Priorité : adresse (?verdict=, ?sort=colonne:sens, ?page_size=) > choix de l'utilisateur pendant la consultation > valeurs initiales de l'administration (Colonnes).
+  const urlq=new URLSearchParams(location.search),urlSort=(urlq.get('sort')||'').split(':'),validSort=k=>REG[k]&&!REG[k].nosort;
+  const urlSorts=validSort(urlSort[0])?[{key:urlSort[0],dir:urlSort[1]==='asc'?'asc':'desc'}]:null;
+  const tableState={sorts:urlSorts||[{key:'simple',dir:'desc'}],page:1,pageSize:[25,50,100].includes(+urlq.get('page_size'))?+urlq.get('page_size'):layout.filters.page_size||50,userSorted:!!urlSorts,
+    verdict:['retained','excluded','all'].includes(urlq.get('verdict'))?urlq.get('verdict'):layout.filters.verdict||'retained',query:urlq.get('q')||''};
+  const sortKey=()=>tableState.sorts[0].key,sortDir=()=>tableState.sorts[0].dir;
+  const configuredSorts=()=>layout.sort&&layout.sort.length?layout.sort.filter(x=>validSort(x.key)).map(x=>({...x})):[];
+  const applyDefaultSort=()=>{if(tableState.userSorted)return;const c=configuredSorts();tableState.sorts=c.length?c:[{key:defaultSort,dir:'desc'}];};
   let activeFilter=null, filterQuery='';
   const config = () => state.profiles[state.strategy];
   const isPrimary = r => r.metric === 'slope' || r.metric === 'r2';
@@ -145,8 +169,7 @@
   if(serverOk&&enabledIds().includes(serverView.selected))state.strategy=serverView.selected;else if(serverOk&&enabledIds().length)state.strategy=enabledIds()[0];
   {const want=new URLSearchParams(location.search).get('strategy');if(serverOk&&want&&enabledIds().includes(want))state.strategy=want;}
   for(const id of order()){const s=state.strategy;state.strategy=id;tree();state.strategy=s;saved[id]={p:cloneJSON(state.profiles[id]),o:cloneJSON(ovBy[id])};}
-  try{const l=JSON.parse(localStorage.getItem(key)||'{}')||{};if(['simple','expert'].includes(l.mode))state.mode=l.mode;if(Array.isArray(l.cols)&&l.cols.every(n=>Number.isInteger(n)&&n>=0&&n<columns.length))state.columns=l.cols;}catch(_){/* préférences d'affichage facultatives */}
-  try{if(!localStorage.getItem('jigo_ct_cols_v4')){state.columns=window.matchMedia('(max-width:700px)').matches?[0,3,4,5,12,13]:[0,3,4,5,6,7,8,12,13,14];localStorage.setItem('jigo_ct_cols_v3','1');}}catch(_){/* préférence facultative */}   // colonnes essentielles par défaut (place, secteur, recul… via « Colonnes ») : pas de défilement horizontal inutile
+  try{const l=JSON.parse(localStorage.getItem(key)||'{}')||{};if(['simple','expert'].includes(l.mode))state.mode=l.mode;}catch(_){/* préférences d'affichage facultatives */}
   overrides=ovBy[state.strategy];state.filters=filtersFor(overrides);
   state.selected=periods.find(([k])=>config().periods[k].enabled)?.[0]||state.selected;
   const isDirty=id=>JSON.stringify([state.profiles[id],id===state.strategy?overrides:ovBy[id]])!==JSON.stringify([saved[id].p,saved[id].o]);
@@ -167,7 +190,7 @@
   function takeView(view){rev=view.revision;meta=cloneJSON(view.meta||{});for(const it of view.items)names[it.id]=it.name;customIds=view.items.filter(i=>!i.builtin).map(i=>i.id);}
   function switchTo(id,remember=true){
     closeFilter();ovBy[state.strategy]=overrides;state.strategy=id;overrides=ovBy[id]||(ovBy[id]={});state.filters=filtersFor(overrides);
-    tableState.page=1;tableState.userSorted=false;tree();project();state.selected=periods.find(([k])=>config().periods[k].enabled)?.[0]||'week';render();loadRows();
+    tableState.page=1;applyDefaultSort();tree();project();state.selected=periods.find(([k])=>config().periods[k].enabled)?.[0]||'week';render();loadRows();
     if(remember&&serverOk)J.post('classement-test/strategies/save',{action:'select',id}).catch(()=>{});
   }
   function currentPayload(){tree();project();return {config:cloneJSON(state.profiles[state.strategy]),filters:cloneJSON(overrides)};}
@@ -269,8 +292,6 @@
     const old=activeFilter;activeFilter=null;filterQuery='';
     if(old){$(`#ct-list-${old}`).hidden=true;$(`[data-open-filter="${old}"]`).setAttribute('aria-expanded','false');if(restoreFocus)$(`[data-open-filter="${old}"]`).focus();}
   }
-  const columnKeys=['name','market','sector','price','change','slope','r2','volatility','turnover','avgVolume','drawdown','perfMonth','simple','complex','trend'];
-  const columnTitles=columns;
   const MEASURE={volatility:'volatility',turnover:'turnover_eur',avgVolume:'avg_volume',drawdown:'drawdown',perfMonth:'perf-month',simple:'score_simple_v4',complex:'score_complex_v4'};
   const eur=n=>n===null||n===undefined?'—':new Intl.NumberFormat('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:n>=1000?0:2}).format(n);
   const money=eur;
@@ -357,7 +378,13 @@
   }
   const sectorLabel=row=>{const f=defs.find(x=>x.id==='sector'),g=(categoryPayload.defaults&&null)||null;const v=f&&(f.values||[]).find(x=>x.id===(row.group&&row.group.sector));return v?v.label:null;};
   function rowCell(row,key){
-    if(key==='name')return `<a class="ct-company" href="${esc(sheetHref(row.id))}" target="_blank" rel="noopener" aria-label="Ouvrir la fiche de ${esc(row.symbol)} dans un nouvel onglet"><span class="ct-company-mark" style="--mark:${row.color}" aria-hidden="true">${esc(row.symbol.slice(0,2))}</span><span class="ct-company-text"><b>${esc(row.symbol)}${row.kind==='etf'?' <i class="ct-kind">ETF</i>':''}${row.held?' <i class="ct-kind held">détenu</i>':''}</b><span>${esc(row.name)}</span></span>${statusBadge(row)}</a>`;
+    if(key==='rank')return rankCell(row);
+    if(key==='status')return statusBadge(row);
+    if(key==='kind')return row.kind==='etf'?'ETF':'Action';
+    if(key==='rank_simple'||key==='rank_complex'){const w=key==='rank_simple'?'Simple':'Complex',r=row['rank'+w],t=row['tie'+w];return r==null?'—':t>1?`<span title="Ex æquo : ${t} titres ont exactement ce score">=${r}</span>`:String(r);}
+    {const m=/^(perf|slope|r2)_(week|quarter|half|year)$/.exec(key);if(m){const [,f,k]=m,v=f==='perf'?(row.perf||{})[k]:(row.periods[SESS[k]]||{})[f];
+      return v==null?'—':f==='r2'?fmt(v):`<span class="${v>0?'up':v<0?'down':''}">${percent(v,true)}</span>`;}}
+    if(key==='name')return `<a class="ct-company" href="${esc(sheetHref(row.id))}" target="_blank" rel="noopener" aria-label="Ouvrir la fiche de ${esc(row.symbol)} dans un nouvel onglet"><span class="ct-company-mark" style="--mark:${row.color}" aria-hidden="true">${esc(row.symbol.slice(0,2))}</span><span class="ct-company-text"><b>${esc(row.symbol)}${row.kind==='etf'?' <i class="ct-kind">ETF</i>':''}${row.held?' <i class="ct-kind held">détenu</i>':''}</b><span>${esc(row.name)}</span></span></a>`;
     if(key==='market')return `<b>${esc(row.mic)}</b><span class="ct-sub">${esc(row.country||'Pays inconnu')} · ${esc(row.currency||'—')}</span>`;
     if(key==='sector'){const g=sectorLabel(row);return row.category?`<b>${esc(row.category)}</b><span class="ct-sub">${esc(g||'')}</span>`:'<span class="ct-missing">Inconnu</span>';}
     if(key==='price')return `${eur(row.price)}${row.currency&&row.currency!=='EUR'&&row.priceNative!==null?`<span class="ct-sub">${esc(new Intl.NumberFormat('fr-FR',{maximumFractionDigits:2}).format(row.priceNative))} ${esc(row.currency)}</span>`:''}`;
@@ -373,31 +400,34 @@
     return spark(row);
   }
   function renderColumns(){
-    state.columns=[...new Set([0,...state.columns])];
-    $('#ct-columns').innerHTML=columns.map((l,i)=>`<label class="ct-option"><input type="checkbox" data-column="${i}" ${state.columns.includes(i)?'checked':''} ${i===0?'disabled':''}>${l}</label>`).join('');
+    const shown=new Set(shownColumns().map(c=>c.id));
+    $('#ct-columns').innerHTML=layout.columns.filter(c=>REG[c.id]).map(c=>`<label class="ct-option"><input type="checkbox" data-column="${esc(c.id)}" ${shown.has(c.id)?'checked':''} ${c.id==='name'?'disabled':''}>${esc(labelOf(c.id))}</label>`).join('');
     renderRanking();
   }
-  const scoreKeyOf=()=>tableState.sort==='complex'?'complex':tableState.sort==='simple'?'simple':defaultSort;     // score dont le rang est affiché
+  const scoreKeyOf=()=>['complex','rank_complex'].includes(sortKey())?'complex':['simple','rank_simple'].includes(sortKey())?'simple':defaultSort;     // score dont le rang est affiché
   const rankKey=()=>scoreKeyOf()==='simple'?'rankSimple':'rankComplex';
   const posKey=()=>scoreKeyOf()==='simple'?'posSimple':'posComplex';
   const tieKey=()=>scoreKeyOf()==='simple'?'tieSimple':'tieComplex';
   const rankCell=row=>{const r=row[rankKey()];return r==null?'—':row[tieKey()]>1?`<span title="Ex æquo : ${row[tieKey()]} titres ont exactement ce score">=${r}</span>`:String(r);};
   function renderRanking(){
     if(loading){$('#ct-table-body').innerHTML='<tr class="ct-loading"><td colspan="20"><span class="spinner"></span> Chargement des titres…</td></tr>';$('#ct-empty-results').hidden=true;$('#ct-result-count').textContent='';return;}
-    const selected=columnKeys.map((key,i)=>({key,i,label:columnTitles[i]})).filter(x=>state.columns.includes(x.i));
+    const selected=shownColumns().map(c=>({key:c.id,label:labelOf(c.id),width:c.width}));
     const {base,scoped,counts,rows:filtered}=visibleRows();
     const rows=[...filtered].sort((a,b)=>{
-      const isScore=tableState.sort==='simple'||tableState.sort==='complex';
-      const av=isScore?(a[posKey()]==null?null:-a[posKey()]):a[tableState.sort],bv=isScore?(b[posKey()]==null?null:-b[posKey()]):b[tableState.sort];
-      if((av===null||av===undefined)&&!(bv===null||bv===undefined))return 1;if((bv===null||bv===undefined)&&!(av===null||av===undefined))return -1;
-      const compare=(av===null||av===undefined)?0:typeof av==='string'?av.localeCompare(bv,'fr'):av-bv;
-      return (tableState.direction==='asc'?compare:-compare)||(a[posKey()]??1e9)-(b[posKey()]??1e9)||a.id-b.id;
+      for(const {key,dir} of tableState.sorts){                      // jusqu'à trois critères ; valeurs absentes toujours en dernier ; nombres comparés comme des nombres
+        const av=REG[key].val(a),bv=REG[key].val(b),an=av==null||Number.isNaN(av),bn=bv==null||Number.isNaN(bv);
+        if(an&&bn)continue;if(an)return 1;if(bn)return -1;
+        const c=typeof av==='string'?av.localeCompare(bv,'fr'):av-bv;if(c)return dir==='asc'?c:-c;
+      }
+      return (a[posKey()]??1e9)-(b[posKey()]??1e9)||a.id-b.id;                // égalités : ordre général du classement, puis identifiant (déterministe)
     });
     const pages=Math.max(1,Math.ceil(rows.length/tableState.pageSize));tableState.page=Math.min(Math.max(1,tableState.page),pages);
     const start=(tableState.page-1)*tableState.pageSize,pageRows=rows.slice(start,start+tableState.pageSize);
     $('#ct-result-count').textContent=loadError?'':`${num0(rows.length)} titre${rows.length>1?'s':''}`+(rows.length!==intrinsicRows.length?` sur ${num0(intrinsicRows.length)} évalués`:'');
-    $('#ct-table-head').innerHTML=`<th scope="col" class="ct-rank-cell" title="Rang général sur tous les titres notés (${tableState.sort==='simple'?'score simple':'score complexe'}), conservé lors du filtrage">#</th>`+selected.map(({key,label})=>`<th scope="col" class="${key==='name'?'ct-name-heading':''}" ${key!=='trend'?`aria-sort="${key===tableState.sort?(tableState.direction==='asc'?'ascending':'descending'):'none'}"`:''}>${key!=='trend'?`<button type="button" data-sort-column="${key}" aria-label="Trier par ${esc(label)}">${label}${key===tableState.sort?(tableState.direction==='asc'?' ↑':' ↓'):''}</button>`:label}</th>`).join('');
-    $('#ct-table-body').innerHTML=pageRows.map(row=>`<tr data-row="${row.id}"><td class="ct-rank-cell" data-label="Rang">${rankCell(row)}</td>${selected.map(({key,label})=>`<td class="ct-cell-${key}" data-label="${esc(label)}">${rowCell(row,key)}</td>`).join('')}</tr>`).join('');
+    const wstyle=w=>w?` style="width:${w}px;min-width:${w}px;max-width:none"`:'';
+    const cls=key=>key==='rank'?'ct-rank-cell':key==='name'?'ct-name-heading':'';
+    $('#ct-table-head').innerHTML=selected.map(({key,label,width})=>`<th scope="col" class="${cls(key)}"${wstyle(width)} ${REG[key].nosort?'':`aria-sort="${key===sortKey()?(sortDir()==='asc'?'ascending':'descending'):'none'}"`}>${REG[key].nosort?esc(label):`<button type="button" data-sort-column="${esc(key)}" aria-label="Trier par ${esc(label)}"${key==='rank'?` title="Rang général sur tous les titres notés (${scoreKeyOf()==='simple'?'score simple':'score complexe'}), conservé lors du filtrage et du tri"`:''}>${esc(label)}${key===sortKey()?(sortDir()==='asc'?' ↑':' ↓'):''}</button>`}</th>`).join('');
+    $('#ct-table-body').innerHTML=pageRows.map(row=>`<tr data-row="${row.id}">${selected.map(({key,label,width})=>`<td class="ct-cell-${esc(key)} ${key==='rank'?'ct-rank-cell':''}" data-label="${esc(label)}"${wstyle(width)}>${rowCell(row,key)}</td>`).join('')}</tr>`).join('');
     $('#ct-empty-results').hidden=rows.length!==0||!!loadError;
     const searched=!!tableState.query.trim(),masked=base.length-scoped.length,unevaluated=Math.max(0,universe-intrinsicRows.length);
     $('#ct-strategy-count').textContent=loadError?'':`${num0(intrinsicRows.length)} titres évalués · ${num0(unevaluated)} non évaluables (données insuffisantes) · ${num0(counts.excluded)} exclus par la stratégie · ${counts.undetermined?num0(counts.undetermined)+' indéterminés (données manquantes) · ':''}${num0(masked)} masqués par vos filtres · ${num0(filtered.length)} affichés${searched?` (recherche : ${num0(base.length)} correspondances)`:''}. Critères et filtres n’agissent que sur l’affichage : notes et rangs ne changent pas.${scoreLabel?` Stratégie : ${scoreLabel}.`:''}`;
@@ -407,10 +437,10 @@
     const und=$('#ct-undetermined');if(und){und.hidden=!counts.undetermined||tableState.verdict==='all';und.textContent=`${num0(counts.undetermined)} titre${counts.undetermined>1?'s':''} indéterminé${counts.undetermined>1?'s':''} (données manquantes) : visible${counts.undetermined>1?'s':''} dans « Toutes ».`;}
     $('#ct-page-range').textContent=loadError?loadError:rows.length?`Affichage de ${start+1} à ${Math.min(start+tableState.pageSize,rows.length)} sur ${rows.length} titres`:'Aucun titre visible';
     $('#ct-pages').innerHTML=`<button type="button" data-demo-page="${tableState.page-1}" ${tableState.page===1?'disabled':''} aria-label="Page précédente">‹</button>${Array.from({length:Math.min(pages,9)},(_,i)=>{const n=pages<=9?i+1:Math.min(Math.max(1,tableState.page-4),pages-8)+i;return `<button type="button" data-demo-page="${n}" ${tableState.page===n?'aria-current="page"':''} aria-label="Page ${n}">${n}</button>`;}).join('')}<button type="button" data-demo-page="${tableState.page+1}" ${tableState.page===pages?'disabled':''} aria-label="Page suivante">›</button>`;
-    $('#ct-sort').value=tableState.sort;$('#ct-page-size').value=String(tableState.pageSize);
-    $('#ct-sort-direction').textContent=tableState.direction==='desc'?'↓':'↑';$('#ct-sort-direction').setAttribute('aria-label',`Passer au tri ${tableState.direction==='desc'?'croissant':'décroissant'}`);
+    $('#ct-sort').value=sortKey();$('#ct-page-size').value=String(tableState.pageSize);
+    $('#ct-sort-direction').textContent=sortDir()==='desc'?'↓':'↑';$('#ct-sort-direction').setAttribute('aria-label',`Passer au tri ${sortDir()==='desc'?'croissant':'décroissant'}`);
   }
-  function sortBy(key){tableState.userSorted=true;tableState.direction=tableState.sort===key?(tableState.direction==='desc'?'asc':'desc'):(key==='name'||key==='market'||key==='sector'?'asc':'desc');tableState.sort=key;tableState.page=1;renderRanking();}
+  function sortBy(key){if(!REG[key]||REG[key].nosort)return;tableState.userSorted=true;const same=sortKey()===key;tableState.sorts=[{key,dir:same?(sortDir()==='desc'?'asc':'desc'):(REG[key].dir||'desc')}];tableState.page=1;renderRanking();}
   function render() {
     renderStrategies();
     document.querySelectorAll('[data-mode]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.mode===state.mode));
@@ -444,7 +474,7 @@
     if(el.dataset.simple) el.value=config().periods[state.selected][el.dataset.simple];
     if(el.dataset.enabled){activatePeriod(el.dataset.enabled,el.checked);renderSimple();renderExpert();}
     if(el.dataset.filter){tableState.page=1;const list=state.filters[el.dataset.filter],id=el.dataset.category;state.filters[el.dataset.filter]=el.checked?[...new Set([...list,id])]:list.filter(v=>v!==id);saveLocalSelection(el.dataset.filter);filterSummary();}
-    if(el.dataset.column!==undefined){const n=Number(el.dataset.column);state.columns=el.checked?[...new Set([...state.columns,n])]:state.columns.filter(v=>v!==n);renderColumns();}
+    if(el.dataset.column!==undefined){vis[el.dataset.column]=el.checked;try{localStorage.setItem(visKey,JSON.stringify({rev:layout.revision,dev:TableLayout.device(),vis}));}catch(_){/* préférence facultative */}renderColumns();}
     if(el.dataset.ruleField){const r=at(el.closest('[data-path]').dataset.path),f=el.dataset.ruleField;r[f]=f==='value'?number(el.value,-1e12,1e12,r.value):el.value;if(f==='value')el.value=r.value;project();preview();}
     if(el.dataset.groupJoin!==undefined){at(el.dataset.groupJoin).join=el.value;project();preview();}
   });
@@ -478,7 +508,7 @@
   });
   $('#ct-save').onclick=()=>guarded(async()=>{
     const id=state.strategy;takeView(await post({action:'save',id,...currentPayload()}));markSaved(id);
-    try{localStorage.setItem(key,JSON.stringify({mode:state.mode,cols:state.columns}));}catch(_){/* préférences d'affichage seulement */}
+    try{localStorage.setItem(key,JSON.stringify({mode:state.mode}));}catch(_){/* préférences d'affichage seulement */}
     feedback(`Stratégie « ${names[id]} » enregistrée.`);
   });
   $('#ct-duplicate').onclick=()=>guarded(async()=>{
@@ -500,8 +530,11 @@
     const nxt=enabledIds().filter(x=>x!==id)[0]||'fast';overrides=ovBy[nxt];state.strategy=nxt;switchTo(nxt);feedback(`Stratégie « ${label} » supprimée.`);
   });
   $('#ct-search').value=tableState.query;$('#ct-search').oninput=e=>{tableState.query=e.target.value;tableState.page=1;renderRanking();};
-  $('#ct-sort').onchange=e=>{tableState.userSorted=true;tableState.sort=e.target.value;tableState.direction=['name','market','sector'].includes(e.target.value)?'asc':'desc';tableState.page=1;renderRanking();};
-  $('#ct-sort-direction').onclick=()=>{tableState.direction=tableState.direction==='desc'?'asc':'desc';tableState.page=1;renderRanking();};
+  {const opts=catalogOf().filter(c=>REG[c.id]&&c.sortable!==false&&!REG[c.id].nosort);
+   $('#ct-sort').innerHTML=opts.map((c,i)=>`<option value="${esc(c.id)}">${i?'':'Trier par : '}${esc(c.label)}</option>`).join('');}
+  TableLayout.onChange(()=>{layout=TableLayout.get(tl,'explorer',TableLayout.device(),LEGACY_VISIBLE());vis=personal();applyDefaultSort();renderColumns();});
+  $('#ct-sort').onchange=e=>{sortBy(e.target.value);};
+  $('#ct-sort-direction').onclick=()=>{tableState.userSorted=true;tableState.sorts=[{key:sortKey(),dir:sortDir()==='desc'?'asc':'desc'},...tableState.sorts.slice(1)];tableState.page=1;renderRanking();};
   $('#ct-page-size').onchange=e=>{tableState.pageSize=Number(e.target.value);tableState.page=1;renderRanking();};
   $('#ct-show-demo-all').onclick=()=>{tableState.verdict='all';tableState.query='';const q=$('#ct-search');if(q)q.value='';tableState.page=1;state.filters=secondary.all(categories);for(const k of Object.keys(categories))saveLocalSelection(k);renderFilters();};
   $('#ct-apply').onclick=()=>feedback('Réglages conservés. Le tableau présente des données fictives, indépendantes de la stratégie.');
@@ -518,7 +551,7 @@
   async function loadRows(){
     const my=++loadSeq,want=state.strategy;loading=true;
     $('#ct-table-body').innerHTML='<tr class="ct-loading"><td colspan="20"><span class="spinner"></span> Chargement des titres…</td></tr>';
-    try{const data=await J.api('ranking/table',{params:{strategy:want}});if(my!==loadSeq)return;intrinsicRows=data.rows.map(toRow);universe=data.universe||intrinsicRows.length;defaultSort=data.default_sort==='complex'?'complex':'simple';if(!tableState.userSorted){tableState.sort=defaultSort;tableState.direction='desc';}loadError=null;scoreLabel=data.label||'';appliedSpec=null;loading=false;}
+    try{const data=await J.api('ranking/table',{params:{strategy:want}});if(my!==loadSeq)return;intrinsicRows=data.rows.map(toRow);universe=data.universe||intrinsicRows.length;defaultSort=data.default_sort==='complex'?'complex':'simple';applyDefaultSort();loadError=null;scoreLabel=data.label||'';appliedSpec=null;loading=false;}
     catch(e){if(my!==loadSeq)return;intrinsicRows=[];loadError='Classement indisponible : '+(e.message||'erreur de chargement');loading=false;}
     renderRanking();scheduleVerdicts();                                   // lignes chargées avec les réglages ENREGISTRÉS : si la page affiche un brouillon, les statuts suivent le brouillon
   }

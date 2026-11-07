@@ -30,7 +30,7 @@
   const fmt = (v, d = 1) => v === null || v === undefined ? '—' : J.num(v, d);
   const clone = o => JSON.parse(JSON.stringify(o));
 
-  let root, S, draft, savedJson, sel, rkWhich = 'simple', rkCat = null, rkVerdict = 'all', rkMore = false, rank = null, confBusy = false, confFail = false, confStale = false, tab = 'config', scoreTab = 'simple', mon = null, monErr = null, sim = null, simWin = 0, simBusy = false, simQ = '', useDraft = true, error = '';
+  let root, S, draft, savedJson, sel, rkWhich = 'simple', rkCat = null, rkVerdict = 'all', rkSorts = [], tl = null, rkMore = false, rank = null, confBusy = false, confFail = false, confStale = false, tab = 'config', scoreTab = 'simple', mon = null, monErr = null, sim = null, simWin = 0, simBusy = false, simQ = '', useDraft = true, error = '';
   const autoCache = {};
 
   const v4 = () => S.strategies.filter(s => s.engine === 'v4');
@@ -66,6 +66,7 @@
 
   async function load() {
     S = await J.api('admin/scores');
+    tl = await TableLayout.load();
     if (!sel || !S.strategies.find(s => s.name === sel)) sel = (v4()[0] || S.strategies[0]).name;
     reset();
   }
@@ -74,6 +75,7 @@
     root = page;
     root.innerHTML = '<div class="empty"><span class="spinner"></span></div>';
     await load();
+    initRank();
     root.onchange = onChange; root.oninput = onInput; root.onclick = onClick;
     root.onpointermove = chartMove; root.onpointerdown = chartMove; root.onpointerleave = chartLeave; root.onpointerup = e => { if (e.pointerType === 'touch') setTimeout(chartLeave, 2500); };
     root.onkeydown = e => { if (e.key === 'Enter' && e.target.id === 'as-q') { simQ = e.target.value; runSim(null); } };
@@ -310,7 +312,7 @@
         <div class="row between" style="flex-wrap:wrap;gap:8px"><div class="seg"><button data-a="rk-which" data-v="simple" class="${rkWhich === 'simple' ? 'on' : ''}">Classé par score simple</button><button data-a="rk-which" data-v="complex" class="${rkWhich === 'complex' ? 'on' : ''}">Classé par score complexe</button></div>${verdictBar(c.listing.counts)}</div>
         <div class="as-chips" style="margin:8px 0"><button class="btn small ${rkCat ? '' : 'primary'}" data-a="rk-cat" data-v="">Toutes <b>${J.num(c.listing.categories.reduce((a, x) => a + x.count, 0), 0)}</b></button>
           ${c.listing.categories.map(k => `<button class="btn small ${rkCat === k.id ? 'primary' : ''}" data-a="rk-cat" data-v="${E(k.id)}"><i class="as-dot" style="background:${E(k.color || '#999')}"></i> ${E(k.name)} <b>${J.num(k.count, 0)}</b></button>`).join('')}</div>
-        <div class="as-rklist">${c.listing.rows.length ? c.listing.rows.map(r => rowHtml(r, rkWhich)).join('') : '<p class="muted">Aucun titre dans cette catégorie.</p>'}</div>
+        ${c.listing.rows.length ? rankTable(c.listing.rows) : '<p class="muted">Aucun titre dans cette catégorie.</p>'}
         <p class="as-hint">* note calculée sur des données incomplètes. Ce classement porte sur tous les titres notés ; la page Classement présente les mêmes titres, dans le même ordre, avec les mêmes notes et les mêmes rangs (rang commun « = » pour des notes strictement identiques). Seuls ses filtres secondaires peuvent masquer des lignes.</p>
         ${c.listing.rows.length < c.listing.total ? `<div style="margin-top:8px"><button class="btn small" data-a="rk-more" ${rkMore ? 'disabled' : ''}>${rkMore ? 'Chargement…' : `Afficher la suite (${c.listing.rows.length} sur ${J.num(c.listing.total, 0)})`}</button></div>` : `<p class="as-hint">${J.num(c.listing.total, 0)} titre${c.listing.total > 1 ? 's' : ''}.</p>`}
         <div class="as-ranks" style="margin-top:14px">${block('simple', 'Score simple')}${block('complex', 'Score complexe')}</div>
@@ -318,7 +320,36 @@
         <p class="as-hint">Moteur de notation version ${c.engine_version}. Poids réels des périodes : ${c.weights.map(w => `${E(labels()[w.id])} <b>${fmt(100 * w.weight, 1)} %</b>`).join(' · ')} (κ = ${fmt(c.kappa, 2)}${c.weights.some(w => w.custom) ? ', poids personnalisés' : ', automatiques'}).</p>`}</div>`;
   }
 
-  const rankBody = (extra) => { const body = { strategy: sel, which: rkWhich, category: rkCat, verdict: rkVerdict, limit: 25, ...extra }; if (dirty()) body.draft = { global: draft.global, profile: payload() }; return body; };
+  // Colonnes, tri et statut initiaux : Administration → Colonnes (configuration « scores » de l'affichage courant). Le choix fait ensuite dans le tableau reste prioritaire.
+  const SC_FALLBACK = () => ['rank', 'name', 'status', 'trend', 'simple', 'complex'].map(id => [id, true]);
+  const layoutNow = () => TableLayout.get(tl, 'scores', TableLayout.device(), SC_FALLBACK());
+  function initRank() {
+    const l = layoutNow();
+    rkVerdict = (l.filters && l.filters.verdict) || 'all';
+    rkSorts = (l.sort || []).map(x => ({ ...x }));
+    if (rkSorts[0] && ['simple', 'complex'].includes(rkSorts[0].key)) rkWhich = rkSorts[0].key;
+    if (!window.__asLayoutWatch) { window.__asLayoutWatch = true; TableLayout.onChange(() => { if (rank && $('#as-rktable')) paintBody(); }); }
+  }
+  const SC_COLS = {
+    rank: { cell: r => r.rank == null ? '—' : r.rank, cls: 'as-c-rank', dir: 'asc' },
+    name: { cell: r => `<b>${E(r.symbol)}</b> <span class="muted">${E(r.name)}</span>`, cls: 'as-c-name', dir: 'asc' },
+    status: { cell: r => statusBadge(r.status), dir: 'asc' },
+    kind: { cell: r => r.kind === 'etf' ? 'ETF' : 'Action', dir: 'asc' },
+    market: { cell: r => E(r.mic), dir: 'asc' },
+    trend: { cell: r => spark(r.curve), nosort: true },
+    simple: { cell: r => scoreCell(r.simple, r.simple_status, rkWhich === 'simple'), cls: 'as-c-num' },
+    complex: { cell: r => scoreCell(r.complex, r.complex_status, rkWhich === 'complex'), cls: 'as-c-num' },
+  };
+  function rankTable(rows) {
+    const l = layoutNow(), cat = l.catalog || Object.keys(SC_COLS).map(id => ({ id, label: id }));
+    const label = id => (cat.find(c => c.id === id) || {}).label || id;
+    const cols = l.columns.filter(c => SC_COLS[c.id] && c.visible);
+    const prim = rkSorts[0] || { key: rkWhich, dir: 'desc' };
+    const w = c => c.width ? ` style="width:${c.width}px;min-width:${c.width}px"` : '';
+    return `<div class="as-rkwrap"><table class="as-rktable" id="as-rktable"><thead><tr>${cols.map(c => `<th scope="col" class="${SC_COLS[c.id].cls || ''}"${w(c)} ${SC_COLS[c.id].nosort ? '' : `aria-sort="${prim.key === c.id ? (prim.dir === 'asc' ? 'ascending' : 'descending') : 'none'}"`}>${SC_COLS[c.id].nosort ? E(label(c.id)) : `<button type="button" data-a="rk-sort" data-v="${E(c.id)}">${E(label(c.id))}${prim.key === c.id ? (prim.dir === 'asc' ? ' ↑' : ' ↓') : ''}</button>`}</th>`).join('')}</tr></thead>
+      <tbody>${rows.map(r => `<tr>${cols.map(c => `<td class="${SC_COLS[c.id].cls || ''}"${w(c)} data-label="${E(label(c.id))}">${SC_COLS[c.id].cell(r)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+  }
+  const rankBody = (extra) => { const body = { strategy: sel, which: rkWhich, category: rkCat, verdict: rkVerdict, sort: rkSorts, limit: 25, ...extra }; if (dirty()) body.draft = { global: draft.global, profile: payload() }; return body; };
   async function runConf(keepCat) {
     confBusy = true; confFail = false; confStale = false; if (!keepCat) rkCat = null; paintBody();
     try { rank = await J.post('admin/scores/ranking', rankBody({ offset: 0 })); error = ''; }
@@ -468,7 +499,8 @@
     else if (a === 'cw-ref') { prof().complex_weights = clone(S.design.complex_weights); paint(); }
     else if (a === 'open') { sel = v; tab = 'profils'; sim = null; rank = null; paint(); }
     else if (a === 'conf-run') { runConf(true); }
-    else if (a === 'rk-which') { rkWhich = v; rkCat = null; runConf(true); }
+    else if (a === 'rk-which') { rkWhich = v; rkSorts = [{ key: v, dir: 'desc' }]; rkCat = null; runConf(true); }
+    else if (a === 'rk-sort') { const same = rkSorts[0] && rkSorts[0].key === v; rkSorts = [{ key: v, dir: same ? (rkSorts[0].dir === 'desc' ? 'asc' : 'desc') : (SC_COLS[v].dir || 'desc') }]; if (['simple', 'complex'].includes(v)) { rkWhich = v; rkCat = null; } runConf(true); }
     else if (a === 'rk-cat') { rkCat = v || null; runConf(true); }
     else if (a === 'rk-verdict') { rkVerdict = v; runConf(true); }
     else if (a === 'rk-more') rankMore();

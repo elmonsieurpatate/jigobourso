@@ -152,7 +152,7 @@ J.NAV = (admin) => [
     { label: 'Actions / ETF', href: 'admin.html#titres', on: (q, h) => h === '#titres' }, { label: 'Cron', href: 'admin.html#cron', on: (q, h) => h === '#cron' }, { label: 'Journaux', href: 'admin.html#logs', on: (q, h) => h === '#logs' },
     { label: 'Utilisateurs', href: 'admin.html#users', on: (q, h) => h === '#users' }, { label: 'Réglages', href: 'admin.html#settings', on: (q, h) => h === '#settings' },
     { head: 'Explorer' },
-    { label: 'Scores', href: 'admin.html#scores', on: (q, h) => h === '#scores' }, { label: 'Filtres et catégories', href: 'admin-categories-test.html', on: () => true }] }] : []),
+    { label: 'Scores', href: 'admin.html#scores', on: (q, h) => h === '#scores' }, { label: 'Colonnes', href: 'admin.html#colonnes', on: (q, h) => h === '#colonnes' }, { label: 'Filtres et catégories', href: 'admin-categories-test.html', on: () => true }] }] : []),
 ];
 J.buildShell = function (page, user) {
   const file = location.pathname.split('/').pop() || 'index.html', store = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) { } } };
