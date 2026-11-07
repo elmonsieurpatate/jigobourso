@@ -4,19 +4,22 @@
   const user = await J.init('explorer'); if (!user) return;
   const $ = s => document.querySelector(s), esc = J.esc;
   const periods = [['week','Semaine',5],['month','Mois',21],['quarter','Trimestre',63],['half','6 mois',126],['year','1 an',252],['two_year','2 ans',504]];
-  // Admission par défaut de chaque stratégie d'origine : mêmes seuils que la stratégie de scores du même nom (scores_admin.V4_STRATEGIES).
-  // per = {période:[pente min %/séance, R² min]} ; extra = seuils facultatifs sur 1 mois [mesure, sens, valeur].
-  // Périodes actives de chaque stratégie (identiques à celles du moteur). Aucun seuil : le moteur note et classe tous les titres, les seuils n'excluent rien.
-  const profiles = {
-    fast: { per:{week:[0,0],month:[0,0]} },
-    regular: { per:{month:[0,0],quarter:[0,0]} },
-    calm: { per:{month:[0,0],quarter:[0,0]} },
-    rebound: { per:{week:[0,0],month:[0,0]} },
-    mom6: { per:{quarter:[0,0],half:[0,0]} },
-    mom12: { per:{half:[0,0],year:[0,0]} },
-    momrisk: { per:{half:[0,0],year:[0,0]} }
-  };
-
+  // Critères de RECHERCHE de chaque stratégie intégrée : lus dans le moteur (scores_admin.V4_STRATEGIES via ranking/criteria), jamais recopiés ici.
+  // Ils filtrent l'affichage ; ils n'entrent ni dans les notes ni dans les rangs. Une stratégie sans critère (Momentum) a des seuils à 0 = aucun critère.
+  let crit={};try{crit=(await J.api('ranking/criteria')).criteria||{};}catch(_){/* périodes actives seules si le moteur ne répond pas */}
+  const FALLBACK={fast:['week','month'],regular:['month','quarter'],calm:['month','quarter'],rebound:['week','month','half'],mom6:['quarter','half'],mom12:['half','year'],momrisk:['half','year']};
+  const profiles=Object.fromEntries(Object.keys(FALLBACK).map(id=>{
+    const src=(crit[id]&&crit[id].periods)||Object.fromEntries(FALLBACK[id].map(k=>[k,{}])),per={},extra=[];
+    for(const [k,t] of Object.entries(src)){
+      if(t.slope!==undefined||t.r2!==undefined||!Object.keys(t).length)per[k]=[t.slope||0,t.r2||0];
+      if(t.max_volatility!==undefined&&!extra.some(x=>x[0]==='volatility'))extra.push(['volatility','<=',t.max_volatility,'month']);
+      if(t.max_drawdown!==undefined&&!extra.some(x=>x[0]==='drawdown'))extra.push(['drawdown','<=',t.max_drawdown,'month']);
+      if(t.max_return!==undefined)extra.push(['return','<=',t.max_return,k]);
+      if(t.min_return!==undefined)extra.push(['return','>=',t.min_return,k]);
+    }
+    for(const k of Object.keys(src))if(!per[k])per[k]=[0,0];                                 // période active sans pente ni R² (ex. contexte du Rebond)
+    return [id,{per,extra}];
+  }));
   const secondary=window.ClassementTestSecondary;
   const categoryPayload=window.ClassementTestCategoryConfig || await J.api('explorer/secondary-filters');
   const categories=secondary.normalize(categoryPayload);
@@ -25,7 +28,7 @@
   const columns = ['Titre','Place','Secteur','Cours','Var. %','Pente %/séance','R²','Volatilité','Liquidité','Volume','Recul max.','Perf. 1 mois','Score simple','Score complexe','Tendance'];
   const metrics = { slope:['Pente (% / séance)','% / séance'], r2:['R² (régression)',''], volatility:['Volatilité quotidienne','%'], drawdown:['Recul maximal','%'], return:['Rendement observé','%'], volume:['Volume moyen','titres / séance'] };
   const key = 'jigo_classement_test_v1';
-  const fresh = id => { const pr=profiles[id],first=Object.values(pr.per)[0]; return { periods:Object.fromEntries(periods.map(([k]) => { const v=pr.per[k]; return [k,{enabled:!!v,slope:v?v[0]:first[0],r2:v?v[1]:first[1]}]; })), extra:(pr.extra||[]).map(([metric,op,value])=>({metric,op,value})), join:'and' }; };
+  const fresh = id => { const pr=profiles[id],first=Object.values(pr.per)[0]; return { periods:Object.fromEntries(periods.map(([k]) => { const v=pr.per[k]; return [k,{enabled:!!v,slope:v?v[0]:first[0],r2:v?v[1]:first[1]}]; })), extra:(pr.extra||[]).map(([metric,op,value,period])=>({metric,op,value,period:period||'month'})), join:'and' }; };
   let state = { mode:'simple',strategy:'fast',selected:'week',profiles:Object.fromEntries(Object.keys(profiles).map(id=>[id,fresh(id)])),filters:secondary.all(categories),columns:[0,3,4,5,6,7,8,12,13,14] };
   // Seules les sauvegardes explicites de cette page sont relues. Les préférences Explorer restent séparées.
   try {
@@ -79,7 +82,7 @@
   state.categorySignature=categorySignature;
   // Jeu fictif immuable. Le formulaire de stratégie n'entre jamais dans son calcul.
   let intrinsicRows=[],loadError=null,scoreLabel='',loading=true,universe=0,defaultSort='simple';
-  const tableState={sort:'simple',direction:'desc',page:1,pageSize:50,userSorted:false,query:new URLSearchParams(location.search).get('q')||''};
+  const tableState={sort:'simple',direction:'desc',page:1,pageSize:50,userSorted:false,criteria:true,query:new URLSearchParams(location.search).get('q')||''};
   let activeFilter=null, filterQuery='';
   const config = () => state.profiles[state.strategy];
   const isPrimary = r => r.metric === 'slope' || r.metric === 'r2';
@@ -94,7 +97,7 @@
     const c=config();
     if(!c.tree || !validTree(c.tree) || c.tree.kind!=='group') {
       c.tree=group(periods.filter(([k])=>c.periods[k].enabled).flatMap(([k])=>['slope','r2'].map(m=>rule(m,k,c.periods[k][m]))));
-      if(c.extra.length) c.tree.children.push(group(c.extra.map(x=>rule(x.metric,'month',x.value,x.op)),c.join));
+      if(c.extra.length) c.tree.children.push(group(c.extra.map(x=>rule(x.metric,x.period||'month',x.value,x.op)),c.join));
     }
     return c.tree;
   }
@@ -299,7 +302,7 @@
   function toRow(r){
     return {id:r.id,rank:r.rank_complex,rankSimple:r.rank_simple,rankComplex:r.rank_complex,posSimple:r.pos_simple,posComplex:r.pos_complex,tieSimple:r.tie_simple||1,tieComplex:r.tie_complex||1,symbol:r.symbol,name:r.name,mic:r.mic,currency:r.currency,kind:r.kind,country:r.country,category:r.category,group:r.group,
       price:r.price_eur,priceNative:r.price,change:r.change,slope:r.slope,r2:r.r2,volatility:r.volatility,drawdown:r.drawdown,turnover:r.turnover_eur,liquiditySource:r.liquidity_source,avgVolume:r.avg_volume,
-      perfMonth:r.perf&&r.perf.month!==undefined?r.perf.month:null,simple:r.simple,complex:r.complex,simpleStatus:r.simple_status,complexStatus:r.complex_status,score:r.complex,
+      perf:r.perf||{},perfMonth:r.perf&&r.perf.month!==undefined?r.perf.month:null,simple:r.simple,complex:r.complex,simpleStatus:r.simple_status,complexStatus:r.complex_status,score:r.complex,
       isin:r.isin,points:r.curve||[],color:hue(r.symbol),secondary:secondaryOf(r),periods:r.periods||{},held:!!r.held,lastClose:r.last_close,quality:r.quality};
   }
   // Une ligne appartient à une catégorie par mesure (filtres à seuils) ou par groupe (pays, secteur, place, type). Un filtre retient la ligne si l'une de ses catégories est cochée (OU) ; les filtres se combinent en ET.
@@ -318,27 +321,28 @@
     return rows.filter(row=>active.every(([k])=>rowOptions(row,k).some(id=>state.filters[k].includes(id))));
   }
   // Aucune admission : tous les titres évalués sont classés. Seuls les filtres secondaires masquent des lignes (affichage), sans toucher aux scores ni aux rangs.
-  // Seuils de pente / R² (Simple) et règles (Expert) : filtres d'AFFICHAGE. Un seuil à 0 est inactif ; ils masquent des lignes, jamais ne changent une note ou un rang.
-  const extraValue=(row,m)=>m==='slope'?row.slope:m==='r2'?row.r2:m==='volatility'?row.volatility:m==='drawdown'?row.drawdown:m==='return'?row.perfMonth:m==='volume'?row.avgVolume:null;
+  // Critères de recherche de la stratégie (pente / R² du mode Simple, règles du mode Expert) : ils servent à RECHERCHER les titres du profil. Ils ne modifient jamais une note ni un rang :
+  // l'univers noté reste complet, un titre hors critères reste noté et classé (« Ignorer les critères » l'affiche). Un seuil à 0 est sans effet.
+  const sessionOf=Object.fromEntries(periods.map(([k,,n])=>[k,String(n)]));
+  const extraValue=(row,r)=>r.metric==='slope'?(row.periods[sessionOf[r.period]]||{}).slope:r.metric==='r2'?(row.periods[sessionOf[r.period]]||{}).r2:
+    r.metric==='volatility'?row.volatility:r.metric==='drawdown'?row.drawdown:r.metric==='return'?(row.perf||{})[r.period]:r.metric==='volume'?row.avgVolume:null;
   const cmp={'>=':(a,b)=>a>=b,'<=':(a,b)=>a<=b,'>':(a,b)=>a>b,'<':(a,b)=>a<b,'=':(a,b)=>a===b};
-  function thresholdTest(){
+  function criteriaTest(){
     const c=config(),extra=leaves().map(x=>x.node).filter(r=>!isPrimary(r)),active=periods.filter(([k])=>c.periods[k].enabled&&(c.periods[k].slope>0||c.periods[k].r2>0));
     if(!active.length&&!extra.length)return ()=>true;
-    const test=(row,r)=>{const v=extraValue(row,r.metric);return v!=null&&cmp[r.op](v,r.value);};
+    const test=(row,r)=>{const v=extraValue(row,r);return v!=null&&cmp[r.op](v,r.value);};
     return row=>{
       const periodsOk=active.every(([k,,n])=>{const p=c.periods[k],m=row.periods[String(n)]||{};return (!(p.slope>0)||(m.slope!=null&&m.slope>=p.slope))&&(!(p.r2>0)||(m.r2!=null&&m.r2>=p.r2));});
       if(!periodsOk)return false;
       return !extra.length||(c.join==='or'?extra.some(r=>test(row,r)):extra.every(r=>test(row,r)));
     };
   }
-  function clearThresholds(){
-    for(const [k] of periods){const p=config().periods[k];p.slope=0;p.r2=0;}
-    leaves().filter(x=>isPrimary(x.node)&&x.node.op==='>=').forEach(x=>{x.node.value=0;});
-  }
+  // base = titres notés (recherche texte comprise) ; matching = ceux qui répondent aux critères ; rows = matching moins les filtres secondaires.
   function visibleRows(){
     const needle=tableState.query.trim().toLocaleLowerCase('fr');
     const base=needle?intrinsicRows.filter(r=>(r.symbol+' '+r.name+' '+(r.isin||'')).toLocaleLowerCase('fr').includes(needle)):intrinsicRows;
-    return {base,rows:applySecondary(base).filter(thresholdTest())};
+    const matching=tableState.criteria?base.filter(criteriaTest()):base;
+    return {base,matching,rows:applySecondary(matching)};
   }
   function spark(row){
     if(!row.points.length)return '<span class="ct-missing">Indisponible</span>';
@@ -377,7 +381,7 @@
   function renderRanking(){
     if(loading){$('#ct-table-body').innerHTML='<tr class="ct-loading"><td colspan="20"><span class="spinner"></span> Chargement des titres…</td></tr>';$('#ct-empty-results').hidden=true;$('#ct-result-count').textContent='';return;}
     const selected=columnKeys.map((key,i)=>({key,i,label:columnTitles[i]})).filter(x=>state.columns.includes(x.i));
-    const {base,rows:filtered}=visibleRows();
+    const {base,matching,rows:filtered}=visibleRows();
     const rows=[...filtered].sort((a,b)=>{
       const isScore=tableState.sort==='simple'||tableState.sort==='complex';
       const av=isScore?(a[posKey()]==null?null:-a[posKey()]):a[tableState.sort],bv=isScore?(b[posKey()]==null?null:-b[posKey()]):b[tableState.sort];
@@ -391,10 +395,11 @@
     $('#ct-table-head').innerHTML=`<th scope="col" class="ct-rank-cell" title="Rang général sur tous les titres notés (${tableState.sort==='simple'?'score simple':'score complexe'}), conservé lors du filtrage">#</th>`+selected.map(({key,label})=>`<th scope="col" class="${key==='name'?'ct-name-heading':''}" ${key!=='trend'?`aria-sort="${key===tableState.sort?(tableState.direction==='asc'?'ascending':'descending'):'none'}"`:''}>${key!=='trend'?`<button type="button" data-sort-column="${key}" aria-label="Trier par ${esc(label)}">${label}${key===tableState.sort?(tableState.direction==='asc'?' ↑':' ↓'):''}</button>`:label}</th>`).join('');
     $('#ct-table-body').innerHTML=pageRows.map(row=>`<tr data-row="${row.id}"><td class="ct-rank-cell" data-label="Rang">${rankCell(row)}</td>${selected.map(({key,label})=>`<td class="ct-cell-${key}" data-label="${esc(label)}">${rowCell(row,key)}</td>`).join('')}</tr>`).join('');
     $('#ct-empty-results').hidden=rows.length!==0||!!loadError;
-    const searched=!!tableState.query.trim(),masked=base.length-filtered.length,unevaluated=Math.max(0,universe-intrinsicRows.length);
-    $('#ct-strategy-count').textContent=loadError?'':`${num0(intrinsicRows.length)} titres évalués · ${num0(unevaluated)} non évaluables (données insuffisantes) · ${num0(masked)} masqués par vos filtres · ${num0(filtered.length)} affichés${searched?` (recherche : ${num0(base.length)} correspondances)`:''}. Les seuils et filtres ne masquent que l’affichage : notes et rangs ne changent pas.${scoreLabel?` Stratégie : ${scoreLabel}.`:''}`;
+    const searched=!!tableState.query.trim(),offCriteria=base.length-matching.length,masked=matching.length-filtered.length,unevaluated=Math.max(0,universe-intrinsicRows.length);
+    $('#ct-strategy-count').textContent=loadError?'':`${num0(intrinsicRows.length)} titres évalués · ${num0(unevaluated)} non évaluables (données insuffisantes) · ${num0(offCriteria)} hors critères de la stratégie · ${num0(masked)} masqués par vos filtres · ${num0(filtered.length)} affichés${searched?` (recherche : ${num0(base.length)} correspondances)`:''}. Critères et filtres n’agissent que sur l’affichage : notes et rangs ne changent pas.${scoreLabel?` Stratégie : ${scoreLabel}.`:''}`;
     $('#ct-masked-count').textContent=`${num0(masked)} titre${masked>1?'s':''} masqué${masked>1?'s':''}`;
     $('#ct-masked-count').classList.toggle('has-hidden',masked>0);
+    const tg=$('#ct-criteria');if(tg){tg.setAttribute('aria-pressed',String(tableState.criteria));tg.textContent=tableState.criteria?`Critères appliqués · ${num0(offCriteria)} hors critères`:'Critères ignorés · univers complet';}
     $('#ct-page-range').textContent=loadError?loadError:rows.length?`Affichage de ${start+1} à ${Math.min(start+tableState.pageSize,rows.length)} sur ${rows.length} titres`:'Aucun titre visible';
     $('#ct-pages').innerHTML=`<button type="button" data-demo-page="${tableState.page-1}" ${tableState.page===1?'disabled':''} aria-label="Page précédente">‹</button>${Array.from({length:Math.min(pages,9)},(_,i)=>{const n=pages<=9?i+1:Math.min(Math.max(1,tableState.page-4),pages-8)+i;return `<button type="button" data-demo-page="${n}" ${tableState.page===n?'aria-current="page"':''} aria-label="Page ${n}">${n}</button>`;}).join('')}<button type="button" data-demo-page="${tableState.page+1}" ${tableState.page===pages?'disabled':''} aria-label="Page suivante">›</button>`;
     $('#ct-sort').value=tableState.sort;$('#ct-page-size').value=String(tableState.pageSize);
@@ -450,7 +455,12 @@
   window.addEventListener('resize',()=>closeFilter());
   document.addEventListener('keydown',e=>{if(e.key==='Escape'&&activeFilter){e.preventDefault();closeFilter(true);}});
   $('#ct-filter-panel').addEventListener('toggle',()=>{if(!$('#ct-filter-panel').open)closeFilter();});
-  for(const id of ['ct-all-filters','ct-reset-filters']) $('#'+id).onclick=e=>{e.preventDefault();e.stopPropagation();const panel=$('#ct-filter-panel'),was=panel.open;tableState.page=1;if(id==='ct-reset-filters'){overrides={};state.filters=secondary.defaults(categoryPayload,categories);saveLocalSelection();}else{clearThresholds();state.filters=secondary.all(categories);for(const k of Object.keys(categories))saveLocalSelection(k);}renderFilters();render();panel.open=was;queueMicrotask(()=>{panel.open=was;});const m=$('#ct-masked-count');m.textContent=id==='ct-all-filters'?'Tout est affiché ✓':'Filtres réinitialisés ✓';setTimeout(()=>filterSummary(),1600);};
+  for(const id of ['ct-all-filters','ct-none-filters','ct-reset-filters']) $('#'+id).onclick=e=>{e.preventDefault();e.stopPropagation();tableState.page=1;
+    if(id==='ct-reset-filters'){overrides={};state.filters=secondary.defaults(categoryPayload,categories);saveLocalSelection();}
+    else if(id==='ct-all-filters'){state.filters=secondary.all(categories);for(const k of Object.keys(categories))saveLocalSelection(k);}
+    else{state.filters=Object.fromEntries(Object.keys(categories).map(k=>[k,[]]));for(const k of Object.keys(categories))saveLocalSelection(k);}
+    renderFilters();};
+  $('#ct-criteria').onclick=()=>{tableState.criteria=!tableState.criteria;tableState.page=1;renderRanking();};
   $('#ct-reset').onclick=()=>guarded(async()=>{
     const id=state.strategy,builtin=!!builtinNames[id];
     if(!await J.confirm(builtin?'Restaurer les valeurs par défaut':'Annuler les modifications',builtin?`« ${names[id]} » reprendra ses valeurs d’origine (périodes, seuils, règles et filtres). Les autres stratégies ne changent pas.`:`« ${names[id]} » reviendra à sa dernière version enregistrée.`,builtin?'Restaurer':'Annuler les modifications'))return;
@@ -488,7 +498,7 @@
   $('#ct-sort').onchange=e=>{tableState.userSorted=true;tableState.sort=e.target.value;tableState.direction=['name','market','sector'].includes(e.target.value)?'asc':'desc';tableState.page=1;renderRanking();};
   $('#ct-sort-direction').onclick=()=>{tableState.direction=tableState.direction==='desc'?'asc':'desc';tableState.page=1;renderRanking();};
   $('#ct-page-size').onchange=e=>{tableState.pageSize=Number(e.target.value);tableState.page=1;renderRanking();};
-  $('#ct-show-demo-all').onclick=()=>{clearThresholds();tableState.query='';const q=$('#ct-search');if(q)q.value='';tableState.page=1;state.filters=secondary.all(categories);for(const k of Object.keys(categories))saveLocalSelection(k);renderFilters();render();};
+  $('#ct-show-demo-all').onclick=()=>{tableState.criteria=false;tableState.query='';const q=$('#ct-search');if(q)q.value='';tableState.page=1;state.filters=secondary.all(categories);for(const k of Object.keys(categories))saveLocalSelection(k);renderFilters();};
   $('#ct-apply').onclick=()=>feedback('Réglages conservés. Le tableau présente des données fictives, indépendantes de la stratégie.');
   let loadSeq=0;
   async function loadRows(){

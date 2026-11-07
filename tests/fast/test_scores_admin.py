@@ -280,20 +280,24 @@ def test_strategies_current_profile_always_carries_sessions():
 
 
 def test_classement_proposes_every_v4_strategy():
-    """Chaque stratégie V4 de l'administration a son entrée dans le Classement, avec les mêmes périodes que le moteur et sans seuil d'exclusion."""
+    """Chaque stratégie V4 de l'administration a son entrée dans le Classement ; ses critères de recherche viennent du moteur (V4_STRATEGIES), pas d'une copie dans la page."""
     import os
-    import re
+    from engine.analytics import ranking_table as R
     root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     assert sorted(A.CT_BUILTIN.values()) == sorted(A.V4_STRATEGIES)
     php = open(os.path.join(root, 'app', 'services', 'ct_strategies.php'), encoding='utf-8').read()
     js = open(os.path.join(root, 'app', 'public', 'assets', 'classement-test.js'), encoding='utf-8').read()
+    crit = R.criteria()['criteria']
+    assert 'ranking/criteria' in js and '.3,.6' not in js and '[.07,.56]' not in js         # aucune valeur de critère recopiée dans la page
     for ct_id, name in A.CT_BUILTIN.items():
         label = A.V4_STRATEGIES[name]['label']
         assert f"'{ct_id}' => '{label}'" in php
         assert f"{ct_id}:'{label}'" in js
-        m = re.search(rf"^\s+{ct_id}: \{{ per:\{{(.*?)\}}(?:, extra|\s*\}})", js, re.M)
-        assert m, ct_id
-        per = {k: [float(x) for x in v.split(',')] for k, v in re.findall(r"(\w+):\[([^\]]*)\]", m.group(1))}
         engine = {p['id']: p for p in A.V4_STRATEGIES[name]['build']()['periods'] if p['enabled']}
-        assert set(per) == set(engine) - ({'half'} if name == 'rebound' else set()), ct_id          # mêmes périodes (Rebond : le semestre n'est qu'un contexte)
-        assert all(v == [0.0, 0.0] for v in per.values()), ct_id                                  # aucun seuil dupliqué dans la page : le moteur note tous les titres
+        assert set(crit[ct_id]['periods']) == set(engine), ct_id                              # mêmes périodes actives
+        for k, p in engine.items():
+            expected = {f: p[m] for m, f in R.CRITERIA_FIELDS.items() if p.get(m) is not None}
+            assert crit[ct_id]['periods'][k] == expected, (ct_id, k)                          # mêmes critères historiques
+    assert crit['fast']['periods'] == {'week': {'slope': .3, 'r2': .6}, 'month': {'slope': .2, 'r2': .6}}
+    assert crit['calm']['periods']['month']['max_volatility'] == 1.5 and crit['rebound']['periods']['half'] == {'max_return': 10.0}
+    assert all(not v for ct in ('mom6', 'mom12', 'momrisk') for v in crit[ct]['periods'].values())   # Momentum : aucun critère

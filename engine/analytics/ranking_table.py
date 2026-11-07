@@ -14,7 +14,7 @@ CONFIG = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.ab
 ACCENTS = str.maketrans({'é': 'e', 'è': 'e', 'ê': 'e', 'ë': 'e', 'à': 'a', 'â': 'a', 'ä': 'a', 'á': 'a', 'ã': 'a', 'å': 'a', 'î': 'i', 'ï': 'i', 'í': 'i', 'ì': 'i', 'ô': 'o', 'ö': 'o', 'ó': 'o',
                          'ò': 'o', 'õ': 'o', 'û': 'u', 'ü': 'u', 'ú': 'u', 'ù': 'u', 'ç': 'c', 'ñ': 'n', 'ý': 'y', 'ÿ': 'y'})
 MISSING = {'', 'unknown', 'inconnu', 'inconnue', 'n/a', 'n.a.', 'none', 'null', 'not available', 'unavailable', '-', '—'}
-WINDOWS = {'week': 5, 'month': 21, 'quarter': 63}
+WINDOWS = {'week': 5, 'month': 21, 'quarter': 63, 'half': 126}
 REFERENCE = 21                                           # fenêtre des mesures affichées (un mois)
 QUALITY = {'ok': 0, 'insufficient': 1, 'incomplete': 1, 'stale': 1, 'inconsistent_adjustments': 2, 'break': 2}
 
@@ -62,6 +62,23 @@ def _fetch(conn, ids):
         for r in cur.fetchall():
             out[r['listing_id']]['x'] = r
     return out
+
+
+CRITERIA_FIELDS = {'min_slope': 'slope', 'min_r2': 'r2', 'min_return': 'min_return', 'max_return': 'max_return', 'max_volatility': 'max_volatility', 'max_drawdown': 'max_drawdown'}
+
+
+def criteria(conn=None, request=None):
+    """Critères de recherche historiques des stratégies intégrées, lus dans la source centralisée `scores_admin.V4_STRATEGIES` : {identifiant du Classement: {période: {critère: valeur}}}.
+    Ce sont des critères de RECHERCHE (affichage) : ils n'entrent ni dans les notes ni dans les rangs. Une stratégie sans critère (Momentum) renvoie des périodes vides."""
+    out = {}
+    for ct_id, name in scores_admin.CT_BUILTIN.items():
+        cfg = scores_admin.V4_STRATEGIES[name]['build']()
+        per = {}
+        for p in cfg['periods']:
+            if p['id'] in scores_admin.SCORING_PERIODS and p.get('enabled'):
+                per[p['id']] = {CRITERIA_FIELDS[f]: p[f] for f in CRITERIA_FIELDS if p.get(f) is not None}
+        out[ct_id] = {'name': name, 'periods': per}
+    return {'criteria': out}
 
 
 def _ties(ranks):

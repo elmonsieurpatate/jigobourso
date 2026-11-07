@@ -368,3 +368,12 @@ a.ct-company:hover b,a.ct-company:focus-visible b{text-decoration:underline}
   .ct .ct-multi-trigger{min-height:var(--ct-control-h)}
   .ct .ct-ranking-controls,.ct .ct-ranking-controls>*{min-width:0;max-width:100%}
 }
+
+/* Filtres secondaires : commandes dans le panneau (le chevron ne fait qu'ouvrir/fermer), pastille de comptage dans l'en-tête */
+.ct .ct-secondary .ct-filter-actions{margin:0;padding:12px 16px 4px;justify-content:flex-start;flex-wrap:wrap}
+.ct .ct-secondary .ct-masked-chip{margin-left:auto}
+.ct #ct-criteria[aria-pressed="false"]{background:var(--ct-soft);border-color:var(--ct-accent);color:var(--ct-accent)}
+@media(max-width:700px){
+  .ct .ct-secondary .ct-filter-actions{padding:10px 12px 0}
+  .ct .ct-secondary .ct-filter-actions .btn{flex:1 1 calc(33% - 8px);padding:0 6px;font-size:13px}
+}

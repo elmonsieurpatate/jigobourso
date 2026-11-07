@@ -30,7 +30,7 @@ def test_table_has_scores_ranks_groups_and_unknowns_stay_none():
     assert up['simple'] is not None and up['rank_simple'] == 1 and up['rank_complex'] in (1, 2)
     assert up['group'] == {'country': 'country:europe', 'market': 'market:europe', 'sector': 'sector:technology', 'asset': 'asset:equity'}
     assert rows['ZIG.DE']['group']['sector'] == 'unknown'                           # secteur non renseigné : inconnu, pas « autres »
-    assert up['price_eur'] == pytest.approx(250.0) and up['curve'] and set(up['perf']) == {'week', 'month', 'quarter'}
+    assert up['price_eur'] == pytest.approx(250.0) and up['curve'] and set(up['perf']) == {'week', 'month', 'quarter', 'half'}
     assert up['avg_volume'] == 300000 and up['extra']['up_fraction'] is not None
     assert set(up['periods']) >= {'5', '21', '63'} and up['periods']['21']['slope'] is not None
     assert 'freshness' not in up['extra'] and 'secondary' not in up                  # fraîcheur : non fournie, jamais zéro

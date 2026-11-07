@@ -69,6 +69,7 @@ return [
         foreach ($res['rows'] as &$r) $r['held'] = in_array($r['id'], $held, true);
         return $res;
     },
+    'ranking/criteria' => function () { require_user(); return engine_call('ranking-criteria', []); },   // critères de recherche historiques des stratégies intégrées (source : V4_STRATEGIES)
     'ranking/table' => function () {          // tous les titres notés (scores V4, rangs, valeurs des filtres) : tri, filtres et pages se font dans la page
         $u = require_user();
         $ct = (string)($_GET['strategy'] ?? '');
