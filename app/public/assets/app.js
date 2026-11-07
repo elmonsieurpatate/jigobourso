@@ -142,6 +142,7 @@ J.ICONS = {
 };
 J.icon = (n, cls = 'ic') => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">${J.ICONS[n]}</svg>`;
 J.NAV = (admin) => [
+  { id: 'aide', label: 'Aide', icon: 'help', file: ['aide.html'], href: 'aide.html' },
   { sec: 'Marchés' },
   { id: 'explorer', label: 'Explorer', icon: 'compass', file: ['index.html', 'titre.html', 'mes-filtres.html', 'mes-strategies.html', 'mes-scores.html', 'mes-colonnes.html', 'classement-test.html'], children: [
     { label: 'Recherche et résultats', href: 'index.html', icon: 'search', on: () => true },
@@ -161,8 +162,7 @@ J.NAV = (admin) => [
     { label: 'FinanceDatabase', href: 'admin.html#fdb', on: (q, h) => !h || h === '#fdb' }, { label: 'Yahoo Finance', href: 'admin.html#yahoo', on: (q, h) => h === '#yahoo' },
     { label: 'Actions / ETF', href: 'admin.html#titres', on: (q, h) => h === '#titres' }, { label: 'Cron', href: 'admin.html#cron', on: (q, h) => h === '#cron' }, { label: 'Journaux', href: 'admin.html#logs', on: (q, h) => h === '#logs' },
     { label: 'Utilisateurs', href: 'admin.html#users', on: (q, h) => h === '#users' }, { label: 'Réglages', href: 'admin.html#settings', on: (q, h) => h === '#settings' },
-    ] }] : []),
-  { id: 'aide', label: 'Aide', icon: 'help', file: ['aide.html'], href: 'aide.html' }
+    ] }] : [])
 ];
 J.buildShell = function (page, user) {
   const file = location.pathname.split('/').pop() || 'index.html', store = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) { } } };

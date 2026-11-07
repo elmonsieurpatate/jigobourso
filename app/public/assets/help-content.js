@@ -1,12 +1,17 @@
 /* Contenu de l'aide (un objet par rubrique : b = Débutant, e = Expert). À modifier ici seulement ; les chiffres des stratégies ne sont JAMAIS écrits ici :
    ils sont lus dans le moteur (route help/facts) et affichés par aide.js. Une rubrique `admin: true` n'est affichée qu'aux administrateurs. */
 window.HELP = [
-  { id: 'premiers-pas', title: 'Premiers pas', icon: 'rocket',
-    b: `<p>Jigobourso note chaque action et chaque ETF suivi, puis les classe selon la <b>stratégie</b> que vous choisissez. Commencez par la page <a href="index.html">Explorer</a> : choisissez une stratégie, parcourez le classement, ouvrez une fiche titre.</p>
-        <ol><li>Choisissez une stratégie dans le sélecteur (7 stratégies intégrées).</li><li>Regardez les titres les mieux classés et leurs scores de 0 à 100.</li><li>Ouvrez une fiche pour voir le détail.</li><li>Enregistrez vos achats dans un portefeuille pour suivre vos gains.</li></ol>
+  { id: 'premiers-pas', title: 'Comprendre en 2 minutes', icon: 'rocket',
+    b: `<p><b>Choisissez une stratégie.</b> C’est le point de départ de tout : la stratégie décide quelles actions et quels ETF vous voulez voir, puis comment ils sont notés.</p>
+        <ol class="help-steps">
+          <li><b>1. Le filtrage (les critères de recherche).</b> Une stratégie commence par un filtre : on garde les titres dont le cours monte assez vite (la <i>pente</i>), de façon assez régulière (la <i>régularité</i>, notée R²), et ceci sur une ou plusieurs durées d’observation (les <i>granularités</i> : semaine, mois, trimestre…). Les titres qui passent le filtre sont « retenus ».</li>
+          <li><b>2. La notation (les scores).</b> Les actions et ETF filtrés sont ensuite <b>notés de 0 à 100</b> selon plusieurs points : la force de la hausse, sa régularité, les séances positives, la volatilité, la plus forte baisse, la liquidité… Un <b>score simple</b> (hausse × régularité) et un <b>score complexe</b> (moyenne pondérée de tous ces points). Les titres sont classés selon ces notes.</li>
+          <li><b>3. Tout est modifiable.</b> Les critères comme les scores de chaque stratégie peuvent être adaptés pour vous, séparément. La stratégie devient alors « Adaptée » ; vous pouvez revenir à la version officielle en un clic.</li>
+        </ol>
+        <p>Les sections « Critères de recherche » et « Les scores » ci-dessous expliquent chaque élément, avec les valeurs réellement utilisées. La section « Les 7 stratégies » détaille chacune d’elles.</p>
         <p class="help-note">Les scores aident à trier des titres ; ils ne sont pas un conseil d’investissement.</p>`,
-    e: `<p>Chaîne de traitement : collecte des cours (Yahoo Finance), calcul des mesures par fenêtre (pente, R², rendement, volatilité, repli), notation par le moteur commun (<i>score simple</i> et <i>score complexe</i>), puis classement. Les critères de recherche (pente et R² minimaux par granularité) ne modifient jamais une note : ils classent chaque titre en <i>retenu / exclu / indéterminé</i>.</p>
-        <p>Chaque utilisateur peut adapter séparément les <b>critères</b> et les <b>scores</b> d’une stratégie intégrée ; la référence officielle reste protégée et restaurable.</p>` },
+    e: `<p>Chaîne de traitement : collecte des cours (Yahoo Finance), calcul des mesures par fenêtre (pente, R², rendement, volatilité, repli), <b>critères de recherche</b> (statut retenu / exclu / indéterminé, affichage seulement), puis <b>notation</b> par le moteur commun (score simple, score complexe) et classement. Les critères ne modifient jamais une note, et les notes ne dépendent pas de vos filtres.</p>
+        <p>Chaque utilisateur adapte séparément les <b>critères</b> et les <b>scores</b> d’une stratégie intégrée ; la référence officielle (code + réglage administrateur) reste protégée et restaurable. Statut = Officielle si les deux sont identiques à la référence, Adaptée sinon.</p>` },
   { id: 'explorer', title: 'Explorer', icon: 'compass',
     b: `<p>L’Explorer affiche le classement des titres pour la stratégie choisie. Le <b>bandeau</b> sous le sélecteur indique si les critères et les scores sont officiels ou adaptés. La roue <i>info</i> à côté du nom ouvre un résumé de la stratégie.</p>
         <p>Vos réglages se trouvent dans le menu Explorer : <a href="mes-strategies.html">Mes stratégies</a>, <a href="mes-strategies.html#criteres">Mes critères de recherche</a>, <a href="mes-scores.html">Mes paramètres de scores</a>, <a href="mes-colonnes.html">Mes colonnes et tris</a>, <a href="mes-filtres.html">Mes filtres et catégories</a>.</p>`,
@@ -20,13 +25,24 @@ window.HELP = [
         <p>Une <span class="sui-badge personal">Personnelle</span> est une stratégie que vous créez : elle n’existe que dans votre compte.</p>`,
     e: `<p>Le statut est calculé en comparant l’état enregistré à la référence : <b>critères</b> (granularités actives, pente, R²…) et <b>scores</b> (périodes, poids, réglages) sont jugés indépendamment et restaurables séparément ; la stratégie est Adaptée si l’un des deux diffère. Enregistrer un profil de scores identique à la référence supprime l’adaptation.</p>
         <p>Les adaptations sont stockées par utilisateur ; un autre compte ne les voit jamais. Les stratégies personnelles (dont « Blou ») restent privées.</p>` },
-  { id: 'criteres', title: 'Critères et granularités', icon: 'sliders',
-    b: `<p>Une <b>granularité</b> est une durée d’observation : Jour, Semaine, Mois, Trimestre, Semestre, Année. Un <b>critère de recherche</b> fixe un minimum à atteindre sur une granularité (par exemple une hausse moyenne minimale par séance). Les titres qui l’atteignent sont <i>retenus</i>.</p>`,
-    e: `<p>Séances par granularité : Jour 1, Semaine 5, Mois 21, Trimestre 63, Semestre 126, Année 252. Seuils de pente (% par séance) et de R² : niveaux nommés lus dans le moteur (voir le tableau comparatif). Jour n’utilise que la variation de la dernière séance (ni pente, ni R²). Une donnée manquante donne « indéterminé », jamais zéro.</p>` },
-  { id: 'scores', title: 'Scores simple et complexe', icon: 'gauge',
-    b: `<p>Chaque titre reçoit deux notes de 0 à 100. Le <b>score simple</b> mesure surtout la force de la hausse. Le <b>score complexe</b> ajoute la régularité, les séances positives, le risque (volatilité, repli) et la liquidité. Plus la note est haute, mieux le titre colle à la stratégie.</p>
-        <p>Vous pouvez adapter les poids dans <a href="mes-scores.html">Mes paramètres de scores</a>.</p>`,
-    e: `<div data-facts="formulas"></div>` },
+  { id: 'criteres', title: 'Critères de recherche : pente, régularité, granularités', icon: 'sliders',
+    b: `<p>Le critère de recherche est le <b>filtre d’entrée</b> d’une stratégie. Il se règle sur trois notions :</p>
+        <ul><li><b>Granularité</b> : la durée sur laquelle on observe le titre (Jour, Semaine, Mois, Trimestre, Semestre, Année). Une stratégie peut en utiliser plusieurs ; le titre doit alors passer le filtre sur chacune.</li>
+        <li><b>Pente</b> : de combien le cours monte en moyenne <i>par séance</i> sur cette durée. Plus elle est élevée, plus la hausse est rapide. Quatre niveaux : douce, modérée, forte, très forte.</li>
+        <li><b>Régularité (R²)</b> : à quel point la hausse suit une ligne bien droite. Proche de 1, la courbe monte sans à-coups ; proche de 0, elle zigzague. Trois niveaux : souple, équilibré, strict.</li></ul>
+        <div data-facts="criteria"></div>
+        <p>Un titre est <b>retenu</b> s’il passe tous les seuils, <b>exclu</b> s’il en rate un, <b>indéterminé</b> si une donnée manque (jamais compté comme zéro). Vous modifiez ces seuils dans l’Explorer ; la stratégie devient « Adaptée » pour les critères.</p>`,
+    e: `<p>Séances par granularité : Jour 1, Semaine 5, Mois 21, Trimestre 63, Semestre 126, Année 252. Pente en % par séance ; niveaux nommés lus dans le moteur (tableau ci-dessous). Jour n’utilise que la variation de la dernière séance (ni pente, ni R²). Pas de R² ni de volatilité sous 3 séances. Les critères ne portent que sur la pente et le R² ; rendement, volatilité et repli n’y sont jamais des seuils (ils pèsent dans le score complexe).</p><div data-facts="criteria"></div>` },
+  { id: 'scores', title: 'Les scores : comment les titres sont notés', icon: 'gauge',
+    b: `<p>Une fois filtrés, les titres reçoivent deux notes de 0 à 100.</p>
+        <p><b>Score simple</b> = Dynamique × Régularité. Il ne regarde que la force de la hausse et sa régularité, sur les granularités de la stratégie.</p>
+        <p><b>Score complexe</b> = moyenne pondérée de plusieurs notes, chacune de 0 à 100. Voici chaque point noté, et ce qu’il mesure :</p>
+        <div data-facts="components"></div>
+        <p>Chaque stratégie donne un poids différent à chaque point : c’est ce qui la distingue (Hausse calme pèse fort sur la volatilité et le repli, Rebond sur le contexte de rebond et l’accélération, les stratégies Momentum sur le momentum). Les poids sont affichés dans la fiche de chaque stratégie.</p>
+        <p><b>Tout se modifie</b> dans <a href="mes-scores.html">Mes paramètres de scores</a> : granularités utilisées, poids de chaque durée, poids de chaque point du score complexe. La stratégie devient « Adaptée » pour les scores ; vous pouvez la restaurer.</p>`,
+    e: `<p>Score simple = min(100, 100 × D × Q) ; D = Σ ω<sub>p</sub> × note de pente de la période p (poids renormalisés sur les périodes mesurables) ; Q = moyenne pondérée des R², chaque R² pesant min(1, n/21). Pics, séances positives, accélération, volatilité, repli et liquidité n’y entrent pas.</p>
+        <p>Score complexe = moyenne pondérée des notes ci-dessous ; une composante indisponible sort du calcul et les poids restants sont renormalisés (jamais comptée zéro).</p>
+        <div data-facts="components"></div><div data-facts="formulas"></div>` },
   { id: 'classements', title: 'Classements et filtres', icon: 'funnel',
     b: `<p>Le classement trie les titres par score. Vos <a href="mes-filtres.html">filtres et catégories</a> (pays, secteur, place, type) masquent des lignes sans changer les notes.</p>`,
     e: `<p>Rang général : calculé sur tous les titres notés, ex æquo possibles. Les filtres secondaires s’appliquent à l’affichage uniquement ; les groupes pays / secteur / place / type viennent d’une table de correspondances commune.</p>` },

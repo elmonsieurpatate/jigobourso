@@ -15,7 +15,17 @@ const CT_PERIODS = ['week', 'month', 'quarter', 'half', 'year', 'two_year'];   /
 const CT_DAY = 'day';                                                           // Jour (1 séance) : facultatif, seule la variation 1J sert de critère
 const CT_METRICS = ['slope', 'r2', 'volatility', 'drawdown', 'return', 'volume'];
 const CT_MAX_CUSTOM = 30;
-const CT_ICONS = ['📈', '📉', '🚀', '🛡️', '⚖️', '🎯', '⚡', '🔥', '🌱', '💎', '⏳', '💰', '🏦', '🔍'];
+/** Présentation par défaut des stratégies d'origine (icône et explications) ; modifiable par chaque utilisateur dans « Mes stratégies ». */
+const CT_DEFAULT_META = [
+    'fast' => ['icon' => '🚀', 'description' => 'Les titres qui montent très vite : forte hausse moyenne par séance, sur la semaine ET sur le mois.'],
+    'regular' => ['icon' => '📈', 'description' => 'Une hausse soutenue et régulière sur un mois et un trimestre : la courbe monte sans grands à-coups.'],
+    'calm' => ['icon' => '🌱', 'description' => 'Une hausse douce avec peu de secousses sur un mois et un trimestre : peu de volatilité, peu de baisses.'],
+    'rebound' => ['icon' => '🔄', 'description' => 'Les titres qui repartent à la hausse (semaine et mois) alors que le semestre a peu progressé.'],
+    'mom6' => ['icon' => '⏳', 'description' => 'Le momentum des 6 derniers mois, dernier mois exclu : on classe les titres qui ont le mieux monté sur le semestre.'],
+    'mom12' => ['icon' => '🗓️', 'description' => 'Le momentum des 12 derniers mois, dernier mois exclu : on classe les titres qui ont le mieux monté sur l’année.'],
+    'momrisk' => ['icon' => '🛡️', 'description' => 'Le momentum 6 et 12 mois, corrigé du risque : la volatilité et la plus forte baisse pénalisent la note.'],
+];
+const CT_ICONS = ['📈', '📉', '🚀', '🛡️', '⚖️', '🎯', '⚡', '🔥', '🌱', '💎', '⏳', '💰', '🏦', '🔍', '🔄', '🗓️', '🧭', '🏆', '🌊', '🌙', '☀️', '🌳', '🍀', '🌿', '🐢', '🐇', '🦅', '🐂', '🐻', '🦁', '🧲', '🔋', '🛰️', '🏔️', '⛰️', '🏄', '🚴', '🧘', '🧠', '💡', '🔭', '🔬', '🧪', '⚙️', '🛠️', '🔧', '📊', '📌', '📍', '🔔', '⭐', '🌟', '✨', '💫', '🎲', '♟️', '🧩', '🪙', '💵', '💶', '📦', '🏗️', '🏭', '🛒', '🎢', '🌀', '🌪️', '❄️', '🧊', '🔒', '🔑', '👁️', '🧱', '⚓', '⛵', '🚦', '✅'];
 
 function ct_key(int $uid): string { return 'ct_strategies:' . $uid; }
 function ct_json($v): string { return json_encode($v, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR); }
@@ -90,7 +100,7 @@ function ct_name(string $name, array $doc, ?string $exceptId): string {
 function ct_view(array $doc): array {
     if (!isset(CT_BUILTIN[$doc['selected']]) && !array_filter($doc['items'], fn($i) => $i['id'] === $doc['selected'])) $doc['selected'] = 'fast';
     return ['schema' => 1, 'revision' => $doc['revision'], 'selected' => $doc['selected'], 'builtin' => CT_BUILTIN, 'max_custom' => CT_MAX_CUSTOM, 'items' => $doc['items'],
-            'meta' => (object)($doc['meta'] ?? []), 'icons' => CT_ICONS];
+            'meta' => (object)array_merge(array_map(fn($m) => $m + ['enabled' => true], CT_DEFAULT_META), $doc['meta'] ?? []), 'icons' => CT_ICONS];
 }
 function ct_read(int $uid): array {
     $json = q('SELECT value_json FROM settings WHERE name=?', [ct_key($uid)])->fetchColumn();
@@ -183,7 +193,7 @@ function ct_write_once(int $uid, array $req): array {
                 $doc['items'][$i]['name'] = ct_name((string)$req['name'], $doc, $id);
             }
             $in = array_intersect_key($req, ['icon' => 1, 'description' => 1, 'enabled' => 1]);
-            $doc['meta'][$id] = ct_meta($in, $doc['meta'][$id] ?? []);
+            $doc['meta'][$id] = ct_meta($in, $doc['meta'][$id] ?? (CT_DEFAULT_META[$id] ?? []));
             if (!ct_enabled_ids($doc)) throw new ApiError('Au moins une stratégie doit rester active.', 422);
             if ($i !== null && !$doc['items'][$i]['builtin']) $doc['items'][$i]['updated_at'] = $now;
         } elseif ($action === 'rename') {

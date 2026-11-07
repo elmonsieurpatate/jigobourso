@@ -27,7 +27,8 @@ const api=(pg,route,body)=>pg.evaluate(async([r,b])=>{try{const j=b?await J.post
   must(new Set(u.o.map(x=>x.label)).size===u.o.length,'Doublon de stratégie');
   must(await U.pg.$('.sui-banner'),'Bandeau absent');
   // 4. fenêtre d'information : au clic, lien vers la fiche, Échap ferme
-  await U.pg.click('#ct-info .sui-info');must(await U.pg.$('.sui-pop a[href^="aide.html#strategie-"]'),'Fenêtre d’information sans lien');await U.pg.keyboard.press('Escape');must(!(await U.pg.$('.sui-pop')),'Échap ne ferme pas la fenêtre');
+  await U.pg.click('#ct-info .sui-info');must(await U.pg.$('.sui-pop a[href^="aide.html#strategie-"]'),'Fenêtre d’information sans lien');must(/montent très vite/.test(await U.pg.textContent('.sui-pop')),'Texte par défaut absent de la fenêtre d’information');await U.pg.keyboard.press('Escape');must(!(await U.pg.$('.sui-pop')),'Échap ne ferme pas la fenêtre');
+  must(/montent très vite/.test(await U.pg.textContent('#ct-strategy-desc')),'Texte de la stratégie absent sous le sélecteur');must((await U.pg.textContent('.sui-pick-btn')).includes('🚀'),'Icône par défaut absente du sélecteur');
   // 5. adaptation privée : le compte ordinaire adapte Hausse calme, l'admin reste Officielle
   const state=(await api(U.pg,'my/scores')).json,calm=state.strategies.find(s=>s.name==='calm_rise');must(calm,'Profil calm_rise absent');
   const prof=JSON.parse(JSON.stringify(calm.current));Object.values(prof.periods).forEach(x=>delete x.sessions);prof.complex_weights.volatility-=5;prof.complex_weights.up_days+=5;
@@ -49,7 +50,7 @@ const api=(pg,route,body)=>pg.evaluate(async([r,b])=>{try{const j=b?await J.post
   // 7. Aide : modes, 7 fiches, recherche, section admin
   await U.pg.goto(BASE+'aide.html');await U.pg.waitForSelector('#strategies .sui-card');
   must((await U.pg.$$('#strategies article[id^="strategie-"]')).length===7,'7 fiches attendues');
-  must(await U.pg.$('#strategies table.sui-cmp'),'Comparatif absent');
+  must(await U.pg.$('#strategies table.sui-cmp'),'Comparatif absent');must(await U.pg.$('#scores table.sui-cmp'),'Tableau des composantes de score absent');must(/pente/i.test(await U.pg.textContent('#premiers-pas'))&&/filtrage/i.test(await U.pg.textContent('#premiers-pas')),'Introduction de l’aide incomplète');must(await U.pg.$eval('#help-nav a',a=>a.getAttribute('href'))==='#premiers-pas','Aide : première rubrique');
   must(!(await U.pg.$('#administration')),'Rubrique admin visible pour un compte ordinaire');
   await U.pg.click('[data-mode="expert"]');await U.pg.waitForSelector('#strategie-fast table.sui-cmp');
   must(/pente ≥/.test(await U.pg.textContent('#strategie-fast')),'Fiche Expert sans seuil de pente');

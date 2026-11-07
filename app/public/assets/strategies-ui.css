@@ -53,3 +53,5 @@
 .help-hit mark{background:var(--warn-soft);color:inherit}
 @media (max-width:860px){.help{grid-template-columns:minmax(0,1fr)}.help-main{min-width:0}.help-main .card{overflow-wrap:anywhere}.help-side{position:static;max-height:none}.sui-banner a{margin-left:0}}
 .sui-native{position:absolute!important;left:0;top:0;max-width:1px;width:1px;height:1px;opacity:0;pointer-events:none;overflow:hidden}
+.sui-emoji{font-size:1.25rem;line-height:1}
+.help-steps{padding-left:0;list-style:none;display:grid;gap:10px}.help-steps li{border:1px solid var(--line);border-radius:10px;background:var(--surface-2);padding:10px 12px}

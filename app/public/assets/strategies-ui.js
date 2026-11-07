@@ -12,8 +12,11 @@
     mom12: 'Classe selon la variation des douze derniers mois, hors dernier mois.',
     momrisk: 'Combine le momentum 6 et 12 mois, corrigé de la volatilité et du repli.',
     personal: 'Stratégie personnelle : visible uniquement dans votre compte.' };
-  const icon = (id, kind) => J.icon(kind === 'personal' ? 'user' : (ICON[id] || 'target'), 'sui-ic');
+  let META = {};                                   // icône et explications choisies par l'utilisateur (défauts des stratégies d'origine inclus) : mêmes partout
+  const setMeta = m => { META = m && typeof m === 'object' ? m : {}; };
+  const icon = (id, kind) => META[id] && META[id].icon ? `<span class="sui-emoji">${E(META[id].icon)}</span>` : J.icon(kind === 'personal' ? 'user' : (ICON[id] || 'target'), 'sui-ic');
   const ico = (id, kind) => `<span class="sui-ico" aria-hidden="true">${icon(id, kind)}</span>`;
+  const desc = (id, kind) => (META[id] && META[id].description) || SHORT[kind === 'personal' ? 'personal' : id] || '';
   const badge = st => `<span class="sui-badge ${E(st)}">${E(STATUS[st] || st)}</span>`;
   let pop = null;
   function closePop() { if (pop) { pop.remove(); pop = null; document.removeEventListener('keydown', onKey, true); } }
@@ -23,7 +26,7 @@
     closePop();
     const kind = s.kind || (s.builtin === false ? 'personal' : 'builtin');
     pop = document.createElement('div'); pop.className = 'sui-pop'; pop.setAttribute('role', 'dialog'); pop.setAttribute('aria-label', 'À propos de ' + s.label);
-    pop.innerHTML = `<h4>${ico(s.id, kind)}<span>${E(s.label)}</span>${badge(s.status)}</h4><p>${E(SHORT[kind === 'personal' ? 'personal' : s.id] || '')}</p><a href="aide.html#strategie-${E(kind === 'personal' ? 'personnelles' : s.id)}">Lire la fiche complète dans l’aide</a>`;
+    pop.innerHTML = `<h4>${ico(s.id, kind)}<span>${E(s.label)}</span>${badge(s.status)}</h4><p>${E(desc(s.id, kind))}</p><a href="aide.html#strategie-${E(kind === 'personal' ? 'personnelles' : s.id)}">Lire la fiche complète dans l’aide</a>`;
     document.body.appendChild(pop);
     const r = btn.getBoundingClientRect(), w = pop.offsetWidth;
     pop.style.left = Math.max(12, Math.min(innerWidth - w - 12, r.left)) + 'px'; pop.style.top = Math.min(innerHeight - pop.offsetHeight - 12, r.bottom + 6) + 'px';
@@ -60,5 +63,5 @@
     const part = (name, p) => `<span><b>${name}</b> ${badge(p.state === 'adapted' ? 'adapted' : 'official')}${p.modified ? ` <span class="muted small">${p.modified} paramètre${p.modified > 1 ? 's' : ''} modifié${p.modified > 1 ? 's' : ''}</span>` : ''}</span>`;
     return `<div class="sui-banner" role="status">${part('Critères de recherche', s.criteria)}${part('Calcul des scores', s.scores)}<a href="mes-strategies.html?id=${E(s.id)}">Comparer / restaurer</a></div>`;
   }
-  window.SUI = { ICON, STATUS, SHORT, icon, ico, badge, infoButton, bindInfo, openInfo, picker, banner };
+  window.SUI = { ICON, STATUS, SHORT, setMeta, desc, icon, ico, badge, infoButton, bindInfo, openInfo, picker, banner };
 })();

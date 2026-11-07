@@ -31,6 +31,7 @@
       <div class="row gap-s"><button type="submit" class="btn small primary">Enregistrer</button><button type="button" class="btn small" data-act="cancel">Annuler</button>${r.builtin ? `<button type="button" class="btn small" data-act="restore" data-id="${esc(r.id)}" title="Remet les réglages d’origine (seuils, périodes, filtres)" style="margin-left:auto">Restaurer par défaut</button>` : ''}</div></form>`;
   }
   function render(msg, err) {
+    SUI.setMeta(view.meta);
     const custom = view.items.filter(i => !i.builtin).length;
     page.innerHTML = (msg ? `<div class="notice ${err ? 'err' : ''}" role="status" style="margin-bottom:12px">${esc(msg)}</div>` : '') +
       `<div class="row between" style="margin-bottom:12px"><span class="muted">${custom} / ${view.max_custom} stratégie(s) personnelle(s)</span><a class="btn primary" href="index.html">Créer depuis le Classement test</a></div>` +
@@ -38,7 +39,7 @@
         const m = meta(r.id), off = !m.enabled;
         return `<div class="card tight" style="margin-bottom:10px;${off ? 'opacity:.8' : ''}"><div class="row between" style="align-items:flex-start">
           <div class="row" style="flex-wrap:nowrap;align-items:flex-start;min-width:0">${SUI.ico(r.id, r.builtin ? 'builtin' : 'personal')}<div style="min-width:0"><b>${esc(r.name)}</b> ${SUI.badge(status[r.id] ? status[r.id].status : r.builtin ? 'official' : 'personal')} ${SUI.infoButton({ id: r.id, label: r.name })}${off ? ' <span class="tag">Désactivée</span>' : ''}${r.id === view.selected ? ' <span class="tag open">Dernière utilisée</span>' : ''}
-          <div class="small muted" style="white-space:pre-line;max-width:70ch">${esc(m.description || (r.builtin ? SUI.SHORT[r.id] : '') || 'Aucune explication.')}</div>${statusBlock(r)}
+          <div class="small muted" style="white-space:pre-line;max-width:70ch">${esc(m.description || 'Aucune explication.')}</div>${statusBlock(r)}
           <div class="small muted">${r.row ? (r.builtin ? 'Réglages modifiés' : 'Enregistrée') + ' le ' + esc(when(r.row.updated_at)) : 'Valeurs d’origine'}</div></div></div>
           <div class="row gap-s"><label class="row gap-s small" style="cursor:pointer"><input type="checkbox" data-act="toggle" data-id="${esc(r.id)}" ${m.enabled ? 'checked' : ''}> Active</label>
           <button class="btn small" data-act="edit" data-id="${esc(r.id)}">Modifier</button>

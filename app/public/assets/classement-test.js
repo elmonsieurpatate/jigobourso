@@ -197,7 +197,7 @@
   function drawPicker(){
     if(!suiList||!window.SUI)return;
     const on=new Set(enabledIds().concat([state.strategy])),list=suiList.filter(s=>on.has(s.id));
-    const key=JSON.stringify([list,state.strategy]);if(key===suiKey)return;suiKey=key;
+    const key=JSON.stringify([list,state.strategy,meta]);if(key===suiKey)return;suiKey=key;SUI.setMeta(meta);
     SUI.picker($('#ct-strategy'),list,state.strategy);
     const cur=list.find(s=>s.id===state.strategy);
     $('#ct-strategy-banner').innerHTML=SUI.banner(cur);
