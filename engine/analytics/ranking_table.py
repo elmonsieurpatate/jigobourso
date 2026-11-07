@@ -55,7 +55,7 @@ def _fetch(conn, ids):
                         LEFT JOIN liquidity_state q ON q.listing_id=l.id WHERE l.id IN ({marks})""", ids)
         for r in cur.fetchall():
             out[r['id']].update(r)
-        cur.execute(f"SELECT listing_id, sessions, slope, r2, perf, volatility, drawdown, coverage FROM strategy_metrics WHERE listing_id IN ({marks}) AND sessions IN (5,21,63,126,252)", ids)
+        cur.execute(f"SELECT listing_id, sessions, slope, r2, perf, volatility, drawdown, coverage FROM strategy_metrics WHERE listing_id IN ({marks}) AND sessions IN (1,5,21,63,126,252)", ids)
         for r in cur.fetchall():
             out[r['listing_id']].setdefault('m', {})[r['sessions']] = r
         cur.execute(f"SELECT listing_id, up_fraction, spike_share FROM score_inputs WHERE listing_id IN ({marks}) AND sessions=%s", ids + [REFERENCE])
@@ -173,7 +173,7 @@ def table(conn, request):
                       'sector': classify(groups, 'sector', d.get('category'), d['kind']), 'asset': 'asset:' + d['kind']},
             'price': None if price is None else round(price, 4), 'price_eur': None if price is None or not factor else round(price * factor, 4), 'price_time': d['price_time'].isoformat() if d.get('price_time') else None,
             'last_close': d['last_close_date'].isoformat() if d.get('last_close_date') else None, 'change': _num(d.get('daily_change')),
-            'periods': {str(n): {'slope': _num(v.get('slope')), 'r2': _num(v.get('r2'))} for n, v in m.items()},
+            'periods': {str(n): {'slope': _num(v.get('slope')), 'r2': _num(v.get('r2'))} for n, v in m.items() if n > 1},
             'slope': _num(mo.get('slope')), 'r2': _num(mo.get('r2')), 'perf': perf, 'volatility': _num(mo.get('volatility')), 'drawdown': _num(mo.get('drawdown')),
             'turnover_eur': _num(d.get('turnover_eur')), 'liquidity_source': d.get('liquidity_source'), 'avg_volume': _num(d.get('avg_volume_3m')),
             'analyst': d.get('analyst_rating'), 'quality': d.get('quality'),

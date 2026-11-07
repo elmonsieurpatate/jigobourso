@@ -43,9 +43,17 @@
     },
     {
      "id": "change",
-     "label": "Var. % du jour",
+     "label": "Var. 1J (%)",
      "group": "Performances",
-     "sortable": true
+     "sortable": true,
+     "hint": "Variation du cours entre les deux dernières séances clôturées."
+    },
+    {
+     "id": "last_close",
+     "label": "Dernière clôture",
+     "group": "Performances",
+     "sortable": true,
+     "hint": "Date de la dernière séance clôturée utilisée pour les mesures du titre (Var. 1J comprise)."
     },
     {
      "id": "slope",
@@ -266,6 +274,13 @@
      "label": "Place",
      "group": "Identification",
      "sortable": true
+    },
+    {
+     "id": "change",
+     "label": "Var. 1J (%)",
+     "group": "Performances",
+     "sortable": true,
+     "hint": "Variation du cours entre les deux dernières séances clôturées."
     },
     {
      "id": "trend",

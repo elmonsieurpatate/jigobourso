@@ -39,8 +39,9 @@ def test_auto_weights_follow_kappa_and_active_set():
     w = A.auto_weights(0.7, ['week', 'month'])
     assert round(w['week'], 1) == 41.6 and round(w['month'], 1) == 58.4
     for n in range(1, 6):
-        ids = list(A.SCORING_PERIODS)[:n]
+        ids = [p for p in A.SCORING_PERIODS if p != 'day'][:n]
         assert sum(A.auto_weights(0.7, ids).values()) == pytest.approx(100)
+        assert A.auto_weights(0.7, ['day'] + ids) == {'day': 0.0, **A.auto_weights(0.7, ids)}      # Jour n'a jamais de poids automatique et ne déplace aucun autre poids
     assert A.auto_weights(0.5, ['week', 'month'])['week'] < A.auto_weights(0.7, ['week', 'month'])['week']      # κ plus bas : poids aux longues périodes
     assert A.auto_weights(0.7, []) == {}
 
@@ -190,7 +191,7 @@ def test_advanced_criteria_and_day_filter_roundtrip_and_never_change_scores(memo
     key = S._key(A.growth_v4(), 1)
     p = profile()
     p['periods']['month'].update(min_return=8.0, max_spike_share=0.45, max_volatility=7.0, min_up_fraction=0.5, max_drawdown=20.0)
-    p['day_filter'] = {'enabled': True, 'min_return': 0.0}
+    p['periods']['day'].update(enabled=True, min_return=0.0)
     p['liquidity'] = {'min_turnover_eur': 2e6, 'min_turnover_eur_us': 5e6}
     p['filters'] = {'enabled': True}
     A.save(None, {'profile': p})
@@ -199,16 +200,16 @@ def test_advanced_criteria_and_day_filter_roundtrip_and_never_change_scores(memo
     cfg = S.apply_admin(None, A.growth_v4())
     day = next(x for x in cfg['periods'] if x['id'] == 'day')
     assert day['enabled'] and day['min_return'] == 0.0
-    assert S._key(cfg, 1) == key                                                  # ni le filtre du dernier jour ni les critères avancés ne changent les notes
-    assert [x['id'] for x in S.params_for(cfg, 'equity')['periods']] == ['week', 'month']       # le dernier jour n'est jamais une granularité de notation
+    assert S._key(cfg, 1) == key                                                  # ni Jour à 0 % ni les critères avancés ne changent les notes
+    assert [x['id'] for x in S.params_for(cfg, 'equity')['periods']] == ['week', 'month']       # Jour sans poids n'entre dans aucun calcul
 
 
 def test_last_day_filter_can_be_disabled_again(memory):
     p = profile('growth_v4')
-    p['day_filter'] = {'enabled': True, 'min_return': 0.0}
+    p['periods']['day'].update(enabled=True, min_return=0.0)
     A.save(None, {'profile': p})
-    assert A.stored_profiles(None)['growth_v4']['day_filter']['enabled']
-    p['day_filter']['enabled'] = False
+    assert A.stored_profiles(None)['growth_v4']['periods']['day']['enabled'] and A.stored_profiles(None)['growth_v4']['day_filter']['enabled']
+    p['periods']['day'].update(enabled=False, min_return=None)
     A.save(None, {'profile': p})
     cfg = S.apply_admin(None, A.base_config('growth_v4'))
     day = next(x for x in cfg['periods'] if x['id'] == 'day')

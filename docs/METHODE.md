@@ -195,3 +195,5 @@ Chaque configuration enregistre l'ordre complet des colonnes (masquées comprise
 Compatibilité : identifiant inconnu ignoré à la lecture ; colonne ajoutée au catalogue rangée en fin avec sa visibilité par défaut ; enregistrement strict (jamais de sauvegarde silencieuse d'une configuration invalide).
 Priorité : adresse (`?verdict=`, `?sort=colonne:sens`, `?page_size=`) > choix de l'utilisateur pendant la consultation > valeurs de l'administration. Tri Explorer : sur tous les résultats, valeurs absentes en dernier, égalités par rang général puis identifiant. Tri Scores : fait côté serveur sur toute la liste. Le rang global n'est jamais recalculé par un tri.
 Les catégories des filtres secondaires restent dans « Filtres et catégories ».
+
+Granularité Jour et colonne « Var. 1J (%) » : voir `docs/ADMIN_SCORES_V4.md` (section « Granularité Jour »). Jour est facultatif, désactivé et à 0 % partout par défaut ; la variation 1J est la variation entre les deux dernières séances clôturées de la place du titre, indépendante de la période choisie pour les autres indicateurs.

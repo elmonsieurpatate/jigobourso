@@ -18,7 +18,8 @@ import math
 VERSION = 5   # 5 : dénominateur du score complexe aligné sur son numérateur (composantes mesurables sur une partie seulement des périodes)
 KAPPA = 0.7                  # poids automatiques : ω_p ∝ n_p^(1−κ) − n_{p−1}^(1−κ) ; κ = 0,7 redonne les 41,6 % / 58,4 % semaine / mois de V1
 COVERAGE_THRESHOLD = 0.75    # seuil de FIABILITÉ (information) : ne supprime plus aucune note
-MIN_SESSIONS = 3             # R² et volatilité n'existent pas sous 3 séances : la granularité « jour » n'entre jamais dans un score
+MIN_SESSIONS = 3             # R² et volatilité n'existent pas sous 3 séances
+DAY_SESSIONS = 1             # granularité « Jour » (facultative, poids 0 par défaut) : seule la variation d'une séance existe, ni R², ni volatilité, ni repli, ni accélération
 SAT_A, SAT_B = 17.0, 0.52    # croissance lissée qui sature la note de dynamique : A·(n/5)^0,52 %. A = 17 par défaut (90e percentile observé, titres admis V1) ; A est réglable par stratégie (SAT_A_RANGE)
 SAT_A_RANGE = (5.0, 200.0)   # bornes de A (croissance, en %, sur 5 séances à laquelle la dynamique vaut 100)
 ACCEL_REF, ACCEL_REF_RANGE = 0.4, (0.05, 5.0)   # coefficient k de la référence d'accélération : ref = saturation(n)/n × k (écart de pente par séance, en %, pour lequel la note d'accélération vaut 100)
@@ -39,6 +40,11 @@ COMPLEX_LABELS = {'dynamics': 'Dynamique', 'r2': 'Régularité (R²)', 'up_days'
                   'volatility': 'Volatilité', 'drawdown': 'Drawdown', 'liquidity': 'Liquidité', 'acceleration': 'Accélération', 'momentum': 'Momentum (6/12 mois)', 'recovery': 'Contexte de rebond'}
 PER_PERIOD = ('dynamics', 'r2', 'up_days', 'concentration', 'volatility', 'drawdown', 'acceleration')
 GATED = ('r2', 'up_days', 'concentration', 'volatility', 'drawdown')
+
+
+def scorable(n):
+    """Une fenêtre entre dans un score si elle a au moins MIN_SESSIONS séances, ou si c'est la granularité Jour (1 séance)."""
+    return n >= MIN_SESSIONS or n == DAY_SESSIONS
 
 
 def clamp(x, lo=0.0, hi=1.0):
@@ -110,8 +116,8 @@ def resolve_weights(periods, kappa=KAPPA):
     if all(isinstance(w, (int, float)) and not isinstance(w, bool) and math.isfinite(w) and w >= 0 for w in custom) and sum(custom) > 0:
         total = float(sum(custom))
         return {p['id']: p['weight'] / total for p in periods}
-    auto = auto_weights([p['sessions'] for p in periods], kappa)
-    return {p['id']: auto[p['sessions']] for p in periods}
+    auto = auto_weights([p['sessions'] for p in periods if p['sessions'] >= MIN_SESSIONS], kappa)      # Jour : jamais de poids automatique, seulement un poids saisi
+    return {p['id']: auto.get(p['sessions'], 0.0) for p in periods}
 
 
 def liquidity_note(turnover_eur):
@@ -127,8 +133,14 @@ def liquidity_note(turnover_eur):
 def period_components(m, n, sat_a=SAT_A, accel_ref=ACCEL_REF, vol_mode='absolute'):
     """Notes 0-100 d'une période depuis ses mesures brutes. m : {slope, r2, volatility, drawdown, up_fraction, spike_share, accel, r2_prev}.
     Chaque note absente reste None (jamais 0). Renvoie None si la pente n'est pas mesurable."""
-    if not m or m.get('slope') is None or n < MIN_SESSIONS:
+    if not m or m.get('slope') is None or not scorable(n):
         return None
+    if n == DAY_SESSIONS:                                  # une seule séance : variation seule, ni R², ni volatilité, ni repli (0 % sur deux clôtures n'est pas une mesure de risque)
+        growth = period_growth(m['slope'], n)
+        dyn = 100 * clamp(growth / saturation(n, sat_a))
+        c = {'growth': growth, 'dynamics': dyn, 'gate': clamp(dyn / GATE_FLOOR), 'raw': {k: (m.get(k) if k == 'slope' else None) for k in ('slope', 'r2', 'volatility', 'drawdown', 'up_fraction', 'spike_share', 'accel')}}
+        c.update(r2=None, up_days=None, concentration=None, volatility=None, drawdown=None, acceleration=None, spike_factor=None, up_factor=None)
+        return c
     growth = period_growth(m['slope'], n)
     dyn = 100 * clamp(growth / saturation(n, sat_a))
     c = {'growth': growth, 'dynamics': dyn, 'gate': clamp(dyn / GATE_FLOOR), 'raw': {k: m.get(k) for k in ('slope', 'r2', 'volatility', 'drawdown', 'up_fraction', 'spike_share', 'accel')}}
@@ -159,7 +171,7 @@ def _missing_taxonomy(periods, comps, required):
         c = comps[p['id']]
         if c is None:
             out['required_periods' if p['id'] in required else 'optional_periods'].append(p['id'])
-        else:
+        elif p['sessions'] != DAY_SESSIONS:
             for k in ('r2', 'up_days', 'concentration', 'volatility', 'drawdown', 'acceleration'):
                 if c.get(k) is None:
                     out['secondary'].append(f"{p['id']}:{k}")
@@ -181,7 +193,7 @@ def score_title(inputs, liquidity, periods, weights=None, kappa=KAPPA, required=
       * calcul mathématiquement impossible (aucune période mesurable, ou aucune régularité mesurable) → score None, status 'inconnu', raison explicite
     Renvoie {'simple': {...}, 'complex': {...}, 'weights', 'weights_effective', 'periods', 'missing', 'liquidity'}.
     """
-    periods = sorted([dict(p) for p in periods if p['sessions'] >= MIN_SESSIONS], key=lambda p: p['sessions'])
+    periods = sorted([dict(p) for p in periods if scorable(p['sessions'])], key=lambda p: p['sessions'])
     if weights is None:
         weights = resolve_weights(periods, kappa)
     comps = {p['id']: period_components(inputs.get(p['sessions']), p['sessions'], sat_a, accel_ref, vol_mode) for p in periods}
@@ -229,6 +241,8 @@ def _simple(periods, comps, weights, eff, threshold):
             rel = min(1.0, p['sessions'] / RELIABILITY_SESSIONS)
             r_num += w * rel * max(c['raw']['r2'], 0.0); r_den += w * rel
             cd += w0
+        elif p['sessions'] == DAY_SESSIONS:
+            cd += w0                                      # Jour : pas de R² possible, ce n'est pas une donnée manquante
         parts[p['id']] = {'weight': w, 'dynamics': c['dynamics'], 'slope': c['raw']['slope'], 'r2': c['raw']['r2'], 'r2_reliability': rel}
     cover_w = sum(weights.get(p['id'], 0.0) for p in periods) or 1.0
     coverage = cd / cover_w                           # part du poids de référence dont la pente ET le R² sont mesurés
@@ -247,6 +261,8 @@ def _complex(avail, comps, weights, eff, period_cover, liquidity_score, threshol
     contributions = {}
     wsum = float(sum(cw.values())) or 1.0
     ref_w = sum(weights.get(p['id'], 0.0) for p in avail) or 1.0
+    day_w = sum(eff.get(p['id'], 0.0) for p in avail if p['sessions'] == DAY_SESSIONS)
+    others = 1.0 - day_w if day_w < 1.0 else 1.0           # part des périodes à plus d'une séance : Jour n'a que la dynamique, son absence de R², volatilité… n'abaisse pas la fiabilité
     for key, weight in cw.items():
         if weight <= 0:
             continue
@@ -270,7 +286,8 @@ def _complex(avail, comps, weights, eff, period_cover, liquidity_score, threshol
             contributions[key] = {'weight': w, 'value': None, 'points': None, 'unavailable': True}
             continue
         s /= cv                                   # moyenne sur les seules périodes où la mesure existe
-        total += w * s / 100; coverage += w * cv; avail_w += w      # la composante compte pour son poids entier (sa note est déjà la moyenne des périodes mesurées) ; cv n'alimente que la fiabilité
+        cv_ref = cv if key == 'dynamics' else min(1.0, cv / others)
+        total += w * s / 100; coverage += w * cv_ref; avail_w += w      # la composante compte pour son poids entier (sa note est déjà la moyenne des périodes mesurées) ; cv n'alimente que la fiabilité
         contributions[key] = {'weight': w, 'value': s, 'points': w * s, 'coverage': cv}
     if avail_w <= 1e-12:
         return {'score': None, 'status': 'inconnu', 'coverage': 0.0, 'reliable': False, 'why': 'calcul impossible : aucune composante mesurable', 'contributions': contributions}
@@ -280,7 +297,7 @@ def _complex(avail, comps, weights, eff, period_cover, liquidity_score, threshol
             v['points_effective'] = v['weight_effective'] * v['value']      # somme = note brute avant ancrage
     base = total / avail_w
     coverage *= period_cover
-    short = comps[avail[0]['id']]                  # période la plus courte réellement mesurable (pas de pénalité si la plus courte n'existe pas)
+    short = comps[next((p for p in avail if p['sessions'] >= MIN_SESSIONS), avail[0])['id']]      # période la plus courte réellement mesurable, hors Jour (pas de pénalité si la plus courte n'existe pas)
     mult = 1 - anchor * (1 - short['gate'])        # ralentissement ou retournement récent : pénalité progressive, jamais une multiplication brutale
     return {'score': 100 * base * mult, 'status': _status(coverage), 'coverage': coverage, 'reliable': coverage >= threshold - 1e-12, 'anchor': mult, 'anchor_gate': short['gate'], 'anchor_lambda': anchor,
             'raw_total': 100 * base, 'contributions': contributions}

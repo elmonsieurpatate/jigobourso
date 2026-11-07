@@ -28,12 +28,16 @@ def params_for(config, kind):
     """Paramètres de score d'un type (action / ETF) : granularités ACTIVES de ce type (≥ 3 séances), obligatoires, poids, κ, seuil."""
     cfg = C.effective(v4(config), kind)
     sc = cfg.get('scoring') or C.validate_scoring(None, cfg['periods'])
-    active = [dict(id=p['id'], sessions=p['sessions']) for p in cfg['periods'] if p['enabled'] and p['sessions'] >= SC.MIN_SESSIONS]
+    active = [dict(id=p['id'], sessions=p['sessions']) for p in cfg['periods'] if p['enabled'] and SC.scorable(p['sessions'])]
     custom = sc['weights']
-    if custom and active and all(custom.get(p['id']) is not None for p in active):
+    # Jour (1 séance) : poids 0 tant qu'aucun poids n'est saisi, y compris dans un profil enregistré avant son ajout (les autres poids ne bougent pas)
+    if custom and active and all(custom.get(p['id']) is not None or p['sessions'] == SC.DAY_SESSIONS for p in active):
         for p in active:
-            p['weight'] = float(custom[p['id']])
-    return {'periods': active, 'required': [p['id'] for p in cfg['periods'] if p['enabled'] and p.get('require_history') and p['sessions'] >= SC.MIN_SESSIONS],
+            p['weight'] = float(custom.get(p['id']) or 0.0)
+    # Jour à 0 % (ou sans poids) n'entre dans aucun calcul : mêmes notes, même clé de cache qu'avant l'ajout de la granularité
+    active = [p for p in active if p['sessions'] != SC.DAY_SESSIONS or (p.get('weight') or 0.0) > 0]
+    ids = {p['id'] for p in active}
+    return {'periods': active, 'required': [p['id'] for p in cfg['periods'] if p['id'] in ids and p.get('require_history')],
             'kappa': float(sc['kappa']), 'complex_weights': {k: float(v) for k, v in dict(SC.COMPLEX_WEIGHTS, **sc['complex_weights']).items()}, 'threshold': float(sc['threshold']), 'anchor': float(sc.get('anchor', SC.ANCHOR_LAMBDA)),
             'sat_a': float(sc.get('sat_a', SC.SAT_A)), 'accel_ref': float(sc.get('accel_ref', SC.ACCEL_REF)), 'vol_mode': sc.get('vol_mode', 'absolute'), 'momentum_horizon': sc.get('momentum_horizon', '6m')}
 

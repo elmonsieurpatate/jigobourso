@@ -62,7 +62,7 @@ const must=(c,m)=>{if(!c)throw new Error(m);};
   // mobile : configuration indépendante (valeurs par défaut) ; basculement de largeur en direct
   await p.setViewportSize({width:390,height:900});await p.waitForTimeout(500);
   const hm=await heads(p);log.mobile=hm;
-  must(JSON.stringify(hm)===JSON.stringify(['Rang','Titre','Statut stratégie','Cours','Var. % du jour','Pente · mois','Score simple','Score complexe']),'Mobile par défaut : '+JSON.stringify(hm));
+  must(JSON.stringify(hm)===JSON.stringify(['Rang','Titre','Statut stratégie','Cours','Var. 1J (%)','Pente · mois','Score simple','Score complexe']),'Mobile par défaut : '+JSON.stringify(hm));
   must(!(await p.evaluate(()=>document.documentElement.scrollWidth>innerWidth)),'Mobile : débordement de page');
   await p.setViewportSize({width:1280,height:900});await p.waitForTimeout(500);
   must((await heads(p))[0]==='Score complexe','Retour ordinateur');
