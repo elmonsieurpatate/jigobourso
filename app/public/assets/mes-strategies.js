@@ -2,7 +2,18 @@
 (async () => {
   if (!await J.init('explorer')) return;
   const page = J.$('#page'), esc = J.esc;
-  let view = null, editing = null;
+  let view = null, editing = null, status = {}, open = new Set(location.hash === '#criteres' ? ['*'] : new URLSearchParams(location.search).getAll('id'));
+  const loadStatus = async () => { try { status = Object.fromEntries((await J.api('strategies/status')).strategies.map(s => [s.id, s])); } catch (_) { status = {}; } };
+  const val = v => v == null ? 'aucun seuil' : typeof v === 'object' ? JSON.stringify(v) : String(typeof v === 'number' ? +v.toFixed(4) : v);
+  const rowsOf = d => d.length ? `<div class="sui-scroll"><table class="sui-cmp"><thead><tr><th>Paramètre</th><th>Officiel</th><th>Le vôtre</th></tr></thead><tbody>${d.map(x => `<tr class="mod"><td>${esc(x.key)}</td><td>${esc(val(x.official))}</td><td>${esc(val(x.mine))}</td></tr>`).join('')}</tbody></table></div>` : '';
+  const statusBlock = r => {
+    const st = status[r.id]; if (!st || st.kind !== 'builtin') return '';
+    const part = (label, p, act) => `<div class="row gap-s small" style="align-items:center"><b>${label}</b> ${SUI.badge(p.state)}${p.modified ? ` <span class="muted">${p.modified} paramètre${p.modified > 1 ? 's' : ''} modifié${p.modified > 1 ? 's' : ''}</span> <button class="btn small" data-act="${act}" data-id="${esc(r.id)}">${J.icon('undo', 'sui-ic')} Restaurer</button>` : ''}</div>`;
+    const showing = open.has('*') || open.has(r.id);
+    return `<div style="margin-top:8px;display:grid;gap:4px">${part('Critères de recherche', st.criteria, 'restore-criteria')}${part('Calcul des scores', st.scores, 'restore-scores')}
+      <div class="row gap-s">${st.status === 'adapted' ? `<button class="btn small" data-act="compare" data-id="${esc(r.id)}" aria-expanded="${showing}">${J.icon('compare', 'sui-ic')} Comparer à l’officielle</button><button class="btn small" data-act="restore-all" data-id="${esc(r.id)}">Tout restaurer</button>` : ''}<a class="btn small" href="mes-scores.html">Modifier les scores</a><a class="btn small" href="index.html?strategy=${encodeURIComponent(r.id)}">Modifier les critères</a></div>
+      ${showing && st.status === 'adapted' ? `${st.criteria.details.length ? '<h4 style="margin:8px 0 4px">Critères de recherche</h4>' + rowsOf(st.criteria.details) : ''}${st.scores.details.length ? '<h4 style="margin:8px 0 4px">Calcul des scores</h4>' + rowsOf(st.scores.details) : ''}` : ''}</div>`;
+  };
   const post = body => J.post('classement-test/strategies/save', { revision: view.revision, ...body });
   const meta = id => ({ icon: '📈', description: '', enabled: true, ...((view.meta || {})[id] || {}) });
   const when = s => { try { return new Date(String(s).replace(' ', 'T') + (/Z|[+-]\d\d:?\d\d$/.test(s) ? '' : 'Z')).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }); } catch (_) { return ''; } };
@@ -22,20 +33,21 @@
   function render(msg, err) {
     const custom = view.items.filter(i => !i.builtin).length;
     page.innerHTML = (msg ? `<div class="notice ${err ? 'err' : ''}" role="status" style="margin-bottom:12px">${esc(msg)}</div>` : '') +
-      `<div class="row between" style="margin-bottom:12px"><span class="muted">${custom} / ${view.max_custom} stratégie(s) personnelle(s)</span><a class="btn primary" href="classement-test.html">Créer depuis le Classement test</a></div>` +
+      `<div class="row between" style="margin-bottom:12px"><span class="muted">${custom} / ${view.max_custom} stratégie(s) personnelle(s)</span><a class="btn primary" href="index.html">Créer depuis le Classement test</a></div>` +
       rows().map(r => {
         const m = meta(r.id), off = !m.enabled;
         return `<div class="card tight" style="margin-bottom:10px;${off ? 'opacity:.8' : ''}"><div class="row between" style="align-items:flex-start">
-          <div class="row" style="flex-wrap:nowrap;align-items:flex-start;min-width:0"><span style="font-size:1.6rem;line-height:1.1" aria-hidden="true">${m.icon}</span><div style="min-width:0"><b>${esc(r.name)}</b> ${r.builtin ? '<span class="tag">Fournie</span>' : '<span class="tag held">Personnelle</span>'}${off ? ' <span class="tag">Désactivée</span>' : ''}${r.id === view.selected ? ' <span class="tag open">Dernière utilisée</span>' : ''}
-          <div class="small muted" style="white-space:pre-line;max-width:70ch">${esc(m.description) || 'Aucune explication.'}</div>
+          <div class="row" style="flex-wrap:nowrap;align-items:flex-start;min-width:0">${SUI.ico(r.id, r.builtin ? 'builtin' : 'personal')}<div style="min-width:0"><b>${esc(r.name)}</b> ${SUI.badge(status[r.id] ? status[r.id].status : r.builtin ? 'official' : 'personal')} ${SUI.infoButton({ id: r.id, label: r.name })}${off ? ' <span class="tag">Désactivée</span>' : ''}${r.id === view.selected ? ' <span class="tag open">Dernière utilisée</span>' : ''}
+          <div class="small muted" style="white-space:pre-line;max-width:70ch">${esc(m.description || (r.builtin ? SUI.SHORT[r.id] : '') || 'Aucune explication.')}</div>${statusBlock(r)}
           <div class="small muted">${r.row ? (r.builtin ? 'Réglages modifiés' : 'Enregistrée') + ' le ' + esc(when(r.row.updated_at)) : 'Valeurs d’origine'}</div></div></div>
           <div class="row gap-s"><label class="row gap-s small" style="cursor:pointer"><input type="checkbox" data-act="toggle" data-id="${esc(r.id)}" ${m.enabled ? 'checked' : ''}> Active</label>
           <button class="btn small" data-act="edit" data-id="${esc(r.id)}">Modifier</button>
-          ${m.enabled ? `<a class="btn small primary" href="classement-test.html?strategy=${encodeURIComponent(r.id)}">Ouvrir</a>` : ''}
+          ${m.enabled ? `<a class="btn small primary" href="index.html?strategy=${encodeURIComponent(r.id)}">Ouvrir</a>` : ''}
           ${r.builtin ? '' : `<button class="btn small" data-act="copy" data-id="${esc(r.id)}">Dupliquer</button><button class="btn small danger" data-act="delete" data-id="${esc(r.id)}">Supprimer</button>`}</div></div>
           ${editing === r.id ? form(r) : ''}</div>`;
       }).join('');
     J.$$('[data-act]', page).forEach(b => { const a = b.dataset.act; if (a === 'toggle') b.onchange = () => act(a, b.dataset.id, b.checked); else b.onclick = () => a === 'cancel' ? (editing = null, render()) : act(a, b.dataset.id); });
+    SUI.bindInfo(page, Object.values(status).map(x => ({ ...x, status: x.status })).concat(view.items.filter(i => !i.builtin && !status[i.id]).map(i => ({ id: i.id, label: i.name, kind: 'personal', status: 'personal' }))));
     J.$$('.ms-form', page).forEach(f => f.onsubmit = e => { e.preventDefault(); act('save-meta', f.dataset.id, new FormData(f)); });
   }
   function askName(initial) {
@@ -59,12 +71,16 @@
         render(`« ${n} » créée.`);
       }
       else if (a === 'delete') { if (!await J.confirm('Supprimer la stratégie', `« ${name} » sera supprimée définitivement. Les autres stratégies ne changent pas.`, 'Supprimer')) return; view = await post({ action: 'delete', id }); if (editing === id) editing = null; render(`« ${name} » supprimée.`); }
-      else if (a === 'restore') { if (!await J.confirm('Restaurer les valeurs par défaut', `Les réglages de « ${name} » reprendront leurs valeurs d’origine (nom, icône et explications restent). Les autres stratégies ne changent pas.`, 'Restaurer')) return; view = await post({ action: 'restore', id }); render(`« ${name} » : valeurs par défaut restaurées.`); }
+      else if (a === 'compare') { open.has(id) ? open.delete(id) : open.add(id); open.delete('*'); render(); }
+      else if (a === 'restore-scores') { if (!await J.confirm('Restaurer les scores', `Le calcul des scores de « ${name} » reprendra les valeurs officielles. Vos critères de recherche ne changent pas.`, 'Restaurer')) return; await J.post('my/scores/save', { reset: 'profile', name: status[id].name }); await loadStatus(); render(`« ${name} » : scores restaurés.`); }
+      else if (a === 'restore-criteria') { if (!await J.confirm('Restaurer les critères', `Les critères de recherche de « ${name} » reprendront les valeurs officielles. Vos réglages de scores ne changent pas.`, 'Restaurer')) return; view = await post({ action: 'restore', id }); await loadStatus(); render(`« ${name} » : critères restaurés.`); }
+      else if (a === 'restore-all') { if (!await J.confirm('Tout restaurer', `« ${name} » redeviendra entièrement officielle (critères et scores).`, 'Tout restaurer')) return; view = await post({ action: 'restore', id }); await J.post('my/scores/save', { reset: 'profile', name: status[id].name }); await loadStatus(); render(`« ${name} » : redevenue officielle.`); }
+      else if (a === 'restore') { if (!await J.confirm('Restaurer les valeurs par défaut', `Les réglages de « ${name} » reprendront leurs valeurs d’origine (nom, icône et explications restent). Les autres stratégies ne changent pas.`, 'Restaurer')) return; view = await post({ action: 'restore', id }); await loadStatus(); render(`« ${name} » : valeurs par défaut restaurées.`); }
     } catch (e) {
       if (/autre session|Rechargez/i.test(e.message || '')) { try { view = await J.api('classement-test/strategies'); } catch (_) { } }
       render(e.message || 'Action impossible.', true);
     }
   }
-  try { view = await J.api('classement-test/strategies'); render(); }
+  try { view = await J.api('classement-test/strategies'); await loadStatus(); render(); const tgt = new URLSearchParams(location.search).get('id'); const el = tgt && page.querySelector(`[data-act="compare"][data-id="${CSS.escape(tgt)}"]`); if (el) el.scrollIntoView({ block: 'center' }); }
   catch (e) { page.innerHTML = `<div class="notice err">Stratégies indisponibles : ${esc(e.message)}</div>`; }
 })();

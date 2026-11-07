@@ -10,13 +10,23 @@ from engine.shared import settings
 
 from . import criteria as _CR, explorer_config as C, score_categories, score_service, scores as SC, strategy as LEGACY
 
-PROFILES = 'scores_profiles'
-SCORING_PERIODS = tuple(p for p in C.PERIODS if C.SESSIONS[p] >= SC.MIN_SESSIONS)
+PROFILES = 'scores_profiles'                                    # références OFFICIELLES communes (administrateur) : jamais modifiées par un utilisateur
+USER = {'id': None}                                             # utilisateur de la requête en cours (un processus par appel) : ses adaptations se superposent aux références
+
+
+def set_user(uid):
+    USER['id'] = int(uid) if isinstance(uid, (int, str)) and str(uid).isdigit() and int(uid) > 0 else None
+
+
+def user_key(uid):
+    return f'scores_profiles_u{int(uid)}'
+SCORING_PERIODS = tuple(p for p in C.PERIODS if SC.scorable(C.SESSIONS[p]))           # Jour (1 séance) comprise : facultative, désactivée et à 0 % par défaut
 SIMPLE = {'min_slope': (-100, 100), 'min_r2': (0, 1)}                      # mode simple : exactement deux seuils par granularité
 ADVANCED = {'min_return': (-100, 10000), 'max_return': (-100, 10000), 'max_spike_share': (0, 1), 'max_volatility': (0, 100), 'min_up_fraction': (0, 1), 'max_drawdown': (0, 100)}
 THRESHOLDS = {**SIMPLE, **ADVANCED}
 LIQUIDITY = {'min_turnover_eur': (0, 1e12), 'min_turnover_eur_us': (0, 1e12)}
 TOLERANCE = 0.05
+DAY_THRESHOLDS = ('min_return', 'max_return')              # Jour (1 séance) : seule la variation a un sens, jamais de pente, de R², de volatilité ni de repli
 SLOPE, R2 = LEGACY.SLOPE_LEVELS, LEGACY.R2_LEVELS          # niveaux historiques exacts (strategy.py, V2) : pente en % par séance, R² 1 − (2/3)² pour « flexible »
 
 
@@ -78,9 +88,9 @@ V4_STRATEGIES = {
     'growth_v4': {'label': 'Croissance rapide', 'build': growth_v4,
                   'note': 'Mode simple : pente et R² par granularité, aucun autre filtre imposé.'},
     'rebound': {'label': 'Rebond', 'build': _rebound,
-                'note': 'Semaine et mois qui repartent à la hausse alors que le semestre n’a presque pas progressé (admission : rendement 6 mois ≤ 10 %). Contexte de rebond (semestre peu avancé) 25 % et accélération 20 % du score complexe, référence d’accélération abaissée (0,25) : un retournement net suffit.'},
+                'note': 'Semaine et mois qui repartent à la hausse (critères de recherche : pente et R² minimaux « douce » / « souple » ; le semestre ne sert qu’au contexte, sans seuil). Contexte de rebond (semestre peu avancé) 25 % et accélération 20 % du score complexe, référence d’accélération abaissée (0,25) : un retournement net suffit.'},
     'calm_rise': {'label': 'Hausse calme', 'build': _calm,
-                  'note': 'Mois et trimestre en hausse douce avec peu de variations (admission : volatilité ≤ 1,5 %/séance, repli ≤ 20 %). Volatilité 35 % et drawdown 20 % du score complexe.'},
+                  'note': 'Mois et trimestre en hausse douce (critères de recherche : pente et R² minimaux « douce » / « souple » ; la volatilité et le repli ne sont pas des seuils). Volatilité 35 % et drawdown 20 % du score complexe.'},
     'momentum_6m': {'label': 'Momentum 6 mois (expérimental)',
                     'build': lambda: _momentum('momentum_6m', '6m', ('quarter', 'half'), {'quarter': 30, 'half': 70},
                                                {'dynamics': 15, 'r2': 10, 'up_days': 0, 'concentration': 0, 'volatility': 5, 'drawdown': 10, 'liquidity': 10, 'acceleration': 0, 'momentum': 50}),
@@ -109,7 +119,7 @@ def _ct_builder(label, periods, thresholds=None):
             if on:
                 by[pid]['require_history'] = True
                 t = (thresholds or {}).get(pid) or {}
-                for f, key in (('min_slope', 'slope'), ('min_r2', 'r2')):
+                for f, key in (() if pid == 'day' else (('min_slope', 'slope'), ('min_r2', 'r2'))):      # Jour : pas de pente ni de R² sur une séance
                     if isinstance(t.get(key), (int, float)) and not isinstance(t.get(key), bool) and t[key] > 0:
                         by[pid][f] = float(t[key])
         return C.validate(c)
@@ -134,7 +144,7 @@ def refresh(conn):
                     continue
                 per = it['config'].get('periods') or {}
                 active = tuple(pid for pid in SCORING_PERIODS if (per.get(pid) or {}).get('enabled'))
-                if not active:
+                if not [pid for pid in active if pid != 'day']:               # Jour seul n'a aucun poids automatique : la stratégie garde alors les scores par défaut
                     continue
                 name = f'ct:{uid}:{it["id"]}'
                 DYNAMIC[name] = {'label': it.get('name') or name, 'build': _ct_builder(name, active, per), 'note': 'Stratégie personnelle du Classement : granularités actives de cette stratégie, notes réglées ici.'}
@@ -143,6 +153,8 @@ def refresh(conn):
 
 
 def known(name):
+    if name in DYNAMIC and USER['id'] and not str(name).startswith(f"ct:{USER['id']}:"):
+        return False                                           # la stratégie personnelle d'un autre utilisateur n'existe pas pour celui-ci
     return name in V4_STRATEGIES or name in DYNAMIC
 
 
@@ -159,7 +171,7 @@ def resolve(conn, ct_id, user_id):
     return name if name in DYNAMIC else 'growth_v4'
 
 
-PERIOD_LABELS = {'week': 'Semaine', 'month': 'Mois', 'quarter': 'Trimestre', 'half': 'Semestre', 'year': 'Année'}
+PERIOD_LABELS = {'day': 'Jour', 'week': 'Semaine', 'month': 'Mois', 'quarter': 'Trimestre', 'half': 'Semestre', 'year': 'Année'}
 
 
 def design():
@@ -215,7 +227,7 @@ def apply_profile(config, profile):
             for f in THRESHOLDS:
                 if f in pp:
                     p[f] = pp[f]
-        if p['id'] == 'day' and isinstance(profile.get('day_filter'), dict):               # filtre facultatif « dernier jour positif » : indépendant de la notation
+        if p['id'] == 'day' and 'day' not in (profile.get('periods') or {}) and isinstance(profile.get('day_filter'), dict):      # profil antérieur à la granularité Jour : ancien filtre « dernier jour »
             p['enabled'] = bool(profile['day_filter'].get('enabled'))
             p['min_return'] = profile['day_filter'].get('min_return', 0.0) if p['enabled'] else None
     if isinstance(profile.get('liquidity'), dict):
@@ -245,7 +257,7 @@ def neutral(config):
             for f in THRESHOLDS:
                 p[f] = None
         elif p['id'] == 'day':
-            p['enabled'], p['min_return'] = False, None
+            p['enabled'], p['min_return'] = False, None                   # (jamais atteint tant que Jour est une granularité ; conservé par sécurité)
     c['liquidity'] = dict(c.get('liquidity') or {}, **{f: None for f in LIQUIDITY})
     return C.validate(c)
 
@@ -258,19 +270,20 @@ def clean_profile(raw):
     out = {'periods': {}}
     for pid in SCORING_PERIODS:
         pp = periods.get(pid)
+        if pid == 'day' and not isinstance(pp, dict):         # profil enregistré avant l'ajout de Jour : Jour désactivé (ou ancien filtre « dernier jour » repris tel quel)
+            old = raw.get('day_filter') if isinstance(raw.get('day_filter'), dict) else {}
+            pp = {'enabled': bool(old.get('enabled')), 'require_history': False, 'min_return': old.get('min_return') if old.get('enabled') else None}
         if not isinstance(pp, dict):
             raise ValueError(f'Granularité manquante : {PERIOD_LABELS[pid]}')
         item = {'enabled': bool(pp.get('enabled')), 'require_history': bool(pp.get('require_history'))}
         for f, (lo, hi) in THRESHOLDS.items():
-            item[f] = C.number(pp.get(f), lo, hi, f'{PERIOD_LABELS[pid]} : {f}')
+            item[f] = None if pid == 'day' and f not in DAY_THRESHOLDS else C.number(pp.get(f), lo, hi, f'{PERIOD_LABELS[pid]} : {f}')
         out['periods'][pid] = item
     active = [pid for pid in SCORING_PERIODS if out['periods'][pid]['enabled']]
     if not active:
         raise ValueError('Au moins une granularité doit rester active')
-    day = raw.get('day_filter') or {}
-    out['day_filter'] = {'enabled': bool(day.get('enabled')), 'min_return': C.number(day.get('min_return', 0.0), -100, 100, 'Dernier jour : rendement minimal')}
-    if out['day_filter']['min_return'] is None:
-        out['day_filter']['min_return'] = 0.0
+    d = out['periods']['day']                         # champ conservé pour les anciens lecteurs : reflet de la granularité Jour
+    out['day_filter'] = {'enabled': d['enabled'], 'min_return': d['min_return'] if d['min_return'] is not None else 0.0}
     liq = raw.get('liquidity') or {}
     out['liquidity'] = {f: C.number(liq.get(f), lo, hi, f) for f, (lo, hi) in LIQUIDITY.items()}
     out['technical'] = {'require_fresh': bool((raw.get('technical') or {}).get('require_fresh'))}
@@ -282,12 +295,15 @@ def clean_profile(raw):
     out['weights'] = {}
     if mode == 'custom':
         weights = raw.get('weights') or {}
-        vals = {pid: C.number(weights.get(pid), 0, 100, f'Poids {PERIOD_LABELS[pid]}') for pid in active}
+        vals = {pid: C.number(weights.get(pid, 0 if pid == 'day' else None), 0, 100, f'Poids {PERIOD_LABELS[pid]}') for pid in active}      # Jour sans poids saisi : 0 %
         if any(v is None for v in vals.values()):
             raise ValueError('Chaque granularité active doit avoir un poids')
         if abs(sum(vals.values()) - 100) > TOLERANCE:
             raise ValueError(f'Le total des poids des périodes doit faire 100 % (actuellement {sum(vals.values()):g} %)')
         out['weights'] = vals
+    day_on = out['periods']['day']['enabled']
+    if not [pid for pid in active if pid != 'day'] and not (mode == 'custom' and day_on and out['weights'].get('day', 0) > 0):
+        raise ValueError('Jour seul n’a aucun poids automatique : activez une autre granularité ou donnez-lui un poids personnalisé')
     cw = dict(raw.get('complex_weights') or {})
     for new in ('momentum', 'recovery'):
         cw.setdefault(new, 0)                             # composantes ajoutées après coup : un profil enregistré sans elles les garde à 0
@@ -306,8 +322,18 @@ def clean_profile(raw):
     return out
 
 
-def stored_profiles(conn):
+def global_profiles(conn):
     return settings.get(conn, PROFILES, {}) or {}
+
+
+def user_profiles(conn, uid):
+    return settings.get(conn, user_key(uid), {}) or {}
+
+
+def stored_profiles(conn):
+    """Profils effectifs : références officielles, puis adaptations de l'utilisateur de la requête (propres à son compte)."""
+    g = global_profiles(conn)
+    return {**g, **user_profiles(conn, USER['id'])} if USER['id'] else g
 
 
 def base_config(name):
@@ -346,6 +372,8 @@ def strategies(conn):
     stored = stored_profiles(conn)
     out = []
     for name, sp in list(V4_STRATEGIES.items()) + list(DYNAMIC.items()):
+        if not known(name):
+            continue                                                                          # stratégie personnelle d'un autre utilisateur
         base = base_config(name)
         cfg = build_config(conn, name)
         current = clean_profile(stored[name]) if name in stored else profile_of(base)       # valeurs saisies (seuils conservés même si les filtres sont désactivés)
@@ -354,8 +382,139 @@ def strategies(conn):
             current['periods'][pid].setdefault('sessions', C.SESSIONS[pid])                  # le profil enregistré ne garde pas la durée : l'affichage en a besoin
         active = [p for p in SCORING_PERIODS if current['periods'][p]['enabled']]
         out.append({'name': name, 'label': sp['label'], 'note': sp['note'], 'engine': 'v4', 'sort': cfg['ranking'].get('sort'), 'defaults': profile_of(base), 'current': current,
-                    'customised': name in stored, 'auto_weights': auto_weights(glob['kappa'], active), 'saved_at': _iso(settings.saved_at(conn, PROFILES)) if name in stored else None})
+                    'customised': name in stored, 'official': official_clean(conn, name), 'modified': profile_diff(current, official_clean(conn, name)) if name in V4_STRATEGIES else [],
+                    'auto_weights': auto_weights(glob['kappa'], active), 'saved_at': _iso(settings.saved_at(conn, PROFILES)) if name in stored else None})
     return out
+
+
+# ───────────── références officielles, adaptations d'un utilisateur, statuts ─────────────
+
+def _flat(v, prefix=''):
+    if isinstance(v, dict):
+        out = {}
+        for k, x in v.items():
+            out.update(_flat(x, f'{prefix}{k}.'))
+        return out
+    return {prefix[:-1]: v}
+
+
+def _same(a, b):
+    if isinstance(a, (int, float)) and isinstance(b, (int, float)) and not isinstance(a, bool) and not isinstance(b, bool):
+        return abs(float(a) - float(b)) < 1e-9
+    return a == b
+
+
+def profile_diff(a, b):
+    """Paramètres de score qui diffèrent entre deux profils (chemins pointés) ; vide si identiques. `sessions` et `day_filter` sont dérivés : ignorés."""
+    if a is None or b is None:
+        return []
+    fa, fb = _flat(a), _flat(b)
+    keys = sorted(k for k in set(fa) | set(fb) if '.sessions' not in k and not k.startswith('day_filter'))
+    return [k for k in keys if not _same(fa.get(k), fb.get(k))]
+
+
+def diff_rows(a, b):
+    """Comparaison lisible : [{key, official, mine}] pour chaque paramètre de score qui diffère (a = adapté, b = officiel)."""
+    fa, fb = _flat(a), _flat(b)
+    return [{'key': k, 'official': fb.get(k), 'mine': fa.get(k)} for k in profile_diff(a, b)]
+
+
+def official_clean(conn, name):
+    """Profil de référence d'une stratégie intégrée : définition du code, puis réglage officiel de l'administrateur s'il existe. None pour une stratégie personnelle."""
+    if name not in V4_STRATEGIES:
+        return None
+    g = global_profiles(conn)
+    return clean_profile(g[name]) if name in g else clean_profile(profile_of(base_config(name)))
+
+
+def criteria_diff(official_periods, spec):
+    """Critères de recherche qui diffèrent de la référence : liste de « métrique:période ». `spec` = configuration enregistrée par l'utilisateur."""
+    mine = _CR.normalize(spec)
+    ref = _CR.normalize(_CR.default_spec(official_periods))
+    if mine is None or ref is None:
+        return []
+    def table(n):
+        return {f"{c['metric']}:{c['period']}:{c['op']}": c['value'] for c in n['primary'] + n['extra']}
+    a, b = table(mine), table(ref)
+    out = sorted({k.rsplit(':', 1)[0] for k in set(a) | set(b) if not (k in a and k in b and _same(a[k], b[k]))})
+    if mine['extra'] and mine['join'] != ref['join']:
+        out.append('join')
+    return out
+
+
+def criteria_rows(official_periods, spec):
+    """Comparaison lisible des critères : [{key: « métrique:période », official, mine}] (None = pas de seuil)."""
+    mine = _CR.normalize(spec)
+    ref = _CR.normalize(_CR.default_spec(official_periods))
+    if mine is None or ref is None:
+        return []
+    def table(n):
+        return {f"{c['metric']}:{c['period']}": c['value'] for c in n['primary'] + n['extra']}
+    a, b = table(mine), table(ref)
+    keys = criteria_diff(official_periods, spec)
+    return [{'key': k, 'official': b.get(k), 'mine': a.get(k)} for k in keys]
+
+
+LABELS = {'growth_v4': 'Croissance rapide', 'growth_regular': 'Croissance régulière', 'calm_rise': 'Hausse calme', 'rebound': 'Rebond',
+          'momentum_6m': 'Momentum 6 mois', 'momentum_12m': 'Momentum 12 mois', 'momentum_risk': 'Momentum ajusté au risque'}
+
+
+def strategies_status(conn, request):
+    """Statut de chaque stratégie intégrée et personnelle de l'utilisateur : une seule entrée par stratégie intégrée, Officielle ou Adaptée ; critères et scores jugés séparément.
+    `ct_items` : stratégies enregistrées par l'utilisateur (surcharges de critères et stratégies personnelles)."""
+    from . import ranking_table
+    refresh(conn)
+    items = {i['id']: i for i in (request.get('ct_items') or []) if isinstance(i, dict) and isinstance(i.get('id'), str)}
+    crit = ranking_table.criteria()['criteria']
+    mine = user_profiles(conn, USER['id']) if USER['id'] else {}
+    out = []
+    for ct_id, name in CT_BUILTIN.items():
+        it = items.get(ct_id)
+        cmod = criteria_diff(crit[ct_id]['periods'], it.get('config')) if it and it.get('builtin') and isinstance(it.get('config'), dict) else []
+        smod = profile_diff(clean_profile(mine[name]), official_clean(conn, name)) if name in mine else []
+        out.append({'id': ct_id, 'name': name, 'label': LABELS[name], 'kind': 'builtin', 'status': 'adapted' if cmod or smod else 'official',
+                    'criteria': {'state': 'adapted' if cmod else 'official', 'modified': len(cmod), 'details': criteria_rows(crit[ct_id]['periods'], it.get('config')) if cmod else []},
+                    'scores': {'state': 'adapted' if smod else 'official', 'modified': len(smod), 'details': diff_rows(clean_profile(mine[name]), official_clean(conn, name)) if smod else []}})
+    for ct_id, it in items.items():
+        if not it.get('builtin') and ct_id not in CT_BUILTIN:
+            out.append({'id': ct_id, 'name': f"ct:{USER['id']}:{ct_id}", 'label': it.get('name') or ct_id, 'kind': 'personal', 'status': 'personal',
+                        'criteria': {'state': 'personal', 'modified': 0, 'details': []}, 'scores': {'state': 'personal', 'modified': 0, 'details': []}})
+    return {'strategies': out}
+
+
+def user_save(conn, request):
+    """Adaptation de scores propre à l'utilisateur : n'écrit jamais les références. Un profil identique à la référence redevient « Officiel » (l'adaptation est supprimée)."""
+    uid = USER['id']
+    if not uid:
+        raise ValueError('Utilisateur requis')
+    refresh(conn)
+    mine = user_profiles(conn, uid)
+    prof = request.get('profile') if isinstance(request.get('profile'), dict) else None
+    name = request.get('name') or (prof or {}).get('name')
+    if not known(name):
+        raise ValueError('Stratégie V4 inconnue')
+    reset = request.get('reset')
+    if reset == 'profile':
+        mine.pop(name, None)
+    elif prof is not None:
+        clean = clean_profile(prof)
+        apply_profile(base_config(name), clean)                                   # revalidation complète de la configuration résultante
+        ref = official_clean(conn, name)
+        if ref is not None and not profile_diff(clean, ref):
+            mine.pop(name, None)
+        else:
+            mine[name] = clean
+    else:
+        raise ValueError('Demande invalide')
+    settings.put(conn, user_key(uid), mine)
+    return user_state(conn, request)
+
+
+def user_state(conn, request=None):
+    st = state(conn)
+    st['personal'] = None                                                            # statistiques d'administration : jamais exposées
+    st['volume_collection'] = None
+    return st
 
 
 def references():
@@ -411,7 +570,7 @@ def save(conn, request):
     if reset in ('global', 'all'):
         settings.put(conn, score_service.SETTING, {})
     if reset in ('profile', 'all'):
-        profiles = stored_profiles(conn)
+        profiles = global_profiles(conn)
         if reset == 'profile':
             name = request.get('name')
             if not known(name):
@@ -435,7 +594,7 @@ def save(conn, request):
             raise ValueError('Stratégie V4 inconnue')
         clean = clean_profile(request['profile'])
         apply_profile(base_config(name), clean)                                   # revalidation complète de la configuration résultante
-        profiles = stored_profiles(conn)
+        profiles = global_profiles(conn)
         profiles[name] = clean
         settings.put(conn, PROFILES, profiles)
     return state(conn)
@@ -452,8 +611,8 @@ def _titles(conn, ids):
     if not ids:
         return {}
     with conn.cursor() as cur:
-        cur.execute(f"""SELECT l.id, l.symbol, l.mic, i.name, i.kind, i.isin FROM listings l JOIN instruments i ON i.id=l.instrument_id
-                        WHERE l.id IN ({','.join(['%s'] * len(ids))})""", list(ids))
+        cur.execute(f"""SELECT l.id, l.symbol, l.mic, i.name, i.kind, i.isin, s.daily_change FROM listings l JOIN instruments i ON i.id=l.instrument_id
+                        LEFT JOIN series_state s ON s.listing_id=l.id WHERE l.id IN ({','.join(['%s'] * len(ids))})""", list(ids))
         return {r['id']: r for r in cur.fetchall()}
 
 
@@ -502,7 +661,7 @@ def simulate(conn, request):
             'candidates': candidates, 'result': scored, 'periods': [dict(id=p['id'], sessions=p['sessions']) for p in params['periods']],
             'kappa': params['kappa'], 'tuning': {k: params[k] for k in TUNING_DEFAULTS}, 'suggestions': _suggestions(conn, book, sessions=gran),
             'curve': dated_series(conn, lid, max(CURVE_SESSIONS, _granularity(params))),
-            'windows': [dict(id=x, sessions=C.SESSIONS[x], active=any(q['id'] == x for q in params['periods'])) for x in SCORING_PERIODS if C.SESSIONS[x] <= max(CURVE_SESSIONS, _granularity(params))], 'granularity': _granularity(params), 'ranks': _rank_of(book, lid)}
+            'windows': [dict(id=x, sessions=C.SESSIONS[x], active=any(q['id'] == x for q in params['periods'])) for x in SCORING_PERIODS if x != 'day' and C.SESSIONS[x] <= max(CURVE_SESSIONS, _granularity(params))], 'granularity': _granularity(params), 'ranks': _rank_of(book, lid)}
 
 
 def _rank_of(book, lid):
@@ -697,14 +856,14 @@ def _granularity(params):
     return max((p['sessions'] for p in params['periods']), default=0)
 
 
-SORT_KEYS = ('rank', 'simple', 'complex', 'name', 'status', 'kind', 'market')
+SORT_KEYS = ('rank', 'simple', 'complex', 'name', 'status', 'kind', 'market', 'change')
 STATUS_ORDER = {'retained': 0, 'undetermined': 1, 'excluded': 2}
 
 
 def _sorted(conn, entries, sort, key, rank_of, statuses):
     """Tri complet de la liste (pas seulement de la page) : jusqu'à trois critères, valeurs absentes toujours en dernier, repli stable sur l'ordre général du classement puis l'identifiant.
     Le rang affiché reste le rang général : il ne dépend pas de ce tri."""
-    info = _titles(conn, [e['id'] for e in entries]) if any(s['key'] in ('name', 'kind', 'market') for s in sort) else {}
+    info = _titles(conn, [e['id'] for e in entries]) if any(s['key'] in ('name', 'kind', 'market', 'change') for s in sort) else {}
     def value(e, k):
         if k == 'rank':
             return rank_of.get(e['id'])
@@ -713,6 +872,8 @@ def _sorted(conn, entries, sort, key, rank_of, statuses):
         if k == 'status':
             return STATUS_ORDER.get((statuses or {}).get(e['id'], 'undetermined'))
         t = info.get(e['id']) or {}
+        if k == 'change':                                           # Var. 1J : variation entre les deux dernières séances clôturées
+            return None if t.get('daily_change') is None else float(t['daily_change'])
         v = {'name': t.get('name'), 'kind': t.get('kind'), 'market': t.get('mic')}[k]
         return None if v is None else str(v).casefold()
     base = {e['id']: i for i, e in enumerate(entries)}
@@ -745,7 +906,7 @@ def _listing(conn, book, which, category, offset, limit, cats, sessions, statuse
     info = _titles(conn, [e['id'] for e in page])
     curves = series(conn, [e['id'] for e in page], sessions)
     rows = [dict(rank=rank_of[e['id']], id=e['id'], symbol=info[e['id']]['symbol'], mic=info[e['id']]['mic'], name=info[e['id']]['name'], kind=info[e['id']]['kind'],
-                 status=(statuses or {}).get(e['id']), simple=e['simple'], complex=e['complex'], simple_status=e['simple_status'], complex_status=e['complex_status'],
+                 status=(statuses or {}).get(e['id']), change=None if info[e['id']].get('daily_change') is None else round(float(info[e['id']]['daily_change']), 4), simple=e['simple'], complex=e['complex'], simple_status=e['simple_status'], complex_status=e['complex_status'],
                  coverage=e[key + '_coverage'], curve=curves.get(e['id'], [])) for e in page if e['id'] in info]
     return {'which': key, 'category': category or None, 'verdict': verdict, 'counts': scope_counts, 'total': len(chosen), 'offset': offset, 'rows': rows,
             'categories': [dict(id=c['id'], name=c['name'], color=c.get('color'), min=c.get('min'), max=c.get('max'), minIncluded=c.get('minIncluded'), maxIncluded=c.get('maxIncluded'),

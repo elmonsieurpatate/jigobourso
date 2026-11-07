@@ -147,3 +147,25 @@ def test_old_documents_stay_readable_when_the_catalogue_evolves():
     assert ids[:2] == ['simple', 'name'] and set(ids) == {x['id'] for x in CATALOG['scores']['columns']}            # inconnue ignorée, nouvelles colonnes ajoutées en fin
     assert next(x for x in c['columns'] if x['id'] == 'name')['visible'] is True and next(x for x in c['columns'] if x['id'] == 'name')['width'] is None
     assert c['sort'] == [] and c['filters']['verdict'] == 'all'
+
+
+def test_personal_layouts_are_isolated_between_users_and_fall_back_to_the_common_default():
+    fresh()
+    with_conn = connect()
+    try:
+        with with_conn.cursor() as cur:
+            cur.execute("DELETE FROM settings WHERE name LIKE 'table_layouts:%'")
+        with_conn.commit()
+    finally:
+        with_conn.close()
+    base = php('echo json_encode(tl_read(7));')['layouts']['scores.desktop']
+    assert base == read()['layouts']['scores.desktop']                              # sans réglage personnel : défaut commun
+    mine = dict(base, sort=[{'key': 'complex', 'dir': 'desc'}])
+    r = php('echo json_encode(tl_write(["page"=>"scores","device"=>"desktop","config"=>json_decode(' + json.dumps(json.dumps(mine)) + ',true),"revision"=>0], 7));')
+    assert r['saved']['scores.desktop'] and r['revision'] == 1
+    assert php('echo json_encode(tl_read(7));')['layouts']['scores.desktop']['sort'] == mine['sort']
+    other = php('echo json_encode(tl_read(8));')
+    assert other['layouts']['scores.desktop']['sort'] == base['sort'] and not other['saved']['scores.desktop']      # l'autre utilisateur ne voit rien
+    assert read()['layouts']['scores.desktop']['sort'] == base['sort']                                              # le défaut commun reste intact
+    back = php('echo json_encode(tl_write(["action"=>"reset","page"=>"scores","device"=>"desktop","revision"=>1], 7));')
+    assert not back['saved']['scores.desktop'] and back['layouts']['scores.desktop']['sort'] == base['sort']

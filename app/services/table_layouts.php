@@ -89,34 +89,38 @@ function tl_decode($json): array {
     return is_array($d) && ($d['schema'] ?? null) === 1 && is_array($d['layouts'] ?? null) ? $d : ['schema' => 1, 'revision' => 0, 'layouts' => []];
 }
 /** Les quatre configurations effectives (enregistrées, sinon par défaut) + le catalogue. Lisible par tout utilisateur connecté : aucune donnée de titre. */
-function tl_read(): array {
-    $doc = tl_decode(q('SELECT value_json FROM settings WHERE name=?', [TL_KEY])->fetchColumn());
+function tl_key(?int $uid): string { return $uid ? TL_KEY . ':' . $uid : TL_KEY; }
+/** $uid = null : document commun (réglage par défaut hérité de l'administration). $uid : réglages PERSONNELS ; une configuration jamais enregistrée par l'utilisateur reprend le défaut commun. */
+function tl_read(?int $uid = null): array {
+    $doc = tl_decode(q('SELECT value_json FROM settings WHERE name=?', [tl_key($uid)])->fetchColumn());
+    $base = $uid ? tl_decode(q('SELECT value_json FROM settings WHERE name=?', [TL_KEY])->fetchColumn()) : ['layouts' => []];
     $out = []; $saved = [];
     foreach (array_keys(tl_catalog()['pages']) as $page) foreach (TL_DEVICES as $dev) {
         $k = $page . '.' . $dev;
-        $out[$k] = tl_clean($page, $dev, $doc['layouts'][$k] ?? tl_default($page, $dev), false);
+        $out[$k] = tl_clean($page, $dev, $doc['layouts'][$k] ?? $base['layouts'][$k] ?? tl_default($page, $dev), false);
         $saved[$k] = isset($doc['layouts'][$k]);
     }
     return ['schema' => 1, 'revision' => (int)$doc['revision'], 'catalog' => tl_catalog()['pages'], 'layouts' => $out, 'saved' => $saved,
             'defaults' => array_merge(...array_map(fn($p) => array_combine(array_map(fn($d) => $p . '.' . $d, TL_DEVICES), array_map(fn($d) => tl_default($p, $d), TL_DEVICES)), array_keys(tl_catalog()['pages'])))];
 }
 /** action = save (config) ou reset ; ne touche que la configuration visée. */
-function tl_write(array $req): array {
+function tl_write(array $req, ?int $uid = null): array {
+    $key = tl_key($uid);
     $page = (string)($req['page'] ?? ''); $dev = tl_device((string)($req['device'] ?? '')); tl_page($page);
     $action = $req['action'] ?? 'save';
     if (!in_array($action, ['save', 'reset'], true)) throw new ApiError('Action inconnue.', 422);
     $clean = $action === 'save' ? tl_clean($page, $dev, $req['config'] ?? null, true) : null;
     $db = db(); $db->beginTransaction();
     try {
-        q('INSERT IGNORE INTO settings(name,value_json,updated_at) VALUES (?,?,?)', [TL_KEY, tl_json(['schema' => 1, 'revision' => 0, 'layouts' => (object)[]]), now_utc()]);
-        $doc = tl_decode(q('SELECT value_json FROM settings WHERE name=? FOR UPDATE', [TL_KEY])->fetchColumn());
+        q('INSERT IGNORE INTO settings(name,value_json,updated_at) VALUES (?,?,?)', [$key, tl_json(['schema' => 1, 'revision' => 0, 'layouts' => (object)[]]), now_utc()]);
+        $doc = tl_decode(q('SELECT value_json FROM settings WHERE name=? FOR UPDATE', [$key])->fetchColumn());
         if (($req['revision'] ?? null) !== $doc['revision']) throw new ApiError('Ces réglages ont changé dans une autre session. Rechargez avant d’enregistrer.', 409);
         $k = $page . '.' . $dev;
         if ($action === 'save') $doc['layouts'][$k] = $clean; else unset($doc['layouts'][$k]);
         $doc['revision']++;
         if (!$doc['layouts']) $doc['layouts'] = (object)[];
-        q('UPDATE settings SET value_json=?, updated_at=? WHERE name=?', [tl_json($doc), now_utc(), TL_KEY]);
+        q('UPDATE settings SET value_json=?, updated_at=? WHERE name=?', [tl_json($doc), now_utc(), $key]);
         $db->commit();
     } catch (Throwable $e) { if ($db->inTransaction()) $db->rollBack(); throw $e; }
-    return tl_read();
+    return tl_read($uid);
 }

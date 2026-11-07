@@ -5,6 +5,8 @@
   const PAGES = [['explorer', 'Explorer / Stratégie'], ['scores', 'Scores / Classement']];
   const DEVICES = [['desktop', 'Ordinateur'], ['mobile', 'Mobile']];
   const VERDICTS = [['retained', 'Retenues'], ['excluded', 'Exclues'], ['all', 'Toutes']];
+  let MINE = false;
+  const R = () => MINE ? 'table-layouts' : 'admin/table-layouts';
   let root, data, page = 'explorer', device = 'desktop', draft = null, base = '', notice = null, busy = false;
 
   const key = () => page + '.' + device;
@@ -18,7 +20,7 @@
     base = JSON.stringify(draft);
     notice = null;
   }
-  async function reload() { data = await J.api('admin/table-layouts'); open(); }
+  async function reload() { data = await J.api(R()); open(); }
 
   async function guard(fn) {
     if (dirty() && !await J.confirm('Modifications non enregistrées', 'Les changements de cette configuration seront perdus.', 'Abandonner')) return;
@@ -53,7 +55,7 @@
     const cols = draft.columns.filter(c => c.visible);
     const prim = draft.sort[0];
     const w = c => c.width ? ` style="width:${c.width}px;min-width:${c.width}px"` : '';
-    return `<div class="ac-frame ${device}"><div class="ac-scroll"><table class="ac-table"><thead><tr>${cols.map(c => `<th${w(c)}>${E(meta(c.id).label)}${prim && prim.key === c.id ? (prim.dir === 'asc' ? ' ↑' : ' ↓') : ''}</th>`).join('')}</tr></thead>
+    return `<div class="ac-frame ${device}"><div class="ac-scroll"><table class="ac-table"><thead><tr>${cols.map(c => `<th${w(c)}${meta(c.id).hint ? ` title="${E(meta(c.id).hint)}"` : ''}>${E(meta(c.id).label)}${prim && prim.key === c.id ? (prim.dir === 'asc' ? ' ↑' : ' ↓') : ''}</th>`).join('')}</tr></thead>
       <tbody>${SAMPLE.map(r => `<tr>${cols.map(c => `<td${w(c)}>${sample(c.id, r)}</td>`).join('')}</tr>`).join('')}</tbody></table></div></div>
       <p class="small muted" style="margin:6px 0 0">Valeurs d’exemple : seuls l’ordre, la visibilité et les largeurs sont réels. ${device === 'mobile' ? 'Cadre de 375 px ; le tableau défile horizontalement.' : ''}</p>`;
   }
@@ -65,7 +67,7 @@
     const rows = draft.columns.map((c, i) => `<li class="ac-row ${c.visible ? '' : 'off'}" data-id="${E(c.id)}">
         <span class="ac-handle" data-handle title="Glisser pour déplacer" aria-hidden="true">⠿</span>
         <span class="ac-pos">${i + 1}</span>
-        <label class="ac-vis"><input type="checkbox" data-vis="${E(c.id)}" ${c.visible ? 'checked' : ''} ${c.id === 'name' ? 'disabled title="Colonne d’identification : toujours visible"' : ''}><span class="ac-name">${E(meta(c.id).label)}</span> <span class="small muted">${E(meta(c.id).group || '')}</span></label>
+        <label class="ac-vis"><input type="checkbox" data-vis="${E(c.id)}" ${c.visible ? 'checked' : ''} ${c.id === 'name' ? 'disabled title="Colonne d’identification : toujours visible"' : ''}><span class="ac-name"${meta(c.id).hint ? ` title="${E(meta(c.id).hint)}"` : ''}>${E(meta(c.id).label)}</span> <span class="small muted">${E(meta(c.id).group || '')}</span></label>
         <span class="ac-width"><select data-wmode="${E(c.id)}" aria-label="Largeur de ${E(meta(c.id).label)}"><option value="auto" ${c.width ? '' : 'selected'}>Auto</option><option value="custom" ${c.width ? 'selected' : ''}>Fixe</option></select>${c.width ? `<input type="number" min="48" max="480" step="1" value="${c.width}" data-w="${E(c.id)}" aria-label="Largeur en pixels"> <span class="small muted">px</span>` : ''}</span>
         <span class="ac-move"><button type="button" class="btn small" data-up="${E(c.id)}" ${i === 0 ? 'disabled' : ''} aria-label="Monter ${E(meta(c.id).label)}">↑</button><button type="button" class="btn small" data-down="${E(c.id)}" ${i === draft.columns.length - 1 ? 'disabled' : ''} aria-label="Descendre ${E(meta(c.id).label)}">↓</button></span></li>`).join('');
     const visible = draft.columns.filter(c => c.visible).length;
@@ -110,14 +112,14 @@
 
   async function save() {
     busy = true; paint();
-    try { data = await J.post('admin/table-layouts/save', { page, device, config: draft, revision: data.revision }); open(); notice = { text: 'Enregistré : ' + PAGES.find(p => p[0] === page)[1] + ' · ' + DEVICES.find(d => d[0] === device)[1] + '. Les trois autres configurations ne sont pas modifiées.' }; J.toast('Réglages enregistrés'); }
+    try { data = await J.post(R() + '/save', { page, device, config: draft, revision: data.revision }); open(); notice = { text: 'Enregistré : ' + PAGES.find(p => p[0] === page)[1] + ' · ' + DEVICES.find(d => d[0] === device)[1] + '. Les trois autres configurations ne sont pas modifiées.' }; J.toast('Réglages enregistrés'); }
     catch (e) { notice = { err: true, text: e.message }; if (/autre session/.test(e.message)) { try { await reload(); } catch (_) { /* message déjà affiché */ } notice = { err: true, text: e.message }; } }
     busy = false; paint();
   }
   async function resetDefaults() {
     if (!await J.confirm('Réinitialiser', 'Revenir aux valeurs par défaut pour cette page et cet affichage ? Les trois autres configurations ne changent pas.', 'Réinitialiser')) return;
     busy = true; paint();
-    try { data = await J.post('admin/table-layouts/save', { action: 'reset', page, device, revision: data.revision }); open(); notice = { text: 'Valeurs par défaut rétablies pour cette configuration.' }; }
+    try { data = await J.post(R() + '/save', { action: 'reset', page, device, revision: data.revision }); open(); notice = { text: 'Valeurs par défaut rétablies pour cette configuration.' }; }
     catch (e) { notice = { err: true, text: e.message }; }
     busy = false; paint();
   }
@@ -169,7 +171,8 @@
     window.addEventListener('pointermove', moveFn); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
   }
 
-  async function render(host) {
+  async function render(host, opts) {
+    MINE = !!(opts && opts.mine);
     root = host;
     root.innerHTML = '<div class="empty"><span class="spinner"></span></div>';
     await reload();

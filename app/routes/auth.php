@@ -74,7 +74,7 @@ return [
         need_post();
         $u = require_user();
         $b = body();
-        $allowed = ['mode' => ['simple', 'advanced'], 'theme' => ['light', 'dark', 'auto']];
+        $allowed = ['mode' => ['simple', 'advanced'], 'theme' => ['light', 'dark', 'auto'], 'help_level' => ['beginner', 'expert']];
         $prefs = $u['prefs_json'] ? json_decode($u['prefs_json'], true) : [];
         foreach ($allowed as $k => $values) if (isset($b[$k]) && in_array($b[$k], $values, true)) $prefs[$k] = $b[$k];
         q('UPDATE users SET prefs_json = ? WHERE id = ?', [json_encode($prefs), $u['id']]);

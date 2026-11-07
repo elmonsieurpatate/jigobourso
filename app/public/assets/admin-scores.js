@@ -23,13 +23,15 @@
   const SIMPLE = [
     ['Dynamique', 'Pente de chaque période, ramenée à une croissance sur la période puis à une échelle de saturation (A % × (séances/5)^0,52 ; A = réglage de la stratégie, 17 par défaut). 100 % = croissance saturée. Moyenne pondérée des périodes mesurables.', 'facteur de 0 à 1'],
     ['Régularité', 'R² de chaque période, chacun pesant min(1, séances/21) car un R² sur peu de séances est bruité. Moyenne pondérée des périodes où le R² est mesuré.', 'facteur de 0 à 1']];
-  const LASTDAY = 'Dernier jour : aucun coefficient propre. La dernière séance compte comme les autres séances dans les mesures de chaque période.';
+  const LASTDAY = 'Jour (1 séance) : granularité facultative, à 0 % par défaut. Quand elle a un poids, elle ne note que la variation entre les deux dernières séances clôturées (Dynamique) ; elle n’a ni R², ni volatilité, ni repli, ni accélération. Sans poids, la dernière séance compte comme les autres séances dans les mesures de chaque période.';
   const TABS = [['config', 'Configuration du moteur'], ['profils', 'Profils de stratégies'], ['simulation', 'Simulation & exemples'], ['suivi', 'Suivi des calculs']];
   const $ = (s, r) => (r || document).querySelector(s);
   const E = s => J.esc(String(s ?? ''));
   const fmt = (v, d = 1) => v === null || v === undefined ? '—' : J.num(v, d);
   const clone = o => JSON.parse(JSON.stringify(o));
 
+  let MINE = false;
+  const P = () => MINE ? 'my/scores' : 'admin/scores';
   let root, S, draft, savedJson, sel, rkWhich = 'simple', rkCat = null, rkVerdict = 'all', rkSorts = [], tl = null, rkMore = false, rank = null, confBusy = false, confFail = false, confStale = false, tab = 'config', scoreTab = 'simple', mon = null, monErr = null, sim = null, simWin = 0, simBusy = false, simQ = '', useDraft = true, error = '';
   const autoCache = {};
 
@@ -56,7 +58,7 @@
     if (autoCache[key]) return autoCache[key];
     if (!autoCache['?' + key]) {
       autoCache['?' + key] = true;
-      J.post('admin/scores/preview', { kappa: draft.global.kappa, periods: ids }).then(r => { autoCache[key] = r.weights; paint(); }).catch(() => { });
+      J.post(P() + '/preview', { kappa: draft.global.kappa, periods: ids }).then(r => { autoCache[key] = r.weights; paint(); }).catch(() => { });
     }
     const st = strat();
     return st && JSON.stringify(Object.keys(st.auto_weights).sort()) === JSON.stringify(ids.slice().sort()) && draft.global.kappa === S.global.kappa ? st.auto_weights : null;
@@ -65,13 +67,14 @@
   const sum = o => Object.values(o).reduce((a, b) => a + (+b || 0), 0);
 
   async function load() {
-    S = await J.api('admin/scores');
+    S = await J.api(P());
     tl = await TableLayout.load();
     if (!sel || !S.strategies.find(s => s.name === sel)) sel = (v4()[0] || S.strategies[0]).name;
     reset();
   }
 
-  async function render(page) {
+  async function render(page, opts) {
+    MINE = !!(opts && opts.mine);
     root = page;
     root.innerHTML = '<div class="empty"><span class="spinner"></span></div>';
     await load();
@@ -106,10 +109,14 @@
 
   function paintBody() {
     const st = strat(), isV4 = st && st.engine === 'v4';
-    $('#as-tabs').innerHTML = TABS.map(([k, t]) => `<button data-a="tab" data-v="${k}" class="${tab === k ? 'on' : ''}">${t}</button>`).join('');
+    $('#as-tabs').innerHTML = TABS.filter(t => !(MINE && t[0] === 'suivi')).map(([k, t]) => `<button data-a="tab" data-v="${k}" class="${tab === k ? 'on' : ''}">${t}</button>`).join('');
     $('#as-err').innerHTML = error ? `<div class="notice err" style="margin-bottom:12px">${E(error)}</div>` : '';
     $('#as-body').innerHTML = tab === 'config' ? configView(st, isV4) : tab === 'profils' ? profilesView() : tab === 'simulation' ? simulationView(isV4) : monitorView();
-    if (tab === 'suivi' && !mon && !monErr) loadMonitor();
+    if (MINE && tab === 'config') {       // réglages communs : propres à l'administration, lecture seule pour un utilisateur
+      $('#as-body').insertAdjacentHTML('afterbegin', '<div class="notice" style="margin-bottom:12px">Les réglages communs (priorité aux périodes courtes, seuil de fiabilité, ancrage) sont fixés par l’administration. Vos adaptations se font dans « Profils de stratégies » et ne concernent que votre compte.</div>');
+      document.querySelectorAll('#as-body [data-a=kappa],#as-body [data-a=anchor],#as-body [data-a=thr]').forEach(e => { e.disabled = true; });
+    }
+    if (tab === 'suivi' && !mon && !monErr && !MINE) loadMonitor();
     if (tab === 'profils' && !rank && !confBusy && !confFail && st && st.engine === 'v4') runConf();
   }
 
@@ -132,11 +139,11 @@
         <h3 class="as-h">Périodes (granularités) actives</h3>
         ${S.scoring_periods.map(id => {
           const x = p.periods[id], on = x.enabled;
-          return `<div class="as-period"><label><input type="checkbox" data-a="active" data-p="${id}" ${on ? 'checked' : ''}> ${E(labels()[id])} <span class="muted">(${x.sessions} séances)</span></label>
+          return `<div class="as-period"><label><input type="checkbox" data-a="active" data-p="${id}" ${on ? 'checked' : ''}> ${E(labels()[id])} <span class="muted">(${x.sessions} séance${x.sessions > 1 ? 's' : ''})</span></label>
             ${!on ? '<span class="as-w muted">—</span>' : custom ? `<span class="as-w"><input type="number" class="as-num" data-a="pw" data-p="${id}" min="0" max="100" step="0.1" value="${p.weights[id] ?? 0}"> %</span>` : `<span class="as-w as-pill">${w && w[id] !== undefined ? fmt(w[id], 1) + ' %' : '…'}</span>`}</div>`; }).join('')}
         <div class="as-total ${Math.abs(total - 100) <= 0.05 ? 'ok' : 'ko'}" id="pw-total">Pondération totale : <b>${fmt(total, 1)} %</b>${Math.abs(total - 100) > 0.05 && ids.length ? ' — doit faire 100 %' : ''}</div>
         ${custom ? '<button class="btn small" data-a="pw-auto">Répartir automatiquement</button>' : ''}
-        <p class="as-hint">${ids.length} période${ids.length > 1 ? 's' : ''} active${ids.length > 1 ? 's' : ''} sur ${S.scoring_periods.length}. Le « dernier jour » ne se note pas : il faut au moins ${S.formula.min_sessions} séances pour mesurer R² et volatilité.</p></div>
+        <p class="as-hint">${ids.length} période${ids.length > 1 ? 's' : ''} active${ids.length > 1 ? 's' : ''} sur ${S.scoring_periods.length}. <b>Jour</b> (1 séance) est facultatif : désactivé et à 0 % par défaut, il n’a jamais de poids automatique. Pour l’utiliser, passez en mode Personnalisé et donnez-lui un poids ; seule la variation d’une séance est notée (ni R², ni volatilité, ni repli sur une séance : il faut au moins ${S.formula.min_sessions} séances pour les mesurer). Tant qu’il reste à 0 %, les notes ne changent pas.</p></div>
       <div class="card"><div class="row between"><div class="seg"><button data-a="score" data-v="simple" class="${scoreTab === 'simple' ? 'on' : ''}">Score simple</button><button data-a="score" data-v="complex" class="${scoreTab === 'complex' ? 'on' : ''}">Score complexe</button></div><span class="badge accent">Note sur 100</span></div>
         ${scoreTab === 'simple' ? simpleView() : complexView(p)}</div>
       <div class="card"><h3 class="as-h">Paramètres généraux (moteur commun)</h3>
@@ -336,6 +343,7 @@
     status: { cell: r => statusBadge(r.status), dir: 'asc' },
     kind: { cell: r => r.kind === 'etf' ? 'ETF' : 'Action', dir: 'asc' },
     market: { cell: r => E(r.mic), dir: 'asc' },
+    change: { cell: r => r.change == null ? '—' : `<span class="${r.change > 0 ? 'up' : r.change < 0 ? 'down' : ''}">${r.change > 0 ? '+' : ''}${J.num(r.change, 2)} %</span>`, cls: 'as-c-num' },
     trend: { cell: r => spark(r.curve), nosort: true },
     simple: { cell: r => scoreCell(r.simple, r.simple_status, rkWhich === 'simple'), cls: 'as-c-num' },
     complex: { cell: r => scoreCell(r.complex, r.complex_status, rkWhich === 'complex'), cls: 'as-c-num' },
@@ -343,22 +351,24 @@
   function rankTable(rows) {
     const l = layoutNow(), cat = l.catalog || Object.keys(SC_COLS).map(id => ({ id, label: id }));
     const label = id => (cat.find(c => c.id === id) || {}).label || id;
+    const hint = id => (cat.find(c => c.id === id) || {}).hint || '';
+    const tip = id => hint(id) ? ` title="${E(hint(id))}"` : '';
     const cols = l.columns.filter(c => SC_COLS[c.id] && c.visible);
     const prim = rkSorts[0] || { key: rkWhich, dir: 'desc' };
     const w = c => c.width ? ` style="width:${c.width}px;min-width:${c.width}px"` : '';
-    return `<div class="as-rkwrap"><table class="as-rktable" id="as-rktable"><thead><tr>${cols.map(c => `<th scope="col" class="${SC_COLS[c.id].cls || ''}"${w(c)} ${SC_COLS[c.id].nosort ? '' : `aria-sort="${prim.key === c.id ? (prim.dir === 'asc' ? 'ascending' : 'descending') : 'none'}"`}>${SC_COLS[c.id].nosort ? E(label(c.id)) : `<button type="button" data-a="rk-sort" data-v="${E(c.id)}">${E(label(c.id))}${prim.key === c.id ? (prim.dir === 'asc' ? ' ↑' : ' ↓') : ''}</button>`}</th>`).join('')}</tr></thead>
+    return `<div class="as-rkwrap"><table class="as-rktable" id="as-rktable"><thead><tr>${cols.map(c => `<th scope="col" class="${SC_COLS[c.id].cls || ''}"${w(c)}${tip(c.id)} ${SC_COLS[c.id].nosort ? '' : `aria-sort="${prim.key === c.id ? (prim.dir === 'asc' ? 'ascending' : 'descending') : 'none'}"`}>${SC_COLS[c.id].nosort ? E(label(c.id)) : `<button type="button" data-a="rk-sort" data-v="${E(c.id)}">${E(label(c.id))}${prim.key === c.id ? (prim.dir === 'asc' ? ' ↑' : ' ↓') : ''}</button>`}</th>`).join('')}</tr></thead>
       <tbody>${rows.map(r => `<tr>${cols.map(c => `<td class="${SC_COLS[c.id].cls || ''}"${w(c)} data-label="${E(label(c.id))}">${SC_COLS[c.id].cell(r)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
   }
   const rankBody = (extra) => { const body = { strategy: sel, which: rkWhich, category: rkCat, verdict: rkVerdict, sort: rkSorts, limit: 25, ...extra }; if (dirty()) body.draft = { global: draft.global, profile: payload() }; return body; };
   async function runConf(keepCat) {
     confBusy = true; confFail = false; confStale = false; if (!keepCat) rkCat = null; paintBody();
-    try { rank = await J.post('admin/scores/ranking', rankBody({ offset: 0 })); error = ''; }
+    try { rank = await J.post(P() + '/ranking', rankBody({ offset: 0 })); error = ''; }
     catch (e) { rank = null; confFail = true; error = e.message; }
     confBusy = false; paint();
   }
   async function rankMore() {
     rkMore = true; paintBody();
-    try { const r = await J.post('admin/scores/ranking', rankBody({ offset: rank.listing.rows.length })); rank.listing.rows = rank.listing.rows.concat(r.listing.rows); rank.listing.total = r.listing.total; }
+    try { const r = await J.post(P() + '/ranking', rankBody({ offset: rank.listing.rows.length })); rank.listing.rows = rank.listing.rows.concat(r.listing.rows); rank.listing.total = r.listing.total; }
     catch (e) { error = e.message; }
     rkMore = false; paint();
   }
@@ -382,7 +392,7 @@
     const r = sim.result, ids = sim.periods.map(x => x.id), L = labels();
     const rk = sim.ranks || {}, rkOf = cls => { const x = rk[cls === 's' ? 'simple' : 'complex']; return x && x.rank ? `rang <b>${x.rank}</b> sur ${J.num(x.of, 0)} · ` : ''; };
     const sc = (o, cls) => `<div class="as-score ${cls}"><span>${cls === 's' ? 'Score simple' : 'Score complexe'}</span><b>${o.score === null ? 'inconnu' : fmt(o.score, 1)}</b>${o.score === null ? '' : ' / 100'}<small>${rkOf(cls)}${o.status === 'ok' ? 'données complètes' : o.status === 'partiel' ? 'données incomplètes' : E(o.why || '')} · couverture ${fmt(100 * (o.coverage || 0), 0)} %${o.score !== null && o.reliable === false ? ' · peu fiable' : ''}</small></div>`;
-    const cell = (c, key, unit, d) => { if (!c) return '<td class="num muted">—</td>'; const raw = c.raw || {}; const val = key === 'growth' ? c.growth : raw[key]; const note = c[key === 'growth' ? 'dynamics' : { r2: 'r2', up_fraction: 'up_days', spike_share: 'concentration', accel: 'acceleration', volatility: 'volatility', drawdown: 'drawdown' }[key]];
+    const cell = (c, key, unit, d, pid) => { if (!c) return '<td class="num muted">—</td>'; if (pid === 'day' && key !== 'growth') return '<td class="num muted" title="Une seule séance : cette mesure n’existe pas">sans objet</td>'; const raw = c.raw || {}; const val = key === 'growth' ? c.growth : raw[key]; const note = c[key === 'growth' ? 'dynamics' : { r2: 'r2', up_fraction: 'up_days', spike_share: 'concentration', accel: 'acceleration', volatility: 'volatility', drawdown: 'drawdown' }[key]];
       return `<td class="num">${val === null || val === undefined ? '<span class="muted">indisponible</span>' : fmt(unit === '%' ? val * (['up_fraction', 'spike_share'].includes(key) ? 100 : 1) : val, d) + (unit ? ' ' + unit : '')}${note === null || note === undefined ? '' : `<br><small class="muted">note ${fmt(note, 0)}</small>`}</td>`; };
     const rows = [['Croissance (Dynamique)', 'growth', '%', 2], ['Régularité (R²)', 'r2', '', 2], ['Séances positives', 'up_fraction', '%', 0], ['Plus gros pic ÷ hausse nette', 'spike_share', '%', 0], ['Accélération (écart de pente)', 'accel', '', 3], ['Volatilité (par séance)', 'volatility', '%', 2], ['Drawdown', 'drawdown', '%', 1]];
     const s = r.simple, c = r.complex, liq = r.liquidity || {};
@@ -390,7 +400,7 @@
       ${sim.tuning ? `<p class="as-hint">Normalisations utilisées par le calcul : saturation de dynamique <b>${fmt(sim.tuning.sat_a, 1)}</b> · référence d’accélération <b>${fmt(sim.tuning.accel_ref, 2)}</b> · volatilité <b>${E(VOLMODES[sim.tuning.vol_mode] || sim.tuning.vol_mode)}</b> · momentum <b>${E(HORIZONS[sim.tuning.momentum_horizon] || sim.tuning.momentum_horizon)}</b>.</p>` : ''}
       ${chartCard()}
       <div class="table-wrap"><table class="as-dec"><thead><tr><th>Mesure</th>${ids.map(i => `<th class="num">${E(L[i])}<br><small class="muted">poids réel ${fmt(100 * ((r.weights_effective || {})[i] || 0), 1)} %${r.periods[i] ? '' : ' (période sans données)'}</small></th>`).join('')}</tr></thead><tbody>
-        ${rows.map(([n, k, u, d]) => `<tr><td>${n}</td>${ids.map(i => cell(r.periods[i], k, u, d)).join('')}</tr>`).join('')}</tbody></table></div>
+        ${rows.map(([n, k, u, d]) => `<tr><td>${n}</td>${ids.map(i => cell(r.periods[i], k, u, d, i)).join('')}</tr>`).join('')}</tbody></table></div>
       <div class="as-two"><div><h4 class="as-h">Score simple (pente × R²)</h4>${s.score === null ? `<p class="muted">${E(s.why || '')}</p>` : `<p>100 × Dynamique <b>${fmt(s.dynamics, 2)}</b> × Régularité <b>${fmt(s.quality, 2)}</b> = <b>${fmt(s.score, 1)}</b></p>
           <table class="as-mini"><thead><tr><th>Période</th><th class="num">Poids réel</th><th class="num">Pente</th><th class="num">R²</th><th class="num">Fiabilité R²</th></tr></thead><tbody>${Object.entries(s.parts || {}).map(([k, v]) => `<tr><td>${E(L[k] || k)}</td><td class="num">${fmt(100 * v.weight, 1)} %</td><td class="num">${fmt(v.slope, 2)} %/s</td><td class="num">${v.r2 === null ? '<span class="muted">indisponible</span>' : fmt(v.r2, 2)}</td><td class="num">${v.r2_reliability === null ? '—' : fmt(100 * v.r2_reliability, 0) + ' %'}</td></tr>`).join('')}</tbody></table>
           <p class="as-hint">Complétude : couverture ${fmt(100 * (s.coverage || 0), 0)} % ${s.status === 'ok' ? '(pente et R² mesurés sur toutes les périodes)' : '(une période n’a pas de R² ou de pente : elle sort du calcul, poids renormalisés)'}.</p>`}</div>
@@ -403,7 +413,7 @@
     try {
       const body = { strategy: sel, q: id ? '' : simQ, listing_id: id || null };
       if (useDraft && dirty() && strat().engine === 'v4') body.draft = { global: draft.global, profile: payload() };
-      sim = await J.post('admin/scores/simulate', body);
+      sim = await J.post(P() + '/simulate', body);
     } catch (e) { sim = null; error = e.message; }
     simBusy = false; paint();
   }
@@ -516,8 +526,8 @@
   async function save() {
     try {
       const before = savedProfiles(), changed = v4().map(s => s.name).filter(n => JSON.stringify(draft.profiles[n]) !== JSON.stringify(before[n]));
-      if (!changed.length) S = await J.post('admin/scores/save', { global: draft.global });
-      for (const [i, n] of changed.entries()) S = await J.post('admin/scores/save', i === 0 ? { global: draft.global, profile: payloadFor(n) } : { profile: payloadFor(n) });
+      if (!changed.length && !MINE) S = await J.post(P() + '/save', { global: draft.global });
+      for (const [i, n] of changed.entries()) S = await J.post(P() + '/save', i === 0 && !MINE ? { global: draft.global, profile: payloadFor(n) } : { profile: payloadFor(n) });
       reset(); Object.keys(autoCache).forEach(k => delete autoCache[k]); mon = null; sim = null; rank = null; J.toast('Configuration enregistrée');
     } catch (e) { error = e.message; J.toast(e.message); }
     paint();
@@ -527,11 +537,11 @@
     const st = strat(), name = st && st.engine === 'v4' ? st.label : 'la stratégie';
     J.dialog({ title: 'Restaurer les valeurs par défaut', body: `<p class="as-hint">Choisissez ce qui revient aux valeurs proposées. Les modifications non enregistrées seront perdues.</p>
       <label class="as-rad"><input type="radio" name="rs" value="profile" checked> Le profil « ${E(name)} » (périodes, seuils, poids)</label>
-      <label class="as-rad"><input type="radio" name="rs" value="global"> Les réglages communs (priorité aux périodes courtes, couverture minimale)</label>
-      <label class="as-rad"><input type="radio" name="rs" value="all"> Tout (communs et tous les profils V4)</label>`,
+      ${MINE ? '' : `<label class="as-rad"><input type="radio" name="rs" value="global"> Les réglages communs (priorité aux périodes courtes, couverture minimale)</label>
+      <label class="as-rad"><input type="radio" name="rs" value="all"> Tout (communs et tous les profils V4)</label>`}`,
       actions: [{ label: 'Annuler', run: () => { } }, { label: 'Restaurer', cls: 'primary', run: async d => {
         const scope = ($('input[name=rs]:checked', d) || {}).value || 'profile';
-        try { S = await J.post('admin/scores/save', scope === 'profile' ? { reset: 'profile', name: st && st.engine === 'v4' ? sel : v4()[0].name } : { reset: scope }); reset(); Object.keys(autoCache).forEach(k => delete autoCache[k]); sim = null; rank = null; J.toast('Valeurs par défaut rétablies'); } catch (e) { J.toast(e.message); }
+        try { S = await J.post(P() + '/save', scope === 'profile' ? { reset: 'profile', name: st && st.engine === 'v4' ? sel : v4()[0].name } : { reset: scope }); reset(); Object.keys(autoCache).forEach(k => delete autoCache[k]); sim = null; rank = null; J.toast('Valeurs par défaut rétablies'); } catch (e) { J.toast(e.message); }
         paint(); } }] });
   }
 

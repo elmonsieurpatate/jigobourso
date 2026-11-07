@@ -3,7 +3,7 @@
   'use strict';
   const user = await J.init('explorer'); if (!user) return;
   const $ = s => document.querySelector(s), esc = J.esc;
-  const periods = [['week','Semaine',5],['month','Mois',21],['quarter','Trimestre',63],['half','6 mois',126],['year','1 an',252],['two_year','2 ans',504]];
+  const periods = [['day','Jour',1],['week','Semaine',5],['month','Mois',21],['quarter','Trimestre',63],['half','6 mois',126],['year','1 an',252],['two_year','2 ans',504]];
   // Critères de RECHERCHE de chaque stratégie intégrée : lus dans le moteur (scores_admin.V4_STRATEGIES via ranking/criteria), jamais recopiés ici.
   // Ils filtrent l'affichage ; ils n'entrent ni dans les notes ni dans les rangs. Une stratégie sans critère (Momentum) a des seuils à 0 = aucun critère.
   let crit={};try{crit=(await J.api('ranking/criteria')).criteria||{};}catch(_){/* périodes actives seules si le moteur ne répond pas */}
@@ -27,14 +27,16 @@
   const filters=Object.fromEntries(Object.entries(categories).map(([k,c])=>[k,[c.label,c.options]]));
   const metrics = { slope:['Pente (% / séance)','% / séance'], r2:['R² (régression)',''], volatility:['Volatilité quotidienne','%'], drawdown:['Recul maximal','%'], return:['Rendement observé','%'], volume:['Volume moyen','titres / séance'] };
   const key = 'jigo_classement_test_v1';
-  const fresh = id => { const pr=profiles[id],first=Object.values(pr.per)[0]; return { periods:Object.fromEntries(periods.map(([k]) => { const v=pr.per[k]; return [k,{enabled:!!v,slope:v?v[0]:first[0],r2:v?v[1]:first[1]}]; })), extra:(pr.extra||[]).map(([metric,op,value,period])=>({metric,op,value,period:period||'month'})), join:'and' }; };
+  // Jour (1 séance) : facultatif et désactivé par défaut ; seule la variation 1J sert de critère (ni pente ni R² sur une séance). Les configurations enregistrées avant son ajout n'ont pas cette entrée.
+  const DAY_OFF={enabled:false,slope:0,r2:0,return:0},withDay=c=>{if(c&&c.periods){if(!c.periods.day)c.periods.day={...DAY_OFF};if(c.periods.day.return==null)c.periods.day.return=0;}return c;};
+  const fresh = id => { const pr=profiles[id],first=Object.values(pr.per)[0]; return { periods:Object.fromEntries(periods.map(([k]) => { const v=pr.per[k]; if(k==='day')return [k,{...DAY_OFF}]; return [k,{enabled:!!v,slope:v?v[0]:first[0],r2:v?v[1]:first[1]}]; })), extra:(pr.extra||[]).map(([metric,op,value,period])=>({metric,op,value,period:period||'month'})), join:'and' }; };
   let state = { mode:'simple',strategy:'fast',selected:'week',profiles:Object.fromEntries(Object.keys(profiles).map(id=>[id,fresh(id)])),filters:secondary.all(categories) };
   // Seules les sauvegardes explicites de cette page sont relues. Les préférences Explorer restent séparées.
   try {
     const saved = JSON.parse(localStorage.getItem(key));
-    if (saved && saved.profiles && typeof saved.profiles==='object') for (const id of Object.keys(profiles)) if (!saved.profiles[id]) saved.profiles[id]=fresh(id);     // stratégies ajoutées depuis la sauvegarde
+    if (saved && saved.profiles && typeof saved.profiles==='object') for (const id of Object.keys(profiles)) if (!saved.profiles[id]) saved.profiles[id]=fresh(id); else withDay(saved.profiles[id]);     // stratégies ajoutées depuis la sauvegarde
     if (saved && ['simple','expert'].includes(saved.mode) && profiles[saved.strategy] && periods.some(([k])=>k===saved.selected) && Object.keys(profiles).every(id => {
-      const p=saved.profiles?.[id]; return p && ['and','or'].includes(p.join) && Array.isArray(p.extra) && p.extra.every(x=>metrics[x.metric] && ['>=','<='].includes(x.op) && Number.isFinite(x.value) && x.value>=0) && periods.every(([k])=>typeof p.periods?.[k]?.enabled==='boolean' && Number.isFinite(p.periods[k].slope) && p.periods[k].slope>=.01 && p.periods[k].slope<=2 && Number.isFinite(p.periods[k].r2) && p.periods[k].r2>=0 && p.periods[k].r2<=1);
+      const p=saved.profiles?.[id]; return p && ['and','or'].includes(p.join) && Array.isArray(p.extra) && p.extra.every(x=>metrics[x.metric] && ['>=','<='].includes(x.op) && Number.isFinite(x.value) && x.value>=0) && periods.every(([k])=>k==='day' || typeof p.periods?.[k]?.enabled==='boolean' && Number.isFinite(p.periods[k].slope) && p.periods[k].slope>=.01 && p.periods[k].slope<=2 && Number.isFinite(p.periods[k].r2) && p.periods[k].r2>=0 && p.periods[k].r2<=1);
     }) && saved.filters && typeof saved.filters==='object') state=saved;
   } catch (_) { /* Stockage absent ou ancien : valeurs de démonstration. */ }
   const adminSelections=secondary.defaults(categoryPayload,categories);
@@ -83,16 +85,18 @@
   // Colonnes : identifiants et libellés viennent du catalogue de l'administration (app/config/table_columns.json) ; ici, seulement la valeur de tri et le rendu de chaque identifiant.
   const SESS={week:'5',month:'21',quarter:'63',half:'126',year:'252'},STATUS_ORDER={retained:0,undetermined:1,excluded:2};
   const REG={rank:{val:r=>r[rankKey()],dir:'asc'},name:{val:r=>r.name,dir:'asc'},status:{val:r=>STATUS_ORDER[r.status]??1,dir:'asc'},market:{val:r=>r.mic,dir:'asc'},sector:{val:r=>r.category,dir:'asc'},kind:{val:r=>r.kind,dir:'asc'},
-    price:{val:r=>r.price},change:{val:r=>r.change},slope:{val:r=>r.slope},r2:{val:r=>r.r2},volatility:{val:r=>r.volatility},turnover:{val:r=>r.turnover},avgVolume:{val:r=>r.avgVolume},drawdown:{val:r=>r.drawdown},perfMonth:{val:r=>r.perfMonth},
+    price:{val:r=>r.price},change:{val:r=>r.change},last_close:{val:r=>r.lastClose},slope:{val:r=>r.slope},r2:{val:r=>r.r2},volatility:{val:r=>r.volatility},turnover:{val:r=>r.turnover},avgVolume:{val:r=>r.avgVolume},drawdown:{val:r=>r.drawdown},perfMonth:{val:r=>r.perfMonth},
     simple:{val:r=>r.posSimple==null?null:-r.posSimple},complex:{val:r=>r.posComplex==null?null:-r.posComplex},rank_simple:{val:r=>r.rankSimple,dir:'asc'},rank_complex:{val:r=>r.rankComplex,dir:'asc'},trend:{val:()=>null,nosort:true}};
   for(const k of ['week','quarter','half'])REG['perf_'+k]={val:r=>(r.perf||{})[k]};
   for(const k of ['week','quarter','half','year']){REG['slope_'+k]={val:r=>(r.periods[SESS[k]]||{}).slope};REG['r2_'+k]={val:r=>(r.periods[SESS[k]]||{}).r2};}
-  const LEGACY_LABELS={rank:'Rang',name:'Titre',status:'Statut stratégie',market:'Place',sector:'Secteur',price:'Cours',change:'Var. %',slope:'Pente · mois',r2:'R² · mois',volatility:'Volatilité',turnover:'Liquidité',avgVolume:'Volume',drawdown:'Recul max.',perfMonth:'Perf. 1 mois',simple:'Score simple',complex:'Score complexe',trend:'Tendance'};
+  const LEGACY_LABELS={rank:'Rang',name:'Titre',status:'Statut stratégie',market:'Place',sector:'Secteur',price:'Cours',change:'Var. 1J (%)',last_close:'Dernière clôture',slope:'Pente · mois',r2:'R² · mois',volatility:'Volatilité',turnover:'Liquidité',avgVolume:'Volume',drawdown:'Recul max.',perfMonth:'Perf. 1 mois',simple:'Score simple',complex:'Score complexe',trend:'Tendance'};
+  const LEGACY_HINTS={change:'Variation du cours entre les deux dernières séances clôturées.'};
   const LEGACY_VISIBLE=()=>Object.keys(REG).map(id=>[id,(window.matchMedia('(max-width:700px)').matches?['rank','name','status','price','change','slope','simple','complex']:['rank','name','status','price','change','slope','r2','volatility','turnover','simple','complex','trend']).includes(id)]);
   const tl=await TableLayout.load();
   let layout=TableLayout.get(tl,'explorer',TableLayout.device(),LEGACY_VISIBLE());
   const catalogOf=()=>layout.catalog||Object.keys(REG).map(id=>({id,label:LEGACY_LABELS[id]||id,sortable:!REG[id].nosort}));
   const labelOf=id=>(catalogOf().find(c=>c.id===id)||{}).label||LEGACY_LABELS[id]||id;
+  const hintOf=id=>(catalogOf().find(c=>c.id===id)||{}).hint||LEGACY_HINTS[id]||'';
   // Préférences personnelles de visibilité (sélecteur « Colonnes ») : valables tant que l'administrateur n'a pas modifié cette configuration.
   const visKey='jigo_ct_vis_v5';
   const personal=()=>{try{const v=JSON.parse(localStorage.getItem(visKey)||'null');return v&&v.rev===layout.revision&&v.dev===TableLayout.device()?v.vis:{};}catch(_){return {};}};
@@ -109,7 +113,7 @@
   const applyDefaultSort=()=>{if(tableState.userSorted)return;const c=configuredSorts();tableState.sorts=c.length?c:[{key:defaultSort,dir:'desc'}];};
   let activeFilter=null, filterQuery='';
   const config = () => state.profiles[state.strategy];
-  const isPrimary = r => r.metric === 'slope' || r.metric === 'r2';
+  const isPrimary = r => r.metric === 'slope' || r.metric === 'r2' || (r.metric === 'return' && r.period === 'day');
   const rule = (metric,period,value,op='>=') => ({kind:'rule',metric,period,value,op});
   const group = (children=[],join='and') => ({kind:'group',join,children});
   function validTree(n,depth=0) {
@@ -120,7 +124,7 @@
   function tree() {
     const c=config();
     if(!c.tree || !validTree(c.tree) || c.tree.kind!=='group') {
-      c.tree=group(periods.filter(([k])=>c.periods[k].enabled).flatMap(([k])=>['slope','r2'].map(m=>rule(m,k,c.periods[k][m]))));
+      c.tree=group(periods.filter(([k])=>c.periods[k].enabled).flatMap(([k])=>k==='day'?[rule('return','day',c.periods.day.return)]:['slope','r2'].map(m=>rule(m,k,c.periods[k][m]))));
       if(c.extra.length) c.tree.children.push(group(c.extra.map(x=>rule(x.metric,x.period||'month',x.value,x.op)),c.join));
     }
     return c.tree;
@@ -135,13 +139,13 @@
     periods.forEach(([k])=>{
       const p=config().periods[k], own=rules.filter(r=>isPrimary(r)&&r.period===k);
       p.enabled=own.length>0;
-      ['slope','r2'].forEach(m=>{const r=own.find(r=>r.metric===m&&r.op==='>=');if(r)p[m]=r.value;});
+      ['slope','r2','return'].forEach(m=>{const r=own.find(r=>r.metric===m&&r.op==='>=');if(r)p[m]=r.value;});
     });
   }
   function simpleCompatible() {
     const all=leaves().filter(x=>isPrimary(x.node));
-    return all.every(({node:r,joins})=>r.op==='>=' && joins.every(j=>j==='and') && r.value>=0 && r.value<=(r.metric==='slope'?2:1)) && periods.every(([k])=>{
-      const own=all.filter(x=>x.node.period===k);return !own.length || (own.length===2 && new Set(own.map(x=>x.node.metric)).size===2);
+    return all.every(({node:r,joins})=>r.op==='>=' && joins.every(j=>j==='and') && (r.metric==='return'?r.value>=-20&&r.value<=20:r.value>=0 && r.value<=(r.metric==='slope'?2:1))) && periods.every(([k])=>{
+      const own=all.filter(x=>x.node.period===k);return !own.length || (k==='day'?own.length===1:own.length===2 && new Set(own.map(x=>x.node.metric)).size===2);
     });
   }
   function setSimpleValue(metric,value) {
@@ -151,7 +155,7 @@
   function activatePeriod(k,enabled) {
     function remove(n) {if(n.kind==='group') {n.children=n.children.filter(x=>!(x.kind==='rule'&&isPrimary(x)&&x.period===k));n.children.forEach(remove);}}
     remove(tree());
-    if(enabled) ['slope','r2'].forEach(m=>tree().children.push(rule(m,k,config().periods[k][m])));
+    if(enabled) (k==='day'?['return']:['slope','r2']).forEach(m=>tree().children.push(rule(m,k,config().periods[k][m])));
     project();
   }
 
@@ -164,7 +168,7 @@
   const order=()=>[...Object.keys(builtinNames),...customIds];
   const seed=cloneJSON(overrides);
   for(const id of Object.keys(builtinNames)){if(serverOk)state.profiles[id]=fresh(id);ovBy[id]=cloneJSON(seed);}
-  for(const it of serverView?.items||[]){names[it.id]=it.name;state.profiles[it.id]=cloneJSON(it.config);ovBy[it.id]=cloneJSON(it.filters||{});if(!it.builtin)customIds.push(it.id);}
+  for(const it of serverView?.items||[]){names[it.id]=it.name;state.profiles[it.id]=withDay(cloneJSON(it.config));ovBy[it.id]=cloneJSON(it.filters||{});if(!it.builtin)customIds.push(it.id);}
   const enabledIds=()=>order().filter(id=>metaOf(id).enabled);
   if(serverOk&&enabledIds().includes(serverView.selected))state.strategy=serverView.selected;else if(serverOk&&enabledIds().length)state.strategy=enabledIds()[0];
   {const want=new URLSearchParams(location.search).get('strategy');if(serverOk&&want&&enabledIds().includes(want))state.strategy=want;}
@@ -185,8 +189,22 @@
     $('#ct-reset').textContent=builtin?'Restaurer les valeurs par défaut':'Annuler les modifications';
     $('#ct-strategy-state').textContent=!serverOk?'Enregistrement indisponible':isDirty(state.strategy)?'Modifications non enregistrées':'Enregistrée';
     $('#ct-save').disabled=!serverOk;$('#ct-duplicate').disabled=!serverOk;
+    drawPicker();
   }
-  const post=body=>J.post('classement-test/strategies/save',{revision:rev,...body});
+  // Statuts Officielle / Adaptée / Personnelle (serveur) : sélecteur groupé à badges, bandeau et fenêtre d'information. Reconstruits seulement si leur contenu change.
+  let suiList=null,suiKey='';
+  function loadStatus(){return J.api('strategies/status').then(r=>{suiList=r.strategies;suiKey='';drawPicker();}).catch(()=>{suiList=null;});}
+  function drawPicker(){
+    if(!suiList||!window.SUI)return;
+    const on=new Set(enabledIds().concat([state.strategy])),list=suiList.filter(s=>on.has(s.id));
+    const key=JSON.stringify([list,state.strategy]);if(key===suiKey)return;suiKey=key;
+    SUI.picker($('#ct-strategy'),list,state.strategy);
+    const cur=list.find(s=>s.id===state.strategy);
+    $('#ct-strategy-banner').innerHTML=SUI.banner(cur);
+    const host=document.querySelector('.sui-pick');if(host&&cur&&!document.getElementById('ct-info')){host.insertAdjacentHTML('afterend',`<span id="ct-info">${SUI.infoButton(cur)}</span>`);}
+    const ib=document.getElementById('ct-info');if(ib&&cur){ib.innerHTML=SUI.infoButton(cur);SUI.bindInfo(ib,list);}
+  }
+  const post=body=>J.post('classement-test/strategies/save',{revision:rev,...body}).then(v=>{loadStatus();return v;});
   function takeView(view){rev=view.revision;meta=cloneJSON(view.meta||{});for(const it of view.items)names[it.id]=it.name;customIds=view.items.filter(i=>!i.builtin).map(i=>i.id);}
   function switchTo(id,remember=true){
     closeFilter();ovBy[state.strategy]=overrides;state.strategy=id;overrides=ovBy[id]||(ovBy[id]={});state.filters=filtersFor(overrides);
@@ -207,6 +225,7 @@
   function number(value,min,max,fallback) { if(String(value).trim()==='') return fallback; const n=Number(String(value).replace(',','.'));return Number.isFinite(n)?Math.max(min,Math.min(max,n)):fallback; }
   function chart() {
     const p=config().periods[state.selected];
+    if(state.selected==='day'){$('#ct-chart').innerHTML=`<svg viewBox="0 0 240 110" role="img" aria-label="Illustration : variation de la dernière séance clôturée d’au moins ${fmt(p.return)} pour cent"><path d="M10 95H230M10 95V10" fill="none" stroke="var(--line)"/><polyline points="60,70 180,${70-Math.max(-30,Math.min(30,p.return*4))}" fill="none" stroke="var(--ct-accent)" stroke-width="2"/><circle cx="60" cy="70" r="3.5" fill="var(--ct-accent)"/><circle cx="180" cy="${70-Math.max(-30,Math.min(30,p.return*4))}" r="3.5" fill="var(--ct-accent)"/></svg>`;return;}
     const slope=p.slope/2, spread=(1-p.r2)*28, jitter=[0,1,-.7,.8,-1,.4,-.6,.3,0];
     const pts=jitter.map((j,i)=>[15+i*25,86-i*(2+slope*7)+j*spread]);
     $('#ct-chart').innerHTML=`<svg viewBox="0 0 240 110" role="img" aria-label="Illustration : pente ${fmt(p.slope)} pour cent par séance, R² ${fmt(p.r2)}"><path d="M10 95H230M10 95V10" fill="none" stroke="var(--line)"/><path d="M15 86L215 ${86-8*(2+slope*7)}" stroke="var(--ct-green)" stroke-width="2" stroke-dasharray="4 4"/><polyline points="${pts.map(p=>p.join(',')).join(' ')}" fill="none" stroke="var(--ct-accent)" stroke-width="2"/>${pts.map(([x,y])=>`<circle cx="${x}" cy="${y}" r="3.5" fill="var(--ct-accent)"/>`).join('')}</svg>`;
@@ -215,7 +234,7 @@
     const active=periods.filter(([k])=>config().periods[k].enabled);
     $('#ct-active-summary').textContent=active.length?`${active.length} périodes actives · ${active.map(([,l])=>l).join(' + ')}`:'Aucune période active · configuration libre';
     function text(n) {
-      if(n.kind==='rule') return `<span>${metrics[n.metric][0]} ${esc(n.op)} ${fmt(n.value)} ${metrics[n.metric][1]} <em>(${periods.find(([k])=>k===n.period)[1]})</em></span>`;
+      if(n.kind==='rule') return `<span>${n.metric==='return'&&n.period==='day'?'Variation 1J':metrics[n.metric][0]} ${esc(n.op)} ${fmt(n.value)} ${metrics[n.metric][1]} <em>(${periods.find(([k])=>k===n.period)[1]})</em></span>`;
       return `<div class="ct-preview-group"><b>${n.join==='and'?'TOUTES (ET)':'AU MOINS UNE (OU)'}</b>${n.children.map(x=>`<div>${text(x)}</div>`).join('')||'<span>Aucun critère</span>'}</div>`;
     }
     $('#ct-preview').innerHTML=text(tree());
@@ -229,9 +248,9 @@
     $('#ct-extra-note').textContent=compatible?`${advanced} critère(s) avancé(s) conservé(s). Consultez le mode Expert pour les modifier.`:'Règles avancées conservées : cette combinaison ne peut pas être représentée fidèlement par deux minimums. Modifiez-la en mode Expert ; les curseurs simples sont verrouillés.';
   }
   function renderSimple() {
-    $('#ct-periods').innerHTML=periods.map(([k,label,n])=>`<div class="ct-period ${config().periods[k].enabled?'active':''} ${state.selected===k?'selected':''}"><button type="button" data-period="${k}" aria-pressed="${state.selected===k}">${label}<small>≈ ${n} séances</small></button><label><input type="checkbox" data-enabled="${k}" ${config().periods[k].enabled?'checked':''}>Activée</label></div>`).join('');
+    $('#ct-periods').innerHTML=periods.map(([k,label,n])=>`<div class="ct-period ${config().periods[k].enabled?'active':''} ${state.selected===k?'selected':''}"><button type="button" data-period="${k}" aria-pressed="${state.selected===k}">${label}<small>≈ ${n} séance${n>1?'s':''}</small></button><label><input type="checkbox" data-enabled="${k}" ${config().periods[k].enabled?'checked':''}>Activée</label></div>`).join('');
     const p=config().periods[state.selected];
-    $('#ct-sliders').innerHTML=[['slope','Pente minimale',0,2,.001,'% / séance','Progression moyenne modélisée par séance. À 0 : aucun seuil. Masque seulement des lignes : notes et rangs ne changent pas.'],['r2','R² minimal',0,1,.001,'','Régularité : de 0 (dispersé) à 1 (aligné).']].map(([id,label,min,max,step,unit,help])=>`<div class="ct-control"><label for="ct-range-${id}">${label} · ${periods.find(([k])=>k===state.selected)[1]}</label><div class="ct-slider-row"><button type="button" data-step="${id}" data-delta="-${step}" aria-label="Diminuer ${label}">−</button><input id="ct-range-${id}" type="range" data-simple="${id}" min="${min}" max="${max}" step="${step}" value="${p[id]}" aria-label="${label}"><button type="button" data-step="${id}" data-delta="${step}" aria-label="Augmenter ${label}">+</button><div class="ct-number"><input id="ct-value-${id}" type="number" data-simple="${id}" min="${min}" max="${max}" step="${step}" value="${p[id]}" aria-label="Valeur ${label}"><span>${unit}</span></div></div><p class="ct-control-help">${help}</p></div>`).join('');
+    $('#ct-sliders').innerHTML=(state.selected==='day'?[['return','Variation 1J minimale',-20,20,.1,'%','Variation du cours entre les deux dernières séances clôturées. Une seule séance : ni pente ni R². À 0 : le dernier jour doit être positif. Masque seulement des lignes : notes et rangs ne changent pas.']]:[['slope','Pente minimale',0,2,.001,'% / séance','Progression moyenne modélisée par séance. À 0 : aucun seuil. Masque seulement des lignes : notes et rangs ne changent pas.'],['r2','R² minimal',0,1,.001,'','Régularité : de 0 (dispersé) à 1 (aligné).']]).map(([id,label,min,max,step,unit,help])=>`<div class="ct-control"><label for="ct-range-${id}">${label} · ${periods.find(([k])=>k===state.selected)[1]}</label><div class="ct-slider-row"><button type="button" data-step="${id}" data-delta="-${step}" aria-label="Diminuer ${label}">−</button><input id="ct-range-${id}" type="range" data-simple="${id}" min="${min}" max="${max}" step="${step}" value="${p[id]}" aria-label="${label}"><button type="button" data-step="${id}" data-delta="${step}" aria-label="Augmenter ${label}">+</button><div class="ct-number"><input id="ct-value-${id}" type="number" data-simple="${id}" min="${min}" max="${max}" step="${step}" value="${p[id]}" aria-label="Valeur ${label}"><span>${unit}</span></div></div><p class="ct-control-help">${help}</p></div>`).join('');
     const compatible=simpleCompatible();
     $('#ct-simple').querySelectorAll('input,button[data-step]').forEach(el=>el.disabled=!compatible);
     chart();preview();
@@ -243,7 +262,7 @@
         <select data-rule-field="metric" aria-label="Indicateur ${p}">${Object.entries(metrics).map(([k,[l]])=>`<option value="${k}" ${n.metric===k?'selected':''}>${l}</option>`).join('')}</select>
         <select data-rule-field="op" aria-label="Opérateur ${p}">${[['>=','≥'],['<=','≤'],['>','>'],['<','<'],['=','=']].map(([v,l])=>`<option value="${esc(v)}" ${n.op===v?'selected':''}>${esc(l)}</option>`).join('')}</select>
         <input type="number" step="any" value="${Number(n.value.toFixed(3))}" data-rule-field="value" aria-label="Valeur ${p}">
-        <select data-rule-field="period" aria-label="Période ${p}">${periods.map(([k,l,count])=>`<option value="${k}" ${n.period===k?'selected':''}>sur ${l.toLowerCase()} (≈ ${count} s.)</option>`).join('')}</select>
+        <select data-rule-field="period" aria-label="Période ${p}">${periods.filter(([k])=>k!=='day'||n.metric==='return').map(([k,l,count])=>`<option value="${k}" ${n.period===k?'selected':''}>sur ${l.toLowerCase()} (≈ ${count} s.)</option>`).join('')}</select>
         <button type="button" class="ct-rule-remove" data-remove-node="${p}" aria-label="Supprimer le critère ${p}">×</button>
       </div>`;
       return `<div class="ct-builder-group ${depth?'nested':''}" data-group-path="${p}"><div class="ct-group-operator"><select data-group-join="${p}" aria-label="Combinaison ${depth?'du groupe '+p:'principale'}"><option value="and" ${n.join==='and'?'selected':''}>ET</option><option value="or" ${n.join==='or'?'selected':''}>OU</option></select></div><div class="ct-group-content">${n.children.map((x,i)=>draw(x,[...path,i],depth+1)).join('')||'<p class="ct-no-rules">Aucun critère dans ce groupe.</p>'}<div class="ct-group-actions"><button type="button" data-add-node="${p}">＋ Ajouter un critère</button>${depth<4?`<button type="button" data-add-group="${p}">＋ Groupe ET / OU</button>`:''}${depth?`<button type="button" data-remove-node="${p}" class="ct-delete-group">Supprimer le groupe</button>`:''}</div></div></div>`;
@@ -389,6 +408,7 @@
     if(key==='sector'){const g=sectorLabel(row);return row.category?`<b>${esc(row.category)}</b><span class="ct-sub">${esc(g||'')}</span>`:'<span class="ct-missing">Inconnu</span>';}
     if(key==='price')return `${eur(row.price)}${row.currency&&row.currency!=='EUR'&&row.priceNative!==null?`<span class="ct-sub">${esc(new Intl.NumberFormat('fr-FR',{maximumFractionDigits:2}).format(row.priceNative))} ${esc(row.currency)}</span>`:''}`;
     if(key==='change')return `<span class="${row.change>0?'up':row.change<0?'down':''}">${percent(row.change,true)}</span>`;
+    if(key==='last_close')return row.lastClose?esc(new Date(row.lastClose+'T00:00:00').toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'})):'—';
     if(key==='slope')return `<span class="${row.slope>0?'up':row.slope<0?'down':''}">${percent(row.slope,true)}</span>`;
     if(key==='r2')return row.r2===null?'—':fmt(row.r2);
     if(key==='volatility')return tinted(MEASURE.volatility,row.volatility,percent(row.volatility));
@@ -426,7 +446,7 @@
     $('#ct-result-count').textContent=loadError?'':`${num0(rows.length)} titre${rows.length>1?'s':''}`+(rows.length!==intrinsicRows.length?` sur ${num0(intrinsicRows.length)} évalués`:'');
     const wstyle=w=>w?` style="width:${w}px;min-width:${w}px;max-width:none"`:'';
     const cls=key=>key==='rank'?'ct-rank-cell':key==='name'?'ct-name-heading':'';
-    $('#ct-table-head').innerHTML=selected.map(({key,label,width})=>`<th scope="col" class="${cls(key)}"${wstyle(width)} ${REG[key].nosort?'':`aria-sort="${key===sortKey()?(sortDir()==='asc'?'ascending':'descending'):'none'}"`}>${REG[key].nosort?esc(label):`<button type="button" data-sort-column="${esc(key)}" aria-label="Trier par ${esc(label)}"${key==='rank'?` title="Rang général sur tous les titres notés (${scoreKeyOf()==='simple'?'score simple':'score complexe'}), conservé lors du filtrage et du tri"`:''}>${esc(label)}${key===sortKey()?(sortDir()==='asc'?' ↑':' ↓'):''}</button>`}</th>`).join('');
+    $('#ct-table-head').innerHTML=selected.map(({key,label,width})=>`<th scope="col" class="${cls(key)}"${wstyle(width)}${hintOf(key)?` title="${esc(hintOf(key))}"`:''} ${REG[key].nosort?'':`aria-sort="${key===sortKey()?(sortDir()==='asc'?'ascending':'descending'):'none'}"`}>${REG[key].nosort?esc(label):`<button type="button" data-sort-column="${esc(key)}" aria-label="Trier par ${esc(label)}"${key==='rank'?` title="Rang général sur tous les titres notés (${scoreKeyOf()==='simple'?'score simple':'score complexe'}), conservé lors du filtrage et du tri"`:''}>${esc(label)}${key===sortKey()?(sortDir()==='asc'?' ↑':' ↓'):''}</button>`}</th>`).join('');
     $('#ct-table-body').innerHTML=pageRows.map(row=>`<tr data-row="${row.id}">${selected.map(({key,label,width})=>`<td class="ct-cell-${esc(key)} ${key==='rank'?'ct-rank-cell':''}" data-label="${esc(label)}"${wstyle(width)}>${rowCell(row,key)}</td>`).join('')}</tr>`).join('');
     $('#ct-empty-results').hidden=rows.length!==0||!!loadError;
     const searched=!!tableState.query.trim(),masked=base.length-scoped.length,unevaluated=Math.max(0,universe-intrinsicRows.length);
@@ -456,9 +476,9 @@
     else if(b.dataset.allIndicator){tableState.page=1;const k=b.dataset.allIndicator;state.filters[k]=categories[k].options.map(o=>o.id);saveLocalSelection(k);$(`#ct-list-${k}`).querySelectorAll('input[type=checkbox]').forEach(el=>el.checked=true);filterSummary();}
     else if(b.dataset.mode){closeFilter();state.mode=b.dataset.mode;project();render();}
     else if(b.dataset.period){state.selected=b.dataset.period;renderSimple();}
-    else if(b.dataset.step){const f=b.dataset.step,p=config().periods[state.selected];setSimpleValue(f,Number(Math.max(f==='slope'?.01:0,Math.min(f==='slope'?2:1,p[f]+Number(b.dataset.delta))).toFixed(3)));renderSimple();}
-    else if(b.dataset.addNode!==undefined){at(b.dataset.addNode).children.push(rule('volatility',state.selected,2,'<='));renderExpert();}
-    else if(b.dataset.addGroup!==undefined){at(b.dataset.addGroup).children.push(group([rule('volatility',state.selected,2,'<='),rule('drawdown',state.selected,15,'<=')]));renderExpert();}
+    else if(b.dataset.step){const f=b.dataset.step,p=config().periods[state.selected];setSimpleValue(f,Number(Math.max(f==='return'?-20:f==='slope'?.01:0,Math.min(f==='return'?20:f==='slope'?2:1,p[f]+Number(b.dataset.delta))).toFixed(3)));renderSimple();}
+    else if(b.dataset.addNode!==undefined){at(b.dataset.addNode).children.push(rule('volatility',state.selected==='day'?'month':state.selected,2,'<='));renderExpert();}
+    else if(b.dataset.addGroup!==undefined){at(b.dataset.addGroup).children.push(group([rule('volatility',state.selected==='day'?'month':state.selected,2,'<='),rule('drawdown',state.selected==='day'?'month':state.selected,15,'<=')]));renderExpert();}
     else if(b.dataset.removeNode!==undefined){const path=b.dataset.removeNode.split('.'),i=Number(path.pop());at(path.join('.')).children.splice(i,1);project();renderExpert();}
     else if(b.dataset.action==='reset') $('#ct-reset').click();
     else if(b.dataset.action==='save') $('#ct-save').click();
@@ -466,7 +486,7 @@
   $('#ct-page').addEventListener('input',e=>{
     const el=e.target;
     if(el.dataset.categorySearch){filterQuery=el.value;searchCategories(el.dataset.categorySearch,el.value);}
-    if(el.dataset.simple){const f=el.dataset.simple,p=config().periods[state.selected];setSimpleValue(f,number(el.value,0,f==='slope'?2:1,p[f]));$(`#ct-${el.type==='range'?'value':'range'}-${f}`).value=p[f];chart();preview();}
+    if(el.dataset.simple){const f=el.dataset.simple,p=config().periods[state.selected];setSimpleValue(f,number(el.value,f==='return'?-20:0,f==='return'?20:f==='slope'?2:1,p[f]));$(`#ct-${el.type==='range'?'value':'range'}-${f}`).value=p[f];chart();preview();}
     if(el.dataset.ruleField==='value'){const r=at(el.closest('[data-path]').dataset.path);r.value=number(el.value,-1e12,1e12,r.value);project();preview();}
   });
   $('#ct-page').addEventListener('change',e=>{
@@ -478,6 +498,7 @@
     if(el.dataset.ruleField){const r=at(el.closest('[data-path]').dataset.path),f=el.dataset.ruleField;r[f]=f==='value'?number(el.value,-1e12,1e12,r.value):el.value;if(f==='value')el.value=r.value;project();preview();}
     if(el.dataset.groupJoin!==undefined){at(el.dataset.groupJoin).join=el.value;project();preview();}
   });
+  loadStatus();
   $('#ct-strategy').onchange=e=>switchTo(e.target.value);
   for(const t of ['input','change','click'])$('#ct-page').addEventListener(t,e=>{if(e.target.id!=='ct-strategy')queueMicrotask(renderStrategies);});
   $('#ct-tab-rules').onclick=()=>$('#ct-rules').scrollIntoView({behavior:'smooth',block:'nearest'});

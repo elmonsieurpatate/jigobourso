@@ -132,13 +132,24 @@ J.ICONS = {
   shield: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/>', menu: '<path d="M4 6h16M4 12h16M4 18h16"/>', search: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>',
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>', moon: '<path d="M21 13a8 8 0 1 1-10-10 7 7 0 0 0 10 10z"/>',
   panel: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/>', chev: '<path d="M9 6l6 6-6 6"/>',
+  help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 1-1 1.7M12 17h.01"/>', info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5h.01"/>',
+  book: '<path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 21V5M9 7h6"/>', sliders: '<path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/>',
+  cols: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M15 4v16"/>', funnel: '<path d="M3 5h18l-7 8v6l-4-2v-4z"/>', target: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>',
+  rocket: '<path d="M5 15c-1 1-1.5 4-1.5 4s3-.5 4-1.5M14 4c3 0 6 3 6 6-3 5-6 7-9 7l-4-4c0-3 2-6 7-9z"/><circle cx="14.5" cy="9.5" r="1.4"/>', trend: '<path d="M3 17l6-6 4 4 8-9M15 6h6v6"/>',
+  leaf: '<path d="M5 19c0-9 5-14 15-14 0 10-5 15-14 15M5 19l8-8"/>', rebound: '<path d="M4 6v6h6M4 12c1.5-4 5-6 9-6 4 0 7 3 7 7s-3 7-7 7"/>', gauge: '<path d="M4 17a8 8 0 1 1 16 0M12 17l4-5"/>',
+  clock6: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>', shieldcheck: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
+  user: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>', check: '<path d="M5 12l5 5 9-10"/>', undo: '<path d="M9 14L4 9l5-5M4 9h11a5 5 0 0 1 0 10h-3"/>', compare: '<path d="M7 4v16M17 4v16M3 8l4-4 4 4M13 16l4 4 4-4"/>',
 };
 J.icon = (n, cls = 'ic') => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">${J.ICONS[n]}</svg>`;
 J.NAV = (admin) => [
   { sec: 'Marchés' },
-  { id: 'explorer', label: 'Explorer', icon: 'compass', file: ['index.html', 'titre.html', 'mes-filtres.html', 'mes-strategies.html', 'classement-test.html'], children: [
-    { label: 'Classement', href: 'index.html', on: () => true },
-    { label: 'Mes stratégies', href: 'mes-strategies.html', on: () => location.pathname.endsWith('mes-strategies.html') }] },
+  { id: 'explorer', label: 'Explorer', icon: 'compass', file: ['index.html', 'titre.html', 'mes-filtres.html', 'mes-strategies.html', 'mes-scores.html', 'mes-colonnes.html', 'classement-test.html'], children: [
+    { label: 'Recherche et résultats', href: 'index.html', icon: 'search', on: () => true },
+    { label: 'Mes stratégies', href: 'mes-strategies.html', icon: 'target', on: (q, h) => h !== '#criteres' },
+    { label: 'Mes critères de recherche', href: 'mes-strategies.html#criteres', icon: 'sliders', on: (q, h) => h === '#criteres' },
+    { label: 'Mes paramètres de scores', href: 'mes-scores.html', icon: 'gauge', on: () => true },
+    { label: 'Mes colonnes et tris', href: 'mes-colonnes.html', icon: 'cols', on: () => true },
+    { label: 'Mes filtres et catégories', href: 'mes-filtres.html', icon: 'funnel', on: () => true }] },
   { sec: 'Mon patrimoine' },
   { id: 'portefeuilles', label: 'Portefeuilles', icon: 'wallet', file: ['portefeuilles.html'], dynamic: 'portfolios', children: [{ label: 'Vue d’ensemble', href: 'portefeuilles.html', on: q => !q.has('id') }] },
   { id: 'bilan', label: 'Bilans', icon: 'chart', file: ['bilan.html'], children: [{ label: 'Bilan global', href: 'bilan.html', on: () => true }] },
@@ -146,13 +157,12 @@ J.NAV = (admin) => [
   { id: 'suivi', label: 'Suivi des classements', icon: 'pulse', file: ['suivi.html'], href: 'suivi.html' },
   { id: 'donnees', label: 'Données', icon: 'db', file: ['donnees.html'], children: [
     { label: 'Sources et fraîcheur', href: 'donnees.html', on: (q, h) => h !== '#places' }, { label: 'Couverture par place', href: 'donnees.html#places', on: (q, h) => h === '#places' }] },
-  ...(admin ? [{ sec: 'Administration' }, { id: 'admin', label: 'Administration', icon: 'shield', file: ['admin.html', 'admin-categories-test.html'], children: [
-    { head: 'Administration' },
+  ...(admin ? [{ sec: 'Administration technique' }, { id: 'admin', label: 'Administration', icon: 'shield', file: ['admin.html', 'admin-categories-test.html'], children: [
     { label: 'FinanceDatabase', href: 'admin.html#fdb', on: (q, h) => !h || h === '#fdb' }, { label: 'Yahoo Finance', href: 'admin.html#yahoo', on: (q, h) => h === '#yahoo' },
     { label: 'Actions / ETF', href: 'admin.html#titres', on: (q, h) => h === '#titres' }, { label: 'Cron', href: 'admin.html#cron', on: (q, h) => h === '#cron' }, { label: 'Journaux', href: 'admin.html#logs', on: (q, h) => h === '#logs' },
     { label: 'Utilisateurs', href: 'admin.html#users', on: (q, h) => h === '#users' }, { label: 'Réglages', href: 'admin.html#settings', on: (q, h) => h === '#settings' },
-    { head: 'Explorer' },
-    { label: 'Scores', href: 'admin.html#scores', on: (q, h) => h === '#scores' }, { label: 'Colonnes', href: 'admin.html#colonnes', on: (q, h) => h === '#colonnes' }, { label: 'Filtres et catégories', href: 'admin-categories-test.html', on: () => true }] }] : []),
+    ] }] : []),
+  { id: 'aide', label: 'Aide', icon: 'help', file: ['aide.html'], href: 'aide.html' }
 ];
 J.buildShell = function (page, user) {
   const file = location.pathname.split('/').pop() || 'index.html', store = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) { } } };
