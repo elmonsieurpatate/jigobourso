@@ -8,7 +8,7 @@ import copy
 
 from engine.shared import settings
 
-from . import explorer_config as C, score_categories, score_service, scores as SC
+from . import explorer_config as C, score_categories, score_service, scores as SC, strategy as LEGACY
 
 PROFILES = 'scores_profiles'
 SCORING_PERIODS = tuple(p for p in C.PERIODS if C.SESSIONS[p] >= SC.MIN_SESSIONS)
@@ -17,6 +17,7 @@ ADVANCED = {'min_return': (-100, 10000), 'max_return': (-100, 10000), 'max_spike
 THRESHOLDS = {**SIMPLE, **ADVANCED}
 LIQUIDITY = {'min_turnover_eur': (0, 1e12), 'min_turnover_eur_us': (0, 1e12)}
 TOLERANCE = 0.05
+SLOPE, R2 = LEGACY.SLOPE_LEVELS, LEGACY.R2_LEVELS          # niveaux historiques exacts (strategy.py, V2) : pente en % par séance, R² 1 − (2/3)² pour « flexible »
 
 
 def growth_v4():
@@ -25,8 +26,8 @@ def growth_v4():
     c = C.empty()
     c['name'] = 'growth_v4'
     by = {p['id']: p for p in c['periods']}
-    by['week'].update(enabled=True, require_history=True, min_slope=0.30, min_r2=0.60)
-    by['month'].update(enabled=True, require_history=True, min_slope=0.20, min_r2=0.60)
+    by['week'].update(enabled=True, require_history=True, min_slope=SLOPE['very_strong'], min_r2=None)       # critères de recherche historiques (pente « très forte », pas de R²)
+    by['month'].update(enabled=True, require_history=True, min_slope=SLOPE['very_strong'], min_r2=None)
     c['selection'] = {'combine': 'all', 'missing': 'unknown', 'require_fresh': True}
     c['ranking'] = {'mode': C.SCORES_MODE, 'sort': 'simple'}
     c['scoring'] = {'kappa': SC.KAPPA, 'weights': {}, 'complex_weights': {}, 'threshold': SC.COVERAGE_THRESHOLD}
@@ -48,17 +49,22 @@ def _historic(name, periods, weights, complex_weights, tuning=None, sort='comple
 
 
 def _regular():
-    return _historic('growth_regular', {'month': dict(min_slope=0.07, min_r2=0.56), 'quarter': dict(min_slope=0.07, min_r2=0.56)}, {},
+    crit = dict(min_slope=SLOPE['moderate'], min_r2=R2['flexible'])
+    return _historic('growth_regular', {'month': dict(crit), 'quarter': dict(crit)}, {},
                      {'dynamics': 20, 'r2': 35, 'up_days': 15, 'concentration': 10, 'volatility': 5, 'drawdown': 5, 'liquidity': 10, 'acceleration': 0, 'momentum': 0}, {'sat_a': 10.0})
 
 
 def _rebound():
-    return _historic('rebound', {'week': dict(min_slope=0.07, min_r2=0.56), 'month': dict(min_slope=0.07, min_r2=0.56), 'half': dict(max_return=10.0)}, {'week': 50, 'month': 50, 'half': 0},
+    """Critères de recherche : semaine et mois. Le semestre n'a ni pente ni R² : il reste une période de CONTEXTE (poids 0) car la note « contexte de rebond » lit son rendement."""
+    crit = dict(min_slope=SLOPE['gentle'], min_r2=R2['flexible'])
+    return _historic('rebound', {'week': dict(crit), 'month': dict(crit), 'half': {}}, {'week': 50, 'month': 50, 'half': 0},
                      {'dynamics': 15, 'r2': 10, 'up_days': 5, 'concentration': 5, 'volatility': 10, 'drawdown': 5, 'liquidity': 5, 'acceleration': 20, 'momentum': 0, 'recovery': 25}, {'accel_ref': 0.25})
 
 
 def _calm():
-    return _historic('calm_rise', {'month': dict(min_slope=0.07, min_r2=0.56, max_volatility=1.5, max_drawdown=20.0), 'quarter': dict(min_slope=0.07, min_r2=0.56, max_volatility=1.5, max_drawdown=20.0)}, {},
+    """Critères de recherche : mois et trimestre (pente, R²). Volatilité et drawdown ne sont plus des seuils : ils pèsent 35 % et 20 % du score complexe."""
+    crit = dict(min_slope=SLOPE['gentle'], min_r2=R2['flexible'])
+    return _historic('calm_rise', {'month': dict(crit), 'quarter': dict(crit)}, {},
                      {'dynamics': 10, 'r2': 10, 'up_days': 10, 'concentration': 5, 'volatility': 35, 'drawdown': 20, 'liquidity': 10, 'acceleration': 0, 'momentum': 0}, {'sat_a': 10.0})
 
 

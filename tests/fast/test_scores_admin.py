@@ -175,7 +175,7 @@ def test_simple_mode_defaults_impose_nothing_hidden():
     on = {k: v for k, v in p['periods'].items() if v['enabled']}
     assert set(on) == {'week', 'month'}
     for x in on.values():                                                         # mode simple : seulement pente et R², aucun critère avancé
-        assert x['min_slope'] is not None and x['min_r2'] is not None
+        assert x['min_slope'] == A.SLOPE['very_strong'] and x['min_r2'] is None             # Croissance rapide : pente seule, pas de R²
         assert all(x[f] is None for f in A.ADVANCED)
     assert not p['day_filter']['enabled'] and p['liquidity'] == {'min_turnover_eur': None, 'min_turnover_eur_us': None}
 
@@ -246,7 +246,7 @@ def test_filters_are_off_by_default_and_remove_no_title_from_the_ranking():
     assert not next(p for p in cfg['periods'] if p['id'] == 'day')['enabled']
     assert cfg['liquidity']['min_turnover_eur'] is None and cfg['liquidity']['min_turnover_eur_us'] is None
     cur = row(A.state(None))['current']
-    assert cur['filters'] == {'enabled': False} and cur['periods']['week']['min_slope'] == 0.30       # valeurs conservées, prêtes à être activées
+    assert cur['filters'] == {'enabled': False} and cur['periods']['week']['min_slope'] == A.SLOPE['very_strong']       # valeurs conservées, prêtes à être activées
 
 
 def test_enabling_filters_applies_thresholds_but_never_changes_scores():
@@ -255,7 +255,7 @@ def test_enabling_filters_applies_thresholds_but_never_changes_scores():
     A.save(None, {'profile': p})
     cfg = S.apply_admin(None, A.growth_v4())
     wk = next(x for x in cfg['periods'] if x['id'] == 'week')
-    assert wk['min_slope'] == 0.30 and wk['require_history']
+    assert wk['min_slope'] == A.SLOPE['very_strong'] and wk['require_history']
     assert S._key(cfg, 1) == S._key(S.apply_admin(None, A.growth_v4()), 1)
     assert S._key(cfg, 1) == S._key(A.neutral(A.growth_v4()), 1)          # même notation avec ou sans filtres
 
@@ -298,6 +298,48 @@ def test_classement_proposes_every_v4_strategy():
         for k, p in engine.items():
             expected = {f: p[m] for m, f in R.CRITERIA_FIELDS.items() if p.get(m) is not None}
             assert crit[ct_id]['periods'][k] == expected, (ct_id, k)                          # mêmes critères historiques
-    assert crit['fast']['periods'] == {'week': {'slope': .3, 'r2': .6}, 'month': {'slope': .2, 'r2': .6}}
-    assert crit['calm']['periods']['month']['max_volatility'] == 1.5 and crit['rebound']['periods']['half'] == {'max_return': 10.0}
+    assert crit['fast']['periods'] == {'week': {'slope': 0.27543703768897265}, 'month': {'slope': 0.27543703768897265}}           # pente « très forte », pas de R²
+    assert crit['regular']['periods'] == {k: {'slope': 0.06878824951818499, 'r2': 0.5555555555555556} for k in ('month', 'quarter')}
+    assert crit['calm']['periods'] == {k: {'slope': 0.034388212013465085, 'r2': 0.5555555555555556} for k in ('month', 'quarter')}      # volatilité et drawdown : plus des seuils
+    assert crit['rebound']['periods'] == {'week': {'slope': 0.034388212013465085, 'r2': 0.5555555555555556}, 'month': {'slope': 0.034388212013465085, 'r2': 0.5555555555555556}, 'half': {}}
+    assert all(set(v) <= {'slope', 'r2'} for ct in crit.values() for v in ct['periods'].values())   # critères de recherche : pente et R² seulement
     assert all(not v for ct in ('mom6', 'mom12', 'momrisk') for v in crit[ct]['periods'].values())   # Momentum : aucun critère
+
+
+SPEC_SCORES = {   # (poids complexes dynamique, r2, jours positifs, concentration, volatilité, drawdown, liquidité, accélération, momentum, rebond), poids des granularités, saturation, référence d'accélération, score par défaut
+    'growth_v4': ((40, 15, 5, 7, 15, 8, 10, 0, 0, 0), {}, 17.0, 0.4, 'simple'),
+    'growth_regular': ((20, 35, 15, 10, 5, 5, 10, 0, 0, 0), {}, 10.0, 0.4, 'complex'),
+    'calm_rise': ((10, 10, 10, 5, 35, 20, 10, 0, 0, 0), {}, 10.0, 0.4, 'complex'),
+    'rebound': ((15, 10, 5, 5, 10, 5, 5, 20, 0, 25), {'week': 50, 'month': 50, 'half': 0}, 17.0, 0.25, 'complex'),
+    'momentum_6m': ((15, 10, 0, 0, 5, 10, 10, 0, 50, 0), {'quarter': 30, 'half': 70}, 17.0, 0.4, 'complex'),
+    'momentum_12m': ((15, 10, 0, 0, 5, 10, 10, 0, 50, 0), {'half': 30, 'year': 70}, 17.0, 0.4, 'complex'),
+    'momentum_risk': ((0, 0, 0, 0, 10, 10, 0, 0, 80, 0), {'half': 40, 'year': 60}, 17.0, 0.4, 'complex'),
+}
+KEYS = ('dynamics', 'r2', 'up_days', 'concentration', 'volatility', 'drawdown', 'liquidity', 'acceleration', 'momentum', 'recovery')
+
+
+def test_the_seven_strategies_keep_their_scoring_part_and_have_search_criteria_apart():
+    """Deux parties séparées : SCORES (barème, poids, saturation, score par défaut) et STRATÉGIE (granularités, pente, R²). Aucun rendement, volatilité ni drawdown n'est un seuil."""
+    from engine.analytics import score_service as SS, scores as SC
+    for name, (cw, weights, sat, accel, sort) in SPEC_SCORES.items():
+        cfg = A.V4_STRATEGIES[name]['build']()
+        params = SS.params_for(cfg, 'equity')
+        assert tuple(params['complex_weights'][k] for k in KEYS) == tuple(float(x) for x in cw), name
+        assert {k: v for k, v in (cfg['scoring']['weights'] or {}).items()} == {k: float(v) for k, v in weights.items()}, name
+        assert params['sat_a'] == sat and params['accel_ref'] == accel and cfg['ranking']['sort'] == sort, name
+        assert (params['kappa'], params['threshold'], params['anchor']) == (SC.KAPPA, SC.COVERAGE_THRESHOLD, SC.ANCHOR_LAMBDA), name
+        for p in cfg['periods']:
+            assert all(p.get(f) is None for f in A.ADVANCED), (name, p['id'])                      # jamais de seuil de rendement, volatilité ou drawdown
+    assert (SC.LIQUIDITY_FLOOR_EUR, SC.LIQUIDITY_CEIL_EUR, SC.GATE_FLOOR, SC.SAT_A, SC.ACCEL_REF) == (2e6, 5e7, 32.0, 17.0, 0.4)
+
+
+def test_rebound_keeps_the_half_year_loaded_as_context_so_the_rebound_note_works():
+    """Le semestre n'a ni pente ni R² (poids 0), mais il doit rester une période chargée : la note « contexte de rebond » lit son rendement."""
+    from engine.analytics import score_service as SS, scores as SC
+    cfg = A.V4_STRATEGIES['rebound']['build']()
+    half = next(p for p in cfg['periods'] if p['id'] == 'half')
+    assert half['enabled'] and half['min_slope'] is None and half['min_r2'] is None and half['max_return'] is None
+    assert 126 in {p['sessions'] for p in SS.params_for(cfg, 'equity')['periods']}                # sa mesure est chargée pour la note de rebond
+    # la note distingue une reprise après baisse d'une croissance continue (même hausse récente)
+    after_fall, continuous = SC.recovery_note(-10.0), SC.recovery_note(30.0)
+    assert after_fall == 100 and continuous == 0

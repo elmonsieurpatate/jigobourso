@@ -148,3 +148,25 @@ Limite connue : le filtre « au-dessus de la moyenne 200 jours » de l'ancien pr
 
 ### Correction de la normalisation du score complexe (scores V5, 07/11/2026)
 Le score complexe est la moyenne, pondérée par le poids entier de chaque composante disponible, des notes de composantes (chaque note étant elle-même la moyenne sur les périodes où la mesure existe). Avant la correction, le numérateur utilisait ce poids entier mais le dénominateur le multipliait par la part de périodes mesurées : un titre dont une composante n'existait que sur une partie des périodes pondérées était gonflé (jusqu'à +28 points, un score de 101,5 observé). Le dénominateur est maintenant la somme des poids des composantes disponibles. Aucun titre dont toutes les mesures existent ne change ; le score simple, les autres formules et la fiabilité (`coverage`, statut « partiel ») ne changent pas. `scores.VERSION` passe à 5 : les scores en cache sont recalculés. Mesure sur les 9 611 titres de la prod (06/11) : 16 à 787 notes complexes baissent selon la stratégie (maximum −28,0 points, Hausse calme), aucun score ne dépasse plus 100. Tests : `tests/fast/test_scores.py` (données partielles, bornes 0-100 sur 4 000 cas aléatoires, inversion de rang entre un titre complet et un titre incomplet).
+
+
+## Stratégies intégrées : critères de recherche et barème de notation séparés (07/11/2026)
+
+**STRATÉGIE** = granularités actives, pente minimale (% par séance) et R² minimum : des critères de *recherche*. Ils filtrent l'affichage du Classement (bouton « Critères appliqués / ignorés »), jamais une note ni un rang.
+**SCORES** = barème (poids du score complexe, poids des granularités, saturation, référence d'accélération, score par défaut). Le rendement, la volatilité et le drawdown contribuent aux scores, sans jamais être des seuils.
+
+Critères (niveaux historiques exacts de `strategy.py`, V2 : pente `100·expm1(ln 2 / (années·252))`, R² « flexible » = 1 − (2/3)²) :
+
+| Stratégie | Granularités | Pente min. | R² min. |
+|---|---|---|---|
+| Croissance rapide | semaine, mois | 0,27543703768897265 | aucun |
+| Croissance régulière | mois, trimestre | 0,06878824951818499 | 0,5555555555555556 |
+| Hausse calme | mois, trimestre | 0,034388212013465085 | 0,5555555555555556 |
+| Rebond | semaine, mois | 0,034388212013465085 | 0,5555555555555556 |
+| Momentum 6 mois | trimestre, semestre | aucune | aucun |
+| Momentum 12 mois | semestre, année | aucune | aucun |
+| Momentum ajusté du risque | semestre, année | aucune | aucun |
+
+Retirés des critères : rendement mensuel ≥ 12 % (Rapide), volatilité ≤ 1,5 % et drawdown ≤ 20 % (Hausse calme), rendement semestriel ≤ 10 % (Rebond) ; les filtres MM200 du Momentum ajusté du risque ne sont pas réactivés.
+Rebond : le semestre n'a ni pente ni R² (poids 0) mais reste une période chargée, car la note « contexte de rebond » lit son rendement (100 si ≤ −10 %, 0 si ≥ +20 %).
+Les performances réelles entrent dans les scores par la croissance lissée (pente de régression, dynamique), le momentum 6-1 / 12-1 mois et le contexte de rebond. Formules inchangées.

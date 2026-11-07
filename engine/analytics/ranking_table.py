@@ -64,7 +64,7 @@ def _fetch(conn, ids):
     return out
 
 
-CRITERIA_FIELDS = {'min_slope': 'slope', 'min_r2': 'r2', 'min_return': 'min_return', 'max_return': 'max_return', 'max_volatility': 'max_volatility', 'max_drawdown': 'max_drawdown'}
+CRITERIA_FIELDS = {'min_slope': 'slope', 'min_r2': 'r2'}      # critères de RECHERCHE : granularités actives, pente et R² seulement ; rendement, volatilité, drawdown n'y sont jamais des seuils
 
 
 def criteria(conn=None, request=None):

@@ -13,3 +13,4 @@ cron.key
 *.sql.gz
 node_modules/
 audit-results/
+rsync-deploy.log
