@@ -7,7 +7,11 @@
   const profiles = {
     fast: { active:['week','month'], slope:.08, r2:.65 },
     regular: { active:['month','quarter'], slope:.05, r2:.8 },
-    calm: { active:['month','quarter','half'], slope:.03, r2:.85 }
+    calm: { active:['month','quarter','half'], slope:.03, r2:.85 },
+    rebound: { active:['week','month'], slope:.07, r2:.56 },
+    mom6: { active:['quarter','half'], slope:.01, r2:.3 },
+    mom12: { active:['half','year'], slope:.01, r2:.3 },
+    momrisk: { active:['half','year'], slope:.01, r2:.3 }
   };
   const secondary=window.ClassementTestSecondary;
   const categoryPayload=window.ClassementTestCategoryConfig || await J.api('explorer/secondary-filters');
@@ -22,6 +26,7 @@
   // Seules les sauvegardes explicites de cette page sont relues. Les préférences Explorer restent séparées.
   try {
     const saved = JSON.parse(localStorage.getItem(key));
+    if (saved && saved.profiles && typeof saved.profiles==='object') for (const id of Object.keys(profiles)) if (!saved.profiles[id]) saved.profiles[id]=fresh(id);     // stratégies ajoutées depuis la sauvegarde
     if (saved && ['simple','expert'].includes(saved.mode) && profiles[saved.strategy] && periods.some(([k])=>k===saved.selected) && Object.keys(profiles).every(id => {
       const p=saved.profiles?.[id]; return p && ['and','or'].includes(p.join) && Array.isArray(p.extra) && p.extra.every(x=>metrics[x.metric] && ['>=','<='].includes(x.op) && Number.isFinite(x.value) && x.value>=0) && periods.every(([k])=>typeof p.periods?.[k]?.enabled==='boolean' && Number.isFinite(p.periods[k].slope) && p.periods[k].slope>=.01 && p.periods[k].slope<=2 && Number.isFinite(p.periods[k].r2) && p.periods[k].r2>=0 && p.periods[k].r2<=1);
     }) && saved.filters && typeof saved.filters==='object' && Array.isArray(saved.cols) && saved.cols.every(n=>Number.isInteger(n)&&n>=0&&n<columns.length)) state=saved;
@@ -120,7 +125,7 @@
   }
 
   // ───── Stratégies enregistrées (MariaDB) : une configuration et des choix de filtres propres à chacune ─────
-  const builtinNames={fast:'Croissance rapide',regular:'Croissance régulière',calm:'Croissance calme'};
+  const builtinNames={fast:'Croissance rapide',regular:'Croissance régulière',calm:'Hausse calme',rebound:'Rebond',mom6:'Momentum 6 mois (expérimental)',mom12:'Momentum 12 mois (expérimental)',momrisk:'Momentum ajusté du risque (expérimental)'};
   const names={...builtinNames},ovBy={},saved={},cloneJSON=x=>JSON.parse(JSON.stringify(x));
   let customIds=[],rev=serverView?serverView.revision:0,busy=false,meta=cloneJSON(serverView?.meta||{});
   const metaOf=id=>({icon:'📈',description:'',enabled:true,...(meta[id]||{})});

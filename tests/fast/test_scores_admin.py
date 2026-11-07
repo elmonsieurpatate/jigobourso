@@ -277,3 +277,18 @@ def test_strategies_current_profile_always_carries_sessions():
     from engine.analytics import scores_admin as A
     cur = A.clean_profile(A.profile_of(A.base_config('growth_v4')))
     assert 'sessions' not in cur['periods']['week']                    # clean_profile ne le garde pas : strategies() doit le rajouter
+
+
+def test_classement_proposes_every_v4_strategy():
+    """Chaque stratégie V4 de l'administration a son entrée dans le Classement (PHP, JS et correspondance moteur alignés)."""
+    import os
+    import re
+    root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    assert sorted(A.CT_BUILTIN.values()) == sorted(A.V4_STRATEGIES)
+    php = open(os.path.join(root, 'app', 'services', 'ct_strategies.php'), encoding='utf-8').read()
+    js = open(os.path.join(root, 'app', 'public', 'assets', 'classement-test.js'), encoding='utf-8').read()
+    for ct_id, name in A.CT_BUILTIN.items():
+        label = A.V4_STRATEGIES[name]['label']
+        assert f"'{ct_id}' => '{label}'" in php
+        assert f"{ct_id}:'{label}'" in js
+        assert re.search(rf"\b{ct_id}: \{{ active", js)

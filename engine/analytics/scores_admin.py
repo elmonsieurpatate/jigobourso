@@ -88,7 +88,7 @@ V4_STRATEGIES = {
                                                  {'dynamics': 0, 'r2': 0, 'up_days': 0, 'concentration': 0, 'volatility': 10, 'drawdown': 10, 'liquidity': 0, 'acceleration': 0, 'momentum': 80}),
                       'note': 'Momentum 6 et 12 mois (moyenne, 80 %) corrigé par la volatilité et le repli maximal des périodes semestre et année (10 % chacun), comme l’ancien profil. Le filtre « au-dessus de la moyenne 200 jours » n’est pas une notation : il reste un filtre d’affichage.'}}
 # ───────────── stratégies du Classement (« Blou », Croissance régulière…) : chacune a son propre profil de scores ─────────────
-CT_BUILTIN = {'fast': 'growth_v4', 'regular': 'growth_regular', 'calm': 'calm_rise'}      # stratégies d'origine de la page Classement -> stratégie de scores V4
+CT_BUILTIN = {'fast': 'growth_v4', 'regular': 'growth_regular', 'calm': 'calm_rise', 'rebound': 'rebound', 'mom6': 'momentum_6m', 'mom12': 'momentum_12m', 'momrisk': 'momentum_risk'}      # stratégies d'origine de la page Classement -> stratégie de scores V4
 DYNAMIC = {}                                          # nom -> spécification ; rempli par refresh(conn) en tête de chaque appel
 
 

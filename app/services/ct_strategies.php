@@ -4,13 +4,13 @@
  * même méthode que les filtres secondaires : transaction, verrou, révision optimiste.
  * Chaque stratégie garde sa configuration et ses choix de filtres ; aucune ne touche aux autres, ni aux définitions
  * des filtres (administration), ni à explorer_saved, ni au moteur.
- * Les trois stratégies d'origine (fast, regular, calm) n'ont pas de ligne tant qu'elles ne sont pas modifiées :
+ * Les sept stratégies d'origine (celles des scores V4) n'ont pas de ligne tant qu'elles ne sont pas modifiées :
  * leurs valeurs par défaut sont dans la page. « Restaurer » supprime seulement leur surcharge.
  */
 require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/http.php';
 
-const CT_BUILTIN = ['fast' => 'Croissance rapide', 'regular' => 'Croissance régulière', 'calm' => 'Croissance calme'];
+const CT_BUILTIN = ['fast' => 'Croissance rapide', 'regular' => 'Croissance régulière', 'calm' => 'Hausse calme', 'rebound' => 'Rebond', 'mom6' => 'Momentum 6 mois (expérimental)', 'mom12' => 'Momentum 12 mois (expérimental)', 'momrisk' => 'Momentum ajusté du risque (expérimental)'];
 const CT_PERIODS = ['week', 'month', 'quarter', 'half', 'year', 'two_year'];
 const CT_METRICS = ['slope', 'r2', 'volatility', 'drawdown', 'return', 'volume'];
 const CT_MAX_CUSTOM = 30;
