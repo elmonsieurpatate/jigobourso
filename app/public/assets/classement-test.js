@@ -6,15 +6,17 @@
   const periods = [['week','Semaine',5],['month','Mois',21],['quarter','Trimestre',63],['half','6 mois',126],['year','1 an',252],['two_year','2 ans',504]];
   // Admission par défaut de chaque stratégie d'origine : mêmes seuils que la stratégie de scores du même nom (scores_admin.V4_STRATEGIES).
   // per = {période:[pente min %/séance, R² min]} ; extra = seuils facultatifs sur 1 mois [mesure, sens, valeur].
+  // Périodes actives de chaque stratégie (identiques à celles du moteur). Aucun seuil : le moteur note et classe tous les titres, les seuils n'excluent rien.
   const profiles = {
-    fast: { per:{week:[.3,.6],month:[.2,.6]} },
-    regular: { per:{month:[.07,.56],quarter:[.07,.56]} },
-    calm: { per:{month:[.07,.56],quarter:[.07,.56]}, extra:[['volatility','<=',1.5],['drawdown','<=',20]] },
-    rebound: { per:{week:[.07,.56],month:[.07,.56]} },
-    mom6: { per:{quarter:[.01,0],half:[.01,0]} },
-    mom12: { per:{half:[.01,0],year:[.01,0]} },
-    momrisk: { per:{half:[.01,0],year:[.01,0]} }
+    fast: { per:{week:[0,0],month:[0,0]} },
+    regular: { per:{month:[0,0],quarter:[0,0]} },
+    calm: { per:{month:[0,0],quarter:[0,0]} },
+    rebound: { per:{week:[0,0],month:[0,0]} },
+    mom6: { per:{quarter:[0,0],half:[0,0]} },
+    mom12: { per:{half:[0,0],year:[0,0]} },
+    momrisk: { per:{half:[0,0],year:[0,0]} }
   };
+
   const secondary=window.ClassementTestSecondary;
   const categoryPayload=window.ClassementTestCategoryConfig || await J.api('explorer/secondary-filters');
   const categories=secondary.normalize(categoryPayload);
@@ -76,8 +78,8 @@
   const categorySignature=JSON.stringify(categoryPayload.definitions||categoryPayload.categories);
   state.categorySignature=categorySignature;
   // Jeu fictif immuable. Le formulaire de stratégie n'entre jamais dans son calcul.
-  let intrinsicRows=[],loadError=null,scoreLabel='',loading=true;
-  const tableState={sort:'complex',direction:'desc',page:1,pageSize:50,outside:false,query:new URLSearchParams(location.search).get('q')||''};
+  let intrinsicRows=[],loadError=null,scoreLabel='',loading=true,universe=0,defaultSort='simple';
+  const tableState={sort:'simple',direction:'desc',page:1,pageSize:50,userSorted:false,query:new URLSearchParams(location.search).get('q')||''};
   let activeFilter=null, filterQuery='';
   const config = () => state.profiles[state.strategy];
   const isPrimary = r => r.metric === 'slope' || r.metric === 'r2';
@@ -162,7 +164,7 @@
   function takeView(view){rev=view.revision;meta=cloneJSON(view.meta||{});for(const it of view.items)names[it.id]=it.name;customIds=view.items.filter(i=>!i.builtin).map(i=>i.id);}
   function switchTo(id,remember=true){
     closeFilter();ovBy[state.strategy]=overrides;state.strategy=id;overrides=ovBy[id]||(ovBy[id]={});state.filters=filtersFor(overrides);
-    tableState.page=1;tree();project();state.selected=periods.find(([k])=>config().periods[k].enabled)?.[0]||'week';render();loadRows();
+    tableState.page=1;tableState.userSorted=false;tree();project();state.selected=periods.find(([k])=>config().periods[k].enabled)?.[0]||'week';render();loadRows();
     if(remember&&serverOk)J.post('classement-test/strategies/save',{action:'select',id}).catch(()=>{});
   }
   function currentPayload(){tree();project();return {config:cloneJSON(state.profiles[state.strategy]),filters:cloneJSON(overrides)};}
@@ -245,9 +247,6 @@
       $(`[data-count="${k}"]`).textContent=`${state.filters[k].length} / ${c.options.length}`;
       $(`[data-selected-count="${k}"]`).textContent=`${state.filters[k].length} / ${c.options.length} sélectionnées`;
     }
-    const {base,rows:visible}=visibleRows(),hidden=base.length-visible.length;
-    $('#ct-masked-count').textContent=`${hidden} titre${hidden>1?'s':''} masqué${hidden>1?'s':''}`;
-    $('#ct-masked-count').classList.toggle('has-hidden',hidden>0);
     renderRanking();
   }
   function searchCategories(key,query) {
@@ -297,7 +296,7 @@
       score_simple_v4:r.simple,score_complex_v4:r.complex};
   }
   function toRow(r){
-    return {id:r.id,rank:r.rank_complex,rankSimple:r.rank_simple,rankComplex:r.rank_complex,symbol:r.symbol,name:r.name,mic:r.mic,currency:r.currency,kind:r.kind,country:r.country,category:r.category,group:r.group,
+    return {id:r.id,rank:r.rank_complex,rankSimple:r.rank_simple,rankComplex:r.rank_complex,posSimple:r.pos_simple,posComplex:r.pos_complex,tieSimple:r.tie_simple||1,tieComplex:r.tie_complex||1,symbol:r.symbol,name:r.name,mic:r.mic,currency:r.currency,kind:r.kind,country:r.country,category:r.category,group:r.group,
       price:r.price_eur,priceNative:r.price,change:r.change,slope:r.slope,r2:r.r2,volatility:r.volatility,drawdown:r.drawdown,turnover:r.turnover_eur,liquiditySource:r.liquidity_source,avgVolume:r.avg_volume,
       perfMonth:r.perf&&r.perf.month!==undefined?r.perf.month:null,simple:r.simple,complex:r.complex,simpleStatus:r.simple_status,complexStatus:r.complex_status,score:r.complex,
       isin:r.isin,points:r.curve||[],color:hue(r.symbol),secondary:secondaryOf(r),periods:r.periods||{},held:!!r.held,lastClose:r.last_close,quality:r.quality};
@@ -317,15 +316,10 @@
     if(!active.length)return [...rows];
     return rows.filter(row=>active.every(([k])=>rowOptions(row,k).some(id=>state.filters[k].includes(id))));
   }
-  // Stratégie choisie : chaque période active exige une pente ET un R² au moins égaux aux seuils ; une mesure absente n'admet pas le titre.
-  const sessionsOf=Object.fromEntries(periods.map(([k,,n])=>[k,n]));
-  function admitted(row){
-    return periods.every(([k,,n])=>{const p=config().periods[k];if(!p.enabled)return true;const m=row.periods[String(n)];return !!m&&m.slope!==null&&m.r2!==null&&m.slope>=p.slope&&m.r2>=p.r2;});
-  }
+  // Aucune admission : tous les titres évalués sont classés. Seuls les filtres secondaires masquent des lignes (affichage), sans toucher aux scores ni aux rangs.
   function visibleRows(){
     const needle=tableState.query.trim().toLocaleLowerCase('fr');
-    const found=needle?intrinsicRows.filter(r=>(r.symbol+' '+r.name+' '+(r.isin||'')).toLocaleLowerCase('fr').includes(needle)):intrinsicRows;
-    const base=tableState.outside||needle?found:found.filter(admitted);          // une recherche porte sur tous les titres notés, hors stratégie compris
+    const base=needle?intrinsicRows.filter(r=>(r.symbol+' '+r.name+' '+(r.isin||'')).toLocaleLowerCase('fr').includes(needle)):intrinsicRows;
     return {base,rows:applySecondary(base)};
   }
   function spark(row){
@@ -357,32 +351,38 @@
     $('#ct-columns').innerHTML=columns.map((l,i)=>`<label class="ct-option"><input type="checkbox" data-column="${i}" ${state.columns.includes(i)?'checked':''} ${i===0?'disabled':''}>${l}</label>`).join('');
     renderRanking();
   }
-  const rankKey=()=>tableState.sort==='simple'?'rankSimple':'rankComplex';
+  const scoreKeyOf=()=>tableState.sort==='complex'?'complex':tableState.sort==='simple'?'simple':defaultSort;     // score dont le rang est affiché
+  const rankKey=()=>scoreKeyOf()==='simple'?'rankSimple':'rankComplex';
+  const posKey=()=>scoreKeyOf()==='simple'?'posSimple':'posComplex';
+  const tieKey=()=>scoreKeyOf()==='simple'?'tieSimple':'tieComplex';
+  const rankCell=row=>{const r=row[rankKey()];return r==null?'—':row[tieKey()]>1?`<span title="Ex æquo : ${row[tieKey()]} titres ont exactement ce score">=${r}</span>`:String(r);};
   function renderRanking(){
     if(loading){$('#ct-table-body').innerHTML='<tr class="ct-loading"><td colspan="20"><span class="spinner"></span> Chargement des titres…</td></tr>';$('#ct-empty-results').hidden=true;$('#ct-result-count').textContent='';return;}
     const selected=columnKeys.map((key,i)=>({key,i,label:columnTitles[i]})).filter(x=>state.columns.includes(x.i));
     const {base,rows:filtered}=visibleRows();
     const rows=[...filtered].sort((a,b)=>{
-      const av=a[tableState.sort],bv=b[tableState.sort];
+      const isScore=tableState.sort==='simple'||tableState.sort==='complex';
+      const av=isScore?(a[posKey()]==null?null:-a[posKey()]):a[tableState.sort],bv=isScore?(b[posKey()]==null?null:-b[posKey()]):b[tableState.sort];
       if((av===null||av===undefined)&&!(bv===null||bv===undefined))return 1;if((bv===null||bv===undefined)&&!(av===null||av===undefined))return -1;
       const compare=(av===null||av===undefined)?0:typeof av==='string'?av.localeCompare(bv,'fr'):av-bv;
-      return (tableState.direction==='asc'?compare:-compare)||(a.rankComplex??1e9)-(b.rankComplex??1e9)||a.id-b.id;
+      return (tableState.direction==='asc'?compare:-compare)||(a[posKey()]??1e9)-(b[posKey()]??1e9)||a.id-b.id;
     });
     const pages=Math.max(1,Math.ceil(rows.length/tableState.pageSize));tableState.page=Math.min(Math.max(1,tableState.page),pages);
     const start=(tableState.page-1)*tableState.pageSize,pageRows=rows.slice(start,start+tableState.pageSize);
-    $('#ct-result-count').textContent=loadError?'':`${num0(rows.length)} titres`+(rows.length!==intrinsicRows.length?` sur ${num0(intrinsicRows.length)} notés`:'');
+    $('#ct-result-count').textContent=loadError?'':`${num0(rows.length)} titre${rows.length>1?'s':''}`+(rows.length!==intrinsicRows.length?` sur ${num0(intrinsicRows.length)} évalués`:'');
     $('#ct-table-head').innerHTML=`<th scope="col" class="ct-rank-cell" title="Rang général sur tous les titres notés (${tableState.sort==='simple'?'score simple':'score complexe'}), conservé lors du filtrage">#</th>`+selected.map(({key,label})=>`<th scope="col" class="${key==='name'?'ct-name-heading':''}" ${key!=='trend'?`aria-sort="${key===tableState.sort?(tableState.direction==='asc'?'ascending':'descending'):'none'}"`:''}>${key!=='trend'?`<button type="button" data-sort-column="${key}" aria-label="Trier par ${esc(label)}">${label}${key===tableState.sort?(tableState.direction==='asc'?' ↑':' ↓'):''}</button>`:label}</th>`).join('');
-    $('#ct-table-body').innerHTML=pageRows.map(row=>`<tr data-row="${row.id}"><td class="ct-rank-cell" data-label="Rang">${row[rankKey()]??'—'}</td>${selected.map(({key,label})=>`<td class="ct-cell-${key}" data-label="${esc(label)}">${rowCell(row,key)}</td>`).join('')}</tr>`).join('');
+    $('#ct-table-body').innerHTML=pageRows.map(row=>`<tr data-row="${row.id}"><td class="ct-rank-cell" data-label="Rang">${rankCell(row)}</td>${selected.map(({key,label})=>`<td class="ct-cell-${key}" data-label="${esc(label)}">${rowCell(row,key)}</td>`).join('')}</tr>`).join('');
     $('#ct-empty-results').hidden=rows.length!==0||!!loadError;
-    const hiddenByStrategy=intrinsicRows.length-base.length;
-    $('#ct-strategy-count').textContent=loadError?'':tableState.query.trim()?`Recherche sur tous les titres notés, stratégie non appliquée : ${num0(base.length)} correspondance${base.length>1?'s':''}.`:tableState.outside?`Tous les titres notés sont affichés (${num0(base.length)}).`:`${num0(base.length)} titres répondent à la stratégie « ${names[state.strategy]||''} » ; ${num0(hiddenByStrategy)} ne la satisfont pas ou n’ont pas assez de données.`;
-    if(!loadError&&scoreLabel)$('#ct-strategy-count').textContent+=` Scores : ${scoreLabel}.`;
+    const searched=!!tableState.query.trim(),masked=base.length-filtered.length,unevaluated=Math.max(0,universe-intrinsicRows.length);
+    $('#ct-strategy-count').textContent=loadError?'':`${num0(intrinsicRows.length)} titres évalués · ${num0(unevaluated)} non évaluables (données insuffisantes) · ${num0(masked)} masqués par vos filtres · ${num0(filtered.length)} affichés${searched?` (recherche : ${num0(base.length)} correspondances)`:''}. Aucun titre n’est exclu par la stratégie.${scoreLabel?` Stratégie : ${scoreLabel}.`:''}`;
+    $('#ct-masked-count').textContent=`${num0(masked)} titre${masked>1?'s':''} masqué${masked>1?'s':''}`;
+    $('#ct-masked-count').classList.toggle('has-hidden',masked>0);
     $('#ct-page-range').textContent=loadError?loadError:rows.length?`Affichage de ${start+1} à ${Math.min(start+tableState.pageSize,rows.length)} sur ${rows.length} titres`:'Aucun titre visible';
     $('#ct-pages').innerHTML=`<button type="button" data-demo-page="${tableState.page-1}" ${tableState.page===1?'disabled':''} aria-label="Page précédente">‹</button>${Array.from({length:Math.min(pages,9)},(_,i)=>{const n=pages<=9?i+1:Math.min(Math.max(1,tableState.page-4),pages-8)+i;return `<button type="button" data-demo-page="${n}" ${tableState.page===n?'aria-current="page"':''} aria-label="Page ${n}">${n}</button>`;}).join('')}<button type="button" data-demo-page="${tableState.page+1}" ${tableState.page===pages?'disabled':''} aria-label="Page suivante">›</button>`;
-    $('#ct-sort').value=tableState.sort;$('#ct-page-size').value=String(tableState.pageSize);$('#ct-show-outside').checked=tableState.outside;
+    $('#ct-sort').value=tableState.sort;$('#ct-page-size').value=String(tableState.pageSize);
     $('#ct-sort-direction').textContent=tableState.direction==='desc'?'↓':'↑';$('#ct-sort-direction').setAttribute('aria-label',`Passer au tri ${tableState.direction==='desc'?'croissant':'décroissant'}`);
   }
-  function sortBy(key){tableState.direction=tableState.sort===key?(tableState.direction==='desc'?'asc':'desc'):(key==='name'||key==='market'||key==='sector'?'asc':'desc');tableState.sort=key;tableState.page=1;renderRanking();}
+  function sortBy(key){tableState.userSorted=true;tableState.direction=tableState.sort===key?(tableState.direction==='desc'?'asc':'desc'):(key==='name'||key==='market'||key==='sector'?'asc':'desc');tableState.sort=key;tableState.page=1;renderRanking();}
   function render() {
     renderStrategies();
     document.querySelectorAll('[data-mode]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.mode===state.mode));
@@ -467,17 +467,16 @@
     const nxt=enabledIds().filter(x=>x!==id)[0]||'fast';overrides=ovBy[nxt];state.strategy=nxt;switchTo(nxt);feedback(`Stratégie « ${label} » supprimée.`);
   });
   $('#ct-search').value=tableState.query;$('#ct-search').oninput=e=>{tableState.query=e.target.value;tableState.page=1;renderRanking();};
-  $('#ct-show-outside').onchange=e=>{tableState.outside=e.target.checked;tableState.page=1;renderRanking();};
-  $('#ct-sort').onchange=e=>{tableState.sort=e.target.value;tableState.direction=['name','market','sector'].includes(e.target.value)?'asc':'desc';tableState.page=1;renderRanking();};
+  $('#ct-sort').onchange=e=>{tableState.userSorted=true;tableState.sort=e.target.value;tableState.direction=['name','market','sector'].includes(e.target.value)?'asc':'desc';tableState.page=1;renderRanking();};
   $('#ct-sort-direction').onclick=()=>{tableState.direction=tableState.direction==='desc'?'asc':'desc';tableState.page=1;renderRanking();};
   $('#ct-page-size').onchange=e=>{tableState.pageSize=Number(e.target.value);tableState.page=1;renderRanking();};
-  $('#ct-show-demo-all').onclick=()=>{tableState.outside=true;tableState.page=1;state.filters=secondary.all(categories);for(const k of Object.keys(categories))saveLocalSelection(k);renderFilters();};
+  $('#ct-show-demo-all').onclick=()=>{tableState.query='';const q=$('#ct-search');if(q)q.value='';tableState.page=1;state.filters=secondary.all(categories);for(const k of Object.keys(categories))saveLocalSelection(k);renderFilters();};
   $('#ct-apply').onclick=()=>feedback('Réglages conservés. Le tableau présente des données fictives, indépendantes de la stratégie.');
   let loadSeq=0;
   async function loadRows(){
     const my=++loadSeq,want=state.strategy;loading=true;
     $('#ct-table-body').innerHTML='<tr class="ct-loading"><td colspan="20"><span class="spinner"></span> Chargement des titres…</td></tr>';
-    try{const data=await J.api('ranking/table',{params:{strategy:want}});if(my!==loadSeq)return;intrinsicRows=data.rows.map(toRow);loadError=null;scoreLabel=data.label||'';loading=false;}
+    try{const data=await J.api('ranking/table',{params:{strategy:want}});if(my!==loadSeq)return;intrinsicRows=data.rows.map(toRow);universe=data.universe||intrinsicRows.length;defaultSort=data.default_sort==='complex'?'complex':'simple';if(!tableState.userSorted){tableState.sort=defaultSort;tableState.direction='desc';}loadError=null;scoreLabel=data.label||'';loading=false;}
     catch(e){if(my!==loadSeq)return;intrinsicRows=[];loadError='Classement indisponible : '+(e.message||'erreur de chargement');loading=false;}
     renderRanking();
   }

@@ -511,7 +511,7 @@ def _rank_of(book, lid):
 def _suggestions(conn, book, n=8, sessions=0):
     """Titres les mieux notés (score simple), avec leurs deux scores, leur rang et leur courbe."""
     ranks = _ranks(book, 'simple')
-    top = sorted((e for e in book.values() if e['simple'] is not None), key=lambda e: (-e['simple'], e['id']))[:n]
+    top = ordered(book, 'simple')[0][:n]
     info = _titles(conn, [e['id'] for e in top])
     curves = series(conn, [e['id'] for e in top], sessions)
     return [dict(id=e['id'], symbol=info[e['id']]['symbol'], mic=info[e['id']]['mic'], name=info[e['id']]['name'], simple=e['simple'], complex=e['complex'],
@@ -568,29 +568,6 @@ def monitor(conn):
             'liquidity': coverage(conn), 'problems': problems, 'volume_collection': bool(settings.get(conn, 'volume_collection', False))}
 
 
-# ───────────── conformité (aperçu sur les données réelles) ─────────────
-
-def conformity(conn, request):
-    """Effet des seuils d'un profil sur les titres réels : conformes / écartés / non évaluables. Les titres écartés gardent leurs deux scores (calculés hors filtres)."""
-    refresh(conn)
-    from . import service
-    name = request.get('strategy')
-    if not known(name):
-        raise ValueError('Stratégie V4 inconnue')
-    draft = request.get('draft') or {}
-    cfg = build_config(conn, name, draft.get('profile'), draft.get('global'))
-    verdicts = service.judge_universe(conn, cfg)
-    book = score_service.score_book(conn, cfg, service.data_version(conn))
-    counts = {'retained': 0, 'rejected': 0, 'unknown': 0}
-    kept = 0
-    for v in verdicts:
-        counts[v['status']] = counts.get(v['status'], 0) + 1
-        b = book.get(v['key'])
-        if v['status'] == 'rejected' and b and b['simple'] is not None and b['complex'] is not None:
-            kept += 1
-    return {'universe': len(verdicts), 'counts': counts, 'rejected_with_both_scores': kept, 'rated': len(book)}
-
-
 # ───────────── classement général (résultat principal du moteur) ─────────────
 
 BUCKETS = 10
@@ -630,8 +607,16 @@ def _book_summary(book, threshold, universe):
     return out
 
 
+def ordered(book, key):
+    """Source unique de l'ordre et des rangs d'un score (simple ou complexe) : (entrées triées, {id: rang}, {id: position}).
+    Ordre : score décroissant, puis l'autre score, puis l'identifiant. Rang commun uniquement pour des scores bruts strictement identiques."""
+    other = 'complex' if key == 'simple' else 'simple'
+    order, ranks = SC.rank_order({l: e[key] for l, e in book.items()}, {l: e[other] for l, e in book.items()})
+    return [book[l] for l in order], ranks, {l: i for i, l in enumerate(order, 1)}
+
+
 def _ranks(book, key):
-    return {lid: i for i, lid in enumerate(sorted((l for l, e in book.items() if e[key] is not None), key=lambda l: (-book[l][key], l)), 1)}
+    return ordered(book, key)[1]
 
 
 def _movement(saved, draft, key, top=20):
@@ -646,10 +631,11 @@ def _movement(saved, draft, key, top=20):
 
 
 def _top(conn, book, key, n=10):
-    ranked = sorted((e for e in book.values() if e[key] is not None), key=lambda e: (-e[key], e['id']))[:n]
+    entries, ranks, _ = ordered(book, key)
+    ranked = entries[:n]
     info = _titles(conn, [e['id'] for e in ranked])
-    return [dict(rank=i, id=e['id'], symbol=info[e['id']]['symbol'], name=info[e['id']]['name'], score=e[key], other=e['complex' if key == 'simple' else 'simple'],
-                 status=e[key + '_status']) for i, e in enumerate(ranked, 1) if e['id'] in info]
+    return [dict(rank=ranks[e['id']], id=e['id'], symbol=info[e['id']]['symbol'], name=info[e['id']]['name'], score=e[key], other=e['complex' if key == 'simple' else 'simple'],
+                 status=e[key + '_status']) for e in ranked if e['id'] in info]
 
 
 PAGE = 25
@@ -708,8 +694,7 @@ def _granularity(params):
 def _listing(conn, book, which, category, offset, limit, cats, sessions):
     """Classement d'un score, éventuellement restreint à une catégorie de note. Le rang est le rang GÉNÉRAL (sur tous les titres notés) : une catégorie ne le change pas."""
     key = 'simple' if which == 'simple' else 'complex'
-    ranked = sorted((e for e in book.values() if e[key] is not None), key=lambda e: (-e[key], e['id']))
-    rank_of = {e['id']: i for i, e in enumerate(ranked, 1)}
+    ranked, rank_of, _ = ordered(book, key)
     counts = {c['id']: 0 for c in cats}
     for e in ranked:
         cid = score_categories.assign(e[key], cats)

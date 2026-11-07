@@ -280,7 +280,7 @@ def test_strategies_current_profile_always_carries_sessions():
 
 
 def test_classement_proposes_every_v4_strategy():
-    """Chaque stratégie V4 de l'administration a son entrée dans le Classement, avec la même admission que le moteur."""
+    """Chaque stratégie V4 de l'administration a son entrée dans le Classement, avec les mêmes périodes que le moteur et sans seuil d'exclusion."""
     import os
     import re
     root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -296,6 +296,4 @@ def test_classement_proposes_every_v4_strategy():
         per = {k: [float(x) for x in v.split(',')] for k, v in re.findall(r"(\w+):\[([^\]]*)\]", m.group(1))}
         engine = {p['id']: p for p in A.V4_STRATEGIES[name]['build']()['periods'] if p['enabled']}
         assert set(per) == set(engine) - ({'half'} if name == 'rebound' else set()), ct_id          # mêmes périodes (Rebond : le semestre n'est qu'un contexte)
-        for k, (slope, r2) in per.items():
-            if engine[k].get('min_slope') is not None:
-                assert (slope, r2) == (engine[k]['min_slope'], engine[k]['min_r2']), (ct_id, k)       # mêmes seuils d'admission que la stratégie de scores
+        assert all(v == [0.0, 0.0] for v in per.values()), ct_id                                  # aucun seuil dupliqué dans la page : le moteur note tous les titres

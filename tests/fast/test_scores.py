@@ -543,3 +543,21 @@ def test_complex_score_stays_within_0_and_100_whatever_data_is_missing():
 
 def test_score_version_changes_so_cached_scores_are_recomputed():
     assert SC.VERSION >= 5
+
+
+def test_rank_order_shares_rank_only_for_strictly_identical_raw_scores():
+    scores = {1: 50.0, 2: 50.0, 3: 50.004, 4: 10.0, 5: None}
+    order, ranks = SC.rank_order(scores)
+    assert order == [3, 1, 2, 4]
+    assert ranks == {3: 1, 1: 2, 2: 2, 4: 4}          # 50.004 et 50.0 s'affichent pareil mais ne sont pas ex æquo
+
+
+def test_rank_order_secondary_score_then_numeric_id_make_the_order_deterministic():
+    scores = {10: 40.0, 9: 40.0, 11: 40.0}
+    order, _ = SC.rank_order(scores, {10: 5.0, 9: 5.0, 11: 80.0})
+    assert order == [11, 9, 10]                         # autre score d'abord, puis identifiant numérique (9 avant 10)
+    assert SC.rank_order(dict(reversed(list(scores.items()))), {10: 5.0, 9: 5.0, 11: 80.0})[0] == order
+
+
+def test_rank_positions_stays_the_legacy_position_rank():
+    assert SC.rank_positions({2: 9.0, 4: 7.0, 1: 7.0, 3: None}) == {2: 1, 1: 2, 4: 3}

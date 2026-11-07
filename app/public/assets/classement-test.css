@@ -321,14 +321,7 @@ a.ct-company:hover b,a.ct-company:focus-visible b{text-decoration:underline}
 .ct-kind{font-style:normal;font-size:9px;font-weight:700;letter-spacing:.04em;background:var(--surface-2);border:1px solid var(--line);border-radius:5px;padding:1px 5px;margin-left:4px;color:var(--muted)}
 .ct-kind.held{color:var(--ct-accent);border-color:var(--ct-accent)}
 .ct-score{font-weight:700}
-.ct-outside{display:inline-flex;gap:8px;align-items:center;height:34px;padding:0 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);font-size:12px;font-weight:600;white-space:nowrap;cursor:pointer;user-select:none}
-.ct-outside{position:relative}.ct-outside input{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer}
-.ct-switch{position:relative;width:30px;height:17px;border-radius:999px;background:#b9b6cc;transition:background .15s;flex:none}
-.ct-switch::after{content:"";position:absolute;top:2px;left:2px;width:13px;height:13px;border-radius:50%;background:#fff;transition:transform .15s}
-.ct-outside input:checked+.ct-switch{background:var(--ct-accent)}
-.ct-outside input:checked+.ct-switch::after{transform:translateX(13px)}
-.ct-outside:has(input:focus-visible){outline:3px solid var(--ct-accent);outline-offset:2px}
-@media(max-width:700px){.ct-ranking-controls{grid-template-areas:"search search search" "sort sort dir" "cols size size" "outside outside outside"}.ct-ranking-controls .ct-search{grid-area:search}.ct-outside{grid-area:outside;height:40px;font-size:13px;justify-content:flex-start}}
+@media(max-width:700px){.ct-ranking-controls{grid-template-areas:"search search search" "sort sort dir" "cols size size"}.ct-ranking-controls .ct-search{grid-area:search}}
 #ct-strategy-count{font-weight:600}
 .ct table td.ct-cell-market,.ct table td.ct-cell-sector{text-align:left}
 .ct-search input{min-width:240px;max-width:100%;background:var(--surface);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:9px 12px}
@@ -353,4 +346,25 @@ a.ct-company:hover b,a.ct-company:focus-visible b{text-decoration:underline}
   .ct .ct-strategy .ct-strategy-state{flex:1 1 100%}
   .ct .ct-strategy .ct-strategy-tools .btn,.ct .ct-strategy .ct-fold{flex:1 1 calc(50% - 8px);height:42px;font-size:13px;margin:0}
   .ct .ct-strategy .ct-fold{flex-basis:100%}
+}
+
+/* ── Harmonisation des commandes (dernier bloc, prioritaire) : même hauteur, même corps de texte, même rayon pour boutons, champs et listes ── */
+.ct{--ct-control-h:36px;--ct-control-fs:13px;--ct-control-r:8px}
+.ct .ct-ranking-controls select,.ct .ct-ranking-controls .btn,.ct .ct-ranking-controls summary,.ct .ct-search input,
+.ct .ct-filter-actions .btn,.ct .ct-strategy .ct-strategy-tools .btn,.ct .ct-strategy .ct-fold,.ct .ct-strategy select{box-sizing:border-box;height:var(--ct-control-h);min-height:var(--ct-control-h);font-size:var(--ct-control-fs);border-radius:var(--ct-control-r);line-height:1.2}
+.ct .ct-ranking-controls .btn,.ct .ct-ranking-controls summary,.ct .ct-filter-actions .btn,.ct .ct-strategy .ct-strategy-tools .btn,.ct .ct-strategy .ct-fold{display:inline-flex;align-items:center;justify-content:center;padding:0 12px;white-space:nowrap}
+.ct .ct-ranking-controls select,.ct .ct-strategy select{padding:0 32px 0 12px;font-weight:600}
+.ct .ct-search input{padding:0 12px;width:100%}
+.ct .ct-ranking-controls,.ct .ct-filter-actions,.ct .ct-strategy-tools{gap:8px}
+.ct .ct-multi-trigger{min-height:var(--ct-control-h);font-size:var(--ct-control-fs)!important;border-radius:var(--ct-control-r)}
+.ct #ct-masked-count,.ct #ct-filter-summary{font-size:12px}
+.ct-ranking-note{overflow-wrap:anywhere}
+@media(max-width:700px){
+  .ct{--ct-control-h:44px;--ct-control-fs:16px}
+  .ct .ct-ranking-controls .btn,.ct .ct-ranking-controls summary,.ct .ct-filter-actions .btn,.ct .ct-strategy .ct-strategy-tools .btn,.ct .ct-strategy .ct-fold{font-size:14px;padding:0 10px}
+  .ct .ct-filter-actions{flex-wrap:wrap;justify-content:flex-end}
+  .ct .ct-filter-actions .btn{flex:1 1 calc(50% - 8px)}
+  .ct .ct-ranking-controls #ct-sort-direction{padding:0;font-size:18px}
+  .ct .ct-multi-trigger{min-height:var(--ct-control-h)}
+  .ct .ct-ranking-controls,.ct .ct-ranking-controls>*{min-width:0;max-width:100%}
 }

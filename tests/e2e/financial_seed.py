@@ -4,7 +4,7 @@ from engine.shared.db import connect
 from tests.dbutil import reset_data
 from engine.analytics.compute import compute_all
 con=connect();reset_data(con)
-dates=[];d=dt.date(2026,10,28)
+dates=[];d=dt.date.today()
 while len(dates)<400:
     if d.weekday()<5:dates.append(d)
     d-=dt.timedelta(days=1)

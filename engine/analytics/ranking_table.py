@@ -64,6 +64,14 @@ def _fetch(conn, ids):
     return out
 
 
+def _ties(ranks):
+    """{rang: nombre de titres à ce rang} (1 = rang unique)."""
+    out = {}
+    for r in ranks.values():
+        out[r] = out.get(r, 0) + 1
+    return out
+
+
 def table(conn, request):
     """Toutes les lignes du classement, avec scores et rangs généraux (indépendants des filtres, du tri et de la page)."""
     scores_admin.refresh(conn)
@@ -76,10 +84,9 @@ def table(conn, request):
     cfg = scores_admin.build_config(conn, name)
     book = score_service.score_book(conn, cfg, service.data_version(conn))
     ids = sorted(book)
-    simple = sorted((e for e in book.values() if e['simple'] is not None), key=lambda e: (-e['simple'], e['id']))
-    complex_ = sorted((e for e in book.values() if e['complex'] is not None), key=lambda e: (-e['complex'], e['id']))
-    rank_s = {e['id']: i for i, e in enumerate(simple, 1)}
-    rank_c = {e['id']: i for i, e in enumerate(complex_, 1)}
+    simple, rank_s, pos_s = scores_admin.ordered(book, 'simple')            # même fonction que l'administration des scores : même ordre, mêmes rangs
+    complex_, rank_c, pos_c = scores_admin.ordered(book, 'complex')
+    tie_s, tie_c = _ties(rank_s), _ties(rank_c)
     data = _fetch(conn, ids) if ids else {}
     curves = scores_admin.series(conn, ids, REFERENCE) if ids else {}
     rates = latest_rates(conn)
@@ -87,7 +94,7 @@ def table(conn, request):
     rows = []
     for lid in ids:
         d, e = data.get(lid) or {}, book[lid]
-        if not d:
+        if not d or (e['simple'] is None and e['complex'] is None):
             continue
         m = d.get('m') or {}
         mo = m.get(REFERENCE) or {}
@@ -113,5 +120,10 @@ def table(conn, request):
             'turnover_eur': _num(d.get('turnover_eur')), 'liquidity_source': d.get('liquidity_source'), 'avg_volume': _num(d.get('avg_volume_3m')),
             'analyst': d.get('analyst_rating'), 'quality': d.get('quality'),
             'simple': _num(e['simple']), 'complex': _num(e['complex']), 'simple_status': e['simple_status'], 'complex_status': e['complex_status'],
-            'rank_simple': rank_s.get(lid), 'rank_complex': rank_c.get(lid), 'curve': [round(x, 2) for x in curves.get(lid, [])], 'extra': extra})
-    return {'strategy': name, 'label': scores_admin.spec(name)['label'], 'reference_sessions': REFERENCE, 'universe': len(rows), 'scored': {'simple': len(simple), 'complex': len(complex_)}, 'rows': rows}
+            'rank_simple': rank_s.get(lid), 'rank_complex': rank_c.get(lid), 'pos_simple': pos_s.get(lid), 'pos_complex': pos_c.get(lid),
+            'tie_simple': tie_s.get(rank_s.get(lid), 1), 'tie_complex': tie_c.get(rank_c.get(lid), 1), 'curve': [round(x, 2) for x in curves.get(lid, [])], 'extra': extra})
+    with conn.cursor() as cur:
+        cur.execute('SELECT COUNT(*) AS n FROM v_recommendable')
+        universe = int(cur.fetchone()['n'])
+    return {'strategy': name, 'label': scores_admin.spec(name)['label'], 'reference_sessions': REFERENCE, 'universe': universe, 'evaluated': len(rows),
+            'scored': {'simple': len(simple), 'complex': len(complex_)}, 'default_sort': cfg['ranking']['sort'] if (cfg.get('ranking') or {}).get('sort') in ('simple', 'complex') else 'simple', 'rows': rows}

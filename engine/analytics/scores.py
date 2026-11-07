@@ -286,7 +286,26 @@ def _complex(avail, comps, weights, eff, period_cover, liquidity_score, threshol
             'raw_total': 100 * base, 'contributions': contributions}
 
 
+def _id_key(k):
+    """Clé de départage déterministe : identifiants numériques dans l'ordre numérique, le reste dans l'ordre du texte."""
+    return (0, k, '') if isinstance(k, int) else (1, 0, str(k))
+
+
+def rank_order(scores, others=None, common=True):
+    """{clé: score|None} → (ordre, rangs). Ordre : score décroissant, puis l'autre score décroissant, puis l'identifiant (stable, indépendant des filtres).
+    Rang : avec `common`, 1 + nombre de scores strictement plus grands (valeurs brutes, pas arrondies) : les ex æquo réels partagent le rang ; sinon rang = position."""
+    others = others or {}
+    known = [(k, v) for k, v in scores.items() if v is not None]
+    known.sort(key=lambda kv: (-kv[1], -(others.get(kv[0]) if others.get(kv[0]) is not None else float('-inf')), _id_key(kv[0])))
+    ranks, last, rank = {}, None, 0
+    for pos, (k, v) in enumerate(known, 1):
+        if not common or last is None or v != last:
+            rank = pos
+        last = v
+        ranks[k] = rank
+    return [k for k, _ in known], ranks
+
+
 def rank_positions(scores):
-    """{clé: score|None} → {clé: rang 1..N} sur les seuls scores connus, ex æquo départagés par la clé (stable, indépendant des filtres)."""
-    known = sorted(((k, v) for k, v in scores.items() if v is not None), key=lambda kv: (-kv[1], str(kv[0])))
-    return {k: i for i, (k, _) in enumerate(known, 1)}
+    """{clé: score|None} → {clé: rang 1..N} sur les seuls scores connus (rang = position). Usage historique (fiche titre)."""
+    return rank_order(scores, common=False)[1]
