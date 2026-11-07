@@ -8,7 +8,7 @@ import copy
 
 from engine.shared import settings
 
-from . import explorer_config as C, score_categories, score_service, scores as SC, strategy as LEGACY
+from . import criteria as _CR, explorer_config as C, score_categories, score_service, scores as SC, strategy as LEGACY
 
 PROFILES = 'scores_profiles'
 SCORING_PERIODS = tuple(p for p in C.PERIODS if C.SESSIONS[p] >= SC.MIN_SESSIONS)
@@ -697,7 +697,7 @@ def _granularity(params):
     return max((p['sessions'] for p in params['periods']), default=0)
 
 
-def _listing(conn, book, which, category, offset, limit, cats, sessions):
+def _listing(conn, book, which, category, offset, limit, cats, sessions, statuses=None, verdict='all'):
     """Classement d'un score, éventuellement restreint à une catégorie de note. Le rang est le rang GÉNÉRAL (sur tous les titres notés) : une catégorie ne le change pas."""
     key = 'simple' if which == 'simple' else 'complex'
     ranked, rank_of, _ = ordered(book, key)
@@ -706,16 +706,39 @@ def _listing(conn, book, which, category, offset, limit, cats, sessions):
         cid = score_categories.assign(e[key], cats)
         if cid in counts:
             counts[cid] += 1
-    chosen = [e for e in ranked if category in (None, '') or score_categories.assign(e[key], cats) == category]
+    scoped = [e for e in ranked if category in (None, '') or score_categories.assign(e[key], cats) == category]
+    scope_counts = _CR.counts((statuses or {}).get(e['id'], _CR.UNDETERMINED) for e in scoped) if statuses is not None else None
+    chosen = [e for e in scoped if verdict == 'all' or statuses is None or statuses.get(e['id'], _CR.UNDETERMINED) == verdict]
     page = chosen[offset:offset + limit]
     info = _titles(conn, [e['id'] for e in page])
     curves = series(conn, [e['id'] for e in page], sessions)
     rows = [dict(rank=rank_of[e['id']], id=e['id'], symbol=info[e['id']]['symbol'], mic=info[e['id']]['mic'], name=info[e['id']]['name'], kind=info[e['id']]['kind'],
-                 simple=e['simple'], complex=e['complex'], simple_status=e['simple_status'], complex_status=e['complex_status'],
+                 status=(statuses or {}).get(e['id']), simple=e['simple'], complex=e['complex'], simple_status=e['simple_status'], complex_status=e['complex_status'],
                  coverage=e[key + '_coverage'], curve=curves.get(e['id'], [])) for e in page if e['id'] in info]
-    return {'which': key, 'category': category or None, 'total': len(chosen), 'offset': offset, 'rows': rows,
+    return {'which': key, 'category': category or None, 'verdict': verdict, 'counts': scope_counts, 'total': len(chosen), 'offset': offset, 'rows': rows,
             'categories': [dict(id=c['id'], name=c['name'], color=c.get('color'), min=c.get('min'), max=c.get('max'), minIncluded=c.get('minIncluded'), maxIncluded=c.get('maxIncluded'),
                                 count=counts.get(c['id'], 0)) for c in cats if not c.get('unknown')]}
+
+
+def _ct_id(name):
+    """Identifiant du Classement correspondant à une stratégie V4 (intégrée ou personnelle `ct:<utilisateur>:<id>`), ou None."""
+    for ct_id, n in CT_BUILTIN.items():
+        if n == name:
+            return ct_id
+    parts = name.split(':')
+    return parts[2] if len(parts) == 3 and parts[0] == 'ct' else None
+
+
+def _statuses(conn, book, name, request):
+    """Statut de stratégie (critères de recherche) de chaque titre noté : même moteur que le Classement et la fiche. Ne touche ni scores ni rangs."""
+    from . import ranking_table
+    ct_id = _ct_id(name)
+    spec = (request.get('ct_specs') or {}).get(ct_id) if ct_id else None
+    norm = ranking_table.norm_of({'ct_id': ct_id, 'spec': spec})
+    ids = ranking_table.evaluable(book)
+    data = ranking_table._fetch(conn, ids) if ids else {}
+    out = {i: _CR.evaluate(norm, {'m': (data.get(i) or {}).get('m'), 'avg_volume': (data.get(i) or {}).get('avg_volume_3m')})['status'] for i in ids}
+    return out, ('missing' if norm is None else 'ok')
 
 
 def ranking(conn, request):
@@ -746,7 +769,10 @@ def ranking(conn, request):
     off = max(0, int(request.get('offset') or 0))
     lim = max(1, min(100, int(request.get('limit') or PAGE)))
     out['granularity'] = {'sessions': sessions, 'periods': [dict(id=p['id'], sessions=p['sessions']) for p in params['periods']]}
-    out['listing'] = _listing(conn, book, which, cat if isinstance(cat, str) else None, off, lim, cats, sessions)
+    statuses, context = _statuses(conn, book, name, request)
+    verdict = request.get('verdict') if request.get('verdict') in (_CR.RETAINED, _CR.EXCLUDED, _CR.UNDETERMINED) else 'all'
+    out['listing'] = _listing(conn, book, which, cat if isinstance(cat, str) else None, off, lim, cats, sessions, statuses, verdict)
+    out['listing']['context'] = context
     if draft:
         saved_book = score_service.score_book(conn, build_config(conn, name), version)
         out['compared'] = {k: _movement(saved_book, book, k) for k in ('simple', 'complex')}

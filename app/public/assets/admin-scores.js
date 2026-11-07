@@ -30,7 +30,7 @@
   const fmt = (v, d = 1) => v === null || v === undefined ? '—' : J.num(v, d);
   const clone = o => JSON.parse(JSON.stringify(o));
 
-  let root, S, draft, savedJson, sel, rkWhich = 'simple', rkCat = null, rkMore = false, rank = null, confBusy = false, confFail = false, confStale = false, tab = 'config', scoreTab = 'simple', mon = null, monErr = null, sim = null, simWin = 0, simBusy = false, simQ = '', useDraft = true, error = '';
+  let root, S, draft, savedJson, sel, rkWhich = 'simple', rkCat = null, rkVerdict = 'all', rkMore = false, rank = null, confBusy = false, confFail = false, confStale = false, tab = 'config', scoreTab = 'simple', mon = null, monErr = null, sim = null, simWin = 0, simBusy = false, simQ = '', useDraft = true, error = '';
   const autoCache = {};
 
   const v4 = () => S.strategies.filter(s => s.engine === 'v4');
@@ -281,9 +281,14 @@
   function chartLeave() { if (!chart || !$('#as-cur')) return; $('#as-cur').style.display = $('#as-dot').style.display = 'none'; $('#as-read').innerHTML = readout(chart.pts.length - 1); }
   const scoreCell = (v, st, main) => `<span class="as-sc ${main ? 'main' : ''}">${v === null || v === undefined ? '<span class="muted">inconnu</span>' : `<b>${fmt(v, 1)}</b>`}<span class="as-flag" ${st === 'partiel' ? 'title="Note calculée sur des données incomplètes (une période ou une mesure manque) : les poids restent répartis sur les composantes disponibles." aria-label="données incomplètes"' : 'aria-hidden="true"'}>${st === 'partiel' ? '*' : ''}</span></span>`;
   // Une ligne de classement : rang, nom, courbe, scores à droite. `which` met en avant le score qui sert au classement.
+  // Statut de stratégie (critères de recherche) : même moteur que le Classement et la fiche ; il ne change ni la note ni le rang.
+  const STATUS = { retained: ['Retenue', 'ok'], excluded: ['Exclue', 'no'], undetermined: ['Indéterminée', 'na'] };
+  const statusBadge = st => { if (!st) return ''; const [t, k] = STATUS[st] || STATUS.undetermined; return `<i class="as-status ${k}" title="Statut de la stratégie : ${t.toLowerCase()}. Détail dans la fiche du titre.">${t}</i>`; };
+  const verdictBar = (n) => `<div class="seg" role="radiogroup" aria-label="Statut de stratégie : titres affichés">${[['retained', 'Retenues'], ['excluded', 'Exclues'], ['all', 'Toutes']].map(([k, l]) => `<button data-a="rk-verdict" data-v="${k}" role="radio" aria-checked="${rkVerdict === k}" class="${rkVerdict === k ? 'on' : ''}">${l} <b>${J.num(n ? n[k] : 0, 0)}</b></button>`).join('')}</div>${n && n.undetermined ? `<span class="as-hint" style="margin:0">${J.num(n.undetermined, 0)} indéterminé${n.undetermined > 1 ? 's' : ''} (données manquantes), visible${n.undetermined > 1 ? 's' : ''} dans « Toutes ».</span>` : ''}${c0ctx()}`;
+  const c0ctx = () => rank && rank.listing && rank.listing.context === 'missing' ? '<span class="as-hint" style="margin:0;color:var(--warn)">Critères de cette stratégie introuvables : statuts indéterminés.</span>' : '';
   function rowHtml(r, which, pick) {
     return `<div class="as-rk ${pick ? 'pick' : ''}" ${pick ? `data-a="sim-pick" data-id="${r.id}" tabindex="0" role="button"` : ''}><span class="as-rk-n">${r.rank ?? '—'}</span>
-      <span class="as-rk-name"><b>${E(r.symbol)}</b> <span class="muted">${E(r.name)}</span></span>${spark(r.curve)}
+      <span class="as-rk-name"><b>${E(r.symbol)}</b> <span class="muted">${E(r.name)}</span> ${statusBadge(r.status)}</span>${spark(r.curve)}
       <span class="as-rk-sc"><span class="as-rk-l">Simple</span>${scoreCell(r.simple, r.simple_status, which === 'simple')}<span class="as-rk-l">Complexe</span>${scoreCell(r.complex, r.complex_status, which === 'complex')}</span></div>`;
   }
   const stratPicker = () => `<select data-a="strategy" class="as-select" aria-label="Stratégie">${v4().map(s => `<option value="${E(s.name)}" ${s.name === sel ? 'selected' : ''}>${E(s.label)}</option>`).join('')}</select>`;
@@ -302,7 +307,7 @@
       ${confStale ? '<p class="as-hint" style="color:var(--warn)">Réglages modifiés depuis ce calcul : cliquez sur « Recalculer ».</p>' : ''}
       ${confBusy && !c ? '<div class="empty"><span class="spinner"></span></div>' : !c ? `<p class="muted">${confFail ? 'Calcul impossible : voir le message ci-dessus.' : 'Calcul au premier affichage.'}</p>` : s.universe === 0 ? '<div class="notice warn" style="margin-top:8px">Aucun titre dans cette base : rien à noter. Aucune valeur d’exemple n’est affichée.</div>' : `
         <p class="as-hint">Stratégie « ${E(st ? st.label : '')} » : ${granText(c.granularity)}. Tous les titres évaluables sont notés et classés, du meilleur au moins bon. Le rang est le rang général : choisir une catégorie ne le change pas.</p>
-        <div class="row between" style="flex-wrap:wrap;gap:8px"><div class="seg"><button data-a="rk-which" data-v="simple" class="${rkWhich === 'simple' ? 'on' : ''}">Classé par score simple</button><button data-a="rk-which" data-v="complex" class="${rkWhich === 'complex' ? 'on' : ''}">Classé par score complexe</button></div></div>
+        <div class="row between" style="flex-wrap:wrap;gap:8px"><div class="seg"><button data-a="rk-which" data-v="simple" class="${rkWhich === 'simple' ? 'on' : ''}">Classé par score simple</button><button data-a="rk-which" data-v="complex" class="${rkWhich === 'complex' ? 'on' : ''}">Classé par score complexe</button></div>${verdictBar(c.listing.counts)}</div>
         <div class="as-chips" style="margin:8px 0"><button class="btn small ${rkCat ? '' : 'primary'}" data-a="rk-cat" data-v="">Toutes <b>${J.num(c.listing.categories.reduce((a, x) => a + x.count, 0), 0)}</b></button>
           ${c.listing.categories.map(k => `<button class="btn small ${rkCat === k.id ? 'primary' : ''}" data-a="rk-cat" data-v="${E(k.id)}"><i class="as-dot" style="background:${E(k.color || '#999')}"></i> ${E(k.name)} <b>${J.num(k.count, 0)}</b></button>`).join('')}</div>
         <div class="as-rklist">${c.listing.rows.length ? c.listing.rows.map(r => rowHtml(r, rkWhich)).join('') : '<p class="muted">Aucun titre dans cette catégorie.</p>'}</div>
@@ -313,7 +318,7 @@
         <p class="as-hint">Moteur de notation version ${c.engine_version}. Poids réels des périodes : ${c.weights.map(w => `${E(labels()[w.id])} <b>${fmt(100 * w.weight, 1)} %</b>`).join(' · ')} (κ = ${fmt(c.kappa, 2)}${c.weights.some(w => w.custom) ? ', poids personnalisés' : ', automatiques'}).</p>`}</div>`;
   }
 
-  const rankBody = (extra) => { const body = { strategy: sel, which: rkWhich, category: rkCat, limit: 25, ...extra }; if (dirty()) body.draft = { global: draft.global, profile: payload() }; return body; };
+  const rankBody = (extra) => { const body = { strategy: sel, which: rkWhich, category: rkCat, verdict: rkVerdict, limit: 25, ...extra }; if (dirty()) body.draft = { global: draft.global, profile: payload() }; return body; };
   async function runConf(keepCat) {
     confBusy = true; confFail = false; confStale = false; if (!keepCat) rkCat = null; paintBody();
     try { rank = await J.post('admin/scores/ranking', rankBody({ offset: 0 })); error = ''; }
@@ -465,6 +470,7 @@
     else if (a === 'conf-run') { runConf(true); }
     else if (a === 'rk-which') { rkWhich = v; rkCat = null; runConf(true); }
     else if (a === 'rk-cat') { rkCat = v || null; runConf(true); }
+    else if (a === 'rk-verdict') { rkVerdict = v; runConf(true); }
     else if (a === 'rk-more') rankMore();
     else if (a === 'cancel') { reset(); rank = null; paint(); }
     else if (a === 'save') save();

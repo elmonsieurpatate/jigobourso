@@ -170,3 +170,19 @@ Critères (niveaux historiques exacts de `strategy.py`, V2 : pente `100·expm1(l
 Retirés des critères : rendement mensuel ≥ 12 % (Rapide), volatilité ≤ 1,5 % et drawdown ≤ 20 % (Hausse calme), rendement semestriel ≤ 10 % (Rebond) ; les filtres MM200 du Momentum ajusté du risque ne sont pas réactivés.
 Rebond : le semestre n'a ni pente ni R² (poids 0) mais reste une période chargée, car la note « contexte de rebond » lit son rendement (100 si ≤ −10 %, 0 si ≥ +20 %).
 Les performances réelles entrent dans les scores par la croissance lissée (pente de régression, dynamique), le momentum 6-1 / 12-1 mois et le contexte de rebond. Formules inchangées.
+
+## Statut de stratégie (retenue / exclue / indéterminée)
+
+Deux mécanismes séparés. Les **scores V4** (simple, complexe) et leurs **rangs généraux** se calculent sur tous les titres évaluables, sans aucune référence à une stratégie de recherche. Les **critères de recherche** d'une stratégie (granularités actives, pente minimale en % par séance, R² minimal, règles Expert) décident seulement du **statut** :
+
+- **Retenue** : tous les critères actifs sont respectés (une stratégie sans critère, comme Momentum, retient tout, volontairement) ;
+- **Exclue** : au moins un critère actif est mesuré et non respecté ;
+- **Indéterminée** : aucun critère n'est violé mais une mesure nécessaire manque. Jamais une exclusion ; visible dans « Toutes ».
+
+Moteur unique : `engine/analytics/criteria.py` (`normalize`, `evaluate`, `counts`), alimenté par `strategy_metrics`, utilisé par `ranking_table` (Classement, `ranking/table` et `ranking/verdicts` pour les critères en cours de modification), par `scores_admin.ranking` (page Scores/Classement, filtre `verdict`) et par la fiche (`service._v4_strategy`). Le navigateur n'évalue plus rien.
+
+Pages : sélecteur **Retenues | Exclues | Toutes** (Classement : Retenues par défaut ; Scores : Toutes par défaut), compteurs réels sur le périmètre courant (filtres secondaires, recherche), badge « Statut stratégie » dans les tableaux. Le détail (mesure, seuil, résultat par critère) n'est que dans la fiche.
+
+Fiche : le lien du Classement porte `ct=<stratégie>` ; des réglages non enregistrés sont déposés sous `ctx=<clé>` (localStorage, même origine). Brouillon introuvable ou stratégie inconnue : la fiche le dit et ne rend aucun verdict (indéterminée), jamais « retenue ». Scores et rangs de la fiche viennent de la stratégie V4 du contexte : mêmes valeurs que dans le Classement.
+
+Unités : seuils et mesures de pente en % par séance ; la pente « sur période » (composée) n'est qu'une lecture et ne se compare jamais à un seuil par séance.

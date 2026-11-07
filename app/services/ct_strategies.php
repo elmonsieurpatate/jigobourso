@@ -91,6 +91,24 @@ function ct_read(int $uid): array {
     $json = q('SELECT value_json FROM settings WHERE name=?', [ct_key($uid)])->fetchColumn();
     return ct_view($json === false ? ct_empty() : ct_decode($json));
 }
+/** Document brut des stratégies d'un utilisateur (items seuls utiles aux autres pages). */
+function ct_all(int $uid): array {
+    $json = q('SELECT value_json FROM settings WHERE name=?', [ct_key($uid)])->fetchColumn();
+    return $json === false ? ct_empty() : ct_decode($json);
+}
+/** Configuration enregistrée d'une stratégie de l'utilisateur (surcharge d'une intégrée ou stratégie personnelle) et son nom ; null si aucune ligne (une intégrée utilise alors ses valeurs par défaut du moteur). */
+function ct_saved(int $uid, string $id): ?array {
+    $json = q('SELECT value_json FROM settings WHERE name=?', [ct_key($uid)])->fetchColumn();
+    if ($json === false) return null;
+    foreach (ct_decode($json)['items'] as $it) if ($it['id'] === $id) return ['config' => $it['config'] ?? null, 'name' => $it['name'] ?? $id, 'builtin' => !empty($it['builtin'])];
+    return null;
+}
+/** Nom affiché d'une stratégie du Classement, ou null si inconnue. */
+function ct_label(int $uid, string $id): ?string {
+    if (isset(CT_BUILTIN[$id])) return CT_BUILTIN[$id];
+    $s = ct_saved($uid, $id);
+    return $s ? $s['name'] : null;
+}
 /** Présentation d'une stratégie (icône, explications, active ou non), séparée de sa configuration. */
 function ct_meta(array $in, array $old): array {
     $icon = $in['icon'] ?? $old['icon'] ?? CT_ICONS[0];

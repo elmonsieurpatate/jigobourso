@@ -372,7 +372,19 @@ a.ct-company:hover b,a.ct-company:focus-visible b{text-decoration:underline}
 /* Filtres secondaires : commandes dans le panneau (le chevron ne fait qu'ouvrir/fermer), pastille de comptage dans l'en-tête */
 .ct .ct-secondary .ct-filter-actions{margin:0;padding:12px 16px 4px;justify-content:flex-start;flex-wrap:wrap}
 .ct .ct-secondary .ct-masked-chip{margin-left:auto}
-.ct #ct-criteria[aria-pressed="false"]{background:var(--ct-soft);border-color:var(--ct-accent);color:var(--ct-accent)}
+/* Sélecteur Retenues | Exclues | Toutes et badge de statut */
+.ct .ct-seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface-2,transparent)}
+.ct .ct-seg button{min-height:var(--ct-control-h,36px);padding:0 12px;border:0;border-right:1px solid var(--line);background:transparent;color:inherit;font:inherit;font-size:13px;cursor:pointer;white-space:nowrap}
+.ct .ct-seg button:last-child{border-right:0}
+.ct .ct-seg button b{margin-left:5px;font-variant-numeric:tabular-nums;opacity:.75;font-weight:600}
+.ct .ct-seg button[aria-checked="true"]{background:var(--ct-soft);color:var(--ct-accent);font-weight:700}
+.ct .ct-seg button:focus-visible{outline:2px solid var(--ct-accent);outline-offset:-2px}
+.ct .ct-status{font-style:normal;font-size:10px;font-weight:700;letter-spacing:.02em;padding:1px 6px;border-radius:999px;border:1px solid var(--line);margin-left:6px;white-space:nowrap;vertical-align:1px}
+.ct .ct-status.ok{color:var(--ct-green,#16803c);border-color:currentColor}
+.ct .ct-status.no{color:var(--ct-red,#b42318);border-color:currentColor}
+.ct .ct-status.na{color:var(--muted,#6b7280)}
+.ct .ct-undetermined{font-size:12px;color:var(--muted,#6b7280);margin-left:8px}
+@media(max-width:700px){.ct .ct-seg{width:100%}.ct .ct-seg button{flex:1 1 0;min-height:44px;padding:0 4px;font-size:13px}.ct .ct-company-text{min-width:0}}
 @media(max-width:700px){
   .ct .ct-secondary .ct-filter-actions{padding:10px 12px 0}
   .ct .ct-secondary .ct-filter-actions .btn{flex:1 1 calc(33% - 8px);padding:0 6px;font-size:13px}

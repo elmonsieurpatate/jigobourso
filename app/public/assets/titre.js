@@ -15,10 +15,22 @@
   const pfList = (await J.api('portfolios').catch(() => ({ portfolios: [] }))).portfolios.filter(p => p.has_strategy);
   const P = await J.api('strategy/presets').catch(() => ({ presets: {} }));
   const PN = { regular: 'Croissance régulière', fast: 'Croissance rapide', recovery: 'Rebond', low_volatility: 'Hausse calme', momentum: 'Momentum 6 mois (essai)', momentum12: 'Momentum 12 mois (essai)', momentum_risk: 'Momentum ajusté du risque (essai)' };
-  let src = params.get('src') || (params.get('portfolio') ? 'pf:' + params.get('portfolio') : '');
+  /* Contexte « stratégie du Classement » : `ct` = identifiant de la stratégie ; `ctx` = clé d'un brouillon non enregistré déposé par la page (localStorage, même origine).
+     Brouillon annoncé mais introuvable : la fiche le dit et ne rend aucun verdict (jamais de substitution silencieuse par d'autres réglages). */
+  const ctId = params.get('ct');
+  let src = ctId ? 'ct' : params.get('src') || (params.get('portfolio') ? 'pf:' + params.get('portfolio') : '');
   if (src === 'explorer' && !(saved && saved.config)) src = '';
   const reqBody = { id };
-  if (src === 'explorer') {
+  if (src === 'ct') {
+    reqBody.ct = { id: ctId };
+    const key = params.get('ctx');
+    if (key) {
+      let draft = null;
+      try { const d = JSON.parse(localStorage.getItem('jigo_ct_ctx:' + key)); if (d && d.id === ctId && d.spec) draft = d.spec; } catch (e) { draft = null; }
+      if (draft) reqBody.ct.draft = draft; else reqBody.ct.draft_lost = true;
+    }
+    reqBody.source = 'Stratégie du Classement';
+  } else if (src === 'explorer') {
     const sv = saved.view || {}, keep = {};
     ['currency', 'min_aum', 'max_aum', 'max_fee', 'geo_region', 'tradable', 'kind', 'market', 'country', 'category', 'budget', 'min_price', 'max_price', 'min_score', 'max_volatility', 'max_drawdown', 'min_volume', 'pea', 'owned_only', 'open_now', 'fresh_only'].forEach(k => { if (sv[k] !== '' && (sv[k] !== false || k==='tradable') && sv[k] !== undefined) keep[k] = sv[k]; });
     reqBody.config = saved.config; reqBody.view = keep;
@@ -53,11 +65,16 @@
     s.product_warning ? `<div class="notice warn"><b>Produit à surveiller.</b> ${J.esc(s.product_warning)}</div>` : '',
     F.stale ? `<div class="notice warn">Les clôtures de ce titre sont anciennes par rapport à la dernière séance attendue (dernière : ${J.date(F.last_close_date)}, attendue : ${J.date(F.market_latest_close)}). Les mesures peuvent être décalées.</div>` : '',
   ].filter(Boolean).join('');
+  const V4S = { retained: ['Retenue', 'ok'], excluded: ['Exclue', 'wait'], undetermined: ['Indéterminée', ''] };
+  const v4Badge = x => { const [t, c] = V4S[x.status] || V4S.undetermined; return `<span class="badge ${c}" style="white-space:normal;max-width:100%" title="Statut de la stratégie${x.label ? ' « ' + J.esc(x.label) + ' »' : ''}, indépendant des scores">Statut stratégie : ${t}</span>${x.label ? ` <span class="muted small">${J.esc(x.label)}</span>` : ''}`; };
+  const CT_STATE = { saved: 'réglages enregistrés', default: 'valeurs par défaut de la stratégie intégrée', draft: 'réglages en cours de modification (non enregistrés)' };
+  const OPS = { '>=': '≥', '<=': '≤', '>': '>', '<': '<', '=': '=' };
+  const fmtCheck = (m, x) => x === null || x === undefined ? 'indisponible' : m === 'slope' ? J.num(x, 3) + ' % par séance' : m === 'r2' ? J.num(x, 2) : m === 'volume' ? J.num(x, 0) + ' titres/j' : J.num(x, 2) + ' %';
   page.innerHTML = `
   <p class="small" style="margin:0 0 8px"><a href="index.html">← Explorer</a></p>
   <div class="hero"><div><h1>${J.esc(s.name)}</h1>
     <div class="chips" style="margin-top:8px"><span class="badge">${J.esc(s.symbol)}</span><span class="badge">${J.esc(s.market)} · ${J.esc(s.mic)}</span><span class="badge">${s.kind === 'etf' ? 'ETF' : 'Action'}</span>${s.isin ? `<span class="badge">${J.esc(s.isin)}</span>` : ''}${s.country ? `<span class="badge">${J.esc(s.country)}</span>` : ''}${s.category ? `<span class="badge">${J.esc(s.category)}</span>` : ''}${PEA ? `<span class="badge">${PEA[0]}</span>` : ''}${held ? '<span class="badge">Détenu</span>' : ''}${s.is_primary ? '' : '<span class="badge">Cotation secondaire</span>'}</div>
-    <div style="margin-top:10px">${v.status ? J.statusBadge(v.status, v.status_label) : ''}${v.rank && !s.scores_v4 ? ` <span class="muted">n° ${v.rank} sur ${v.of} ${s.kind === 'etf' ? 'ETF' : 'actions'} retenus${v.scope_filtered ? ' (sélection)' : ''} · selon ${J.esc((s.strategy || {}).source || 'réglage par défaut')} · score ${J.num(v.score, 0)}/100</span>` : ''}</div></div>
+    <div style="margin-top:10px">${src === 'ct' && s.v4 ? v4Badge(s.v4) : v.status ? J.statusBadge(v.status, v.status_label) : ''}${v.rank && !s.scores_v4 && src !== 'ct' ? ` <span class="muted">n° ${v.rank} sur ${v.of} ${s.kind === 'etf' ? 'ETF' : 'actions'} retenus${v.scope_filtered ? ' (sélection)' : ''} · selon ${J.esc((s.strategy || {}).source || 'réglage par défaut')} · score ${J.num(v.score, 0)}/100</span>` : ''}</div></div>
     <div style="text-align:right"><div class="px">${J.money(s.price, s.currency)}</div><div class="muted">${s.price ? J.priceLabel(s) + ' · ' + J.dateTime(s.price_time) : 'Pas de cours'}</div>${lastDay !== null ? `<div class="${J.cls(lastDay)}" style="font-weight:700">${J.pct(lastDay)} <span class="muted" style="font-weight:400">sur la dernière séance</span></div>` : ''}
     ${s.price_eur !== null && s.currency !== 'EUR' ? `<div class="muted small">≈ ${J.eur(s.price_eur)}</div>` : ''}<div style="margin-top:10px"><button class="btn small" id="add">+ Ajouter à un portefeuille</button></div></div></div>
   ${s.price_stale ? '<div class="notice warn">Cours ancien : aucune cotation récente confirmée. Le prix affiché reste daté, il ne représente pas un cours actuel.</div>' : ''}
@@ -71,8 +88,14 @@
     <div class="card"><h2>Repères</h2><div class="metric-grid" style="grid-template-columns:1fr 1fr"><div class="metric"><div class="l">Moy. 20 j</div><div class="v">${J.num(st.ma20, 2)}</div></div><div class="metric"><div class="l">Moy. 50 j</div><div class="v">${J.num(st.ma50, 2)}</div></div><div class="metric"><div class="l">Écart moy. 20 j</div><div class="v">${J.pct(st.gap_to_ma20, 1)}</div></div><div class="metric"><div class="l">Volume moy. 3 m</div><div class="v">${s.avg_volume_3m !== null ? J.num(s.avg_volume_3m, 0) : '–'}</div></div><div class="metric" title="Variation du cours entre il y a 126 et il y a 21 séances (le dernier mois est ignoré). Mesure du passé."><div class="l">Momentum 6 mois</div><div class="v ${J.cls(st.momentum_6m)}">${st.momentum_6m !== null && st.momentum_6m !== undefined ? J.pct(st.momentum_6m, 1) : 'non évaluable'}</div></div><div class="metric" title="Variation du cours entre il y a 252 et il y a 21 séances (le dernier mois est ignoré). Mesure du passé."><div class="l">Momentum 12 mois</div><div class="v ${J.cls(st.momentum_12m)}">${st.momentum_12m !== null && st.momentum_12m !== undefined ? J.pct(st.momentum_12m, 1) : 'non évaluable'}</div></div></div></div>
     ${sib ? `<div class="card"><h2>Autres cotations du produit</h2><div class="small" style="display:grid;gap:6px">${sib}</div></div>` : ''}
    </div></div>`;
-  if (innerWidth < 960) J.$('#layout').style.gridTemplateColumns = '1fr';
+  if (innerWidth < 960) J.$('#layout').style.gridTemplateColumns = 'minmax(0,1fr)';
 
+  const measuresCard = () => {
+    const periodSlope = (x, n) => x == null ? null : 100 * Math.expm1(n * Math.log1p(x / 100));
+    return `<div class="card"><h2>Mesures par période</h2><div class="table-wrap"><table><thead><tr><th>Période</th><th class="num">Séances</th><th class="num" title="Unité des critères de la stratégie">Pente (% par séance)</th><th class="num">Pente (% sur période)</th><th class="num">R²</th><th class="num">Performance (%)</th><th class="num">Volatilité (%)</th><th class="num">Repli max. (%)</th></tr></thead><tbody>
+      ${periodRows.map(({ n, m }) => `<tr><td>${J.esc(labelFor(n))}</td><td class="num">${n}</td><td class="num ${J.cls(m.slope)}">${J.num(m.slope, 3)}</td><td class="num ${J.cls(m.slope)}">${J.num(m.slope_period ?? periodSlope(m.slope, n), 2)}</td><td class="num">${J.num(m.r2, 2)}</td><td class="num ${J.cls(m.perf)}">${J.pct(m.perf)}</td><td class="num">${m.volatility === null || m.volatility === undefined ? '—' : J.num(m.volatility, 1)}</td><td class="num">${m.drawdown === null || m.drawdown === undefined ? '—' : J.num(m.drawdown, 1)}</td></tr>`).join('')}</tbody></table></div>
+      <p class="small muted" style="margin:8px 0 0">Les seuils de pente des stratégies s’expriment en % par séance : comparez-les à la première colonne. La pente « sur période » (composée sur le nombre de séances) sert à la lecture seulement et ne se compare jamais directement à un seuil par séance.</p></div>`;
+  };
   const panes = {
     cours() {
       const R = [['1 S', 5], ['1 M', 21], ['3 M', 63], ['6 M', 126], ['1 A', 252], ['Max', 0]];
@@ -93,7 +116,29 @@
         <p class="small muted">Chaque bougie ou point représente 15 minutes de cotation, à l’heure de la place (${J.esc(s.market)}). Les barres proviennent de Yahoo Finance et sont conservées par Jigobourso ; quand Yahoo n’en fournit pas pour un créneau, le créneau reste vide.</p>`;
       J.intradayPanel(J.$('#ipanel'), id);
     },
+    analyseV4() {
+      const x = s.v4 || { status: 'undetermined', checks: [] }, label = x.label || 'stratégie inconnue';
+      const periodSlope = (q, n) => q == null ? null : 100 * Math.expm1(n * Math.log1p(q / 100));
+      const missingCtx = x.context === 'missing';
+      const headline = missingCtx
+        ? `<div class="notice warn"><b>Contexte de stratégie introuvable.</b> ${x.state === 'draft_lost' ? 'Les réglages non enregistrés utilisés par le Classement ne sont plus disponibles dans ce navigateur.' : 'La stratégie demandée est inconnue ou n’a pas été transmise.'} Aucun verdict n’est rendu : rouvrez la fiche depuis le Classement. Les scores ci-dessus restent valables, ils ne dépendent pas de la stratégie.</div>`
+        : x.criteria_free ? `<div class="notice"><b>Aucun critère actif</b> dans « ${J.esc(label)} » : tous les titres évaluables sont retenus par construction. Ce choix est volontaire (stratégie sans critère de recherche), pas un défaut de transmission.</div>` : '';
+      const fails = x.checks.filter(c => c.result === 'fail'), unk = x.checks.filter(c => c.result === 'unknown'), pass = x.checks.filter(c => c.result === 'pass');
+      const sentence = missingCtx ? '' : x.status === 'excluded'
+        ? `<p><b>Exclue</b> par ${fails.length} critère${fails.length > 1 ? 's' : ''} de recherche : ${fails.map(c => J.esc(c.label + ' ' + c.period_label.toLowerCase())).join(', ')}. Son score et son rang général ne changent pas.</p>`
+        : x.status === 'undetermined' ? `<p><b>Indéterminée</b> : ${unk.length} mesure${unk.length > 1 ? 's' : ''} nécessaire${unk.length > 1 ? 's' : ''} manque${unk.length > 1 ? 'nt' : ''} (${unk.map(c => J.esc(c.label + ' ' + c.period_label.toLowerCase())).join(', ')}). Ce n’est pas une exclusion.</p>`
+        : x.active ? `<p><b>Retenue</b> : les ${pass.length} critère${pass.length > 1 ? 's' : ''} actif${pass.length > 1 ? 's' : ''} ${pass.length > 1 ? 'sont satisfaits' : 'est satisfait'}.</p>` : '';
+      const mark = { pass: '<span class="up">✓ respecté</span>', fail: '<span class="down">✗ non respecté</span>', unknown: '<span class="muted">? donnée manquante</span>' };
+      J.$('#main').innerHTML = `<div class="notice" style="margin-bottom:12px"><b>Stratégie appliquée :</b> ${J.esc(label)}${CT_STATE[x.state] ? ' · ' + CT_STATE[x.state] : ''}
+          <div class="small muted" style="margin-top:4px">Les critères de recherche (pente et R² par granularité, règles Expert) décident « retenue / exclue ». Ils ne modifient ni les scores V4 ni les rangs.</div></div>
+        ${headline}
+        <div class="card"><div class="row between"><h2 style="margin:0">Statut de la stratégie</h2>${v4Badge(x)}</div>${sentence}
+          ${x.checks.length ? `<div class="table-wrap"><table class="dense"><thead><tr><th>Critère</th><th>Granularité</th><th class="num">Mesuré</th><th class="num">Exigé</th><th>Résultat</th></tr></thead><tbody>${x.checks.map(c => `<tr><td>${J.esc(c.label)}${c.optional ? ' <span class="small muted">(règle Expert)</span>' : ''}</td><td>${J.esc(c.period_label)}</td><td class="num">${fmtCheck(c.metric, c.value)}</td><td class="num">${OPS[c.op] || c.op} ${fmtCheck(c.metric, c.threshold)}</td><td>${mark[c.result]}</td></tr>`).join('')}</tbody></table></div>
+          ${x.join === 'or' ? '<p class="small muted">Règles Expert combinées avec OU : une seule suffit.</p>' : ''}` : ''}</div>
+        ${measuresCard()}`;
+    },
     analyse() {
+      if (src === 'ct') return panes.analyseV4();
       const periodSlope=(x,n)=>x==null?null:100*Math.expm1(n*Math.log1p(x/100));
       const explain=r=>{if(r.metric!=='slope')return J.explain(r);const p=(s.strategy?.periods||[]).find(x=>x.id===r.period),x={...r,metric:'slope_period',value:periodSlope(r.value,p?.sessions||1),threshold:periodSlope(r.threshold,p?.sessions||1)};return `<div class="reason ${r.result}">${J.esc(p?.label||r.period)} : pente sur période ${J.pct(x.value)} ; seuil ${r.criterion.startsWith('min')?'≥':'≤'} ${J.pct(x.threshold)} · ${J.esc(r.result)}</div>`;};
       const sg = s.strategy || {}, crit = p => Object.entries(p.criteria).map(([k, x]) => `${(J.CRITERIA[k] || [k])[0]} ${k.startsWith('min') ? '≥' : '≤'} ${J.num(k.includes('slope')?periodSlope(x,p.sessions):x, 2)}${k.includes('slope')?' % sur période':''}`).join(', ') || 'aucun seuil';
@@ -106,8 +151,7 @@
         ${v.rank ? `<p class="muted" style="margin:6px 0 10px">N° <b>${v.rank}</b> sur ${v.of} ${s.kind === 'etf' ? 'ETF' : 'actions'} retenus${v.scope_filtered ? ' dans votre sélection' : ''} · score ${J.num(v.score, 2)} points (${s.strategy?.ranking==='weighted'?'contributions configurables':s.strategy?.ranking === 'momentum_risk' ? 'composite momentum et risque' : 'percentile moyen sur les périodes actives'})</p>` : v.in_scope === false ? '<p class="muted" style="margin:6px 0 10px">Ce titre est hors de la sélection de l’Explorer (filtres actifs) : il n’est pas classé.</p>' : ''}
         ${v.note ? `<p>${J.esc(v.note)}</p>` : ''}<div class="reasons">${Object.values(grouped).flat().map(explain).join('') || (v.note ? '' : '<span class="muted">Aucun critère actif.</span>')}</div>
         <p class="small muted" style="margin:10px 0 0">Chaque ligne donne la valeur mesurée et le seuil exigé par la configuration ci-dessus.</p></div>
-        <div class="card"><h2>Mesures par période</h2><div class="table-wrap"><table><thead><tr><th>Période</th><th class="num">Séances</th><th class="num">Pente (% sur période)</th><th class="num">R²</th><th class="num">ER</th><th class="num">Performance</th><th class="num">Volatilité</th><th class="num">Repli max.</th></tr></thead><tbody>
-        ${periodRows.map(({ n, m }) => `<tr><td>${J.esc(labelFor(n))}</td><td class="num">${n}</td><td class="num ${J.cls(m.slope)}">${J.num(m.slope_period??periodSlope(m.slope,n), 3)}</td><td class="num">${J.num(m.r2, 2)}</td><td class="num">${J.num(m.er, 2)}</td><td class="num ${J.cls(m.perf)}">${J.pct(m.perf)}</td><td class="num">${m.volatility === null || m.volatility === undefined ? '–' : J.num(m.volatility, 2) + ' %'}</td><td class="num">${m.drawdown === null || m.drawdown === undefined ? '–' : J.num(m.drawdown, 1) + ' %'}</td></tr>`).join('')}</tbody></table></div></div>
+        ${measuresCard()}
         <div class="card"><h2>Comment lire ces mesures</h2><div class="grid cols-2" style="gap:10px"><div class="metric"><div class="l">Pente</div><div class="s">Progression de la droite de régression sur toute la période, calculée sur le logarithme du cours : un titre à 5 € se compare à un titre à 500 €.</div></div><div class="metric"><div class="l">R² (régularité)</div><div class="s">À quel point la hausse suit une droite : 1 = parfaitement régulière, 0 = aucun lien avec le temps.</div></div><div class="metric"><div class="l">ER (efficacité)</div><div class="s">Trajet net divisé par le trajet total parcouru, entre −1 et +1 : un cours qui zigzague a un ER faible.</div></div><div class="metric"><div class="l">Volatilité / repli</div><div class="s">Écart-type des variations quotidiennes ; plus forte baisse depuis un sommet pendant la période.</div></div></div></div>`;
       J.$('#src-sel').onchange = e => { const u = new URL(location.href); if (e.target.value) u.searchParams.set('src', e.target.value); else u.searchParams.delete('src'); u.searchParams.delete('portfolio'); u.hash = '#analyse'; location.href = u.toString(); };
     },

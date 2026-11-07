@@ -109,3 +109,7 @@
 /* Notes : colonne d'alignement fixe ; « * » = note calculée sur des données incomplètes (plus de pastille qui décale les colonnes) */
 .as-sc { display: inline-flex; align-items: baseline; justify-content: flex-end; gap: 2px; }
 .as-flag { display: inline-block; width: 1ch; color: var(--warn, #b26a00); font-weight: 700; text-align: left; cursor: help; }
+
+.as-status{font-style:normal;font-size:.7rem;font-weight:700;padding:1px 6px;border-radius:999px;border:1px solid var(--line);white-space:nowrap}
+.as-status.ok{color:var(--good,#16803c);border-color:currentColor}.as-status.no{color:var(--bad,#b42318);border-color:currentColor}.as-status.na{color:var(--muted,#6b7280)}
+.seg button b{margin-left:4px;font-variant-numeric:tabular-nums;opacity:.75}

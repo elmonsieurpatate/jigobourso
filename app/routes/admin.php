@@ -14,6 +14,7 @@ function log_tail(string $file, int $n, ?string $re): array {
 
 require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/engine.php';
+require_once __DIR__ . '/../services/ct_strategies.php';
 
 function system_counts(): array {
     $c = [];
@@ -155,8 +156,9 @@ return [
                                               'listing_id' => isset($b['listing_id']) ? (int)$b['listing_id'] : null, 'draft' => is_array($b['draft'] ?? null) ? $b['draft'] : null]);
     },
     'admin/scores/ranking' => function () {
-        need_post(); require_admin(); $b = body();
-        return engine_call('scores-ranking', ['strategy' => str_in($b, 'strategy', 40), 'draft' => is_array($b['draft'] ?? null) ? $b['draft'] : null,
+        need_post(); $adm = require_admin(); $b = body();
+        $specs = []; foreach ((ct_all((int)$adm['id'])['items'] ?? []) as $it) if (is_array($it['config'] ?? null)) $specs[$it['id']] = $it['config'];
+        return engine_call('scores-ranking', ['strategy' => str_in($b, 'strategy', 40), 'ct_specs' => (object)$specs, 'verdict' => in_array($b['verdict'] ?? '', ['retained', 'excluded', 'undetermined'], true) ? $b['verdict'] : 'all', 'draft' => is_array($b['draft'] ?? null) ? $b['draft'] : null,
             'which' => ($b['which'] ?? '') === 'complex' ? 'complex' : 'simple', 'category' => isset($b['category']) && is_string($b['category']) ? mb_substr($b['category'], 0, 60) : null,
             'offset' => max(0, (int)($b['offset'] ?? 0)), 'limit' => max(1, min(100, (int)($b['limit'] ?? 25)))]);
     },

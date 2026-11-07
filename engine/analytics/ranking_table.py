@@ -8,7 +8,7 @@ import os
 
 from engine.market.collect import latest_rates, to_eur_factor
 
-from . import scores_admin, score_service, service
+from . import criteria as CR, scores_admin, score_service, service
 
 CONFIG = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'app', 'config', 'secondary_metadata_groups.json')
 ACCENTS = str.maketrans({'é': 'e', 'è': 'e', 'ê': 'e', 'ë': 'e', 'à': 'a', 'â': 'a', 'ä': 'a', 'á': 'a', 'ã': 'a', 'å': 'a', 'î': 'i', 'ï': 'i', 'í': 'i', 'ì': 'i', 'ô': 'o', 'ö': 'o', 'ó': 'o',
@@ -89,8 +89,21 @@ def _ties(ranks):
     return out
 
 
-def table(conn, request):
-    """Toutes les lignes du classement, avec scores et rangs généraux (indépendants des filtres, du tri et de la page)."""
+def default_norm(ct_id):
+    """Critères normalisés d'une stratégie intégrée (valeurs historiques centralisées) ; None pour un identifiant inconnu."""
+    item = criteria().get('criteria', {}).get(ct_id)
+    return None if item is None else CR.normalize(CR.default_spec(item['periods']))
+
+
+def norm_of(request):
+    """Critères à appliquer : `spec` transmis (réglages enregistrés ou brouillon) sinon valeurs par défaut de la stratégie intégrée. None = contexte absent."""
+    spec = request.get('spec')
+    if isinstance(spec, dict):
+        return CR.normalize(spec)
+    return default_norm(request.get('ct_id') or '')
+
+
+def _base(conn, request):
     scores_admin.refresh(conn)
     if request.get('ct_id'):                                                       # stratégie du Classement : ses propres réglages de scores
         name = scores_admin.resolve(conn, request['ct_id'], request.get('user_id') or 0)
@@ -100,6 +113,33 @@ def table(conn, request):
         name = 'growth_v4'
     cfg = scores_admin.build_config(conn, name)
     book = score_service.score_book(conn, cfg, service.data_version(conn))
+    return name, cfg, book
+
+
+def evaluable(book):
+    """Titres du classement : notés (au moins un des deux scores)."""
+    return [i for i in sorted(book) if book[i]['simple'] is not None or book[i]['complex'] is not None]
+
+
+def verdicts(conn, request):
+    """Statut de stratégie de chaque titre évaluable, pour des critères donnés. Aucun score ni rang n'est touché."""
+    _, _, book = _base(conn, request)
+    ids = [i for i in evaluable(book)]
+    data = _fetch(conn, ids) if ids else {}
+    norm = norm_of(request)
+    status = {}
+    for lid in ids:
+        d = data.get(lid) or {}
+        if not d:
+            continue
+        status[lid] = CR.evaluate(norm, {'m': d.get('m'), 'avg_volume': d.get('avg_volume_3m')})['status']
+    return {'status': status, 'counts': CR.counts(status.values()), 'context': 'missing' if norm is None else 'ok', 'active': 0 if norm is None else len(norm['primary']) + len(norm['extra'])}
+
+
+def table(conn, request):
+    """Toutes les lignes du classement, avec scores et rangs généraux (indépendants des filtres, du tri et de la page)."""
+    name, cfg, book = _base(conn, request)
+    norm = norm_of(request)
     ids = sorted(book)
     simple, rank_s, pos_s = scores_admin.ordered(book, 'simple')            # même fonction que l'administration des scores : même ordre, mêmes rangs
     complex_, rank_c, pos_c = scores_admin.ordered(book, 'complex')
@@ -115,6 +155,7 @@ def table(conn, request):
             continue
         m = d.get('m') or {}
         mo = m.get(REFERENCE) or {}
+        verdict = CR.evaluate(norm, {'m': m, 'avg_volume': d.get('avg_volume_3m')})
         factor = to_eur_factor(d.get('currency'), rates)
         price = _num(d.get('price'))
         if price is None:
@@ -138,9 +179,10 @@ def table(conn, request):
             'analyst': d.get('analyst_rating'), 'quality': d.get('quality'),
             'simple': _num(e['simple']), 'complex': _num(e['complex']), 'simple_status': e['simple_status'], 'complex_status': e['complex_status'],
             'rank_simple': rank_s.get(lid), 'rank_complex': rank_c.get(lid), 'pos_simple': pos_s.get(lid), 'pos_complex': pos_c.get(lid),
-            'tie_simple': tie_s.get(rank_s.get(lid), 1), 'tie_complex': tie_c.get(rank_c.get(lid), 1), 'curve': [round(x, 2) for x in curves.get(lid, [])], 'extra': extra})
+            'status': verdict['status'], 'tie_simple': tie_s.get(rank_s.get(lid), 1), 'tie_complex': tie_c.get(rank_c.get(lid), 1), 'curve': [round(x, 2) for x in curves.get(lid, [])], 'extra': extra})
     with conn.cursor() as cur:
         cur.execute('SELECT COUNT(*) AS n FROM v_recommendable')
         universe = int(cur.fetchone()['n'])
-    return {'strategy': name, 'label': scores_admin.spec(name)['label'], 'reference_sessions': REFERENCE, 'universe': universe, 'evaluated': len(rows),
+    counts = CR.counts(r['status'] for r in rows)
+    return {'strategy': name, 'label': scores_admin.spec(name)['label'], 'counts': counts, 'context': 'missing' if norm is None else 'ok', 'reference_sessions': REFERENCE, 'universe': universe, 'evaluated': len(rows),
             'scored': {'simple': len(simple), 'complex': len(complex_)}, 'default_sort': cfg['ranking']['sort'] if (cfg.get('ranking') or {}).get('sort') in ('simple', 'complex') else 'simple', 'rows': rows}

@@ -3,6 +3,7 @@ require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/engine.php';
 require_once __DIR__ . '/../services/ledger.php';
 require_once __DIR__ . '/../services/explorer_library.php';
+require_once __DIR__ . '/../services/ct_strategies.php';
 
 function held_listing_ids(int $userId): array {
     // Quantité nette > 0, splits confirmés compris (même règle que la valorisation des portefeuilles).
@@ -73,10 +74,18 @@ return [
     'ranking/table' => function () {          // tous les titres notés (scores V4, rangs, valeurs des filtres) : tri, filtres et pages se font dans la page
         $u = require_user();
         $ct = (string)($_GET['strategy'] ?? '');
-        $res = engine_call('ranking-table', ['ct_id' => preg_match('/^[a-z0-9-]{1,40}$/', $ct) ? $ct : 'fast', 'user_id' => (int)$u['id']]);
+        $ct = preg_match('/^[a-z0-9-]{1,40}$/', $ct) ? $ct : 'fast';
+        $saved = ct_saved((int)$u['id'], $ct);
+        $res = engine_call('ranking-table', ['ct_id' => $ct, 'user_id' => (int)$u['id'], 'spec' => $saved['config'] ?? null]);   // critères enregistrés ; sinon valeurs par défaut du moteur
         $held = held_listing_ids((int)$u['id']);
         foreach ($res['rows'] as &$r) $r['held'] = in_array($r['id'], $held, true);
         return $res;
+    },
+    'ranking/verdicts' => function () {       // statuts de stratégie (retenue / exclue / indéterminée) pour des critères en cours de modification : mêmes règles que le tableau et la fiche
+        need_post(); $u = require_user(); $b = body();
+        $ct = (string)($b['strategy'] ?? '');
+        $ct = preg_match('/^[a-z0-9-]{1,40}$/', $ct) ? $ct : 'fast';
+        return engine_call('ranking-verdicts', ['ct_id' => $ct, 'user_id' => (int)$u['id'], 'spec' => is_array($b['config'] ?? null) ? $b['config'] : null]);
     },
     'data/overview' => function () { require_user(); return engine_call('overview', []); },
     'suivi' => function () { require_user(); return engine_call('suivi', []); },
@@ -103,7 +112,18 @@ return [
         }
         $view = is_array($b['view'] ?? null) ? $b['view'] : [];
         $view['owned_ids'] = held_listing_ids((int)$u['id']);
-        $sheet = engine_call('sheet', ['listing_id' => $id, 'config' => $cfg ?: 'regular', 'view' => $view, 'source' => $cfg ? $source : 'Croissance régulière (réglage par défaut)', 'fetch_profile' => true]);
+        // Contexte de stratégie du Classement : identifiant + réglages enregistrés (ou brouillon transmis par la page). Aucun contexte fiable ⇒ le moteur répond « indéterminée », jamais « retenue ».
+        $ctIn = is_array($b['ct'] ?? null) ? $b['ct'] : [];
+        $ctId = isset($ctIn['id']) && is_string($ctIn['id']) && preg_match('/^[a-z0-9-]{1,40}$/', $ctIn['id']) ? $ctIn['id'] : null;
+        $ct = ['id' => null, 'state' => 'missing', 'spec' => null, 'label' => null, 'user_id' => (int)$u['id']];
+        if ($ctId !== null) {
+            $label = ct_label((int)$u['id'], $ctId);
+            if ($label === null) { $ct['id'] = $ctId; }
+            elseif (!empty($ctIn['draft_lost'])) { $ct = ['id' => $ctId, 'state' => 'draft_lost', 'spec' => null, 'label' => $label, 'user_id' => (int)$u['id']]; }
+            elseif (is_array($ctIn['draft'] ?? null)) { $ct = ['id' => $ctId, 'state' => 'draft', 'spec' => $ctIn['draft'], 'label' => $label, 'user_id' => (int)$u['id']]; }
+            else { $sv = ct_saved((int)$u['id'], $ctId); $ct = ['id' => $ctId, 'state' => ($sv && is_array($sv['config'])) ? 'saved' : (isset(CT_BUILTIN[$ctId]) ? 'default' : 'missing'), 'spec' => $sv['config'] ?? null, 'label' => $label, 'user_id' => (int)$u['id']]; }
+        }
+        $sheet = engine_call('sheet', ['listing_id' => $id, 'ct' => $ct, 'config' => $cfg ?: 'regular', 'view' => $view, 'source' => $cfg ? $source : 'Croissance régulière (réglage par défaut)', 'fetch_profile' => true]);
         $sheet['holdings'] = [];
         foreach (q('SELECT p.id, p.name FROM portfolios p WHERE p.user_id = ? ORDER BY p.is_default DESC, p.name', [$u['id']])->fetchAll() as $p) {
             $v = portfolio_valuation((int)$p['id']);

@@ -127,3 +127,107 @@ def test_identical_raw_scores_share_a_rank_and_the_order_is_deterministic():
     assert rows['DOWN.DE']['simple'] == rows['DOWN2.DE']['simple'] == 0 and rows['DOWN.DE']['rank_simple'] == rows['DOWN2.DE']['rank_simple']
     assert rows['DOWN.DE']['simple'] is not None and rows['DOWN.DE']['complex'] is not None                         # aucun titre en baisse n'est exclu
     assert R.table(conn, {'strategy': 'growth_v4'})['rows'] == t['rows']                                           # résultat reproductible
+
+
+# ───────────── statut de stratégie : moteur unique (Classement = Scores = fiche) ─────────────
+
+def _strict(period='month', slope=0.3, r2=0.0):
+    return {'periods': {period: {'enabled': True, 'slope': slope, 'r2': r2}}, 'extra': [], 'join': 'and'}
+
+
+def test_three_modes_counts_cover_every_evaluable_title_and_never_change_scores_or_ranks():
+    conn = connect()
+    reset_data(conn)
+    seed(conn)
+    _extra_titles(conn)
+    loose = R.table(conn, {'ct_id': 'fast', 'user_id': 1, 'spec': _strict(slope=0.0)})
+    strict = R.table(conn, {'ct_id': 'fast', 'user_id': 1, 'spec': _strict(slope=0.39)})
+    assert loose['counts']['all'] == strict['counts']['all'] == len(loose['rows']) == loose['evaluated']
+    assert loose['counts']['retained'] == loose['evaluated']                                      # aucun critère actif : tout est retenu
+    assert strict['counts']['excluded'] > 0 and sum(strict['counts'][k] for k in ('retained', 'excluded', 'undetermined')) == strict['counts']['all']
+    keep = lambda t: {r['id']: (r['simple'], r['complex'], r['rank_simple'], r['rank_complex'], r['pos_simple']) for r in t['rows']}
+    assert keep(loose) == keep(strict)                                                             # les critères ne changent ni score ni rang
+    assert {r['id'] for r in strict['rows'] if r['status'] == 'retained'} < {r['id'] for r in loose['rows']}
+
+
+def test_live_verdicts_endpoint_equals_table_statuses_and_scores_admin_listing():
+    from engine.analytics import scores_admin as A
+    conn = connect()
+    reset_data(conn)
+    seed(conn)
+    _extra_titles(conn)
+    spec = _strict(slope=0.39, r2=0.5)
+    t = R.table(conn, {'ct_id': 'fast', 'user_id': 1, 'spec': spec})
+    v = R.verdicts(conn, {'ct_id': 'fast', 'user_id': 1, 'spec': spec})
+    assert v['status'] == {r['id']: r['status'] for r in t['rows']} and v['counts'] == t['counts']
+    for mode in ('retained', 'excluded', 'all'):
+        ids = []
+        for which in ('simple', 'complex'):
+            L = A.ranking(conn, {'strategy': 'growth_v4', 'which': which, 'limit': 100, 'verdict': mode, 'ct_specs': {'fast': spec}})['listing']
+            assert L['counts'] == {**{k: sum(1 for r in t['rows'] if r['status'] == k and r[which] is not None) for k in ('retained', 'excluded', 'undetermined')},
+                                   'all': sum(1 for r in t['rows'] if r[which] is not None)}
+            expected = [r for r in t['rows'] if r[which] is not None and (mode == 'all' or r['status'] == mode)]
+            assert sorted(r['id'] for r in L['rows']) == sorted(r['id'] for r in expected), (mode, which)
+            for r in L['rows']:
+                mine = next(x for x in t['rows'] if x['id'] == r['id'])
+                assert r['rank'] == mine['rank_' + which] and r['status'] == mine['status']       # même rang et même statut dans les deux pages
+            ids.append(L['total'])
+        assert all(n >= 0 for n in ids)
+
+
+def test_insufficient_data_is_undetermined_never_excluded():
+    conn = connect()
+    reset_data(conn)
+    seed(conn)
+    _extra_titles(conn)
+    with conn.cursor() as cur:
+        cur.execute('DELETE FROM strategy_metrics WHERE listing_id=1 AND sessions=21')
+    conn.commit()
+    t = R.table(conn, {'ct_id': 'fast', 'user_id': 1, 'spec': _strict(slope=0.01)})
+    row = next(r for r in t['rows'] if r['id'] == 1)
+    assert row['status'] == 'undetermined' and row['simple'] is not None                        # noté, classé, mais statut indéterminé
+    assert t['counts']['undetermined'] >= 1
+
+
+def test_missing_context_is_undetermined_and_builtin_defaults_come_from_the_central_source():
+    conn = connect()
+    reset_data(conn)
+    seed(conn)
+    t = R.table(conn, {'ct_id': 'cs-inconnu', 'user_id': 1})
+    assert t['context'] == 'missing' and {r['status'] for r in t['rows']} == {'undetermined'}
+    assert R.table(conn, {'ct_id': 'mom6', 'user_id': 1})['context'] == 'ok'
+    assert {r['status'] for r in R.table(conn, {'ct_id': 'mom6', 'user_id': 1})['rows']} == {'retained'}   # Momentum : aucun critère de recherche
+
+
+def test_sheet_status_and_scores_equal_the_ranking_in_every_context():
+    from engine.analytics import service
+    conn = connect()
+    reset_data(conn)
+    seed(conn)
+    _extra_titles(conn)
+    spec = _strict(slope=0.39)
+    t = {r['id']: r for r in R.table(conn, {'ct_id': 'fast', 'user_id': 1, 'spec': spec})['rows']}
+    for lid, row in t.items():
+        s = service.instrument_sheet(conn, {'listing_id': lid, 'config': 'regular', 'ct': {'id': 'fast', 'state': 'draft', 'spec': spec, 'label': 'Croissance rapide', 'user_id': 1}})
+        assert s['v4']['status'] == row['status'] and s['v4']['state'] == 'draft'
+        if row['status'] == 'excluded':
+            assert any(c['result'] == 'fail' and c['unit'] == '% par séance' for c in s['v4']['checks'])
+        assert s['scores_v4']['ranks']['simple']['rank'] == row['rank_simple'] and s['scores_v4']['ranks']['complex']['rank'] == row['rank_complex']
+    lost = service.instrument_sheet(conn, {'listing_id': 1, 'config': 'regular', 'ct': {'id': 'fast', 'state': 'draft_lost', 'spec': None, 'label': 'Croissance rapide', 'user_id': 1}})
+    none = service.instrument_sheet(conn, {'listing_id': 1, 'config': 'regular'})
+    for s in (lost, none):
+        assert s['v4']['status'] == 'undetermined' and s['v4']['context'] == 'missing'          # jamais « retenue » par défaut de transmission
+    free = service.instrument_sheet(conn, {'listing_id': 1, 'config': 'regular', 'ct': {'id': 'mom6', 'state': 'default', 'spec': None, 'label': 'Momentum', 'user_id': 1}})
+    assert free['v4']['status'] == 'retained' and free['v4']['criteria_free'] is True
+
+
+def test_sheet_measures_use_the_units_of_the_criteria():
+    from engine.analytics import service
+    conn = connect()
+    reset_data(conn)
+    seed(conn)
+    s = service.instrument_sheet(conn, {'listing_id': 1, 'config': 'regular'})
+    m = s['measures']['21']
+    t = next(r for r in R.table(conn, {})['rows'] if r['id'] == 1)
+    assert m['slope'] == pytest.approx(t['periods']['21']['slope'], abs=1e-3)                    # % par séance : même valeur que celle comparée aux seuils
+    assert m['slope_period'] > m['slope'] * 15                                                   # pente composée sur 21 séances : plus grande, jamais comparée au seuil par séance

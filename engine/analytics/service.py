@@ -825,7 +825,9 @@ def instrument_sheet(conn, request):
                          'technical': {k: v for k, v in config['technical'].items() if v},
                          'periods': [{'id': p['id'], 'label': strategy.LABELS[p['id']], 'sessions': p['sessions'], 'criteria': {f: p.get(f) for f, _, _ in (explorer_config.CRITERIA if config.get('version')==4 else strategy.CRITERIA) if p.get(f) is not None}} for p in config['periods'] if p['enabled']]}
     sheet['config_periods'] = [{'id': p['id'], 'label': strategy.LABELS[p['id']], 'sessions': p['sessions'], 'enabled': p['enabled']} for p in config['periods']]
-    sheet['scores_v4'] = _scores_v4(conn, lid)
+    ct = request.get('ct') or {}
+    sheet['scores_v4'] = _scores_v4(conn, lid, ct)
+    sheet['v4'] = _v4_strategy(conn, lid, ct)
     return sheet
 
 
@@ -1037,15 +1039,42 @@ def _etf_profile(conn, listing_id, symbol, allow_fetch):
     return {'state': 'none', 'fetched_at': None, 'data': None}
 
 
-def _scores_v4(conn, lid):
-    """Scores V4 du titre (simple, complexe, rangs généraux, contributions) avec la stratégie V4 enregistrée ; None si le titre n'est pas noté. Lecture seule."""
+def _scores_v4(conn, lid, ct=None):
+    """Scores V4 du titre (simple, complexe, rangs généraux, contributions) avec la stratégie V4 du contexte (celle du Classement dont la fiche est ouverte) ; None si le titre n'est pas noté. Lecture seule.
+    Mêmes scores et mêmes rangs que le Classement : retenu ou exclu, la note et le rang ne changent pas."""
     from . import scores, scores_admin
+    ct = ct or {}
+    name = 'growth_v4'
+    if ct.get('id'):
+        scores_admin.refresh(conn)
+        name = scores_admin.resolve(conn, ct['id'], int(ct.get('user_id') or 0))
+        name = name if scores_admin.known(name) else 'growth_v4'
     try:
-        sim = scores_admin.simulate(conn, {'strategy': 'growth_v4', 'listing_id': lid})
+        sim = scores_admin.simulate(conn, {'strategy': name, 'listing_id': lid})
     except Exception:                                                                        # noqa: BLE001 : la fiche reste complète sans ce bloc
         return None
     result = sim.get('result')
     if not result:
         return None
-    return {'strategy': 'growth_v4', 'ranks': sim.get('ranks'), 'simple': result['simple'], 'complex': result['complex'], 'liquidity': result.get('liquidity'),
+    return {'strategy': name, 'ranks': sim.get('ranks'), 'simple': result['simple'], 'complex': result['complex'], 'liquidity': result.get('liquidity'),
             'labels': scores.COMPLEX_LABELS, 'weights_effective': result.get('weights_effective'), 'periods': [dict(id=p['id'], sessions=p['sessions']) for p in sim.get('periods', [])]}
+
+
+V4_STATUS_LABELS = {'retained': 'Retenue', 'excluded': 'Exclue', 'undetermined': 'Indéterminée'}
+
+
+def _v4_strategy(conn, lid, ct):
+    """Verdict de la stratégie du Classement pour ce titre : même moteur (`criteria`) et mêmes mesures (`strategy_metrics`) que le tableau. Sans contexte fiable : indéterminé, jamais « retenue »."""
+    from . import criteria as CR, ranking_table
+    ct = ct or {}
+    ct_id, state = ct.get('id'), ct.get('state') or 'missing'
+    base = {'id': ct_id, 'label': ct.get('label'), 'state': state, 'checks': [], 'active': 0, 'join': None}
+    if not ct_id or state in ('missing', 'draft_lost'):
+        return dict(base, context='missing', status='undetermined', status_label=V4_STATUS_LABELS['undetermined'], reason='context_missing')
+    norm = ranking_table.norm_of({'ct_id': ct_id, 'spec': ct.get('spec')})
+    if norm is None:
+        return dict(base, context='missing', state='missing', status='undetermined', status_label=V4_STATUS_LABELS['undetermined'], reason='context_missing')
+    data = ranking_table._fetch(conn, [lid]).get(lid) or {}
+    ev = CR.evaluate(norm, {'m': data.get('m'), 'avg_volume': data.get('avg_volume_3m')})
+    return dict(base, context='ok', status=ev['status'], status_label=V4_STATUS_LABELS[ev['status']], checks=ev['checks'], active=ev['active'], join=ev['join'], reason=ev['reason'],
+                criteria_free=ev['active'] == 0)
