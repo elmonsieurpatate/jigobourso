@@ -389,3 +389,15 @@ a.ct-company:hover b,a.ct-company:focus-visible b{text-decoration:underline}
   .ct .ct-secondary .ct-filter-actions{padding:10px 12px 0}
   .ct .ct-secondary .ct-filter-actions .btn{flex:1 1 calc(33% - 8px);padding:0 6px;font-size:13px}
 }
+
+/* Le sélecteur enrichi remplace le select dans la même cellule de grille. */
+.ct .ct-strategy .sui-pick{grid-area:select;display:block;width:100%;min-width:0;max-width:100%}
+.ct .ct-strategy .sui-pick-btn,.ct .ct-strategy .sui-opt{box-sizing:border-box;min-width:0;max-width:100%}
+.ct .ct-strategy .sui-opt .grow{min-width:0;overflow-wrap:anywhere}
+#ct-search-status{margin:-12px 0 16px;color:var(--muted);font-size:.9rem}
+#ct-apply{display:inline-flex;align-items:center;justify-content:center;gap:8px}
+@media(max-width:700px){
+  .ct .ct-strategy .sui-pick-btn{flex-wrap:wrap}
+  .ct .ct-strategy .sui-pick-btn .grow{flex:1 1 100px}
+  .ct .ct-strategy .sui-pick-btn .sui-badge{margin-left:auto;font-size:.65rem}
+}

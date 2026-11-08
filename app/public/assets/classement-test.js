@@ -176,6 +176,7 @@
   try{const l=JSON.parse(localStorage.getItem(key)||'{}')||{};if(['simple','expert'].includes(l.mode))state.mode=l.mode;}catch(_){/* préférences d'affichage facultatives */}
   overrides=ovBy[state.strategy];state.filters=filtersFor(overrides);
   state.selected=periods.find(([k])=>config().periods[k].enabled)?.[0]||state.selected;
+  let applied=null;
   const isDirty=id=>JSON.stringify([state.profiles[id],id===state.strategy?overrides:ovBy[id]])!==JSON.stringify([saved[id].p,saved[id].o]);
   const anyDirty=()=>order().some(isDirty);
   function renderStrategies(){
@@ -190,6 +191,7 @@
     $('#ct-strategy-state').textContent=!serverOk?'Enregistrement indisponible':isDirty(state.strategy)?'Modifications non enregistrées':'Enregistrée';
     $('#ct-save').disabled=!serverOk;$('#ct-duplicate').disabled=!serverOk;
     drawPicker();
+    updateSearchStatus();
   }
   // Statuts Officielle / Adaptée / Personnelle (serveur) : sélecteur groupé à badges, bandeau et fenêtre d'information. Reconstruits seulement si leur contenu change.
   let suiList=null,suiKey='';
@@ -206,7 +208,7 @@
   function takeView(view){rev=view.revision;meta=cloneJSON(view.meta||{});for(const it of view.items)names[it.id]=it.name;customIds=view.items.filter(i=>!i.builtin).map(i=>i.id);}
   function switchTo(id,remember=true){
     closeFilter();ovBy[state.strategy]=overrides;state.strategy=id;overrides=ovBy[id]||(ovBy[id]={});state.filters=filtersFor(overrides);
-    tableState.page=1;applyDefaultSort();tree();project();state.selected=periods.find(([k])=>config().periods[k].enabled)?.[0]||'week';render();loadRows();
+    tableState.page=1;applyDefaultSort();tree();project();state.selected=periods.find(([k])=>config().periods[k].enabled)?.[0]||'week';render();
     if(remember&&serverOk)J.post('classement-test/strategies/save',{action:'select',id}).catch(()=>{});
   }
   function currentPayload(){tree();project();return {config:cloneJSON(state.profiles[state.strategy]),filters:cloneJSON(overrides)};}
@@ -236,7 +238,7 @@
       return `<div class="ct-preview-group"><b>${n.join==='and'?'TOUTES (ET)':'AU MOINS UNE (OU)'}</b>${n.children.map(x=>`<div>${text(x)}</div>`).join('')||'<span>Aucun critère</span>'}</div>`;
     }
     $('#ct-preview').innerHTML=text(tree());
-    if(!loading&&typeof renderRanking==='function'){renderRanking();scheduleVerdicts();}                 // le tableau suit immédiatement les seuils / règles (affichage seulement)
+    updateSearchStatus();
     const hasEmpty = n => n.kind==='group' && (!n.children.length || n.children.some(hasEmpty));
     const valid=leaves().length>0 && !hasEmpty(tree()) && leaves().every(({node:r})=>Number.isFinite(r.value) && (r.metric!=='r2'||(r.value>=0&&r.value<=1)) && (!['volatility','drawdown','volume'].includes(r.metric)||r.value>=0));
     const badge=$('.ct-valid');badge.textContent=valid?'✓ Filtre valide':'⚠ Filtre à compléter';badge.classList.toggle('invalid',!valid);
@@ -333,9 +335,10 @@
   // Brouillon introuvable côté fiche ⇒ elle l'indique et ne rend aucun verdict : jamais de remplacement silencieux par d'autres réglages.
   const ctxKey=s=>{let h=0;for(const c of s)h=(h*31+c.charCodeAt(0))|0;return (h>>>0).toString(36);};
   function sheetHref(id){
-    let q='titre.html?src=explorer&id='+encodeURIComponent(id)+'&ct='+encodeURIComponent(state.strategy);
-    if(typeof isDirty==='function'&&serverOk&&isDirty(state.strategy)){
-      const spec=specNow(),json=JSON.stringify({id:state.strategy,spec}),k=ctxKey(json);
+    const context=applied||{strategy:state.strategy,config:specNow()};
+    let q='titre.html?src=explorer&id='+encodeURIComponent(id)+'&ct='+encodeURIComponent(context.strategy);
+    if(context.config){
+      const json=JSON.stringify({id:context.strategy,spec:context.config}),k=ctxKey(json);
       try{localStorage.setItem('jigo_ct_ctx:'+k,json);}catch(_){/* la fiche signalera un contexte introuvable */}
       q+='&ctx='+k;
     }
@@ -364,10 +367,11 @@
     return row._o[k]=out;
   }
   function applySecondary(rows){
-    if(categoryPayload.schema!==2)return secondary.apply(rows,state.filters,categories);
-    const active=Object.entries(categories).filter(([k,c])=>state.filters[k]&&state.filters[k].length!==c.options.length);
+    const filters=applied?applied.filters:state.filters;
+    if(categoryPayload.schema!==2)return secondary.apply(rows,filters,categories);
+    const active=Object.entries(categories).filter(([k,c])=>filters[k]&&filters[k].length!==c.options.length);
     if(!active.length)return [...rows];
-    return rows.filter(row=>active.every(([k])=>rowOptions(row,k).some(id=>state.filters[k].includes(id))));
+    return rows.filter(row=>active.every(([k])=>rowOptions(row,k).some(id=>filters[k].includes(id))));
   }
   // Aucune admission : tous les titres évalués sont classés. Seuls les filtres secondaires masquent des lignes (affichage), sans toucher aux scores ni aux rangs.
   // Critères de recherche de la stratégie (pente / R² du mode Simple, règles du mode Expert) : ils servent à RECHERCHER les titres du profil. Ils ne modifient jamais une note ni un rang :
@@ -559,23 +563,33 @@
   $('#ct-sort-direction').onclick=()=>{tableState.userSorted=true;tableState.sorts=[{key:sortKey(),dir:sortDir()==='desc'?'asc':'desc'},...tableState.sorts.slice(1)];tableState.page=1;renderRanking();};
   $('#ct-page-size').onchange=e=>{tableState.pageSize=Number(e.target.value);tableState.page=1;renderRanking();};
   $('#ct-show-demo-all').onclick=()=>{tableState.verdict='all';tableState.query='';const q=$('#ct-search');if(q)q.value='';tableState.page=1;state.filters=secondary.all(categories);for(const k of Object.keys(categories))saveLocalSelection(k);renderFilters();};
-  $('#ct-apply').onclick=()=>feedback('Réglages conservés. Le tableau présente des données fictives, indépendantes de la stratégie.');
-  // Critères en cours de modification : le serveur recalcule les statuts avec le même moteur (aucune évaluation locale) ; scores et rangs ne bougent pas.
-  let verdictSeq=0,verdictTimer=null,appliedSpec=null;
+  $('#ct-apply').onclick=()=>loadRows();
+  // Un instantané au clic : les modifications du formulaire restent en attente.
   const specNow=()=>{tree();project();return cloneJSON(config());};
-  function scheduleVerdicts(){clearTimeout(verdictTimer);if(JSON.stringify(specNow())===appliedSpec)return;verdictTimer=setTimeout(refreshVerdicts,250);}
-  async function refreshVerdicts(){
-    const my=++verdictSeq,want=state.strategy,spec=specNow(),json=JSON.stringify(spec);
-    try{const d=await J.post('ranking/verdicts',{strategy:want,config:spec});if(my!==verdictSeq||want!==state.strategy)return;for(const r of intrinsicRows)r.status=d.status[r.id]||'undetermined';appliedSpec=json;renderRanking();}
-    catch(e){if(my===verdictSeq)feedback('Statuts de stratégie non actualisés : '+(e.message||'erreur'));}
+  function updateSearchStatus(message){
+    const button=$('#ct-apply'),status=$('#ct-search-status');
+    button.disabled=loading;
+    button.innerHTML=loading?'<span class="spinner" aria-hidden="true"></span> Chargement…':'Appliquer les réglages';
+    $('.ct-ranking').setAttribute('aria-busy',String(loading));
+    const pending=applied&&(applied.strategy!==state.strategy||JSON.stringify(applied.config)!==JSON.stringify(config())||JSON.stringify(applied.filters)!==JSON.stringify(state.filters));
+    status.textContent=message||(loading?'Chargement des résultats…':loadError?loadError:pending?'Réglages modifiés : appuyez sur « Appliquer les réglages ».':applied?'Résultats à jour.':'');
   }
-  let loadSeq=0;
   async function loadRows(){
-    const my=++loadSeq,want=state.strategy;loading=true;
-    $('#ct-table-body').innerHTML='<tr class="ct-loading"><td colspan="20"><span class="spinner"></span> Chargement des titres…</td></tr>';
-    try{const data=await J.api('ranking/table',{params:{strategy:want}});if(my!==loadSeq)return;intrinsicRows=data.rows.map(toRow);universe=data.universe||intrinsicRows.length;defaultSort='complex';applyDefaultSort();loadError=null;scoreLabel=data.label||'';appliedSpec=null;loading=false;}
-    catch(e){if(my!==loadSeq)return;intrinsicRows=[];loadError='Classement indisponible : '+(e.message||'erreur de chargement');loading=false;}
-    renderRanking();scheduleVerdicts();                                   // lignes chargées avec les réglages ENREGISTRÉS : si la page affiche un brouillon, les statuts suivent le brouillon
+    if(loading&&applied)return;
+    const request={strategy:state.strategy,config:specNow(),filters:cloneJSON(state.filters)};
+    loading=true;loadError=null;updateSearchStatus();renderRanking();
+    try{
+      const data=await J.api('ranking/table',{params:{strategy:request.strategy}});
+      const verdicts=await J.post('ranking/verdicts',{strategy:request.strategy,config:request.config});
+      const rows=data.rows.map(toRow);
+      for(const row of rows)row.status=verdicts.status[row.id]||'undetermined';
+      intrinsicRows=rows;applied=request;universe=data.universe||rows.length;
+      defaultSort='complex';applyDefaultSort();tableState.page=1;scoreLabel=data.label||'';
+    }catch(e){
+      loadError='Résultats non actualisés : '+(e.message||'erreur de chargement')+'. Réessayez avec « Appliquer les réglages ».';
+    }finally{
+      loading=false;renderRanking();updateSearchStatus();
+    }
   }
   tree();project();render();loadRows();
 })().catch(error=>{const p=document.querySelector('#ct-feedback');p.textContent='Impossible d’ouvrir la page de test : '+error.message;});
