@@ -44,7 +44,7 @@ const BASE = process.env.BASE || 'http://127.0.0.1:18095', SHOTS = process.env.S
       const ctx = await login('audit_portfolio', 'audit-local-validation-2026', width), page = await ctx.newPage(), errors = []; page.on('pageerror', e => errors.push(e.message)); page.setDefaultTimeout(15000);
       await page.goto(`${BASE}/alertes.html?portfolio=${pid}&listing=${lid}`); await page.locator('.al-cnt').waitFor(); await page.locator('.al-row').first().waitFor();
       assert.ok(await page.locator('.al-c').count() === 4); assert.ok(await page.locator('#al-side .al-r').count() >= 3);
-      assert.match(await page.locator('#al-side').innerText(), /Stratégie d’origine/); assert.match(await page.locator('#al-side').innerText(), /Stratégie de surveillance/);
+      assert.doesNotMatch(await page.locator('#al-side').innerText(), /Stratégie d’origine/); assert.match(await page.locator('#al-side').innerText(), /Stratégie de surveillance/);
       if (SHOTS) await page.screenshot({ path: `${SHOTS}/al-${width}.png`, fullPage: true });
       await page.locator('#al-tabs [data-t="hist"]').click(); assert.ok(await page.locator('.al-ev').count() >= 1);
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true, 'défilement horizontal ' + width);

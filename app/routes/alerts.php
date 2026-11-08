@@ -6,8 +6,8 @@ require_once __DIR__ . '/../lib/engine.php';
 require_once __DIR__ . '/../services/ct_strategies.php';
 require_once __DIR__ . '/portfolios.php';
 
-const ALERT_KINDS = ['price_below', 'price_above', 'target', 'gain_pct_above', 'loss_pct', 'gain_eur_above', 'loss_eur', 'drawdown_from_high', 'gain_giveback', 'daily_move', 'slope_min', 'r2_min', 'vol_max', 'drawdown_max', 'momentum_min', 'ma_below'];
-const ALERT_TREND = ['slope_min', 'r2_min', 'vol_max', 'drawdown_max', 'momentum_min'];
+const ALERT_KINDS = ['price_below', 'price_above', 'target', 'gain_pct_above', 'loss_pct', 'gain_eur_above', 'loss_eur', 'drawdown_from_high', 'gain_giveback', 'daily_move', 'slope_min', 'r2_min', 'vol_max', 'drawdown_max', 'momentum_min', 'ma_below', 'momentum6_min', 'momentum12_min', 'er_min', 'ma_falling', 'gap_ma20_max'];
+const ALERT_TREND = ['slope_min', 'r2_min', 'vol_max', 'drawdown_max', 'momentum_min', 'momentum6_min', 'momentum12_min', 'er_min'];
 const ALERT_GRAN = ['day', 'week', 'month', 'quarter', 'half', 'year'];
 // identifiants des stratégies de la page Classement -> modèles du moteur (mêmes sept stratégies)
 const ALERT_PRESET = ['fast' => 'fast', 'regular' => 'regular', 'calm' => 'low_volatility', 'rebound' => 'recovery', 'mom6' => 'momentum', 'mom12' => 'momentum12', 'momrisk' => 'momentum_risk'];
@@ -44,8 +44,8 @@ function alert_event(int $rule, int $uid, string $ev, $val = null, $thr = null, 
     q('INSERT INTO alert_events(rule_id, user_id, at, event, value_obs, threshold, message) VALUES (?,?,?,?,?,?,?)', [$rule, $uid, now_utc(), $ev, $val, $thr, $msg]);
 }
 function alert_insert(array $u, int $pid, int $lid, array $r, string $source, ?string $strategy): int {
-    q('INSERT INTO alert_rules(user_id, portfolio_id, listing_id, kind, granularity, threshold, default_threshold, severity, source, strategy_key, enabled, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,1,?,?)',
-      [$u['id'], $pid, $lid, $r['kind'], $r['granularity'] ?? null, $r['threshold'] ?? null, $source === 'strategy' ? ($r['threshold'] ?? null) : null, $r['severity'] ?? 'vigilance', $source, $strategy, now_utc(), now_utc()]);
+    q('INSERT INTO alert_rules(user_id, portfolio_id, listing_id, kind, granularity, threshold, default_threshold, severity, source, strategy_key, enabled, why, model_version, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+      [$u['id'], $pid, $lid, $r['kind'], $r['granularity'] ?? null, $r['threshold'] ?? null, $source === 'strategy' ? ($r['threshold'] ?? null) : null, $r['severity'] ?? 'vigilance', $source, $strategy, array_key_exists('enabled', $r) && !$r['enabled'] ? 0 : 1, isset($r['why']) ? mb_substr((string)$r['why'], 0, 220) : null, $r['model_version'] ?? null, now_utc(), now_utc()]);
     return (int)db()->lastInsertId();
 }
 /** Reprend, sans rien supprimer, les filets de sécurité et objectifs déjà enregistrés : ils deviennent des règles d'alerte (la table d'origine reste intacte). */
@@ -61,6 +61,20 @@ function alert_import_legacy(array $u, int $pid): void {
 function alert_origin_for(int $uid, int $pid, int $lid): array {
     return q("SELECT t.id AS transaction_id, o.strategy_key, o.status, o.set_by, t.trade_at FROM portfolio_transactions t LEFT JOIN lot_origin o ON o.transaction_id = t.id WHERE t.portfolio_id = ? AND t.listing_id = ? AND t.side = 'buy' ORDER BY t.trade_at", [$pid, $lid])->fetchAll();
 }
+/** Version du modèle d'alerte d'une stratégie : enregistre une nouvelle version publiée uniquement si les règles ont changé (empreinte différente). Jamais de modification d'une version publiée. */
+function alert_model_version(string $key, array $tpl): int {
+    $rules = array_map(fn($r) => ['kind' => $r['kind'], 'granularity' => $r['granularity'] ?? null, 'threshold' => isset($r['threshold']) ? round((float)$r['threshold'], 6) : null, 'enabled' => !isset($r['enabled']) || $r['enabled'] ? 1 : 0], $tpl);
+    $json = json_encode($rules, JSON_UNESCAPED_UNICODE); $dg = sha1($json);
+    $last = q("SELECT version, digest FROM alert_models WHERE strategy_key = ? AND status = 'published' ORDER BY version DESC LIMIT 1", [$key])->fetch();
+    if ($last && $last['digest'] === $dg) return (int)$last['version'];
+    $v = $last ? (int)$last['version'] + 1 : 1;
+    q("INSERT INTO alert_models(strategy_key, version, status, rules_json, digest, created_by, created_at) VALUES (?,?,'published',?,?,'system',?)", [$key, $v, $json, $dg, now_utc()]);
+    return $v;
+}
+function alert_log_change(int $pid, int $lid, string $summary): void {
+    $w = q('SELECT strategy_key FROM position_watch WHERE portfolio_id = ? AND listing_id = ?', [$pid, $lid])->fetch();
+    q('INSERT INTO position_watch_log(portfolio_id, listing_id, from_key, to_key, summary, at) VALUES (?,?,?,?,?,?)', [$pid, $lid, $w['strategy_key'] ?? null, $w['strategy_key'] ?? 'personal', mb_substr($summary, 0, 300), now_utc()]);
+}
 function alert_apply_template(array $u, int $pid, int $lid, string $key, string $mode, bool $dry = false): array {
     $all = alert_strategies($u); $s = $all[$key] ?? null;
     if (!$s) throw new ApiError('Stratégie inconnue', 422);
@@ -69,13 +83,17 @@ function alert_apply_template(array $u, int $pid, int $lid, string $key, string 
     if (!$s['preset'] && !$hasCfg) return $plan + ['added' => 0, 'updated' => 0, 'kept' => 0];       // stratégie sans critères de tendance exploitables : aucune règle inventée
     $tpl = engine_call('watch-template', ['name' => $s['preset'] ?: 'regular', 'config' => $hasCfg ? $s['config'] : null])['rules'] ?? [];
     $plan['available'] = count($tpl);
+    $mv = alert_model_version($key, $tpl); $plan['model_version'] = $mv;
+    $plan['tpl'] = array_map(fn($r) => $r + ['enabled' => !isset($r['enabled']) || $r['enabled']], $tpl);
     foreach ($tpl as $r) {
+        $r['model_version'] = $mv;
         $ex = q("SELECT * FROM alert_rules WHERE portfolio_id = ? AND listing_id = ? AND source = 'strategy' AND strategy_key = ? AND kind = ? AND granularity <=> ?", [$pid, $lid, $key, $r['kind'], $r['granularity'] ?? null])->fetch();
         if (!$ex) { $plan['add'][] = $r; if (!$dry) alert_insert($u, $pid, $lid, $r, 'strategy', $key); continue; }
-        if ($mode !== 'sync') continue;
+        if (!in_array($mode, ['sync', 'reset'], true)) continue;
         $custom = $ex['threshold'] !== null && $ex['default_threshold'] !== null && abs((float)$ex['threshold'] - (float)$ex['default_threshold']) > 2e-6;
-        if ($custom) { $plan['keep'][] = ['id' => (int)$ex['id'], 'kind' => $r['kind'], 'granularity' => $r['granularity'] ?? null, 'threshold' => (float)$ex['threshold'], 'strategy_threshold' => $r['threshold']]; if (!$dry) q('UPDATE alert_rules SET default_threshold = ? WHERE id = ?', [$r['threshold'], $ex['id']]); }
-        elseif (abs((float)$ex['threshold'] - round((float)$r['threshold'], 6)) > 2e-6) { $plan['update'][] = ['id' => (int)$ex['id'], 'kind' => $r['kind'], 'granularity' => $r['granularity'] ?? null, 'from' => (float)$ex['threshold'], 'to' => $r['threshold']]; if (!$dry) q('UPDATE alert_rules SET threshold = ?, default_threshold = ?, updated_at = ? WHERE id = ?', [$r['threshold'], $r['threshold'], now_utc(), $ex['id']]); }
+        if ($custom && $mode === 'reset') { $plan['update'][] = ['id' => (int)$ex['id'], 'kind' => $r['kind'], 'granularity' => $r['granularity'] ?? null, 'from' => (float)$ex['threshold'], 'to' => $r['threshold']]; if (!$dry) q('UPDATE alert_rules SET threshold = ?, default_threshold = ?, why = ?, model_version = ?, updated_at = ? WHERE id = ?', [$r['threshold'], $r['threshold'], $r['why'] ?? null, $mv, now_utc(), $ex['id']]); }
+        elseif ($custom) { $plan['keep'][] = ['id' => (int)$ex['id'], 'kind' => $r['kind'], 'granularity' => $r['granularity'] ?? null, 'threshold' => (float)$ex['threshold'], 'strategy_threshold' => $r['threshold']]; if (!$dry) q('UPDATE alert_rules SET default_threshold = ? WHERE id = ?', [$r['threshold'], $ex['id']]); }
+        elseif (abs((float)$ex['threshold'] - round((float)$r['threshold'], 6)) > 2e-6 ) { $plan['update'][] = ['id' => (int)$ex['id'], 'kind' => $r['kind'], 'granularity' => $r['granularity'] ?? null, 'from' => (float)$ex['threshold'], 'to' => $r['threshold']]; if (!$dry) q('UPDATE alert_rules SET threshold = ?, default_threshold = ?, why = ?, model_version = ?, updated_at = ? WHERE id = ?', [$r['threshold'], $r['threshold'], $r['why'] ?? null, $mv, now_utc(), $ex['id']]); }
     }
     return $plan + ['added' => count($plan['add']), 'updated' => count($plan['update']), 'kept' => count($plan['keep'])];
 }
@@ -95,7 +113,7 @@ function alerts_mail_pending(): int {
     }
     return $sent;
 }
-const ALERT_LABELS = ['price_below' => 'cours inférieur à', 'price_above' => 'cours supérieur à', 'target' => 'objectif de cours', 'gain_pct_above' => 'gain d’au moins (%)', 'loss_pct' => 'perte d’au moins (%)', 'gain_eur_above' => 'gain d’au moins (€)', 'loss_eur' => 'perte d’au moins (€)', 'drawdown_from_high' => 'recul depuis le sommet (%)', 'gain_giveback' => 'gain rendu (points)', 'daily_move' => 'variation sur une séance (%)', 'slope_min' => 'pente sous', 'r2_min' => 'R² sous', 'vol_max' => 'volatilité au-dessus de', 'drawdown_max' => 'recul maximal au-dessus de', 'momentum_min' => 'progression sous', 'ma_below' => 'cours sous la moyenne mobile'];
+const ALERT_LABELS = ['price_below' => 'cours inférieur à', 'price_above' => 'cours supérieur à', 'target' => 'objectif de cours', 'gain_pct_above' => 'gain d’au moins (%)', 'loss_pct' => 'perte d’au moins (%)', 'gain_eur_above' => 'gain d’au moins (€)', 'loss_eur' => 'perte d’au moins (€)', 'drawdown_from_high' => 'recul depuis le sommet (%)', 'gain_giveback' => 'gain rendu (points)', 'daily_move' => 'variation sur une séance (%)', 'slope_min' => 'pente sous', 'r2_min' => 'R² sous', 'vol_max' => 'volatilité au-dessus de', 'drawdown_max' => 'recul maximal au-dessus de', 'momentum_min' => 'progression sous', 'ma_below' => 'cours sous la moyenne mobile', 'momentum6_min' => 'momentum 6 mois (6−1) sous', 'momentum12_min' => 'momentum 12 mois (12−1) sous', 'er_min' => 'régularité sous', 'ma_falling' => 'moyenne mobile en baisse', 'gap_ma20_max' => 'écart à la moyenne 20 séances au-dessus de'];
 
 return [
     'alerts/state' => function () {
@@ -108,7 +126,8 @@ return [
         $strategies = alert_strategies($u);
         $pos = []; $rules = q('SELECT * FROM alert_rules WHERE user_id = ? AND portfolio_id = ? ORDER BY id', [$u['id'], $p['id']])->fetchAll();
         $by = []; foreach ($rules as $r) $by[(int)$r['listing_id']][] = $r;
-        $watch = []; foreach (q('SELECT listing_id, strategy_key FROM position_watch WHERE portfolio_id = ?', [$p['id']])->fetchAll() as $w) $watch[(int)$w['listing_id']] = $w['strategy_key'];
+        $watch = []; $wmv = []; foreach (q('SELECT listing_id, strategy_key, model_version FROM position_watch WHERE portfolio_id = ?', [$p['id']])->fetchAll() as $w) { $watch[(int)$w['listing_id']] = $w['strategy_key']; $wmv[(int)$w['listing_id']] = $w['model_version'] === null ? null : (int)$w['model_version']; }
+        $latest = []; foreach (q("SELECT strategy_key, MAX(version) v FROM alert_models WHERE status = 'published' GROUP BY strategy_key")->fetchAll() as $m) $latest[$m['strategy_key']] = (int)$m['v'];
         foreach ($val['positions'] as $x) {
             if (!$x['listing_id'] || $x['qty'] <= 0) continue;
             $lid = (int)$x['listing_id'];
@@ -116,7 +135,7 @@ return [
             $legacyLot = q("SELECT s.strategy, t.id FROM lot_settings s JOIN portfolio_transactions t ON t.id = s.transaction_id WHERE t.portfolio_id = ? AND t.listing_id = ? AND s.strategy IS NOT NULL", [$p['id'], $lid])->fetchAll();
             $pos[] = ['listing_id' => $lid, 'symbol' => $x['symbol'], 'name' => $x['name'], 'kind' => $x['kind'] ?? null, 'price' => $x['price'] ?? null, 'currency' => $x['price_currency'] ?? $x['currency'], 'value' => $x['value'] ?? null,
                       'origins' => $origins, 'lot_strategies' => array_map(fn($l) => ['tx' => (int)$l['id'], 'strategy' => $l['strategy'], 'label' => alert_label($strategies, $l['strategy'])], $legacyLot),
-                      'watch' => isset($watch[$lid]) ? ['key' => $watch[$lid], 'label' => $strategies[$watch[$lid]]['label'] ?? $watch[$lid], 'status' => $strategies[$watch[$lid]]['status'] ?? null] : null,
+                      'watch' => isset($watch[$lid]) ? ['key' => $watch[$lid], 'label' => $strategies[$watch[$lid]]['label'] ?? $watch[$lid], 'status' => $strategies[$watch[$lid]]['status'] ?? null, 'model_version' => $wmv[$lid] ?? null, 'model_latest' => $latest[$watch[$lid]] ?? null] : null,
                       'rules' => count($by[$lid] ?? []),
                       'watch_log' => q('SELECT at, summary FROM position_watch_log WHERE portfolio_id = ? AND listing_id = ? ORDER BY at DESC, id DESC LIMIT 6', [$p['id'], $lid])->fetchAll()];
         }
@@ -139,6 +158,7 @@ return [
         if (!empty($b['id'])) {
             $r = alert_owned_rule((int)$b['id'], $u);
             q('UPDATE alert_rules SET threshold = ?, granularity = ?, severity = ?, enabled = ?, updated_at = ? WHERE id = ?', [(float)$thr, $gran, $sev, empty($b['enabled']) && array_key_exists('enabled', $b) ? 0 : 1, now_utc(), $r['id']]);
+            if (abs((float)$r['threshold'] - (float)$thr) > 2e-6) alert_log_change((int)$r['portfolio_id'], (int)$r['listing_id'], 'Seuil modifié : ' . (ALERT_LABELS[$r['kind']] ?? $r['kind']) . ' ' . rtrim(rtrim(number_format((float)$r['threshold'], 4, ',', ''), '0'), ',') . ' → ' . rtrim(rtrim(number_format((float)$thr, 4, ',', ''), '0'), ',') . '.');
             return ['id' => (int)$r['id']];
         }
         $p = own_portfolio((int)($b['portfolio_id'] ?? 0), $u); $lid = (int)($b['listing_id'] ?? 0);
@@ -150,6 +170,7 @@ return [
     'alerts/rule-toggle' => function () {
         need_post(); $u = require_user(); $b = body(); $r = alert_owned_rule((int)($b['id'] ?? 0), $u);
         $on = !empty($b['enabled']) ? 1 : 0; q('UPDATE alert_rules SET enabled = ?, state = ?, updated_at = ? WHERE id = ?', [$on, $on ? null : $r['state'], now_utc(), $r['id']]);
+        alert_log_change((int)$r['portfolio_id'], (int)$r['listing_id'], ($on ? 'Règle activée : ' : 'Règle désactivée : ') . (ALERT_LABELS[$r['kind']] ?? $r['kind']) . '.');
         return ['ok' => true];
     },
     'alerts/rule-delete' => function () { need_post(); $u = require_user(); $r = alert_owned_rule((int)(body()['id'] ?? 0), $u); q('DELETE FROM alert_rules WHERE id = ?', [$r['id']]); return ['ok' => true]; },
@@ -164,7 +185,7 @@ return [
     'alerts/rule-restore' => function () {
         need_post(); $u = require_user(); $r = alert_owned_rule((int)(body()['id'] ?? 0), $u);
         if ($r['default_threshold'] === null) throw new ApiError('Cette règle n’a pas de valeur d’origine', 422);
-        q('UPDATE alert_rules SET threshold = ?, updated_at = ? WHERE id = ?', [$r['default_threshold'], now_utc(), $r['id']]); return ['ok' => true];
+        q('UPDATE alert_rules SET threshold = ?, updated_at = ? WHERE id = ?', [$r['default_threshold'], now_utc(), $r['id']]); alert_log_change((int)$r['portfolio_id'], (int)$r['listing_id'], 'Seuil du modèle restauré : ' . (ALERT_LABELS[$r['kind']] ?? $r['kind']) . '.'); return ['ok' => true];
     },
     // Modèle de surveillance d'une stratégie appliqué à une position : ajoute les règles manquantes ; en mode « sync », met à jour les règles héritées non modifiées et conserve les personnalisées.
     'alerts/apply-template' => function () {
@@ -173,11 +194,11 @@ return [
         if (!$lid) throw new ApiError('Titre manquant', 422);
         $dry = !empty($b['dry']);
         $prev = q('SELECT strategy_key FROM position_watch WHERE portfolio_id = ? AND listing_id = ?', [$p['id'], $lid])->fetch();
-        $r = alert_apply_template($u, (int)$p['id'], $lid, $key, ($b['mode'] ?? 'add') === 'sync' ? 'sync' : 'add', $dry);
+        $r = alert_apply_template($u, (int)$p['id'], $lid, $key, in_array($b['mode'] ?? 'add', ['sync', 'reset'], true) ? $b['mode'] : 'add', $dry);
         if ($dry) return $r;
         $sum = ($prev && $prev['strategy_key'] !== $key ? 'Changement vers « ' . $r['strategy_label'] . ' »' : ($prev ? 'Mise à jour de « ' . $r['strategy_label'] . ' »' : 'Surveillance « ' . $r['strategy_label'] . ' » activée')) . ' : ' . $r['added'] . ' ajoutée(s), ' . $r['updated'] . ' mise(s) à jour, ' . $r['kept'] . ' conservée(s), ' . $r['personal_kept'] . ' règle(s) personnelle(s) intacte(s).';
         q('INSERT INTO position_watch_log(portfolio_id, listing_id, from_key, to_key, summary, at) VALUES (?,?,?,?,?,?)', [$p['id'], $lid, $prev['strategy_key'] ?? null, $key, $sum, now_utc()]);
-        q('INSERT INTO position_watch(portfolio_id, listing_id, strategy_key, updated_at) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE strategy_key = VALUES(strategy_key), updated_at = VALUES(updated_at)', [$p['id'], $lid, $key, now_utc()]);
+        q('INSERT INTO position_watch(portfolio_id, listing_id, strategy_key, model_version, updated_at) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE strategy_key = VALUES(strategy_key), model_version = VALUES(model_version), updated_at = VALUES(updated_at)', [$p['id'], $lid, $key, $r['model_version'] ?? null, now_utc()]);
         return $r;
     },
     // Stratégie d'origine d'un achat, renseignée à la main quand elle est inconnue (jamais inventée, jamais réécrite si déjà connue par l'achat).

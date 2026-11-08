@@ -1,4 +1,4 @@
-/* 25 scénarios fonctionnels du moteur d'alertes (via l'API réelle) : transitions, acquittement, réarmement, données insuffisantes, modèles de stratégie, aperçu, isolation. */
+/* 33 scénarios fonctionnels du moteur d'alertes (via l'API réelle) : transitions, acquittement, réarmement, données insuffisantes, modèles de stratégie, aperçu, isolation. */
 const assert = require('node:assert/strict'); const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const BASE = process.env.BASE || 'http://127.0.0.1:18095'; let n = 0;
 (async () => {
@@ -47,6 +47,19 @@ const BASE = process.env.BASE || 'http://127.0.0.1:18095'; let n = 0;
     ok('23 stratégie de surveillance changée et journalisée', pos.watch.key === 'fast' && pos.watch_log.length >= 2, JSON.stringify(pos.watch_log));
     ok('24 stratégie inconnue refusée', (await call(A, 'alerts/apply-template', { portfolio_id: pid, listing_id: other, strategy: 'nope', mode: 'add' })).s === 422);
     ok('25 isolation : un autre compte ne voit ni ne modifie', (await call(B, 'alerts/state&portfolio=' + pid)).s === 404 && (await call(B, 'alerts/rule-ack', { id: lo })).s === 404 && (await call(B, 'alerts/apply-template', { portfolio_id: pid, listing_id: lid, strategy: 'regular' })).s === 404);
+    // modèles versionnés, restauration, compléments désactivés, journal
+    s = await S(); let pos2 = s.positions.find(p => p.listing_id === other); const fastRules = s.rules.filter(r => r.listing_id === other && r.source === 'strategy' && r.strategy_key === 'fast');
+    ok('26 modèle : version enregistrée sur la position et sur chaque règle, avec explication', pos2.watch.model_version >= 1 && fastRules.length > 0 && fastRules.every(r => r.model_version === pos2.watch.model_version && r.why), JSON.stringify(pos2.watch));
+    const cu = fastRules.find(r => r.kind === 'slope_min'); await save({ listing_id: other, id: cu.id, kind: cu.kind, granularity: cu.granularity, threshold: cu.threshold + 0.5 });
+    const rdry = (await call(A, 'alerts/apply-template', { portfolio_id: pid, listing_id: other, strategy: 'fast', mode: 'reset', dry: true })).b; ok('27 restauration du modèle : aperçu de la personnalisation à défaire, rien d’écrit', rdry.update.some(u => u.id === cu.id) && Math.abs(R(await S(), cu.id).threshold - cu.threshold - 0.5) < 2e-6, JSON.stringify(rdry));
+    await call(A, 'alerts/apply-template', { portfolio_id: pid, listing_id: other, strategy: 'fast', mode: 'reset' }); ok('28 restauration du modèle : seuil du modèle rétabli, personnelles intactes', Math.abs(R(await S(), cu.id).threshold - cu.threshold) < 2e-6);
+    const mdry = (await call(A, 'alerts/apply-template', { portfolio_id: pid, listing_id: other, strategy: 'mom6', mode: 'sync', dry: true })).b; ok('29 momentum sans seuil : un seul complément, désactivé et à confirmer', mdry.tpl.length === 1 && mdry.tpl[0].enabled === false && mdry.tpl[0].kind === 'momentum6_min', JSON.stringify(mdry.tpl));
+    await call(A, 'alerts/apply-template', { portfolio_id: pid, listing_id: other, strategy: 'mom6', mode: 'sync' }); s = await S(); const comp = s.rules.find(r => r.listing_id === other && r.strategy_key === 'mom6');
+    ok('30 complément créé désactivé, jamais évalué', comp && comp.enabled === 0 && comp.state === null && /à confirmer/.test(comp.why), JSON.stringify(comp));
+    ok('31 nouveau changement de stratégie : règles précédentes conservées sans doublon', (await call(A, 'alerts/apply-template', { portfolio_id: pid, listing_id: other, strategy: 'mom6', mode: 'sync' })).b.added === 0);
+    await call(A, 'alerts/rule-toggle', { id: comp.id, enabled: true }); await call(A, 'alerts/refresh', {}); s = await S(); const c2 = R(s, comp.id);
+    ok('32 complément confirmé : évalué, et jamais « normal » sans données (non évaluable ou mesuré)', c2.enabled === 1 && (['normal', 'triggered'].includes(c2.state) ? c2.last_value !== null : ['insufficient', 'error'].includes(c2.state) && !!c2.last_reason), JSON.stringify(c2));
+    ok('33 journal : modifications et activations tracées', s.positions.find(p => p.listing_id === other).watch_log.some(l => /Règle activée|Seuil modifié|restauré/.test(l.summary)), JSON.stringify(s.positions.find(p => p.listing_id === other).watch_log));
     console.log('ok scénarios', n);
   } finally { await b.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });

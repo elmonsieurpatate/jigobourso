@@ -36,3 +36,20 @@
 .al-r{display:block}.ap-hist{margin-top:10px}.ap-hist summary{cursor:pointer;color:var(--accent)}
 .ap-choices{display:flex;flex-direction:column;gap:6px;margin-bottom:8px}.ap-ch{display:flex;gap:8px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:10px;cursor:pointer}
 @media(max-width:700px){.ap-top{grid-template-columns:1fr}.ap-m{grid-template-columns:1fr 1fr}}
+/* Boutons du panneau de surveillance : une seule taille, primaire comprise */
+.ap .btn,.ap .btn.small,.ap .btn.primary,.ap .btn.danger{box-sizing:border-box;height:32px;min-height:32px;padding:0 12px;font-size:.82rem;font-weight:500;line-height:1;display:inline-flex;align-items:center;justify-content:center;border-radius:8px;white-space:nowrap}
+.ap h4 .btn{font-weight:500}
+.ap-empty{border:1px dashed var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:8px}.ap-empty p{margin:0}
+.ap-pick{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.ap-note{margin:6px 0;padding:8px 10px;border:1px solid var(--line);border-radius:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:.86rem}
+.ap-pvw{border:1px solid var(--accent);border-radius:12px;padding:10px 12px;margin:10px 0}.ap-pvw h4{margin:0 0 6px}
+.ap-pvl{list-style:none;margin:0 0 6px;padding:0;display:flex;flex-direction:column;gap:6px}.ap-pv{font-size:.88rem}
+.ap-line{display:flex;gap:6px 10px;flex-wrap:wrap;align-items:center;justify-content:space-between;padding:8px 0}.ap-l1{display:flex;gap:4px 8px;flex-wrap:wrap;align-items:center}
+.ap-form{display:flex;gap:8px 12px;flex-wrap:wrap;align-items:flex-end}.ap-form label{display:flex;flex-direction:column;gap:3px;font-size:.8rem;color:var(--muted)}.ap-form input,.ap-form select{background:var(--surface);color:var(--text);border:1px solid var(--line);border-radius:9px;padding:6px 8px;height:32px;box-sizing:border-box}
+.ap-new{border:1px solid var(--line);border-radius:12px;padding:10px;margin-bottom:8px;flex-direction:column;align-items:stretch}.ap-new p{margin:0}
+.ap-edit{border:1px solid var(--accent);border-radius:12px;padding:10px;margin:6px 0}
+.ap-top>div{min-width:0}
+.al-ra{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.ap-form label{min-width:0;max-width:100%}.ap-form input,.ap-form select{max-width:100%;min-width:0}.ap-new label,.ap-new input,.ap-new select{width:100%}
+.ap-new .al-ra{position:relative}.ap-new p{position:static}
+.ap h4{flex-wrap:wrap}.ap .btn{flex:0 0 auto}
