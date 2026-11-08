@@ -58,23 +58,45 @@ const PERIODS = ['1d', '2d', '5d', '1w', '2w', '1m', '3m', '6m', '1y', '2y', '3y
       // tableau compact : en-têtes, tri stable, ligne cliquable
       if (width >= 1024) { for (const h of ['Titre', 'Valeur', 'Gain/perte', 'Rendement', 'Surveillance', 'Actions']) assert.ok((await page.locator('.px-t thead').first().innerText()).toLowerCase().includes(h.toLowerCase()), h); }
       await noOverflow('tableau'); await page.locator('.px-t [data-sort="value"]').first().evaluate(e => e.click());
-      // détail en panneau avec surveillance intégrée
+      // les deux accès redondants ont disparu du Portefeuille
+      const pageTxt = await page.locator('#px-page').innerText(); assert.ok(!/Transactions et lots/.test(pageTxt) && !/Centre d’alertes/.test(pageTxt), 'accès redondants supprimés');
+      // détail : en-tête compact + trois onglets, retour au même emplacement
+      await page.evaluate(() => scrollTo(0, 250)); const yBefore = await page.evaluate(() => scrollY);
       await page.locator('.px-t tbody tr[data-open]').first().evaluate(e => e.click()); await page.locator('.px-drawer').waitFor();
-      const dtxt = await page.locator('.px-drawer').innerText();
-      for (const s of ['Synthèse financière', 'Évolution', 'Stratégies', 'Surveillance', 'Transactions et lots', 'Stratégie d’origine', 'A · Règles de la stratégie', 'B · Protection', 'C · Compléments', 'D · Historique']) assert.ok(dtxt.includes(s), 'détail : ' + s);
-      const secOrder = await page.evaluate(() => [...document.querySelectorAll('.px-db > section h3')].map(h => h.textContent)); assert.deepEqual(secOrder.slice(0, 5), ['Synthèse financière', 'Évolution', 'Stratégies', 'Surveillance', 'Transactions et lots']);
+      const tabs = await page.locator('.px-tabs2 button').allInnerTexts(); assert.deepEqual(tabs.map(t => t.replace(/ \(\d+\)/, '')), ['Chiffres', 'Graphique', 'Alertes']);
+      assert.equal(await page.locator('.px-tabs2 button.on').count(), 1); const head = await page.locator('.px-dh').innerText(); for (const h of ['Cours', 'Prix de revient', 'Résultat global', 'Acheter', 'Vendre']) assert.ok(head.includes(h), 'en-tête : ' + h);
       assert.equal(await page.locator('.px-drawer a[target="_blank"]').first().getAttribute('rel'), 'noopener'); await noOverflow('détail');
-      await page.waitForFunction(() => !document.querySelector('#px-det-plot.loading')); await page.locator('#px-det-box [data-k="per"] [data-v="1y"]').click(); await page.locator('#px-det-box [data-k="mode"] [data-v="market"]').click(); await page.waitForFunction(() => !document.querySelector('#px-det-plot.loading'));
-      assert.match(await page.locator('#px-det-cur').innerText(), /1A/); await shot('drawer');
-      // création d'une alerte de protection par l'assistant
-      await page.locator('[data-new="invest"]').click(); await page.locator('#ar-t').fill('12'); await page.locator('#ar-k').selectOption('drawdown_from_high');
-      assert.match(await page.locator('#ar-sum').innerText(), /Vous serez alerté si le cours recule d’au moins 12 %/); await shot('alert-edit');
-      await page.getByRole('button', { name: 'Enregistrer' }).click(); await page.locator('.al-r', { hasText: 'Recul depuis le plus haut cours' }).first().waitFor();
-      assert.match(await page.locator('.px-drawer').innerText(), /Alerte si le cours recule d’au moins 12 %/);
-      // changement de stratégie de surveillance : aperçu puis confirmation
-      await page.locator('#ap-watch').selectOption('regular'); await page.locator('#ap-apply').click(); await page.locator('dialog[open]').first().waitFor(); const prev = await page.locator('dialog[open]').first().innerText(); assert.match(prev, /Règles ajoutées|Rien à modifier|Seuils/);
-      await page.getByRole('button', { name: 'Confirmer' }).click(); await page.locator('.al-r').first().waitFor(); await shot('surv-detail');
-      await page.locator('dialog[open]').waitFor({ state: 'detached' }); await page.keyboard.press('Escape'); await page.locator('.px-drawer').waitFor({ state: 'detached' });
+      // CHIFFRES : 14 périodes, rien d'inventé avant l'achat
+      const prow = await page.locator('.px-fig tbody tr').allInnerTexts(); assert.equal(prow.length, 14, 'quatorze lignes de périodes');
+      for (const lab of ['1J', '2J', '5J', '1S', '2S', '1M', '3M', '6M', '1A', '2A', '3A', '5A', '10A', 'Depuis l’achat']) assert.ok(prow.some(r => r.startsWith(lab)), 'période ' + lab);
+      const last = prow[12]; assert.ok(/Partiel|Indisponible/.test(last), '10A : partiel ou indisponible, jamais une performance inventée : ' + last.replace(/\s+/g, ' '));
+      assert.ok(/Depuis l’origine[\s\S]*réalisé[\s\S]*latent/i.test(await page.locator('.px-origin').innerText()), 'origine, réalisé, latent');
+      await page.locator('[data-fig="market"]').click(); assert.match(await page.locator('.px-fig thead').innerText(), /Variation du cours/i); assert.equal((await page.locator('.px-fig tbody tr').count()), 14); await page.locator('[data-fig="perso"]').click();
+      assert.match(await page.locator('.px-ops thead').innerText(), /Frais/i); assert.ok(await page.locator('.px-ops tbody tr').count() >= 1, 'opérations'); assert.ok(!/Lots FIFO/i.test(await page.locator('.px-drawer').innerText()), 'FIFO pas en titre');
+      if (await page.locator('.px-tech').count()) { await page.locator('.px-tech summary').click(); assert.match(await page.locator('.px-tech').innerText(), /Stratégie : (Non renseignée|Croissance|Croiss|Rapide|Calme|Rebond|Momentum)/); }
+      // GRAPHIQUE : onglet, périodes, intraday, modes
+      await page.locator('[data-tab="graphique"]').click(); await page.locator('#px-det-plot').waitFor(); await page.waitForFunction(() => !document.querySelector('#px-det-plot.loading') && document.querySelector('#px-det-plot svg,#px-det-plot .px-empty'));
+      assert.equal(await page.locator('#px-det-box [data-k="per"] button').count(), 15, 'quinze périodes dans le graphique'); await page.locator('#px-det-box [data-k="per"] [data-v="1d"]').click(); await page.waitForFunction(() => !document.querySelector('#px-det-plot.loading'));
+      assert.match(await page.locator('#px-det-cur').innerText(), /1J/); await page.locator('#px-det-box [data-k="mode"] [data-v="market"]').click(); await page.locator('#px-det-box [data-k="per"] [data-v="max"]').click(); await page.waitForFunction(() => !document.querySelector('#px-det-plot.loading'));
+      assert.match(await page.locator('#px-det-sum').innerText(), /^Données :/); await shot('drawer');
+      // ALERTES
+      await page.locator('[data-tab="alertes"]').click(); await page.locator('.ap-top').waitFor(); const atxt = await page.locator('[data-panel="alertes"]').innerText();
+      for (const s of ['Stratégie d’origine', 'Stratégie de surveillance', 'État de la surveillance', 'Ajouter une protection']) assert.ok(atxt.includes(s), 'alertes : ' + s);
+      assert.ok(!/Appliquer le modèle|A · Règles|B · Protection/.test(atxt), 'plus de jargon A/B/C');
+      assert.ok(!/Tout va bien/.test(atxt) || await page.locator('.al-r .al-b.ok').count() > 0, 'jamais « Tout va bien » sans règle évaluée');
+      const curW = await page.locator('#ap-watch').inputValue(); await page.locator('#ap-watch').selectOption(curW === 'regular' ? 'fast' : 'regular'); await page.locator('#ap-apply').click(); await page.locator('dialog[open]').first().waitFor(); assert.match(await page.locator('dialog[open]').first().innerText(), /Règles ajoutées|Rien à modifier|Seuils|conservés/);
+      await page.getByRole('button', { name: 'Confirmer' }).click(); await page.locator('dialog[open]').waitFor({ state: 'detached' }); await page.locator('.al-r').first().waitFor();
+      const first = await page.locator('.al-r').first().innerText(); assert.match(first, /Héritée de la stratégie|Personnelle|Personnalisée/); assert.match(first, /Valeur mesurée[\s\S]*Seuil[\s\S]*Dernière vérification/);
+      assert.match(await page.locator('[data-panel="alertes"]').innerText(), /Tendance sur|Régularité sur|Progression sur|Volatilité sur/); assert.match(await page.locator('.al-r .ap-ask').first().innerText(), /M’avertir si/);
+      assert.ok(await page.locator('#ap-watch').inputValue() !== '', 'stratégie de surveillance enregistrée');
+      // protection personnelle : ajout, modification, désactivation
+      await page.locator('#ap-add').click(); await page.locator('dialog[open] input[name=apc]').first().waitFor(); assert.equal(await page.locator('dialog[open] input[name=apc]').count(), 7);
+      await page.locator('dialog[open] input[name=apc][value="loss_pct"]').check(); await page.locator('#ar-t').fill('8'); assert.match(await page.locator('#ar-sum').innerText(), /Vous serez averti si je perds 8 % ou plus/); await shot('alert-edit');
+      await page.getByRole('button', { name: 'Enregistrer' }).click(); await page.locator('dialog[open]').waitFor({ state: 'detached' }); const card = page.locator('.al-r', { hasText: 'Perte de 8 %' }).first(); await card.waitFor();
+      await card.getByRole('button', { name: 'Modifier' }).click(); await page.locator('#ar-t').fill('9'); await page.getByRole('button', { name: 'Enregistrer' }).click(); await page.locator('dialog[open]').waitFor({ state: 'detached' }); const c9 = page.locator('.al-r', { hasText: 'Perte de 9 %' }).first(); await c9.waitFor();
+      await c9.getByRole('button', { name: 'Désactiver' }).click(); await page.locator('.al-r', { hasText: 'Perte de 9 %' }).first().getByText('Réactiver').waitFor(); assert.match(await page.locator('.al-r', { hasText: 'Perte de 9 %' }).first().innerText(), /Désactivée/);
+      await page.locator('.al-r', { hasText: 'Perte de 9 %' }).first().getByRole('button', { name: 'Réactiver' }).click(); await page.locator('.al-r', { hasText: 'Perte de 9 %' }).first().getByText('Désactiver').waitFor(); await shot('surv-detail');
+      await page.keyboard.press('Escape'); await page.locator('.px-drawer').waitFor({ state: 'detached' }); assert.ok(Math.abs(await page.evaluate(() => scrollY) - yBefore) < 5, 'retour au même emplacement');
       // zones : positions, transactions, surveillance
       await page.locator('.px-zones [data-zone="surveillance"]').click(); await page.locator('.px-sv').waitFor(); assert.match(await page.locator('.px-sv thead').innerText(), /Stratégie de surveillance[\s\S]*Dernière évaluation/i); await noOverflow('surveillance'); await shot('surveillance');
       await page.locator('.px-sv [data-conf]').first().evaluate(e => e.click()); await page.locator('.px-drawer').waitFor(); await page.keyboard.press('Escape');

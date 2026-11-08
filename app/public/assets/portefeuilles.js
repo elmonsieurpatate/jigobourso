@@ -50,7 +50,7 @@
   /* ── Alertes, ventes, répartition, transactions : repliés par défaut ── */
   function lotsBody(d) {
     const groups = new Map();
-    d.lots.forEach(l => { const label=l.alert?.strategy_label || 'Non renseignée', rule=l.alert?.rules||{}, key=label+JSON.stringify([rule.days,rule.drop,rule.off,rule.exit]); if(!groups.has(key))groups.set(key,{label,rule,lots:[]});groups.get(key).lots.push(l); });
+    d.lots.forEach(l => { const label=l.alert?(l.alert.own_strategy?l.alert.strategy_label:'Non renseignée (règles par défaut : '+l.alert.strategy_label+')'):'Non renseignée', rule=l.alert?.rules||{}, key=label+JSON.stringify([rule.days,rule.drop,rule.off,rule.exit]); if(!groups.has(key))groups.set(key,{label,rule,lots:[]});groups.get(key).lots.push(l); });
     return `<p class="small muted">Les règles communes sont regroupées par stratégie et réglages effectifs. Les réglages individuels restent accessibles à la demande. Aucune vente n’est automatique.</p>${[...groups.values()].map(({label,rule,lots})=>`<details><summary>${J.esc(label)} · ${lots.length} achat(s)</summary><p class="small muted">${rule.off?'Alertes désactivées':`Rappel : ${rule.days || 'aucun'} jours · recul : ${rule.drop ? J.num(rule.drop,1)+' %' : 'sans seuil'}${rule.exit==='momentum_negative'?' · momentum 6 mois négatif':rule.exit==='below_ma50'?' · sous la moyenne 50 j':''}`}</p>${lots.map(l=>`<div class="lot-detail"><b>${J.esc(l.name||l.symbol)}</b> · ${J.date(l.trade_at)} · ${J.num(l.remaining,4)} titre(s) ${l.alert?.rules?.personal?'<span class="badge accent">personnalisé</span>':''}<button class="btn small" data-lot="${l.tx_id}">Régler cet achat</button></div>`).join('')}</details>`).join('')}`;
   }
   function salesBody(d) {
