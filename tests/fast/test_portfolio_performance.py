@@ -1,126 +1,64 @@
-"""Exercise the actual JavaScript performance function with independent cash-flow examples."""
-import json
+"""Règles de calcul du Portefeuille (pf-math.js, exécuté sous Node) avec des exemples de flux indépendants."""
+import json, shutil, subprocess
 from pathlib import Path
-import subprocess
-
 import pytest
 
+ROOT = Path(__file__).resolve().parents[2]
+pytestmark = pytest.mark.skipif(shutil.which('node') is None, reason='node absent')
 
-def perf(gain, values, purchases, start, end):
-    source = (Path(__file__).resolve().parents[2] / 'app/public/assets/portefeuilles.js').read_text()
-    function = source[source.index('  function perf('):source.index('  const tradePrice')]
-    code = function + '\nconsole.log(JSON.stringify(perf(...JSON.parse(process.argv[1]))));'
-    out = subprocess.run(['node', '-e', code, json.dumps([gain, values, purchases, start, end])],
-                         capture_output=True, text=True, check=True)
+
+def js(expr, data):
+    code = "const PFM=require(process.argv[1]);const D=JSON.parse(process.argv[2]);console.log(JSON.stringify(" + expr + "));"
+    out = subprocess.run(['node', '-e', code, str(ROOT / 'app/public/assets/pf-math.js'), json.dumps(data)], capture_output=True, text=True, check=True)
     return json.loads(out.stdout)
 
 
+def hist(dates, gain, value, purchases, net_in=None, factors=None):
+    line = dict(key='1', symbol='A', name='A', values=value, gain=gain, purchases=purchases, net_in=net_in or purchases, quantities=[1] * len(dates))
+    return dict(dates=dates, gain=gain, value=value, purchases=purchases, net_in=net_in or purchases, lines=[line], trades=[], performance=dict(factors=factors or [None] * len(dates)), market=None)
+
+
 def test_total_percentage_uses_purchases_not_net_cash_after_full_sale():
-    assert perf([0, 20], [100, 0], [100, 100], 0, 1) == {'eur': 20, 'pct': 20}
-    result = perf([0, 233.4], [100, 2900.4], [100, 3942], 0, 1)
-    assert result['pct'] == pytest.approx(100 * 233.4 / 3942)
+    h = hist(['2026-01-01', '2026-01-02'], [0, 20], [100, 0], [100, 100])
+    r = js("PFM.position(D,D.lines[0],PFM.resolveWindow(D,'all'))", h)
+    assert r['result'] == 20 and r['pct'] == pytest.approx(20)
 
 
 def test_period_includes_new_purchases_but_does_not_subtract_sales():
-    # Start value 1000, purchase 500, net sale 300, final value 1300 => gain 100.
-    assert perf([0, 0, 100], [0, 1000, 1300], [0, 1000, 1500], 1, 2) == {'eur': 100, 'pct': 100 / 15}
+    # valeur de départ 1000, achat 500, vente nette 300, valeur finale 1300 => gain 100, base 1500
+    h = hist(['2026-01-01', '2026-01-02'], [0, 100], [1000, 1300], [1000, 1500])
+    r = js("PFM.position(D,D.lines[0],{i0:0,i1:1})", h)
+    assert r['result'] == 100 and r['base'] == 1500 and r['pct'] == pytest.approx(100 * 100 / 1500)
 
 
-def test_unknown_value_is_not_zero_and_small_capital_has_a_percentage():
-    assert perf([None, None], [None, None], [10, 10], 0, 1) == {'eur': None, 'pct': None}
-    assert perf([0, .1], [.1, .2], [.1, .1], 0, 1) == {'eur': .1, 'pct': 100}
+def test_unknown_value_is_not_zero():
+    h = hist(['2026-01-01', '2026-01-02', '2026-01-03'], [0, None, 10], [100, None, 110], [100, 100, 100])
+    r = js("PFM.position(D,D.lines[0],{i0:1,i1:2})", h)
+    assert r['result'] is None and r['reason']                                          # départ non valorisable : pas de zéro inventé
+    assert js("PFM.position(D,D.lines[0],PFM.resolveWindow(D,'all'))", h)['result'] == 10
 
 
 def test_period_reference_is_calendar_based_and_clamps_month_end():
-    source = (Path(__file__).resolve().parents[2] / 'app/public/assets/portefeuilles.js').read_text()
-    function = source[source.index('  function periodStart('):source.index('  /* Gain /')]
-    code = "const EVO={per:process.argv[1]};\n" + function + '\nconsole.log(periodStart({dates:JSON.parse(process.argv[2])}));'
-    for period,dates,expected in [('1m',['2026-02-27','2026-02-28','2026-03-01','2026-03-31'],1),
-                                  ('1w',['2026-10-26','2026-10-27','2026-10-28','2026-11-03'],1),
-                                  ('all',['2026-01-01','2026-11-03'],0)]:
-        out=subprocess.run(['node','-e',code,period,json.dumps(dates)],capture_output=True,text=True,check=True)
-        assert int(out.stdout)==expected
+    dates = ['2026-01-28', '2026-02-27', '2026-02-28', '2026-03-31']
+    h = hist(dates, [0, 1, 2, 3], [1, 2, 3, 4], [1, 1, 1, 1])
+    w = js("PFM.resolveWindow(D,'1m')", h)
+    assert w['from'] == '2026-02-28' and w['i0'] == 2                                  # 31 mars − 1 mois = 28 février
+    assert js("PFM.resolveWindow(D,'1w')", h)['from'] == '2026-03-24'
 
 
-def test_transaction_markers_keep_recorded_time_and_sale_result_without_clamping():
-    source=(Path(__file__).resolve().parents[2]/'app/public/assets/portefeuilles.js').read_text()
-    functions=source[source.index('  const tradePrice ='):source.index('  function focusAnalysis(')]
-    trades=[dict(key='1',side='buy',date='2026-01-01',trade_at='2026-01-01 12:00:00',symbol='A'),
-            dict(key='1',side='buy',date='2026-01-07',trade_at='2026-01-07 09:15:00',symbol='A',quantity=2,unit_price=50,currency='USD',fees_eur=1,fx_to_eur=.9,first_buy=False),
-            dict(id=42,key='1',side='sell',date='2026-01-08',trade_at='2026-01-08 09:15:00',symbol='A',quantity=1,unit_price=60,currency='USD',fees_eur=2,fx_to_eur=.9),
-            dict(key='2',side='buy',date='2026-01-07',trade_at='2026-01-07 12:00:00',symbol='B'),
-            dict(key='1',side='buy',date='2026-02-01',trade_at='2026-02-01 12:00:00',symbol='A')]
-    prelude='const D={sales:[{tx_id:42,gain:7}]};const J={num:String,eur:String};const ANALYSIS={markers:true,focus:"1"};const H={trades:JSON.parse(process.argv[1])};'
-    code=prelude+functions+'''\nconst daily=transactionMarkers(['2026-01-05','2026-01-09']);
-    const intraday=transactionMarkers(['2026-01-07T09:00:00','2026-01-07T09:30:00'],true);
-    ANALYSIS.markers=false;
-    console.log(JSON.stringify([daily,intraday,transactionMarkers(['2026-01-05','2026-01-09'])]));'''
-    out=subprocess.run(['node','-e',code,json.dumps(trades)],capture_output=True,text=True,check=True)
-    daily,intraday,hidden=json.loads(out.stdout)
-    assert [m['x'] for m in daily]==['2026-01-07','2026-01-08']
-    assert daily[1]['kind']=='sell' and daily[1]['id']==42
-    assert daily[1]['label']=='Vente A' and 'réalisé 7' in daily[1]['detail']
-    assert [m['x'] for m in intraday]==['2026-01-07T09:15:00']
-    assert 'complémentaire A' in daily[0]['label']
-    assert 'USD' in daily[0]['detail'] and 'frais 1' in daily[0]['detail']
-    assert hidden==[]
+def test_period_before_history_is_flagged_not_extrapolated():
+    h = hist(['2026-03-01', '2026-03-02'], [0, 5], [10, 15], [10, 10])
+    w = js("PFM.resolveWindow(D,'1y')", h)
+    assert w['clipped'] is True and w['i0'] == -1
 
 
-@pytest.mark.parametrize('gains,first,current,gap', [
-    ([-1,2,-3,-4],'2026-01-01','2026-01-03',False),
-    ([-1,2,0,4],'2026-01-01',None,False),
-    ([None,None,-2,-3],'2026-01-03','2026-01-03',True),
-    ([0,1,2,3],None,None,False),
-    ([-1,-2,None,-4],'2026-01-01','2026-01-04',True),
-    ([-1,-2,None,None],'2026-01-01',None,False),
-])
-def test_loss_dates_are_observed_sequences_not_invented_crossings(gains,first,current,gap):
-    source=(Path(__file__).resolve().parents[2]/'app/public/assets/portefeuilles.js').read_text()
-    function=source[source.index('  function lossHistory('):source.index('  function miniCurve(')]
-    code=function+'\nconsole.log(JSON.stringify(lossHistory(["2026-01-01","2026-01-02","2026-01-03","2026-01-04"],JSON.parse(process.argv[1]))));'
-    out=subprocess.run(['node','-e',code,json.dumps(gains)],capture_output=True,text=True,check=True)
-    result=json.loads(out.stdout)
-    assert result['first']==first and result['current']==current
-    assert result.get('gap',False)==gap
+def test_contribution_uses_portfolio_capital_not_stock_return():
+    h = hist(['2026-01-01', '2026-01-02'], [0, 10], [100, 110], [100, 100])
+    c = js("PFM.contribution(PFM.position(D,D.lines[0],{i0:-1,i1:1}),PFM.portfolio(D,{i0:-1,i1:1}))", h)
+    assert c == pytest.approx(10)                                                      # 10 € sur 100 € engagés
 
 
-@pytest.mark.parametrize('period,start,expected', [('all',0,19),('1w',1,10),('1d',0,None)])
-def test_shared_snapshot_keeps_total_and_contributions_on_same_period(period,start,expected):
-    source=(Path(__file__).resolve().parents[2]/'app/public/assets/portefeuilles.js').read_text()
-    performance=source[source.index('  function perf('):source.index('  const tradePrice')]
-    snapshot=source[source.index('  function snapshot('):source.index('  function focusAnalysis(')]
-    history={'dates':['2026-01-01','2026-01-08','2026-01-15'],'gain':[-1,9,19],
-             'value':[100,150,0],'purchases':[101,151,151],
-             'lines':[{'key':'1','gain':[-1,9,19],'values':[100,150,0],'purchases':[101,151,151]}]}
-    code='const H=JSON.parse(process.argv[1]),EVO={per:process.argv[2]},PAL=["red"];function periodStart(){return Number(process.argv[3])};'+performance+snapshot+'\nconsole.log(JSON.stringify(snapshot()));'
-    out=subprocess.run(['node','-e',code,json.dumps(history),period,str(start)],capture_output=True,text=True,check=True)
-    result=json.loads(out.stdout)
-    assert result['total']['eur']==expected
-    assert result['rows'][0]['eur']==expected
-    if period=='1w':assert result['total']['pct']==pytest.approx(100*10/150)
-
-
-def test_personal_curves_keep_flat_realized_result_between_holding_intervals():
-    source=(Path(__file__).resolve().parents[2]/'app/public/assets/portefeuilles.js').read_text()
-    performance=source[source.index('  function perf('):source.index('  const tradePrice')]
-    held=source[source.index('  function heldPerformance('):source.index('  function positionTable(')]
-    code=performance+held+'''\nconst l={quantities:[1,0,0,1,1],purchases:[10,10,10,19,19],values:[10,0,0,9,9],gain:[0,1,1,1,1]};
-    console.log(JSON.stringify(l.gain.map((_,i)=>heldPerformance(l,0,i,'eur'))));'''
-    out=subprocess.run(['node','-e',code],capture_output=True,text=True,check=True)
-    assert json.loads(out.stdout)==[0,1,1,1,1]
-
-
-def test_contribution_percent_uses_common_portfolio_capital_not_stock_return():
-    source=(Path(__file__).resolve().parents[2]/'app/public/assets/portefeuilles.js').read_text()
-    performance=source[source.index('  function perf('):source.index('  const tradePrice')]
-    snapshot=source[source.index('  function snapshot('):source.index('  function focusAnalysis(')]
-    history={'dates':['2026-01-01','2026-01-02','2026-01-03'],'gain':[0,0,-82],'value':[2020,2020,1938],'purchases':[2020,2020,2020],
-      'lines':[{'key':'small','gain':[0,0,-2],'values':[20,20,18],'purchases':[20,20,20]},
-               {'key':'big','gain':[0,0,-80],'values':[2000,2000,1920],'purchases':[2000,2000,2000]}]}
-    code='const H=JSON.parse(process.argv[1]),EVO={per:"1w"},PAL=["red","blue"];function periodStart(){return 1};'+performance+snapshot+'\nconsole.log(JSON.stringify([snapshot(),snapshot({from:Date.parse("2025-01-01")/1000,to:Date.parse("2025-02-01")/1000})]));'
-    out=subprocess.run(['node','-e',code,json.dumps(history)],capture_output=True,text=True,check=True)
-    r,before=json.loads(out.stdout)
-    assert r['rows'][0]['pct']==-10 and r['rows'][1]['pct']==-4
-    assert r['rows'][0]['contribution_pct']==pytest.approx(-2/2020*100)
-    assert sum(l['contribution_pct'] for l in r['rows'])==pytest.approx(r['total']['pct'])
-    assert before['total']['eur']==0 and before['total']['pct'] is None
+def test_personal_peak_and_drop():
+    h = hist(['a', 'b', 'c'], [0, 30, 10], [1, 1, 1], [1, 1, 1])
+    r = js("PFM.personalPeak(D.lines[0])", h)
+    assert r['peak'] == 30 and r['drop'] == -20

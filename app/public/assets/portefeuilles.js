@@ -33,233 +33,19 @@
     });
   }
 
-  const STATUS = { normal: ['ok', 'Normal'], watch: ['wait', 'À surveiller'], act: ['ko', 'À examiner'], unknown: ['', 'Données insuffisantes'] };
-  const positionLots = (d,p) => d.lots.filter(l => p.listing_id ? l.listing_id === p.listing_id : !l.listing_id && l.symbol === p.symbol);
-  const insight = p => (D.insights || {})[p.key] || { status: 'unknown', label: 'Données insuffisantes', reasons: [], market: {} };
-  function statusBadge(i) { const c = STATUS[i.status] || STATUS.unknown; return `<span class="badge ${c[0]}">${J.esc(i.label || c[1])}</span>`; }
-  function priority(i) { return ({ act: 3, watch: 2, unknown: 1, normal: 0 })[i.status] || 0; }
-  function gainProtection(g, compact = false) {
-    if (!g || !g.available) return `<p class="small muted">${J.esc(g?.reason || 'Sommet depuis l’achat indisponible.')}</p>`;
-    const used = Math.max(0, g.peak_gain_pct), kept = Math.max(0, Math.min(100, used > 0 ? 100 * Math.max(0, g.gain_pct) / used : 0));
-    return `<div class="protection"><div class="protection-values"><span>Meilleur gain observé <b>${J.pct(g.peak_gain_pct, 1)}</b></span><span>Actuel <b class="${J.cls(g.gain_pct)}">${J.pct(g.gain_pct, 1)}</b></span><span>Gain rendu <b>${J.num(g.given_back_pp, 1)} points</b></span></div><div class="protection-track" role="img" aria-label="${J.num(kept, 0)} % du gain positif observé conservé"><i style="width:${kept.toFixed(2)}%"></i></div>${compact ? `<p class="small muted">Position actuelle suivie depuis le ${J.date(g.start)} · sommet ${px(g.high,g.currency)} · recul −${J.num(g.drop_pct,2)} %.</p>` : `<p class="small muted">Recul du cours : −${J.num(g.drop_pct, 2)} % depuis le sommet observé ${px(g.high,g.currency)}. Gains personnels calculés en euros ; le recul du cours utilise la devise du titre. Référence : ${J.date(g.start)} ; dernière valeur du ${J.date(g.value_date)} ; sommet du gain le ${J.date(g.peak_date)}.</p>`}</div>`;
-  }
-  function diagnosticDetails(p, i, d) {
-    const m = i.market || {}, trend = { strong: 'hausse forte', steady: 'hausse soutenue', gentle: 'hausse douce', flat: 'pas de tendance nette', down: 'baisse' }[m.trend] || 'non mesurée';
-    return `<div class="diagnostic-grid"><section><h4>Mon investissement · protection des gains</h4><p class="small muted">Quantités actuellement détenues, prix de revient moyen actuel. Comparaison depuis le dernier achat encore ouvert. Les détails de chaque achat suivent leur propre date et leur coût FIFO.</p>${gainProtection(i.protection)}</section><section><h4>État actuel du titre</h4>${!m.reliable ? '<p class="small muted">Données anciennes ou incomplètes : ces indicateurs ne permettent pas un diagnostic actuel fiable.</p>' : ''}<p class="small muted">Clôture de référence : ${m.as_of ? J.date(m.as_of) : 'indisponible'}.</p><dl class="market-facts"><dt>Tendance · 1 mois</dt><dd>${trend}</dd><dt>Momentum 6 mois</dt><dd>${J.pct(m.momentum_6m)}</dd><dt>Clôture / moyenne 50 j</dt><dd>${px(m.close, p.price_currency)} / ${px(m.ma50, p.price_currency)}</dd><dt>Moyenne 200 j</dt><dd>${px(m.ma200, p.price_currency)}</dd><dt>Volatilité · 3 mois</dt><dd>${m.volatility === null || m.volatility === undefined ? 'indisponible' : J.num(m.volatility, 2) + ' % par séance'}</dd></dl></section></div>
-      <div class="diagnostic-reasons"><h4>Ce qui mérite votre attention</h4>${i.reasons?.length ? i.reasons.map(r => `<p><b>${J.esc(r.action || 'Observation')}.</b> ${J.esc(r.message)}</p>`).join('') : '<p>Aucun signal notable parmi les indicateurs disponibles.</p>'}<p class="small muted">Les observations ne sont ni une prévision ni un ordre de vente.</p></div>
-      <details><summary>Détail par achat ouvert</summary>${positionLots(d,p).map(l => `<div class="lot-detail"><b>Achat du ${J.date(l.trade_at)}</b> · ${J.num(l.remaining, 4)} titre(s) · ${J.esc(l.alert?.strategy_label || '')}${gainProtection(l.alert?.protection)}<button class="btn small" data-lot="${l.tx_id}">Régler cet achat</button></div>`).join('')}</details>`;
-  }
-  function periodStart(h) {
-    if (EVO.per === 'all' || EVO.per === '1d' || !h.dates.length) return 0;
-    const end=new Date(h.dates[h.dates.length-1]+'T12:00:00Z'), target=new Date(end);
-    if(EVO.per==='1w') target.setUTCDate(target.getUTCDate()-7);
-    else {const months={ '1m':1,'3m':3,'6m':6,'1y':12 }[EVO.per]||1, day=target.getUTCDate();target.setUTCDate(1);target.setUTCMonth(target.getUTCMonth()-months);const last=new Date(Date.UTC(target.getUTCFullYear(),target.getUTCMonth()+1,0)).getUTCDate();target.setUTCDate(Math.min(day,last));}
-    const since=target.toISOString().slice(0,10);
-    let index=0; h.dates.forEach((d,i)=>{if(d<=since)index=i;}); return index;
-  }
-  /* Gain / (valeur initiale + achats, frais compris). Les ventes restent dans le gain,
-     jamais dans ce dénominateur. Sur Tout : gain total / achats cumulés, comme le résumé. */
-  function perf(gain, values, purchases, i0, i) {
-    if (i < 0 || gain[i] === undefined || gain[i] === null || (i0 > 0 && (gain[i0] === null || values[i0] === null))) return { eur: null, pct: null };
-    const g = gain[i] - (i0 === 0 ? 0 : gain[i0]);
-    const base = (i0 === 0 ? 0 : values[i0]) + purchases[i] - (i0 === 0 ? 0 : purchases[i0]);
-    return { eur: g, pct: base > 0 ? 100 * g / base : null };
-  }
-  function neutralPerformance(start,end){
-    const data=H.performance;if(!data||end<0||start>end)return null;
-    let growth=1;
-    for(let i=start===0?0:start+1;i<=end;i++){const factor=data.factors[i];if(factor===null||factor===undefined||!Number.isFinite(factor))return null;growth*=factor;}
-    return 100*(growth-1);
-  }
-  const tradePrice = t => J.num(t.unit_price,4)+' '+(t.currency || 'devise inconnue');
-  function transactionMarkers(xs, time = false, focus = ANALYSIS.focus) {
-    if (!ANALYSIS.markers || !xs.length) return [];
-    return (H.trades || []).filter(t=>!t.note && (!focus || t.key===focus) && t.date>=xs[0].slice(0,10) && t.date<=xs[xs.length-1].slice(0,10) && (!time || (t.trade_at.replace(' ','T')>=xs[0] && t.trade_at.replace(' ','T')<=xs[xs.length-1]))).map(t=>({x:time?t.trade_at.replace(' ','T'):t.date,id:t.id,kind:t.side,key:t.key,symbol:t.symbol,label:(t.side==='sell'?'Vente ':t.first_buy?'Premier achat ':'Achat complémentaire ')+t.symbol,detail:`${J.num(t.quantity,4)} titre(s) · prix ${tradePrice(t)} · frais ${J.eur(t.fees_eur)} · change ${J.num(t.fx_to_eur,6)} €/unité · ${t.trade_at}${t.side==='sell'?' · réalisé '+J.eur(D.sales.find(x=>x.tx_id===t.id)?.gain):''}`}));
-  }
-  function lossHistory(dates, gains) {
-    const known=gains.map((v,i)=>({v,i})).filter(x=>x.v!==null && Number.isFinite(x.v));
-    const first=known.find(x=>x.v<0), last=known[known.length-1];
-    if(!first)return {first:null,current:null};
-    if(!last || last.i!==gains.length-1 || last.v>=0)return {first:dates[first.i],current:null};
-    let start=last.i;
-    while(start>0 && gains[start-1]!==null && gains[start-1]<0)start--;
-    return {first:dates[first.i],current:dates[start],gap:start>0 && gains[start-1]===null};
-  }
-  function miniCurve(values) {
-    const nums=values.filter(v=>v!==null && Number.isFinite(v));
-    if(nums.length<2)return '<span class="small muted">Historique insuffisant</span>';
-    const lo=Math.min(0,...nums),hi=Math.max(0,...nums),span=hi-lo||1,Y=v=>30-28*(v-lo)/span;
-    let d='',pen=false;values.forEach((v,i)=>{if(v===null || !Number.isFinite(v)){pen=false;return;}d+=(pen?'L':'M')+(2+i*96/Math.max(1,values.length-1)).toFixed(1)+' '+Y(v).toFixed(1);pen=true});
-    return `<svg viewBox="0 0 100 34" role="img" aria-label="Résultat personnel sur la période, échelle propre à cette position"><line x1="2" x2="98" y1="${Y(0)}" y2="${Y(0)}" stroke="var(--line)"/><path d="${d}" fill="none" stroke="${nums[nums.length-1]<0?'var(--down)':'var(--up)'}" stroke-width="1.8"/></svg>`;
-  }
-  function hero(d) {
-    const t=d.totals,base=t.invested_total||0,g=t.total_gain;
-    const tax=Object.values(d.realized_by_year||{}).reduce((s,v)=>s+Math.max(0,Number(v)||0),0);
-    const net=g===null?null:g-.3*(tax+Math.max(0,Number(t.unrealized)||0));
-    const rate=v=>v!==null&&base>0?J.pct(100*v/base,1):'–';
-    return `<section class="card cockpit-summary" aria-label="Résumé financier"><div><span>Valeur actuelle des titres</span><strong class="hero-v">${J.eur(t.value)}</strong></div><div><span>Depuis le début · ventes comprises</span><strong class="hero-g ${J.cls(g)}">${sgn(g)} <small>Sur achats cumulés : <span class="capital-yield">${rate(g)}</span></small></strong></div><div><span id="summary-period-label">Performance hors achats/ventes</span><strong id="neutral-performance">Chargement…</strong><small>Gain sur la période : <b id="period-g">…</b></small></div><div class="summary-secondary"><span>Capital encore investi <b>${J.eur(t.cost)}</b></span><span>Réalisé <b>${sgn(t.realized)}</b></span><span>Latent <b>${sgn(t.unrealized)}</b></span><span>Net d’impôt estimé <b>${sgn(net)} · ${rate(net)}</b></span></div><details class="pf-explain"><summary>Définitions et fiscalité indicative</summary><p>Performance hors mouvements : rendements quotidiens chaînés, avec estimation pondérée des mouvements les jours d’opération (méthode Modified Dietz). Les clôtures ne permettent pas un TWR exact à chaque transaction. Liquidation puis rachat conservent les rendements des périodes de détention. Gain cumulé = réalisé + latent. Pourcentage cumulé = gain ÷ achats cumulés (${J.eur(base)}, frais compris). Sur une période : gain ÷ (valeur au départ + achats), ventes non déduites du dénominateur. Le net conserve l’hypothèse forfaitaire de 30 % des gains annuels réalisés positifs et du latent positif, sans fiscalité personnelle, PEA ou reports de pertes. Liquidités et dividendes ne sont pas gérés. Le coût restant est au PMP ; les lots suivent le FIFO.</p></details></section>`;
-  }
-  function analysis(){return `<section class="card cockpit-analysis" aria-label="Évolution et contributions"><div class="pf-section-title"><h2>Évolution</h2>${pills('evo-unit',[['eur','€'],['pct','%']],EVO.unit)}</div><div id="chart-modes" class="chart-tabs" role="tablist" aria-label="Lecture du graphique">${[['portfolio','Mon portefeuille'],['personal','Mes gains/pertes'],['market','Cours des actions']].map(([k,l])=>`<button type="button" role="tab" data-measure="${k}">${l}</button>`).join('')}</div><p id="chart-meaning" class="small muted"></p><div id="series-list" aria-label="Sélectionner une position"></div><p id="chart-window" class="small muted"></p><p id="evo-note" class="small muted" role="status"></p><div class="cockpit-chart-grid"><div id="chart-pane"><div id="evo-chart"></div></div><aside id="contributions" aria-label="Classement des contributions"></aside></div><div id="selection-summary" aria-live="polite"></div></section>`;}
   const positionKey=p=>p.listing_id?String(p.listing_id):'S'+p.symbol.toUpperCase();
-  function snapshot(window=null){
-    const last=H.dates.length-1;let start=periodStart(H),end=last;
-    const bound=(dates,time,fallback)=>{let found=fallback;dates.forEach((d,i)=>{if(Date.parse(d.length===10?d+'T00:00:00Z':d+'Z')<=time*1000)found=i});return found};
-    if(EVO.per==='1d'&&H.session){
-      const it=H.session,n=it.dates.length;let a=0,b=n-1;if(window){a=bound(it.dates,window.from,0);b=bound(it.dates,window.to,n-1)}
-      const delta=values=>b<0||values[b]==null||values[a]==null?null:values[b]-values[a],base=it.base===null?null:it.value[a];
-      const totalEur=delta(it.gain);const rows=H.lines.map((l,k)=>{const sl=it.lines.find(x=>x.key===l.key),eur=sl?delta(sl.gain):null,own=sl?.values[a];return {l,eur,pct:eur!==null&&own>0?100*eur/own:null,contribution_pct:eur!==null&&base>0?100*eur/base:null,color:PAL[k%PAL.length]}});
-      return {start:a,last:b,base,total:{eur:totalEur,pct:totalEur!==null&&base>0?100*totalEur/base:null},rows};
-    }
-    if(window){start=bound(H.dates,window.from,0);end=bound(H.dates,window.to,-1)}
-    if(end<0)return {start:0,last:-1,base:0,total:{eur:0,pct:null},rows:H.lines.map((l,k)=>({l,eur:0,pct:null,contribution_pct:null,color:PAL[k%PAL.length]}))};
-    const calc=l=>EVO.per==='1d'?{eur:null,pct:null}:perf(l.gain,l.values||l.value,l.purchases,start,end);
-    const base=end<0||start>0&&H.value[start]===null?null:(start?H.value[start]:0)+H.purchases[end]-(start?H.purchases[start]:0);
-    return {start,last:end,base,total:calc(H),rows:H.lines.map((l,k)=>{const r=calc(l);return {l,...r,contribution_pct:r.eur!==null&&base>0?100*r.eur/base:null,color:PAL[k%PAL.length]}})};
-  }
-  function focusAnalysis(key, detail=false, reveal=false) {
-    if(CHART.measure==='portfolio')CHART.measure='personal';
-    ANALYSIS.focus=key;ANALYSIS.auto=false;ANALYSIS.detail=detail||ANALYSIS.detail;
-    CHART.selected=new Set([key]);CHART.hidden.delete(key);DASH.titles=true;DASH.portfolio=true;
-    switchView('home');drawEvo();
-    if(reveal)J.$('#evo-chart').scrollIntoView({block:'start',behavior:'smooth'});
-  }
   function switchView(view) {
     VIEW=view;
     J.$$('#pf-nav [data-view]').forEach(b=>{const active=b.dataset.view===view;b.classList.toggle('on',active);b.setAttribute('aria-selected',String(active));b.tabIndex=active?0:-1});
     J.$$('.pf-panel').forEach(e=>e.hidden=e.dataset.panel!==view);
     if(H)drawEvo();
   }
-  function heldPerformance(l,start,i,unit) {
-    const held=l.purchases[i]>0;
-    return held?perf(l.gain,l.values,l.purchases,start,i)[unit]:null;
-  }
-  function positionTable(d,s) {
-    const items=(POSITION_SCOPE==='closed'?d.closed:POSITION_SCOPE==='all'?[...d.positions,...d.closed]:d.positions).map(p=>{const key=positionKey(p),r=s?.rows.find(r=>r.l.key===key),i=insight(p);return {p,key,r,i}});
-    const value=x=>SORT==='gain'?x.r?.eur:SORT==='impact'?Math.abs(x.r?.eur??NaN):SORT==='pct'?x.r?.pct:SORT==='weight'?x.p.weight:SORT==='drop'?x.i.protection?.drop_pct:SORT==='attention'?priority(x.i):x.r?.eur;
-    items.sort((a,b)=>{const av=value(a),bv=value(b),ak=av!==null&&av!==undefined&&Number.isFinite(av),bk=bv!==null&&bv!==undefined&&Number.isFinite(bv);return ak!==bk?ak?-1:1:ak?(SORT==='loss'?av-bv:bv-av)||a.p.symbol.localeCompare(b.p.symbol):a.p.symbol.localeCompare(b.p.symbol)});
-    return `<table class="positions-table"><thead><tr><th>Titre · premier achat</th><th>Valeur · poids</th><th>Sur la période</th><th>Depuis les achats</th><th>Recul observé</th><th>Surveillance</th><th>Opérations</th></tr></thead><tbody>${items.map(({p,key,r,i})=>{
-      const l=H?.lines.find(l=>l.key===key),c=l?perf(l.gain,l.values,l.purchases,0,EVO.per==='1d'?H.dates.length-1:s.last):{eur:null,pct:null},first=(d.transactions_list||[]).filter(t=>t.side==='buy'&&(p.listing_id?t.listing_id===p.listing_id:t.symbol===p.symbol)).sort((a,b)=>String(a.trade_at).localeCompare(String(b.trade_at)))[0];
-      return `<tr data-position="${J.esc(p.key)}" data-key="${J.esc(key)}" tabindex="0" aria-selected="${ANALYSIS.focus===key}"><td><button type="button" class="position-open" data-select="${J.esc(key)}"><b>${J.esc(p.symbol)}</b> <span>${J.esc(p.name_catalogue||p.name||p.symbol)}</span></button><small>${first?J.date(first.trade_at):'Date indisponible'} · ${J.num(p.qty,4)} titre(s)${p.qty===0?' · Clôturée':''}</small></td><td data-label="Valeur · poids"><b>${J.eur(p.qty===0?0:p.value)}</b><small>${J.pct(p.weight,1,false)}</small></td><td data-label="Sur la période" class="${J.cls(r?.eur)}"><b>${J.eur(r?.eur)}</b><small>${J.pct(r?.pct,1)}</small></td><td data-label="Depuis les achats" class="${J.cls(c.eur)}"><b>${J.eur(c.eur)}</b><small>${J.pct(c.pct,1)}</small></td><td data-label="Recul observé">${i.protection?.available?'−'+J.num(i.protection.drop_pct,1)+' %':'Indisponible'}</td><td data-label="Surveillance">${p.qty===0?'<span class="badge">Clôturée</span>':statusBadge(i)}</td><td data-label="Opérations"><button class="btn small" data-buy="${J.esc(key)}">Acheter</button> <button class="btn small" data-sell="${J.esc(key)}" ${p.qty>0?'':'disabled'}>Vendre</button></td></tr>`;
-    }).join('')||'<tr><td colspan="6" class="empty">Aucune position détenue. Les gains des ventes restent dans le résumé et les contributions.</td></tr>'}</tbody></table>`;
-  }
-  function bindTable() {
-    J.$$('#positions-table [data-key]').forEach(row=>{
-      const open=()=>{focusAnalysis(row.dataset.key,true);J.$('#position-detail').scrollIntoView({block:'nearest',behavior:'smooth'})};
-      row.onclick=e=>{if(!e.target.closest('[data-buy],[data-sell]'))open()};row.onkeydown=e=>{if(e.target===row&&['Enter',' '].includes(e.key)){e.preventDefault();open()}};
-    });
-    bindTradeActions(J.$('#positions-table'));
-  }
   function tradePosition(key,side){const p=[...D.positions,...D.closed].find(p=>positionKey(p)===key);if(!p)return;J.txDialog({portfolios:list,portfolioId:current,listing:{id:p.listing_id,symbol:p.symbol,name:p.name_catalogue||p.name||p.symbol,currency:p.price_currency||p.currency,price:p.price},side,quantity:side==='sell'?p.qty:'',onDone:render})}
-  function bindTradeActions(host=document){host.querySelectorAll('[data-buy],[data-sell]').forEach(b=>b.onclick=e=>{e.stopPropagation();tradePosition(b.dataset.buy||b.dataset.sell,b.dataset.sell?'sell':'buy')})}
-  function clearSelection(){CHART.selected.clear();ANALYSIS.focus=null;ANALYSIS.auto=false;ANALYSIS.detail=false;drawEvo()}
   function openHistory(id=null,key=null){TX_FILTER.key=key||positionKey(D.transactions_list.find(t=>t.id===id)||{});TX_FILTER.side='';TX_FILTER.from='';TX_FILTER.to='';renderTransactions();switchView('manage');const fold=J.$('[data-fold="tx"]');fold.classList.remove('folded');fold.querySelector('.fold-h').setAttribute('aria-expanded','true');const row=id?J.$(`[data-tx-row="${id}"]`):null;row?.classList.add('tx-target');(row||fold).scrollIntoView({block:'center',behavior:'smooth'});row?.focus()}
-  function renderContributions(s) {
-    const rows=[...s.rows].sort((a,b)=>a.eur===null?1:b.eur===null?-1:a.eur<0&&b.eur<0?a.eur-b.eur:a.eur<0?-1:b.eur<0?1:b.eur-a.eur);
-    const max=Math.max(1,...rows.map(r=>Math.abs(r.eur||0))),negative=rows.filter(r=>r.eur!==null&&r.eur<0),missing=rows.filter(r=>r.eur===null).length;
-    J.$('#contributions').innerHTML=`<h3>Mes gains et pertes</h3><p class="small muted">${EVO.unit==='pct'?'Contribution au gain / capital engagé · points, distincts de la performance hors mouvements':'Contribution au résultat en euros'} · tri par impact réel</p>${missing?`<p class="small muted">${EVO.per==='1d'?'Certaines contributions 1 J sont indisponibles ; voir les raisons sous le graphique.':`Contributions partielles : ${missing} titre(s) non calculable(s).`}</p>`:''}<div class="contribution-list">${rows.map((r,index)=>{
-      const rank=negative.indexOf(r),label=r.eur===null?'Données insuffisantes':rank===0?'1re perte':rank===1?'2e perte':r.eur<0?'Perte':r.eur>0?'Gain':'Stable';
-      return `${index===0||((r.eur>=0||r.eur===null)&&rows[index-1]?.eur<0)?'<h4>'+(r.eur<0?'Mes plus grosses pertes':'Mes plus gros gains')+'</h4>':''}<button class="cockpit-contribution ${ANALYSIS.focus===r.l.key?'selected':''}" data-contribution="${J.esc(r.l.key)}" data-eur="${r.eur??''}" aria-pressed="${ANALYSIS.focus===r.l.key}"><span><i style="background:${r.color}"></i><b>${J.esc(r.l.symbol)}</b><small>${label}</small></span><span class="contribution-track"><i class="${r.eur<0?'down':'up'}" style="${r.eur<0?'right':'left'}:50%;width:${50*Math.abs(r.eur||0)/max}%"></i></span><strong class="${J.cls(r.eur)}">${formatContribution(r)}</strong><small class="contribution-meta">Position ${J.pct(r.pct,1)} · Poids ${J.pct(D.positions.find(p=>positionKey(p)===r.l.key)?.weight??(D.closed.some(p=>positionKey(p)===r.l.key)?0:null),1,false)}</small></button>`;
-    }).join('')||'<p class="small muted">Aucune transaction.</p>'}</div><p class="small muted">Titres soldés inclus.</p>`;
-    J.$$('#contributions [data-contribution]').forEach(b=>b.onclick=()=>ANALYSIS.focus===b.dataset.contribution?clearSelection():focusAnalysis(b.dataset.contribution,true));
-  }
-  function renderSelection(s) {
-    const r=s.rows.find(r=>r.l.key===ANALYSIS.focus),host=J.$('#selection-summary');
-    if(!r){host.innerHTML='';return;}
-    const p=D.positions.find(p=>positionKey(p)===r.l.key),c=perf(r.l.gain,r.l.values,r.l.purchases,0,EVO.per==='1d'?H.dates.length-1:s.last),loss=lossHistory(H.dates,r.l.gain),first=(H.trades||[]).find(t=>t.key===r.l.key&&t.side==='buy'&&!t.note);
-    host.innerHTML=`<div class="selection-readout"><b>${J.esc(r.l.symbol)}</b><span>Résultat personnel (plage) <strong class="${J.cls(r.eur)}">${EVO.unit==='pct'?J.pct(r.pct,2):J.eur(r.eur)}</strong></span><span>Depuis les achats (fin de vue) <strong>${J.eur(c.eur)} · ${J.pct(c.pct,1)}</strong></span><span>Poids ${p?J.pct(p.weight,1,false):'0 % · soldée'}</span><span>Acheté depuis ${first?J.date(first.date):'date inconnue'}</span>${c.eur<0&&loss.current?`<span>Perte observée depuis ${J.date(loss.current)}</span>`:''}<button class="btn small" id="open-position">Détails et achats →</button></div>`;
-    J.$('#open-position').onclick=()=>{ANALYSIS.detail=true;renderDetail(s);J.$('#position-detail').scrollIntoView({block:'nearest',behavior:'smooth'})};
-  }
-  function renderDetail(s) {
-    const host=J.$('#position-detail'),key=ANALYSIS.focus,r=s.rows.find(r=>r.l.key===key);
-    host.hidden=!ANALYSIS.detail||!r;if(host.hidden){host.innerHTML='';return;}
-    const p=D.positions.find(p=>positionKey(p)===key),instrument=p||D.closed.find(p=>positionKey(p)===key),i=p?insight(p):null,c=perf(r.l.gain,r.l.values,r.l.purchases,0,EVO.per==='1d'?H.dates.length-1:s.last),loss=lossHistory(H.dates,r.l.gain),trades=(H.trades||[]).filter(t=>t.key===key&&!t.note);
-    host.innerHTML=`<div class="pf-section-title"><h2>${J.esc(r.l.symbol)} · ${J.esc(r.l.name)}</h2><button class="btn small" id="close-position" aria-label="Fermer les détails">Fermer</button></div><p class="small">Mon investissement : <b class="${J.cls(c.eur)}">${J.eur(c.eur)} · ${J.pct(c.pct,1)}</b> depuis les achats, ventes comprises. Sur la période principale : <b>${J.eur(r.eur)} · ${J.pct(r.pct,1)}</b>.</p><p class="small muted">${loss.first?'Première perte observée : '+J.date(loss.first)+'. ':''}${loss.current?'Séquence de perte observée depuis le '+J.date(loss.current)+(loss.gap?' ; historique précédent incomplet.':'.'):''} Les dates décrivent les observations conservées, frais compris, sans inventer de franchissement entre deux cours.</p><details class="selected-purchases" open><summary>Mes transactions · ${trades.length}</summary>${trades.map(t=>`<div><b>${t.side==='sell'?'Vente':t.first_buy?'Premier achat':'Achat complémentaire'} · ${J.date(t.date)}</b><span>${J.num(t.quantity,4)} titre(s) à ${tradePrice(t)} · Frais ${J.eur(t.fees_eur)} · change ${J.num(t.fx_to_eur,6)} €/unité${t.side==='sell'?' · Réalisé '+J.eur(D.sales.find(x=>x.tx_id===t.id)?.gain):''}</span><button class="btn small" data-history-tx="${t.id}">Historique</button></div>`).join('')}</details>${p?diagnosticDetails(p,i,D):`<p class="small muted">Position soldée : résultat réalisé conservé. Pas de diagnostic de position ouverte.</p>${Number(key)>0?`<a class="btn small" href="titre.html?id=${Number(key)}">Fiche complète ↗</a>`:''}`}${p?`<div class="row"><button class="btn small" data-detail-chart="${p.listing_id||''}" ${p.listing_id?'':'disabled'}>Cours historique · analyse approfondie</button><button class="btn small" data-detail-levels="${p.listing_id||''}" ${p.linked?'':'disabled'}>Filet et objectif</button><a class="btn small" href="titre.html?id=${p.listing_id}" ${p.listing_id?'':'hidden'}>Fiche complète ↗</a></div><p class="small muted">Le cours du titre décrit le marché ; le résultat personnel inclut transactions, frais et change. Recul de la position actuelle mesuré depuis le dernier achat encore ouvert.</p>`:''}`;
-    const extra=document.createElement('div');extra.className='position-life';extra.innerHTML=`<div class="row"><button class="btn small" data-buy="${J.esc(key)}">Acheter</button><button class="btn small" data-sell="${J.esc(key)}" ${p?'':'disabled'}>Vendre</button><button class="btn small" id="instrument-history">Historique complet</button><button class="btn small" id="instrument-graph">Graphique et transactions</button>${p?.listing_id?'<button class="btn small" id="refresh-history">Compléter l’historique</button>':''}</div>${instrument?`<p>Quantité ${J.num(instrument.qty,4)} · Coût restant ${J.eur(instrument.cost)} · PMP ${J.eur(instrument.avg_cost)} · Frais cumulés ${J.eur(instrument.fees)}</p>`:''}${(instrument?.holding_periods||[]).map(c=>`<p class="small">Détention : ${J.date(c.start)} → ${c.end?J.date(c.end):'en cours'} · Achats ${J.eur(c.invested)} · Récupéré ${J.eur(c.proceeds)} · Frais ${J.eur(c.fees)} · Réalisé ${J.eur(c.realized)}</p>`).join('')}`;host.append(extra);bindTradeActions(host);
-    J.$('#refresh-history')?.addEventListener('click',async e=>{const button=e.currentTarget,pid=current;button.disabled=true;try{const result=await J.post('portfolio/history-refresh',{id:pid,listing_id:Number(key)});J.toast(result.message||'Collecte ciblée terminée.');const fresh=await J.api('portfolio/history',{params:{id:pid}});if(pid===current){H=fresh;CHART.view=null;drawEvo()}}catch(err){J.toast(err.message)}finally{button.disabled=false}});
-    J.$('#instrument-history').onclick=()=>openHistory(null,key);
-    J.$('#instrument-graph').onclick=()=>{CHART.measure='market';CHART.view=null;focusAnalysis(key,false,true)};
-    J.$$('#position-detail [data-history-tx]').forEach(b=>b.onclick=()=>openHistory(+b.dataset.historyTx));
-    J.$('#close-position').onclick=()=>{ANALYSIS.detail=false;host.hidden=true};
-    J.$('[data-detail-chart]')?.addEventListener('click',()=>chartDialog(D,p));
-    J.$('[data-detail-levels]')?.addEventListener('click',()=>levelsDialog(p));
-    J.$$('#position-detail [data-lot]').forEach(b=>b.onclick=()=>lotDialog(D,D.lots.find(l=>l.tx_id==b.dataset.lot)));
-  }
-  function updateSummary(s) {
-    const label=EVO.per==='all'?'Depuis le début':PERIODS.find(p=>p[0]===EVO.per)?.[1];
-    J.$('#summary-period-label').textContent='Performance hors achats/ventes · '+label;
-    const neutral=EVO.per==='1d'?s.total.pct:neutralPerformance(s.start,s.last);J.$('#neutral-performance').textContent=J.pct(neutral,2);J.$('#neutral-performance').className=J.cls(neutral);
-    const total=J.$('#period-g');total.className=J.cls(s.total.eur);total.textContent=(EVO.per==='1d'?'Indicatif · ':'')+J.eur(s.total.eur);
-    const dates=EVO.per==='1d'&&H.session?.dates.length?J.dateTime(H.session.dates[0])+' → '+J.dateTime(H.session.dates.at(-1)):H.dates.length?J.date(H.dates[s.start])+' → '+J.date(H.dates[s.last]):'aucune transaction';
-    J.$('#period-reference').textContent='Couverture personnelle : '+dates+(s.start===0&&EVO.per!=='1d'?' · historique couvert depuis la première transaction.':'')+'.';
-    const alerts=D.positions.filter(p=>['watch','act'].includes(insight(p).status));
-    J.$('#surveillance-summary').innerHTML=alerts.length?`<span>Surveillance :</span> ${alerts.map(p=>`<button class="btn small" data-watch="${J.esc(positionKey(p))}">${J.esc(p.symbol)} · ${J.esc(insight(p).label)}</button>`).join('')}`:'<span class="small muted">Aucun signal de surveillance notable parmi les indicateurs disponibles.</span>';
-    J.$$('[data-watch]').forEach(b=>b.onclick=()=>focusAnalysis(b.dataset.watch,true));
-  }
-  const VIEW_DEFAULT={summary:true,portfolio:true,titles:true,contributions:true,positions:true,surveillance:true};
-  const DASH=Object.assign({},VIEW_DEFAULT,store('dashboard_v1')||{});
-  const CHART={view:null,selected:new Set(),hidden:new Set(store('series_hidden_v1')||[]),measure:'portfolio'};
-  function formatContribution(r){return EVO.unit==='pct'?r.contribution_pct===null?'Indisponible':J.num(r.contribution_pct,2)+' pts':J.eur(r.eur)}
-  function applyDashboard(){
-    J.$('.cockpit-summary').hidden=!DASH.summary;J.$('.cockpit-positions').hidden=!DASH.positions;
-    J.$('#surveillance-summary').hidden=!DASH.surveillance;J.$('#contributions').hidden=!DASH.contributions;
-    J.$('#chart-pane').hidden=!DASH.portfolio&&!DASH.titles;J.$('.cockpit-analysis').hidden=!DASH.portfolio&&!DASH.titles&&!DASH.contributions;
-    J.$('.cockpit-chart-grid').classList.toggle('without-contributions',!DASH.contributions);J.$('.cockpit-chart-grid').classList.toggle('without-chart',!DASH.portfolio&&!DASH.titles);
-  }
-  function graphTimes(){
-    if(EVO.per==='1d')return (CHART.measure==='market'?H.market?.intraday?.dates:H.session?.dates)||[];
-    const dates=CHART.measure==='market'?(H.market?.dates||[]):H.dates;const end=H.dates.at(-1)||dates.at(-1),reference=dates.length&&dates.at(-1)<end?[...dates,end]:dates;const i=periodStart({dates:reference});return dates.slice(i);
-  }
-  function renderSeries(){
-    J.$('#series-list').innerHTML=CHART.measure==='portfolio'?'':H.lines.filter(l=>D.positions.some(p=>positionKey(p)===l.key)||CHART.selected.has(l.key)).map(l=>`<button type="button" class="series-chip" data-highlight="${J.esc(l.key)}" aria-pressed="${CHART.selected.has(l.key)}"><i style="background:${J.$('#evo-chart')._financial?.getState().data.series.find(s=>s.id===l.key)?.color||PAL[H.lines.indexOf(l)%PAL.length]}"></i>${J.esc(l.symbol)}</button>`).join('');
-    J.$$('[data-highlight]').forEach(b=>b.onclick=()=>CHART.selected.has(b.dataset.highlight)?clearSelection():focusAnalysis(b.dataset.highlight));
-  }
-  function drawInteractive(keepRange=false){
-    if(!H)return;const times=graphTimes(),s=snapshot(),host=J.$('#evo-chart'),pct=EVO.unit==='pct',measure=CHART.measure;
-    const losses=s.rows.filter(r=>r.eur!==null&&r.eur<0).sort((a,b)=>a.eur-b.eur);if(losses[0])losses[0].color='#dc2626';if(losses[1])losses[1].color='#c2410c';
-    const color=key=>s.rows.find(r=>r.l.key===key)?.color||'#6366f1';
-    const visible=D.positions.map(positionKey);for(const k of CHART.selected)if(!visible.includes(k))visible.push(k);
-    const fmt=pct?v=>J.pct(v,2):v=>J.eur(v),series=[];const mapDate=(date,dates)=>dates.indexOf(date);
-    const baseAt=i=>{if(i<0)return null;const start=s.start;if(start>0&&H.value[start]===null)return null;return (start?H.value[start]:0)+H.purchases[i]-(start?H.purchases[start]:0)};
-    if(measure==='market'){
-      const m=EVO.per==='1d'?H.market?.intraday:H.market;
-      const i0=times.length?(m?.dates||[]).indexOf(times[0]):0;
-      for(const l of m?.lines||[]){if(measure==='portfolio'||!visible.includes(l.key))continue;const base=l.prices[i0],bad=(l.break_dates||[]).some(d=>d>times[0]&&d<=times.at(-1));
-        series.push({id:l.key,label:l.symbol,color:color(l.key),values:times.map(t=>{const i=mapDate(t,m.dates);return i<0?null:pct?base>0&&!bad&&l.prices[i]!==null?100*(l.prices[i]/base-1):null:l.prices_eur?.[i]??null})});}
-    }else if(EVO.per==='1d'){
-      const session=H.session||{dates:[],lines:[]};
-      const index=times.map(t=>session.dates.indexOf(t)),a=s.start;
-      if(measure==='portfolio')series.push({id:'portfolio',label:'Portefeuille global · indicatif',color:'#0f172a',width:3,values:index.map(i=>{const g=i<0||session.gain[i]===null||session.gain[a]===null?null:session.gain[i]-session.gain[a];return g===null?null:pct?s.base>0?100*g/s.base:null:g})});
-      for(const l of session.lines){if(measure==='portfolio'||!visible.includes(l.key))continue;const base=measure==='contribution'?s.base:l.values[a];series.push({id:l.key,label:l.symbol,color:color(l.key),values:index.map(i=>{const g=i<0||l.gain[i]===null||l.gain[a]===null?null:l.gain[i]-l.gain[a];return g===null?null:pct?base>0?100*g/base:null:g})});}
-    }else{
-      const indices=times.map(t=>H.dates.indexOf(t));
-      if(measure==='portfolio')series.push({id:'portfolio',label:pct?'Performance hors achats/ventes':'Gains/pertes en euros',color:'#0f172a',width:3,values:indices.map(i=>i<s.start?null:pct?neutralPerformance(s.start,i):perf(H.gain,H.value,H.purchases,s.start,i).eur)});
-      for(const l of H.lines){if(measure==='portfolio'||!visible.includes(l.key))continue;series.push({id:l.key,label:l.symbol,color:color(l.key),values:indices.map(i=>{if(i<s.start)return null;if(measure==='contribution'&&pct){const gain=heldPerformance(l,s.start,i,'eur'),base=baseAt(i);return gain!==null&&base>0?100*gain/base:null}return heldPerformance(l,s.start,i,EVO.unit)})});}
-    }
-    for(const item of series){item.width=CHART.selected.has(item.id)?4:item.width||2;item.selected=CHART.selected.has(item.id);if(CHART.selected.size&&!CHART.selected.has(item.id))item.color=item.color.startsWith('#')?'rgba('+[1,3,5].map(i=>parseInt(item.color.slice(i,i+2),16)).join(',')+',0.3)':item.color;}
-    renderContributions(s);renderSelection(s);
-    const covered=times.length?J.date(times[0].slice(0,10))+' → '+J.date(times.at(-1).slice(0,10)):'aucune observation';
-    J.$('#chart-window').textContent=(CHART.view?'Vue agrandie · ':'Plage graphique · ')+(CHART.view?(EVO.per==='1d'?J.dateTime(new Date(CHART.view.from*1000).toISOString().slice(0,19))+' → '+J.dateTime(new Date(CHART.view.to*1000).toISOString().slice(0,19)):J.date(new Date(CHART.view.from*1000).toISOString().slice(0,10))+' → '+J.date(new Date(CHART.view.to*1000).toISOString().slice(0,10))):covered)+' · Zoom visuel uniquement ; résumé, classement et tableau suivent la période principale.';
-    J.$('#chart-meaning').textContent=measure==='market'?(pct?'Cours normalisés à une date commune · 0 % = base 100, hors change':'Cours historiques convertis en euros au change daté · pas un résultat personnel'):measure==='contribution'?(pct?'Contribution au rendement global, en points · dénominateur commun au portefeuille':'Contribution en euros au résultat du portefeuille'):(measure==='portfolio'?(pct?'Performance hors achats/ventes · rendements quotidiens chaînés, frais compris':'Gains/pertes en euros · ventes comprises, sans normalisation du capital'):'Résultat personnel par position · frais, change et ventes inclus · % rapporté au capital de chaque position');
-    if(CHART.selected.size)J.$('#chart-meaning').textContent+=' · Échelle centrée sur '+H.lines.find(l=>CHART.selected.has(l.key))?.symbol+' ; les autres courbes peuvent sortir du cadre.';
-    const reasons=EVO.per==='1d'?(H.session?.notes||[]):[...(H.notes||[]),...(measure==='portfolio'&&pct?H.performance?.notes||[]:[])];
-    const unavailable=series.filter(x=>!x.values.some(Number.isFinite)).map(x=>x.label);
-    J.$('#evo-note').textContent=[...reasons,unavailable.length?'Séries non calculables : '+unavailable.join(', ')+'.':'',measure==='market'?'Historique boursier disponible avant les achats ; les performances personnelles commencent à l’acquisition. Le portefeuille global n’a pas de cours de marché unique.':'',measure==='market'&&pct?'Une base initiale absente ou une rupture non résolue rend la comparaison indisponible.':'',pct&&!(s.base>0)?'Contribution en % non définie : capital engagé nul ou non valorisable sur cette plage.':'',measure==='market'&&!pct?'Une conversion en euros nécessite un taux historique connu à la date observée, âgé de sept jours au plus ; les valeurs sans ce taux restent indisponibles.':''].filter(Boolean).join(' ');
-    const highlight=CHART.selected;
-    J.financialChart(host,{times,series},{height:innerWidth<700?300:340,time:EVO.per==='1d',format:fmt,markers:transactionMarkers(times,EVO.per==='1d',null).filter(m=>series.some(s=>s.id==='portfolio'||s.id===m.key)),selected:highlight,view:CHART.view,keepRange,onSelect:key=>key?focusAnalysis(key):clearSelection(),onTransaction:id=>openHistory(id),onReset:()=>{CHART.view=null;drawInteractive(false)},onRange:range=>{
-      const a=J.financialTime(times[0]),b=J.financialTime(times.at(-1));const view=range.from<=a&&range.to>=b?null:range;
-      if(JSON.stringify(view)!==JSON.stringify(CHART.view)){CHART.view=view;drawInteractive(true)}
-    }});
-    renderSeries();applyDashboard();
-  }
   function drawEvo(){
-    if(!H||!D||!J.$('#evo-chart'))return;
-    const s=snapshot();
-    if(ANALYSIS.auto){const worst=s.rows.filter(r=>r.eur!==null&&r.eur<0).sort((a,b)=>a.eur-b.eur)[0];ANALYSIS.focus=worst?.l.key||null;CHART.selected=ANALYSIS.focus?new Set([ANALYSIS.focus]):new Set()}
-    updateSummary(s);J.$('#positions-table').innerHTML=positionTable(D,s);bindTable();renderDetail(s);
-    J.$$('#global-per button').forEach(b=>{b.classList.toggle('on',b.dataset.v===EVO.per);b.setAttribute('aria-pressed',String(b.dataset.v===EVO.per))});
-    J.$$('#evo-unit button').forEach(b=>b.classList.toggle('on',b.dataset.v===EVO.unit));
-    J.$$('[data-measure]').forEach(b=>{const on=b.dataset.measure===CHART.measure;b.classList.toggle('on',on);b.setAttribute('aria-selected',String(on));b.tabIndex=on?0:-1});drawInteractive(true);
-    const vh=J.$('#value-history');if(VIEW==='manage'&&vh){if(EVO.per==='1d'){const it=H.session||{dates:[],value:[]};J.lineChart(vh,it.dates,[{id:'value',label:'Valeur observée',values:it.value,color:'#6366f1'}],{height:220,time:true,format:J.eur})}else J.lineChart(vh,H.dates.slice(s.start),[{id:'value',label:'Valeur des titres',values:H.value.slice(s.start),color:'#6366f1'},{id:'net',label:'Achats − ventes nets de frais',values:H.net_in.slice(s.start),color:'#94a3b8'}],{height:220,format:J.eur})}
+    if(!H||!D)return;
+    const vh=J.$('#value-history');if(VIEW==='manage'&&vh){J.lineChart(vh,H.dates,[{id:'value',label:'Valeur des titres',values:H.value,color:'#6366f1'},{id:'net',label:'Achats − ventes nets de frais',values:H.net_in,color:'#94a3b8'}],{height:220,format:J.eur})}
+    if(J.$('#pf-home')&&VIEW==='home')PFHome.mount(J.$('#pf-home'),{D,H,keep:true,helpers:{trade:tradePosition,lot:l=>lotDialog(D,l)}});
   }
   /* ── Alertes, ventes, répartition, transactions : repliés par défaut ── */
   function lotsBody(d) {
@@ -287,7 +73,7 @@
     const sales=D.sales.filter(x=>rows.some(t=>t.id===x.tx_id)),gains=sales.reduce((n,x)=>n+Math.max(0,x.gain),0),losses=sales.reduce((n,x)=>n+Math.min(0,x.gain),0);
     J.$('#tx-totals').textContent='Sur les opérations filtrées : gains réalisés '+J.eur(gains)+' · pertes réalisées '+J.eur(losses)+' · net '+J.eur(gains+losses)+' · frais '+J.eur(rows.reduce((n,x)=>n+Number(x.fees||0),0));
     J.$('#tx-rows').innerHTML=rows.map(t=>{const sale=D.sales.find(x=>x.tx_id===t.id),closed=D.closed.some(p=>positionKey(p)===positionKey(t));return `<tr data-tx-row="${t.id}" tabindex="-1"><td>${J.date(t.trade_at)}</td><td><span class="badge ${t.side==='buy'?'ok':'wait'}">${t.side==='buy'?'Achat':'Vente'}</span> <b>${J.esc(t.symbol)}</b>${closed?' · clôturée':''}<small>${J.esc(t.name||'')}</small></td><td>${J.num(+t.quantity,4)}</td><td>${J.money(+t.unit_price,t.currency)}</td><td>${J.eur(+t.fees)}<small>${J.num(+t.fx_to_eur,6)} €/unité</small></td><td>${sale?J.eur(sale.gain)+' · '+J.pct(sale.gain_pct,1)+'<small>Net '+J.eur(sale.proceeds)+' · Coût '+J.eur(sale.cost)+'</small>':t.side==='sell'?'Indisponible':'—'}</td><td><button class="btn small" data-graph="${J.esc(positionKey(t))}">Graphique</button> <button class="btn small" data-edit="${t.id}">Modifier</button> <button class="btn small danger" data-del="${t.id}" aria-label="Supprimer">✕</button></td></tr>`}).join('')||'<tr><td colspan="7">Aucune transaction pour ces filtres.</td></tr>';
-    J.$$('#tx-rows [data-graph]').forEach(b=>b.onclick=()=>{CHART.measure='market';CHART.view=null;focusAnalysis(b.dataset.graph,true,true)});
+    J.$$('#tx-rows [data-graph]').forEach(b=>b.onclick=()=>{PFHome.state.sel=b.dataset.graph;PFHome.state.dmetric='market';switchView('home')});
     J.$$('#tx-rows [data-edit]').forEach(b=>b.onclick=()=>J.txDialog({portfolios:list,portfolioId:current,tx:D.transactions_list.find(t=>t.id==b.dataset.edit),onDone:render}));
     J.$$('#tx-rows [data-del]').forEach(b=>b.onclick=async()=>{if(await J.confirm('Supprimer la transaction','Cette transaction sera supprimée définitivement.','Supprimer')){await J.post('tx/delete',{id:+b.dataset.del});render()}});
   }
@@ -296,28 +82,19 @@
     list=(await J.api('portfolios')).portfolios;
     if(!list.length){page.innerHTML='<h1>Portefeuilles</h1><div class="card empty"><p>Aucun portefeuille.</p><button class="btn primary" id="first">Créer mon premier portefeuille</button></div>';J.$('#first').onclick=createPf;return;}
     if(!list.some(p=>p.id===current))current=list[0].id;
-    J.$('#evo-chart')?._financial?.destroy();
-    const d=D=await J.api('portfolio',{params:{id:current}});H=null;CHART.view=null;CHART.selected.clear();ANALYSIS.focus=null;ANALYSIS.auto=false;ANALYSIS.detail=false;
+    const d=D=await J.api('portfolio',{params:{id:current}});H=null;PFHome.state.sel=null;PFHome.state.zoom=null;
     history.replaceState(null,'','?id='+current);
-    POSITION_SCOPE='open';
     const etfHtml=JEtf.portfolio(d.etf_analysis);
-    page.innerHTML=`${d.integrity&&!d.integrity.ok?`<div class="notice err">${d.integrity.issues.map(i=>J.esc(i.message)).join('<br>')}</div>`:''}<header class="pf-toolbar"><div><h1>Mes portefeuilles</h1><label class="sr-only" for="pf-select">Portefeuille affiché</label><select id="pf-select">${list.map(p=>`<option value="${p.id}" ${p.id===current?'selected':''}>${J.esc(p.name)}${p.is_default?' ★':''}</option>`).join('')}</select><button class="btn small" id="new-pf" aria-label="Créer un portefeuille">＋</button></div><button class="btn primary" id="add-tx">＋ Transaction</button></header><details class="dashboard-options"><summary>Personnaliser le tableau de bord</summary>${Object.entries({summary:'Résumé financier',portfolio:'Graphique global du portefeuille',titles:'Courbes des actions et ETF',contributions:'Contributions aux gains et pertes',positions:'Tableau des positions',surveillance:'Alertes et surveillance'}).map(([k,label])=>`<label><input type="checkbox" data-section="${k}" ${DASH[k]?'checked':''}>${label}</label>`).join('')}</details><div class="global-period"><span>Période principale</span>${pills('global-per',[['1d','1 jour'],['1w','1 semaine'],['1m','1 mois'],['3m','3 mois'],['6m','6 mois'],['1y','1 an'],['all','Depuis le début']],EVO.per)}</div><p id="period-reference" class="small muted"></p>
-      ${d.totals.unpriced?'<div class="notice warn">Valorisation et gain total indisponibles : cours ou change manquant. Aucun prix d’achat n’est utilisé comme cours actuel.</div>':''}
+    page.innerHTML=`${d.integrity&&!d.integrity.ok?`<div class="notice err">${d.integrity.issues.map(i=>J.esc(i.message)).join('<br>')}</div>`:''}<header class="pf-toolbar"><div><h1>Mes portefeuilles</h1><label class="sr-only" for="pf-select">Portefeuille affiché</label><select id="pf-select">${list.map(p=>`<option value="${p.id}" ${p.id===current?'selected':''}>${J.esc(p.name)}${p.is_default?' ★':''}</option>`).join('')}</select><button class="btn small" id="new-pf" aria-label="Créer un portefeuille">＋</button></div><button class="btn primary" id="add-tx">＋ Transaction</button></header>${d.totals.unpriced?'<div class="notice warn">Valorisation et gain total indisponibles : cours ou change manquant. Aucun prix d’achat n’est utilisé comme cours actuel.</div>':''}
       <nav class="pf-nav" id="pf-nav" role="tablist" aria-label="Espaces du portefeuille">${[['home','Mon portefeuille'],['manage','Historique et gestion']].map(([k,l])=>`<button type="button" role="tab" data-view="${k}" id="tab-${k}" aria-controls="panel-${k}">${l}</button>`).join('')}</nav>
-      <section class="pf-panel" id="panel-home" data-panel="home" role="tabpanel" aria-labelledby="tab-home">${hero(d)}${analysis()}<section class="card cockpit-positions"><div class="pf-section-title"><h2>Mes positions</h2><label>Afficher <select id="position-scope"><option value="open">Positions ouvertes</option><option value="closed">Positions clôturées</option><option value="all">Toutes</option></select></label><label>Trier <select id="position-sort">${[['loss','Plus grosses pertes'],['gain','Plus gros gains'],['impact','Impact en euros'],['pct','Performance en %'],['weight','Poids'],['drop','Recul depuis le sommet'],['attention','Surveillance']].map(([k,l])=>`<option value="${k}" ${SORT===k?'selected':''}>${l}</option>`).join('')}</select></label></div><div id="surveillance-summary" class="surveillance-summary"></div><div id="positions-table"><span class="spinner"></span></div><details class="pf-explain"><summary>Lire les colonnes</summary><p>La période commune pilote les performances. Depuis les achats : résultat cumulé, ventes comprises. Recul : position actuelle depuis le dernier achat encore ouvert. Les contributions en euros s’additionnent, les pourcentages propres aux titres ne s’additionnent pas.</p></details></section><section id="position-detail" class="card cockpit-detail" hidden></section></section>
+      <section class="pf-panel" id="panel-home" data-panel="home" role="tabpanel" aria-labelledby="tab-home"><div id="pf-home" class="pf-home"><span class="spinner"></span></div></section>
       <section class="pf-panel" id="panel-manage" data-panel="manage" role="tabpanel" aria-labelledby="tab-manage">${section('tx','Transactions','',txBody(d))}${d.sales.length?section('sales','Ventes réalisées','',salesBody(d)):''}${d.lots.length?section('lots','Lots et réglages des alertes','',lotsBody(d)):''}${section('valuation','Valeur et mouvements d’argent','',`<p class="small muted">La valeur varie aussi avec les achats et ventes. Ces montants ne sont pas un rendement. Période commune sélectionnée en haut.</p><div id="value-history"></div>`)}${d.allocation?.rows?section('alloc','Répartition par zone','',allocBody(d.allocation)):''}${d.positions.some(p=>p.kind==='etf')&&etfHtml?section('etf','Secteurs de vos ETF','',etfHtml.replace(/^<div class="card">\s*<h2>[^<]*<\/h2>/,'<div>')):''}${splitNotice(d.positions)}${section('settings','Réglages du portefeuille','',`<div class="row"><button class="btn small" id="rename">Renommer</button>${d.portfolio.is_default?'':'<button class="btn small" id="mk-default">Définir par défaut</button>'}<button class="btn small danger" id="del-pf">Supprimer</button></div><p class="small muted">Stratégie : ${J.esc(d.portfolio.strategy?(NAMES[d.portfolio.strategy.name]||'Personnalisée'):'Croissance régulière par défaut')}. Réglage depuis l’Explorer.</p>`)}</section>`;
     folds();
     J.$('#pf-select').onchange=e=>{current=+e.target.value;render()};
     J.$$('#pf-nav [data-view]').forEach((b,index,buttons)=>{b.onclick=()=>switchView(b.dataset.view);b.onkeydown=e=>{const delta={ArrowRight:1,ArrowLeft:-1}[e.key];if(delta){e.preventDefault();const next=buttons[(index+delta+buttons.length)%buttons.length];switchView(next.dataset.view);next.focus()}}});
-    J.$('#position-sort').onchange=e=>{SORT=e.target.value;store('cockpit_sort',SORT);if(H)drawEvo()};
-    J.$$('#global-per button').forEach(b=>b.onclick=()=>{EVO.per=b.dataset.v;CHART.view=null;J.$('#evo-chart')._financial?.destroy();drawEvo()});
-    J.$$('[data-measure]').forEach((b,i,buttons)=>{b.onclick=()=>{CHART.measure=b.dataset.measure;if(CHART.measure==='portfolio')EVO.unit='pct';CHART.view=null;clearSelection()};b.onkeydown=e=>{if(['ArrowLeft','ArrowRight'].includes(e.key)){e.preventDefault();const n=buttons[(i+(e.key==='ArrowRight'?1:-1)+buttons.length)%buttons.length];n.click();n.focus()}}});
-    J.$$('#evo-unit button').forEach(b=>b.onclick=()=>{EVO.unit=b.dataset.v;store('evo_unit',EVO.unit);drawEvo()});
-    J.$('#position-scope').onchange=e=>{POSITION_SCOPE=e.target.value;drawEvo()};
-    J.$$('[data-section]').forEach(c=>c.onchange=()=>{DASH[c.dataset.section]=c.checked;if(!DASH.portfolio&&!DASH.titles){CHART.view=null;J.$('#evo-chart')._financial?.destroy()}store('dashboard_v1',DASH);drawEvo()});
     switchView(VIEW);
     const pid=current;
-    J.api('portfolio/history',{params:{id:pid}}).then(h=>{if(pid!==current)return;H=h;drawEvo()}).catch(e=>{J.$('#evo-chart').innerHTML=`<p class="notice err">${J.esc(e.message)}</p>`;J.$('#period-g').textContent='Indisponible';J.$('#positions-table').innerHTML='<p class="notice warn">Historique indisponible : rechargez pour calculer les performances.</p>'});
+    J.api('portfolio/history',{params:{id:pid}}).then(h=>{if(pid!==current)return;H=h;drawEvo()}).catch(e=>{const hm=J.$('#pf-home');if(hm)hm.innerHTML=`<p class="notice err">Historique indisponible : ${J.esc(e.message)}. Rechargez la page.</p>`});
     J.$('#new-pf').onclick=createPf;
     J.$('#add-tx').onclick=()=>J.txDialog({portfolios:list,portfolioId:current,onDone:render});
     J.$$('[data-lot]').forEach(b=>b.onclick=()=>lotDialog(d,d.lots.find(l=>l.tx_id==b.dataset.lot)));
