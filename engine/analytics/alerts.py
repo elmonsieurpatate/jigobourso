@@ -10,6 +10,7 @@ Valeurs par défaut tirées de research/RESULTATS_SORTIES.md (test chronologique
 """
 import datetime
 
+from . import risk as risk_bar
 from . import strategy
 from .series import prepare_series
 
@@ -143,7 +144,8 @@ def lot_alerts(conn, request, today=None):
         out[str(lot['tx_id'])] = {'strategy': name, 'strategy_label': NAMES.get(name, name), 'own_strategy': own is not None,
                                   'rules': {k: rules.get(k) for k in ('days', 'drop', 'drop_action', 'days_action', 'exit', 'off', 'personal')},
                                   'measures': m, 'rank': rank if rank is not False else None, 'alerts': alerts,
-                                  'level': max((a['level'] for a in alerts), key=('info', 'watch', 'act').index, default=None)}
+                                  'level': max((a['level'] for a in alerts), key=('info', 'watch', 'act').index, default=None),
+                                  'risk': None if rules.get('off') else risk_bar.assess(name, closes, (m or {}).get('drop_pct'), lot.get('alert_drop_pct'), (state or {}).get('ma50'))}
     from .portfolio import enrich
     positions = enrich(conn, request, series, out, today)
     return {'positions': positions, 'lots': out, 'rank_limit': RANK_LIMIT, 'strategies': {k: NAMES[k] for k in STRATEGIES}, 'curves': curves(lots, series)}

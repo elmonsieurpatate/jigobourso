@@ -197,3 +197,11 @@ Priorité : adresse (`?verdict=`, `?sort=colonne:sens`, `?page_size=`) > choix d
 Les catégories des filtres secondaires restent dans « Filtres et catégories ».
 
 Granularité Jour et colonne « Var. 1J (%) » : voir `docs/ADMIN_SCORES_V4.md` (section « Granularité Jour »). Jour est facultatif, désactivé et à 0 % partout par défaut ; la variation 1J est la variation entre les deux dernières séances clôturées de la place du titre, indépendante de la période choisie pour les autres indicateurs.
+
+## Barre de risque d'un achat (portefeuille)
+
+Pour chaque achat détenu, une barre verte / orange / rouge résume l'état du cours depuis l'achat (`engine/analytics/risk.py`). C'est un repère : rien n'est vendu automatiquement et rien n'est prédit.
+
+Trois signaux, notés de 0 à 2 : **tendance** (pente récente comparée à la pente longue, sur des fenêtres qui dépendent de la stratégie : rapide 21/63 séances, régulière 63/126, Momentum 126/252), **recul** depuis le plus haut observé depuis l'achat (seuil = 2 × volatilité quotidienne × √horizon, entre 6 % et 30 % ; serré pour les stratégies rapides, large pour les longues) et **stabilité** (R² qui s'effondre par rapport à la fenêtre précédente). Somme 0-1 : tendance intacte ; 2-3 : à surveiller ; 4-6 ou recul au-delà du seuil : vente à envisager. Un cours très au-dessus de sa moyenne 50 jours (+25 %) n'est qu'une information, jamais notée.
+
+Un saut de cours (règle ×1,6) ou un historique trop court donnent « non évaluée » plutôt qu'une fausse alerte. Les réglages par achat existants (seuil de recul personnel, désactivation) s'appliquent. Les valeurs par défaut sont des points de départ modifiables, non validés par un test historique concluant (les tests de règles de sortie restent exploratoires : biais de survivance et de sélection).

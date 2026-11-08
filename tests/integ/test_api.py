@@ -202,6 +202,7 @@ def test_lot_alerts_follow_each_purchase(world):
     assert curve['buys'] == ['2026-06-01'] and curve['points'][0][0] == '2026-06-01' and curve['points'][-1][1] == 110.0 and len(curve['points']) <= 90
     lot = d['lots'][0]['alert']
     assert lot['strategy'] == 'regular' and round(lot['measures']['drop_pct'], 1) == 26.7
+    assert lot['risk']['level'] == 'na' and lot['risk']['reason'] == 'history'                         # peu de clôtures : barre non évaluée, jamais une fausse alerte
     kinds = {x['kind'] for x in lot['alerts']}
     assert 'drop' in kinds and ('duration' in kinds) == ((datetime.date.today() - datetime.date(2026, 6, 1)).days >= 182) and lot['level'] == 'watch'
     assert 'momentum' in d['lot_strategies'] and d['lot_strategies']['prudent'].startswith('Prudente')
@@ -215,6 +216,7 @@ def test_lot_alerts_follow_each_purchase(world):
     assert lot['alert']['strategy'] == 'momentum' and lot['alert']['own_strategy'] and 'drop' not in {x['kind'] for x in lot['alert']['alerts']}
     assert a.call('lot/settings', {'tx_id': second, 'alerts_off': True})[0] == 200
     assert a.call('portfolio', params=f'&id={pf}')[1]['lots'][0]['alert']['alerts'] == []
+    assert a.call('portfolio', params=f'&id={pf}')[1]['lots'][0]['alert']['risk'] is None              # alertes désactivées : pas de barre
     assert a.call('lot/settings', {'tx_id': second})[0] == 200                                        # tout vide : retour aux réglages par défaut
     assert a.call('portfolio', params=f'&id={pf}')[1]['lots'][0]['settings'] is None
 

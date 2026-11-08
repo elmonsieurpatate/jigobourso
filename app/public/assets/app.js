@@ -101,6 +101,18 @@ J.barChart = function (el, data, { unit = '€' } = {}) {
 
 /* ───── dialogues, messages ───── */
 J.toast = function (msg) { const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.remove(), 3200); };
+/* Barre de risque d'un achat (moteur : engine/analytics/risk.py). Un repère, jamais un ordre : rien n'est vendu automatiquement. */
+J.RISK = { ok: ['ok', 'Tendance intacte'], watch: ['watch', 'À surveiller'], act: ['act', 'Vente à envisager'], na: ['na', 'Non évaluée'] };
+J.riskWorst = list => { const order = ['na', 'ok', 'watch', 'act']; return (list || []).filter(r => r && r.level).sort((a, b) => order.indexOf(b.level) - order.indexOf(a.level))[0] || null; };
+J.riskBar = (r, opt = {}) => {
+  if (!r || !r.level) return '';
+  const [cls, label] = J.RISK[r.level] || J.RISK.na, pct = r.level === 'na' ? 0 : Math.max(8, Math.round(100 * (r.score || 0) / (r.max || 6)));
+  const why = (r.level === 'na' ? [r.message] : (r.signals || []).map(x => x.label + ' : ' + x.message)).concat(r.info ? [r.info] : []).filter(Boolean).join('\n');
+  return `<span class="rbar ${cls}${opt.compact ? ' compact' : ''}" role="img" aria-label="Risque : ${J.esc(label)}${r.level === 'na' ? '' : ', ' + (r.score || 0) + ' sur ' + (r.max || 6)}" title="${J.esc(why)}"><span class="rbar-track"><i style="width:${pct}%"></i></span><b>${J.esc(label)}</b></span>`;
+};
+J.riskDetail = r => !r || !r.level ? '' : r.level === 'na' ? `<p class="small muted">${J.esc(r.message || 'Non évaluée.')}</p>` :
+  `<ul class="rbar-why">${(r.signals || []).map(x => `<li class="p${x.points}"><b>${J.esc(x.label)}</b> ${J.esc(x.message)}</li>`).join('')}${r.info ? `<li class="info">${J.esc(r.info)}</li>` : ''}</ul>`;
+
 J.dialog = function ({ title, body, actions = [], onopen }) {
   const d = document.createElement('dialog');
   d.innerHTML = `<form method="dialog"><div class="head"><h2 style="margin:0">${J.esc(title)}</h2><button class="btn small" value="x" aria-label="Fermer">✕</button></div><div class="body">${body}</div><div class="foot"></div></form>`;
