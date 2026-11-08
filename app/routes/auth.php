@@ -22,8 +22,14 @@ return [
             q('INSERT INTO login_attempts(username, ip, at) VALUES (?,?,?)', [$key, client_ip(), now_utc()]);
             throw new ApiError('Mot d’invitation incorrect ou inscriptions fermées', 403);
         }
-        $id = create_user(str_in($b, 'username', 30), password_input($b, 'password'), str_in($b, 'email', 190, false) ?: null, false);
-        return ['user_id' => $id];
+        $email = mb_strtolower(trim(str_in($b, 'email', 190, false)));
+        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) throw new ApiError('Une adresse e-mail valide est nécessaire pour créer un compte', 422);
+        if (q('SELECT 1 FROM users WHERE email = ?', [$email])->fetch()) throw new ApiError('Cette adresse e-mail est déjà utilisée', 409);
+        $username = str_in($b, 'username', 30);
+        $id = create_user($username, password_input($b, 'password'), $email, false);
+        $sent = send_welcome_mail($username, $email);              // courrier de bienvenue : le résultat est affiché honnêtement à l'utilisateur
+        out_then(['user_id' => $id, 'welcome_mail' => $sent], function () use ($username, $email) { notify_admins_new_account($username, $email); });
+        return [];
     },
     'auth/password' => function () {
         need_post();

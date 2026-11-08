@@ -145,3 +145,18 @@ def test_email_replacement_warns_the_old_address(world):
  assert a.call('auth/account',{'username':'alice','email':'new@example.test','current':'alice-secret-1234'})[0]==200
  raw,_=link();assert Client(world).call('auth/verify-email',{'token':raw})[0]==200
  old=messages_to('alice@example.test');assert len(old)==1 and 'new@example.test' in old[0]['body']
+
+def test_registration_sends_welcome_mail_and_notifies_admins(world):
+ set_email();a=login(world,'alice','alice-secret-1234')
+ assert a.call('admin/settings',{'name':'invite_code','value':'bienvenue1'})[0]==200
+ anon=Client(world)
+ assert anon.call('auth/register',{'username':'dave','password':'dave-secret-12345','code':'bienvenue1'})[0]==422      # e-mail obligatoire
+ s,d=anon.call('auth/register',{'username':'dave','email':'dave@example.test','password':'dave-secret-12345','code':'bienvenue1'})
+ assert s==200 and d['welcome_mail'] is True and d['user_id']
+ for _ in range(30):
+  if len(list(MAILDIR.glob('*.json')))>=2:break
+  time.sleep(.1)
+ mails={m['to']:m for m in (json.loads(p.read_text()) for p in MAILDIR.glob('*.json'))}
+ assert 'Bienvenue' in mails['dave@example.test']['subject'] and 'login.html' in mails['dave@example.test']['body']
+ assert 'nouveau compte dave' in mails['alice@example.test']['subject']
+ assert Client(world).call('auth/register',{'username':'dave2','email':'dave@example.test','password':'dave-secret-12345','code':'bienvenue1'})[0]==409   # adresse déjà utilisée

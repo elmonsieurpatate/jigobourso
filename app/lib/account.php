@@ -87,3 +87,16 @@ function update_account(array $u,array $b): array {
         throw $e;
     }
 }
+
+// Courrier de bienvenue envoyé à la création d'un compte. Ne lève jamais ; renvoie false si le message n'a pas pu partir.
+function send_welcome_mail(string $username, string $email): bool {
+    $body="Bonjour ".$username.",\n\nVotre compte Jigobourso est créé.\n\nPour vous connecter : https://jigobourso.turnjoy.dev/login.html\nVotre identifiant : ".$username."\n\nPour bien démarrer, ouvrez le centre d'aide : il explique la bourse et Jigobourso pas à pas, sans rien supposer connu.\nhttps://jigobourso.turnjoy.dev/aide.html\n\nJigobourso aide à trier et comparer des titres ; il ne donne aucun conseil d'achat.\n\nSi vous n'êtes pas à l'origine de cette inscription, répondez à ce message ou prévenez l'administrateur.\nJigobourso";
+    try { return send_account_mail($email,'Bienvenue sur Jigobourso',$body); } catch (Throwable $e) { error_log('welcome_mail: transport failure'); return false; }
+}
+// Prévient les administrateurs (ayant une adresse) d'une nouvelle inscription. Ne lève jamais.
+function notify_admins_new_account(string $username, string $email): void {
+    try {
+        foreach (q("SELECT email FROM users WHERE is_admin=1 AND active=1 AND email IS NOT NULL AND email<>''")->fetchAll() as $a)
+            send_account_mail($a['email'],'Jigobourso : nouveau compte '.$username,"Un nouveau compte vient d'être créé.\n\nIdentifiant : ".$username."\nAdresse : ".$email."\nDate (UTC) : ".now_utc()."\n\nGestion : https://jigobourso.turnjoy.dev/admin.html");
+    } catch (Throwable $e) { error_log('admin_notice: transport failure'); }
+}
