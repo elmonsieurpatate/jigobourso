@@ -41,11 +41,11 @@
     if(H)drawEvo();
   }
   function tradePosition(key,side){const p=[...D.positions,...D.closed].find(p=>positionKey(p)===key);if(!p)return;J.txDialog({portfolios:list,portfolioId:current,listing:{id:p.listing_id,symbol:p.symbol,name:p.name_catalogue||p.name||p.symbol,currency:p.price_currency||p.currency,price:p.price},side,quantity:side==='sell'?p.qty:'',onDone:render})}
-  function openHistory(id=null,key=null){TX_FILTER.key=key||positionKey(D.transactions_list.find(t=>t.id===id)||{});TX_FILTER.side='';TX_FILTER.from='';TX_FILTER.to='';renderTransactions();switchView('manage');const fold=J.$('[data-fold="tx"]');fold.classList.remove('folded');fold.querySelector('.fold-h').setAttribute('aria-expanded','true');const row=id?J.$(`[data-tx-row="${id}"]`):null;row?.classList.add('tx-target');(row||fold).scrollIntoView({block:'center',behavior:'smooth'});row?.focus()}
+  function openHistory(id=null,key=null){const tx0=D.transactions_list.find(t=>t.id===id);TX_FILTER.key=key||(tx0?positionKey(tx0):'');TX_FILTER.side='';TX_FILTER.from='';TX_FILTER.to='';renderTransactions();switchView('manage');const fold=J.$('[data-fold="tx"]');fold.classList.remove('folded');fold.querySelector('.fold-h').setAttribute('aria-expanded','true');const row=id?J.$(`[data-tx-row="${id}"]`):null;row?.classList.add('tx-target');(row||fold).scrollIntoView({block:'center',behavior:'smooth'});row?.focus()}
   function drawEvo(){
     if(!H||!D)return;
     const vh=J.$('#value-history');if(VIEW==='manage'&&vh){J.lineChart(vh,H.dates,[{id:'value',label:'Valeur des titres',values:H.value,color:'#6366f1'},{id:'net',label:'Achats − ventes nets de frais',values:H.net_in,color:'#94a3b8'}],{height:220,format:J.eur})}
-    if(J.$('#pf-home')&&VIEW==='home')PFHome.mount(J.$('#pf-home'),{D,H,current,keep:true,helpers:{trade:tradePosition,lot:l=>lotDialog(D,l),history:()=>{switchView('manage');const f=J.$('[data-fold="tx"]');f.classList.remove('folded');f.querySelector('.fold-h').setAttribute('aria-expanded','true');scrollTo(0,0)}}});
+    if(J.$('#pf-home')&&VIEW==='home')PFHome.mount(J.$('#pf-home'),{D,H,current,name:(list.find(x=>x.id===current)||{}).name,keep:true,helpers:{trade:tradePosition,lot:l=>lotDialog(D,l),add:()=>J.txDialog({portfolios:list,portfolioId:current,onDone:render}),history:(id,key)=>openHistory(id||null,key||null)}});
   }
   /* ── Alertes, ventes, répartition, transactions : repliés par défaut ── */
   function lotsBody(d) {

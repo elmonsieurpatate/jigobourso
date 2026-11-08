@@ -71,3 +71,18 @@ def test_missing_factor_interrupts_flow_neutral_performance_without_inventing_it
     p = subprocess.run([node, '-e', SCRIPT, str(ROOT / 'app/public/assets/pf-math.js')], input=json.dumps(h, default=str), capture_output=True, text=True, check=True)
     r = json.loads(p.stdout)
     assert r['perf']['nulls'] >= 1 and r['perf']['note']
+
+
+def test_adding_money_is_not_counted_as_performance():
+    """Investir 200, valeur 210, ajouter 200 : la performance reste +5 %, jamais +95 %."""
+    start = dt.date(2026, 1, 5)
+    days = [start + dt.timedelta(days=i) for i in range(0, 10) if (start + dt.timedelta(days=i)).weekday() < 5]
+    bars = {1: [(d.isoformat(), 20.0 if i < 3 else 21.0, None) for i, d in enumerate(days)]}
+    meta = {1: {'currency': 'EUR', 'symbol': 'AAA', 'name': 'Alpha', 'price': None, 'price_time': None}}
+    tx = [dict(id=1, listing_id=1, symbol='AAA', name='Alpha', side='buy', quantity=10, unit_price=20, currency='EUR', fx_to_eur=1, fees=0, trade_at=days[0].isoformat() + ' 12:00:00'),
+          dict(id=2, listing_id=1, symbol='AAA', name='Alpha', side='buy', quantity=10, unit_price=21, currency='EUR', fx_to_eur=1, fees=0, trade_at=days[4].isoformat() + ' 12:00:00')]
+    h = history.build(tx, bars, {}, {1: 'EUR'}, {}, meta, today=days[-1])
+    script = "const P=require(process.argv[1]);const H=JSON.parse(require('fs').readFileSync(0,'utf8'));const s=P.series(H,P.resolveWindow(H,'all'),'pf','perf');console.log(JSON.stringify(s.y))"
+    p = subprocess.run([node, '-e', script, str(ROOT / 'app/public/assets/pf-math.js')], input=json.dumps(h, default=str), capture_output=True, text=True, check=True)
+    last = [v for v in json.loads(p.stdout) if v is not None][-1]
+    assert 4.0 < last < 6.0, last

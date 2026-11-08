@@ -8,14 +8,15 @@
    Aucune valeur n'est inventée : un point manquant reste manquant. */
 (function (root) {
   'use strict';
-  const PERIODS = [['1d', '1J'], ['1w', '1 sem.'], ['1m', '1 mois'], ['3m', '3 mois'], ['6m', '6 mois'], ['1y', '1 an'], ['2y', '2 ans'], ['3y', '3 ans'], ['5y', '5 ans'], ['all', 'Depuis le début']];
-  const MONTHS = { '1m': 1, '3m': 3, '6m': 6, '1y': 12, '2y': 24, '3y': 36, '5y': 60 };
+  const PERIODS = [['1d', '1J'], ['2d', '2J'], ['5d', '5J'], ['1w', '1S'], ['2w', '2S'], ['1m', '1M'], ['3m', '3M'], ['6m', '6M'], ['1y', '1A'], ['2y', '2A'], ['3y', '3A'], ['5y', '5A'], ['10y', '10A'], ['max', 'Max'], ['all', 'Depuis le début']];
+  const MONTHS = { '1m': 1, '3m': 3, '6m': 6, '1y': 12, '2y': 24, '3y': 36, '5y': 60, '10y': 120 };
+  const SESSIONS = { '1d': 1, '2d': 2, '5d': 5 };
   const isNum = v => typeof v === 'number' && isFinite(v);
   const at = (a, i) => (i < 0 ? 0 : a[i]);
 
   function shift(dateStr, period) {
     const d = new Date(dateStr + 'T00:00:00Z');
-    if (period === '1w') { d.setUTCDate(d.getUTCDate() - 7); return d.toISOString().slice(0, 10); }
+    if (period === '1w' || period === '2w') { d.setUTCDate(d.getUTCDate() - (period === '1w' ? 7 : 14)); return d.toISOString().slice(0, 10); }
     const day = d.getUTCDate(); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() - MONTHS[period]);       // fin de mois : 31 mars − 1 mois = 28 février, jamais 3 mars
     d.setUTCDate(Math.min(day, new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate()));
     return d.toISOString().slice(0, 10);
@@ -31,8 +32,8 @@
       if (i1 < 0) return { i0: -1, i1: -1, empty: true, period: 'zoom', clipped: false };
       return { i0, i1, period: 'zoom', zoom: true, startDate: H.dates[Math.max(0, i0 + 1)], endDate: H.dates[i1], clipped: false };
     }
-    if (period === 'all') i0 = -1;
-    else if (period === '1d') { i0 = i1 - 1; if (i0 < 0) { i0 = -1; clipped = true; } }
+    if (period === 'all' || period === 'max') i0 = -1;
+    else if (SESSIONS[period]) { i0 = i1 - SESSIONS[period]; if (i0 < 0) { i0 = -1; clipped = true; } }
     else {
       from = shift(H.dates[i1], period); i0 = lastIdx(H.dates, from);
       if (i0 < 0 || H.dates[0] > from) { i0 = -1; clipped = H.dates[0] > from; }

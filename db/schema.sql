@@ -598,3 +598,17 @@ CREATE TABLE IF NOT EXISTS position_watch (
   PRIMARY KEY (portfolio_id, listing_id),
   CONSTRAINT fk_watch_portfolio FOREIGN KEY (portfolio_id) REFERENCES portfolios(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
+
+-- Journal des changements de stratégie de surveillance d'une position (jamais réécrit).
+CREATE TABLE IF NOT EXISTS position_watch_log (
+  id           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  portfolio_id BIGINT UNSIGNED NOT NULL,
+  listing_id   INT UNSIGNED NOT NULL,
+  from_key     VARCHAR(40) CHARACTER SET ascii NULL,
+  to_key       VARCHAR(40) CHARACTER SET ascii NOT NULL,
+  summary      VARCHAR(300) NOT NULL,
+  at           DATETIME NOT NULL,
+  PRIMARY KEY (id),
+  KEY idx_watchlog (portfolio_id, listing_id, at),
+  CONSTRAINT fk_watchlog_portfolio FOREIGN KEY (portfolio_id) REFERENCES portfolios(id) ON DELETE CASCADE
+) ENGINE=InnoDB;

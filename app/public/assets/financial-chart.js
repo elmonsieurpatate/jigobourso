@@ -15,7 +15,7 @@
    const w=host.clientWidth,h=config.height||300,left=w<500?56:70,right=18,top=35,bottom=32;
    const full={from:input.times[0],to:input.times.at(-1)},r=range||full,n=Math.max(1,r.to-r.from),x=t=>left+(t-r.from)/n*(w-left-right);
    const values=input.series.flatMap(s=>s.values.filter((v,i)=>Number.isFinite(v)&&input.times[i]>=r.from&&input.times[i]<=r.to));
-   let lo=Math.min(0,...values),hi=Math.max(0,...values);if(hi===lo){hi+=1;lo-=1}
+   let lo=config.zero===false?Math.min(...values):Math.min(0,...values),hi=config.zero===false?Math.max(...values):Math.max(0,...values);if(!Number.isFinite(lo)){lo=0;hi=1}if(hi===lo){hi+=1;lo-=1}
    const selected=input.series.find(s=>config.selected?.has(s.id));
    // Explicit focus fits the selected curve; other curves are clipped, never relabelled.
    if(selected){const v=selected.values.filter((v,i)=>Number.isFinite(v)&&input.times[i]>=r.from&&input.times[i]<=r.to);if(v.length){lo=Math.min(0,...v);hi=Math.max(0,...v);if(lo===hi){lo-=1;hi+=1}}}
