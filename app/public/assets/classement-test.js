@@ -102,7 +102,7 @@
   const personal=()=>{try{const v=JSON.parse(localStorage.getItem(visKey)||'null');return v&&v.rev===layout.revision&&v.dev===TableLayout.device()?v.vis:{};}catch(_){return {};}};
   let vis=personal();
   const shownColumns=()=>layout.columns.filter(c=>REG[c.id]&&(c.id==='name'||(c.id in vis?vis[c.id]:c.visible)));
-  let intrinsicRows=[],loadError=null,scoreLabel='',loading=true,universe=0,defaultSort='simple';
+  let intrinsicRows=[],loadError=null,scoreLabel='',loading=true,universe=0,defaultSort='complex';
   // Priorité : adresse (?verdict=, ?sort=colonne:sens, ?page_size=) > choix de l'utilisateur pendant la consultation > valeurs initiales de l'administration (Colonnes).
   const urlq=new URLSearchParams(location.search),urlSort=(urlq.get('sort')||'').split(':'),validSort=k=>REG[k]&&!REG[k].nosort;
   const urlSorts=validSort(urlSort[0])?[{key:urlSort[0],dir:urlSort[1]==='asc'?'asc':'desc'}]:null;
@@ -163,7 +163,7 @@
   const builtinNames={fast:'Croissance rapide',regular:'Croissance régulière',calm:'Hausse calme',rebound:'Rebond',mom6:'Momentum 6 mois (expérimental)',mom12:'Momentum 12 mois (expérimental)',momrisk:'Momentum ajusté du risque (expérimental)'};
   const names={...builtinNames},ovBy={},saved={},cloneJSON=x=>JSON.parse(JSON.stringify(x));
   let customIds=[],rev=serverView?serverView.revision:0,busy=false,meta=cloneJSON(serverView?.meta||{});
-  const metaOf=id=>({icon:'📈',description:'',enabled:true,...(meta[id]||{})});
+  const metaOf=id=>({icon:'trending-up',description:'',enabled:true,...(meta[id]||{})});
   const serverOk=!!serverView;
   const order=()=>[...Object.keys(builtinNames),...customIds];
   const seed=cloneJSON(overrides);
@@ -180,9 +180,9 @@
   const anyDirty=()=>order().some(isDirty);
   function renderStrategies(){
     const sel=$('#ct-strategy');
-    const html=order().filter(id=>metaOf(id).enabled||id===state.strategy).map(id=>`<option value="${esc(id)}">${esc(metaOf(id).icon+' '+names[id])}${isDirty(id)?' •':''}</option>`).join('');
+    const html=order().filter(id=>metaOf(id).enabled||id===state.strategy).map(id=>`<option value="${esc(id)}">${esc(names[id])}${isDirty(id)?' •':''}</option>`).join('');
     if(sel.dataset.html!==html){sel.innerHTML=html;sel.dataset.html=html;}      // ne jamais reconstruire le menu à chaque clic : il se refermerait (iPhone)
-    const d=$('#ct-strategy-desc'),txt=metaOf(state.strategy).description;d.textContent=txt;d.hidden=!txt;
+    const d=$('#ct-strategy-desc'),txt=metaOf(state.strategy).description,lnk=builtinNames[state.strategy]?state.strategy:'personnelles';d.hidden=!txt;if(d.dataset.k!==txt+'|'+lnk){d.dataset.k=txt+'|'+lnk;d.innerHTML='';const t=document.createElement('span');t.textContent=txt;const a=document.createElement('a');a.href='aide.html#strategie-'+lnk;a.textContent='Comprendre cette stratégie';d.append(t,a);}
     if(sel.value!==state.strategy)sel.value=state.strategy;
     const builtin=!!builtinNames[state.strategy];
     $('#ct-rename').hidden=builtin;$('#ct-delete').hidden=builtin;
@@ -201,8 +201,6 @@
     SUI.picker($('#ct-strategy'),list,state.strategy);
     const cur=list.find(s=>s.id===state.strategy);
     $('#ct-strategy-banner').innerHTML=SUI.banner(cur);
-    const host=document.querySelector('.sui-pick');if(host&&cur&&!document.getElementById('ct-info')){host.insertAdjacentHTML('afterend',`<span id="ct-info">${SUI.infoButton(cur)}</span>`);}
-    const ib=document.getElementById('ct-info');if(ib&&cur){ib.innerHTML=SUI.infoButton(cur);SUI.bindInfo(ib,list);}
   }
   const post=body=>J.post('classement-test/strategies/save',{revision:rev,...body}).then(v=>{loadStatus();return v;});
   function takeView(view){rev=view.revision;meta=cloneJSON(view.meta||{});for(const it of view.items)names[it.id]=it.name;customIds=view.items.filter(i=>!i.builtin).map(i=>i.id);}
@@ -403,7 +401,7 @@
     if(key==='rank_simple'||key==='rank_complex'){const w=key==='rank_simple'?'Simple':'Complex',r=row['rank'+w],t=row['tie'+w];return r==null?'—':t>1?`<span title="Ex æquo : ${t} titres ont exactement ce score">=${r}</span>`:String(r);}
     {const m=/^(perf|slope|r2)_(week|quarter|half|year)$/.exec(key);if(m){const [,f,k]=m,v=f==='perf'?(row.perf||{})[k]:(row.periods[SESS[k]]||{})[f];
       return v==null?'—':f==='r2'?fmt(v):`<span class="${v>0?'up':v<0?'down':''}">${percent(v,true)}</span>`;}}
-    if(key==='name')return `<a class="ct-company" href="${esc(sheetHref(row.id))}" target="_blank" rel="noopener" aria-label="Ouvrir la fiche de ${esc(row.symbol)} dans un nouvel onglet"><span class="ct-company-mark" style="--mark:${row.color}" aria-hidden="true">${esc(row.symbol.slice(0,2))}</span><span class="ct-company-text"><b>${esc(row.symbol)}${row.kind==='etf'?' <i class="ct-kind">ETF</i>':''}${row.held?' <i class="ct-kind held">détenu</i>':''}</b><span>${esc(row.name)}</span></span></a>`;
+    if(key==='name')return `<a class="ct-company" href="${esc(sheetHref(row.id))}" target="_blank" rel="noopener" aria-label="Ouvrir la fiche de ${esc(row.symbol)} dans un nouvel onglet"><span class="ct-company-mark" style="--mark:${row.color}" aria-hidden="true">${esc(row.symbol.slice(0,2))}</span><span class="ct-company-text"><b>${esc(row.symbol)}${row.kind==='etf'?' <i class="ct-kind">ETF</i>':''}${row.held?' <i class="ct-kind held">détenu</i>':''}</b><span>${esc(row.name)}</span>${row.category?`<span class="ct-sub ct-sector">${esc(row.category)}</span>`:''}</span></a>`;
     if(key==='market')return `<b>${esc(row.mic)}</b><span class="ct-sub">${esc(row.country||'Pays inconnu')} · ${esc(row.currency||'—')}</span>`;
     if(key==='sector'){const g=sectorLabel(row);return row.category?`<b>${esc(row.category)}</b><span class="ct-sub">${esc(g||'')}</span>`:'<span class="ct-missing">Inconnu</span>';}
     if(key==='price')return `${eur(row.price)}${row.currency&&row.currency!=='EUR'&&row.priceNative!==null?`<span class="ct-sub">${esc(new Intl.NumberFormat('fr-FR',{maximumFractionDigits:2}).format(row.priceNative))} ${esc(row.currency)}</span>`:''}`;
@@ -551,9 +549,12 @@
     const nxt=enabledIds().filter(x=>x!==id)[0]||'fast';overrides=ovBy[nxt];state.strategy=nxt;switchTo(nxt);feedback(`Stratégie « ${label} » supprimée.`);
   });
   $('#ct-search').value=tableState.query;$('#ct-search').oninput=e=>{tableState.query=e.target.value;tableState.page=1;renderRanking();};
-  {const opts=catalogOf().filter(c=>REG[c.id]&&c.sortable!==false&&!REG[c.id].nosort);
-   $('#ct-sort').innerHTML=opts.map((c,i)=>`<option value="${esc(c.id)}">${i?'':'Trier par : '}${esc(c.label)}</option>`).join('');}
-  TableLayout.onChange(()=>{layout=TableLayout.get(tl,'explorer',TableLayout.device(),LEGACY_VISIBLE());vis=personal();applyDefaultSort();renderColumns();});
+  // Choix de tri : même ordre que les colonnes du tableau (réglage personnel), pas l'ordre du catalogue.
+  function buildSortOptions(){const cat=catalogOf(),by=Object.fromEntries(cat.map(c=>[c.id,c])),order=(layout.columns||[]).map(c=>c.id).filter(id=>by[id]).concat(cat.map(c=>c.id).filter(id=>!(layout.columns||[]).some(c=>c.id===id)));
+    const opts=order.map(id=>by[id]).filter(c=>REG[c.id]&&c.sortable!==false&&!REG[c.id].nosort),sel=$('#ct-sort'),keep=sel.value;
+    sel.innerHTML=opts.map((c,i)=>`<option value="${esc(c.id)}">${i?'':'Trier par : '}${esc(c.label)}</option>`).join('');if(keep&&opts.some(c=>c.id===keep))sel.value=keep;}
+  buildSortOptions();
+  TableLayout.onChange(()=>{layout=TableLayout.get(tl,'explorer',TableLayout.device(),LEGACY_VISIBLE());vis=personal();applyDefaultSort();buildSortOptions();renderColumns();});
   $('#ct-sort').onchange=e=>{sortBy(e.target.value);};
   $('#ct-sort-direction').onclick=()=>{tableState.userSorted=true;tableState.sorts=[{key:sortKey(),dir:sortDir()==='desc'?'asc':'desc'},...tableState.sorts.slice(1)];tableState.page=1;renderRanking();};
   $('#ct-page-size').onchange=e=>{tableState.pageSize=Number(e.target.value);tableState.page=1;renderRanking();};
@@ -572,7 +573,7 @@
   async function loadRows(){
     const my=++loadSeq,want=state.strategy;loading=true;
     $('#ct-table-body').innerHTML='<tr class="ct-loading"><td colspan="20"><span class="spinner"></span> Chargement des titres…</td></tr>';
-    try{const data=await J.api('ranking/table',{params:{strategy:want}});if(my!==loadSeq)return;intrinsicRows=data.rows.map(toRow);universe=data.universe||intrinsicRows.length;defaultSort=data.default_sort==='complex'?'complex':'simple';applyDefaultSort();loadError=null;scoreLabel=data.label||'';appliedSpec=null;loading=false;}
+    try{const data=await J.api('ranking/table',{params:{strategy:want}});if(my!==loadSeq)return;intrinsicRows=data.rows.map(toRow);universe=data.universe||intrinsicRows.length;defaultSort='complex';applyDefaultSort();loadError=null;scoreLabel=data.label||'';appliedSpec=null;loading=false;}
     catch(e){if(my!==loadSeq)return;intrinsicRows=[];loadError='Classement indisponible : '+(e.message||'erreur de chargement');loading=false;}
     renderRanking();scheduleVerdicts();                                   // lignes chargées avec les réglages ENREGISTRÉS : si la page affiche un brouillon, les statuts suivent le brouillon
   }

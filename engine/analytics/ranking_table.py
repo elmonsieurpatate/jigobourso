@@ -185,4 +185,4 @@ def table(conn, request):
         universe = int(cur.fetchone()['n'])
     counts = CR.counts(r['status'] for r in rows)
     return {'strategy': name, 'label': scores_admin.spec(name)['label'], 'counts': counts, 'context': 'missing' if norm is None else 'ok', 'reference_sessions': REFERENCE, 'universe': universe, 'evaluated': len(rows),
-            'scored': {'simple': len(simple), 'complex': len(complex_)}, 'default_sort': cfg['ranking']['sort'] if (cfg.get('ranking') or {}).get('sort') in ('simple', 'complex') else 'simple', 'rows': rows}
+            'scored': {'simple': len(simple), 'complex': len(complex_)}, 'default_sort': 'complex', 'rows': rows}      # tri par défaut systématique : score complexe

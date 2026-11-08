@@ -15,7 +15,7 @@
       ${showing && st.status === 'adapted' ? `${st.criteria.details.length ? '<h4 style="margin:8px 0 4px">Critères de recherche</h4>' + rowsOf(st.criteria.details) : ''}${st.scores.details.length ? '<h4 style="margin:8px 0 4px">Calcul des scores</h4>' + rowsOf(st.scores.details) : ''}` : ''}</div>`;
   };
   const post = body => J.post('classement-test/strategies/save', { revision: view.revision, ...body });
-  const meta = id => ({ icon: '📈', description: '', enabled: true, ...((view.meta || {})[id] || {}) });
+  const meta = id => ({ icon: 'trending-up', description: '', enabled: true, ...((view.meta || {})[id] || {}) });
   const when = s => { try { return new Date(String(s).replace(' ', 'T') + (/Z|[+-]\d\d:?\d\d$/.test(s) ? '' : 'Z')).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }); } catch (_) { return ''; } };
   const rows = () => {
     const byId = Object.fromEntries(view.items.map(i => [i.id, i]));
@@ -26,7 +26,7 @@
     const m = meta(r.id);
     return `<form class="ms-form" data-id="${esc(r.id)}" style="margin-top:12px;display:grid;gap:12px">
       <label class="field">Nom<input name="name" maxlength="60" value="${esc(r.name)}" ${r.builtin ? 'readonly title="Le nom d’une stratégie fournie ne change pas"' : ''} autocomplete="off"></label>
-      <fieldset style="border:0;padding:0;margin:0"><legend class="small muted" style="margin-bottom:6px">Icône</legend><div class="row gap-s" role="radiogroup" aria-label="Icône">${view.icons.map(ic => `<label style="cursor:pointer"><input type="radio" name="icon" value="${esc(ic)}" ${ic === m.icon ? 'checked' : ''} style="position:absolute;opacity:0"><span class="ms-ic" style="display:inline-flex;width:38px;height:38px;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:10px;font-size:1.2rem">${ic}</span></label>`).join('')}</div></fieldset>
+      <fieldset style="border:0;padding:0;margin:0"><legend class="small muted" style="margin-bottom:6px">Icône</legend><div class="row gap-s" role="radiogroup" aria-label="Icône">${view.icons.map(ic => `<label style="cursor:pointer"><input type="radio" name="icon" value="${esc(ic)}" ${ic === m.icon ? 'checked' : ''} style="position:absolute;opacity:0"><span class="ms-ic" style="display:inline-flex;width:38px;height:38px;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:10px;" title="${esc(ic)}">${SUI.glyph(ic)}</span></label>`).join('')}</div></fieldset>
       <label class="field">Explications <span class="small muted">(300 caractères max)</span><textarea name="description" rows="3" maxlength="300">${esc(m.description)}</textarea></label>
       <div class="row gap-s"><button type="submit" class="btn small primary">Enregistrer</button><button type="button" class="btn small" data-act="cancel">Annuler</button>${r.builtin ? `<button type="button" class="btn small" data-act="restore" data-id="${esc(r.id)}" title="Remet les réglages d’origine (seuils, périodes, filtres)" style="margin-left:auto">Restaurer par défaut</button>` : ''}</div></form>`;
   }
@@ -38,8 +38,8 @@
       rows().map(r => {
         const m = meta(r.id), off = !m.enabled;
         return `<div class="card tight" style="margin-bottom:10px;${off ? 'opacity:.8' : ''}"><div class="row between" style="align-items:flex-start">
-          <div class="row" style="flex-wrap:nowrap;align-items:flex-start;min-width:0">${SUI.ico(r.id, r.builtin ? 'builtin' : 'personal')}<div style="min-width:0"><b>${esc(r.name)}</b> ${SUI.badge(status[r.id] ? status[r.id].status : r.builtin ? 'official' : 'personal')} ${SUI.infoButton({ id: r.id, label: r.name })}${off ? ' <span class="tag">Désactivée</span>' : ''}${r.id === view.selected ? ' <span class="tag open">Dernière utilisée</span>' : ''}
-          <div class="small muted" style="white-space:pre-line;max-width:70ch">${esc(m.description || 'Aucune explication.')}</div>${statusBlock(r)}
+          <div class="row" style="flex-wrap:nowrap;align-items:flex-start;min-width:0">${SUI.ico(r.id, r.builtin ? 'builtin' : 'personal')}<div style="min-width:0"><b>${esc(r.name)}</b> ${SUI.badge(status[r.id] ? status[r.id].status : r.builtin ? 'official' : 'personal')} ${off ? ' <span class="tag">Désactivée</span>' : ''}${r.id === view.selected ? ' <span class="tag open">Dernière utilisée</span>' : ''}
+          <div class="small muted" style="white-space:pre-line;max-width:70ch">${esc(m.description || 'Aucune explication.')} <a href="aide.html#strategie-${esc(r.builtin ? r.id : 'personnelles')}">Fiche d’aide</a></div>${statusBlock(r)}
           <div class="small muted">${r.row ? (r.builtin ? 'Réglages modifiés' : 'Enregistrée') + ' le ' + esc(when(r.row.updated_at)) : 'Valeurs d’origine'}</div></div></div>
           <div class="row gap-s"><label class="row gap-s small" style="cursor:pointer"><input type="checkbox" data-act="toggle" data-id="${esc(r.id)}" ${m.enabled ? 'checked' : ''}> Active</label>
           <button class="btn small" data-act="edit" data-id="${esc(r.id)}">Modifier</button>
@@ -48,7 +48,6 @@
           ${editing === r.id ? form(r) : ''}</div>`;
       }).join('');
     J.$$('[data-act]', page).forEach(b => { const a = b.dataset.act; if (a === 'toggle') b.onchange = () => act(a, b.dataset.id, b.checked); else b.onclick = () => a === 'cancel' ? (editing = null, render()) : act(a, b.dataset.id); });
-    SUI.bindInfo(page, Object.values(status).map(x => ({ ...x, status: x.status })).concat(view.items.filter(i => !i.builtin && !status[i.id]).map(i => ({ id: i.id, label: i.name, kind: 'personal', status: 'personal' }))));
     J.$$('.ms-form', page).forEach(f => f.onsubmit = e => { e.preventDefault(); act('save-meta', f.dataset.id, new FormData(f)); });
   }
   function askName(initial) {

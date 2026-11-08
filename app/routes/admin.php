@@ -60,7 +60,7 @@ return [
         foreach ($freshness as &$f) $f['last_price'] = $intraday[$f['mic']] ?? null;
         $gaps = q("SELECT state, COUNT(*) n FROM price_gaps GROUP BY state")->fetchAll(PDO::FETCH_KEY_PAIR);
         $settings = [];
-        foreach (q('SELECT name, value_json FROM settings')->fetchAll() as $s) $settings[$s['name']] = $s['name'] === 'invite_code' ? (json_decode($s['value_json'], true) ? '••••' : '') : json_decode($s['value_json'], true);
+        foreach (q('SELECT name, value_json FROM settings')->fetchAll() as $s) $settings[$s['name']] = json_decode($s['value_json'], true);      // route réservée à l'administrateur : le mot d'invitation est affiché en clair
         $catalogue = q('SELECT source_commit, loaded_at, rows_read, rows_kept FROM catalogue_loads ORDER BY id DESC LIMIT 1')->fetch();
         return ['counts' => system_counts(), 'jobs' => $jobs, 'logs' => $logs, 'tables' => $sizes, 'total_mb' => round(array_sum(array_column($sizes, 'mb')), 1),
                 'freshness' => $freshness, 'gaps' => $gaps, 'settings' => $settings, 'catalogue' => $catalogue ?: null];

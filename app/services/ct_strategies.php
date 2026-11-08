@@ -17,15 +17,15 @@ const CT_METRICS = ['slope', 'r2', 'volatility', 'drawdown', 'return', 'volume']
 const CT_MAX_CUSTOM = 30;
 /** Présentation par défaut des stratégies d'origine (icône et explications) ; modifiable par chaque utilisateur dans « Mes stratégies ». */
 const CT_DEFAULT_META = [
-    'fast' => ['icon' => '🚀', 'description' => 'Les titres qui montent très vite : forte hausse moyenne par séance, sur la semaine ET sur le mois.'],
-    'regular' => ['icon' => '📈', 'description' => 'Une hausse soutenue et régulière sur un mois et un trimestre : la courbe monte sans grands à-coups.'],
-    'calm' => ['icon' => '🌱', 'description' => 'Une hausse douce avec peu de secousses sur un mois et un trimestre : peu de volatilité, peu de baisses.'],
-    'rebound' => ['icon' => '🔄', 'description' => 'Les titres qui repartent à la hausse (semaine et mois) alors que le semestre a peu progressé.'],
-    'mom6' => ['icon' => '⏳', 'description' => 'Le momentum des 6 derniers mois, dernier mois exclu : on classe les titres qui ont le mieux monté sur le semestre.'],
-    'mom12' => ['icon' => '🗓️', 'description' => 'Le momentum des 12 derniers mois, dernier mois exclu : on classe les titres qui ont le mieux monté sur l’année.'],
-    'momrisk' => ['icon' => '🛡️', 'description' => 'Le momentum 6 et 12 mois, corrigé du risque : la volatilité et la plus forte baisse pénalisent la note.'],
+    'fast' => ['icon' => 'rocket', 'description' => 'Les titres qui montent très vite : forte hausse moyenne par séance, sur la semaine ET sur le mois.'],
+    'regular' => ['icon' => 'trending-up', 'description' => 'Une hausse soutenue et régulière sur un mois et un trimestre : la courbe monte sans grands à-coups.'],
+    'calm' => ['icon' => 'waves', 'description' => 'Une hausse douce avec peu de secousses sur un mois et un trimestre : peu de volatilité, peu de baisses.'],
+    'rebound' => ['icon' => 'refresh-cw', 'description' => 'Les titres qui repartent à la hausse (semaine et mois) alors que le semestre a peu progressé.'],
+    'mom6' => ['icon' => 'hourglass', 'description' => 'Le momentum des 6 derniers mois, dernier mois exclu : on classe les titres qui ont le mieux monté sur le semestre.'],
+    'mom12' => ['icon' => 'calendar-days', 'description' => 'Le momentum des 12 derniers mois, dernier mois exclu : on classe les titres qui ont le mieux monté sur l’année.'],
+    'momrisk' => ['icon' => 'shield-check', 'description' => 'Le momentum 6 et 12 mois, corrigé du risque : la volatilité et la plus forte baisse pénalisent la note.'],
 ];
-const CT_ICONS = ['📈', '📉', '🚀', '🛡️', '⚖️', '🎯', '⚡', '🔥', '🌱', '💎', '⏳', '💰', '🏦', '🔍', '🔄', '🗓️', '🧭', '🏆', '🌊', '🌙', '☀️', '🌳', '🍀', '🌿', '🐢', '🐇', '🦅', '🐂', '🐻', '🦁', '🧲', '🔋', '🛰️', '🏔️', '⛰️', '🏄', '🚴', '🧘', '🧠', '💡', '🔭', '🔬', '🧪', '⚙️', '🛠️', '🔧', '📊', '📌', '📍', '🔔', '⭐', '🌟', '✨', '💫', '🎲', '♟️', '🧩', '🪙', '💵', '💶', '📦', '🏗️', '🏭', '🛒', '🎢', '🌀', '🌪️', '❄️', '🧊', '🔒', '🔑', '👁️', '🧱', '⚓', '⛵', '🚦', '✅'];
+const CT_ICONS = ['trending-up', 'trending-down', 'rocket', 'shield', 'shield-check', 'scale', 'target', 'zap', 'sprout', 'gem', 'hourglass', 'coins', 'landmark', 'search', 'refresh-cw', 'calendar-days', 'compass', 'trophy', 'waves', 'moon', 'sun', 'gauge', 'activity', 'chart-column', 'chart-line', 'chart-area', 'chart-pie', 'layers', 'filter', 'sliders-horizontal', 'list-checks', 'circle-check', 'flag', 'bookmark', 'star', 'award', 'crosshair', 'radar', 'telescope', 'microscope', 'flask-conical', 'cpu', 'settings', 'wrench', 'anchor', 'lock', 'key', 'eye', 'bell', 'clock', 'timer', 'arrow-up-right', 'arrow-down-right', 'arrow-up-down', 'repeat', 'undo-2', 'git-branch', 'network', 'briefcase', 'building-2', 'banknote', 'wallet', 'percent', 'euro', 'globe', 'factory', 'leaf', 'mountain', 'wind', 'droplets', 'thermometer', 'circle-dollar-sign', 'piggy-bank', 'calculator', 'ruler', 'scan-search', 'lightbulb', 'brain-circuit', 'atom', 'bolt', 'battery-charging', 'flame', 'snowflake', 'route', 'signpost', 'map-pin', 'badge-check', 'scroll-text', 'book-open', 'file-chart-line', 'chart-no-axes-combined', 'chart-candlestick'];      // clés du jeu d'icônes (strategy-icons.js)
 
 function ct_key(int $uid): string { return 'ct_strategies:' . $uid; }
 function ct_json($v): string { return json_encode($v, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR); }
@@ -97,10 +97,21 @@ function ct_name(string $name, array $doc, ?string $exceptId): string {
     foreach ($doc['items'] as $it) if ($it['id'] !== $exceptId && mb_strtolower($it['name']) === $low) throw new ApiError('Ce nom existe déjà.', 422);
     return $name;
 }
+/** Présentation à afficher : défauts des stratégies d'origine, puis choix de l'utilisateur ; une icône enregistrée hors du jeu actuel (ancien emoji) retombe sur l'icône par défaut. */
+function ct_meta_view(array $stored): array {
+    $out = array_map(fn($m) => $m + ['enabled' => true], CT_DEFAULT_META);
+    foreach ($stored as $id => $m) {
+        $m = is_array($m) ? $m : [];
+        $base = $out[$id] ?? ['icon' => CT_ICONS[0], 'description' => '', 'enabled' => true];
+        if (!isset($m['icon']) || !in_array($m['icon'], CT_ICONS, true)) unset($m['icon']);
+        $out[$id] = array_merge($base, $m);
+    }
+    return $out;
+}
 function ct_view(array $doc): array {
     if (!isset(CT_BUILTIN[$doc['selected']]) && !array_filter($doc['items'], fn($i) => $i['id'] === $doc['selected'])) $doc['selected'] = 'fast';
     return ['schema' => 1, 'revision' => $doc['revision'], 'selected' => $doc['selected'], 'builtin' => CT_BUILTIN, 'max_custom' => CT_MAX_CUSTOM, 'items' => $doc['items'],
-            'meta' => (object)array_merge(array_map(fn($m) => $m + ['enabled' => true], CT_DEFAULT_META), $doc['meta'] ?? []), 'icons' => CT_ICONS];
+            'meta' => (object)ct_meta_view($doc['meta'] ?? []), 'icons' => CT_ICONS];
 }
 function ct_read(int $uid): array {
     $json = q('SELECT value_json FROM settings WHERE name=?', [ct_key($uid)])->fetchColumn();
@@ -126,7 +137,8 @@ function ct_label(int $uid, string $id): ?string {
 }
 /** Présentation d'une stratégie (icône, explications, active ou non), séparée de sa configuration. */
 function ct_meta(array $in, array $old): array {
-    $icon = $in['icon'] ?? $old['icon'] ?? CT_ICONS[0];
+    $icon = $in['icon'] ?? null;
+    if ($icon === null) { $icon = $old['icon'] ?? CT_ICONS[0]; if (!is_string($icon) || !in_array($icon, CT_ICONS, true)) $icon = CT_ICONS[0]; }      // ancienne valeur (emoji) : remplacée par l'icône par défaut
     if (!is_string($icon) || !in_array($icon, CT_ICONS, true)) throw new ApiError('Icône inconnue.', 422);
     $desc = $in['description'] ?? $old['description'] ?? '';
     if (!is_string($desc)) throw new ApiError('Explications invalides.', 422);

@@ -128,7 +128,7 @@ def test_concurrent_revision_is_refused_and_reset_restores_defaults_only_for_one
     assert 'ok' in call('tl_write', {'action': 'reset', 'page': 'explorer', 'device': 'desktop', 'revision': 2})
     d = read()
     assert not d['saved']['explorer.desktop'] and d['layouts']['explorer.desktop'] == d['defaults']['explorer.desktop']
-    assert d['saved']['scores.mobile'] and [c['id'] for c in d['layouts']['scores.mobile']['columns'] if c['visible']] == ['name', 'simple']
+    assert d['saved']['scores.mobile'] and [c['id'] for c in d['layouts']['scores.mobile']['columns'] if c['visible']] == ['simple', 'name']
 
 
 def test_old_documents_stay_readable_when_the_catalogue_evolves():

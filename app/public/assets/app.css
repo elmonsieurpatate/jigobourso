@@ -496,3 +496,5 @@ dialog:has(.pc-box){width:min(900px,calc(100vw - 24px))}
 
 #neutral-performance,.capital-yield{white-space:nowrap}.cockpit-summary .capital-yield{font-size:inherit;color:inherit}
 @media(max-width:860px){.cockpit-summary>div:nth-child(3){flex-direction:column;align-items:flex-start;gap:4px}}
+/* Pastilles de statut sur l'en-tête sombre d'une fiche : fond plein et texte lisibles (le fond clair des pastilles standard rendait le texte blanc invisible). */
+.hero .badge.ok { background: #1f8f5f; color: #fff; } .hero .badge.wait { background: #b07a1c; color: #fff; } .hero .badge.ko { background: #b3261e; color: #fff; } .hero .badge.info { background: #2f5fb3; color: #fff; }

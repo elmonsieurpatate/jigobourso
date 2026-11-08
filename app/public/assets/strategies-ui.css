@@ -55,3 +55,25 @@
 .sui-native{position:absolute!important;left:0;top:0;max-width:1px;width:1px;height:1px;opacity:0;pointer-events:none;overflow:hidden}
 .sui-emoji{font-size:1.25rem;line-height:1}
 .help-steps{padding-left:0;list-style:none;display:grid;gap:10px}.help-steps li{border:1px solid var(--line);border-radius:10px;background:var(--surface-2);padding:10px 12px}
+.sui-desc{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:baseline;margin:10px 0 6px!important;padding:10px 14px;border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:8px;background:var(--surface-2);color:var(--text);font-size:.92rem;line-height:1.45;max-width:none}
+.sui-desc a{font-weight:600;white-space:nowrap}
+.sui-desc[hidden]{display:none}
+.ct-company-text .ct-sector{display:block;font-size:.76rem;color:var(--muted);font-weight:400}
+
+.help-path{list-style:none;padding:0;margin:12px 0;display:grid;gap:0;border-left:2px solid var(--line);margin-left:14px}
+.help-path>li{position:relative;padding:0 0 22px 26px}
+.help-path h3{margin:0 0 6px;font-size:1.02rem;display:flex;gap:10px;align-items:center}
+.help-path h3 span{position:absolute;left:-15px;display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:999px;background:var(--accent);color:var(--accent-ink);font-size:.85rem;font-weight:700}
+.help-path h3{padding-left:0}
+.help-if{margin:8px 0;padding:8px 12px;border:1px dashed var(--accent);border-radius:8px;background:var(--accent-soft);font-size:.92rem}
+.help-dl{display:grid;grid-template-columns:minmax(0,200px) minmax(0,1fr);gap:8px 16px;margin:8px 0 16px}
+.help-dl dt{font-weight:700}.help-dl dd{margin:0}
+.help-main h3{margin:18px 0 6px}
+@media (max-width:640px){.help-dl{grid-template-columns:minmax(0,1fr);gap:2px}.help-dl dd{margin-bottom:10px}.help-path>li{padding-left:20px}}
+
+.sui-comps{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr));gap:12px;margin:12px 0}
+.sui-comp{border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:12px 14px}
+.sui-comp h4{margin:0 0 4px;font-size:.98rem}.sui-comp p{margin:0 0 8px;font-size:.9rem;max-width:60ch}
+.sui-chips{display:flex;flex-wrap:wrap;gap:6px}
+.sui-chip{display:inline-flex;gap:8px;align-items:center;padding:3px 10px;border-radius:999px;background:var(--accent-soft);color:var(--text);font-size:.82rem}
+.sui-chip b{color:var(--accent)}

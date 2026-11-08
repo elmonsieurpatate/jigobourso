@@ -26,9 +26,8 @@ const api=(pg,route,body)=>pg.evaluate(async([r,b])=>{try{const j=b?await J.post
   must(/^Stratégies intégrées \(7\)$/i.test(u.g[0]),'Groupe : '+u.g);must(u.o.filter(x=>x.badge.toLowerCase()==='officielle').length===7,'7 Officielles attendues : '+JSON.stringify(u.o));
   must(new Set(u.o.map(x=>x.label)).size===u.o.length,'Doublon de stratégie');
   must(await U.pg.$('.sui-banner'),'Bandeau absent');
-  // 4. fenêtre d'information : au clic, lien vers la fiche, Échap ferme
-  await U.pg.click('#ct-info .sui-info');must(await U.pg.$('.sui-pop a[href^="aide.html#strategie-"]'),'Fenêtre d’information sans lien');must(/montent très vite/.test(await U.pg.textContent('.sui-pop')),'Texte par défaut absent de la fenêtre d’information');await U.pg.keyboard.press('Escape');must(!(await U.pg.$('.sui-pop')),'Échap ne ferme pas la fenêtre');
-  must(/montent très vite/.test(await U.pg.textContent('#ct-strategy-desc')),'Texte de la stratégie absent sous le sélecteur');must((await U.pg.textContent('.sui-pick-btn')).includes('🚀'),'Icône par défaut absente du sélecteur');
+  // 4. texte de la stratégie affiché une seule fois (sous le sélecteur), avec lien vers la fiche
+  must(/montent très vite/.test(await U.pg.textContent('#ct-strategy-desc')),'Texte de la stratégie absent sous le sélecteur');must(await U.pg.$('.sui-pick-btn .sui-ico svg'),'Icône par défaut absente du sélecteur');must(!(await U.pg.$('#ct-info')),'Bouton d’info redondant encore présent');must(await U.pg.$('#ct-strategy-desc a[href^="aide.html#strategie-"]'),'Lien vers la fiche d’aide absent');const so=await U.pg.$$eval('#ct-sort option',o=>o.map(x=>x.value));const co=await U.pg.$$eval('#ct-table-head th',t=>t.map(x=>x.dataset.sortColumn).filter(Boolean));must(so[0]==='complex'&&so[1]==='simple'&&so[2]==='trend'||so[0]==='complex','Ordre des choix de tri : '+so.slice(0,4));
   // 5. adaptation privée : le compte ordinaire adapte Hausse calme, l'admin reste Officielle
   const state=(await api(U.pg,'my/scores')).json,calm=state.strategies.find(s=>s.name==='calm_rise');must(calm,'Profil calm_rise absent');
   const prof=JSON.parse(JSON.stringify(calm.current));Object.values(prof.periods).forEach(x=>delete x.sessions);prof.complex_weights.volatility-=5;prof.complex_weights.up_days+=5;
@@ -50,13 +49,19 @@ const api=(pg,route,body)=>pg.evaluate(async([r,b])=>{try{const j=b?await J.post
   // 7. Aide : modes, 7 fiches, recherche, section admin
   await U.pg.goto(BASE+'aide.html');await U.pg.waitForSelector('#strategies .sui-card');
   must((await U.pg.$$('#strategies article[id^="strategie-"]')).length===7,'7 fiches attendues');
-  must(await U.pg.$('#strategies table.sui-cmp'),'Comparatif absent');must(await U.pg.$('#scores table.sui-cmp'),'Tableau des composantes de score absent');must(/pente/i.test(await U.pg.textContent('#premiers-pas'))&&/filtrage/i.test(await U.pg.textContent('#premiers-pas')),'Introduction de l’aide incomplète');must(await U.pg.$eval('#help-nav a',a=>a.getAttribute('href'))==='#premiers-pas','Aide : première rubrique');
+  must(await U.pg.$('#strategies table.sui-cmp'),'Comparatif absent');must(await U.pg.$('#scores .sui-comp'),'Cartes des composantes de score absentes');must(/pente/i.test(await U.pg.textContent('#premiers-pas'))&&/filtrage/i.test(await U.pg.textContent('#premiers-pas')),'Introduction de l’aide incomplète');must(await U.pg.$eval('#help-nav a',a=>a.getAttribute('href'))==='#premiers-pas','Aide : première rubrique');
   must(!(await U.pg.$('#administration')),'Rubrique admin visible pour un compte ordinaire');
   await U.pg.click('[data-mode="expert"]');await U.pg.waitForSelector('#strategie-fast table.sui-cmp');
   must(/pente ≥/.test(await U.pg.textContent('#strategie-fast')),'Fiche Expert sans seuil de pente');
   await U.pg.waitForTimeout(500);await U.pg.reload();await U.pg.waitForSelector('#strategies .sui-card');must(await U.pg.getAttribute('[data-mode="expert"]','aria-pressed')==='true','Mode Expert non mémorisé');
   await U.pg.fill('#help-q','lots');await U.pg.waitForTimeout(200);must(await U.pg.$('#achats-ventes'),'Recherche « lots » sans résultat');
+  await U.pg.fill('#help-q','');await U.pg.click('[data-mode="beginner"]');await U.pg.waitForSelector('#parcours .help-path');must((await U.pg.$$('#scores .sui-comp')).length===10,'Composantes du score : 10 cartes attendues');must((await U.pg.$$('#parcours .help-path > li')).length===6,'Parcours guidé : 6 étapes attendues');must((await U.pg.$$('#parcours .help-if')).length>=4,'Parcours : encadrés « Si… alors… » absents');
+  must(/Consumer Discretionary/.test(await U.pg.textContent('#bases'))&&/Place de cotation/.test(await U.pg.textContent('#bases'))&&/ETF/.test(await U.pg.textContent('#bases')),'Bases de la bourse incomplètes');
   await A.pg.goto(BASE+'aide.html');await A.pg.waitForSelector('#administration');
+  // mot d'invitation visible de l'administrateur seulement
+  must((await api(A.pg,'admin/settings',{name:'invite_code',value:'motdetest'})).json,'Mot d’invitation non enregistré');
+  must((await api(A.pg,'admin/system')).json.settings.invite_code==='motdetest','Mot d’invitation non visible de l’administrateur');
+  must((await api(U.pg,'admin/system')).json===null,'admin/system ouvert à un compte ordinaire');
   // 8. mobile : pas de débordement horizontal
   const M=await login(browser,'plain_user','plain-local-password',390);
   for(const f of ['aide.html','mes-strategies.html','mes-scores.html','index.html']){await M.pg.goto(BASE+f);await M.pg.waitForTimeout(1500);const over=await M.pg.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1?[...document.querySelectorAll('body *')].filter(e=>e.getBoundingClientRect().right>innerWidth+1&&!e.closest('.ct-table-wrap,.sui-scroll,table')).slice(0,6).map(e=>e.tagName+'.'+e.className+':'+Math.round(e.getBoundingClientRect().right)):null);must(!over,'Débordement horizontal mobile : '+f+' '+JSON.stringify(over));}

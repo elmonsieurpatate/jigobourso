@@ -5,6 +5,24 @@
    "label": "Explorer / Stratégie",
    "columns": [
     {
+     "id": "complex",
+     "label": "Score complexe",
+     "group": "Scores",
+     "sortable": true
+    },
+    {
+     "id": "simple",
+     "label": "Score simple",
+     "group": "Scores",
+     "sortable": true
+    },
+    {
+     "id": "trend",
+     "label": "Tendance (courbe)",
+     "group": "Identification",
+     "sortable": false
+    },
+    {
      "id": "rank",
      "label": "Rang",
      "group": "Identification",
@@ -96,24 +114,6 @@
      "label": "Perf. · mois",
      "group": "Performances",
      "sortable": true
-    },
-    {
-     "id": "simple",
-     "label": "Score simple",
-     "group": "Scores",
-     "sortable": true
-    },
-    {
-     "id": "complex",
-     "label": "Score complexe",
-     "group": "Scores",
-     "sortable": true
-    },
-    {
-     "id": "trend",
-     "label": "Tendance (courbe)",
-     "group": "Identification",
-     "sortable": false
     },
     {
      "id": "kind",
@@ -245,6 +245,24 @@
    "label": "Scores / Classement",
    "columns": [
     {
+     "id": "complex",
+     "label": "Score complexe",
+     "group": "Scores",
+     "sortable": true
+    },
+    {
+     "id": "simple",
+     "label": "Score simple",
+     "group": "Scores",
+     "sortable": true
+    },
+    {
+     "id": "trend",
+     "label": "Tendance (courbe)",
+     "group": "Identification",
+     "sortable": false
+    },
+    {
      "id": "rank",
      "label": "Rang",
      "group": "Identification",
@@ -281,24 +299,6 @@
      "group": "Performances",
      "sortable": true,
      "hint": "Variation du cours entre les deux dernières séances clôturées."
-    },
-    {
-     "id": "trend",
-     "label": "Tendance (courbe)",
-     "group": "Identification",
-     "sortable": false
-    },
-    {
-     "id": "simple",
-     "label": "Score simple",
-     "group": "Scores",
-     "sortable": true
-    },
-    {
-     "id": "complex",
-     "label": "Score complexe",
-     "group": "Scores",
-     "sortable": true
     }
    ],
    "defaults": {

@@ -14,7 +14,8 @@
     personal: 'Stratégie personnelle : visible uniquement dans votre compte.' };
   let META = {};                                   // icône et explications choisies par l'utilisateur (défauts des stratégies d'origine inclus) : mêmes partout
   const setMeta = m => { META = m && typeof m === 'object' ? m : {}; };
-  const icon = (id, kind) => META[id] && META[id].icon ? `<span class="sui-emoji">${E(META[id].icon)}</span>` : J.icon(kind === 'personal' ? 'user' : (ICON[id] || 'target'), 'sui-ic');
+  const glyph = key => (window.STRATEGY_ICONS && STRATEGY_ICONS[key]) ? `<svg class="sui-ic" viewBox="0 0 24 24" aria-hidden="true">${STRATEGY_ICONS[key]}</svg>` : '';
+  const icon = (id, kind) => glyph(META[id] && META[id].icon) || J.icon(kind === 'personal' ? 'user' : (ICON[id] || 'target'), 'sui-ic');
   const ico = (id, kind) => `<span class="sui-ico" aria-hidden="true">${icon(id, kind)}</span>`;
   const desc = (id, kind) => (META[id] && META[id].description) || SHORT[kind === 'personal' ? 'personal' : id] || '';
   const badge = st => `<span class="sui-badge ${E(st)}">${E(STATUS[st] || st)}</span>`;
@@ -63,5 +64,5 @@
     const part = (name, p) => `<span><b>${name}</b> ${badge(p.state === 'adapted' ? 'adapted' : 'official')}${p.modified ? ` <span class="muted small">${p.modified} paramètre${p.modified > 1 ? 's' : ''} modifié${p.modified > 1 ? 's' : ''}</span>` : ''}</span>`;
     return `<div class="sui-banner" role="status">${part('Critères de recherche', s.criteria)}${part('Calcul des scores', s.scores)}<a href="mes-strategies.html?id=${E(s.id)}">Comparer / restaurer</a></div>`;
   }
-  window.SUI = { ICON, STATUS, SHORT, setMeta, desc, icon, ico, badge, infoButton, bindInfo, openInfo, picker, banner };
+  window.SUI = { ICON, STATUS, SHORT, setMeta, desc, glyph, icon, ico, badge, infoButton, bindInfo, openInfo, picker, banner };
 })();
