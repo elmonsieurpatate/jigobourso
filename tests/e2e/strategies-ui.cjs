@@ -9,7 +9,7 @@ const api=(pg,route,body)=>pg.evaluate(async([r,b])=>{try{const j=b?await J.post
  const browser=await chromium.launch({executablePath:process.env.JIGO_CHROMIUM,args:['--no-sandbox']});
  try{
   const A=await login(browser,'review_user','review-local-password'),U=await login(browser,'plain_user','plain-local-password');
-  const ready=pg=>pg.waitForFunction(()=>document.querySelector('#ct-strategy-count')?.textContent.trim().length>0&&document.querySelector('.sui-pick'),null,{timeout:60000});
+  const ready=async pg=>{await pg.waitForFunction(()=>/Cliquez sur/.test(document.querySelector('#ct-ranking-status')?.textContent||''),null,{timeout:60000});await pg.click('#ct-apply');return pg.waitForFunction(()=>document.querySelector('#ct-strategy-count')?.textContent.trim().length>0&&document.querySelector('.sui-pick'),null,{timeout:60000});};
   await ready(A.pg);await ready(U.pg);
   // 1. menu : l'administration technique n'a que 7 entrées, absente pour un compte ordinaire ; menu Explorer personnel
   const sub=async(pg,id)=>pg.$$eval(`[data-sub="${id}"] .sv`,a=>a.map(x=>x.textContent.trim()));
