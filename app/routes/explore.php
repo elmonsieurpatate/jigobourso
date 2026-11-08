@@ -71,15 +71,23 @@ return [
         return $res;
     },
     'ranking/criteria' => function () { require_user(); return engine_call('ranking-criteria', []); },   // critères de recherche historiques des stratégies intégrées (source : V4_STRATEGIES)
-    'ranking/table' => function () {          // tous les titres notés (scores V4, rangs, valeurs des filtres) : tri, filtres et pages se font dans la page
+    'ranking/table' => function () {          // une seule lecture pour les notes ET les statuts des réglages appliqués
         $u = require_user();
-        $ct = (string)($_GET['strategy'] ?? '');
+        $b = [];
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') { need_post(); $b = body(); }
+        $ct = (string)($b['strategy'] ?? $_GET['strategy'] ?? '');
         $ct = preg_match('/^[a-z0-9-]{1,40}$/', $ct) ? $ct : 'fast';
         $saved = ct_saved((int)$u['id'], $ct);
-        $res = engine_call('ranking-table', ['ct_id' => $ct, 'user_id' => (int)$u['id'], 'spec' => $saved['config'] ?? null]);   // critères enregistrés ; sinon valeurs par défaut du moteur
-        $held = held_listing_ids((int)$u['id']);
-        foreach ($res['rows'] as &$r) $r['held'] = in_array($r['id'], $held, true);
+        $spec = is_array($b['config'] ?? null) ? $b['config'] : ($saved['config'] ?? null);
+        $res = engine_call('ranking-table', ['ct_id' => $ct, 'user_id' => (int)$u['id'], 'spec' => $spec, 'include_curves' => ($b['include_curves'] ?? true) !== false]);
+        $held = array_fill_keys(held_listing_ids((int)$u['id']), true);
+        foreach ($res['rows'] as &$r) $r['held'] = isset($held[$r['id']]);
+        unset($r);
         return $res;
+    },
+    'ranking/curves' => function () {         // courbes de la page visible seulement ; aucun calcul de notes
+        need_post(); require_user(); $b = body();
+        return engine_call('ranking-curves', ['ids' => $b['ids'] ?? []]);
     },
     'ranking/verdicts' => function () {       // statuts de stratégie (retenue / exclue / indéterminée) pour des critères en cours de modification : mêmes règles que le tableau et la fiche
         need_post(); $u = require_user(); $b = body();

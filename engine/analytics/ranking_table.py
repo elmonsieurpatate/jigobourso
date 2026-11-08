@@ -140,12 +140,12 @@ def table(conn, request):
     """Toutes les lignes du classement, avec scores et rangs généraux (indépendants des filtres, du tri et de la page)."""
     name, cfg, book = _base(conn, request)
     norm = norm_of(request)
-    ids = sorted(book)
+    ids = evaluable(book)
     simple, rank_s, pos_s = scores_admin.ordered(book, 'simple')            # même fonction que l'administration des scores : même ordre, mêmes rangs
     complex_, rank_c, pos_c = scores_admin.ordered(book, 'complex')
     tie_s, tie_c = _ties(rank_s), _ties(rank_c)
     data = _fetch(conn, ids) if ids else {}
-    curves = scores_admin.series(conn, ids, REFERENCE) if ids else {}
+    curves = scores_admin.series(conn, ids, REFERENCE) if ids and request.get('include_curves', True) is not False else {}
     rates = latest_rates(conn)
     groups = _config()
     rows = []
@@ -186,3 +186,11 @@ def table(conn, request):
     counts = CR.counts(r['status'] for r in rows)
     return {'strategy': name, 'label': scores_admin.spec(name)['label'], 'counts': counts, 'context': 'missing' if norm is None else 'ok', 'reference_sessions': REFERENCE, 'universe': universe, 'evaluated': len(rows),
             'scored': {'simple': len(simple), 'complex': len(complex_)}, 'default_sort': 'complex', 'rows': rows}      # tri par défaut systématique : score complexe
+
+
+def curves(conn, request):
+    """Courbes des seuls titres visibles, bornées à une page ; ne charge ni notes ni critères."""
+    ids = request.get('ids')
+    if not isinstance(ids, list) or len(ids) > 100 or any(type(i) is not int or i <= 0 for i in ids):
+        raise ValueError('Une page de 100 identifiants de titres maximum est requise')
+    return {'curves': scores_admin.series(conn, list(dict.fromkeys(ids)), REFERENCE) if ids else {}}

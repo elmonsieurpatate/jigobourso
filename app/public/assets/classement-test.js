@@ -391,6 +391,7 @@
     return {base,scoped,counts,rows};
   }
   function spark(row){
+    if(row.curveLoading)return '<span class="ct-missing">Chargement…</span>';
     if(!row.points.length)return '<span class="ct-missing">Indisponible</span>';
     const lo=Math.min(...row.points),hi=Math.max(...row.points),span=hi-lo||1;
     const pts=row.points.map((v,i)=>[4+i*96/Math.max(1,row.points.length-1),25-(v-lo)*21/span]);
@@ -446,6 +447,7 @@
     });
     const pages=Math.max(1,Math.ceil(rows.length/tableState.pageSize));tableState.page=Math.min(Math.max(1,tableState.page),pages);
     const start=(tableState.page-1)*tableState.pageSize,pageRows=rows.slice(start,start+tableState.pageSize);
+    if(selected.some(c=>c.key==='trend'))loadPageCurves(pageRows);
     $('#ct-result-count').textContent=loadError?'':`${num0(rows.length)} titre${rows.length>1?'s':''}`+(rows.length!==intrinsicRows.length?` sur ${num0(intrinsicRows.length)} évalués`:'');
     const wstyle=w=>w?` style="width:${w}px;min-width:${w}px;max-width:none"`:'';
     const cls=key=>key==='rank'?'ct-rank-cell':key==='name'?'ct-name-heading':'';
@@ -462,6 +464,20 @@
     $('#ct-pages').innerHTML=`<button type="button" data-demo-page="${tableState.page-1}" ${tableState.page===1?'disabled':''} aria-label="Page précédente">‹</button>${Array.from({length:Math.min(pages,9)},(_,i)=>{const n=pages<=9?i+1:Math.min(Math.max(1,tableState.page-4),pages-8)+i;return `<button type="button" data-demo-page="${n}" ${tableState.page===n?'aria-current="page"':''} aria-label="Page ${n}">${n}</button>`;}).join('')}<button type="button" data-demo-page="${tableState.page+1}" ${tableState.page===pages?'disabled':''} aria-label="Page suivante">›</button>`;
     $('#ct-sort').value=sortKey();$('#ct-page-size').value=String(tableState.pageSize);
     $('#ct-sort-direction').textContent=sortDir()==='desc'?'↓':'↑';$('#ct-sort-direction').setAttribute('aria-label',`Passer au tri ${sortDir()==='desc'?'croissant':'décroissant'}`);
+  }
+  async function loadPageCurves(rows){
+    const pending=rows.filter(r=>!r.curveRequested);
+    if(!applied||!pending.length)return;
+    const context=applied;
+    for(const row of pending){row.curveRequested=true;row.curveLoading=true;}
+    try{
+      const data=await J.post('ranking/curves',{ids:pending.map(r=>r.id)});
+      for(const row of pending)row.points=data?.curves?.[row.id]||[];
+    }catch(_){/* Une courbe indisponible ne bloque jamais les résultats. */}
+    finally{
+      for(const row of pending)row.curveLoading=false;
+      if(context===applied)renderRanking();
+    }
   }
   function sortBy(key){if(!REG[key]||REG[key].nosort)return;tableState.userSorted=true;const same=sortKey()===key;tableState.sorts=[{key,dir:same?(sortDir()==='desc'?'asc':'desc'):(REG[key].dir||'desc')}];tableState.page=1;renderRanking();}
   function render() {
@@ -581,12 +597,9 @@
     const request={strategy:state.strategy,config:specNow(),filters:cloneJSON(state.filters)};
     loading=true;loadError=null;updateSearchStatus();renderRanking();
     try{
-      const data=await J.api('ranking/table',{params:{strategy:request.strategy}});
+      const data=await J.post('ranking/table',{strategy:request.strategy,config:request.config,include_curves:false});
       if(!data||!Array.isArray(data.rows))throw new Error('Le serveur a renvoyé une réponse de classement invalide');
-      const verdicts=await J.post('ranking/verdicts',{strategy:request.strategy,config:request.config});
-      if(!verdicts||!verdicts.status||typeof verdicts.status!=='object')throw new Error('Le serveur n’a pas renvoyé les statuts des titres');
       const rows=data.rows.map(toRow);
-      for(const row of rows)row.status=verdicts.status[row.id]||'undetermined';
       intrinsicRows=rows;applied=request;universe=data.universe||rows.length;
       defaultSort='complex';applyDefaultSort();tableState.page=1;scoreLabel=data.label||'';
     }catch(e){
