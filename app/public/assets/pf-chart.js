@@ -11,11 +11,12 @@
     const dates = o.dates || [], n = dates.length;
     host.innerHTML = '';
     if (n < 2 || !o.series.some(s => s.y.some(isNum))) { host.innerHTML = '<div class="pfc-empty">' + esc(o.emptyText || 'Pas assez de données à tracer sur cette période.') + '</div>'; return null; }
-    const W = Math.max(280, host.clientWidth || 640), H = W < 520 ? 260 : 340, L = W < 520 ? 52 : 64, R = 12, T = 12, B = 26, pw = W - L - R, ph = H - T - B;
+    const W = Math.max(280, host.clientWidth || 640), H = W < 520 ? 260 : 340, R = 12, T = 12, B = 26;
     const vis = o.series.filter(s => !s.hidden);
     let lo = Infinity, hi = -Infinity; vis.forEach(s => s.y.forEach(v => { if (isNum(v)) { lo = Math.min(lo, v); hi = Math.max(hi, v); } }));
     if (!isFinite(lo)) { lo = 0; hi = 1; } if (o.zero !== false) { lo = Math.min(lo, 0); hi = Math.max(hi, 0); }
     const pad = (hi - lo) * 0.06 || 1; lo -= pad; hi += pad;
+    const L = 14 + 6.2 * Math.max(...[lo, hi, (lo + hi) / 2].map(v => String((o.tick || o.fmt)(v)).length)), pw = W - L - R, ph = H - T - B;
     const X = i => L + (i / (n - 1)) * pw, Y = v => T + (1 - (v - lo) / (hi - lo)) * ph;
     const svg = document.createElementNS(NS, 'svg'); svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.setAttribute('class', 'pfc-svg'); svg.setAttribute('role', 'img'); svg.setAttribute('aria-label', o.alt || 'Évolution du portefeuille');
     let h = '';

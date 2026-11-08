@@ -127,7 +127,7 @@ J.init = async function (page, { admin = false } = {}) {
 
 /* ───── coquille : barre latérale repliable à sous-menus, en-tête, tiroir mobile ───── */
 J.ICONS = {
-  compass: '<circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/>', wallet: '<path d="M3 7a2 2 0 0 1 2-2h13v4"/><path d="M3 7v10a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1H5a2 2 0 0 1-2-1"/><circle cx="16" cy="13.5" r="1"/>',
+  compass: '<circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/>', bell: '<path d="M6 17h12l-1.5-2V10a4.5 4.5 0 0 0-9 0v5z"/><path d="M10 20h4"/>', wallet: '<path d="M3 7a2 2 0 0 1 2-2h13v4"/><path d="M3 7v10a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1H5a2 2 0 0 1-2-1"/><circle cx="16" cy="13.5" r="1"/>',
   chart: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>', pulse: '<path d="M3 12h4l3-8 4 16 3-8h4"/>', db: '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/>',
   shield: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/>', menu: '<path d="M4 6h16M4 12h16M4 18h16"/>', search: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>',
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>', moon: '<path d="M21 13a8 8 0 1 1-10-10 7 7 0 0 0 10 10z"/>',
@@ -153,6 +153,7 @@ J.NAV = (admin) => [
     { label: 'Mes filtres et catégories', href: 'mes-filtres.html', icon: 'funnel', on: () => true }] },
   { sec: 'Mon patrimoine' },
   { id: 'portefeuilles', label: 'Portefeuilles', icon: 'wallet', file: ['portefeuilles.html'], dynamic: 'portfolios', children: [{ label: 'Vue d’ensemble', href: 'portefeuilles.html', on: q => !q.has('id') }] },
+  { id: 'alertes', label: 'Alertes', icon: 'bell', file: ['alertes.html'], href: 'alertes.html' },
   { id: 'bilan', label: 'Bilans', icon: 'chart', file: ['bilan.html'], children: [{ label: 'Bilan global', href: 'bilan.html', on: () => true }] },
   { sec: 'Méthode' },
   { id: 'suivi', label: 'Suivi des classements', icon: 'pulse', file: ['suivi.html'], href: 'suivi.html' },

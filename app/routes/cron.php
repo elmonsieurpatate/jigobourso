@@ -29,6 +29,7 @@ function cron_tick(): array {
     if (!hash_equals($key, cron_presented_key())) cron_reject('Clé invalide', 403);
     $log = cfg('JIGO_LOG_DIR', engine_root() . '/logs') . '/cron.log';
     if (!is_dir(dirname($log))) @mkdir(dirname($log), 0700, true);
+    try { require_once __DIR__ . '/../lib/mail.php'; alerts_mail_pending(); } catch (Throwable $e) { error_log('cron alerts mail: ' . $e->getMessage()); }   // e-mails des alertes déclenchées lors du passage précédent
     return ['ok' => true, 'message' => 'Tick détaché ; le résultat est enregistré dans la table jobs.', 'pid' => engine_spawn('tick', $log)];
 }
 

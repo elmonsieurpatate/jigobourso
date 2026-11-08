@@ -10,14 +10,14 @@ J.txDialog = function ({ portfolios, portfolioId, listing, tx, side: initialSide
     <div class="small muted" id="tx-hint" style="grid-column:1/-1;margin-top:-6px"></div>
     ${J.field('Frais (€)', `<input id="tx-fees" inputmode="decimal" value="${tx && tx.fees ? String(+tx.fees) : ''}" placeholder="0">`)}${J.field('Date', `<input id="tx-date" type="date" max="${today}" value="${tx ? tx.trade_at.slice(0, 10) : today}">`)}
     ${J.field('Unité du prix (EUR, USD, GBP ou GBX = pence)', `<input id="tx-cur" maxlength="3" value="${J.esc(tx ? (tx.currency === 'GBp' ? 'GBX' : tx.currency || '') : listing ? (listing.currency === 'GBp' ? 'GBX' : listing.currency || '') : 'EUR')}">`)}${J.field('Taux historique : euros pour 1 unité du prix', `<input id="tx-fx" inputmode="decimal" value="${tx && tx.fx_to_eur ? String(+tx.fx_to_eur) : ''}" placeholder="taux disponible à cette date">`)}</div>
-    <div id="tx-preview" class="notice" role="status" hidden></div><p class="small muted">Enregistrement dans Jigobourso ; aucun ordre transmis à un courtier. Frais saisis en euros.</p>${J.field('Note', `<input id="tx-note" maxlength="500" value="${J.esc(tx ? tx.note || '' : '')}">`)}`;
+    ${editing ? '' : '<div id="tx-stwrap">' + J.field('Stratégie utilisée pour cet achat (alertes préconfigurées)', '<select id="tx-st"><option value="">Non renseignée</option></select>') + '</div>'}<div id="tx-preview" class="notice" role="status" hidden></div><p class="small muted">Enregistrement dans Jigobourso ; aucun ordre transmis à un courtier. Frais saisis en euros.</p>${J.field('Note', `<input id="tx-note" maxlength="500" value="${J.esc(tx ? tx.note || '' : '')}">`)}`;
   let side = tx ? tx.side : initialSide, chosen = listing || null;
   J.dialog({
     title: editing ? 'Modifier la transaction' : 'Nouvelle transaction', body,
     actions: [{ label: 'Annuler', run: () => { } }, {
       label: 'Enregistrer', cls: 'primary', run: async d => {
         const v = id => J.$('#' + id, d)?.value ?? '';
-        const common = { side, quantity: v('tx-qty'), unit_price: v('tx-price'), fees: v('tx-fees'), fx_to_eur: v('tx-fx'), currency: v('tx-cur'), trade_at: v('tx-date'), note: v('tx-note') };
+        const common = { side, quantity: v('tx-qty'), unit_price: v('tx-price'), fees: v('tx-fees'), fx_to_eur: v('tx-fx'), currency: v('tx-cur'), trade_at: v('tx-date'), note: v('tx-note') }; const strat = v('tx-st'); if (strat && side === 'buy' && !editing) common.strategy = strat;
         if (side === 'sell') await J.post('tx/preview', {portfolio_id: editing ? portfolioId : +v('tx-pf'), listing_id: chosen?.id, symbol: chosen?.symbol || v('tx-q'), id: tx?.id, ...common});
         if (editing) await J.post('tx/update', { id: tx.id, ...common });
         else {
@@ -29,6 +29,7 @@ J.txDialog = function ({ portfolios, portfolioId, listing, tx, side: initialSide
       },
     }],
     onopen: d => {
+      if (!editing) J.api('alerts/state').then(r => { const sel = J.$('#tx-st', d); if (sel) sel.innerHTML += (r.strategies || []).map(x => `<option value="${J.esc(x.key)}">${J.esc(x.label)} — ${{ official: 'Officielle', adapted: 'Adaptée', personal: 'Personnelle' }[x.status] || ''}</option>`).join(''); }).catch(() => { J.$('#tx-stwrap', d)?.remove(); });
       let previewTimer, revision=0;
       const preview=()=>{const version=++revision;clearTimeout(previewTimer);const host=J.$('#tx-preview',d);host.hidden=side!=='sell';if(side!=='sell')return;host.textContent='Calcul de l’aperçu…';previewTimer=setTimeout(async()=>{const v=id=>J.$('#'+id,d)?.value||'';try{const r=await J.post('tx/preview',{portfolio_id:editing?portfolioId:+v('tx-pf'),id:tx?.id,listing_id:chosen?.id,symbol:chosen?.symbol||v('tx-q'),side,quantity:v('tx-qty'),unit_price:v('tx-price'),fees:v('tx-fees'),currency:v('tx-cur'),fx_to_eur:v('tx-fx'),trade_at:v('tx-date')});if(version!==revision||!d.isConnected)return;host.innerHTML=`<b>Aperçu de la vente · PMP</b><div>Détenu à cette date : ${J.num(r.before_qty,4)} · Restant : ${J.num(r.remaining_qty,4)}</div><div>Produit net : ${J.eur(r.proceeds)} · Coût attribué : ${J.eur(r.cost)}</div><div>Résultat réalisé estimé : <b>${J.eur(r.gain)} · ${J.pct(r.gain_pct,2)}</b></div><small>Change : ${J.num(r.fx_to_eur,6)} €/unité. Recalcul et contrôle du registre à l’enregistrement.</small>`}catch(e){if(version===revision)host.textContent=e.message}},180)};
       d.addEventListener('close',()=>{revision++;clearTimeout(previewTimer)});

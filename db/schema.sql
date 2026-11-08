@@ -538,3 +538,63 @@ CREATE TABLE IF NOT EXISTS explorer_saved (
  UNIQUE KEY uq_explorer_saved(user_id,kind,name),
  CONSTRAINT fk_explorer_saved_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Surveillance V4 (ajout du 08/11/2026, additif). Règles d'alerte par position, historique des événements, stratégie d'origine de chaque achat.
+CREATE TABLE IF NOT EXISTS alert_rules (
+  id            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  user_id       INT UNSIGNED NOT NULL,
+  portfolio_id  BIGINT UNSIGNED NOT NULL,
+  listing_id    INT UNSIGNED NOT NULL,
+  kind          VARCHAR(24) CHARACTER SET ascii NOT NULL,
+  granularity   VARCHAR(8) CHARACTER SET ascii NULL,           -- day, week, month, quarter, half, year (indicateurs de tendance)
+  threshold     DECIMAL(16,6) NULL,
+  default_threshold DECIMAL(16,6) NULL,                        -- valeur issue de la stratégie, pour « restaurer »
+  severity      ENUM('info','vigilance','goal','sell') NOT NULL DEFAULT 'vigilance',
+  source        ENUM('strategy','personal','legacy') NOT NULL DEFAULT 'personal',
+  strategy_key  VARCHAR(40) CHARACTER SET ascii NULL,          -- stratégie de référence
+  enabled       TINYINT(1) NOT NULL DEFAULT 1,
+  state         ENUM('normal','triggered','insufficient','error') NULL,   -- NULL : jamais évaluée
+  acked_at      DATETIME NULL,
+  last_eval_at  DATETIME NULL,
+  last_value    DECIMAL(16,6) NULL,
+  last_reason   VARCHAR(200) NULL,
+  triggered_at  DATETIME NULL,
+  normal_at     DATETIME NULL,
+  notified_at   DATETIME NULL,
+  created_at    DATETIME NOT NULL,
+  updated_at    DATETIME NOT NULL,
+  PRIMARY KEY (id),
+  KEY idx_alert_user (user_id, portfolio_id, listing_id),
+  CONSTRAINT fk_alert_portfolio FOREIGN KEY (portfolio_id) REFERENCES portfolios(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+CREATE TABLE IF NOT EXISTS alert_events (
+  id        BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  rule_id   BIGINT UNSIGNED NOT NULL,
+  user_id   INT UNSIGNED NOT NULL,
+  at        DATETIME NOT NULL,
+  event     ENUM('triggered','normal','insufficient','acked','rearmed') NOT NULL,
+  value_obs DECIMAL(16,6) NULL,
+  threshold DECIMAL(16,6) NULL,
+  message   VARCHAR(255) NULL,
+  PRIMARY KEY (id),
+  KEY idx_event_user (user_id, at),
+  CONSTRAINT fk_event_rule FOREIGN KEY (rule_id) REFERENCES alert_rules(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+CREATE TABLE IF NOT EXISTS lot_origin (
+  transaction_id BIGINT UNSIGNED NOT NULL,
+  strategy_key   VARCHAR(40) CHARACTER SET ascii NOT NULL,
+  status         ENUM('official','adapted','personal') NOT NULL,
+  snapshot       TEXT NULL,                                     -- paramètres de la stratégie au moment de l'achat (JSON), jamais réécrits
+  set_by         ENUM('purchase','manual') NOT NULL DEFAULT 'purchase',
+  created_at     DATETIME NOT NULL,
+  PRIMARY KEY (transaction_id),
+  CONSTRAINT fk_origin_tx FOREIGN KEY (transaction_id) REFERENCES portfolio_transactions(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+CREATE TABLE IF NOT EXISTS position_watch (
+  portfolio_id BIGINT UNSIGNED NOT NULL,
+  listing_id   INT UNSIGNED NOT NULL,
+  strategy_key VARCHAR(40) CHARACTER SET ascii NOT NULL,        -- stratégie de surveillance, distincte de l'origine
+  updated_at   DATETIME NOT NULL,
+  PRIMARY KEY (portfolio_id, listing_id),
+  CONSTRAINT fk_watch_portfolio FOREIGN KEY (portfolio_id) REFERENCES portfolios(id) ON DELETE CASCADE
+) ENGINE=InnoDB;

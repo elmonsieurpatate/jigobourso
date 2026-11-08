@@ -229,12 +229,26 @@ return [
             $currency = price_unit($quote['currency'] ?? $currency);
         }
         $fx = historical_fx($currency, $when, $fx);
-        return write_transaction((int)$u['id'], (int)$p['id'], function ($rows) use ($p, $listing, $symbol, $b, $side, $qty, $price, $currency, $fx, $fees, $when) {
+        $res = write_transaction((int)$u['id'], (int)$p['id'], function ($rows) use ($p, $listing, $symbol, $b, $side, $qty, $price, $currency, $fx, $fees, $when) {
         q('INSERT INTO portfolio_transactions(portfolio_id, listing_id, symbol, name, isin, side, quantity, unit_price, currency, fx_to_eur, fees, trade_at, note, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
           [$p['id'], $listing ? $listing['id'] : null, $symbol, $listing ? $listing['name'] : (str_in($b, 'name', 120, false) ?: null), $listing ? $listing['isin'] : null, $side, $qty, $price,
            $currency, $fx, $fees, $when, str_in($b, 'note', 500, false) ?: null, now_utc()]);
         return ['id' => (int)db()->lastInsertId()];
         });
+        // Stratégie d'origine de l'achat : enregistrée telle que choisie (jamais devinée), avec un instantané de ses paramètres ; alertes de la stratégie préconfigurées.
+        if ($side === 'buy' && !empty($b['strategy']) && is_string($b['strategy'])) {
+            try {
+                $all = alert_strategies($u); $key = $b['strategy'];
+                if (isset($all[$key])) {
+                    q('INSERT INTO lot_origin(transaction_id, strategy_key, status, snapshot, set_by, created_at) VALUES (?,?,?,?,?,?)', [$res['id'], $key, $all[$key]['status'], json_encode($all[$key]['config'], JSON_UNESCAPED_UNICODE), 'purchase', now_utc()]);
+                    if ($listing) {
+                        $res['alerts'] = alert_apply_template($u, (int)$p['id'], (int)$listing['id'], $key, 'add');
+                        q('INSERT IGNORE INTO position_watch(portfolio_id, listing_id, strategy_key, updated_at) VALUES (?,?,?,?)', [$p['id'], $listing['id'], $key, now_utc()]);
+                    }
+                }
+            } catch (Throwable $e) { error_log('tx/add strategy: ' . $e->getMessage()); $res['alerts_error'] = true; }   // l'achat reste enregistré même si la préconfiguration échoue
+        }
+        return $res;
     },
     'tx/delete' => function () {
         need_post(); $u = require_user();
