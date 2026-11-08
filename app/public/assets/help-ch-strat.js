@@ -61,6 +61,36 @@
   const weightsStack = (s, c) => { const e = Object.entries(s.complex_weights).filter(([, v]) => v > 0); return HC.stack(e.map(([k, v], i) => ({ label: c.complex_labels[k] || k, value: v, color: COLORS[KEYS.indexOf(k) % COLORS.length] })), { alt: 'Poids du score complexe' }) + `<div class="hc-legend">${e.map(([k, v]) => `<span><i style="background:${COLORS[KEYS.indexOf(k) % COLORS.length]}"></i>${HC.esc(c.complex_labels[k] || k)} ${f(v, 0)}</span>`).join('')}</div>`; };
   const tuneLine = s => { const t = s.tuning || {}; return [t.sat_a != null ? `saturation A = ${f(t.sat_a, 2)} %` : '', t.accel_ref != null ? `accélération k = ${f(t.accel_ref, 2)}` : '', t.momentum_horizon ? `horizon de momentum « ${t.momentum_horizon} »` : '', t.vol_mode ? `volatilité en mode ${t.vol_mode === 'relative' ? 'relatif (rapportée à la pente)' : 'absolu'}` : ''].filter(Boolean).join(' · '); };
 
+  /* Explication détaillée de Croissance rapide, avec les vrais seuils du moteur */
+  function fastDeep(H, s, c) {
+    const wk = s.criteria.week || {}, mo = s.criteria.month || {}, a = (s.tuning || {}).sat_a || c.saturation.a, sat = n => a * Math.pow(n / 5, c.saturation.b);
+    const gw = growth(wk.slope, 5), gm = growth(mo.slope, 21), pw = s.periods.find(p => p.id === 'week'), pm = s.periods.find(p => p.id === 'month');
+    return `<h2>Comment Croissance rapide fonctionne, pas à pas</h2>
+    <p>Imaginez que vous cherchiez, parmi des milliers de titres, ceux qui « décollent » en ce moment. Croissance rapide pose <b>deux questions</b>, et seulement deux :</p>
+    ${H.steps([
+      ['Sur la dernière semaine (5 séances), le prix monte-t-il vite ?', `<p>On trace la droite qui résume le mieux la semaine. Sa <b>pente</b> doit être d’au moins <b>${f(wk.slope, 4)} % par séance</b>. Traduit en clair : si la hausse était régulière, le titre aurait gagné environ <b>${pc(gw)}</b> sur la semaine.</p>`],
+      ['Sur le dernier mois (21 séances), est-ce toujours vrai ?', `<p>Même question, sur une durée plus longue : pente d’au moins <b>${f(mo.slope, 4)} % par séance</b>, soit environ <b>${pc(gm)}</b> sur le mois si la hausse est régulière.</p>`],
+      ['Les deux « oui » ? Le titre est retenu', '<p>Un seul « non » et le titre est exclu. La semaine dit « ça accélère maintenant », le mois dit « ce n’est pas un simple coup d’un jour ».</p>'],
+      ['Les titres retenus sont notés puis classés', `<p>Chaque titre retenu reçoit un score de 0 à 100. Il tient compte de la hausse sur ${pw && pm ? `la semaine (poids ${f(100 * pw.weight, 0)} %) et le mois (poids ${f(100 * pm.weight, 0)} %)` : 'les durées actives'}, mais aussi de la régularité, du risque et de la liquidité (voir plus bas).</p>`]])}
+    <h3>Que veut dire « ${f(wk.slope, 4)} % par séance » ?</h3>
+    <p>C’est le niveau « <b>très forte</b> » de Jigobourso : la vitesse qui <b>doublerait</b> le prix en un an (252 séances) si elle durait. Sur une semaine ou un mois, cela représente peu en pourcentage (${pc(gw)} et ${pc(gm)}) : ce n’est donc pas un seuil démesuré, c’est la barre du « ça monte nettement ».</p>
+    <h3>Pourquoi la pente et pas simplement la performance ?</h3>
+    <p>La performance ne regarde que le premier et le dernier prix : un seul bon jour la fait bondir. La pente utilise <b>tous les prix</b> de la période, ce qui réduit l’effet d’un jour isolé. Mais elle ne vérifie pas que la courbe est <b>droite</b> : voilà pourquoi Croissance rapide laisse passer des titres qui montent par à-coups (voir « Tendance, pente et régularité »).</p>
+    <h3>Essayez : qui est retenu ?</h3>
+    <div class="hdemo" data-demo="fastdemo"></div>
+    <h3>Dans la note, comment la hausse compte-t-elle ?</h3>
+    <p>La note de dynamique compare la hausse du titre à une hausse « de référence » qui vaut 100/100. Ici, avec A = ${f(a, 1)} % : <b>${f(sat(5), 1)} %</b> sur 5 séances, <b>${f(sat(21), 1)} %</b> sur 21 séances. Un titre qui gagne la moitié de la référence a 50/100 en dynamique ; il plafonne à 100 au-delà.</p>
+    ${H.warn('<p>Croissance rapide <b>ne demande aucune régularité</b> pour être retenu. Un titre qui monte de +8 % en un seul jour hier peut passer le filtre de la semaine. C’est pourquoi il faut regarder la fiche : courbe, régularité, liquidité.</p>', 'Le piège principal')}
+    <h3>Quand l’utiliser ?</h3>
+    <ul><li>Pour <b>repérer des accélérations</b>, pas pour constituer un choix final.</li><li>Si la liste est trop longue ou trop nerveuse : montez vers <a href="#/strat-regular">Croissance régulière</a>.</li><li>Si elle est vide : le marché est calme, c’est normal ; ou baissez le niveau de pente dans Mes critères de recherche.</li></ul>`;
+  }
+  function fastMount(el, { facts, HM, HC }) {
+    const d = el.querySelector('[data-demo=fastdemo]'); if (!d || !facts) return;
+    const s = facts.strategies.find(x => x.id === 'fast'), wk = s.criteria.week.slope, mo = s.criteria.month.slope, T = window.HELP_TITLES || {};
+    const list = Object.entries(T).map(([n, t]) => [n, t.closes, t.desc]); list.push(['Pic d’un jour', HM.path([[0, 100], [250, 100], [251, 100], [252, 108]], 0.001, 8), 'plat pendant un an, puis +8 % hier']);
+    const rows = list.map(([n, cl, desc]) => { const w = HM.windowOf(cl, 5), m = HM.windowOf(cl, 21), okw = w.slope >= wk, okm = m.slope >= mo; return `<tr><th scope="row">${n}<br><small class="muted">${desc}</small></th><td class="n ${okw ? 'good' : 'bad'}">${HC.f1(w.slope, 3)}</td><td class="n ${okm ? 'good' : 'bad'}">${HC.f1(m.slope, 3)}</td><td><span class="badge ${okw && okm ? 'ok' : 'ko'}">${okw && okm ? 'retenu' : 'exclu'}</span></td></tr>`; }).join('');
+    d.innerHTML = `<span class="fic">Titres fictifs · seuils réels</span><div class="sui-scroll"><table><thead><tr><th>Titre</th><th class="n">Pente semaine<br><small>(seuil ${HC.f1(wk, 3)})</small></th><th class="n">Pente mois<br><small>(seuil ${HC.f1(mo, 3)})</small></th><th>Verdict</th></tr></thead><tbody>${rows}</tbody></table></div><p class="small muted">Vert = la pente atteint le seuil. Il faut deux verts pour être retenu.</p>`;
+  }
   ORDER.forEach(id => {
     const d = DEF[id];
     L.push({ id: 'strat-' + id, group: 'strategies', title: '', icon: I(d.icon), color: d.color, keywords: 'stratégie fiche ' + id, lead: d.lead,
@@ -69,7 +99,7 @@
         if (!s) return '<div class="notice err">Réglages indisponibles pour le moment.</div>';
         const m60 = HM.windowOf(ser, 63) || {}, top = Object.entries(s.complex_weights).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, v]) => `<b>${c.complex_labels[k] || k}</b> (${f(v, 0)})`).join(', ');
         const crit = critLines(s, c);
-        return `<h2>L’objectif en une phrase</h2><p>${d.goal}</p>
+        return `<h2>L’objectif en une phrase</h2><p>${d.goal}</p>${id === 'fast' ? fastDeep(H, s, c) : ''}
         <h2>Le comportement recherché</h2><p>${d.behaviour}</p>
         ${H.fig(HC.line({ series: [{ name: 'Exemple type (fictif)', values: ser, color: d.color }], alt: 'Exemple de comportement recherché', w: 640, h: 240 }), `Courbe fictive illustrant le comportement type. Sur le dernier trimestre de cet exemple : pente ${f(m60.slope, 3)} %/séance, régularité R² = ${f(m60.r2, 2)}.`)}
         <h2>Les vrais critères de recherche</h2>
@@ -97,7 +127,7 @@
         ${id.startsWith('mom') ? `<li>Momentum : <code>100 × (c<sub>J−21</sub> / c<sub>J−126 ou J−252</sub> − 1)</code>, note = <code>100 × clamp(m / saturation)</code> avec saturation ${c.momentum.saturation['6m']} % (6 mois) et ${c.momentum.saturation['12m']} % (12 mois) ; négatif → 0.</li>` : ''}
         ${id === 'calm' ? '<li>Volatilité et repli ne sont pas des critères de recherche : ils pèsent seulement dans le score complexe.</li>' : ''}</ul>
         ${H.warn('<p>Limites statistiques communes : mesures sur des fenêtres courtes, clôtures quotidiennes, aucune validation hors échantillon. Ne pas interpréter une note comme une probabilité de hausse.</p>')}`; },
-      mount: null, strategyId: id });
+      mount: id === 'fast' ? fastMount : null, strategyId: id });
   });
   // titres dynamiques selon les noms officiels (remplis au démarrage par aide.js via facts) : titre de repli
   const FALLBACK = { fast: 'Croissance rapide', regular: 'Croissance régulière', calm: 'Hausse calme', rebound: 'Rebond', mom6: 'Momentum 6 mois', mom12: 'Momentum 12 mois', momrisk: 'Momentum ajusté au risque' };

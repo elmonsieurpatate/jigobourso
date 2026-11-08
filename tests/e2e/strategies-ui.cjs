@@ -67,7 +67,7 @@ const api=(pg,route,body)=>pg.evaluate(async([r,b])=>{try{const j=b?await J.post
   must((await U.pg.$$('[data-demo=sim] tbody tr')).length===5,'5 titres fictifs attendus');
   // fiches des 7 stratégies, ancres historiques et lien depuis l’Explorer
   for(const id of ['fast','regular','calm','rebound','mom6','mom12','momrisk']){await U.pg.goto(BASE+'aide.html#strategie-'+id);await U.pg.waitForSelector('.h-body svg.hc-svg');must(/Les vrais critères/.test(await U.pg.textContent('.h-body')),'Fiche incomplète : '+id);}
-  must(/pente/i.test(await U.pg.textContent('.h-body'))||true,'');
+  await U.pg.goto(BASE+'aide.html#strategie-fast');await U.pg.waitForSelector('[data-demo=fastdemo] table');must(/Comment Croissance rapide fonctionne/.test(await U.pg.textContent('.h-body')),'Explication détaillée de Croissance rapide absente');must((await U.pg.$$('[data-demo=fastdemo] tbody tr')).length===6,'Démo Croissance rapide incomplète');
   await U.pg.goto(BASE+'aide.html#strategie-fast');await U.pg.waitForSelector('.h-body');
   await U.pg.click('[data-mode="expert"]');await U.pg.waitForSelector('.h-body table');must(/Pente min/.test(await U.pg.textContent('.h-body')),'Fiche Expert sans seuil de pente');
   await U.pg.waitForTimeout(500);await U.pg.reload();await U.pg.waitForSelector('.h-body');must(await U.pg.getAttribute('[data-mode="expert"]','aria-pressed')==='true','Mode Expert non mémorisé');
