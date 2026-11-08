@@ -102,7 +102,7 @@
   const personal=()=>{try{const v=JSON.parse(localStorage.getItem(visKey)||'null');return v&&v.rev===layout.revision&&v.dev===TableLayout.device()?v.vis:{};}catch(_){return {};}};
   let vis=personal();
   const shownColumns=()=>layout.columns.filter(c=>REG[c.id]&&(c.id==='name'||(c.id in vis?vis[c.id]:c.visible)));
-  let intrinsicRows=[],loadError=null,scoreLabel='',loading=true,universe=0,defaultSort='complex';
+  let intrinsicRows=[],loadError=null,scoreLabel='',loading=false,universe=0,defaultSort='complex';
   // Priorité : adresse (?verdict=, ?sort=colonne:sens, ?page_size=) > choix de l'utilisateur pendant la consultation > valeurs initiales de l'administration (Colonnes).
   const urlq=new URLSearchParams(location.search),urlSort=(urlq.get('sort')||'').split(':'),validSort=k=>REG[k]&&!REG[k].nosort;
   const urlSorts=validSort(urlSort[0])?[{key:urlSort[0],dir:urlSort[1]==='asc'?'asc':'desc'}]:null;
@@ -432,7 +432,8 @@
   const tieKey=()=>scoreKeyOf()==='simple'?'tieSimple':'tieComplex';
   const rankCell=row=>{const r=row[rankKey()];return r==null?'—':row[tieKey()]>1?`<span title="Ex æquo : ${row[tieKey()]} titres ont exactement ce score">=${r}</span>`:String(r);};
   function renderRanking(){
-    if(loading){$('#ct-table-body').innerHTML='<tr class="ct-loading"><td colspan="20"><span class="spinner"></span> Chargement des titres…</td></tr>';$('#ct-empty-results').hidden=true;$('#ct-result-count').textContent='';return;}
+    if(!loading&&!applied&&!loadError){$('#ct-table-body').innerHTML='<tr class="ct-loading"><td colspan="20">Cliquez sur « Appliquer les réglages » pour rechercher des titres.</td></tr>';$('#ct-empty-results').hidden=true;$('#ct-result-count').textContent='';return;}
+    if(loading){$('#ct-table-body').innerHTML='<tr class="ct-loading"><td colspan="20"><span class="spinner"></span> Recherche en cours…</td></tr>';$('#ct-empty-results').hidden=true;$('#ct-result-count').textContent='';return;}
     const selected=shownColumns().map(c=>({key:c.id,label:labelOf(c.id),width:c.width}));
     const {base,scoped,counts,rows:filtered}=visibleRows();
     const rows=[...filtered].sort((a,b)=>{
@@ -569,18 +570,21 @@
   function updateSearchStatus(message){
     const button=$('#ct-apply'),status=$('#ct-search-status');
     button.disabled=loading;
-    button.innerHTML=loading?'<span class="spinner" aria-hidden="true"></span> Chargement…':'Appliquer les réglages';
+    button.innerHTML=loading?'<span class="spinner" aria-hidden="true"></span> Recherche en cours…':'Appliquer les réglages';
     $('.ct-ranking').setAttribute('aria-busy',String(loading));
     const pending=applied&&(applied.strategy!==state.strategy||JSON.stringify(applied.config)!==JSON.stringify(config())||JSON.stringify(applied.filters)!==JSON.stringify(state.filters));
-    status.textContent=message||(loading?'Chargement des résultats…':loadError?loadError:pending?'Réglages modifiés : appuyez sur « Appliquer les réglages ».':applied?'Résultats à jour.':'');
+    status.textContent=message||(loading?'Recherche en cours…':loadError?loadError:pending?'Réglages modifiés : appuyez sur « Appliquer les réglages ».':applied?'Résultats à jour.':'Cliquez sur « Appliquer les réglages » pour lancer la recherche.');
+    $('#ct-ranking-status').textContent=status.textContent;
   }
   async function loadRows(){
-    if(loading&&applied)return;
+    if(loading)return;
     const request={strategy:state.strategy,config:specNow(),filters:cloneJSON(state.filters)};
     loading=true;loadError=null;updateSearchStatus();renderRanking();
     try{
       const data=await J.api('ranking/table',{params:{strategy:request.strategy}});
+      if(!data||!Array.isArray(data.rows))throw new Error('Le serveur a renvoyé une réponse de classement invalide');
       const verdicts=await J.post('ranking/verdicts',{strategy:request.strategy,config:request.config});
+      if(!verdicts||!verdicts.status||typeof verdicts.status!=='object')throw new Error('Le serveur n’a pas renvoyé les statuts des titres');
       const rows=data.rows.map(toRow);
       for(const row of rows)row.status=verdicts.status[row.id]||'undetermined';
       intrinsicRows=rows;applied=request;universe=data.universe||rows.length;
@@ -591,7 +595,7 @@
       loading=false;renderRanking();updateSearchStatus();
     }
   }
-  tree();project();render();loadRows();
+  tree();project();render();
 })().catch(error=>{const p=document.querySelector('#ct-feedback');p.textContent='Impossible d’ouvrir la page de test : '+error.message;});
 
 // Bloc « Stratégie » : réglages repliés par défaut (Afficher / Masquer), choix mémorisé dans ce navigateur.

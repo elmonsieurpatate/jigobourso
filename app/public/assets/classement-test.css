@@ -401,3 +401,5 @@ a.ct-company:hover b,a.ct-company:focus-visible b{text-decoration:underline}
   .ct .ct-strategy .sui-pick-btn .grow{flex:1 1 100px}
   .ct .ct-strategy .sui-pick-btn .sui-badge{margin-left:auto;font-size:.65rem}
 }
+
+#ct-ranking-status{padding:0 16px;color:var(--muted);font-size:.9rem}
