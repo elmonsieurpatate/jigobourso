@@ -87,7 +87,7 @@ return [
         $ct = preg_match('/^[a-z0-9-]{1,40}$/', $ct) ? $ct : 'fast';
         return engine_call('ranking-verdicts', ['ct_id' => $ct, 'user_id' => (int)$u['id'], 'spec' => is_array($b['config'] ?? null) ? $b['config'] : null]);
     },
-    'data/overview' => function () { require_user(); return engine_call('overview', []); },
+    'data/overview' => function () { require_admin(); return engine_call('overview', []); },
     'suivi' => function () { require_user(); return engine_call('suivi', []); },
     'bars15' => function () {                   // barres de 15 min stockées des 7 derniers jours (vue « 1 semaine » d'un graphique)
         require_user();

@@ -77,3 +77,8 @@
 .sui-chips{display:flex;flex-wrap:wrap;gap:6px}
 .sui-chip{display:inline-flex;gap:8px;align-items:center;padding:3px 10px;border-radius:999px;background:var(--accent-soft);color:var(--text);font-size:.82rem}
 .sui-chip b{color:var(--accent)}
+.sui-ico .sui-ic{stroke-width:2}.sui-ico .sui-emoji{font-size:1.35rem}.ms-ic .sui-emoji{font-size:1.3rem}
+.mf-row{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+.mf-chip{display:inline-flex;align-items:center;gap:6px;padding:2px 10px;border:1px solid var(--line);border-radius:999px;font-size:.82rem;background:var(--surface)}
+.mf-chip i{width:9px;height:9px;border-radius:50%;display:inline-block}
+.mf-chip.off{opacity:.4;text-decoration:line-through}

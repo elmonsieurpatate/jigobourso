@@ -1,6 +1,6 @@
 /* Page Données : d'où viennent les informations, quand elles ont été collectées, ce qui est couvert, ce qui est de qualité moindre. */
 (async () => {
-  const user = await J.init('donnees'); if (!user) return;
+  const user = await J.init('donnees', { admin: true }); if (!user) return;
   const o = await J.api('data/overview'), c = o.catalogue, p = o.prices, page = J.$('#page');
   const kinds = { equity: 'Actions', etf: 'ETF' }, st = { selected: 'Sélectionnées', candidate: 'Candidates', excluded: 'Exclues' };
   const tot = o.places.reduce((a, x) => ({ followed: a.followed + x.followed, ok: a.ok + x.ok, incomplete: a.incomplete + x.incomplete, calendar_unknown: a.calendar_unknown + x.calendar_unknown, stale: a.stale + x.stale, insufficient: a.insufficient + x.insufficient, broken: a.broken + x.broken, full: a.full + x.full_year }), { followed: 0, ok: 0, incomplete: 0, calendar_unknown: 0, stale: 0, insufficient: 0, broken: 0, full: 0 });

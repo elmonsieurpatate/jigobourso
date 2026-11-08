@@ -14,9 +14,15 @@
     personal: 'Stratégie personnelle : visible uniquement dans votre compte.' };
   let META = {};                                   // icône et explications choisies par l'utilisateur (défauts des stratégies d'origine inclus) : mêmes partout
   const setMeta = m => { META = m && typeof m === 'object' ? m : {}; };
-  const glyph = key => (window.STRATEGY_ICONS && STRATEGY_ICONS[key]) ? `<svg class="sui-ic" viewBox="0 0 24 24" aria-hidden="true">${STRATEGY_ICONS[key]}</svg>` : '';
+  // Couleur propre à chaque icône (jeu varié, pas deux teintes) : valeurs choisies pour les stratégies d'origine, puis teinte déduite de la clé.
+  const HUES = { rocket: '#f97316', 'trending-up': '#16a34a', waves: '#0891b2', 'refresh-cw': '#2563eb', hourglass: '#d97706', 'calendar-days': '#7c3aed', 'shield-check': '#4f46e5', 'trending-down': '#dc2626', gem: '#0ea5e9', coins: '#ca8a04', landmark: '#475569', target: '#e11d48', sprout: '#65a30d', scale: '#0d9488', zap: '#eab308', gauge: '#9333ea', trophy: '#f59e0b', compass: '#2563eb', flame: '#ea580c' };
+  const PALETTE = ['#2563eb', '#16a34a', '#f97316', '#9333ea', '#0891b2', '#e11d48', '#ca8a04', '#4f46e5', '#0d9488', '#db2777', '#65a30d', '#ea580c'];
+  const hue = key => HUES[key] || PALETTE[[...String(key)].reduce((a, c) => a + c.charCodeAt(0), 0) % PALETTE.length];
+  const isEmoji = key => typeof key === 'string' && key && !(window.STRATEGY_ICONS && STRATEGY_ICONS[key]) && /[^\x00-\x7f]/.test(key);
+  const glyph = key => (window.STRATEGY_ICONS && STRATEGY_ICONS[key]) ? `<svg class="sui-ic" viewBox="0 0 24 24" aria-hidden="true" style="color:${hue(key)}">${STRATEGY_ICONS[key]}</svg>` : isEmoji(key) ? `<span class="sui-emoji">${E(key)}</span>` : '';
+  const tint = key => (window.STRATEGY_ICONS && STRATEGY_ICONS[key]) ? `background:color-mix(in srgb, ${hue(key)} 16%, transparent)` : '';
   const icon = (id, kind) => glyph(META[id] && META[id].icon) || J.icon(kind === 'personal' ? 'user' : (ICON[id] || 'target'), 'sui-ic');
-  const ico = (id, kind) => `<span class="sui-ico" aria-hidden="true">${icon(id, kind)}</span>`;
+  const ico = (id, kind) => `<span class="sui-ico" aria-hidden="true" style="${tint(META[id] && META[id].icon)}">${icon(id, kind)}</span>`;
   const desc = (id, kind) => (META[id] && META[id].description) || SHORT[kind === 'personal' ? 'personal' : id] || '';
   const badge = st => `<span class="sui-badge ${E(st)}">${E(STATUS[st] || st)}</span>`;
   let pop = null;
@@ -64,5 +70,5 @@
     const part = (name, p) => `<span><b>${name}</b> ${badge(p.state === 'adapted' ? 'adapted' : 'official')}${p.modified ? ` <span class="muted small">${p.modified} paramètre${p.modified > 1 ? 's' : ''} modifié${p.modified > 1 ? 's' : ''}</span>` : ''}</span>`;
     return `<div class="sui-banner" role="status">${part('Critères de recherche', s.criteria)}${part('Calcul des scores', s.scores)}<a href="mes-strategies.html?id=${E(s.id)}">Comparer / restaurer</a></div>`;
   }
-  window.SUI = { ICON, STATUS, SHORT, setMeta, desc, glyph, icon, ico, badge, infoButton, bindInfo, openInfo, picker, banner };
+  window.SUI = { ICON, STATUS, SHORT, setMeta, desc, glyph, hue, tint, icon, ico, badge, infoButton, bindInfo, openInfo, picker, banner };
 })();

@@ -14,9 +14,10 @@ const api=(pg,route,body)=>pg.evaluate(async([r,b])=>{try{const j=b?await J.post
   // 1. menu : l'administration technique n'a que 7 entrées, absente pour un compte ordinaire ; menu Explorer personnel
   const sub=async(pg,id)=>pg.$$eval(`[data-sub="${id}"] .sv`,a=>a.map(x=>x.textContent.trim()));
   must(!(await U.pg.$('[data-sub="admin"]')),'Menu admin visible pour un compte ordinaire');
-  const adm=await sub(A.pg,'admin');must(JSON.stringify(adm)===JSON.stringify(['FinanceDatabase','Yahoo Finance','Actions / ETF','Cron','Journaux','Utilisateurs','Réglages']),'Menu admin : '+adm);
+  const adm=await sub(A.pg,'admin');must(JSON.stringify(adm)===JSON.stringify(['FinanceDatabase','Yahoo Finance','Actions / ETF','Cron','Journaux','Données','Utilisateurs','Réglages']),'Menu admin : '+adm);
   const exp=await sub(U.pg,'explorer');must(JSON.stringify(exp)===JSON.stringify(['Recherche et résultats','Mes stratégies','Mes critères de recherche','Mes paramètres de scores','Mes colonnes et tris','Mes filtres et catégories']),'Menu Explorer : '+exp);
   must(await U.pg.$('#nav a[href="aide.html"]'),'Lien Aide absent');
+  must(!(await U.pg.$('#nav a[href^="donnees.html"]')),'Menu Données visible pour un compte ordinaire');must((await api(U.pg,'data/overview')).json===null,'data/overview ouvert à un compte ordinaire');must((await api(A.pg,'data/overview')).json!==null,'data/overview refusé à l administrateur');
   // 2. permissions serveur
   for(const r of ['admin/scores','admin/table-layouts','admin/users']){const x=await api(U.pg,r);must(x.json===null,'Route admin ouverte à un compte ordinaire : '+r);}
   must((await api(A.pg,'admin/scores')).json!==null,'Admin refusé');
@@ -46,6 +47,7 @@ const api=(pg,route,body)=>pg.evaluate(async([r,b])=>{try{const j=b?await J.post
   await U.pg.goto(BASE+'mes-scores.html');await U.pg.waitForSelector('[data-a="tab"]');
   must(!(await U.pg.$$eval('[data-a="tab"]',b=>b.some(x=>/Suivi/.test(x.textContent)))),'Onglet de suivi visible côté utilisateur');
   await U.pg.goto(BASE+'mes-colonnes.html');await U.pg.waitForSelector('.ac-list');
+  await U.pg.goto(BASE+'mes-filtres.html');await U.pg.waitForSelector('.sui-card');must(!U.pg.url().endsWith('index.html'),'Mes filtres redirige encore vers l Explorer');must((await U.pg.$$('.mf-chip')).length>0,'Catégories absentes de Mes filtres');
   // 7. Aide : modes, 7 fiches, recherche, section admin
   await U.pg.goto(BASE+'aide.html');await U.pg.waitForSelector('#strategies .sui-card');
   must((await U.pg.$$('#strategies article[id^="strategie-"]')).length===7,'7 fiches attendues');
