@@ -77,6 +77,7 @@ return [
         $allowed = ['mode' => ['simple', 'advanced'], 'theme' => ['light', 'dark', 'auto'], 'help_level' => ['beginner', 'expert']];
         $prefs = $u['prefs_json'] ? json_decode($u['prefs_json'], true) : [];
         foreach ($allowed as $k => $values) if (isset($b[$k]) && in_array($b[$k], $values, true)) $prefs[$k] = $b[$k];
+        if (isset($b['help_last']) && is_string($b['help_last']) && preg_match('/^[a-z0-9-]{1,40}$/', $b['help_last'])) $prefs['help_last'] = $b['help_last']; // dernier chapitre de l'aide
         q('UPDATE users SET prefs_json = ? WHERE id = ?', [json_encode($prefs), $u['id']]);
         return ['prefs' => $prefs];
     },

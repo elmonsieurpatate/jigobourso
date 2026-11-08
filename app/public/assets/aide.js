@@ -1,113 +1,94 @@
-/* Centre d'aide : rubriques (help-content.js), fiches des 7 stratégies générées depuis les faits du moteur (help/facts), recherche, mode Débutant / Expert (préférence par utilisateur). */
+/* Centre d'aide interactif : un chapitre à la fois, sommaire latéral, fil d'Ariane, progression, Précédent / Suivant, recherche, modes Débutant / Expert, mémorisation du dernier chapitre.
+   Les chapitres sont déclarés dans help-ch-*.js (window.HELP_CHAPTERS.push({...})). Les chiffres des stratégies viennent du moteur (route help/facts) ; les exemples sont fictifs. */
 (async () => {
   const me = await J.init('aide'); if (!me) return;
-  const E = J.esc, main = J.$('#help-main'), nav = J.$('#help-nav'), q = J.$('#help-q');
-  let level = (me.prefs || {}).help_level === 'expert' ? 'expert' : 'beginner', facts = null, factsErr = null;
-  const pct = (v, d = 1) => (v == null ? '—' : (+v).toLocaleString('fr-FR', { maximumFractionDigits: d }) + ' %');
-  const num = (v, d = 3) => (v == null ? '—' : (+v).toLocaleString('fr-FR', { maximumFractionDigits: d }));
-  const LV_SLOPE = { gentle: 'douce', moderate: 'modérée', strong: 'forte', very_strong: 'très forte' }, LV_R2 = { flexible: 'souple', balanced: 'équilibré', strict: 'strict' };
-  const levelName = (map, labels, v) => { for (const [k, x] of Object.entries(map)) if (Math.abs(x - v) < 1e-9) return labels[k]; return null; };
-  const BEGIN = {
-    fast: ['Vous voulez repérer ce qui monte vite en ce moment.', 'Une hausse forte à la semaine ET au mois.', 'Ne dit rien de la régularité : un titre peut monter par à-coups.'],
-    regular: ['Vous préférez une progression solide et constante.', 'Une hausse moyenne modérée, sur un mois et un trimestre, avec une courbe assez régulière.', 'Plus lente à réagir que Croissance rapide.'],
-    calm: ['Vous voulez monter sans trop de secousses.', 'Une hausse douce sur un mois et un trimestre ; la faible volatilité et le faible repli comptent beaucoup dans la note.', 'Les gains sont souvent plus modestes.'],
-    rebound: ['Vous cherchez un titre qui redémarre après une période calme ou en baisse.', 'Semaine et mois qui repartent ; le semestre sert de contexte : moins il a progressé, meilleure est la note de rebond.', 'Un rebond peut être éphémère.'],
-    mom6: ['Vous misez sur la tendance des six derniers mois.', 'Aucun seuil de recherche : tous les titres notés sont classés selon leur variation sur six mois (hors dernier mois).', 'Stratégie marquée « expérimentale » dans le moteur.'],
-    mom12: ['Vous misez sur la tendance de l’année écoulée.', 'Aucun seuil de recherche : classement selon la variation sur douze mois (hors dernier mois).', 'Stratégie marquée « expérimentale » dans le moteur.'],
-    momrisk: ['Vous voulez du momentum, mais en tenant compte du risque.', 'Aucun seuil de recherche : moyenne des momentums 6 et 12 mois, corrigée par la volatilité et le repli.', 'Stratégie marquée « expérimentale » dans le moteur.']
+  const E = J.esc, root = J.$('#help'), $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  const store = { get: k => { try { return localStorage.getItem(k); } catch (_) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (_) { /* facultatif */ } } };
+  const GROUPS = [['demarrer', 'Pour démarrer'], ['bourse', 'Les bases de la bourse'], ['mesures', 'Lire un cours de bourse'], ['jigo', 'Jigobourso : chercher et noter'], ['strategies', 'Les 7 stratégies'], ['patrimoine', 'Mon portefeuille'], ['outils', 'Outils et fiabilité'], ['admin', 'Administration']];
+  const ALIAS = { 'premiers-pas': 'bienvenue', parcours: 'parcours', bases: 'action-etf', strategies: 'strategies-vue', adaptees: 'adapter', criteres: 'criteres', scores: 'scores', classements: 'classements', indicateurs: 'indicateurs', fiches: 'fiches', portefeuille: 'portefeuille', gains: 'gains', performances: 'performance-portefeuille', colonnes: 'colonnes', donnees: 'donnees', glossaire: 'glossaire', faq: 'faq', administration: 'admin', explorer: 'explorer',
+    'strategie-fast': 'strat-fast', 'strategie-regular': 'strat-regular', 'strategie-calm': 'strat-calm', 'strategie-rebound': 'strat-rebound', 'strategie-mom6': 'strat-mom6', 'strategie-mom12': 'strat-mom12', 'strategie-momrisk': 'strat-momrisk', 'strategie-personnelles': 'adapter' };
+  let level = (me.prefs || {}).help_level === 'expert' ? 'expert' : 'beginner', facts = null, meta = {}, current = null, seen = new Set();
+  try { seen = new Set(JSON.parse(store.get('jigo_help_seen') || '[]')); } catch (_) { seen = new Set(); }
+
+  /* ───── composants de mise en page partagés par tous les chapitres ───── */
+  const H = {
+    box: (kind, title, html) => `<aside class="hb hb-${kind}"><div class="hb-t">${E(title)}</div><div class="hb-c">${html}</div></aside>`,
+    tip: (html, t = 'À retenir') => H.box('tip', t, html), example: (html, t = 'Exemple') => H.box('example', t, html), jigo: (html, t = 'Dans Jigobourso') => H.box('jigo', t, html), warn: (html, t = 'Attention') => H.box('warn', t, html),
+    fig: (svg, cap) => `<div class="hf">${svg}${cap ? `<figcaption>${cap}</figcaption>` : ''}</div>`,
+    fold: (title, html, open) => `<details class="hd" ${open ? 'open' : ''}><summary>${title}</summary><div>${html}</div></details>`,
+    steps: items => `<ol class="hs">${items.map((s, i) => `<li><span class="hs-n">${i + 1}</span><div><h4>${s[0]}</h4>${s[1]}</div></li>`).join('')}</ol>`,
+    cards: items => `<div class="hcards">${items.map(c => `<div class="hcard" ${c.href ? `data-go="${E(c.href)}" tabindex="0" role="link"` : ''}><span class="hcard-i" style="background:${c.bg || 'var(--accent-soft)'}">${c.icon || ''}</span><b>${c.title}</b><p>${c.text}</p></div>`).join('')}</div>`,
+    table: (head, rows, cls = '') => `<div class="sui-scroll"><table class="sui-cmp ${cls}"><thead><tr>${head.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.map(r => `<tr>${r.map((c, i) => i ? `<td>${c}</td>` : `<th scope="row">${c}</th>`).join('')}</tr>`).join('')}</tbody></table></div>`,
+    demo: (name, extra = '') => `<div class="hdemo" data-demo="${E(name)}" ${extra}></div>`,
+    quiz: (id, qs) => `<section class="hq" data-quiz="${E(id)}"><h3>Testez-vous</h3>${qs.map((q, i) => `<div class="hq-q" data-i="${i}"><p><b>${i + 1}.</b> ${q.q}</p>${q.o.map((o, j) => `<button type="button" class="hq-o" data-j="${j}" data-ok="${j === q.a ? 1 : 0}">${o}</button>`).join('')}<div class="hq-r" hidden>${q.why}</div></div>`).join('')}<div class="hq-s small muted"></div></section>`,
+    fmt: (v, d = 1) => HC.f1(v, d), pct: (v, d = 1) => HC.f1(v, d) + ' %'
   };
-  const VIGIL = {
-    fast: ['Aucun seuil de R² dans ses critères de recherche : seule la pente compte (semaine et mois). Le R² n’intervient que dans le score complexe.'],
-    regular: [], calm: ['La volatilité et le repli ne sont pas des critères de recherche : ils pèsent seulement dans le score complexe.'],
-    rebound: ['Le semestre est activé avec un poids automatique nul : il sert uniquement au contexte de rebond, sans critère.'],
-    mom6: ['Aucun critère de recherche : tous les titres notés sont « retenus » tant que les données existent.'], mom12: ['Aucun critère de recherche : tous les titres notés sont « retenus » tant que les données existent.'],
-    momrisk: ['Aucun critère de recherche. Le filtre « au-dessus de la moyenne 200 jours » de l’ancien profil n’est pas une notation : il reste un filtre d’affichage.']
-  };
-  async function loadFacts() { try { facts = await J.api('help/facts'); } catch (e) { factsErr = e.message; } try { SUI.setMeta((await J.api('classement-test/strategies')).meta); } catch (e) { /* présentation par défaut */ } }
-  const critCell = (s, pid) => { const c = (s.criteria || {})[pid]; if (!c) return '—'; const parts = []; const cm = facts.common;
-    if (c.slope != null) parts.push(`pente ≥ ${num(c.slope, 4)} %/séance (${levelName(cm.slope_levels, LV_SLOPE, c.slope) || 'personnalisée'})`);
-    if (c.r2 != null) parts.push(`R² ≥ ${num(c.r2, 3)} (${levelName(cm.r2_levels, LV_R2, c.r2) || 'personnalisé'})`);
-    return parts.length ? parts.join(' ; ') : 'aucun seuil'; };
-  const fiche = s => {
-    const id = s.id, b = BEGIN[id] || ['', '', ''];
-    const periods = s.periods.map(p => `${E(p.label)} (${p.sessions} séances) : ${pct(p.weight)}`).join(' · ');
-    const crit = s.periods.map(p => `<tr><th scope="row">${E(p.label)}</th><td>${E(critCell(s, p.id))}</td><td>${pct(p.weight)}</td></tr>`).join('');
-    const cw = Object.entries(s.complex_weights).filter(([, v]) => v > 0).map(([k, v]) => `${E(facts.common.complex_labels[k] || k)} ${pct(v, 0)}`).join(' · ');
-    const t = s.tuning || {}, tune = [t.sat_a != null ? `saturation de dynamique A = ${num(t.sat_a, 2)} %` : '', t.accel_ref != null ? `référence d’accélération k = ${num(t.accel_ref, 2)}` : '', t.momentum_horizon ? `horizon de momentum : ${E(t.momentum_horizon)}` : '', t.vol_mode ? `volatilité : mode ${E(t.vol_mode)}` : ''].filter(Boolean).join(' · ');
-    const vig = (VIGIL[id] || []).map(x => `<div class="help-note">${E(x)}</div>`).join('');
-    const slopeGain = (c, n) => c && c.slope != null ? `+${num(gain(c.slope, n), 1)} %` : null;
-    const tests = s.periods.filter(p => (s.criteria[p.id] || {}).slope != null).map(p => { const c = s.criteria[p.id]; return `<li>sur <b>${E(p.label.toLowerCase())}</b> (${p.sessions} séances) : le prix doit avoir monté d’au moins environ <b>${slopeGain(c, p.sessions)}</b> (pente ${E(levelName(facts.common.slope_levels, LV_SLOPE, c.slope) || 'personnalisée')})${c.r2 != null ? `, et la courbe doit être assez droite (régularité ${E(levelName(facts.common.r2_levels, LV_R2, c.r2) || 'personnalisée')}, R² ≥ ${num(c.r2, 2)})` : ''}</li>`; }).join('');
-    const cwTop = Object.entries(s.complex_weights).filter(([, v]) => v >= 15).sort((x, y) => y[1] - x[1]).map(([k, v]) => `<b>${E((COMP[k] || [k])[0])}</b> (${v} %)`).join(', ');
-    const body = level === 'beginner'
-      ? `<p><b>Pour qui ?</b> ${E(b[0])}</p>
-         <p><b>Le tri (critères de recherche).</b> ${tests ? `Un titre est retenu seulement s’il réussit tous ces tests :</p><ul>${tests}</ul><p>Il doit donc réussir sur <b>toutes</b> les durées à la fois.` : 'Aucun seuil de pente ou de régularité : tous les titres notés sont retenus tant que leurs données existent.'}</p>
-         <p><b>La note (scores).</b> Le score complexe donne le plus de poids à : ${cwTop || '—'}. Durées utilisées pour les notes : ${periods}.</p>
-         <p><b>Comment ça marche, en clair.</b> ${E(b[1])}</p><p><b>À savoir.</b> ${E(b[2])}</p>`
-      : `<div class="sui-scroll"><table class="sui-cmp"><thead><tr><th>Granularité</th><th>Critère de recherche</th><th>Poids du score</th></tr></thead><tbody>${crit}</tbody></table></div>
-         <p><b>Poids du score complexe :</b> ${cw}.</p><p><b>Réglages :</b> ${tune || '—'}. Mode des poids de périodes : ${s.weights_mode === 'auto' ? 'automatique (κ = ' + num(facts.common.kappa, 2) + ')' : 'personnalisé'}. Tri par défaut : score ${s.sort === 'complex' ? 'complexe' : 'simple'}.</p>${vig}`;
-    return `<article class="sui-card" id="strategie-${E(id)}" style="margin-bottom:12px"><div class="sui-head">${SUI.ico(id)}<div><h3>${E(s.label)}</h3><div class="small muted">${E(SUI.desc(id))}</div></div></div>${body}</article>`;
-  };
-  const compare = () => {
-    const rows = facts.strategies.map(s => `<tr><th scope="row">${E(s.label)}</th><td>${s.periods.map(p => E(p.label)).join(', ')}</td><td>${s.periods.map(p => E(critCell(s, p.id)).replace(/ \(.*?\)/g, '')).filter(x => x !== '—').join(' / ') || 'aucun seuil'}</td><td>${Object.entries(s.complex_weights).filter(([, v]) => v >= 20).map(([k, v]) => E((facts.common.complex_labels[k] || k) + ' ' + v + ' %')).join(', ')}</td></tr>`).join('');
-    return `<h3>Comparatif des 7 stratégies</h3><div class="sui-scroll"><table class="sui-cmp"><thead><tr><th>Stratégie</th><th>Granularités</th><th>Critères de recherche</th><th>Composantes dominantes du score complexe (≥ 20 %)</th></tr></thead><tbody>${rows}</tbody></table></div>`;
-  };
-  const formulas = () => { const c = facts.common; return `<div class="prose"><p>Constantes lues dans le moteur :</p><ul>
-    <li>Dynamique : croissance lissée sur n séances comparée à A·(n/5)<sup>${num(c.saturation.b, 2)}</sup> % (A = ${num(c.saturation.a, 0)} par défaut, réglable par stratégie) ; la note vaut 100 à saturation.</li>
-    <li>Garde-fou : sous une note de dynamique de ${num(c.gate_floor, 0)}, régularité et risque de la période sont amortis.</li>
-    <li>Fiabilité du R² : poids min(1, n/${c.reliability_sessions}) ; aucun R² ni volatilité sous ${c.min_sessions} séances.</li>
-    <li>Accélération : référence k × saturation(n)/n ; régularité requise : facteur min(R², R²<sub>préc.</sub>)/${num(c.accel.r2, 1)}.</li>
-    <li>Contexte de rebond : rendement du semestre ≤ ${num(c.recovery.best, 0)} % → 100, ≥ ${num(c.recovery.worst, 0)} % → 0.</li>
-    <li>Momentum : variation J−126→J−21 (6 mois, saturation ${num(c.momentum.saturation['6m'], 0)} %) ou J−252→J−21 (12 mois, saturation ${num(c.momentum.saturation['12m'], 0)} %) ; négatif : 0.</li>
-    <li>Liquidité : valeur échangée par jour de ${num(c.liquidity.floor_eur / 1e6, 0)} à ${num(c.liquidity.ceil_eur / 1e6, 0)} M€, échelle logarithmique 0 → 100.</li>
-    <li>Volatilité (mode relatif) : rapport volatilité/pente ≤ ${num(c.vol.ratio_best, 0)} → 100, ≥ ${num(c.vol.ratio_worst, 0)} → 0 ; plancher de pente ${num(c.vol.slope_floor, 1)} %/séance.</li>
-    <li>Réglages communs (administration) : κ = ${num(c.kappa, 2)}, seuil de couverture = ${num(c.threshold, 2)}, ancrage = ${num(c.anchor, 2)}.</li></ul></div>`; };
-  const COMP = {
-    dynamics: ['Dynamique (la hausse)', 'De combien le prix a monté sur la période, comparé à une hausse « de référence ». 0 = pas de hausse ; 100 = au moins la hausse de référence.', c => `Référence du réglage standard : ${num(c.saturation.a * 1, 0)} % sur 1 semaine, ${num(c.saturation.a * Math.pow(21 / 5, c.saturation.b), 0)} % sur 1 mois, ${num(c.saturation.a * Math.pow(63 / 5, c.saturation.b), 0)} % sur 1 trimestre. Exemple : +18 % sur un mois → environ 50/100.`],
-    r2: ['Régularité (R²)', 'Est-ce que la hausse suit une ligne bien droite ? Un prix qui zigzague est pénalisé.', () => '0 si le R² est de 0,5 ou moins ; 100 si 0,95 ou plus. Sur une durée très courte, cette note compte moins (elle est moins fiable).'],
-    up_days: ['Séances en hausse', 'Sur 100 jours de bourse, combien ont fini en hausse ? Une hausse portée par beaucoup de petits pas vaut mieux qu’un seul gros saut.', () => '0 si 40 % des séances ou moins sont en hausse ; 100 si 80 % ou plus.'],
-    concentration: ['Gains bien répartis', 'La hausse vient-elle de quelques énormes sauts, ou d’une progression régulière ? Si tout vient d’un seul jour, la hausse est fragile.', () => '100 si les plus gros sauts pèsent 10 % de la hausse ou moins ; 0 s’ils en pèsent 60 % ou plus.'],
-    volatility: ['Prix peu agité (volatilité)', 'À quel point le prix bouge d’un jour à l’autre. Montagnes russes = mauvaise note.', () => '100 si le prix bouge de 1 % par jour ou moins ; 0 s’il bouge de 5 % par jour ou plus.'],
-    drawdown: ['Petites chutes (drawdown)', 'La plus grosse chute depuis un sommet pendant la période. Plus elle est petite, mieux c’est.', () => '100 si aucune chute ; 0 si la chute atteint 15 % ou plus.'],
-    liquidity: ['Facilité à revendre (liquidité)', 'Combien d’argent s’échange chaque jour sur ce titre. Peu d’échanges = difficile de revendre vite.', c => `Échelle logarithmique : 0 si moins de ${num(c.liquidity.floor_eur / 1e6, 0)} millions d’euros échangés par jour ; 100 à partir de ${num(c.liquidity.ceil_eur / 1e6, 0)} millions.`],
-    acceleration: ['Accélération', 'La hausse est-elle en train de s’accélérer par rapport à la période d’avant ? Utile pour repérer un démarrage.', () => '50 = la vitesse n’a pas changé ; au-dessus = ça accélère ; en dessous = ça ralentit.'],
-    momentum: ['Momentum (la tendance passée)', 'De combien le prix a monté sur 6 ou 12 mois, sans compter le dernier mois (pour ne pas suivre un emballement trop récent).', c => `100 si la hausse atteint ${num(c.momentum.saturation['6m'], 0)} % (6 mois) ou ${num(c.momentum.saturation['12m'], 0)} % (12 mois) ; 0 si le prix a baissé.`],
-    recovery: ['Contexte de rebond', 'Le titre a-t-il peu monté (ou baissé) ces 6 derniers mois ? Si oui, un redémarrage est plus intéressant : il n’a pas déjà beaucoup progressé.', c => `100 si le semestre est à ${num(c.recovery.best, 0)} % ou moins ; 0 s’il a déjà gagné ${num(c.recovery.worst, 0)} % ou plus.`]
-  };
-  const gain = (slope, n) => 100 * (Math.pow(1 + slope / 100, n) - 1);
-  const criteriaFacts = () => { const c = facts.common, per = ['day', 'week', 'month', 'quarter', 'half', 'year'];
-    return `<div class="sui-scroll"><table class="sui-cmp"><caption class="small muted" style="text-align:left">Les durées (granularités)</caption><thead><tr><th>Durée</th><th>Nombre de séances</th></tr></thead><tbody>${per.filter(k => c.periods[k]).map(k => `<tr><th scope="row">${E(c.periods[k].label)}</th><td>${c.periods[k].sessions}</td></tr>`).join('')}</tbody></table></div>
-    <div class="sui-scroll"><table class="sui-cmp"><caption class="small muted" style="text-align:left">Les niveaux de pente, et ce que ça représente si la hausse est régulière</caption><thead><tr><th>Niveau</th><th>Hausse par séance</th><th>≈ sur 1 semaine</th><th>≈ sur 1 mois</th><th>≈ sur 1 trimestre</th></tr></thead><tbody>${Object.entries(c.slope_levels).map(([k, v]) => `<tr><th scope="row">${E(LV_SLOPE[k])}</th><td>${num(v, 3)} %</td><td>+${num(gain(v, 5), 1)} %</td><td>+${num(gain(v, 21), 1)} %</td><td>+${num(gain(v, 63), 1)} %</td></tr>`).join('')}</tbody></table></div>
-    <div class="sui-scroll"><table class="sui-cmp"><caption class="small muted" style="text-align:left">Les niveaux de régularité (R², de 0 à 1)</caption><thead><tr><th>Niveau</th><th>R² minimal</th></tr></thead><tbody>${Object.entries(c.r2_levels).map(([k, v]) => `<tr><th scope="row">${E(LV_R2[k])}</th><td>${num(v, 3)}</td></tr>`).join('')}</tbody></table></div>`; };
-  const componentFacts = () => `<div class="sui-comps">${Object.keys(COMP).map(k => {
-    const used = facts.strategies.filter(s => s.complex_weights[k] > 0);
-    return `<article class="sui-comp"><h4>${E(COMP[k][0])}</h4><p>${E(COMP[k][1])}</p><p class="small"><b>Note de 0 à 100 :</b> ${E(COMP[k][2](facts.common))}</p>
-      <div class="sui-chips" aria-label="Poids dans le score complexe">${used.length ? used.map(s => `<span class="sui-chip"><span>${E(s.label)}</span><b>${s.complex_weights[k]} %</b></span>`).join('') : '<span class="muted small">Poids nul dans les 7 stratégies officielles (réglable dans Mes paramètres de scores).</span>'}</div></article>`;
-  }).join('')}</div>`;
-  const personal = () => `<article class="sui-card" id="strategie-personnelles">${`<div class="sui-head">${SUI.ico('x', 'personal')}<div><h3>Stratégies personnelles</h3><div class="small muted">${E(SUI.SHORT.personal)}</div></div></div>`}<p>Créez-les depuis <a href="mes-strategies.html">Mes stratégies</a> (copie d’une stratégie existante, ou nouveau réglage depuis l’Explorer). Elles ne sont jamais distribuées aux autres comptes ni modifiées par une mise à jour des références.</p></article>`;
-  function sectionHtml(sec) {
-    let h = `<section id="${E(sec.id)}" class="card"><h2>${J.icon(sec.icon || 'book', 'sui-ic')} ${E(sec.title)}</h2><div class="prose">${level === 'expert' ? sec.e : sec.b}</div>`;
-    if (sec.dynamic === 'strategies') {
-      if (factsErr) h += `<div class="notice err">Faits indisponibles : ${E(factsErr)}</div>`;
-      else if (facts) h += `<div style="margin-top:12px">${facts.strategies.map(fiche).join('')}</div>${compare()}`;
-    }
-    if (sec.id === 'adaptees') h += personal();
-    h += '</section>';
-    return h;
+  const ctx = () => ({ facts, level, H, HM: window.HM, HC: window.HC, meta, me, go, E });
+
+  /* ───── registre ───── */
+  const chapters = () => (window.HELP_CHAPTERS || []).filter(c => !c.admin || me.is_admin);
+  const byId = id => chapters().find(c => c.id === id);
+  const order = () => { const g = Object.fromEntries(GROUPS.map((x, i) => [x[0], i])); return chapters().map((c, i) => [c, i]).sort((a, b) => (g[a[0].group] - g[b[0].group]) || (a[1] - b[1])).map(x => x[0]); };
+
+  function renderToc(filter) {
+    const list = order(), term = (filter || '').trim();
+    const matches = term ? search(term) : null;
+    $('#h-toc').innerHTML = GROUPS.map(([gid, gl]) => {
+      const cs = list.filter(c => c.group === gid && (!matches || matches.has(c.id))); if (!cs.length) return '';
+      return `<div class="ht-g"><div class="ht-gl">${E(gl)}</div>${cs.map(c => `<a href="#/${E(c.id)}" class="ht-i ${c.parent ? 'sub' : ''} ${current && current.id === c.id ? 'on' : ''} ${seen.has(c.id) ? 'seen' : ''}" data-id="${E(c.id)}">${c.icon ? `<span class="ht-ic" style="color:${c.color || 'var(--accent)'}">${c.icon}</span>` : ''}<span>${E(c.title)}</span>${seen.has(c.id) ? '<i class="ht-ok" aria-label="vu">✓</i>' : ''}</a>`).join('')}</div>`;
+    }).join('') || '<p class="muted small" style="padding:8px">Aucun résultat. Essayez un autre mot.</p>';
   }
-  const visible = () => HELP.filter(s => !s.admin || me.is_admin);
-  function paint() {
-    const term = q.value.trim().toLowerCase(), list = visible();
-    const text = s => (s.title + ' ' + (level === 'expert' ? s.e : s.b) + (s.dynamic && facts ? ' ' + facts.strategies.map(x => x.label).join(' ') : '')).replace(/<[^>]+>/g, ' ').toLowerCase();
-    const shown = term ? list.filter(s => text(s).includes(term)) : list;
-    nav.innerHTML = list.map(s => `<a href="#${E(s.id)}" ${shown.includes(s) ? '' : 'style="opacity:.4"'}>${J.icon(s.icon || 'book', 'sui-ic')}<span>${E(s.title)}</span></a>`).join('');
-    main.innerHTML = shown.length ? shown.map(sectionHtml).join('').replace(/<div data-facts="(formulas|criteria|components)"><\/div>/g, (m, k) => !facts ? '' : k === 'formulas' ? formulas() : k === 'criteria' ? criteriaFacts() : componentFacts()) : '<div class="empty">Aucun résultat. Essayez un autre mot.</div>';
-    J.$$('[data-mode]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mode === level)));
-    markNav();
+  let index = null;
+  function buildIndex() { if (index) return; const clean = h => String(h).replace(/<[^>]+>/g, ' ').toLowerCase(); index = chapters().map(c => ({ id: c.id, title: c.title.toLowerCase(), kw: (c.keywords || '').toLowerCase(), text: clean(safe(c, 'beginner') + ' ' + safe(c, 'expert')) })); }
+  /* Résultats triés par pertinence : titre > mots-clés > texte (nombre d'occurrences). */
+  function ranked(term) { buildIndex(); const words = term.toLowerCase().split(/\s+/).filter(Boolean), phrase = term.toLowerCase().trim();
+    return index.map(x => { const all = x.title + ' ' + x.kw + ' ' + x.text; if (!words.every(w => all.includes(w))) return null; let sc = 0; if (x.title.includes(phrase)) sc += 1000; else if (words.every(w => x.title.includes(w))) sc += 600; if (x.kw.includes(phrase)) sc += 300; words.forEach(w => { if (x.kw.includes(w)) sc += 60; sc += Math.min(40, x.text.split(w).length - 1); }); return [x.id, sc]; }).filter(Boolean).sort((a, b) => b[1] - a[1]).map(x => x[0]); }
+  function search(term) { return new Set(ranked(term)); }
+  function safe(c, k) { try { return typeof c[k] === 'function' ? (c[k](ctx()) || '') : (c[k] || ''); } catch (e) { return ''; } }
+
+  /* ───── affichage d'un chapitre ───── */
+  function open(id, opts = {}) {
+    id = ALIAS[id] || id; const list = order(); let c = byId(id) || list[0]; if (!c) return;
+    current = c; const i = list.indexOf(c), prev = list[i - 1], next = list[i + 1], hasExpert = !!c.expert;
+    const parent = c.parent ? byId(c.parent) : null, gl = (GROUPS.find(g => g[0] === c.group) || [0, ''])[1];
+    const body = level === 'expert' && hasExpert ? safe(c, 'expert') : safe(c, 'beginner');
+    const crumbs = [`<a href="#/bienvenue">Aide</a>`, E(gl), parent ? `<a href="#/${E(parent.id)}">${E(parent.title)}</a>` : '', `<b>${E(c.title)}</b>`].filter(Boolean).join(' <span aria-hidden="true">›</span> ');
+    seen.add(c.id); store.set('jigo_help_seen', JSON.stringify([...seen])); store.set('jigo_help_last', c.id);
+    if (!opts.silent) J.post('auth/prefs', { help_last: c.id }).then(r => { me.prefs = r.prefs; }).catch(() => { });
+    const pct = Math.round(100 * list.filter(x => seen.has(x.id)).length / list.length);
+    $('#h-main').innerHTML = `<nav class="h-crumb" aria-label="Fil d’Ariane">${crumbs}</nav>
+      <header class="h-head"><span class="h-ico" style="background:color-mix(in srgb, ${c.color || '#2563eb'} 16%, transparent);color:${c.color || '#2563eb'}">${c.icon || ''}</span><div><h1>${E(c.title)}</h1>${c.lead ? `<p class="h-lead">${c.lead}</p>` : ''}</div></header>
+      ${hasExpert ? `<div class="h-levelbar">${level === 'expert' ? `Vous lisez la version <b>Expert</b> (formules, paramètres, limites). <button class="btn small" data-level="beginner">Revenir au niveau Débutant</button>` : `Version <b>Débutant</b>. Envie d’aller plus loin ? <button class="btn small" data-level="expert">Approfondir (Expert)</button>`}</div>` : ''}
+      <article class="h-body">${body}</article>
+      ${c.quiz ? '' : ''}
+      <footer class="h-nav">${prev ? `<a class="btn" href="#/${E(prev.id)}">← ${E(prev.title)}</a>` : '<span></span>'}<span class="h-prog" title="Progression"><i style="width:${pct}%"></i><small>${list.filter(x => seen.has(x.id)).length} / ${list.length} chapitres vus</small></span>${next ? `<a class="btn primary" href="#/${E(next.id)}">${E(next.title)} →</a>` : '<span></span>'}</footer>`;
+    mount(c); renderToc($('#h-q').value); closeDrawer();
+    if (!opts.keepScroll) window.scrollTo({ top: 0 });
+    document.title = c.title + ' — Aide — Jigobourso';
   }
-  function markNav() { const h = location.hash.slice(1); J.$$('a', nav).forEach(a => a.removeAttribute('aria-current')); const a = nav.querySelector(`a[href="#${CSS.escape(h)}"]`); if (a) a.setAttribute('aria-current', 'true'); }
-  J.$$('[data-mode]').forEach(b => b.onclick = async () => { level = b.dataset.mode; paint(); scrollToHash(); try { me.prefs = (await J.post('auth/prefs', { help_level: level })).prefs; } catch (e) { } });
-  q.oninput = paint;
-  const scrollToHash = () => { const h = decodeURIComponent(location.hash.slice(1)); if (!h) return; const el = document.getElementById(h); if (el) el.scrollIntoView(); markNav(); };
-  addEventListener('hashchange', scrollToHash);
-  await loadFacts(); paint(); scrollToHash();
+  function mount(c) {
+    const el = $('#h-main');
+    $$('[data-level]', el).forEach(b => b.onclick = () => setLevel(b.dataset.level));
+    $$('[data-go]', el).forEach(b => { const go2 = () => { location.hash = '#/' + b.dataset.go; }; b.onclick = go2; b.onkeydown = e => { if (e.key === 'Enter') go2(); }; });
+    $$('[data-quiz]', el).forEach(q => { let good = 0, done = 0; const total = $$('.hq-q', q).length;
+      $$('.hq-o', q).forEach(b => b.onclick = () => { const box = b.closest('.hq-q'); if (box.dataset.done) return; box.dataset.done = 1; done++; const ok = b.dataset.ok === '1'; if (ok) good++; b.classList.add(ok ? 'good' : 'bad'); $$('.hq-o', box).forEach(x => { if (x.dataset.ok === '1') x.classList.add('good'); x.disabled = true; }); const r = $('.hq-r', box); r.hidden = false; r.classList.toggle('bad', !ok); $('.hq-s', q).textContent = done === total ? `Résultat : ${good} / ${total}.${good === total ? ' Bravo !' : ' Relisez les explications ci-dessus puis réessayez.'}` : ''; }); });
+    if (typeof c.mount === 'function') { try { c.mount(el, ctx()); } catch (e) { console.error(e); el.insertAdjacentHTML('beforeend', '<div class="notice err">Cette démonstration n’a pas pu se charger.</div>'); } }
+  }
+  const go = id => { location.hash = '#/' + id; };
+  function setLevel(l) { level = l; $$('[data-mode]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mode === level))); J.post('auth/prefs', { help_level: level }).then(r => { me.prefs = r.prefs; }).catch(() => { }); index = null; if (current) open(current.id, { keepScroll: true, silent: true }); }
+  function closeDrawer() { root.classList.remove('toc-open'); }
+
+  /* ───── amorçage ───── */
+  root.innerHTML = `<div class="h-top"><button class="btn small h-burger" type="button" id="h-burger" aria-expanded="false" aria-controls="h-side">☰ Sommaire</button>
+    <div class="help-mode" role="group" aria-label="Niveau de détail"><button type="button" data-mode="beginner" aria-pressed="${level === 'beginner'}">Débutant</button><button type="button" data-mode="expert" aria-pressed="${level === 'expert'}">Expert</button></div></div>
+    <div class="h-layout"><aside class="h-side" id="h-side" aria-label="Sommaire de l’aide"><label class="h-search"><span class="sr-only">Rechercher dans l’aide</span><input id="h-q" type="search" placeholder="Rechercher : pente, ETF, lots…" autocomplete="off"></label><nav id="h-toc"></nav></aside><div class="h-read"><div id="h-main" class="h-main" tabindex="-1"><div class="empty"><span class="spinner"></span></div></div></div></div>`;
+  $$('[data-mode]').forEach(b => b.onclick = () => setLevel(b.dataset.mode));
+  $('#h-burger').onclick = () => { const o = root.classList.toggle('toc-open'); $('#h-burger').setAttribute('aria-expanded', String(o)); };
+  $('#h-q').oninput = e => { renderToc(e.target.value); const t = e.target.value.trim(); if (t) { const best = ranked(t)[0], hit = best && byId(best); if (hit && e.inputType !== 'deleteContentBackward' && t.length >= 3) { /* ouverture directe de la meilleure rubrique */ if (!current || current.id !== hit.id) { history.replaceState(null, '', '#/' + hit.id); open(hit.id, { silent: true }); } } } };
+  $('#h-q').onkeydown = e => { if (e.key === 'Enter') { const best = ranked(e.target.value)[0]; if (best) go(best); } };
+  try { facts = await J.api('help/facts'); } catch (e) { facts = null; }
+  try { meta = (await J.api('classement-test/strategies')).meta || {}; SUI.setMeta(meta); } catch (e) { meta = {}; }
+  const route = () => { const h = decodeURIComponent(location.hash.replace(/^#\/?/, '')); const last = store.get('jigo_help_last') || (me.prefs || {}).help_last; open(h || last || 'bienvenue', { silent: !h }); };
+  addEventListener('hashchange', route);
+  renderToc(''); route();
 })();

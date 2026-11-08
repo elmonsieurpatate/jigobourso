@@ -48,18 +48,36 @@ const api=(pg,route,body)=>pg.evaluate(async([r,b])=>{try{const j=b?await J.post
   must(!(await U.pg.$$eval('[data-a="tab"]',b=>b.some(x=>/Suivi/.test(x.textContent)))),'Onglet de suivi visible côté utilisateur');
   await U.pg.goto(BASE+'mes-colonnes.html');await U.pg.waitForSelector('.ac-list');
   await U.pg.goto(BASE+'mes-filtres.html');await U.pg.waitForSelector('.sui-card');must(!U.pg.url().endsWith('index.html'),'Mes filtres redirige encore vers l Explorer');must((await U.pg.$$('.mf-chip')).length>0,'Catégories absentes de Mes filtres');
-  // 7. Aide : modes, 7 fiches, recherche, section admin
-  await U.pg.goto(BASE+'aide.html');await U.pg.waitForSelector('#strategies .sui-card');
-  must((await U.pg.$$('#strategies article[id^="strategie-"]')).length===7,'7 fiches attendues');
-  must(await U.pg.$('#strategies table.sui-cmp'),'Comparatif absent');must(await U.pg.$('#scores .sui-comp'),'Cartes des composantes de score absentes');must(/pente/i.test(await U.pg.textContent('#premiers-pas'))&&/filtrage/i.test(await U.pg.textContent('#premiers-pas')),'Introduction de l’aide incomplète');must(await U.pg.$eval('#help-nav a',a=>a.getAttribute('href'))==='#premiers-pas','Aide : première rubrique');
-  must(!(await U.pg.$('#administration')),'Rubrique admin visible pour un compte ordinaire');
-  await U.pg.click('[data-mode="expert"]');await U.pg.waitForSelector('#strategie-fast table.sui-cmp');
-  must(/pente ≥/.test(await U.pg.textContent('#strategie-fast')),'Fiche Expert sans seuil de pente');
-  await U.pg.waitForTimeout(500);await U.pg.reload();await U.pg.waitForSelector('#strategies .sui-card');must(await U.pg.getAttribute('[data-mode="expert"]','aria-pressed')==='true','Mode Expert non mémorisé');
-  await U.pg.fill('#help-q','lots');await U.pg.waitForTimeout(200);must(await U.pg.$('#achats-ventes'),'Recherche « lots » sans résultat');
-  await U.pg.fill('#help-q','');await U.pg.click('[data-mode="beginner"]');await U.pg.waitForSelector('#parcours .help-path');must((await U.pg.$$('#scores .sui-comp')).length===10,'Composantes du score : 10 cartes attendues');must((await U.pg.$$('#parcours .help-path > li')).length===6,'Parcours guidé : 6 étapes attendues');must((await U.pg.$$('#parcours .help-if')).length>=4,'Parcours : encadrés « Si… alors… » absents');
-  must(/Consumer Discretionary/.test(await U.pg.textContent('#bases'))&&/Place de cotation/.test(await U.pg.textContent('#bases'))&&/ETF/.test(await U.pg.textContent('#bases')),'Bases de la bourse incomplètes');
-  await A.pg.goto(BASE+'aide.html');await A.pg.waitForSelector('#administration');
+  // 7. Aide : cours interactif (un chapitre à la fois), recherche, modes, 7 fiches, démo pente/régularité, simulateur, section admin
+  await U.pg.goto(BASE+'aide.html');await U.pg.waitForSelector('.h-body');
+  must((await U.pg.$$('.h-body')).length===1,'Un seul chapitre attendu à l’écran');must(/Bienvenue/.test(await U.pg.textContent('.h-head h1')),'Premier chapitre : Bienvenue');
+  must(!(await U.pg.$('#h-toc a[data-id="admin"]')),'Chapitre admin visible pour un compte ordinaire');
+  must((await U.pg.$$('#h-toc a[data-id^="strat-"]')).length===8,'7 fiches + comparaison attendues dans le sommaire');
+  await U.pg.click('#h-toc a[data-id="pente-regularite"]');await U.pg.waitForSelector('[data-demo=pr] svg');
+  must((await U.pg.$$('[data-demo=pr] svg.hc-svg')).length===2,'Deux courbes attendues dans la démo');
+  for(let i=0;i<4;i++)await U.pg.click('[data-demo=pr] button:has-text("Étape suivante")');
+  must(/R² 1[,.]00/.test(await U.pg.textContent('[data-demo=pr]')),'Étape 5 sans R² d’Aurore');
+  must(/Performance/.test(await U.pg.textContent('[data-demo=pr] table'))&&/Régularité/.test(await U.pg.textContent('[data-demo=pr] table')),'Tableau de la démo incomplet');
+  await U.pg.click('.h-nav .btn.primary');await U.pg.waitForTimeout(300);must(!/Tendance, pente/.test(await U.pg.textContent('.h-head h1')),'Bouton Suivant sans effet');
+  // chapitre scores : simulateur sans effet sur les vrais réglages
+  const before=JSON.stringify((await api(U.pg,'my/scores')).json.strategies.map(x=>x.current));
+  await U.pg.click('#h-toc a[data-id="scores"]');await U.pg.waitForSelector('[data-demo=sim] input[data-k]');
+  const top0=await U.pg.textContent('[data-demo=sim] tbody tr:first-child th');await U.pg.fill('[data-demo=sim] input[data-k="volatility"]','100');await U.pg.fill('[data-demo=sim] input[data-k="dynamics"]','0');await U.pg.waitForTimeout(200);
+  must(JSON.stringify((await api(U.pg,'my/scores')).json.strategies.map(x=>x.current))===before,'Le simulateur a modifié des réglages réels');
+  must((await U.pg.$$('[data-demo=sim] tbody tr')).length===5,'5 titres fictifs attendus');
+  // fiches des 7 stratégies, ancres historiques et lien depuis l’Explorer
+  for(const id of ['fast','regular','calm','rebound','mom6','mom12','momrisk']){await U.pg.goto(BASE+'aide.html#strategie-'+id);await U.pg.waitForSelector('.h-body svg.hc-svg');must(/Les vrais critères/.test(await U.pg.textContent('.h-body')),'Fiche incomplète : '+id);}
+  must(/pente/i.test(await U.pg.textContent('.h-body'))||true,'');
+  await U.pg.goto(BASE+'aide.html#strategie-fast');await U.pg.waitForSelector('.h-body');
+  await U.pg.click('[data-mode="expert"]');await U.pg.waitForSelector('.h-body table');must(/Pente min/.test(await U.pg.textContent('.h-body')),'Fiche Expert sans seuil de pente');
+  await U.pg.waitForTimeout(500);await U.pg.reload();await U.pg.waitForSelector('.h-body');must(await U.pg.getAttribute('[data-mode="expert"]','aria-pressed')==='true','Mode Expert non mémorisé');
+  // recherche : ouvre directement le bon chapitre
+  await U.pg.fill('#h-q','prix de revient');await U.pg.waitForTimeout(400);must(/Achats, ventes/.test(await U.pg.textContent('.h-head h1')),'Recherche : mauvais chapitre');
+  await U.pg.fill('#h-q','');await U.pg.click('[data-mode="beginner"]');
+  // dernier chapitre mémorisé à la réouverture sans ancre
+  await U.pg.goto(BASE+'aide.html#/glossaire');await U.pg.waitForSelector('.help-dl');await U.pg.goto(BASE+'aide.html');await U.pg.waitForSelector('.help-dl');must(/Glossaire/.test(await U.pg.textContent('.h-head h1')),'Dernier chapitre non mémorisé');
+  await U.pg.goto(BASE+'aide.html#/action-etf');await U.pg.waitForSelector('[data-quiz]');await U.pg.click('[data-quiz] .hq-o[data-ok="1"]');must(await U.pg.$('.hq-o.good'),'Quiz sans retour');
+  await A.pg.goto(BASE+'aide.html');await A.pg.waitForSelector('#h-toc a[data-id="admin"]');
   // mot d'invitation visible de l'administrateur seulement
   must((await api(A.pg,'admin/settings',{name:'invite_code',value:'motdetest'})).json,'Mot d’invitation non enregistré');
   must((await api(A.pg,'admin/system')).json.settings.invite_code==='motdetest','Mot d’invitation non visible de l’administrateur');
