@@ -107,8 +107,8 @@ const PERIODS = ['1d', '2d', '5d', '1w', '2w', '1m', '3m', '6m', '1y', '2y', '3y
       LP.click = origClick;
       await page.keyboard.press('Escape'); await page.locator('.px-drawer').waitFor({ state: 'detached' }); assert.ok(Math.abs(await page.evaluate(() => scrollY) - yBefore) < 5, 'retour au même emplacement');
       // zones : positions, transactions, surveillance
-      await page.locator('.px-zones [data-zone="surveillance"]').click(); await page.locator('.px-sv').waitFor(); assert.match(await page.locator('.px-sv thead').innerText(), /Stratégie de surveillance[\s\S]*Dernière évaluation/i); await noOverflow('surveillance'); await shot('surveillance');
-      await page.locator('.px-sv [data-conf]').first().evaluate(e => e.click()); await page.locator('.px-drawer').waitFor(); await page.keyboard.press('Escape');
+      await page.locator('.px-zones [data-zone="surveillance"]').click(); await page.locator('.px-alert').first().waitFor(); const atx = (await page.locator('.px-alert').allInnerTexts()).join('\n'); assert.ok(/Meilleur gain observé[\s\S]*Gain rendu/.test(atx) && /Régler cet achat/.test(atx), 'alertes : protection des gains et réglage par achat : ' + atx.slice(0, 300)); await noOverflow('surveillance'); await shot('surveillance');
+      await page.locator('.px-alert [data-lot]').first().evaluate(e => e.click()); await page.locator('dialog, .dlg, [role="dialog"]').first().waitFor(); await page.keyboard.press('Escape');
       await page.locator('.px-zones [data-zone="positions"]').click(); await page.locator('.px-t').waitFor(); await noOverflow('positions'); await shot('positions');
       await page.locator('.px-zones [data-zone="transactions"]').click(); await page.locator('.px-tx').waitFor(); await noOverflow('transactions');
       assert.deepEqual(errors, [], 'erreurs JS'); await ctx.close(); console.log('ok pf', width);

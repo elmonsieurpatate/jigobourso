@@ -197,12 +197,11 @@
     const f = COLS[S.sort] || COLS.value, num = !(f[2] === 'l' && S.sort !== 'watch');
     return rows.map((r, i) => [r, i]).sort((A, B) => { const x = f[1](A[0]), y = f[1](B[0]); if (!num) return S.dir * String(x).localeCompare(String(y), 'fr') || A[1] - B[1]; const kx = isNum(x), ky = isNum(y); if (kx !== ky) return kx ? -1 : 1; return (kx ? S.dir * (x - y) : 0) || A[1] - B[1]; }).map(a => a[0]);
   }
-  function insightOf(p, r) { const m = (C.D && C.D.insights) || {}; return m[p.key] || (r && m[r.key]) || m[p.listing_id] || null; }
   function table(st, limit) {
     let rows = st.rows.filter(r => S.closed || r.p.qty > 0), total = rows.length; rows = sortRows(rows); if (limit) rows = rows.slice(0, limit);
     const th = k => { const c = COLS[k], on = S.sort === k; return `<th class="${c[2] === 'l' ? '' : 'num'} c-${k}" aria-sort="${on ? (S.dir > 0 ? 'ascending' : 'descending') : 'none'}"><button type="button" data-sort="${k}">${c[0]}${on ? (S.dir > 0 ? ' ▲' : ' ▼') : ''}</button></th>`; };
     const body = rows.map(r => { const { p } = r, closed = !(p.qty > 0), w = r.watch;
-      return `<tr class="${closed ? 'closed' : ''}" data-open="${esc(r.key)}" tabindex="0"><td class="c-title" data-l="Titre"><b>${esc(p.symbol)}</b><span class="ell">${esc(p.name_catalogue || p.name || '')}${closed ? ' · soldé' : ''}</span>${closed ? '' : J.protectionMini(insightOf(p, r))}</td><td class="num c-value" data-l="Valeur">${closed ? '–' : eur(p.value)}</td><td class="num c-gain ${cl(r.gain)}" data-l="Gain/perte">${sg(r.gain)}</td><td class="num c-pct ${cl(r.pctv)}" data-l="Rendement">${pc(r.pctv)}</td><td class="num c-contrib ${cl(r.contrib)}" data-l="Contribution">${pt(r.contrib)}</td><td class="num c-w" data-l="Poids">${isNum(r.w) ? J.num(r.w, 1) + ' %' : '–'}</td><td class="c-strat" data-l="Stratégie"><span class="ell">${esc(w.strat || w.origin || 'Non renseignée')}</span></td><td class="c-watch" data-l="Surveillance"><button type="button" class="px-w ${w.k}" data-conf="${esc(r.key)}">${I.bell}${esc(w.t)}</button></td>
+      return `<tr class="${closed ? 'closed' : ''}" data-open="${esc(r.key)}" tabindex="0"><td class="c-title" data-l="Titre"><b>${esc(p.symbol)}</b><span class="ell">${esc(p.name_catalogue || p.name || '')}${closed ? ' · soldé' : ''}</span>${closed ? '' : J.riskBar(J.riskWorst((C.D.lots || []).filter(lo => p.listing_id ? lo.listing_id === p.listing_id : lo.symbol === p.symbol).map(lo => lo.alert && lo.alert.risk)), { compact: true })}</td><td class="num c-value" data-l="Valeur">${closed ? '–' : eur(p.value)}</td><td class="num c-gain ${cl(r.gain)}" data-l="Gain/perte">${sg(r.gain)}</td><td class="num c-pct ${cl(r.pctv)}" data-l="Rendement">${pc(r.pctv)}</td><td class="num c-contrib ${cl(r.contrib)}" data-l="Contribution">${pt(r.contrib)}</td><td class="num c-w" data-l="Poids">${isNum(r.w) ? J.num(r.w, 1) + ' %' : '–'}</td><td class="c-strat" data-l="Stratégie"><span class="ell">${esc(w.strat || w.origin || 'Non renseignée')}</span></td><td class="c-watch" data-l="Surveillance"><button type="button" class="px-w ${w.k}" data-conf="${esc(r.key)}">${I.bell}${esc(w.t)}</button></td>
         <td class="c-act"><button type="button" class="px-btn s" data-buy="${esc(r.key)}">Acheter</button><button type="button" class="px-btn s" data-sell="${esc(r.key)}" ${closed ? 'disabled' : ''}>Vendre</button>${p.listing_id ? `<a class="px-btn s" href="titre.html?id=${p.listing_id}&from=portefeuille" target="_blank" rel="noopener" aria-label="Analyse du titre ${esc(p.symbol)} (nouvel onglet)">Analyse ${I.ext}</a>` : ''}</td></tr>`; }).join('');
     return `<div class="px-tw"><table class="px-t"><thead><tr>${Object.keys(COLS).map(th).join('')}<th class="c-act">Actions</th></tr></thead><tbody>${body || '<tr><td colspan="9" class="px-note">Aucune position.</td></tr>'}</tbody></table></div>${limit && total > limit ? `<p class="px-more"><button type="button" class="px-link" data-zone="positions">Toutes les positions (${total}) ${I.chev}</button></p>` : ''}`;
   }
@@ -219,12 +218,19 @@
     return `<section class="px-card"><div class="px-ph"><h2>Transactions</h2><div class="px-ha"><button type="button" class="px-btn pri" data-add>Ajouter une opération</button><button type="button" class="px-btn" data-hist>Historique complet, lots et ventes</button></div></div>
       <div class="px-tw"><table class="px-t px-tx"><thead><tr><th>Date</th><th>Opération</th><th>Titre</th><th class="num">Quantité</th><th class="num">Prix</th></tr></thead><tbody>${tr.map(t => `<tr data-tx="${t.id}" tabindex="0"><td data-l="Date">${J.date(t.date)}</td><td data-l="Opération"><b>${t.side === 'sell' ? 'Vente' : 'Achat'}</b></td><td data-l="Titre">${esc(t.symbol)}</td><td class="num" data-l="Quantité">${J.num(t.quantity, 4)}</td><td class="num" data-l="Prix">${J.num(t.unit_price, 4)} ${esc(t.currency || '')}</td></tr>`).join('') || '<tr><td colspan="5" class="px-note">Aucune transaction.</td></tr>'}</tbody></table></div><p class="px-note">12 dernières opérations. L’historique complet permet de filtrer, modifier et régler les lots.</p></section>`;
   }
+  /* Alertes (version du 3 novembre) : positions classées par priorité, meilleur gain / gain rendu / recul, statut en clair, réglage par achat. */
+  function insightOf(p, r) { const m = (C.D && C.D.insights) || {}; return m[p.key] || (r && m[r.key]) || m[p.listing_id] || null; }
+  const PRIO = { act: 3, watch: 2, unknown: 1, normal: 0 };
   function viewSurv(st) {
-    const A = S.al; if (!A) return `<section class="px-card"><h2>Surveillance</h2><p class="notice err">${S.alErr ? esc(S.alErr) : 'Chargement…'}</p></section>`;
-    const rows = st.rows.filter(r => r.p.qty > 0 && r.p.listing_id);
-    return `<section class="px-card"><div class="px-ph"><h2>Surveillance des positions</h2><div class="px-ha"><button type="button" class="px-btn" id="px-eval">Évaluer maintenant</button></div></div>${alertSummary('div')}
-      <div class="px-tw"><table class="px-t px-sv"><thead><tr><th>Titre</th><th>Stratégie de surveillance</th><th>État</th><th class="num">Règles actives</th><th class="num">Déclenchées</th><th>Dernière évaluation</th><th></th></tr></thead><tbody>${rows.map(r => { const w = r.watch; return `<tr data-open="${esc(r.key)}" tabindex="0"><td data-l="Titre"><b>${esc(r.p.symbol)}</b><span class="ell">${esc(r.p.name_catalogue || r.p.name || '')}</span></td><td data-l="Stratégie"><span class="ell">${esc(w.strat || 'Aucune')}</span></td><td data-l="État"><span class="px-w ${w.k}">${esc(w.t)}</span></td><td class="num" data-l="Règles actives">${w.rules}</td><td class="num" data-l="Déclenchées">${w.trig}</td><td data-l="Dernière évaluation">${w.last ? J.dateTime(String(w.last).replace(' ', 'T')) : '–'}</td><td><button type="button" class="px-btn s" data-conf="${esc(r.key)}">Configurer</button></td></tr>`; }).join('') || '<tr><td colspan="7" class="px-note">Aucune position avec cotation.</td></tr>'}</tbody></table></div>
-      <p class="px-note">Une alerte informe, elle ne vend jamais à votre place. Évaluation à chaque passage automatique (toutes les 5 minutes en séance pour les cours, une fois par jour pour les tendances).</p></section>`;
+    const money = (v, c) => J.money(v, c || 'EUR'), lotsOf = p => (C.D.lots || []).filter(lo => p.listing_id ? lo.listing_id === p.listing_id : lo.symbol === p.symbol);
+    const items = st.rows.filter(r => r.p.qty > 0).map(r => ({ r, p: r.p, i: insightOf(r.p, r) })).sort((a, b) => (PRIO[(b.i || {}).status] || 0) - (PRIO[(a.i || {}).status] || 0));
+    const card = ({ r, p, i }) => { const lots = lotsOf(p), strategies = [...new Set(lots.map(lo => lo.alert && lo.alert.strategy_label).filter(Boolean))];
+      return `<article class="px-alert ${i ? i.status : 'unknown'}"><header><div><b>${esc(p.name_catalogue || p.name || p.symbol)}</b><small>${esc(p.symbol)} · ${J.num(p.qty, 4)} titre(s)${strategies.length ? ' · ' + esc(strategies.join(' / ')) : ''}</small></div>${J.insightBadge(i)}</header>
+        <dl class="px-kv2"><div><dt>Valeur actuelle</dt><dd>${eur(p.value)}</dd></div><div><dt>Depuis mes achats</dt><dd class="${cl(r.gain)}">${sg(r.gain)}</dd></div></dl>
+        ${i ? J.gainProtection(i.protection, money, true) : '<p class="small muted">Données insuffisantes.</p>'}
+        ${i && (i.personal_text || i.next_step) ? `<div class="px-obs"><b>Mon investissement.</b> ${esc(i.personal_text || 'Résultat indisponible.')} <b>État du titre.</b> ${esc(i.next_step || 'Données insuffisantes.')}</div>` : ''}
+        <div class="px-lotrow-wrap">${lots.map(lo => `<div class="px-lotrow"><span>Achat du ${J.date(lo.trade_at)} · ${J.num(lo.remaining, 4)} titre(s)</span><button type="button" class="px-btn s" data-lot="${lo.tx_id}">Régler cet achat</button></div>`).join('')}</div></article>`; };
+    return `<section class="px-card"><div class="px-ph"><h2>Mes positions sous surveillance</h2></div><p class="px-note">Classées par priorité. Un repère, jamais un ordre : rien n’est vendu à votre place. Les gains sont calculés depuis vos achats ; le recul depuis le sommet observé depuis l’achat.</p>${items.length ? items.map(card).join('') : '<p class="px-note">Aucune position ouverte.</p>'}</section>`;
   }
 
   /* ───────── détail : en-tête compact, trois onglets (Chiffres, Graphique, Alertes) ───────── */
@@ -264,15 +270,6 @@
     const a = lo.alert, ap = S.al && S.al.positions.find(z => z.listing_id === lo.listing_id), o = ap && ap.origins.find(z => z.tx === lo.tx_id && z.strategy);
     return a && a.own_strategy ? a.strategy_label : o ? o.label : !a ? 'Non renseignée' : 'Non renseignée (règles par défaut du portefeuille : ' + a.strategy_label + ')';
   }
-  /* Protection des gains (meilleur gain, gain rendu, recul), statut en clair, barre de risque et réglage par achat. */
-  function protectBlock(p, x, lots) {
-    const i = insightOf(p, x), money = (v, c) => J.money(v, c || 'EUR');
-    const risk = J.riskWorst((lots || []).map(lo => lo.alert && lo.alert.risk));
-    return `<div class="px-protect"><h4>Protection de mon gain ${i ? J.insightBadge(i) : ''}</h4>${i ? J.gainProtection(i.protection, money) : '<p class="small muted">Données insuffisantes.</p>'}
-      ${i && (i.personal_text || i.next_step) ? `<div class="obs"><b>Mon investissement.</b> ${esc(i.personal_text || 'Résultat indisponible.')} <b>État du titre.</b> ${esc(i.next_step || 'Données insuffisantes.')}</div>` : ''}
-      ${risk ? `<div class="rbar-wrap">${J.riskBar(risk)}${J.riskDetail(risk)}</div>` : ''}
-      ${(lots || []).length ? `<div class="rbar-wrap"><b>Réglages par achat</b>${lots.map(lo => `<div class="px-lotrow">Achat du ${J.date(lo.trade_at)} · ${J.num(lo.remaining, 4)} titre(s) ${J.riskBar(lo.alert && lo.alert.risk, { compact: true })}<button type="button" class="px-btn s" data-lot="${lo.tx_id}">Régler cet achat</button></div>`).join('')}</div>` : ''}</div>`;
-  }
   function openDetail(key, goAlerts) {
     S.sel = key; S.fig = 'perso'; S.tab = goAlerts ? 'alertes' : 'chiffres'; const st = stats(), x = st.rows.find(r => r.key === key); if (!x) return;
     const { p, l } = x, closed = !(p.qty > 0), cur = p.price_currency || p.currency;
@@ -284,7 +281,7 @@
       <div class="px-ha px-dact">${p.listing_id ? `<a class="px-btn" href="titre.html?id=${p.listing_id}&from=portefeuille" target="_blank" rel="noopener">Analyse du titre ${I.ext}</a>` : ''}<button type="button" class="px-btn pri" data-buy="${esc(key)}">Acheter</button><button type="button" class="px-btn" data-sell="${esc(key)}" ${closed ? 'disabled' : ''}>Vendre</button><button type="button" class="px-btn" data-close aria-label="Fermer le détail">✕</button></div></header>
       <div class="px-tabs2" role="tablist" aria-label="Détail du titre">${[['chiffres', 'Chiffres'], ['graphique', 'Graphique'], ['alertes', 'Alertes' + (x.watch.trig ? ' (' + x.watch.trig + ')' : '')]].map(([k, lb]) => `<button type="button" role="tab" data-tab="${k}" aria-selected="${S.tab === k}" class="${S.tab === k ? 'on' : ''}">${lb}</button>`).join('')}</div>
       <div class="px-db">
-       <section data-panel="chiffres" ${S.tab === 'chiffres' ? '' : 'hidden'}><h3>Combien ai-je gagné ou perdu sur ce titre ?</h3>${closed ? '' : protectBlock(p, x, lots)}
+       <section data-panel="chiffres" ${S.tab === 'chiffres' ? '' : 'hidden'}><h3>Combien ai-je gagné ou perdu sur ce titre ?</h3>
         <dl class="px-kv2 px-origin">${kv('Depuis l’origine', `<span class="${cl(x.gain)}">${sg(x.gain)}</span>`)}${kv('dont réalisé (ventes)', `<span class="${cl(re)}">${sg(re)}</span>`)}${kv('dont latent', closed ? '–' : `<span class="${cl(lat)}">${sg(lat)}</span>`)}${kv('Après impôts (estimé)', `<span class="${cl(tp.net)}">${sg(tp.net)} · ${pc(tp.pct, 1)}</span>`)}${kv('Quantité', closed ? '0' : J.num(p.qty, 4))}</dl>
         <div class="px-seg px-figseg" id="px-figseg" aria-label="Type de chiffres"><button type="button" data-fig="perso" class="on" aria-pressed="true">Mon résultat</button><button type="button" data-fig="market" aria-pressed="false">Variation du cours</button></div>
         <div id="px-fig">${figuresHtml(x)}</div>
@@ -331,6 +328,7 @@
     const c = t.closest('[data-conf]'); if (c) return openDetail(c.dataset.conf, true);
     const tx = t.closest('tr[data-tx]'); if (tx) return C.helpers.history(+tx.dataset.tx);
     const o = t.closest('[data-open]'); if (o) return openDetail(o.dataset.open);
+    const lotBtn = t.closest && t.closest('[data-lot]'); if (lotBtn && !t.closest('.px-drawer')) { const lo = (C.D.lots || []).find(z => z.tx_id == lotBtn.dataset.lot); if (lo) C.helpers.lot(lo); return; }
     if (t.id === 'px-eval') { t.disabled = true; J.post('alerts/refresh', {}).then(() => loadAlerts()).then(() => { render(); J.toast('Évaluation terminée'); }).catch(x => { t.disabled = false; J.toast(x.message); }); }
   }
   function onChange(e) { if (e.target.id === 'px-closed') { S.closed = e.target.checked; const y = scrollY; render(); scrollTo(0, y); } }

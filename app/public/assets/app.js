@@ -110,14 +110,6 @@ J.gainProtection = (g, px, compact) => {
   const kept = J.keptShare(g), money = px || ((v, c) => J.money(v, c || 'EUR'));
   return `<div class="protection"><div class="protection-values"><span>Meilleur gain observé <b>${J.pct(g.peak_gain_pct, 1)}</b></span><span>Actuel <b class="${J.cls(g.gain_pct)}">${J.pct(g.gain_pct, 1)}</b></span><span>Gain rendu <b>${J.num(g.given_back_pp, 1)} points</b></span></div><div class="protection-track" role="img" aria-label="${J.num(kept, 0)} % du gain positif observé conservé"><i style="width:${kept.toFixed(2)}%"></i></div>${compact ? `<p class="small muted">Suivi depuis le ${J.date(g.start)} · sommet ${money(g.high, g.currency)} · recul −${J.num(g.drop_pct, 2)} %.</p>` : `<p class="small muted">Recul du cours : −${J.num(g.drop_pct, 2)} % depuis le sommet observé ${money(g.high, g.currency)}. Référence : ${J.date(g.start)} ; dernière valeur du ${J.date(g.value_date)} ; sommet du gain le ${J.date(g.peak_date)}.</p>`}</div>`;
 };
-/* Mini-indicateur d'une ligne de tableau : barre de gain conservé + statut + recul. */
-J.protectionMini = (i) => {
-  if (!i) return '';
-  const g = i.protection, c = J.INSIGHT[i.status] || J.INSIGHT.unknown, st = i.status || 'unknown';
-  const kept = g && g.available ? J.keptShare(g) : 0, drop = g && g.available ? ` · recul −${J.num(g.drop_pct, 1)} %` : '';
-  return `<span class="pmini ${st}" title="${J.esc([i.personal_text, i.next_step].filter(Boolean).join(' '))}"><span class="pmini-track"><i style="width:${Math.max(6, kept).toFixed(0)}%"></i></span><b>${J.esc(i.label || c[1])}</b><small>${drop.replace(/^ · /, '')}</small>${g && g.available ? `<em class="pmini-v">Meilleur ${J.pct(g.peak_gain_pct, 1)} · Actuel ${J.pct(g.gain_pct, 1)} · Rendu ${J.num(g.given_back_pp, 1)} pts</em>` : ''}</span>`;
-};
-
 /* Barre de risque d'un achat (moteur : engine/analytics/risk.py). Un repère, jamais un ordre : rien n'est vendu automatiquement. */
 J.RISK = { ok: ['ok', 'Tendance intacte'], watch: ['watch', 'À surveiller'], act: ['act', 'Vente à envisager'], na: ['na', 'Non évaluée'] };
 J.riskWorst = list => { const order = ['na', 'ok', 'watch', 'act']; return (list || []).filter(r => r && r.level).sort((a, b) => order.indexOf(b.level) - order.indexOf(a.level))[0] || null; };
