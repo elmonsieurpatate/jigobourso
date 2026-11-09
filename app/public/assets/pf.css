@@ -99,3 +99,4 @@ body.px-lock{overflow:hidden}
 @media(max-width:640px){.px-hk{grid-template-columns:repeat(2,auto)!important}.px-dact{width:100%;justify-content:flex-start}.px-fig tr{grid-template-columns:1fr 1fr}.px-fig td[colspan]{grid-column:1/-1;display:block;text-align:left}.px-fig td:first-child{grid-column:1/-1;text-align:left;display:block}.px-fig td:first-child::before{display:none}}
 .px-tax{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:2px 12px;align-items:baseline;background:var(--surface-2,var(--bg));border-radius:8px;padding:8px 10px}.px-tax>span{font-size:.72rem;color:var(--muted)}.px-tax>b{font-size:.95rem}.px-tax>small{flex-basis:100%;color:var(--muted);font-size:.7rem;line-height:1.35}
 .px-hk dd{white-space:nowrap}
+.px-sum .n.info{background:var(--info);color:#fff}

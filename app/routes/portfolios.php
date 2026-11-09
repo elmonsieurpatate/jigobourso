@@ -129,8 +129,10 @@ return [
         if ($days === '') $days = null; if ($drop === '') $drop = null;
         if ($days !== null && (!is_numeric($days) || (int)$days < 1 || (int)$days > 3650)) throw new ApiError('Durée invalide (1 à 3 650 jours)', 422);
         if ($drop !== null && (!is_numeric($drop) || $drop <= 0 || $drop >= 100)) throw new ApiError('Seuil de chute invalide (entre 0 et 100 %)', 422);
-        $off = !empty($b['alerts_off']) ? 1 : 0;
-        if ($strategy === null && $days === null && $drop === null && !$off) q('DELETE FROM lot_settings WHERE transaction_id = ?', [$t['id']]);
+        // Réglage « désactiver les alertes de cet achat » retiré de l'interface : sa valeur déjà stockée est conservée telle quelle si le champ n'est pas envoyé.
+        $off = array_key_exists('alerts_off', $b) ? (!empty($b['alerts_off']) ? 1 : 0) : (int)(q('SELECT alerts_off FROM lot_settings WHERE transaction_id = ?', [$t['id']])->fetch()['alerts_off'] ?? 0);
+        $reset = !array_key_exists('alerts_off', $b) || !$off;   // champ absent et tous les réglages vides = retour aux réglages par défaut (chemin de retour pour une ancienne case cochée)
+        if ($strategy === null && $days === null && $drop === null && $reset) q('DELETE FROM lot_settings WHERE transaction_id = ?', [$t['id']]);
         else q('INSERT INTO lot_settings(transaction_id, strategy, alert_days, alert_drop_pct, alerts_off, updated_at) VALUES (?,?,?,?,?,?) ON DUPLICATE KEY UPDATE strategy = VALUES(strategy), alert_days = VALUES(alert_days), alert_drop_pct = VALUES(alert_drop_pct), alerts_off = VALUES(alerts_off), updated_at = VALUES(updated_at)',
                [$t['id'], $strategy, $days === null ? null : (int)$days, $drop === null ? null : round((float)$drop, 2), $off, now_utc()]);
         return ['ok' => true];

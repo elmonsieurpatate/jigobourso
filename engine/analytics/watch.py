@@ -185,9 +185,17 @@ def _one(r, lid, dates, closes, meta, line, hdates, brk=()):
 MESSAGES = {'triggered': 'Condition atteinte', 'normal': 'Retour à la normale', 'insufficient': 'Données insuffisantes'}
 
 
+# Ancien système « Surveillance » : remplacé par le Plan de suivi (engine/analytics/position_plan.py). Les règles restent en base, intactes ;
+# plus aucune évaluation ni aucun événement n'est produit, quel que soit l'appelant (tick planifié, CLI, API). Verrou unique, volontairement en dur.
+LEGACY_EXECUTION_ENABLED = False
+
+
 def run_all(conn, now=None, user_id=None, force=False):
     """Évalue les règles actives (toutes, ou celles d'un utilisateur) et enregistre états et événements.
-    Une règle déjà déclenchée ne génère pas de nouvel événement tant que sa condition persiste (pas de répétition à chaque passage)."""
+    Une règle déjà déclenchée ne génère pas de nouvel événement tant que sa condition persiste (pas de répétition à chaque passage).
+    DÉSACTIVÉ : renvoie immédiatement, sans lire ni écrire alert_rules / alert_events."""
+    if not LEGACY_EXECUTION_ENABLED:
+        return {'disabled': True, 'rules': 0, 'triggered': 0}
     now = now or datetime.datetime.utcnow()
     with conn.cursor() as cur:
         if not force and user_id is None:

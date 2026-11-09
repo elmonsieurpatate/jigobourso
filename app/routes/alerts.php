@@ -98,8 +98,12 @@ function alert_apply_template(array $u, int $pid, int $lid, string $key, string 
     return $plan + ['added' => count($plan['add']), 'updated' => count($plan['update']), 'kept' => count($plan['keep'])];
 }
 
+/** Ancien système « Surveillance » désactivé : les règles restent stockées, rien n'est évalué ni envoyé. Verrou unique côté PHP (miroir de watch.LEGACY_EXECUTION_ENABLED). */
+const ALERTS_EXECUTION_ENABLED = false;
+
 /** Envoie un e-mail par utilisateur pour les alertes nouvellement déclenchées (une seule fois par déclenchement) ; appelé par le cron. Aucun ordre de vente, simple information. */
 function alerts_mail_pending(): int {
+    if (!ALERTS_EXECUTION_ENABLED) return 0;   // ancien moteur désactivé : aucune notification, aucune écriture
     $sent = 0;
     $rows = q("SELECT r.*, u.email, u.username, u.prefs_json FROM alert_rules r JOIN users u ON u.id = r.user_id WHERE r.enabled = 1 AND r.state = 'triggered' AND r.acked_at IS NULL AND (r.notified_at IS NULL OR r.notified_at < r.triggered_at) AND u.email IS NOT NULL AND u.email <> ''")->fetchAll();
     $by = []; foreach ($rows as $r) $by[$r['user_id']][] = $r;
@@ -215,6 +219,7 @@ return [
     },
     'alerts/refresh' => function () {
         need_post(); $u = require_user();
+        if (!ALERTS_EXECUTION_ENABLED) return ['disabled' => true, 'rules' => 0, 'triggered' => 0];   // ancien moteur désactivé : aucune évaluation
         return engine_call('watch-run', ['user_id' => (int)$u['id']]);
     },
     'alerts/prefs' => function () {

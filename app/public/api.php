@@ -5,7 +5,7 @@ require_once __DIR__ . '/../lib/auth.php';
 set_error_handler(function ($no, $str, $file, $line) { throw new ErrorException($str, 0, $no, $file, $line); });
 try {
     $routes = [];
-    foreach (['auth', 'explore', 'portfolios', 'admin', 'cron', 'secondary_filters', 'ct_strategies', 'table_layouts', 'alerts'] as $group) $routes += require __DIR__ . '/../routes/' . $group . '.php';
+    foreach (['auth', 'explore', 'portfolios', 'admin', 'cron', 'secondary_filters', 'ct_strategies', 'table_layouts', 'alerts', 'tracking'] as $group) $routes += require __DIR__ . '/../routes/' . $group . '.php';
     $route = (string)($_GET['r'] ?? '');
     if (!isset($routes[$route])) throw new ApiError('Route inconnue', 404);
     out($routes[$route]());

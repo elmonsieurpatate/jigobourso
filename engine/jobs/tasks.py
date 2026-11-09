@@ -466,8 +466,7 @@ def tick(conn, client, now=None, trigger='cron'):
         work = guarded('rattrapage', lambda: catchup.plan_intraday(conn, now))
         if work:
             done.append(('catchup', None, guarded('rattrapage', lambda: run_job(conn, 'catchup', lambda log: catchup.execute(conn, client, work, now, log), trigger=trigger))))
-    from ..analytics import watch
-    guarded('alertes', lambda: watch.run_all(conn, now.replace(tzinfo=None) if getattr(now, 'tzinfo', None) else now))                 # évalue les règles d'alerte (au plus toutes les 10 minutes)
+    # L'ancien moteur d'alertes (watch.run_all) n'est plus exécuté : remplacé par le Plan de suivi, calculé à la demande et en lecture seule.
     summary = ', '.join(f'{k}{":" + m if m else ""}' for k, m, _ in done) or 'rien à faire'
     schedule.beat(conn, now, trigger, done=summary[:200], duration=round(time.monotonic() - t0, 1))
     return done

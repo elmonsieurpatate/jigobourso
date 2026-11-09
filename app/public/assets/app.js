@@ -174,7 +174,6 @@ J.NAV = (admin) => [
     { label: 'Mes filtres et catégories', href: 'mes-filtres.html', icon: 'funnel', on: () => true }] },
   { sec: 'Mon patrimoine' },
   { id: 'portefeuilles', label: 'Portefeuilles', icon: 'wallet', file: ['portefeuilles.html'], dynamic: 'portfolios', children: [{ label: 'Vue d’ensemble', href: 'portefeuilles.html', on: q => !q.has('id') }] },
-  { id: 'alertes', label: 'Alertes', icon: 'bell', file: ['alertes.html'], href: 'alertes.html' },
   { id: 'bilan', label: 'Bilans', icon: 'chart', file: ['bilan.html'], children: [{ label: 'Bilan global', href: 'bilan.html', on: () => true }] },
   { sec: 'Méthode' },
   { id: 'suivi', label: 'Suivi des classements', icon: 'pulse', file: ['suivi.html'], href: 'suivi.html' },

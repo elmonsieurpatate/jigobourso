@@ -17,8 +17,8 @@ const PERIODS = ['1d', '2d', '5d', '1w', '2w', '1m', '3m', '6m', '1y', '2y', '3y
       const shot = async n => { if (SHOTS && [390, 1440].includes(width)) await page.screenshot({ path: `${SHOTS}/pf5-${n}-${width}.png`, fullPage: n !== 'drawer' && n !== 'surv-detail' && n !== 'alert-edit' }); };
       const noOverflow = async tag => assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true, `débordement horizontal ${tag} ${width}`);
       const settle = async () => { await page.waitForFunction(() => !document.querySelector('#px-main-plot.loading') && document.querySelector('#px-main-plot svg,#px-main-plot .px-empty')); };
-      // quatre zones, ordre de la vue d'ensemble
-      assert.deepEqual(await page.locator('.px-zones button').allInnerTexts(), ['Vue d’ensemble', 'Positions', 'Transactions', 'Surveillance']);
+      // deux zones, ordre de la vue d'ensemble
+      assert.deepEqual(await page.locator('.px-zones button').allInnerTexts(), ['Vue d’ensemble', 'Transactions']);
       const order = await page.evaluate(() => ['.px-head', '.px-syn', '.px-sum', '#px-main-box', '.px-t'].map(s => document.querySelector(s).getBoundingClientRect().top));
       assert.deepEqual(order, [...order].sort((x, y) => x - y), 'ordre : en-tête, synthèse, alertes, graphique, positions');
       await settle(); await noOverflow('overview'); await shot('overview');
@@ -56,14 +56,14 @@ const PERIODS = ['1d', '2d', '5d', '1w', '2w', '1m', '3m', '6m', '1y', '2y', '3y
         await page.mouse.move(box.x + box.width * 0.5, box.y + box.height / 2); await page.waitForTimeout(100); assert.ok(await page.locator('#px-main-plot .fc-tip').isVisible(), 'infobulle');
       }
       // tableau compact : en-têtes, tri stable, ligne cliquable
-      if (width >= 1024) { for (const h of ['Titre', 'Valeur', 'Gain/perte', 'Rendement', 'Surveillance', 'Actions']) assert.ok((await page.locator('.px-t thead').first().innerText()).toLowerCase().includes(h.toLowerCase()), h); }
+      if (width >= 1024) { for (const h of ['Titre', 'Valeur', 'Gain/perte', 'Rendement', 'Suivi', 'Actions']) assert.ok((await page.locator('.px-t thead').first().innerText()).toLowerCase().includes(h.toLowerCase()), h); }
       await noOverflow('tableau'); await page.locator('.px-t [data-sort="value"]').first().evaluate(e => e.click());
       // les deux accès redondants ont disparu du Portefeuille
       const pageTxt = await page.locator('#px-page').innerText(); assert.ok(!/Transactions et lots/.test(pageTxt) && !/Centre d’alertes/.test(pageTxt), 'accès redondants supprimés');
       // détail : en-tête compact + trois onglets, retour au même emplacement
       await page.evaluate(() => scrollTo(0, 250)); const yBefore = await page.evaluate(() => scrollY);
       await page.locator('.px-t tbody tr[data-open]').first().evaluate(e => e.click()); await page.locator('.px-drawer').waitFor();
-      const tabs = await page.locator('.px-tabs2 button').allInnerTexts(); assert.deepEqual(tabs.map(t => t.replace(/ \(\d+\)/, '')), ['Chiffres', 'Graphique', 'Alertes']);
+      const tabs = await page.locator('.px-tabs2 button').allInnerTexts(); assert.deepEqual(tabs.map(t => t.replace(/ \(\d+\)/, '')), ['Chiffres', 'Graphique', 'Plan de suivi']);
       assert.equal(await page.locator('.px-tabs2 button.on').count(), 1); const head = await page.locator('.px-dh').innerText(); for (const h of ['Cours', 'Prix de revient', 'Résultat global', 'Acheter', 'Vendre']) assert.ok(head.includes(h), 'en-tête : ' + h);
       assert.equal(await page.locator('.px-drawer a[target="_blank"]').first().getAttribute('rel'), 'noopener'); await noOverflow('détail');
       // CHIFFRES : 14 périodes, rien d'inventé avant l'achat
@@ -73,43 +73,15 @@ const PERIODS = ['1d', '2d', '5d', '1w', '2w', '1m', '3m', '6m', '1y', '2y', '3y
       assert.ok(/Depuis l’origine[\s\S]*réalisé[\s\S]*latent/i.test(await page.locator('.px-origin').innerText()), 'origine, réalisé, latent');
       await page.locator('[data-fig="market"]').click(); assert.match(await page.locator('.px-fig thead').innerText(), /Variation du cours/i); assert.equal((await page.locator('.px-fig tbody tr').count()), 14); await page.locator('[data-fig="perso"]').click();
       assert.match(await page.locator('.px-ops thead').innerText(), /Frais/i); assert.ok(await page.locator('.px-ops tbody tr').count() >= 1, 'opérations'); assert.ok(!/Lots FIFO/i.test(await page.locator('.px-drawer').innerText()), 'FIFO pas en titre');
-      if (await page.locator('.px-tech').count()) { await page.locator('.px-tech summary').click(); assert.match(await page.locator('.px-tech').innerText(), /Stratégie : (Non renseignée|Croissance|Croiss|Rapide|Calme|Rebond|Momentum)/); }
+      if (await page.locator('.px-tech').count()) { await page.locator('.px-tech summary').click(); assert.match(await page.locator('.px-tech').innerText(), /Stratégie d’origine : (Non renseignée|Croissance|Croiss|Rapide|Calme|Rebond|Momentum)/); }
       // GRAPHIQUE : onglet, périodes, intraday, modes
       await page.locator('[data-tab="graphique"]').click(); await page.locator('#px-det-plot').waitFor(); await page.waitForFunction(() => !document.querySelector('#px-det-plot.loading') && document.querySelector('#px-det-plot svg,#px-det-plot .px-empty'));
       assert.equal(await page.locator('#px-det-box [data-k="per"] button').count(), 15, 'quinze périodes dans le graphique'); await page.locator('#px-det-box [data-k="per"] [data-v="1d"]').click(); await page.waitForFunction(() => !document.querySelector('#px-det-plot.loading'));
       assert.match(await page.locator('#px-det-cur').innerText(), /1J/); await page.locator('#px-det-box [data-k="mode"] [data-v="market"]').click(); await page.locator('#px-det-box [data-k="per"] [data-v="max"]').click(); await page.waitForFunction(() => !document.querySelector('#px-det-plot.loading'));
       assert.match(await page.locator('#px-det-sum').innerText(), /^Données :/); await shot('drawer');
-      // ALERTES
-      // Émulation mobile de Playwright : le test de visibilité du clic se trompe de conteneur de défilement dans le tiroir ; sur mobile, clic par script après défilement (le contenu a été vérifié sans débordement).
-      const LP = Object.getPrototypeOf(page.locator('body')), origClick = LP.click; if (width < 600) LP.click = function () { return this.evaluate(e => { e.scrollIntoView({ block: 'center' }); e.click(); }); };
-      await page.locator('[data-tab="alertes"]').click(); await page.locator('.ap-top,.ap-empty').first().waitFor(); const atxt = await page.locator('[data-panel="alertes"]').innerText();
-      assert.ok(/Surveillance non configurée|Stratégie de surveillance/.test(atxt) && atxt.includes('Ajouter une protection'), 'alertes : en-tête et protections');
-      assert.ok(!/Stratégie d’origine/.test(atxt), 'la stratégie d’origine reste dans les infos d’achat');
-      assert.ok(!/Appliquer le modèle|A · Règles|B · Protection/.test(atxt), 'plus de jargon A/B/C');
-      assert.ok(!/Tout va bien/.test(atxt) || await page.locator('.al-r .al-b.ok').count() > 0, 'jamais « Tout va bien » sans règle évaluée');
-      assert.equal(await page.locator('dialog[open]').count(), 0, 'aucune fenêtre ouverte');
-      // choix de stratégie en ligne : aperçu, puis confirmation
-      if (await page.locator('#ap-chg').count()) await page.locator('#ap-chg').click(); else if (await page.locator('#ap-other').count()) await page.locator('#ap-other').click();
-      const hd = await page.locator('[data-panel="alertes"]').innerText(); await page.locator('#ap-watch').selectOption(/rapide/i.test(hd) ? 'regular' : 'fast');
-      await page.locator('.ap-pvw').waitFor(); assert.match(await page.locator('.ap-pvw').innerText(), /Règles proposées/); assert.match(await page.locator('.ap-pvw').innerText(), /Nécessite \d+ clôtures|aucun critère surveillable/); assert.equal(await page.locator('dialog[open]').count(), 0, 'aperçu sans fenêtre'); await shot('alert-preview');
-      await page.locator('#ap-go').click(); await page.locator('.ap-pvw').waitFor({ state: 'detached' }); await page.locator('.al-r').first().waitFor();
-      const apTop = await page.locator('.ap-top').innerText(); assert.match(apTop, /règle\(s\) active\(s\)[\s\S]*déclenchée\(s\)/); assert.match(apTop, /Modèle version \d+/);
-      assert.match(await page.locator('[data-panel="alertes"]').innerText(), /Tendance sur|Régularité sur|Progression sur|Volatilité sur|Momentum|Cours sous la moyenne|Recul maximal/);
-      // boutons : une seule taille
-      const hs = await page.locator('.ap .btn').evaluateAll(bs => [...new Set(bs.map(b => Math.round(b.getBoundingClientRect().height)))]); assert.equal(hs.length, 1, 'tous les boutons ont la même hauteur : ' + hs);
-      // protection personnelle en ligne : ajout, modification, désactivation
-      await page.locator('#ap-add').click(); await page.locator('#pr-k').waitFor(); assert.equal(await page.locator('#pr-k option').count(), 9); assert.equal(await page.locator('dialog[open]').count(), 0, 'formulaire en ligne');
-      await page.locator('#pr-k').selectOption('loss_pct'); await page.locator('#pr-t').fill('8'); assert.match(await page.locator('#pr-s').innerText(), /Vous serez averti si je perds 8 % ou plus/); await shot('alert-edit');
-      await page.locator('#pr-ok').click(); const card = page.locator('.al-r', { hasText: 'Perte de 8 %' }).first(); await card.waitFor();
-      await card.getByRole('button', { name: 'Modifier' }).click(); await page.locator('#ap-e-t').fill('9'); await page.locator('[data-es]').click(); const c9 = page.locator('.al-r', { hasText: 'Perte de 9 %' }).first(); await c9.waitFor();
-      await c9.getByRole('button', { name: 'Désactiver' }).click(); await page.locator('.al-r', { hasText: 'Perte de 9 %' }).first().getByText('Réactiver').waitFor(); assert.match(await page.locator('.al-r', { hasText: 'Perte de 9 %' }).first().innerText(), /Désactivée/);
-      await page.locator('.al-r', { hasText: 'Perte de 9 %' }).first().getByRole('button', { name: 'Réactiver' }).click(); await page.locator('.al-r', { hasText: 'Perte de 9 %' }).first().getByText('Désactiver').waitFor(); await shot('surv-detail');
-      LP.click = origClick;
+      // Plan de suivi : couvert par plan-suivi.cjs (onglet « Plan de suivi » à la place de « Alertes »)
       await page.keyboard.press('Escape'); await page.locator('.px-drawer').waitFor({ state: 'detached' }); assert.ok(Math.abs(await page.evaluate(() => scrollY) - yBefore) < 5, 'retour au même emplacement');
-      // zones : positions, transactions, surveillance
-      await page.locator('.px-zones [data-zone="surveillance"]').click(); await page.locator('.px-alert').first().waitFor(); const atx = (await page.locator('.px-alert').allInnerTexts()).join('\n'); assert.ok(/Meilleur gain observé[\s\S]*Gain rendu/.test(atx) && /Régler cet achat/.test(atx), 'alertes : protection des gains et réglage par achat : ' + atx.slice(0, 300)); await noOverflow('surveillance'); await shot('surveillance');
-      await page.locator('.px-alert [data-lot]').first().evaluate(e => e.click()); await page.locator('dialog, .dlg, [role="dialog"]').first().waitFor(); await page.keyboard.press('Escape');
-      await page.locator('.px-zones [data-zone="positions"]').click(); await page.locator('.px-t').waitFor(); await noOverflow('positions'); await shot('positions');
+      // zones : Vue d’ensemble et Transactions seulement
       await page.locator('.px-zones [data-zone="transactions"]').click(); await page.locator('.px-tx').waitFor(); await noOverflow('transactions');
       assert.deepEqual(errors, [], 'erreurs JS'); await ctx.close(); console.log('ok pf', width);
     }
