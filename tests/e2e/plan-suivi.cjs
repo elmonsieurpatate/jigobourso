@@ -1,6 +1,5 @@
-/* Plan de suivi (spécification exécutable) : zones sans « Positions » ni « Surveillance », table et graphique de la Vue d'ensemble conservés, onglet « Plan de suivi » du détail,
-   jauge (repères, échelle), conseils par scénario chiffré, protection personnelle jamais écrasée, une stratégie de surveillance par position, mobile 320→1440 sans débordement.
-   Base : tests/e2e/plan_suivi_seed.py. Serveur : php8.3 -S 127.0.0.1:18096 -t app/public. */
+/* Suivi des positions (spécification exécutable) : section repliable sous le tableau, une ligne par position, jauge, états, configuration par règle,
+   cohérence ligne/détail, sections repliables, thèmes, mobile 320→1440 sans débord. Base : tests/e2e/plan_suivi_seed.py. Serveur : php8.3 -S 127.0.0.1:18096 -t app/public. */
 const assert = require('node:assert/strict'); const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const BASE = process.env.BASE || 'http://127.0.0.1:18096', SHOTS = process.env.SHOTS || '';
 const text = s => s.replace(/\s+/g, ' ').trim();
@@ -27,88 +26,104 @@ const text = s => s.replace(/\s+/g, ' ').trim();
       assert.deepEqual(await page.locator('.px-zones button').allInnerTexts(), ['Vue d’ensemble', 'Transactions']);
       await page.waitForFunction(() => !/Chargement/.test(document.querySelector('.px-sum').innerText)); await noOverflow('overview');
       assert.equal(await page.locator('a[href="alertes.html"]').count(), 0, 'plus de lien vers le Centre d’alertes');
-      assert.match(await page.locator('.px-sum').innerText(), /Suivi des positions/); assert.doesNotMatch(await page.locator('body').innerText(), /Surveillance/);
+      assert.match(await page.locator('.px-sum').innerText(), /Synthèse du suivi/); assert.match(await page.locator('#px-sec-suivi h2').innerText(), /Suivi des positions/); assert.doesNotMatch(await page.locator('body').innerText(), /Surveillance/);
       // 2. la liste des positions : toutes les positions ouvertes (plus de limite à 8), colonnes inchangées sauf « Suivi »
       const heads = (await page.locator('.px-t thead th').allInnerTexts()).map(t => t.replace(/[▲▼]/g, '').trim().toLowerCase());
       assert.deepEqual(heads, ['titre', 'valeur', 'gain/perte', 'rendement', 'contribution', 'poids', 'stratégie', 'suivi', 'actions']);
-      assert.equal(await page.locator('.px-t tbody tr').count(), 20, '20 positions ouvertes');
+      assert.equal(await page.locator('.px-t tbody tr').count(), 25, '25 positions ouvertes');
       assert.equal(await page.locator('.px-more').count(), 0);
       const closedBox = page.locator('#px-closed'); assert.equal(await closedBox.count(), 1, 'positions soldées : case dans la Vue d’ensemble');
-      await closedBox.check(); assert.equal(await page.locator('.px-t tbody tr').count(), 21); await page.locator('#px-closed').uncheck();
+      await closedBox.check(); assert.equal(await page.locator('.px-t tbody tr').count(), 26); await page.locator('#px-closed').uncheck();
       assert.ok(await page.locator('#px-main-box').count(), 'graphique conservé');
       await shot('overview');
-      // 3. détail d'une position : onglets Chiffres, Graphique, Plan de suivi
-      const open = async sym => { await page.locator(`.px-t tbody tr:has(.c-title b:text-is("${sym}"))`).click(); await page.locator('.px-drawer').waitFor(); };
-      const plan = async () => { await page.locator('.px-tabs2 [data-tab="suivi"]').click(); await page.locator('.ps-card').waitFor(); return page.locator('.ps-card'); };
+
+      // 3. « Suivi des positions » : sous le tableau, une ligne par position ouverte, toutes visibles sans ouvrir de détail
+      const sec = page.locator('#px-sec-suivi'); await sec.locator('.psr').first().waitFor();
+      assert.equal(await sec.locator('.psr').count(), 25, 'une ligne par position ouverte');
+      assert.equal(await page.evaluate(() => { const p = document.querySelector('#px-sec-positions'), s = document.querySelector('#px-sec-suivi'); return !!(p.compareDocumentPosition(s) & Node.DOCUMENT_POSITION_FOLLOWING); }), true, 'Suivi des positions sous le tableau Positions');
+      { const tops = await sec.locator('.psr').evaluateAll(els => els.map(e => Math.round(e.getBoundingClientRect().top))); assert.equal(new Set(tops).size, tops.length, 'jamais deux positions sur la même ligne'); }
+      const row = sym => sec.locator(`.psr:has(.psr-name strong:text-is("${sym}"))`);
+      const adv = async sym => text(await row(sym).locator('.psr-adv').innerText());
+      const states = ['SUIVI PARTIEL', 'CONSERVER', 'SURVEILLER', 'RÉÉVALUER', 'SORTIE À ENVISAGER'];
+      for (const t of await sec.locator('.psr .psr-adv').allInnerTexts()) assert.ok(states.some(x => t.includes(x)), 'chaque ligne porte un état : ' + text(t).slice(0, 60));
+      await noOverflow('suivi'); await shot('suivi');
+      // 4. cas chiffrés : chaque conseil nomme la règle déclenchée
+      assert.match(await adv('GIBO'), /SURVEILLER[\s\S]*La hausse se poursuit, mais le risque de repli est très élevé/); assert.match(await adv('GIBO'), /Protection automatique : [\d\s.,  ]+ €\. Tu peux la modifier/); assert.doesNotMatch(await adv('GIBO'), /SORTIE|RÉÉVALUER/, 'forte volatilité seule : jamais un ordre de sortie');
+      assert.match(await adv('RISEUP'), /CONSERVER/); assert.match(await adv('MULTILOT'), /CONSERVER/);
+      assert.match(await adv('LOSSPERS'), /SORTIE À ENVISAGER[\s\S]*protection personnelle/i);
+      assert.match(await adv('TARGETHIT'), /SORTIE À ENVISAGER[\s\S]*objectif de gain/i);
+      assert.match(await adv('RECULPERS'), /RÉÉVALUER[\s\S]*seuil de [\s\S]*5,0 %/); assert.match(await adv('MULTIRULE'), /RÉÉVALUER/);
+      assert.match(await adv('FAST'), /SORTIE À ENVISAGER[\s\S]*protection automatique/i, 'protection automatique franchie');
+      assert.match(await adv('NOSTOP'), /SURVEILLER|CONSERVER/); assert.doesNotMatch(await adv('NOSTOP'), /SORTIE/, 'règle de protection désactivée : pas de sortie');
+      assert.match(await adv('SHORT'), /historique insuffisant|Historique insuffisant/i); assert.equal(await row('SHORT').locator('.ps-mk').count() <= 3, true); assert.doesNotMatch(await row('SHORT').innerText(), /Protection auto\s*\d/, 'aucune protection inventée');
+      // priorité : sortie > réévaluer > surveiller > conserver ; autres règles consultables
+      assert.match(await row('MULTIRULE').locator('.psr-adv').innerText(), /Explication et détails/);
+      // jauge : repères aux vrais prix, PRU non centré, perte (protection < cours < PRU), protection perso au-dessus du cours
+      const xs = async sym => row(sym).locator('.ps-track .ps-mk').evaluateAll(els => Object.fromEntries(els.map(e => [e.className.match(/ps-m-(\w+)/)[1], e.getBoundingClientRect().left + e.getBoundingClientRect().width / 2])));
+      { const x = await xs('LOSS'); assert.ok(x.suggested < x.current && x.current < x.pru, 'perte ' + JSON.stringify(x)); }
+      { const x = await xs('LOSSPERS'); assert.ok(x.personal > x.current, 'protection perso au-dessus du cours ' + JSON.stringify(x)); }
+      { const x = await xs('GIBO'); assert.ok(x.pru < x.suggested && x.suggested < x.current, 'GIBO ' + JSON.stringify(x)); }
+      { const x = await xs('MULTIRULE'); assert.ok(x.pru < x.personal && x.personal < x.current && x.current < x.suggested, 'protection perso au-dessus du PRU ' + JSON.stringify(x)); }
+      assert.equal(await row('CROWD').locator('.ps-mk').count() >= 3, true);
+      for (const sym of ['CROWD', 'GIBO', 'MULTIRULE', 'LOSSPERS']) { const lb = row(sym).locator('.ps-lb'); if (await row(sym).locator('.ps-labels').first().isVisible()) { const r = await lb.evaluateAll(els => els.map(e => { const b = e.getBoundingClientRect(); return [b.left, b.top, b.right, b.bottom]; }));
+        for (let i = 0; i < r.length; i++) for (let j = i + 1; j < r.length; j++) assert.ok(r[i][2] <= r[j][0] + 1 || r[j][2] <= r[i][0] + 1 || r[i][3] <= r[j][1] + 1 || r[j][3] <= r[i][1] + 1, `étiquettes ${sym} ${i}/${j} superposées`); } }
+      // 5. sept stratégies : chaque ligne affiche sa stratégie de surveillance
+      for (const [sym, chip] of Object.entries({ FAST: /Croissance rapide/, REGULAR: /Croissance régulière/, CALM: /Hausse calme/, REBOUND: /Rebond/, MOM6: /Momentum 6 mois/, MOM12: /Momentum 12 mois/, MOMRISK: /ajusté au risque/, NOSTRAT: /non définie/ })) assert.match(await row(sym).locator('.ps-chip').innerText(), chip, sym);
+      // 6. cohérence ligne / détail : même état, même message, même protection
+      const detail = async sym => { await page.locator(`#px-sec-suivi .psr:has(.psr-name strong:text-is("${sym}")) .psr-name`).click(); await page.locator('.px-drawer').waitFor(); await page.locator('.px-tabs2 [data-tab="suivi"]').click(); await page.locator('.ps-card').waitFor(); };
       const close = async () => { await page.locator('.px-dact [data-close]').click(); await page.locator('.px-drawer').waitFor({ state: 'detached' }); };
-      await open('RISEUP'); assert.deepEqual((await page.locator('.px-tabs2 button').allInnerTexts()).map(text), ['Chiffres', 'Graphique', 'Plan de suivi']);
-      let card = await plan();
-      // forte hausse 100 -> 160 : aucun conseil de vente, jauge complète
-      assert.match(await card.locator('.ps-advice').innerText(), /progresse sans signal de vigilance/); assert.doesNotMatch(await card.innerText(), /vendre maintenant|il faut vendre|objectif de vente (de|à|:)/i);
-      assert.equal(await card.locator('.ps-track .ps-mk').count(), 4, 'PRU, cours, plus-haut, protection suggérée (pas de protection perso)');
-      assert.equal(await card.locator('.ps-track .ps-m-personal').count(), 0, 'pas de protection perso inventée');
-      for (const k of ['.ps-m-suggested', '.ps-m-pru', '.ps-m-current', '.ps-m-high']) assert.ok(await card.locator('.ps-track ' + k).count(), k);
-      assert.equal(await card.locator('.ps-tile').count(), 4); assert.match(await card.locator('.ps-tiles').innerText(), /Tendance[\s\S]*Haussière[\s\S]*Risque[\s\S]*Modéré[\s\S]*Recul depuis le sommet[\s\S]*Momentum 6−1/);
-      // ordre horizontal (valeurs 100 < 129,57 < 160 <= plus-haut) : PRU < suggérée < cours <= plus-haut
-      const xs = await card.locator('.ps-track .ps-mk').evaluateAll(els => Object.fromEntries(els.map(e => [e.className.match(/ps-m-(\w+)/)[1], e.getBoundingClientRect().left + e.getBoundingClientRect().width / 2])));
-      assert.ok(xs.pru < xs.suggested && xs.suggested < xs.current && xs.current <= xs.high + 1, JSON.stringify(xs));
-      await noOverflow('drawer plan'); await shot('plan-rise');
-      assert.match(await card.locator('.ps-foot').innerText(), /jamais un ordre de vente/); assert.match(await card.locator('.ps-foot').innerText(), /Aucun objectif de gain/);
-      await close();
-      // correction 160 -> 150 / recul important
-      await open('CORRECT'); card = await plan(); assert.match(await card.locator('.ps-advice').innerText(), /sans signal de vigilance/); await close();
-      await open('DEEP140'); card = await plan(); assert.match(await card.locator('.ps-advice').innerText(), /momentum de moyen terme est devenu négatif/); assert.match(await card.locator('.ps-advice').innerText(), /peut remonter/); await shot('plan-deep140'); await close();
-      await open('DEEP120'); card = await plan(); assert.match(await card.locator('.ps-advice').innerText(), /repère de risque|momentum/); assert.match(await card.locator('.ps-advice').innerText(), /pas un signal de vente/); await close();
-      // protection personnelle : distincte de la suggestion, jamais écrasée
-      await open('PERSOSTOP'); card = await plan(); assert.equal(await card.locator('.ps-track .ps-m-personal').count(), 1); assert.match(await card.locator('.ps-labels, .ps-legend').first().innerText(), /110,00/);
-      assert.match(await card.locator('.ps-foot').innerText(), /Objectif personnel enregistré : 200/); await shot('plan-personal');
-      const before = await (await ctx.request.get(BASE + '/api.php?r=portfolio&id=1')).json(); const lv0 = before.positions.find(p => p.symbol === 'PERSOSTOP').levels;
-      await card.locator('[data-ps-settings]').click(); await page.locator('dialog #ps-st').selectOption('regular'); await page.locator('dialog .btn.primary').click(); await page.waitForFunction(() => !document.querySelector('dialog[open]'));
-      const after = await (await ctx.request.get(BASE + '/api.php?r=portfolio&id=1')).json(); assert.deepEqual(after.positions.find(p => p.symbol === 'PERSOSTOP').levels, lv0, 'protection et objectif intacts après changement de stratégie');
-      await page.waitForFunction(() => /Croissance régulière/.test(document.querySelector('.ps-chip')?.innerText || '')); await close();
-      // multi-lots : une seule jauge, une stratégie de surveillance, trois origines conservées
-      await open('MULTILOT'); assert.match(text(await page.locator('.px-drawer').first().innerText()), /Prix de revient 120,00 €/); card = await plan(); assert.match(text(await card.innerText()), /PRU 120,00 €/); assert.equal(await card.locator('.ps-gauge').count(), 1); assert.match(await card.locator('.ps-chip').innerText(), /Croissance régulière/);
-      const origin = await card.locator('.ps-origin').innerText(); for (const o of ['Croissance rapide', 'Croissance régulière', 'Rebond']) assert.match(origin, new RegExp(o));
-      await close();
-      // sept stratégies
-      const expect = { FAST: [/Croissance rapide/, /momentum de moyen terme est devenu négatif/], REGULAR: [/Croissance régulière/, /momentum de moyen terme est devenu négatif/], CALM: [/Hausse calme/, /Vigilance renforcée/], REBOUND: [/Rebond/, /repère de risque/],
-        MOM6: [/Momentum 6 mois/, /Vigilance renforcée/], MOM12: [/Momentum 12 mois/, /provisoire/], MOMRISK: [/ajusté au risque/, /provisoire/], NOSTRAT: [/non définie/, /repère de risque/] };
-      for (const [sym, [chip, msg]] of Object.entries(expect)) { await open(sym); card = await plan(); assert.match(await card.locator('.ps-chip').innerText(), chip, sym); assert.match(await card.locator('.ps-advice').innerText(), msg, sym); if (sym === 'REBOUND') assert.doesNotMatch(await card.locator('.ps-advice').innerText(), /momentum de moyen terme est devenu/); await close(); }
-      // cas particuliers : historique court, ETF, devise
-      await open('SHORT'); card = await plan(); assert.match(await card.locator('.ps-advice').innerText(), /historique insuffisant/); assert.equal(await card.locator('.ps-track .ps-m-suggested').count(), 0, 'aucune protection inventée'); assert.match(await card.innerText(), /indisponible/); await close();
-      await open('ETFSAFE'); card = await plan(); assert.match(await card.locator('.ps-tiles').innerText(), /Faible/); await close();
-      await open('USDPOS'); card = await plan(); assert.match(await card.locator('.ps-advice').innerText(), /progresse/); await close();
-      // position en perte, sans protection perso
-      await open('LOSS'); card = await plan(); assert.match(await card.locator('.ps-gain').innerText(), /^−/); assert.equal(await card.locator('.ps-track .ps-m-personal').count(), 0); assert.equal(await card.locator('.ps-track .ps-m-suggested').count(), 1);
-      assert.match(await card.locator('.ps-advice').innerText(), /Surveille le repère de protection suggéré/); assert.doesNotMatch(await card.locator('.ps-advice').innerText(), /ton niveau de protection\./);
-      { const x = await card.locator('.ps-track .ps-mk').evaluateAll(els => Object.fromEntries(els.map(e => [e.className.match(/ps-m-(\w+)/)[1], e.getBoundingClientRect().left]))); assert.ok(x.suggested < x.current && x.current < x.pru, 'perte : protection < cours < PRU ' + JSON.stringify(x)); }
-      await close();
-      // perte, protection perso AU-DESSUS du cours : atteinte, jamais écrasée
-      await open('LOSSPERS'); card = await plan(); assert.match(await card.locator('.ps-advice').innerText(), /protection personnel est atteint/); assert.equal(await card.locator('.ps-track .ps-m-personal').count(), 1);
-      { const x = await card.locator('.ps-track .ps-mk').evaluateAll(els => Object.fromEntries(els.map(e => [e.className.match(/ps-m-(\w+)/)[1], e.getBoundingClientRect().left]))); assert.ok(x.personal > x.current, 'protection perso au-dessus du cours ' + JSON.stringify(x)); }
-      await close();
-      // repères superposés (PRU ≈ cours ≈ plus-haut) : étiquettes lisibles, jamais l'une sur l'autre
-      await open('CROWD'); card = await plan(); assert.equal(await card.locator('.ps-track .ps-mk').count(), 4);
-      if (await card.locator('.ps-labels').isVisible()) { const r = await card.locator('.ps-lb').evaluateAll(els => els.map(e => { const b = e.getBoundingClientRect(); return [b.left, b.top, b.right, b.bottom]; }));
-        for (let i = 0; i < r.length; i++) for (let j = i + 1; j < r.length; j++) assert.ok(r[i][2] <= r[j][0] + 1 || r[j][2] <= r[i][0] + 1 || r[i][3] <= r[j][1] + 1 || r[j][3] <= r[i][1] + 1, `étiquettes ${i}/${j} superposées`); }
-      else assert.equal(await card.locator('.ps-legend li').count(), 4, 'légende mobile : 4 lignes');
-      await noOverflow('crowd'); await close();
-      // thème sombre : contraste des textes du plan (≥ 4,5:1) et fond sombre
-      for (const theme of ['dark', 'light']) { await page.evaluate(t => { document.documentElement.dataset.theme = t; }, theme);
-      for (const sym of ['LOSSPERS', 'RISEUP', 'LOSS']) { await open(sym); card = await plan();
-        const ratios = await card.evaluate(c => { const lum = rgb => { const v = rgb.match(/[\d.]+/g).slice(0, 3).map(Number).map(x => { x /= 255; return x <= .03928 ? x / 12.92 : ((x + .055) / 1.055) ** 2.4; }); return .2126 * v[0] + .7152 * v[1] + .0722 * v[2]; };
-          const bgOf = el => { for (let e = el; e; e = e.parentElement) { const b = getComputedStyle(e).backgroundColor; const a = b.match(/[\d.]+/g); if (a && (a.length < 4 || +a[3] > .5)) return b; } return 'rgb(255,255,255)'; };
-          return [...c.querySelectorAll('.ps-advice b, .ps-advice p, .ps-tile b, .ps-tile small, .ps-lb b, .ps-lb strong, .ps-legend li, .ps-gain strong, .ps-foot p')].filter(e => e.offsetParent && e.textContent.trim()).map(e => { const f = lum(getComputedStyle(e).color), g = lum(bgOf(e)), [hi, lo] = f > g ? [f, g] : [g, f]; return { t: e.textContent.trim().slice(0, 30), r: (hi + .05) / (lo + .05) }; }); });
-        const bad = ratios.filter(x => x.r < 4.5); assert.deepEqual(bad, [], 'contraste insuffisant (' + theme + ') ' + sym); assert.ok(await card.evaluate((c, th) => { const m = getComputedStyle(c).backgroundColor.match(/\d+/g).map(Number), sum = m[0] + m[1] + m[2]; return th === 'dark' ? sum < 300 : sum > 600; }, theme), 'fond de carte ' + theme); await close(); } }
-      // lots : toujours consultables et réglables depuis le détail (sans onglet Positions)
-      await open('MULTILOT'); await page.locator('.px-tabs2 [data-tab="chiffres"]').click(); await page.locator('.px-tech summary').click();
-      assert.equal(await page.locator('.px-tech [data-lot]').count(), 3, 'trois lots restants'); assert.match(await page.locator('.px-tech').innerText(), /Stratégie d’origine : Croissance rapide/);
-      await page.locator('.px-tech [data-lot]').first().click(); await page.locator('dialog #lt-st').waitFor(); assert.match(await page.locator('dialog').innerText(), /Stratégie de cet achat/); assert.equal(await page.locator('dialog #lt-off').count(), 0, 'case « Désactiver les alertes de cet achat » retirée'); assert.doesNotMatch(await page.locator('dialog').innerText(), /Désactiver les alertes/); for (const id of ['#lt-days', '#lt-drop']) assert.equal(await page.locator('dialog ' + id).count(), 1, 'autres réglages du lot conservés ' + id);
+      for (const sym of ['GIBO', 'LOSSPERS', 'MULTIRULE', 'RISEUP', 'SHORT']) { const a = (await adv(sym)).replace(/Explication et détails[\s\S]*/, '').replace(/Configurer/, '').trim(); await detail(sym); const d = text(await page.locator('.ps-card .ps-advice, .ps-card .psr-adv, .ps-card [class*=adv]').first().innerText());
+        const head = a.split(/\s{1}/).slice(0, 8).join(' '); assert.ok(d.includes(head.slice(0, 40)), `ligne et détail alignés ${sym} : « ${head} » / « ${d.slice(0, 100)} »`); await noOverflow('détail ' + sym); await close(); }
+      // 7. repli indépendant des deux sections : le repli masque seulement l'affichage, le contenu reste intact
+      const foldBtn = n => page.locator(`[data-fold="${n}"]`);
+      assert.equal(await foldBtn('suivi').getAttribute('aria-expanded'), 'true'); assert.equal(await foldBtn('positions').getAttribute('aria-expanded'), 'true');
+      await foldBtn('suivi').click(); assert.equal(await foldBtn('suivi').getAttribute('aria-expanded'), 'false'); assert.equal(await page.locator('#px-fb-suivi').isVisible(), false); assert.equal(await page.locator('#px-fb-positions').isVisible(), true, 'Positions indépendante');
+      await foldBtn('positions').click(); assert.equal(await page.locator('#px-fb-positions').isVisible(), false); assert.equal(await foldBtn('suivi').getAttribute('aria-expanded'), 'false');
+      assert.ok(await page.locator('#px-main-box').count(), 'graphique intact après repli'); await page.reload(); await page.locator('.px-zones').waitFor();
+      assert.equal(await foldBtn('positions').getAttribute('aria-expanded'), 'false', 'état mémorisé (Positions)'); assert.equal(await foldBtn('suivi').getAttribute('aria-expanded'), 'false', 'état mémorisé (Suivi)');
+      await foldBtn('positions').click(); await foldBtn('suivi').click(); await page.locator('#px-sec-suivi .psr').first().waitFor();
+      assert.equal(await page.locator('.px-t tbody tr').count(), 25, 'tableau Positions inchangé après repli/dépli'); assert.equal(await sec.locator('.psr').count(), 25);
+      // 8. dialogue Configurer : valeurs automatiques à côté des personnalisées, règle par règle
+      const cfg = async sym => { await row(sym).locator('[data-ps-cfg]').click(); await page.locator('dialog [data-rule="stop"]').waitFor(); };
+      const save = async () => { await page.locator('dialog .btn.primary').click(); await page.waitForFunction(() => !document.querySelector('dialog[open]')); await page.waitForTimeout(400); await sec.locator('.psr').first().waitFor(); };
+      await cfg('LOSSPERS'); { const dlg = page.locator('dialog'); assert.deepEqual(await dlg.locator('.ps-rule legend').allInnerTexts().then(a => a.length >= 5), true, 'une règle par bloc'); assert.match(await dlg.locator('[data-rule="stop"]').innerText(), /Personnalisé[\s\S]*Valeur automatique/); assert.match(await dlg.innerText(), /objectif de gain facultatif|Objectif/i); await dlg.locator('button:has-text("Annuler")').click(); await page.waitForFunction(() => !document.querySelector('dialog[open]')); }
+      const stopOf = async sym => { const pf = await (await ctx.request.get(BASE + '/api.php?r=portfolio&id=1')).json(); return pf.positions.find(p => p.symbol === sym).levels; };
+      const lv0 = await stopOf('LOSSPERS');
+      if (width === 1440) {
+        // protection personnelle modifiée : devient la référence effective, l'automatique reste calculée
+        await cfg('GIBO'); await page.locator('dialog [data-rule="stop"] input[value="custom"]').check(); await page.locator('dialog [data-rule="stop"] [data-val]').fill('130'); await save();
+        assert.match(await adv('GIBO'), /Protection personnelle : 130,00 €/); assert.match(await adv('GIBO'), /automatique : [\d\s.,  ]+ €/);
+        { const x = await xs('GIBO'); assert.ok(x.personal !== undefined && x.personal > x.pru, 'repère personnel sur la jauge'); }
+        await cfg('GIBO'); await page.locator('dialog [data-rule="recul"] [data-en]').uncheck(); await save(); // une autre règle reste indépendante
+        assert.match(await adv('GIBO'), /Protection personnelle : 130,00 €/, 'désactiver une règle ne touche pas les autres');
+        await cfg('GIBO'); await page.locator('dialog [data-rule="recul"] [data-en]').check(); await save();
+        // retour à l'automatique par règle : n'efface pas les autres réglages
+        await cfg('GIBO'); await page.locator('dialog [data-rule="stop"] [data-reset]').click(); await save();
+        assert.doesNotMatch(await adv('GIBO'), /Protection personnelle/); assert.match(await adv('GIBO'), /Protection automatique/); assert.equal(((await stopOf('GIBO')) || {}).stop_px ?? null, null, 'retour à l’automatique : valeur personnelle retirée');
+        // protection personnelle franchie : 200 > cours 160,67 -> sortie à envisager nommant la protection
+        await cfg('GIBO'); await page.locator('dialog [data-rule="stop"] input[value="custom"]').check(); await page.locator('dialog [data-rule="stop"] [data-val]').fill('200'); await save();
+        assert.match(await adv('GIBO'), /SORTIE À ENVISAGER[\s\S]*Ta protection personnelle de 200,00 € est franchie/);
+        await cfg('GIBO'); await page.locator('dialog [data-rule="stop"] [data-reset]').click(); await save(); assert.match(await adv('GIBO'), /SURVEILLER/);
+        // la protection personnelle d'un autre titre est intacte
+        assert.deepEqual(await stopOf('LOSSPERS'), lv0, 'autres protections personnelles intactes');
+      }
+      // 9. changement de stratégie de surveillance : n'écrase aucune protection personnelle
+      await cfg('PERSOSTOP'); await page.locator('dialog #ps-st').selectOption('rebound'); await save(); assert.match(await row('PERSOSTOP').locator('.ps-chip').innerText(), /Rebond/); assert.match(await row('PERSOSTOP').locator('.psr-gauge').innerText(), /110,00/, 'Rebond garde la protection personnelle');
+      await cfg('PERSOSTOP'); await page.locator('dialog #ps-st').selectOption('regular'); await save();
+      // 10. détail : onglets, PRU multi-lots, lots réglables, colonne Suivi du tableau
+      await detail('MULTILOT'); assert.match(text(await page.locator('.ps-card').innerText()), /PRU 120,00 €/); assert.equal(await page.locator('.ps-card .ps-gauge').count(), 1); { const origin = await page.locator('.ps-card .ps-origin').innerText(); for (const o of ['Croissance rapide', 'Croissance régulière', 'Rebond']) assert.match(origin, new RegExp(o)); }
+      await page.locator('.px-tabs2 [data-tab="chiffres"]').click(); await page.locator('.px-tech summary').click(); assert.equal(await page.locator('.px-tech [data-lot]').count(), 3, 'trois lots restants');
+      await page.locator('.px-tech [data-lot]').first().click(); await page.locator('dialog #lt-st').waitFor(); assert.doesNotMatch(await page.locator('dialog').innerText(), /Désactiver les alertes/); for (const id of ['#lt-days', '#lt-drop']) assert.equal(await page.locator('dialog ' + id).count(), 1);
       await page.locator('dialog button:has-text("Annuler")').click(); await page.waitForFunction(() => !document.querySelector('dialog[open]')); await close();
-      // la colonne « Suivi » du tableau ouvre directement le plan
       await page.locator('.px-t tbody tr:has(.c-title b:text-is("DEEP140")) .px-w').click(); await page.locator('.ps-card').waitFor(); await close();
-      // zone Transactions inchangée
-      await page.locator('.px-zones [data-zone="transactions"]').click(); assert.ok(await page.locator('.px-tx').count()); await page.locator('[data-hist]').first().click(); await page.waitForSelector('#back-home'); assert.match(await page.locator('#panel-manage').innerText(), /Lots et réglages/); assert.doesNotMatch(await page.locator('#panel-manage').innerText(), /Lots et réglages des alertes|Surveillance/); await page.locator('#back-home').click(); await page.locator('.px-zones').waitFor(); await page.locator('.px-zones [data-zone="transactions"]').click(); await page.locator('.px-zones [data-zone="overview"]').click();
+      // 11. thème sombre / clair : contraste des textes du suivi
+      for (const theme of ['dark', 'light']) { await page.evaluate(t => { document.documentElement.dataset.theme = t; }, theme);
+        const bad = await sec.evaluate(c => { const lum = rgb => { const v = rgb.match(/[\d.]+/g).slice(0, 3).map(Number).map(x => { x /= 255; return x <= .03928 ? x / 12.92 : ((x + .055) / 1.055) ** 2.4; }); return .2126 * v[0] + .7152 * v[1] + .0722 * v[2]; };
+          const bgOf = el => { for (let e = el; e; e = e.parentElement) { const b = getComputedStyle(e).backgroundColor; const a = b.match(/[\d.]+/g); if (a && (a.length < 4 || +a[3] > .5)) return b; } return 'rgb(255,255,255)'; };
+          return [...c.querySelectorAll('.psr-adv p, .psr-adv strong, .ps-state, .psr-gain strong, .ps-lb b, .ps-lb strong, .psr-hl, .ps-chip')].filter(e => e.offsetParent && e.textContent.trim()).map(e => { const f = lum(getComputedStyle(e).color), g = lum(bgOf(e)), [hi, lo] = f > g ? [f, g] : [g, f]; return { t: e.textContent.trim().slice(0, 30), r: (hi + .05) / (lo + .05) }; }).filter(x => x.r < 4.5); });
+        assert.deepEqual(bad, [], 'contraste insuffisant (' + theme + ')'); await shot('suivi-' + theme); }
+      // 12. zone Transactions inchangée
+      await page.locator('.px-zones [data-zone="transactions"]').click(); assert.ok(await page.locator('.px-tx').count()); await page.locator('[data-hist]').first().click(); await page.waitForSelector('#back-home'); assert.match(await page.locator('#panel-manage').innerText(), /Lots et réglages/); assert.doesNotMatch(await page.locator('#panel-manage').innerText(), /Lots et réglages des alertes/); await page.locator('#back-home').click(); await page.locator('.px-zones').waitFor(); await page.locator('.px-zones [data-zone="transactions"]').click(); await page.locator('.px-zones [data-zone="overview"]').click();
       await noOverflow('final');
       assert.deepEqual(errors, [], 'aucune erreur JavaScript : ' + errors.join(' | '));
       report.push(width); await ctx.close();

@@ -39,6 +39,11 @@ S['USDPOS'] = path([(0, 100), (N - 1, 200)])
 S['LOSS'] = path([(0, 100), (N - 1, 80)])          # position en perte, sans protection perso
 S['LOSSPERS'] = path([(0, 100), (N - 1, 82)])      # perte, protection perso (90) au-dessus du cours
 S['CROWD'] = path([(0, 100), (N - 1, 103)], 0.002)  # repères très rapprochés : PRU ≈ cours ≈ plus-haut
+S['GIBO'] = path([(0, 85), (N - 1, 160.67)], 0.035)        # hausse continue, volatilité très élevée (≈ 7 % par séance), stratégie Rebond
+S['RECULPERS'] = path([(0, 100), (N - 61, 160), (N - 21, 148)], 0.012)   # recul ≈ 8 % ; seuil de recul personnel à 5 %
+S['TARGETHIT'] = path([(0, 100), (N - 1, 160)])             # objectif personnel (150) dépassé
+S['MULTIRULE'] = path([(0, 100), (250, 200), (N - 1, 140)])  # plusieurs règles déclenchées en même temps
+S['NOSTOP'] = path([(0, 100), (250, 200), (N - 1, 140)])     # protection automatique désactivée : pas de sortie
 LEN = {'SHORT': 40}
 with c.cursor() as q:
     q.execute("SELECT id FROM users WHERE username='plan_suivi'"); uid = q.fetchone()['id']
@@ -62,13 +67,19 @@ with c.cursor() as q:
     a = tx('MULTILOT', 'buy', 10, 100, 100); b = tx('MULTILOT', 'buy', 5, 130, 200); cc = tx('MULTILOT', 'buy', 5, 150, 300); tx('MULTILOT', 'sell', 8, 160, 330)
     for t, key in ((a, 'fast'), (b, 'regular'), (cc, 'rebound')):
         q.execute("INSERT INTO lot_origin(transaction_id,strategy_key,status,snapshot,set_by,created_at) VALUES (%s,%s,'official',NULL,'purchase',NOW())", (t, key))
+    tx('GIBO', 'buy', 10, 85.47, 100); tx('RECULPERS', 'buy', 10, 100, 100); tx('TARGETHIT', 'buy', 10, 100, 100); tx('MULTIRULE', 'buy', 10, 100, 100); tx('NOSTOP', 'buy', 10, 100, 100)
     tx('LOSS', 'buy', 10, 100, 100); tx('LOSSPERS', 'buy', 10, 100, 100); tx('CROWD', 'buy', 10, 103, 100)
     tx('SHORT', 'buy', 10, 110, 410)
     tx('CLOSEDX', 'buy', 10, 100, 100); tx('CLOSEDX', 'sell', 10, 125, 380)
     tx('USDPOS', 'buy', 10, 100, 100, fx=.9)
     q.execute("INSERT INTO position_levels(portfolio_id,listing_id,stop_px,target_px,updated_at) VALUES (1,%s,110,200,NOW())", (ids['PERSOSTOP'],))
     q.execute("INSERT INTO position_levels(portfolio_id,listing_id,stop_px,target_px,updated_at) VALUES (1,%s,90,NULL,NOW())", (ids['LOSSPERS'],))
+    q.execute("INSERT INTO position_levels(portfolio_id,listing_id,stop_px,target_px,updated_at) VALUES (1,%s,NULL,150,NOW())", (ids['TARGETHIT'],))
+    q.execute("INSERT INTO position_levels(portfolio_id,listing_id,stop_px,target_px,updated_at) VALUES (1,%s,150,130,NOW())" if False else "INSERT INTO position_levels(portfolio_id,listing_id,stop_px,target_px,updated_at) VALUES (1,%s,125,NULL,NOW())", (ids['MULTIRULE'],))
+    q.execute("INSERT INTO position_plan_rules(portfolio_id,listing_id,rule_key,enabled,custom_value,updated_at) VALUES (1,%s,'recul',1,5,NOW())", (ids['RECULPERS'],))
+    q.execute("INSERT INTO position_plan_rules(portfolio_id,listing_id,rule_key,enabled,custom_value,updated_at) VALUES (1,%s,'recul',1,10,NOW())", (ids['MULTIRULE'],))
+    q.execute("INSERT INTO position_plan_rules(portfolio_id,listing_id,rule_key,enabled,custom_value,updated_at) VALUES (1,%s,'stop',0,NULL,NOW())", (ids['NOSTOP'],))
     for sym, key in (('RISEUP', 'regular'), ('CORRECT', 'regular'), ('DEEP140', 'regular'), ('DEEP120', 'regular'), ('MULTILOT', 'regular'), ('PERSOSTOP', 'fast'), ('FAST', 'fast'), ('REGULAR', 'regular'), ('CALM', 'calm'), ('REBOUND', 'rebound'),
-                     ('MOM6', 'mom6'), ('MOM12', 'mom12'), ('MOMRISK', 'momrisk'), ('SHORT', 'regular'), ('ETFSAFE', 'regular'), ('USDPOS', 'regular'), ('LOSS', 'regular'), ('LOSSPERS', 'regular'), ('CROWD', 'calm')):
+                     ('MOM6', 'mom6'), ('MOM12', 'mom12'), ('MOMRISK', 'momrisk'), ('SHORT', 'regular'), ('ETFSAFE', 'regular'), ('USDPOS', 'regular'), ('LOSS', 'regular'), ('LOSSPERS', 'regular'), ('CROWD', 'calm'), ('GIBO', 'rebound'), ('RECULPERS', 'calm'), ('TARGETHIT', 'regular'), ('MULTIRULE', 'calm'), ('NOSTOP', 'regular')):
         q.execute("INSERT INTO position_watch(portfolio_id,listing_id,strategy_key,updated_at) VALUES (1,%s,%s,NOW())", (ids[sym], key))
 c.commit(); c.close(); print(json.dumps(ids))

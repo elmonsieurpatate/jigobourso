@@ -616,6 +616,18 @@ CREATE TABLE IF NOT EXISTS position_watch_log (
   CONSTRAINT fk_watchlog_portfolio FOREIGN KEY (portfolio_id) REFERENCES portfolios(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
+-- Réglage individuel des règles du Plan de suivi (voir db/migrations/20261110_position_plan_rules.sql) : pas de ligne = tout automatique et actif.
+CREATE TABLE IF NOT EXISTS position_plan_rules (
+  portfolio_id BIGINT UNSIGNED NOT NULL,
+  listing_id   INT UNSIGNED NOT NULL,
+  rule_key     VARCHAR(20) CHARACTER SET ascii NOT NULL,   -- stop | recul | trend | risk | target
+  enabled      TINYINT(1) NOT NULL DEFAULT 1,
+  custom_value DECIMAL(16,6) NULL,                          -- seuil personnalisé (recul : % depuis le sommet) ; NULL = valeur automatique
+  updated_at   DATETIME NOT NULL,
+  PRIMARY KEY (portfolio_id, listing_id, rule_key),
+  CONSTRAINT fk_plan_rules_portfolio FOREIGN KEY (portfolio_id) REFERENCES portfolios(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
 -- Modèles d'alerte versionnés (voir db/migrations/20261108_alert_models.sql).
 CREATE TABLE IF NOT EXISTS alert_models (
   id           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,

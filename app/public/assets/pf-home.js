@@ -44,10 +44,10 @@
     return { k: c.k, t: c.t, rank: c.rank, strat: pl.watch ? pl.watch.label : null, origin: o ? o.label : null };
   }
   function planSummary() {
-    if (!S.tr) return `<div class="px-sum"><span class="px-ab">${I.bell}<b>Suivi des positions</b></span><span class="muted">${S.trErr ? 'Indisponible : ' + esc(S.trErr) : 'Chargement…'}</span></div>`;
+    if (!S.tr) return `<div class="px-sum"><span class="px-ab">${I.bell}<b>Synthèse du suivi</b></span><span class="muted">${S.trErr ? 'Indisponible : ' + esc(S.trErr) : 'Chargement…'}</span></div>`;
     const ws = open().filter(p => p.listing_id).map(watchOf), n = k => ws.filter(w => w.k === k).length;
-    const parts = [[n('ko'), 'protection personnelle atteinte', 'ko'], [n('na'), 'en vigilance', 'na'], [n('info'), 'à risque élevé', 'info'], [n('ok'), 'sans signal', 'ok']].filter(x => x[0]);
-    return `<div class="px-sum"><span class="px-ab">${I.bell}<b>Suivi des positions</b></span>${parts.length ? parts.map(([c, l, k]) => `<span><i class="n ${k}">${c}</i>${l}</span>`).join('') : '<span class="muted">Aucune position suivie</span>'}<span class="muted">Un repère, jamais un ordre : rien n’est vendu automatiquement.</span></div>`;
+    const parts = [[n('ko'), 'sortie à envisager', 'ko'], [n('rv'), 'à réévaluer', 'rv'], [n('na'), 'à surveiller', 'na'], [n('ok'), 'à conserver', 'ok']].filter(x => x[0]);
+    return `<div class="px-sum"><span class="px-ab">${I.bell}<b>Synthèse du suivi</b></span>${parts.length ? parts.map(([c, l, k]) => `<span><i class="n ${k}">${c}</i>${l}</span>`).join('') : '<span class="muted">Aucune position suivie</span>'}<span class="muted">Un repère, jamais un ordre : rien n’est vendu automatiquement.</span></div>`;
   }
 
   /* ───────── données du graphique : une seule fonction, deux modes, toutes les périodes ───────── */
@@ -207,9 +207,41 @@
   /* ───────── zones ───────── */
   function zoneTabs() { return `<nav class="px-zones" role="tablist" aria-label="Zones du portefeuille">${[['overview', 'Vue d’ensemble'], ['transactions', 'Transactions']].map(([k, l]) => `<button type="button" role="tab" data-zone="${k}" aria-selected="${S.zone === k}" class="${S.zone === k ? 'on' : ''}">${l}</button>`).join('')}</nav>`; }
   function head() { return `<header class="px-head"><div><h1>${esc(C.name || 'Portefeuille')}</h1><p class="muted">${open().length} position${open().length > 1 ? 's' : ''} · valeur et résultat en euros</p></div><div class="px-ha"><button type="button" class="px-btn pri" data-add>Ajouter une opération</button></div></header>${zoneTabs()}`; }
+  /* ───────── sections repliables (seul l'affichage est replié : le suivi continue d'être calculé) ───────── */
+  function foldHead(key, title, count) {
+    const folded = !!store('fold_' + key);
+    return `<button type="button" class="px-fold" data-fold="${key}" aria-expanded="${!folded}" aria-controls="px-fb-${key}"><span class="chv">${I.chev}</span><h2>${title}${count ? ` <span>(${count})</span>` : ''}</h2><span class="hint">${folded ? 'Masqué · afficher' : 'Masquer'}</span></button>`;
+  }
+  /** Suivi des positions : une ligne par position ouverte (même jauge, mêmes conseils que le détail), classées par urgence de décision. */
+  function suiviSection() {
+    const fs = !!store('fold_suivi'), ps = open().filter(p => p.listing_id), noq = open().length - ps.length;
+    let sum = '', body;
+    if (!S.tr || !root.PlanSuivi) body = `<p class="px-note">${S.trErr ? esc('Suivi indisponible : ' + S.trErr) : 'Chargement du suivi…'}</p>`;
+    else {
+      const items = ps.map(p => ({ p, pl: planOf(p) })).filter(x => x.pl);
+      const rank = x => root.PlanSuivi.STATE[root.PlanSuivi.stateOf(x.pl)].rank;
+      items.sort((a, b) => rank(a) - rank(b) || (b.p.value || 0) - (a.p.value || 0));
+      const cnt = k => items.filter(x => root.PlanSuivi.stateOf(x.pl) === k).length;
+      sum = [['exit', 'sortie à envisager'], ['reevaluate', 'à réévaluer'], ['watch', 'à surveiller'], ['keep', 'à conserver']].filter(([k]) => cnt(k)).map(([k, l]) => `<span><i class="${k}">${cnt(k)}</i>${l}</span>`).join('');
+      body = `<p class="psr-note">Un repère de surveillance, jamais un ordre de vente : rien n’est vendu automatiquement. Les couleurs de la jauge sont des zones de prix et de protection, pas une garantie de faible risque. Clique le nom d’un titre pour son détail, « Configurer » pour ses règles.</p>
+        <div class="psr-list">${items.length ? items.map(x => root.PlanSuivi.row(x.pl, { key: pkey(x.p) })).join('') : '<p class="px-note">Aucune position suivie.</p>'}</div>${noq ? `<p class="px-note">${noq} position${noq > 1 ? 's' : ''} sans cotation suivie : pas de suivi possible.</p>` : ''}`;
+    }
+    return `<section class="px-card${fs ? ' folded' : ''}" id="px-sec-suivi"><div class="px-ph">${foldHead('suivi', 'Suivi des positions', ps.length || '')}<div class="psr-sum" aria-label="Synthèse du suivi">${sum}</div></div><div class="px-fold-body" id="px-fb-suivi" ${fs ? 'hidden' : ''}>${body}</div></section>`;
+  }
+  async function reloadTracking() {
+    await loadTracking(); refreshPage();
+    if (S.sel && J.$('#px-plan-body')) { const x = stats().rows.find(r => r.key === S.sel); if (x) renderPlan(x); }
+  }
+  function configureFor(lid) {
+    const p = open().find(x => String(x.listing_id) === String(lid)), pl = p && planOf(p);
+    if (!pl || !root.PlanSuivi) return;
+    root.PlanSuivi.configure({ plan: pl, strategies: S.tr.strategies, portfolio: C.current, listing: p.listing_id, reload: reloadTracking });
+  }
+
   function viewOverview(st) {
     const nc = st.rows.filter(r => !(r.p.qty > 0)).length;
-    return `${synth(st)}${planSummary()}<section class="px-card"><h2>Évolution</h2>${boxHtml(S.main, MAIN)}</section><section class="px-card"><div class="px-ph"><h2>Positions</h2>${nc ? `<label class="px-chk"><input type="checkbox" id="px-closed" ${S.closed ? 'checked' : ''}> Afficher les positions soldées (${nc})</label>` : ''}</div>${table(st, 0)}</section>`;
+    const fp = !!store('fold_positions');
+    return `${synth(st)}${planSummary()}<section class="px-card"><h2>Évolution</h2>${boxHtml(S.main, MAIN)}</section><section class="px-card${fp ? ' folded' : ''}" id="px-sec-positions"><div class="px-ph">${foldHead('positions', 'Positions', '')}${nc ? `<label class="px-chk" id="px-closed-wrap" ${fp ? 'hidden' : ''}><input type="checkbox" id="px-closed" ${S.closed ? 'checked' : ''}> Afficher les positions soldées (${nc})</label>` : ''}</div><div class="px-fold-body" id="px-fb-positions" ${fp ? 'hidden' : ''}>${table(st, 0)}</div></section>${suiviSection()}`;
   }
   function viewTx() {
     const tr = (C.H.trades || []).filter(t => !t.note).slice().sort((a, b) => String(b.trade_at).localeCompare(String(a.trade_at))).slice(0, 12);
@@ -291,7 +323,7 @@
     if (!S.tr && !S.trErr && S.trP) { host.innerHTML = '<p class="px-note">Chargement du plan de suivi…</p>'; S.trP.then(() => { if (J.$('#px-plan-body') === host) renderPlan(x); }); return; }
     if (!S.tr || !root.PlanSuivi) { host.innerHTML = `<p class="notice err">${esc(S.trErr || 'Plan de suivi indisponible')}</p>`; return; }
     const pl = planOf(p); if (!pl) { host.innerHTML = '<p class="notice err">Plan de suivi indisponible pour ce titre.</p>'; return; }
-    root.PlanSuivi.render(host, { plan: pl, strategies: S.tr.strategies, portfolio: C.current, listing: p.listing_id, reload: async () => { await loadTracking(); renderPlan(x); refreshPage(); } });
+    root.PlanSuivi.render(host, { plan: pl, strategies: S.tr.strategies, portfolio: C.current, listing: p.listing_id, reload: reloadTracking });
   }
 
   /* ───────── rendu ───────── */
@@ -306,6 +338,11 @@
   function onClick(e) {
     const t = e.target, z = t.closest('[data-zone]'); if (z) { e.preventDefault(); S.zone = z.dataset.zone; render(); const h = J.$('.px-zones'); h && h.scrollIntoView({ block: 'start' }); return; }
     const s = t.closest('[data-sort]'); if (s) { const k = s.dataset.sort; S.dir = S.sort === k ? -S.dir : (COLS[k][2] === 'l' ? 1 : -1); S.sort = k; store('sort', k); store('dir', S.dir); const y = scrollY; render(); scrollTo(0, y); return; }
+    const f = t.closest('[data-fold]');
+    if (f) { const k = f.dataset.fold, hide = f.getAttribute('aria-expanded') === 'true'; store('fold_' + k, hide); f.setAttribute('aria-expanded', String(!hide)); f.querySelector('.hint').textContent = hide ? 'Masqué · afficher' : 'Masquer';
+      const b = J.$('#px-fb-' + k); if (b) b.hidden = hide; const sec = f.closest('.px-card'); if (sec) sec.classList.toggle('folded', hide);
+      if (k === 'positions') { const w = J.$('#px-closed-wrap'); if (w) w.hidden = hide; } return; }
+    const cf = t.closest('[data-ps-cfg]'); if (cf) return configureFor(cf.dataset.psCfg);
     if (t.closest('[data-add]')) return C.helpers.add();
     if (t.closest('[data-hist]')) return C.helpers.history();
     const b = t.closest('[data-buy],[data-sell]'); if (b && !t.closest('#px-drawer-root')) { e.stopPropagation(); return C.helpers.trade(b.dataset.buy || b.dataset.sell, b.dataset.sell ? 'sell' : 'buy'); }
