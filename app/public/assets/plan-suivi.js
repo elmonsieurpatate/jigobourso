@@ -68,7 +68,7 @@
   const symOf = x => x.icon === 'shield' ? ICON.shield(x.id === 'personal' ? 'own' : 'sug') : x.icon === 'tick' ? '<i class="ps-tick"></i>' : x.icon === 'dot' ? '<i class="ps-dot"></i>' : x.icon === 'flag' ? '<i class="ps-flagm"></i>' : '<i class="ps-hdot"></i>';
 
   function gauge(pl, opt) {
-    const compact = !!(opt && opt.compact), TIER = compact ? 54 : 62, GAP = compact ? 22 : 17;
+    const compact = !!(opt && opt.compact), TIER = compact ? 40 : 62, GAP = compact ? 18 : 17;
     const P = pl.prices, m = markers(pl), sc = scale(m.map(x => x.value));
     // dégradé ancré sur les niveaux : rouge sous la plus basse protection, jaune au PRU, vert au-dessus. Ce sont des zones de prix et de protection, pas une garantie de faible risque.
     const prot = m.filter(x => x.id === 'personal' || x.id === 'suggested').map(x => sc.at(x.value)), xp = isNum(P.pru) ? sc.at(P.pru) : 50;
