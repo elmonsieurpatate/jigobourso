@@ -43,21 +43,21 @@ const text = s => s.replace(/\s+/g, ' ').trim();
       assert.equal(await page.evaluate(() => { const p = document.querySelector('#px-sec-positions'), s = document.querySelector('#px-sec-suivi'); return !!(p.compareDocumentPosition(s) & Node.DOCUMENT_POSITION_FOLLOWING); }), true, 'Suivi des positions sous le tableau Positions');
       { const tops = await sec.locator('.psr').evaluateAll(els => els.map(e => Math.round(e.getBoundingClientRect().top))); assert.equal(new Set(tops).size, tops.length, 'jamais deux positions sur la même ligne'); }
       const row = sym => sec.locator(`.psr:has(.psr-name strong:text-is("${sym}"))`);
-      const adv = async sym => text(await row(sym).locator('.psr-adv').innerText());
+      const adv = async sym => text(await row(sym).evaluate(e => (e.querySelector('.psr-adv').textContent + ' ' + e.querySelector('.psr-more').textContent)));
       const states = ['SUIVI PARTIEL', 'CONSERVER', 'SURVEILLER', 'RÉÉVALUER', 'SORTIE À ENVISAGER'];
       for (const t of await sec.locator('.psr .psr-adv').allInnerTexts()) assert.ok(states.some(x => t.includes(x)), 'chaque ligne porte un état : ' + text(t).slice(0, 60));
       await noOverflow('suivi'); await shot('suivi');
       // 4. cas chiffrés : chaque conseil nomme la règle déclenchée
-      assert.match(await adv('GIBO'), /SURVEILLER[\s\S]*La hausse se poursuit, mais le risque de repli est très élevé/); assert.match(await adv('GIBO'), /Protection automatique : [\d\s.,  ]+ €\. Tu peux la modifier/); assert.doesNotMatch(await adv('GIBO'), /SORTIE|RÉÉVALUER/, 'forte volatilité seule : jamais un ordre de sortie');
-      assert.match(await adv('RISEUP'), /CONSERVER/); assert.match(await adv('MULTILOT'), /CONSERVER/);
+      assert.match(await adv('GIBO'), /SURVEILLER[\s\S]*La hausse se poursuit, mais le risque de repli est très élevé/i); assert.match(await adv('GIBO'), /Protection automatique : [\d\s.,  ]+ €\. Tu peux la modifier/i); assert.doesNotMatch(await adv('GIBO'), /SORTIE|RÉÉVALUER/i, 'forte volatilité seule : jamais un ordre de sortie');
+      assert.match(await adv('RISEUP'), /CONSERVER/i); assert.match(await adv('MULTILOT'), /CONSERVER/i);
       assert.match(await adv('LOSSPERS'), /SORTIE À ENVISAGER[\s\S]*protection personnelle/i);
       assert.match(await adv('TARGETHIT'), /SORTIE À ENVISAGER[\s\S]*objectif de gain/i);
-      assert.match(await adv('RECULPERS'), /RÉÉVALUER[\s\S]*seuil de [\s\S]*5,0 %/); assert.match(await adv('MULTIRULE'), /RÉÉVALUER/);
+      assert.match(await adv('RECULPERS'), /RÉÉVALUER[\s\S]*seuil de [\s\S]*5,0 %/i); assert.match(await adv('MULTIRULE'), /RÉÉVALUER/i);
       assert.match(await adv('FAST'), /SORTIE À ENVISAGER[\s\S]*protection automatique/i, 'protection automatique franchie');
-      assert.match(await adv('NOSTOP'), /SURVEILLER|CONSERVER/); assert.doesNotMatch(await adv('NOSTOP'), /SORTIE/, 'règle de protection désactivée : pas de sortie');
-      assert.match(await adv('SHORT'), /historique insuffisant|Historique insuffisant/i); assert.equal(await row('SHORT').locator('.ps-mk').count() <= 3, true); assert.doesNotMatch(await row('SHORT').innerText(), /Protection auto\s*\d/, 'aucune protection inventée');
+      assert.match(await adv('NOSTOP'), /SURVEILLER|CONSERVER/i); assert.doesNotMatch(await adv('NOSTOP'), /SORTIE/i, 'règle de protection désactivée : pas de sortie');
+      assert.match(await adv('SHORT'), /historique insuffisant|Historique insuffisant/i); assert.equal(await row('SHORT').locator('.ps-mk').count() <= 3, true); assert.doesNotMatch(await row('SHORT').innerText(), /Protection auto\s*\d/i, 'aucune protection inventée');
       // priorité : sortie > réévaluer > surveiller > conserver ; autres règles consultables
-      assert.match(await row('MULTIRULE').locator('.psr-adv').innerText(), /Explication et détails/);
+      { const r = row('MULTIRULE'), btn = r.locator('[data-ps-exp]'); assert.equal(await r.locator('.psr-more').isVisible(), false, 'détail replié par défaut'); await btn.click(); assert.equal(await r.locator('.psr-more').isVisible(), true); assert.equal(await btn.getAttribute('aria-expanded'), 'true'); await btn.click(); assert.equal(await r.locator('.psr-more').isVisible(), false); }
       // jauge : repères aux vrais prix, PRU non centré, perte (protection < cours < PRU), protection perso au-dessus du cours
       const xs = async sym => row(sym).locator('.ps-track .ps-mk').evaluateAll(els => Object.fromEntries(els.map(e => [e.className.match(/ps-m-(\w+)/)[1], e.getBoundingClientRect().left + e.getBoundingClientRect().width / 2])));
       { const x = await xs('LOSS'); assert.ok(x.suggested < x.current && x.current < x.pru, 'perte ' + JSON.stringify(x)); }
@@ -73,7 +73,7 @@ const text = s => s.replace(/\s+/g, ' ').trim();
       const detail = async sym => { await page.locator(`#px-sec-suivi .psr:has(.psr-name strong:text-is("${sym}")) .psr-name`).click(); await page.locator('.px-drawer').waitFor(); await page.locator('.px-tabs2 [data-tab="suivi"]').click(); await page.locator('.ps-card').waitFor(); };
       const close = async () => { await page.locator('.px-dact [data-close]').click(); await page.locator('.px-drawer').waitFor({ state: 'detached' }); };
       for (const sym of ['GIBO', 'LOSSPERS', 'MULTIRULE', 'RISEUP', 'SHORT']) { const a = (await adv(sym)).replace(/Explication et détails[\s\S]*/, '').replace(/Configurer/, '').trim(); await detail(sym); const d = text(await page.locator('.ps-card .ps-advice, .ps-card .psr-adv, .ps-card [class*=adv]').first().innerText());
-        const head = a.split(/\s{1}/).slice(0, 8).join(' '); assert.ok(d.includes(head.slice(0, 40)), `ligne et détail alignés ${sym} : « ${head} » / « ${d.slice(0, 100)} »`); await noOverflow('détail ' + sym); await close(); }
+        const head = a.split(/\s{1}/).slice(0, 8).join(' '); assert.ok(d.toLowerCase().includes(head.slice(0, 40).toLowerCase()), `ligne et détail alignés ${sym} : « ${head} » / « ${d.slice(0, 100)} »`); await noOverflow('détail ' + sym); await close(); }
       // 7. repli indépendant des deux sections : le repli masque seulement l'affichage, le contenu reste intact
       const foldBtn = n => page.locator(`[data-fold="${n}"]`);
       assert.equal(await foldBtn('suivi').getAttribute('aria-expanded'), 'true'); assert.equal(await foldBtn('positions').getAttribute('aria-expanded'), 'true');
@@ -92,18 +92,18 @@ const text = s => s.replace(/\s+/g, ' ').trim();
       if (width === 1440) {
         // protection personnelle modifiée : devient la référence effective, l'automatique reste calculée
         await cfg('GIBO'); await page.locator('dialog [data-rule="stop"] input[value="custom"]').check(); await page.locator('dialog [data-rule="stop"] [data-val]').fill('130'); await save();
-        assert.match(await adv('GIBO'), /Protection personnelle : 130,00 €/); assert.match(await adv('GIBO'), /automatique : [\d\s.,  ]+ €/);
+        assert.match(await adv('GIBO'), /Protection personnelle : 130,00 €/i); assert.match(await adv('GIBO'), /automatique : [\d\s.,  ]+ €/i);
         { const x = await xs('GIBO'); assert.ok(x.personal !== undefined && x.personal > x.pru, 'repère personnel sur la jauge'); }
         await cfg('GIBO'); await page.locator('dialog [data-rule="recul"] [data-en]').uncheck(); await save(); // une autre règle reste indépendante
-        assert.match(await adv('GIBO'), /Protection personnelle : 130,00 €/, 'désactiver une règle ne touche pas les autres');
+        assert.match(await adv('GIBO'), /Protection personnelle : 130,00 €/i, 'désactiver une règle ne touche pas les autres');
         await cfg('GIBO'); await page.locator('dialog [data-rule="recul"] [data-en]').check(); await save();
         // retour à l'automatique par règle : n'efface pas les autres réglages
         await cfg('GIBO'); await page.locator('dialog [data-rule="stop"] [data-reset]').click(); await save();
-        assert.doesNotMatch(await adv('GIBO'), /Protection personnelle/); assert.match(await adv('GIBO'), /Protection automatique/); assert.equal(((await stopOf('GIBO')) || {}).stop_px ?? null, null, 'retour à l’automatique : valeur personnelle retirée');
+        assert.doesNotMatch(await adv('GIBO'), /Protection personnelle/i); assert.match(await adv('GIBO'), /Protection automatique/i); assert.equal(((await stopOf('GIBO')) || {}).stop_px ?? null, null, 'retour à l’automatique : valeur personnelle retirée');
         // protection personnelle franchie : 200 > cours 160,67 -> sortie à envisager nommant la protection
         await cfg('GIBO'); await page.locator('dialog [data-rule="stop"] input[value="custom"]').check(); await page.locator('dialog [data-rule="stop"] [data-val]').fill('200'); await save();
-        assert.match(await adv('GIBO'), /SORTIE À ENVISAGER[\s\S]*Ta protection personnelle de 200,00 € est franchie/);
-        await cfg('GIBO'); await page.locator('dialog [data-rule="stop"] [data-reset]').click(); await save(); assert.match(await adv('GIBO'), /SURVEILLER/);
+        assert.match(await adv('GIBO'), /SORTIE À ENVISAGER[\s\S]*Ta protection personnelle de 200,00 € est franchie/i);
+        await cfg('GIBO'); await page.locator('dialog [data-rule="stop"] [data-reset]').click(); await save(); assert.match(await adv('GIBO'), /SURVEILLER/i);
         // la protection personnelle d'un autre titre est intacte
         assert.deepEqual(await stopOf('LOSSPERS'), lv0, 'autres protections personnelles intactes');
       }
@@ -120,7 +120,7 @@ const text = s => s.replace(/\s+/g, ' ').trim();
       for (const theme of ['dark', 'light']) { await page.evaluate(t => { document.documentElement.dataset.theme = t; }, theme);
         const bad = await sec.evaluate(c => { const lum = rgb => { const v = rgb.match(/[\d.]+/g).slice(0, 3).map(Number).map(x => { x /= 255; return x <= .03928 ? x / 12.92 : ((x + .055) / 1.055) ** 2.4; }); return .2126 * v[0] + .7152 * v[1] + .0722 * v[2]; };
           const bgOf = el => { for (let e = el; e; e = e.parentElement) { const b = getComputedStyle(e).backgroundColor; const a = b.match(/[\d.]+/g); if (a && (a.length < 4 || +a[3] > .5)) return b; } return 'rgb(255,255,255)'; };
-          return [...c.querySelectorAll('.psr-adv p, .psr-adv strong, .ps-state, .psr-gain strong, .ps-lb b, .ps-lb strong, .psr-hl, .ps-chip')].filter(e => e.offsetParent && e.textContent.trim()).map(e => { const f = lum(getComputedStyle(e).color), g = lum(bgOf(e)), [hi, lo] = f > g ? [f, g] : [g, f]; return { t: e.textContent.trim().slice(0, 30), r: (hi + .05) / (lo + .05) }; }).filter(x => x.r < 4.5); });
+          return [...c.querySelectorAll('.psr-msg, .psr-more p, .ps-state, .psr-gain strong, .ps-lb b, .ps-lb strong, .psr-hl, .ps-chip')].filter(e => e.offsetParent && e.textContent.trim()).map(e => { const f = lum(getComputedStyle(e).color), g = lum(bgOf(e)), [hi, lo] = f > g ? [f, g] : [g, f]; return { t: e.textContent.trim().slice(0, 30), r: (hi + .05) / (lo + .05) }; }).filter(x => x.r < 4.5); });
         assert.deepEqual(bad, [], 'contraste insuffisant (' + theme + ')'); await shot('suivi-' + theme); }
       // 12. zone Transactions inchangée
       await page.locator('.px-zones [data-zone="transactions"]').click(); assert.ok(await page.locator('.px-tx').count()); await page.locator('[data-hist]').first().click(); await page.waitForSelector('#back-home'); assert.match(await page.locator('#panel-manage').innerText(), /Lots et réglages/); assert.doesNotMatch(await page.locator('#panel-manage').innerText(), /Lots et réglages des alertes/); await page.locator('#back-home').click(); await page.locator('.px-zones').waitFor(); await page.locator('.px-zones [data-zone="transactions"]').click(); await page.locator('.px-zones [data-zone="overview"]').click();

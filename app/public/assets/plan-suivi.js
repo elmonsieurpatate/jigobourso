@@ -68,19 +68,19 @@
   const symOf = x => x.icon === 'shield' ? ICON.shield(x.id === 'personal' ? 'own' : 'sug') : x.icon === 'tick' ? '<i class="ps-tick"></i>' : x.icon === 'dot' ? '<i class="ps-dot"></i>' : x.icon === 'flag' ? '<i class="ps-flagm"></i>' : '<i class="ps-hdot"></i>';
 
   function gauge(pl, opt) {
-    const compact = !!(opt && opt.compact), TIER = compact ? 40 : 62, GAP = compact ? 18 : 17;
+    const compact = !!(opt && opt.compact), TIER = compact ? 34 : 62, GAP = compact ? 30 : 17;
     const P = pl.prices, m = markers(pl), sc = scale(m.map(x => x.value));
     // dégradé ancré sur les niveaux : rouge sous la plus basse protection, jaune au PRU, vert au-dessus. Ce sont des zones de prix et de protection, pas une garantie de faible risque.
     const prot = m.filter(x => x.id === 'personal' || x.id === 'suggested').map(x => sc.at(x.value)), xp = isNum(P.pru) ? sc.at(P.pru) : 50;
     const lowest = prot.length ? Math.min(...prot) : Math.max(0, xp - 25), mid = (lowest + xp) / 2;
     const grad = `linear-gradient(90deg,#d6342d 0%,#d6342d ${Math.max(lowest - 4, 0).toFixed(1)}%,#ea6a1e ${lowest.toFixed(1)}%,#f0a30a ${mid.toFixed(1)}%,#e6c200 ${xp.toFixed(1)}%,#7fb11e ${Math.min(xp + (100 - xp) * 0.35, 100).toFixed(1)}%,#1f8f4e ${Math.min(xp + (100 - xp) * 0.75, 100).toFixed(1)}%,#14783f 100%)`;
-    const sorted = m.slice().sort((a, b) => sc.at(a.value) - sc.at(b.value));
+    const sorted = m.slice().sort((a, b) => sc.at(a.value) - sc.at(b.value)), labelled = compact ? sorted.filter(x => x.id !== 'high') : sorted;
     // alternance de niveaux d'étiquettes pour éviter les chevauchements (repères très proches ou superposés)
-    const tier = {}; const last = []; sorted.forEach(x => { const xv = sc.at(x.value); let t = 0; while (last[t] !== undefined && xv - last[t] < GAP) t++; tier[x.id] = t; last[t] = xv; });
-    const rows = Math.max(...Object.values(tier)) + 1;
-    const mk = x => { const xv = sc.at(x.value), t = tier[x.id];
-      return { sym: `<span class="ps-mk ${x.cls}" style="left:${xv.toFixed(2)}%">${symOf(x)}</span>`,
-        lab: `<span class="ps-lb ${x.cls}" style="left:${xv.toFixed(2)}%;top:${t * TIER}px"><b>${esc(x.label)}</b><strong>${eur(x.value)}</strong>${x.sub ? `<em class="${x.id === 'current' ? cl(pl.gain && pl.gain.pct) : x.id === 'high' || x.id === 'personal' ? 'down' : 'sug'}">${x.sub}</em>` : ''}</span>`,
+    const tier = {}; const last = []; labelled.forEach(x => { const xv = sc.at(x.value); let t = 0; while (last[t] !== undefined && xv - last[t] < GAP) t++; tier[x.id] = t; last[t] = xv; });
+    const rows = Math.max(...Object.values(tier), 0) + 1;
+    const mk = x => { const xv = sc.at(x.value), t = tier[x.id] || 0, nolab = compact && x.id === 'high';
+      return { sym: `<span class="ps-mk ${x.cls}" style="left:${xv.toFixed(2)}%" title="${esc(x.label)} ${eur(x.value)}">${symOf(x)}</span>`,
+        lab: nolab ? '' : `<span class="ps-lb ${x.cls}" style="left:${xv.toFixed(2)}%;top:${t * TIER}px"><b>${esc(x.label)}</b><strong>${eur(x.value)}</strong>${x.sub ? `<em class="${x.id === 'current' ? cl(pl.gain && pl.gain.pct) : x.id === 'high' || x.id === 'personal' ? 'down' : 'sug'}">${x.sub}</em>` : ''}</span>`,
         leg: `<li class="${x.cls}"><span>${symOf(x)}</span><b>${esc(x.label)}</b><strong>${eur(x.value)}</strong>${x.sub ? `<em>${x.sub}</em>` : ''}</li>` }; };
     const parts = sorted.map(mk);
     const note = sc.log ? '<small class="ps-scale">Échelle logarithmique (forte progression) : les distances sont proportionnelles aux variations en %.</small>' : '';
@@ -127,18 +127,20 @@
     return `<p class="ps-origin">Stratégie d’origine des achats (historique, inchangée) : ${Object.entries(by).map(([l, n]) => esc(l) + (n > 1 ? ' × ' + n : '')).join(' · ')}.</p>`;
   }
 
-  /** Une ligne de « Suivi des positions » : identité et performance à gauche, jauge au centre, conseil et bouton « Configurer » à droite (sous la jauge sur écran étroit). */
+  /** Une ligne de « Suivi des positions » (grille type tableau) : titre, performance, jauge avec protections, conseil en une ligne, actions ; le détail complet s'ouvre sous la ligne. */
   function row(pl, o) {
     o = o || {};
-    const g = pl.gain || {}, st = pl.strategy || {}, sk = stateOf(pl), key = o.key ? ` data-open="${esc(o.key)}"` : '';
-    const ok = pl.status !== 'unavailable' && pl.prices;
+    const g = pl.gain || {}, st = pl.strategy || {}, sk = stateOf(pl), S = STATE[sk], key = o.key ? ` data-open="${esc(o.key)}"` : '';
+    const ok = pl.status !== 'unavailable' && pl.prices, a = pl.advice || {}, id = esc(pl.listing_id);
     const hl = ok ? `<p class="psr-hl">Plus-haut depuis l’entrée : <b>${eur(pl.prices.high)}</b> · recul <b class="${pl.recul_pct > 0.004 ? 'down' : ''}">${pc(-pl.recul_pct)}</b></p>` : '';
-    return `<article class="psr st-${sk}" data-ps-row="${esc(pl.listing_id)}" aria-label="Suivi ${esc(pl.symbol)}">
+    return `<article class="psr st-${sk}" data-ps-row="${id}" aria-label="Suivi ${esc(pl.symbol)}">
       <div class="psr-id"><button type="button" class="psr-name"${key} title="Ouvrir le détail de la position"><strong>${esc(pl.symbol)}</strong><small>${esc(pl.name || '')}</small></button>
-        <div class="psr-gain ${cl(g.pct)}"><strong>${pc(g.pct)}</strong><span>${sgn(g.eur)}</span></div>
         <span class="ps-chip ${st.support === 'undefined' ? 'neutral' : ''}" title="Stratégie de surveillance de la position">${st.label ? esc(st.label) : 'Stratégie non définie'}</span></div>
-      ${ok ? `<div class="psr-gauge">${gauge(pl, { compact: true })}${hl}</div>` : ''}
-      <div class="psr-adv">${adviceBox(pl, { compact: true })}<button type="button" class="btn small psr-cfg" data-ps-cfg="${esc(pl.listing_id)}">${ICON.gear} Configurer</button></div></article>`;
+      <div class="psr-gain ${cl(g.pct)}"><strong>${pc(g.pct)}</strong><span>${sgn(g.eur)}</span></div>
+      <div class="psr-gauge">${ok ? gauge(pl, { compact: true }) : '<span class="ps-na">jauge indisponible</span>'}</div>
+      <div class="psr-adv ps-advice ${S.tone} st-${sk}" role="status"><span class="ps-state">${esc(S.label)}</span> <span class="psr-msg">${esc(a.message || a.headline || 'Suivi indisponible.')}</span></div>
+      <div class="psr-act"><button type="button" class="btn small psr-cfg" data-ps-cfg="${id}">${ICON.gear} Configurer</button><button type="button" class="btn small psr-exp" data-ps-exp="${id}" aria-expanded="false" aria-controls="psr-more-${id}" aria-label="Afficher l’explication et les détails" title="Explication et détails"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
+      <div class="psr-more" id="psr-more-${id}" hidden>${adviceBox(pl)}${hl}</div></article>`;
   }
 
   /** Rend la carte complète (détail d'une position) dans `host`. ctx : { plan, strategies, portfolio, listing, reload() }. */

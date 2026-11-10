@@ -224,7 +224,7 @@
       const cnt = k => items.filter(x => root.PlanSuivi.stateOf(x.pl) === k).length;
       sum = [['exit', 'sortie à envisager'], ['reevaluate', 'à réévaluer'], ['watch', 'à surveiller'], ['keep', 'à conserver']].filter(([k]) => cnt(k)).map(([k, l]) => `<span><i class="${k}">${cnt(k)}</i>${l}</span>`).join('');
       body = `<p class="psr-note">Un repère de surveillance, jamais un ordre de vente : rien n’est vendu automatiquement. Les couleurs de la jauge sont des zones de prix et de protection, pas une garantie de faible risque. Clique le nom d’un titre pour son détail, « Configurer » pour ses règles.</p>
-        <div class="psr-list">${items.length ? items.map(x => root.PlanSuivi.row(x.pl, { key: pkey(x.p) })).join('') : '<p class="px-note">Aucune position suivie.</p>'}</div>${noq ? `<p class="px-note">${noq} position${noq > 1 ? 's' : ''} sans cotation suivie : pas de suivi possible.</p>` : ''}`;
+        <div class="psr-list"><div class="psr-cols" aria-hidden="true"><span>Titre</span><span>Perf.</span><span>Suivi et protections</span><span>Conseil</span><span></span></div>${items.length ? items.map(x => root.PlanSuivi.row(x.pl, { key: pkey(x.p) })).join('') : '<p class="px-note">Aucune position suivie.</p>'}</div>${noq ? `<p class="px-note">${noq} position${noq > 1 ? 's' : ''} sans cotation suivie : pas de suivi possible.</p>` : ''}`;
     }
     return `<section class="px-card${fs ? ' folded' : ''}" id="px-sec-suivi"><div class="px-ph">${foldHead('suivi', 'Suivi des positions', ps.length || '')}<div class="psr-sum" aria-label="Synthèse du suivi">${sum}</div></div><div class="px-fold-body" id="px-fb-suivi" ${fs ? 'hidden' : ''}>${body}</div></section>`;
   }
@@ -343,6 +343,7 @@
       const b = J.$('#px-fb-' + k); if (b) b.hidden = hide; const sec = f.closest('.px-card'); if (sec) sec.classList.toggle('folded', hide);
       if (k === 'positions') { const w = J.$('#px-closed-wrap'); if (w) w.hidden = hide; } return; }
     const cf = t.closest('[data-ps-cfg]'); if (cf) return configureFor(cf.dataset.psCfg);
+    const ex = t.closest('[data-ps-exp]'); if (ex) { const m = J.$('#psr-more-' + ex.dataset.psExp), o = ex.getAttribute('aria-expanded') !== 'true'; ex.setAttribute('aria-expanded', o ? 'true' : 'false'); if (m) m.hidden = !o; return; }
     if (t.closest('[data-add]')) return C.helpers.add();
     if (t.closest('[data-hist]')) return C.helpers.history();
     const b = t.closest('[data-buy],[data-sell]'); if (b && !t.closest('#px-drawer-root')) { e.stopPropagation(); return C.helpers.trade(b.dataset.buy || b.dataset.sell, b.dataset.sell ? 'sell' : 'buy'); }

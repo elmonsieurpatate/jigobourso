@@ -76,26 +76,6 @@
 @media (max-width:640px){.ps-card{padding:14px}}
 
 /* ───────── Suivi des positions : une ligne par position (même jauge, mêmes conseils que le détail) ───────── */
-.psr-list{container:psrl / inline-size;display:grid;gap:10px}
-.psr{display:grid;grid-template-columns:210px minmax(0,1fr) minmax(280px,360px);grid-template-areas:"id gauge adv";gap:10px 18px;align-items:start;border:1px solid var(--line);border-left:5px solid var(--muted);border-radius:12px;padding:12px 14px;background:var(--surface)}
-.psr.st-ok{border-left-color:#0f7a45}.psr.st-watch{border-left-color:#e0a21a}.psr.st-reevaluate{border-left-color:#d9701c}.psr.st-exit{border-left-color:#b3261e}.psr.st-na{border-left-color:var(--muted)}
-.psr-id{grid-area:id;display:grid;gap:6px;justify-items:start;min-width:0}
-.psr-name{all:unset;cursor:pointer;display:block;min-width:0;max-width:100%}.psr-name:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
-.psr-name strong{display:block;font-size:1.15rem;line-height:1.2}.psr-name small{display:block;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px}
-.psr-gain strong{display:block;font-size:1.25rem;line-height:1.1}.psr-gain span{font-weight:600;font-size:.88rem}
-.psr-id .ps-chip{font-size:.74rem;padding:2px 9px}
-.psr-gauge{grid-area:gauge;container:psrg / inline-size;min-width:0}
-.psr-gauge .ps-gauge{padding:6px 6px 0}.psr-gauge .ps-track{height:22px;border-radius:11px}
-.psr-gauge .ps-labels{margin-top:24px}.psr-gauge .ps-lb{font-size:.7rem;min-width:80px}.psr-gauge .ps-lb strong{font-size:.86rem}
-.psr-gauge .ps-dot{width:20px;height:20px;border-width:3px}.psr-gauge .ps-tick{height:34px}.psr-gauge .ps-shield{width:19px;height:22px}.psr-gauge .ps-flagm{width:9px;height:9px}
-.psr-hl{margin:4px 0 0;font-size:.76rem;color:var(--muted)}
-.psr-adv{grid-area:adv;display:grid;gap:8px;justify-items:start;min-width:0}.psr-adv .ps-advice{width:100%;padding:10px 12px;gap:10px;box-sizing:border-box}
-.psr-adv .ps-advice .ps-ai,.psr-adv .ps-advice .ps-ai svg{width:24px;height:24px}
-.psr-adv .ps-detail{margin:4px 0 0;font-size:.82rem}.psr-adv .ps-prot{margin:4px 0 0;font-size:.8rem}
-.psr-cfg svg{width:15px;height:15px}
-@container psrg (max-width: 440px){.psr-gauge .ps-labels{display:none}.psr-gauge .ps-legend{display:grid}.psr-gauge .ps-gauge{padding-bottom:4px}}
-@container psrl (max-width: 980px){.psr{grid-template-columns:200px minmax(0,1fr);grid-template-areas:"id adv" "gauge gauge"}}
-@container psrl (max-width: 600px){.psr{grid-template-columns:minmax(0,1fr);grid-template-areas:"id" "adv" "gauge"}.psr-id{grid-template-columns:1fr auto;align-items:start;width:100%}.psr-id .ps-chip{grid-column:1 / 3}.psr-name small{max-width:none}}
 /* en-têtes repliables des sections « Positions » et « Suivi des positions » */
 .px-fold{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:8px;font-size:1.1rem;font-weight:700;color:var(--text);border-radius:8px;padding:2px 4px;margin:-2px -4px}
 .px-fold:focus-visible{outline:2px solid var(--accent);outline-offset:2px}.px-fold h2{margin:0;font-size:inherit}.px-fold h2 span{color:var(--muted);font-weight:400}
@@ -116,23 +96,34 @@ dialog .ps-rule-val{display:flex;gap:6px 12px;align-items:center;flex-wrap:wrap;
 dialog .ps-rule .small{margin:6px 0 0}dialog [data-reset][hidden]{display:none}
 .ps-tag{display:inline-block;border-radius:999px;padding:2px 10px;font:700 .72rem system-ui;background:var(--info-soft);color:var(--info)}.ps-tag.custom{background:var(--warn-soft);color:var(--warn)}
 .px-chk[hidden]{display:none}
-/* Lignes du suivi : format réduit, en proportion du tableau Positions */
-.psr-list{gap:6px}
-.psr{grid-template-columns:160px minmax(0,1fr) minmax(250px,320px);gap:6px 14px;border-left-width:4px;border-radius:10px;padding:7px 12px;align-items:center}
-.psr-id{gap:2px}
-.psr-name strong{font-size:.95rem}.psr-name small{font-size:.72rem;max-width:150px}
-.psr-gain{display:flex;gap:8px;align-items:baseline}.psr-gain strong{font-size:.95rem;display:inline}.psr-gain span{font-size:.76rem}
-.psr-id .ps-chip{font-size:.68rem;padding:1px 7px}
-.psr-gauge .ps-gauge{padding:2px 6px 0}.psr-gauge .ps-track{height:12px;border-radius:6px}
-.psr-gauge .ps-labels{margin-top:15px}.psr-gauge .ps-lb{font-size:.62rem;min-width:70px;line-height:1.2}.psr-gauge .ps-lb strong{font-size:.76rem}
-.psr-gauge .ps-dot{width:14px;height:14px;border-width:2px}.psr-gauge .ps-tick{height:20px}.psr-gauge .ps-shield{width:13px;height:15px}.psr-gauge .ps-flagm{width:7px;height:7px}
-.psr-hl{margin:2px 0 0;font-size:.68rem}
-.psr-adv{gap:4px}.psr-adv .ps-advice{padding:6px 10px;gap:8px;border-radius:10px}
-.psr-adv .ps-advice .ps-ai,.psr-adv .ps-advice .ps-ai svg{width:18px;height:18px}
-.psr-adv .ps-advice b{font-size:.88rem}.psr-adv .ps-state{font-size:.62rem;padding:1px 7px}
-.psr-adv .ps-advice p,.psr-adv .ps-detail,.psr-adv .ps-prot{font-size:.74rem;margin:2px 0 0}
-.psr-adv .ps-advice details{font-size:.74rem;margin-top:2px}
-.psr-cfg{font-size:.74rem;padding:3px 9px}.psr-cfg svg{width:13px;height:13px}
-.psr-adv .ps-advice .ps-detail{display:none}
-.psr-adv{grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:6px}.psr-adv .ps-advice{grid-column:1 / 3}
-.psr-adv .ps-cfg,.psr-adv .psr-cfg{justify-self:start}
+/* Suivi des positions : grille type tableau, une ligne compacte par position */
+.psr-list{container:psrl / inline-size;display:grid;gap:0;border-top:1px solid var(--line)}
+.psr-cols,.psr{display:grid;grid-template-columns:minmax(120px,.9fr) 72px minmax(300px,2.3fr) minmax(210px,1.6fr) 176px;grid-template-areas:"id gain gauge adv act" "more more more more more";column-gap:12px;align-items:center}
+.psr-cols{padding:6px 12px 6px 16px;font-size:.74rem;font-weight:700;color:var(--muted);background:var(--surface-2,transparent);border-radius:8px;margin-bottom:2px}
+.psr-cols span:nth-child(2){text-align:right}
+.psr{position:relative;padding:6px 12px 6px 16px;border-bottom:1px solid var(--line);background:transparent}
+.psr::before{content:"";position:absolute;left:0;top:6px;bottom:6px;width:4px;border-radius:3px;background:var(--muted)}
+.psr.st-ok::before{background:#0f7a45}.psr.st-watch::before{background:#e0a21a}.psr.st-reevaluate::before{background:#d9701c}.psr.st-exit::before{background:#b3261e}.psr.st-na::before{background:var(--muted)}
+.psr-id{grid-area:id;display:flex;flex-direction:column;gap:2px;align-items:flex-start;min-width:0}
+.psr-name{all:unset;cursor:pointer;display:block;min-width:0;max-width:100%}.psr-name:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+.psr-name strong{display:block;font-size:.98rem;line-height:1.15}.psr-name small{display:block;color:var(--muted);font-size:.72rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:150px}
+.psr-id .ps-chip{font-size:.66rem;padding:1px 7px}
+.psr-gain{grid-area:gain;text-align:right}.psr-gain strong{display:block;font-size:.95rem;line-height:1.15}.psr-gain span{font-weight:600;font-size:.74rem}
+.psr-gauge{grid-area:gauge;min-width:0;container:psrg / inline-size}
+.psr-gauge .ps-gauge{padding:0 8px}.psr-gauge .ps-track{height:10px;border-radius:5px}
+.psr-gauge .ps-labels{margin-top:12px}.psr-gauge .ps-lb{font-size:.64rem;min-width:70px;line-height:1.2}.psr-gauge .ps-lb strong{font-size:.78rem}.psr-gauge .ps-lb em{display:none}
+.psr-gauge .ps-dot{width:14px;height:14px;border-width:2px}.psr-gauge .ps-tick{height:18px}.psr-gauge .ps-shield{width:13px;height:15px}.psr-gauge .ps-flagm{width:7px;height:7px}.psr-gauge .ps-hdot{width:8px;height:8px}
+.psr-gauge .ps-scale{display:none}
+.psr-adv.ps-advice{grid-area:adv;display:flex;gap:10px;align-items:center;padding:0;background:none;border-radius:0;min-width:0}
+.psr-adv .ps-state{flex:none;font-size:.78rem;padding:3px 10px;border-radius:8px}
+.psr-msg{font-size:.84rem;line-height:1.25;color:var(--text)}
+.psr-act{grid-area:act;display:flex;gap:6px;align-items:center;justify-self:end}
+.psr-cfg{font-size:.78rem;padding:4px 10px;white-space:nowrap}.psr-cfg svg{width:14px;height:14px}
+.psr-exp{padding:4px 7px}.psr-exp svg{width:16px;height:16px;transition:transform .15s}.psr-exp[aria-expanded="true"] svg{transform:rotate(180deg)}
+.psr-more{grid-area:more;margin:6px 0 4px;padding-top:6px;border-top:1px dashed var(--line)}.psr-more[hidden]{display:none}
+.psr-hl{margin:6px 0 0;font-size:.78rem;color:var(--muted)}
+@container psrl (max-width: 1020px){.psr-cols{display:none}.psr{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"id gain" "adv adv" "gauge gauge" "act act" "more more";row-gap:6px;padding:10px 12px 10px 16px}.psr-act{justify-self:start}.psr-gain{text-align:right}}
+@container psrg (max-width: 340px){.psr-gauge .ps-labels{display:none}.psr-gauge .ps-legend{display:grid}}
+:root[data-theme="dark"] .psr-adv.ps-advice{background:none}
+.psr-adv.ps-advice{flex-direction:column;align-items:flex-start;gap:3px}
+@container psrl (min-width: 1280px){.psr-adv.ps-advice{flex-direction:row;align-items:center;gap:10px}}
