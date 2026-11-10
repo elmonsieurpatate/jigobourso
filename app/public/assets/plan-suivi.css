@@ -127,3 +127,14 @@ dialog .ps-rule .small{margin:6px 0 0}dialog [data-reset][hidden]{display:none}
 :root[data-theme="dark"] .psr-adv.ps-advice{background:none}
 .psr-adv.ps-advice{flex-direction:column;align-items:flex-start;gap:3px}
 @container psrl (min-width: 1280px){.psr-adv.ps-advice{flex-direction:row;align-items:center;gap:10px}}
+/* Suivi des positions : repères en traits verticaux fins (aucune icône) */
+.psr-gauge .ps-track .ps-mk{top:50%;transform:translate(-50%,-50%)}
+.ps-tk{display:block;width:2px;height:20px;border-radius:1px;background:var(--text)}
+.ps-mk.ps-m-current .ps-tk{width:3px;height:24px}
+.ps-mk.ps-m-suggested .ps-tk{background:#2457c5}.ps-mk.ps-m-personal .ps-tk{background:#b3261e}.ps-mk.ps-m-target .ps-tk{background:#0f7a45}
+:root[data-theme="dark"] .ps-mk.ps-m-suggested .ps-tk{background:#8ab0ff}:root[data-theme="dark"] .ps-mk.ps-m-personal .ps-tk{background:#ff9a92}:root[data-theme="dark"] .ps-mk.ps-m-target .ps-tk{background:#7fe0a8}
+.psr-gauge .ps-lb b{font-weight:500}.psr-gauge .ps-lb.ps-m-current strong{font-weight:800}
+.psr-gauge .ps-labels{margin-top:14px}
+.ps-legend .ps-tk{height:14px}
+.psr-cfg,.psr-exp{background:transparent;box-shadow:none}
+.psr-gauge .ps-tk{box-shadow:0 0 0 1px rgba(255,255,255,.75)}:root[data-theme="dark"] .psr-gauge .ps-tk{box-shadow:0 0 0 1px rgba(16,21,28,.75)}
