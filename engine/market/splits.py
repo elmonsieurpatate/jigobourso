@@ -22,7 +22,9 @@ from engine.analytics.series import BREAK_RATIO
 from engine.market.yahoo import RateLimited
 
 # Ratios usuels parts nouvelles / anciennes (2 = deux pour un) ; leur inverse est le regroupement correspondant.
-COMMON_RATIOS = (1.5, 2, 2.5, 3, 4, 5, 6, 7, 8, 10, 15, 20, 25, 30, 40, 50, 100)
+# CSH2 GBP (LU1230136894) : split 250 pour 1 le 27/10/2026 ;
+# la détection reste un candidat, seule la déclaration fournisseur confirme le split.
+COMMON_RATIOS = (1.5, 2, 2.5, 3, 4, 5, 6, 7, 8, 10, 15, 20, 25, 30, 40, 50, 100, 250)
 TOLERANCE = 0.08          # écart toléré entre le saut observé et le ratio exact (le cours bouge aussi le jour du split)
 
 

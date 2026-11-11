@@ -246,3 +246,34 @@ def test_without_the_new_columns_nothing_is_rechecked_and_verification_still_wor
         with conn.cursor() as cur:
             cur.execute('ALTER TABLE split_log ADD COLUMN checks TINYINT UNSIGNED NOT NULL DEFAULT 1 AFTER checked_at, ADD COLUMN recheck_after DATE NULL AFTER checks')
         conn.commit()
+
+
+@pytest.mark.parametrize('declared', [True, False])
+def test_csh2_250_for_one_split_is_detected_and_never_corrected_without_confirmation(conn, declared):
+    """CSH2 GBP, 27/10/2026 : un ratio hors de l'ancienne liste reste une opération, pas une perte."""
+    day = datetime.date(2026, 10, 27)
+    with conn.cursor() as cur:
+        cur.execute('UPDATE daily_prices SET close_px=CASE WHEN price_date<%s THEN 1250 ELSE 5 END WHERE listing_id=1', (day,))
+    conn.commit()
+    compute.compute_all(conn, NOW)
+    assert quality(conn, 1) == 'break'
+    splits.detect(conn, NOW)
+    with conn.cursor() as cur:
+        cur.execute('SELECT ratio,status FROM split_log WHERE listing_id=1 AND event_date=%s', (day,))
+        candidate = cur.fetchone()
+    assert candidate and float(candidate['ratio']) == 250 and candidate['status'] == 'detected'
+    client = FakeYahoo(declared_splits={'SPL.DE': [(day.isoformat(), 250.0, 1.0)]} if declared else {})
+    splits.verify(conn, client, NOW)
+    compute.compute_all(conn, NOW)
+    with conn.cursor() as cur:
+        cur.execute('SELECT perf FROM strategy_metrics WHERE listing_id=1 AND sessions=5')
+        metric = cur.fetchone()
+        cur.execute('SELECT ratio FROM corporate_events WHERE listing_id=1 AND event_date=%s', (day,))
+        event = cur.fetchone()
+    if declared:
+        assert event and float(event['ratio']) == 250
+        assert quality(conn, 1) == 'ok' and float(metric['perf']) == pytest.approx(0.0)
+        assert splits.detect(conn, NOW) == 0  # ne réapplique pas le split
+    else:
+        assert event is None and quality(conn, 1) == 'break'
+        assert metric is None or metric['perf'] is None

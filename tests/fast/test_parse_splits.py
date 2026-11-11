@@ -29,3 +29,10 @@ def test_matching_requires_close_date_and_a_ratio_that_explains_the_jump():
     assert splits.match_declared([('2026-04-20', 1.0, 10.0)], datetime.date(2026, 4, 20), 0.09975) == (10.0, '2026-04-20')
     assert splits.match_declared([('2026-01-02', 4.0, 1.0)], datetime.date(2026, 1, 2), 0.2505) == (4.0, '2026-01-02')   # split 4 pour 1 : le cours est divisé par 4
     assert splits.match_declared([], jump, 10.05) is None
+
+
+def test_csh2_declared_250_for_one_split_explains_the_price_jump():
+    day = datetime.date(2026, 10, 27)
+    assert splits.match_declared([('2026-10-27', 250.0, 1.0)], day, 5.0 / 1250.0) == (250.0, '2026-10-27')
+    assert splits.match_declared([], day, 5.0 / 1250.0) is None
+    assert splits.match_declared([('2026-10-27', 250.0, 1.0)], day, 0.5) is None

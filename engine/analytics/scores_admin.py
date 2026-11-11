@@ -824,7 +824,8 @@ def _definitions(conn):
 
 
 def _closes(conn, ids, sessions):
-    """{listing_id: [(date, cours)]} : les sessions + 1 dernières clôtures réelles de chaque titre (rien d'interpolé)."""
+    """Dernières clôtures sur la même base ajustée que la fiche et les performances."""
+    from .series import prepare_series
     ids = list(ids)
     out = {i: [] for i in ids}
     if not ids or sessions < 1:
@@ -834,12 +835,24 @@ def _closes(conn, ids, sessions):
     with conn.cursor() as cur:
         for k in range(0, len(ids), 200):
             part = ids[k:k + 200]
-            cur.execute(f"""SELECT listing_id, price_date, COALESCE(adj_close_px, close_px) AS px FROM daily_prices
-                            WHERE listing_id IN ({','.join(['%s'] * len(part))}) AND price_date>=%s AND COALESCE(adj_close_px, close_px) IS NOT NULL
+            marks = ','.join(['%s'] * len(part))
+            cur.execute(f"""SELECT listing_id, price_date, close_px, adj_close_px FROM daily_prices
+                            WHERE listing_id IN ({marks}) AND price_date>=%s
                             ORDER BY listing_id, price_date""", part + [since])
+            bars = {i: [] for i in part}
             for r in cur.fetchall():
-                out[r['listing_id']].append((r['price_date'], float(r['px'])))
-    return {i: v[-(sessions + 1):] for i, v in out.items()}
+                bars[r['listing_id']].append((r['price_date'].isoformat(), float(r['close_px']) if r['close_px'] is not None else None,
+                                             float(r['adj_close_px']) if r['adj_close_px'] is not None else None))
+            cur.execute(f"""SELECT listing_id, event_date, ratio FROM corporate_events
+                            WHERE listing_id IN ({marks}) AND kind IN ('split','reverse_split') AND event_date>=%s
+                            ORDER BY event_date""", part + [since])
+            splits = {i: [] for i in part}
+            for r in cur.fetchall():
+                splits[r['listing_id']].append((r['event_date'].isoformat(), float(r['ratio']) if r['ratio'] else None))
+            for lid in part:
+                dates, closes, _, _ = prepare_series(bars[lid], splits[lid])
+                out[lid] = list(zip(dates, closes))[-(sessions + 1):]
+    return out
 
 
 def series(conn, ids, sessions):

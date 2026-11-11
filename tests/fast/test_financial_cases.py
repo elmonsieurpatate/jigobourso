@@ -10,7 +10,7 @@ from engine.market.collect import to_eur_factor
 def test_price_units(unit,factor):
     assert to_eur_factor(unit,{'GBP':1.2})==pytest.approx(factor)
 
-@pytest.mark.parametrize('ratio',[2.0, .1, 1.25])
+@pytest.mark.parametrize('ratio',[2.0, .1, 1.25, 250.0])
 def test_split_ratio_is_not_economic_return(ratio):
     # A 2:1 split turns 100 into 50; a 1:10 reverse split turns 100 into 1000.
     bars=[('2026-10-01',100,None),('2026-10-02',100/ratio,None),('2026-10-05',110/ratio,None)]

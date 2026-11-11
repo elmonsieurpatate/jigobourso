@@ -255,3 +255,30 @@ def test_scores_listing_sort_covers_the_whole_list_and_never_changes_global_rank
     assert [r['kind'] for r in multi] == sorted(r['kind'] for r in multi)
     assert multi == rows([{'key': 'kind', 'dir': 'asc'}, {'key': 'simple', 'dir': 'desc'}])                          # déterministe
     assert [r['id'] for r in rows([{'key': 'inconnue', 'dir': 'asc'}])] == [r['id'] for r in default]              # clé inconnue ignorée
+
+
+@pytest.mark.parametrize('basis', ['raw', 'adjusted', 'partial'])
+def test_ranking_and_simulation_curves_use_the_same_split_basis_as_the_sheet(basis):
+    import datetime
+    from engine.analytics import scores_admin as A
+    from engine.analytics.series import prepare_series
+    conn = connect()
+    try:
+        reset_data(conn)
+        days = [datetime.date.today() - datetime.timedelta(days=n) for n in (8, 7, 6)]
+        raw = [1250.0, 5.0, 5.005]
+        adjusted = [5.0, 5.0, 5.005] if basis == 'adjusted' else [None, 5.0, 5.005] if basis == 'partial' else [None] * 3
+        with conn.cursor() as cur:
+            cur.execute("INSERT INTO instruments(id,group_key,isin,kind,name,country) VALUES (1,'isin:LU1230136894','LU1230136894','etf','Split curve fixture','United Kingdom')")
+            cur.execute("INSERT INTO listings(id,instrument_id,mic,symbol,currency,status,is_primary) VALUES (1,1,'XLON','CSH2.L','GBP','selected',1)")
+            cur.executemany('INSERT INTO daily_prices(listing_id,price_date,close_px,adj_close_px) VALUES (1,%s,%s,%s)', list(zip(days, raw, adjusted)))
+            cur.execute("INSERT INTO corporate_events(listing_id,event_date,kind,ratio) VALUES (1,%s,'split',250)", (days[1],))
+        conn.commit()
+        expected_dates, expected, _, _ = prepare_series([(d.isoformat(), p, a) for d, p, a in zip(days, raw, adjusted)], [(days[1].isoformat(), 250)])
+        assert expected == pytest.approx([5.0, 5.0, 5.005])
+        assert A.series(conn, [1], 2)[1] == pytest.approx(expected)
+        detail = A.dated_series(conn, 1, 2)
+        assert [r['d'] for r in detail] == expected_dates and [r['p'] for r in detail] == pytest.approx(expected)
+        assert R.curves(conn, {'ids': [1]})['curves'][1] == pytest.approx(expected)
+    finally:
+        conn.close()

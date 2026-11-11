@@ -5,7 +5,7 @@ from engine.market.splits import split_ratio
 
 @pytest.mark.parametrize('price_ratio,expected', [
     (0.5, 2.0), (0.4999, 2.0), (0.52, 2.0), (1 / 3, 3.0), (0.1, 10.0), (0.098, 10.0), (2 / 3, 1.5), (0.25, 4.0),
-    (2.0, 0.5), (10.0, 0.1), (20.0, 0.05), (1.5, 1 / 1.5)])
+    (2.0, 0.5), (10.0, 0.1), (20.0, 0.05), (1.5, 1 / 1.5), (1 / 250, 250.0), (1.0005 / 250, 250.0), (250.0, 1 / 250)])
 def test_usual_split_and_reverse_split_ratios_are_recognised(price_ratio, expected):
     assert split_ratio(price_ratio) == pytest.approx(expected)
 
