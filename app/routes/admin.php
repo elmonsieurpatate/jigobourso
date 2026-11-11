@@ -27,7 +27,7 @@ function system_counts(): array {
 return [
     'admin/splits' => function () {
         require_admin();
-        return engine_call('split-reviews', ['state' => (string)($_GET['state'] ?? 'pending'), 'q' => (string)($_GET['q'] ?? ''), 'page' => max(1,(int)($_GET['page'] ?? 1))]);
+        return engine_call('split-reviews', ['state' => (string)($_GET['state'] ?? 'pending'), 'q' => (string)($_GET['q'] ?? ''), 'page' => max(1,(int)($_GET['page'] ?? 1)), 'sort' => (string)($_GET['sort'] ?? 'magnitude_desc'), 'min_ratio' => (string)($_GET['min_ratio'] ?? '1')]);
     },
     'admin/splits/scan' => function () { need_post(); require_admin(); return engine_call('split-review-scan', []); },
     'admin/splits/decide' => function () {

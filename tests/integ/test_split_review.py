@@ -132,3 +132,28 @@ def test_zero_price_does_not_crash_detection_or_create_a_split(conn):
         q.execute('UPDATE daily_prices SET close_px=0 WHERE listing_id=2 AND price_date=%s',(DAY,))
     conn.commit()
     assert splits.detect(conn,NOW)==0
+
+
+def test_amplitude_sort_and_filter_cover_all_pages_and_reverse_splits(conn):
+    with conn.cursor() as q:
+        q.executemany("INSERT INTO split_log(listing_id,event_date,price_ratio,ratio,status,detected_at) VALUES (2,%s,0.5,2,'detected',UTC_TIMESTAMP())",
+                      [(DAY-datetime.timedelta(days=i),) for i in range(1,46)])
+        q.execute("INSERT INTO split_log(listing_id,event_date,price_ratio,ratio,status,detected_at) VALUES (2,%s,1000,0.001,'detected',UTC_TIMESTAMP())",(DAY-datetime.timedelta(days=50),))
+    conn.commit()
+    d=R.state(conn,{})
+    assert d['total']==47 and len(d['rows'])==40 and d['pages']==2
+    assert float(d['rows'][0]['proposed_ratio'])==pytest.approx(.001)  # regroupement 1 pour 1000 en tête, même ancien
+    assert float(d['rows'][1]['proposed_ratio'])==250
+    filtered=R.state(conn,{'min_ratio':'100'})
+    assert filtered['total']==2 and filtered['counts']['pending']==2
+    assert [float(r['proposed_ratio']) for r in filtered['rows']]==[.001,250]
+    recent=R.state(conn,{'sort':'recent'})
+    assert recent['rows'][0]['listing_id']==1
+    smallest=R.state(conn,{'sort':'magnitude_asc'})
+    assert float(smallest['rows'][0]['proposed_ratio'])==2
+    assert R.state(conn,{'q':'CSH2','min_ratio':'100'})['total']==1
+
+
+@pytest.mark.parametrize('payload',[{'sort':'bogus'},{'min_ratio':'NaN'},{'min_ratio':'inf'},{'min_ratio':'-1'},{'min_ratio':'oops'}])
+def test_invalid_sort_or_amplitude_is_rejected(payload):
+    with pytest.raises(ValueError):R.state(None,payload)

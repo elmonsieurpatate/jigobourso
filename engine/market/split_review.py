@@ -6,6 +6,7 @@ from urllib.parse import urlparse
 from engine.shared import settings
 from . import splits
 
+MAGNITUDE = "GREATEST(COALESCE(r.ratio,s.ratio),1/NULLIF(COALESCE(r.ratio,s.ratio),0))"
 STATE = "CASE WHEN r.decision IN ('applied','rejected') THEN r.decision WHEN s.status='confirmed' THEN 'confirmed' ELSE 'pending' END"
 
 
@@ -15,17 +16,31 @@ def state(conn, request):
         raise ValueError('Statut inconnu')
     page = max(1, int(request.get('page') or 1))
     query = str(request.get('q') or '').strip()[:80]
-    where, args = [], []
-    if view != 'all':
-        where.append(STATE + '=%s')
-        args.append(view)
+    sort = request.get('sort') or 'magnitude_desc'
+    orders = {'magnitude_desc': MAGNITUDE + ' DESC,s.event_date DESC,s.listing_id',
+              'magnitude_asc': MAGNITUDE + ' ASC,s.event_date DESC,s.listing_id',
+              'recent': 's.event_date DESC,s.listing_id'}
+    if sort not in orders:
+        raise ValueError('Tri inconnu')
+    try:
+        minimum = float(request.get('min_ratio') or 1)
+    except (ValueError,TypeError):
+        raise ValueError('Ratio minimum invalide') from None
+    if not math.isfinite(minimum) or not 1 <= minimum <= 1000000000:
+        raise ValueError('Ratio minimum invalide')
+    where, args = [MAGNITUDE + '>=%s'], [minimum]
     if query:
         where.append('(l.symbol LIKE %s OR i.name LIKE %s OR i.isin LIKE %s)')
         args.extend(['%' + query + '%'] * 3)
     join = ' FROM split_log s JOIN listings l ON l.id=s.listing_id JOIN instruments i ON i.id=l.instrument_id LEFT JOIN split_reviews r ON r.listing_id=s.listing_id AND r.event_date=s.event_date'
-    clause = ' WHERE ' + ' AND '.join(where) if where else ''
+    common_clause = ' WHERE ' + ' AND '.join(where)
+    common_args = list(args)
+    if view != 'all':
+        where.append(STATE + '=%s')
+        args.append(view)
+    clause = ' WHERE ' + ' AND '.join(where)
     with conn.cursor() as cur:
-        cur.execute('SELECT ' + STATE + ' AS state,COUNT(*) AS n' + join + ' GROUP BY state')
+        cur.execute('SELECT ' + STATE + ' AS state,COUNT(*) AS n' + join + common_clause + ' GROUP BY state', common_args)
         counts = {v['state']: int(v['n']) for v in cur.fetchall()}
         cur.execute('SELECT COUNT(*) AS n' + join + clause, args)
         total = int(cur.fetchone()['n'])
@@ -37,7 +52,7 @@ def state(conn, request):
                       ''' + STATE + ''' AS state,
                       (SELECT p.close_px FROM daily_prices p WHERE p.listing_id=s.listing_id AND p.price_date<s.event_date ORDER BY p.price_date DESC LIMIT 1) AS price_before,
                       (SELECT p.close_px FROM daily_prices p WHERE p.listing_id=s.listing_id AND p.price_date=s.event_date) AS price_after
-                      ''' + join + clause + ' ORDER BY s.event_date DESC,s.listing_id LIMIT 40 OFFSET %s', args + [(page - 1) * 40])
+                      ''' + join + clause + ' ORDER BY ' + orders[sort] + ' LIMIT 40 OFFSET %s', args + [(page - 1) * 40])
         rows = cur.fetchall()
         ids = sorted({r['listing_id'] for r in rows})
         history = []
@@ -47,7 +62,7 @@ def state(conn, request):
     for row in rows:
         row['history'] = [h for h in history if h['listing_id'] == row['listing_id'] and h['event_date'] == row['event_date']][:5]
     return {'rows': rows, 'counts': counts, 'total': total, 'page': page, 'pages': pages,
-            'recompute_pending': bool(settings.get(conn, 'split_metrics_pending', False))}
+            'sort': sort, 'min_ratio': minimum, 'recompute_pending': bool(settings.get(conn, 'split_metrics_pending', False))}
 
 
 def scan(conn, request):

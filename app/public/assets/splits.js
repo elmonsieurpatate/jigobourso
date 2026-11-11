@@ -4,7 +4,7 @@
   if(!await J.init('admin',{admin:true}))return;
   const $=s=>document.querySelector(s),esc=J.esc;
   const labels={pending:'À examiner',applied:'Appliqués',rejected:'Refusés',confirmed:'Confirmés automatiquement',all:'Tous'};
-  let filter='pending',query='',page=1,rows=[],busy=false,loadSequence=0;
+  let filter='pending',query='',page=1,rows=[],busy=false,loadSequence=0,sort='magnitude_desc',minRatio='1';
   const format=new Intl.NumberFormat('fr-FR',{maximumFractionDigits:6});
   const num=v=>v==null?'—':format.format(+v);
   const date=v=>v?J.date(v):'—';
@@ -30,7 +30,7 @@
     const sequence=++loadSequence,view=filter;
     $('#sr-refresh').disabled=true;$('#sr-rows').setAttribute('aria-busy','true');
     try{
-      const d=await J.api('admin/splits',{params:{state:view,q:query,page}});if(sequence!==loadSequence)return;rows=d.rows;page=d.page;
+      const d=await J.api('admin/splits',{params:{state:view,q:query,page,sort,min_ratio:minRatio}});if(sequence!==loadSequence)return;rows=d.rows;page=d.page;
       $('#sr-rows').dataset.state=view;
       $('#sr-tabs').innerHTML=Object.entries(labels).map(([k,v])=>`<button class="btn small" data-filter="${k}" aria-current="${k===filter}">${esc(v)} <b>${k==='all'?Object.values(d.counts).reduce((a,n)=>a+n,0):d.counts[k]||0}</b></button>`).join('');
       $('#sr-summary').textContent=`${d.total} cas · page ${page} / ${d.pages}. Les décisions s’appliquent aux données de marché communes.`;
@@ -64,6 +64,8 @@
   $('#sr-tabs').onclick=e=>{const b=e.target.closest('[data-filter]');if(b){filter=b.dataset.filter;page=1;load();}};
   $('#sr-pages').onclick=e=>{const b=e.target.closest('[data-page]');if(b){page=+b.dataset.page;load();}};
   $('#sr-search').onsubmit=e=>{e.preventDefault();query=$('#sr-query').value;page=1;load();};
+  $('#sr-sort').onchange=e=>{sort=e.target.value;page=1;load();};
+  $('#sr-min-ratio').onchange=e=>{minRatio=e.target.value;page=1;load();};
   $('#sr-refresh').onclick=()=>load();
   $('#sr-scan').onclick=async()=>{const b=$('#sr-scan');b.disabled=true;b.textContent='Détection en cours…';try{const d=await J.post('admin/splits/scan',{});say(`${d.detected} nouveau(x) cas détecté(s).`);await load();}catch(e){say(e.message,true);}finally{b.disabled=false;b.textContent='Détecter les nouveaux cas';}};
   await load();
