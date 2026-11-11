@@ -25,6 +25,20 @@ function system_counts(): array {
 }
 
 return [
+    'admin/splits' => function () {
+        require_admin();
+        return engine_call('split-reviews', ['state' => (string)($_GET['state'] ?? 'pending'), 'q' => (string)($_GET['q'] ?? ''), 'page' => max(1,(int)($_GET['page'] ?? 1))]);
+    },
+    'admin/splits/scan' => function () { need_post(); require_admin(); return engine_call('split-review-scan', []); },
+    'admin/splits/decide' => function () {
+        need_post(); $u = require_admin(); $b = body(); $b['actor_id'] = (int)$u['id'];
+        $result = engine_call('split-review-decide', $b);
+        if (!empty($result['changed']) && !empty($result['recompute_pending'])) {
+            try { $result['recompute_started'] = engine_spawn('job', engine_root() . '/logs/admin.log', ['--name','metrics','--trigger','admin']) > 0; }
+            catch (Throwable $e) { $result['recompute_started'] = false; } // le cron reprendra la demande persistée
+        }
+        return $result;
+    },
     'admin/users' => function () {
         require_admin();
         return ['users' => q('SELECT id, username, email, is_admin, active, created_at, last_login, (SELECT COUNT(*) FROM portfolios p WHERE p.user_id = users.id) AS portfolios FROM users ORDER BY username')->fetchAll()];

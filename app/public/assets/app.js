@@ -177,10 +177,10 @@ J.NAV = (admin) => [
   { id: 'bilan', label: 'Bilans', icon: 'chart', file: ['bilan.html'], children: [{ label: 'Bilan global', href: 'bilan.html', on: () => true }] },
   { sec: 'Méthode' },
   { id: 'suivi', label: 'Suivi des classements', icon: 'pulse', file: ['suivi.html'], href: 'suivi.html' },
-  ...(admin ? [{ sec: 'Administration technique' }, { id: 'admin', label: 'Administration', icon: 'shield', file: ['admin.html', 'admin-categories-test.html', 'donnees.html'], children: [
+  ...(admin ? [{ sec: 'Administration technique' }, { id: 'admin', label: 'Administration', icon: 'shield', file: ['admin.html', 'admin-categories-test.html', 'donnees.html', 'splits.html'], children: [
     { label: 'FinanceDatabase', href: 'admin.html#fdb', on: (q, h) => !h || h === '#fdb' }, { label: 'Yahoo Finance', href: 'admin.html#yahoo', on: (q, h) => h === '#yahoo' },
     { label: 'Actions / ETF', href: 'admin.html#titres', on: (q, h) => h === '#titres' }, { label: 'Cron', href: 'admin.html#cron', on: (q, h) => h === '#cron' }, { label: 'Journaux', href: 'admin.html#logs', on: (q, h) => h === '#logs' },
-    { label: 'Données', href: 'donnees.html', on: () => true }, { label: 'Utilisateurs', href: 'admin.html#users', on: (q, h) => h === '#users' }, { label: 'Réglages', href: 'admin.html#settings', on: (q, h) => h === '#settings' },
+    { label: 'Splits', href: 'splits.html', on: () => true }, { label: 'Données', href: 'donnees.html', on: () => true }, { label: 'Utilisateurs', href: 'admin.html#users', on: (q, h) => h === '#users' }, { label: 'Réglages', href: 'admin.html#settings', on: (q, h) => h === '#settings' },
     ] }] : [])
 ];
 J.buildShell = function (page, user) {

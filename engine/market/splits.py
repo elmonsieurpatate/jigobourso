@@ -5,7 +5,7 @@ DHY, TACK, GOSS : le saut est dans les données et le split est déclaré à par
 ce peut être un vrai mouvement (à garder tel quel) ou un split non ajusté (à corriger). Seul un split DÉCLARÉ par Yahoo, de ratio cohérent avec le saut observé,
 est donc corrigé.
 
-1. `detect` repère les sauts de cours qui ressemblent à un ratio usuel (×2, ÷2, ÷10, ×3/2…) et les note dans `split_log` (statut « detected »).
+1. `detect` repère les ruptures inexpliquées des séries et les note dans `split_log` (statut « detected »), avec un ratio usuel ou une estimation à vérifier. La détection ne confirme jamais un split.
 2. `verify` interroge Yahoo (`events.splits`) : un split déclaré à la même date (± 5 jours) dont le ratio explique le saut (± 15 %) devient « confirmed » et est écrit
    dans `corporate_events` (ratio = parts nouvelles / anciennes) ; le calcul des séries (`analytics/series.prepare_series`) ajuste alors les clôtures antérieures.
    Sinon le saut passe en « real_move » : rien n'est corrigé et le titre reste « non évaluable » sur les fenêtres qui le traversent. Ce statut veut dire « Yahoo n'a pas déclaré de split qui
@@ -105,8 +105,10 @@ def detect(conn, now):
                 continue
             pair = _pair(conn, r['listing_id'], datetime.date.fromisoformat(day))
             ratio = split_ratio(pair[0] / pair[1]) if pair else None
-            if ratio is None:
-                continue                                                       # saut sans rapport avec un ratio usuel : vrai mouvement, on n'y touche pas
+            if ratio is None and pair and pair[0] > 0 and is_break(pair[0] / pair[1]):
+                ratio = pair[1] / pair[0]  # estimation à revoir : jamais une confirmation
+            if ratio is None or not 0.00000001 <= ratio < 10000000000:
+                continue
             with conn.cursor() as cur:
                 cur.execute("INSERT IGNORE INTO split_log(listing_id,event_date,price_ratio,ratio,status,detected_at) VALUES (%s,%s,%s,%s,'detected',%s)",
                             (r['listing_id'], day, round(pair[0] / pair[1], 8), round(ratio, 8), stamp))
@@ -142,6 +144,18 @@ def match_declared(declared, event_date, price_ratio):
     return None if best is None else (best[2], best[3])
 
 
+def manual_rejections(conn):
+    """Un refus administratif persiste face aux confirmations automatiques ultérieures."""
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT listing_id,event_date FROM split_reviews WHERE decision='rejected'")
+            return {(r['listing_id'], r['event_date']) for r in cur.fetchall()}
+    except pymysql.err.ProgrammingError as exc:
+        if exc.args[0] != 1146:
+            raise
+        return set()  # déploiement avant migration additive
+
+
 def verify(conn, client, now, limit=150):
     """Interroge Yahoo pour les sauts « detected » (au plus `limit` titres par passage) : split déclaré cohérent = « confirmed » (écrit dans corporate_events),
     sinon « real_move » (= non déclaré par Yahoo à cet instant ; une revérification est alors planifiée, voir `recheck`). Un titre dont Yahoo ne répond pas reste « detected » pour le passage suivant.
@@ -155,9 +169,11 @@ def verify(conn, client, now, limit=150):
         cur.execute("""SELECT s.listing_id, s.event_date, s.price_ratio, l.symbol FROM split_log s JOIN listings l ON l.id=s.listing_id
                        WHERE s.status='detected' ORDER BY s.listing_id, s.event_date""")
         rows = cur.fetchall()
+    refused = manual_rejections(conn)
     by_listing = {}
     for r in rows:
-        by_listing.setdefault(r['listing_id'], []).append(r)
+        if (r['listing_id'], r['event_date']) not in refused:
+            by_listing.setdefault(r['listing_id'], []).append(r)
     for lid in list(by_listing)[:limit]:
         events = by_listing[lid]
         try:
@@ -202,9 +218,11 @@ def recheck(conn, client, now, limit=RECHECK_LIMIT):
                        WHERE s.status='real_move' AND s.checks < %s AND s.event_date >= %s AND (s.recheck_after IS NULL OR s.recheck_after <= %s)
                        ORDER BY s.listing_id, s.event_date""", (RECHECK_MAX_CHECKS, today - datetime.timedelta(days=RECHECK_WINDOW_DAYS), today))
         rows = cur.fetchall()
+    refused = manual_rejections(conn)
     by_listing = {}
     for r in rows:
-        by_listing.setdefault(r['listing_id'], []).append(r)
+        if (r['listing_id'], r['event_date']) not in refused:
+            by_listing.setdefault(r['listing_id'], []).append(r)
     todo = list(by_listing)[:max(0, limit)]
     out['waiting'] = sum(len(v) for k, v in by_listing.items() if k not in todo)
     for lid in todo:

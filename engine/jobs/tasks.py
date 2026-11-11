@@ -459,6 +459,8 @@ def tick(conn, client, now=None, trigger='cron'):
         due = guarded(f'daily:{mic}', lambda: catchup.daily_due(conn, mic, rows, now)) if sched['daily']['enabled'] else None
         if due:
             done.append(('daily', mic, guarded(f'daily:{mic}', lambda: run_job(conn, 'daily:' + mic, lambda log: _daily(conn, client, rows, now, log, round_id, due, mic), trigger=trigger))))
+    if settings.get(conn, 'split_metrics_pending', False):
+        done.append(('metrics', None, guarded('metrics', lambda: run_job(conn, 'metrics', lambda log: _recompute(conn, now, log, 'metrics'), trigger=trigger))))
     if sched['daily']['enabled'] and _maintenance_due(conn, now):
         done.append(('maintenance', None, guarded('maintenance', lambda: run_job(conn, 'maintenance', lambda log: maintenance(conn, client, now, log), trigger=trigger))))
     # 2. rattrapage : séances de 15 min incomplètes ou titres sans réponse, y compris après une panne de plusieurs heures ou jours
@@ -506,6 +508,8 @@ def _recompute(conn, now, log, which):
     """Demande explicite d'un seul calcul dérivé (relance après un échec) : même code que l'étape de la maintenance, mêmes verrous."""
     if which == 'metrics':
         n_series, n_metrics = _step(log, 'Indicateurs et classements', lambda: compute.compute_all(conn, now), lambda r: f'{r[0]} séries, {r[1]} lignes de mesures')
+        if settings.get(conn, 'split_metrics_pending', False):
+            settings.put(conn, 'split_metrics_pending', False)
         return n_series, 0, f'séries {n_series}, mesures {n_metrics}'
     r = _step(log, 'Similarité des ETF', lambda: etf.build(conn, now), lambda r: f'{r["etfs"]} ETF, {r["with_minimum_history"]} avec un historique suffisant')
     return r['etfs'], 0, f'{r["etfs"]} ETF, {r["with_minimum_history"]} avec un historique suffisant'

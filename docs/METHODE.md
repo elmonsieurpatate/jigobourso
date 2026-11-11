@@ -205,3 +205,12 @@ Pour chaque achat détenu, une barre verte / orange / rouge résume l'état du c
 Trois signaux, notés de 0 à 2 : **tendance** (pente récente comparée à la pente longue, sur des fenêtres qui dépendent de la stratégie : rapide 21/63 séances, régulière 63/126, Momentum 126/252), **recul** depuis le plus haut observé depuis l'achat (seuil = 2 × volatilité quotidienne × √horizon, entre 6 % et 30 % ; serré pour les stratégies rapides, large pour les longues) et **stabilité** (R² qui s'effondre par rapport à la fenêtre précédente). Somme 0-1 : tendance intacte ; 2-3 : à surveiller ; 4-6 ou recul au-delà du seuil : vente à envisager. Un cours très au-dessus de sa moyenne 50 jours (+25 %) n'est qu'une information, jamais notée.
 
 Un saut de cours (règle ×1,6) ou un historique trop court donnent « non évaluée » plutôt qu'une fausse alerte. Les réglages par achat existants (seuil de recul personnel, désactivation) s'appliquent. Les valeurs par défaut sont des points de départ modifiables, non validés par un test historique concluant (les tests de règles de sortie restent exploratoires : biais de survivance et de sélection).
+
+
+## Revue manuelle des splits
+
+La page **Administration → Splits** (`splits.html`) présente les ruptures stockées dans `split_log`, les prix avant/après, le ratio proposé et les contrôles fournisseur. La détection ne se limite plus aux ratios usuels : tout saut inexpliqué déjà repéré dans les séries peut devenir un candidat, avec un ratio estimé à vérifier.
+
+L'administrateur choisit les parts anciennes/nouvelles et une source ou justification. L'application vérifie le sens et la cohérence du ratio avec le saut, confirme l'événement dans `corporate_events`/`split_log`, conserve la décision et son auteur dans `split_reviews` et ajoute une entrée à `split_review_history`. Les transactions d'origine ne sont pas modifiées. Un recalcul des indicateurs est lancé en arrière-plan ; la demande persistée est reprise par le cron si nécessaire. Le verrou des calculs et la révision de la décision évitent les mises à jour concurrentes ; une confirmation ne peut pas être appliquée deux fois.
+
+Un refus ne corrige ni le cours ni les quantités et interdit la confirmation automatique ultérieure tant que le cas n'est pas remis en attente. Une opération déjà confirmée est consultable, sans bouton de modification ou d'annulation dans cette page. Ces décisions concernent les données de marché communes et nécessitent les droits administrateur.
