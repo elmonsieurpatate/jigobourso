@@ -47,7 +47,7 @@ const api=(pg,route,body)=>pg.evaluate(async([r,b])=>{try{const j=b?await J.post
   await U.pg.goto(BASE+'mes-scores.html');await U.pg.waitForSelector('[data-a="tab"]');
   must(!(await U.pg.$$eval('[data-a="tab"]',b=>b.some(x=>/Suivi/.test(x.textContent)))),'Onglet de suivi visible côté utilisateur');
   await U.pg.goto(BASE+'mes-colonnes.html');await U.pg.waitForSelector('.ac-list');
-  await U.pg.goto(BASE+'mes-filtres.html');await U.pg.waitForSelector('.sui-card');must(!U.pg.url().endsWith('index.html'),'Mes filtres redirige encore vers l Explorer');must((await U.pg.$$('.mf-chip')).length>0,'Catégories absentes de Mes filtres');
+  await U.pg.goto(BASE+'mes-filtres.html');await U.pg.waitForSelector('#ac-filter-select option');must(!U.pg.url().endsWith('index.html'),'Mes filtres redirige encore vers l Explorer');must((await U.pg.$$('[data-category-id]')).length>0,'Options éditables absentes de Mes filtres');
   // 7. Aide : cours interactif (un chapitre à la fois), recherche, modes, 7 fiches, démo pente/régularité, simulateur, section admin
   await U.pg.goto(BASE+'aide.html');await U.pg.waitForSelector('.h-body');
   must((await U.pg.$$('.h-body')).length===1,'Un seul chapitre attendu à l’écran');must(/Bienvenue/.test(await U.pg.textContent('.h-head h1')),'Premier chapitre : Bienvenue');

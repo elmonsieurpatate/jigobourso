@@ -13,9 +13,9 @@
     }
     return {schema:2,source:'offline',definitions:{schema:1,revision:1,filters},defaults};
   }
-  async function load(){state=window.JigoSecondaryOffline?offlineState():await J.api('admin/secondary-filters');return copy(state);}
+  async function load(){state=window.JigoSecondaryOffline?offlineState():await J.api(window.JigoSecondaryPersonal?'explorer/secondary-filters/manage':'admin/secondary-filters');return copy(state);}
   async function write(request){
-    if(!window.JigoSecondaryOffline){state=await J.post('admin/secondary-filters/save',request);return copy(state);}
+    if(!window.JigoSecondaryOffline){state=await J.post(window.JigoSecondaryPersonal?'explorer/secondary-filters/save':'admin/secondary-filters/save',request);return copy(state);}
     if(request.action==='order'){const by=new Map(state.definitions.filters.map(f=>[f.id,f]));state.definitions.filters=request.order.map(i=>by.get(i));state.definitions.revision++;return copy(state);}
     const id=request.filter_id,index=state.definitions.filters.findIndex(f=>f.id===id);
     if(request.action==='save'){const f=copy(request.filter);if(!f.editable)f.values=state.definitions.filters[index].values;state.definitions.filters[index]=f;state.definitions.revision++;}

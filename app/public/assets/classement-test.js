@@ -68,6 +68,7 @@
   const filtersFor=o=>Object.fromEntries(Object.entries(categories).map(([k,c])=>{
     const own=o[k],all=c.options.map(x=>x.id);if(!own)return[k,adminSelections[k]];
     const selected=new Set(own.selected.filter(id=>all.includes(id)));
+    if(own.selected.length&&!selected.size)return[k,[...adminSelections[k]]];
     for(const id of adminSelections[k])if(!own.known.includes(id))selected.add(id);
     return[k,[...selected]];
   }));
@@ -272,12 +273,13 @@
   }
   function renderFilters() {
     $('#ct-filter-source').textContent=(categoryPayload.source_label||'Catégories administrateur')+' · bornes en lecture seule'+(Object.keys(state.secondaryMetadataPreviousByUser[userKey]||{}).length?' · anciennes préférences regroupées : vérifiez vos sélections':'');
+    const manage=document.createElement('a');manage.href='mes-filtres.html';manage.textContent='Configurer mes filtres';$('#ct-filter-source').append(' · ',manage);
     if(categoryPayload.schema===2)document.querySelector('.ct-filter-logic').textContent='Un filtre retient un titre si l’une de ses catégories est cochée ; les filtres se combinent. Les scores et les rangs ne changent jamais.';
     const drawIndicator=([k,c])=>`<div class="ct-multi" data-indicator="${k}"><button type="button" class="ct-multi-trigger" data-open-filter="${k}" title="${esc(c.label)} · ${esc(c.unit)}" aria-expanded="${activeFilter===k}" aria-controls="ct-list-${k}"><span>${esc(c.label)}</span><b data-count="${k}">${state.filters[k].length} / ${c.options.length}</b><span aria-hidden="true">⌄</span></button><div class="ct-multi-popup" id="ct-list-${k}" ${activeFilter===k?'':'hidden'}><label class="ct-category-search"><span aria-hidden="true">⌕</span><input type="search" data-category-search="${k}" placeholder="Rechercher une catégorie…" aria-label="Rechercher une catégorie : ${esc(c.label)}" value="${activeFilter===k?esc(filterQuery):''}"></label><div class="ct-category-options" role="group" aria-label="Catégories : ${esc(c.label)}">${c.options.map(o=>`<label class="ct-category-option" data-search-text="${esc(o.label.toLocaleLowerCase('fr'))}"><input type="checkbox" data-filter="${k}" data-category="${o.id}" ${state.filters[k].includes(o.id)?'checked':''}><i style="background:${o.color}" aria-hidden="true"></i><span>${esc(o.label)}</span><small>${esc(o.range)}</small></label>`).join('')}</div><p class="ct-no-category" hidden>Aucune catégorie correspondante.</p><footer><span data-selected-count="${k}">${state.filters[k].length} / ${c.options.length} sélectionnées</span><button type="button" data-all-indicator="${k}">Tout sélectionner</button><button type="button" data-close-filter="${k}" aria-label="Fermer ${esc(c.label)}">Fermer</button></footer></div></div>`;
     const primaryKeys=categoryPayload.schema===2?['volatility','liquidity','volume','positive','spikes','concentration']:['volatility','turnover_eur','avg_volume','drawdown','up_fraction','gain_share'];
     const isPrimary=([k,c])=>categoryPayload.schema===2?c.group==='main':primaryKeys.includes(k);
     const primary=Object.entries(categories).filter(isPrimary),other=Object.entries(categories).filter(e=>!isPrimary(e));
-    $('#ct-filters').innerHTML=Object.keys(categories).length?`<div class="ct-filter-main">${primary.map(drawIndicator).join('')}</div>${other.length?`<details class="ct-more-filters"><summary>Autres indicateurs (${other.length}) <span id="ct-more-count"></span></summary><div class="ct-filter-main">${other.map(drawIndicator).join('')}</div></details>`:''}`:'<p>Aucun filtre actif. Les définitions restent accessibles dans l’administration.</p>';
+    $('#ct-filters').innerHTML=Object.keys(categories).length?`<div class="ct-filter-main">${primary.map(drawIndicator).join('')}</div>${other.length?`<details class="ct-more-filters"><summary>Autres indicateurs (${other.length}) <span id="ct-more-count"></span></summary><div class="ct-filter-main">${other.map(drawIndicator).join('')}</div></details>`:''}`:'<p>Aucun filtre actif. Réactivez-les depuis « Mes filtres ».</p>';
     filterSummary();
     if(activeFilter) searchCategories(activeFilter,filterQuery);
   }

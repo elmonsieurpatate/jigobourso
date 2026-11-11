@@ -1,0 +1,30 @@
+<?php
+if(getenv('JIGO_TEST_DATABASE')!=='1'||getenv('JIGO_DB_NAME')!=='jigobourso_it')throw new RuntimeException('Base jetable requise');
+require __DIR__.'/../../app/services/personal_secondary_filters.php';
+$ok=function($v,$m){if(!$v)throw new RuntimeException($m);};
+$reject=function($fn,$status)use($ok){try{$fn();}catch(ApiError $e){$ok($e->status===$status,'Statut '.$status.' attendu, reçu '.$e->status);return;}throw new RuntimeException('Rejet attendu');};
+$base=secondary_read();$global=secondary_json([$base['definitions'],$base['defaults']]);
+$read=fn($u=1)=>secondary_user_read($u);
+$save=fn($f,$s)=>secondary_user_write(1,['action'=>'save','filter_id'=>$f['id'],'filter'=>$f,'revision'=>$s['definitions']['revision']]);
+$reset=fn($id,$s)=>secondary_user_write(1,['action'=>'restore','filter_id'=>$id,'revision'=>$s['definitions']['revision'],'defaults_revision'=>$s['defaults']['revision']]);
+$s=$read();$ok(count($s['definitions']['filters'])===15,'Filtres disponibles');
+$f=secondary_find($s['definitions'],'liquidity');$f['enabled']=false;$f['measures'][0]['categories'][0]['name']='Faible perso';$f['measures'][0]['categories'][0]['max']=500000;$f['measures'][0]['categories'][1]['min']=500000;
+$stale=$s;$s=$save($f,$s);$own=secondary_find($read()['definitions'],'liquidity');$other=secondary_find($read(2)['definitions'],'liquidity');
+$ok(!$own['enabled']&&$own['measures'][0]['categories'][0]['name']==='Faible perso','Catégories et activation persistantes');
+$ok($other['enabled']&&$other['measures'][0]['categories'][0]['name']!=='Faible perso','Isolation des comptes');
+$reject(fn()=>$save($f,$stale),409);
+$bad=$f;$bad['measures'][0]['categories'][1]['min']=100000;$reject(fn()=>$save($bad,$s),422);
+$bad=$f;$bad['measures'][0]['unit']='unités inventées';$reject(fn()=>$save($bad,$s),422);
+$new=$f['measures'][0]['categories'][0];$new['id']='new-personal';$new['name']='Option personnelle';$new['min']=250000;$new['max']=500000;$new['minIncluded']=false;$new['maxIncluded']=true;$f['measures'][0]['categories'][0]['max']=250000;$f['measures'][0]['categories'][]=$new;$s=$save($f,$s);
+$own=secondary_find($s['definitions'],'liquidity');$id=end($own['measures'][0]['categories'])['id'];$ok((bool)preg_match('/^cat-[a-f0-9]{32}$/',$id),'Identifiant personnel stable');
+$ok(end(secondary_find($read()['definitions'],'liquidity')['measures'][0]['categories'])['id']===$id,'Identifiant conservé après lecture');
+$s=secondary_user_write(1,['action'=>'defaults','filter_id'=>'liquidity','measure_id'=>'turnover_eur','selection'=>['mode'=>'custom','selected'=>[$id]],'defaults_revision'=>$s['defaults']['revision']]);
+$ok($read()['defaults']['filters']['liquidity']['turnover_eur']['selected']===[$id],'Sélection par défaut personnelle');
+$bad=$own;$bad['measures'][0]['categories']=array_values(array_filter($bad['measures'][0]['categories'],fn($c)=>$c['id']!==$id));$s=$save($bad,$s);$ok($s['defaults']['filters']['liquidity']['turnover_eur']['selected']===[],'Sélection supprimée nettoyée');
+$country=secondary_find($s['definitions'],'country');$country['values']=[['id'=>'fake','label'=>'Inventé']];$reject(fn()=>$save($country,$s),422);
+$s=$reset('liquidity',$s);$ok(secondary_find($s['definitions'],'liquidity')===secondary_find($base['definitions'],'liquidity'),'Retour aux valeurs par défaut du compte sans altérer les autres');
+$order=array_reverse(array_column($s['definitions']['filters'],'id'));$s=secondary_user_write(1,['action'=>'order','order'=>$order,'revision'=>$s['definitions']['revision']]);$ok(array_column($read()['definitions']['filters'],'id')===$order,'Ordre personnel persistant');$ok(array_column($read(2)['definitions']['filters'],'id')!==$order,'Ordre des autres comptes inchangé');
+$after=secondary_read();$ok(secondary_json([$after['definitions'],$after['defaults']])===$global,'Réglages partagés inchangés');
+// Remettre le compte de test à ses valeurs initiales pour le parcours navigateur.
+q('DELETE FROM settings WHERE name=?',[secondary_user_key(1)]);
+echo "OK définitions personnelles, activation, bornes, ajout/suppression, défauts, restauration, isolation, révisions et validations\n";
