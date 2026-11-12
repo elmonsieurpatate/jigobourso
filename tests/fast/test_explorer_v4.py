@@ -12,12 +12,6 @@ def setup_config():
     return c,p
 
 
-@pytest.mark.parametrize('n',[1,5,21,63,126,252])
-@pytest.mark.parametrize('value',[-99,-10,0,5,200])
-def test_period_slope_roundtrip(n,value):
-    assert C.period_slope(C.session_slope(value,n),n)==pytest.approx(value)
-
-
 def test_upgrade_preserves_all_historical_thresholds_and_original():
     old=S.preset('fast');before=copy.deepcopy(old);c=C.upgrade(old)
     assert old==before and c['version']==4

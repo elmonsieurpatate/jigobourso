@@ -50,12 +50,6 @@ def period_slope(slope,sessions):
     return 100*math.expm1(sessions*math.log1p(slope/100))
 
 
-def session_slope(value,sessions):
-    if value is None:return None
-    if value<=-100:raise ValueError('La pente sur période doit être supérieure à −100 %')
-    return 100*math.expm1(math.log1p(value/100)/sessions)
-
-
 def upgrade(config):
     c=copy.deepcopy(config)
     if c.get('version')==4:return validate(c)

@@ -42,9 +42,3 @@ def select(entries, which, selected, categories):
     return [e for e in entries if assign(e.get(key), categories) in chosen]
 
 
-def default_selection(defaults, which, categories):
-    """Catégories incluses par défaut (réglage de l'administration : mode « all » = toutes, « custom » = liste)."""
-    fid, mid = FILTERS[which]
-    s = (defaults.get('filters', {}).get(fid) or {}).get(mid) or {'mode': 'all'}
-    ids = [c['id'] for c in categories]
-    return ids if s.get('mode', 'all') == 'all' else [i for i in ids if i in s.get('selected', [])]

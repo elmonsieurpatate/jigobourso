@@ -73,15 +73,6 @@ def test_selection_keeps_notes_ranks_and_calculation_untouched(which):
     assert SCAT.select(entries, which, None, c) == entries
 
 
-def test_default_selection_follows_the_administrator_defaults(which):
-    c = cats(which)
-    fid, mid = SCAT.FILTERS[which]
-    assert SCAT.default_selection({'filters': {}}, which, c) == [x['id'] for x in c]
-    custom = {'filters': {fid: {mid: {'mode': 'custom', 'selected': [c[3]['id'], c[4]['id']]}}}}
-    assert SCAT.default_selection(custom, which, c) == [c[3]['id'], c[4]['id']]
-    assert SCAT.default_selection({'filters': {fid: {mid: {'mode': 'all', 'selected': []}}}}, which, c) == [x['id'] for x in c]
-
-
 def test_existing_thirteen_filters_are_unchanged():
     import subprocess
     old = subprocess.run(['git', 'show', 'c8abdda:app/config/explorer_secondary_filters.json'], capture_output=True, text=True, cwd=CONFIG.parents[2])

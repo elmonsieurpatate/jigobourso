@@ -8,10 +8,6 @@ def active_components(config):
     return [p for p in config['ranking'].get('components',[]) if p['enabled'] and p['weight']!=0 and p['period'] in active]
 
 
-def applies(part,verdict,config):
-    return part['kind'] in ('all',verdict['group']) and any(p['enabled'] and p['id']==part['period'] for p in C.effective(config,verdict['group'])['periods'])
-
-
 def value(part,verdict,config):
     metric=part['metric'];tech=verdict.get('technical',{})
     if metric=='quoted_avg_volume':v=tech.get('quoted_avg_volume')
