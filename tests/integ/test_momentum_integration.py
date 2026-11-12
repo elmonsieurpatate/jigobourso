@@ -6,6 +6,7 @@ import pytest
 from engine.shared.db import connect
 from engine.analytics.series import compute
 from engine.analytics.admin import service
+from engine.analytics.admin import title_sheet
 from engine.analytics.explorer import strategy
 from engine.analytics.portfolio import tracking
 from tests.dbutil import reset_data
@@ -143,11 +144,11 @@ def test_explorer_ranks_by_momentum_and_keeps_the_tradability_filter():
 def test_fiche_exposes_the_momentum_and_the_experimental_flag():
     conn = connect()
     seed(conn)
-    sheet = service.instrument_sheet(conn, {'listing_id': 1, 'config': 'momentum'})
+    sheet = title_sheet.instrument_sheet(conn, {'listing_id': 1, 'config': 'momentum'})
     assert abs(sheet['state']['momentum_6m'] - expected_momentum(UNIVERSE[0][4])) < 1e-4
     assert sheet['strategy']['experimental'] is True and sheet['verdict']['status'] == 'retained'
     assert sheet['verdict']['rank'] == 2 and sheet['verdict']['of'] == 5                                    # n° 2 du catalogue sur 5 actions retenues (le n° 1, très peu négociable, est masqué dans l'Explorer)
-    assert service.instrument_sheet(conn, {'listing_id': 1, 'config': 'regular'})['strategy']['experimental'] is False
+    assert title_sheet.instrument_sheet(conn, {'listing_id': 1, 'config': 'regular'})['strategy']['experimental'] is False
 
 
 def test_tracking_records_both_strategies_at_21_and_63_sessions():
@@ -205,13 +206,13 @@ def test_risk_adjusted_momentum_shows_eligible_trending_titles():
 def test_fiche_exposes_both_momentums_and_the_flag():
     conn = connect()
     seed(conn)
-    sheet = service.instrument_sheet(conn, {'listing_id': 1, 'config': 'momentum12'})
+    sheet = title_sheet.instrument_sheet(conn, {'listing_id': 1, 'config': 'momentum12'})
     assert abs(sheet['state']['momentum_12m'] - expected_momentum12(UNIVERSE[0][4])) < 1e-4 and abs(sheet['state']['momentum_6m'] - expected_momentum(UNIVERSE[0][4])) < 1e-4
     assert sheet['strategy']['experimental'] is True and sheet['strategy']['ranking'] == 'momentum12' and sheet['verdict']['status'] == 'retained'
     assert sheet['verdict']['rank'] == 2 and sheet['verdict']['of'] == 5
     custom = strategy.preset('momentum12')
     custom['name'] = 'custom'                                       # réglages personnels fondés sur un classement par momentum : la mise en garde reste affichée
-    assert service.instrument_sheet(conn, {'listing_id': 1, 'config': custom})['strategy']['experimental'] is True
+    assert title_sheet.instrument_sheet(conn, {'listing_id': 1, 'config': custom})['strategy']['experimental'] is True
 
 
 def test_explorer_capitalisation_filter_uses_the_size_classes():

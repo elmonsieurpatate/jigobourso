@@ -37,12 +37,12 @@ def test_table_has_scores_ranks_groups_and_unknowns_stay_none():
 
 
 def test_sheet_carries_the_same_v4_scores_as_the_ranking():
-    from engine.analytics.admin import service
+    from engine.analytics.admin import title_sheet
     conn = connect()
     reset_data(conn)
     seed(conn)
     t = {r['symbol']: r for r in R.table(conn, {})['rows']}
-    sheet = service.instrument_sheet(conn, {'listing_id': 1, 'config': 'regular'})
+    sheet = title_sheet.instrument_sheet(conn, {'listing_id': 1, 'config': 'regular'})
     v4 = sheet['scores_v4']
     assert v4['simple']['score'] == pytest.approx(t['UP.DE']['simple'], abs=1e-3) and v4['complex']['score'] == pytest.approx(t['UP.DE']['complex'], abs=1e-3)
     assert v4['ranks']['simple']['rank'] == t['UP.DE']['rank_simple']
@@ -199,7 +199,7 @@ def test_missing_context_is_undetermined_and_builtin_defaults_come_from_the_cent
 
 
 def test_sheet_status_and_scores_equal_the_ranking_in_every_context():
-    from engine.analytics.admin import service
+    from engine.analytics.admin import title_sheet
     conn = connect()
     reset_data(conn)
     seed(conn)
@@ -207,25 +207,25 @@ def test_sheet_status_and_scores_equal_the_ranking_in_every_context():
     spec = _strict(slope=0.39)
     t = {r['id']: r for r in R.table(conn, {'ct_id': 'fast', 'user_id': 1, 'spec': spec})['rows']}
     for lid, row in t.items():
-        s = service.instrument_sheet(conn, {'listing_id': lid, 'config': 'regular', 'ct': {'id': 'fast', 'state': 'draft', 'spec': spec, 'label': 'Croissance rapide', 'user_id': 1}})
+        s = title_sheet.instrument_sheet(conn, {'listing_id': lid, 'config': 'regular', 'ct': {'id': 'fast', 'state': 'draft', 'spec': spec, 'label': 'Croissance rapide', 'user_id': 1}})
         assert s['v4']['status'] == row['status'] and s['v4']['state'] == 'draft'
         if row['status'] == 'excluded':
             assert any(c['result'] == 'fail' and c['unit'] == '% par séance' for c in s['v4']['checks'])
         assert s['scores_v4']['ranks']['simple']['rank'] == row['rank_simple'] and s['scores_v4']['ranks']['complex']['rank'] == row['rank_complex']
-    lost = service.instrument_sheet(conn, {'listing_id': 1, 'config': 'regular', 'ct': {'id': 'fast', 'state': 'draft_lost', 'spec': None, 'label': 'Croissance rapide', 'user_id': 1}})
-    none = service.instrument_sheet(conn, {'listing_id': 1, 'config': 'regular'})
+    lost = title_sheet.instrument_sheet(conn, {'listing_id': 1, 'config': 'regular', 'ct': {'id': 'fast', 'state': 'draft_lost', 'spec': None, 'label': 'Croissance rapide', 'user_id': 1}})
+    none = title_sheet.instrument_sheet(conn, {'listing_id': 1, 'config': 'regular'})
     for s in (lost, none):
         assert s['v4']['status'] == 'undetermined' and s['v4']['context'] == 'missing'          # jamais « retenue » par défaut de transmission
-    free = service.instrument_sheet(conn, {'listing_id': 1, 'config': 'regular', 'ct': {'id': 'mom6', 'state': 'default', 'spec': None, 'label': 'Momentum', 'user_id': 1}})
+    free = title_sheet.instrument_sheet(conn, {'listing_id': 1, 'config': 'regular', 'ct': {'id': 'mom6', 'state': 'default', 'spec': None, 'label': 'Momentum', 'user_id': 1}})
     assert free['v4']['status'] == 'retained' and free['v4']['criteria_free'] is True
 
 
 def test_sheet_measures_use_the_units_of_the_criteria():
-    from engine.analytics.admin import service
+    from engine.analytics.admin import title_sheet
     conn = connect()
     reset_data(conn)
     seed(conn)
-    s = service.instrument_sheet(conn, {'listing_id': 1, 'config': 'regular'})
+    s = title_sheet.instrument_sheet(conn, {'listing_id': 1, 'config': 'regular'})
     m = s['measures']['21']
     t = next(r for r in R.table(conn, {})['rows'] if r['id'] == 1)
     assert m['slope'] == pytest.approx(t['periods']['21']['slope'], abs=1e-3)                    # % par séance : même valeur que celle comparée aux seuils

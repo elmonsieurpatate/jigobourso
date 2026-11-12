@@ -4,6 +4,7 @@ import os
 import pytest
 from engine.shared.db import connect
 from engine.analytics.admin import service
+from engine.analytics.admin import title_sheet
 from engine.analytics.explorer import strategy
 from engine.analytics.explorer import explorer_config as C
 from tests.integ.test_api import server, world, login, Client  # noqa: F401  (fixtures)
@@ -33,7 +34,7 @@ def test_full_scope_scores_are_identical_on_every_page_and_sheet(monkeypatch):
         row=r['rows'][0];seen.append(row['id'])
         parts=row['score_parts'];assert row['score']==pytest.approx(sum(p['contribution'] for p in parts),abs=.0001)
         assert row['measures']['21']['avg_volume']==1000
-        sheet=service.instrument_sheet(c,{'listing_id':row['id'],'config':cfg,'view':req['view'],'fetch_profile':False})
+        sheet=title_sheet.instrument_sheet(c,{'listing_id':row['id'],'config':cfg,'view':req['view'],'fetch_profile':False})
         assert sheet['verdict']['score']==row['score']
         assert sheet['verdict']['score_parts']==parts
         assert len(sheet['analysis_windows']['21'])==22

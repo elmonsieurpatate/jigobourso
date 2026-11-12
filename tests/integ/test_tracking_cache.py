@@ -4,6 +4,8 @@ import pytest
 from engine.shared.db import connect
 from engine.analytics.series import compute
 from engine.analytics.admin import service
+from engine.analytics.admin import universe_verdicts
+from engine.analytics.admin import title_sheet
 from engine.analytics.explorer import strategy
 from engine.analytics.portfolio import tracking
 from tests.dbutil import reset_data
@@ -79,11 +81,11 @@ def test_explorer_cache_is_identical_and_invalidated():
         cur.execute('DELETE FROM result_cache')
     conn.commit()
     assert service.explore(conn, request) == first                      # recalcul complet : même résultat
-    version = service.data_version(conn)
+    version = universe_verdicts.data_version(conn)
     with conn.cursor() as cur:
         cur.execute("INSERT INTO jobs(job_type,status,started_at,finished_at) VALUES ('nightly','completed',%s,%s)", (datetime.datetime.utcnow(),) * 2)
     conn.commit()
-    assert service.data_version(conn) != version                        # un traitement terminé invalide le cache
+    assert universe_verdicts.data_version(conn) != version                        # un traitement terminé invalide le cache
     with conn.cursor() as cur:
         cur.execute("UPDATE listings SET status='excluded', excluded_reason='test' WHERE id=1")
     conn.commit()
@@ -169,10 +171,10 @@ def test_sheet_verdict_matches_explorer_for_the_same_configuration():
     cfg = _custom(week={'min_slope': 0.0}, month={'min_slope': 0.1})
     rows = {r['id']: r for r in service.explore(conn, {'config': cfg, 'view': {'status': 'all', 'page_size': 50}})['rows']}
     for lid, row in rows.items():
-        sheet = service.instrument_sheet(conn, {'config': cfg, 'listing_id': lid, 'source': 'test'})
+        sheet = title_sheet.instrument_sheet(conn, {'config': cfg, 'listing_id': lid, 'source': 'test'})
         assert sheet['verdict']['status'] == row['status'] and sheet['verdict']['rank'] == row['rank'] and sheet['verdict']['score'] == row['score']
         assert [p['id'] for p in sheet['strategy']['periods']] == ['week', 'month'] and sheet['strategy']['source'] == 'test'
-    default = service.instrument_sheet(conn, {'config': 'regular', 'listing_id': 1})
+    default = title_sheet.instrument_sheet(conn, {'config': 'regular', 'listing_id': 1})
     assert [p['id'] for p in default['strategy']['periods']] == ['month', 'quarter']          # la fiche annonce la configuration qu'elle a utilisée
 
 
@@ -186,5 +188,5 @@ def test_excluded_listing_never_becomes_a_recommendation():
         res = service.explore(conn, {'config': cfg, 'view': {'status': 'retained', 'page_size': 50}})
         assert 'A.DE' not in {r['symbol'] for r in res['rows']}
         assert res['universe'] == 2
-    sheet = service.instrument_sheet(conn, {'config': _custom(month={}), 'listing_id': 1})
+    sheet = title_sheet.instrument_sheet(conn, {'config': _custom(month={}), 'listing_id': 1})
     assert sheet['verdict']['status'] == 'excluded'

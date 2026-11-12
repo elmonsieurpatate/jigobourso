@@ -89,6 +89,7 @@ def serve(cmd):
     import datetime as dt
     from engine.analytics.admin import scores_admin
     from engine.analytics.admin import service
+    from engine.analytics.admin import title_sheet
     from engine.analytics.explorer import strategy
     from engine.analytics.portfolio import tracking
 
@@ -151,7 +152,7 @@ def serve(cmd):
             result = C.editable(request) if request.get('_editable') else C.upgrade(request) if request.get('_upgrade') else strategy.validate(request)
         else:
             conn = connect()
-            result = service.explore(conn, request) if cmd == 'explore' else service.instrument_sheet(conn, request)
+            result = service.explore(conn, request) if cmd == 'explore' else title_sheet.instrument_sheet(conn, request)
         print(json.dumps(result, default=plain, ensure_ascii=False, allow_nan=False))
         return 0
     except ValueError as e:                                 # demande invalide : message écrit pour l'utilisateur

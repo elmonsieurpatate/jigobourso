@@ -169,7 +169,7 @@ def enrich(conn, request, series, alerts, today):
             if str(l['tx_id']) in alerts:
                 alerts[str(l['tx_id'])]['protection'] = dict(protection([l], *args, current_date=str(p.get('price_time') or '')[:10] or None), currency=p.get('price_currency'))
         personal = dict(protection(own, *args, basis_cost=p.get('cost'), current_date=str(p.get('price_time') or '')[:10] or None), currency=p.get('price_currency'))
-        from ..admin.service import expected_close, last_collection
+        from ..market_views.market_facts import expected_close, last_collection
         context = dict(p, portfolio_config=(request.get('portfolio_strategy') or {}).get('config'), expected_close=expected_close(conn, p['mic']), collected_at=last_collection(conn, p['mic'])) if p.get('mic') else p
         result[p['key']] = diagnose(context, [alerts[str(l['tx_id'])] for l in own if str(l['tx_id']) in alerts], state, metrics.get(lid, {}), personal, today.isoformat())
     return result

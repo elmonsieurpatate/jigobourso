@@ -26,7 +26,7 @@ def test_filters_scope_full_universe_by_region_and_aum_decile(monkeypatch):
         dict(id=6, instrument_id=102, kind='etf', mic='XNAS', country=None, category=None, status='retained', score=40, net_assets=120, currency='USD', price_currency='USD', symbol='B.US', name='Europe ETF alternate listing', isin=None, group='etf', fails=[]),
     ]
     monkeypatch.setattr(service, 'cached_verdicts', lambda *args: entries)
-    monkeypatch.setattr(service, '_reference_window', lambda *args: 21)
+    monkeypatch.setattr(service, 'reference_window', lambda *args: 21)
     monkeypatch.setattr(service, 'judge_universe', lambda conn, config, ids: [dict(key=i, rank=i, score=i) for i in ids])
     conn = Conn({1: 'United States Stock', 2: 'Europe Stock', 3: 'World Stock', 6: 'Europe Stock'})
     all_entries, largest, _, _ = service.scoped_entries(conn, {}, {'kind': 'large_etf'}, rates={'USD': 0.9}, aux={})
@@ -48,7 +48,7 @@ def test_currency_unknown_does_not_enter_aum_decile(monkeypatch):
         dict(id=2, instrument_id=2, kind='etf', mic='XETR', country=None, category=None, status='retained', score=80, net_assets=999999, currency='XYZ', price_currency='XYZ', symbol='Unknown', name='Unknown FX', isin=None, group='etf', fails=[]),
     ]
     monkeypatch.setattr(service, 'cached_verdicts', lambda *args: entries)
-    monkeypatch.setattr(service, '_reference_window', lambda *args: 21)
+    monkeypatch.setattr(service, 'reference_window', lambda *args: 21)
     monkeypatch.setattr(service, 'judge_universe', lambda conn, config, ids: [dict(key=i, rank=i, score=i) for i in ids])
     _, selected, _, _ = service.scoped_entries(Conn({}), {}, {'kind': 'large_etf'}, rates={}, aux={})
     assert [x['symbol'] for x in selected] == ['Known']
@@ -62,7 +62,7 @@ def _etfs(amounts):
 def test_large_etf_keeps_only_the_top_tenth_by_aum(monkeypatch):
     entries = _etfs([float(a) for a in range(1, 101)])           # encours 1 … 100
     monkeypatch.setattr(service, 'cached_verdicts', lambda *args: entries)
-    monkeypatch.setattr(service, '_reference_window', lambda *args: 21)
+    monkeypatch.setattr(service, 'reference_window', lambda *args: 21)
     monkeypatch.setattr(service, 'judge_universe', lambda conn, config, ids: [dict(key=i, rank=i, score=i) for i in ids])
     _, selected, _, _ = service.scoped_entries(Conn({}), {}, {'kind': 'large_etf'}, rates={}, aux={})
     assert sorted(x['net_assets'] for x in selected) == [float(a) for a in range(91, 101)]
@@ -71,7 +71,7 @@ def test_large_etf_keeps_only_the_top_tenth_by_aum(monkeypatch):
 def test_large_etf_rounds_the_tenth_up_and_keeps_ties(monkeypatch):
     entries = _etfs([5.0, 50.0, 50.0] + [1.0] * 12)               # 15 ETF : 2 au premier dixième, égalité au seuil conservée
     monkeypatch.setattr(service, 'cached_verdicts', lambda *args: entries)
-    monkeypatch.setattr(service, '_reference_window', lambda *args: 21)
+    monkeypatch.setattr(service, 'reference_window', lambda *args: 21)
     monkeypatch.setattr(service, 'judge_universe', lambda conn, config, ids: [dict(key=i, rank=i, score=i) for i in ids])
     _, selected, _, _ = service.scoped_entries(Conn({}), {}, {'kind': 'large_etf'}, rates={}, aux={})
     assert sorted(x['net_assets'] for x in selected) == [50.0, 50.0]
@@ -82,7 +82,7 @@ def test_max_fee_keeps_cheap_etfs_and_ignores_equities(monkeypatch):
                                                  price_currency='EUR', symbol='EQ', name='Action', isin=None, group='equity', fails=[])]
     aux = {1: {'fee': 0.07}, 2: {'fee': 0.45}, 3: {}, 9: {}}                     # ETF 3 : frais inconnus
     monkeypatch.setattr(service, 'cached_verdicts', lambda *args: entries)
-    monkeypatch.setattr(service, '_reference_window', lambda *args: 21)
+    monkeypatch.setattr(service, 'reference_window', lambda *args: 21)
     monkeypatch.setattr(service, 'judge_universe', lambda conn, config, ids: [dict(key=i, rank=i, score=i) for i in ids])
     _, selected, _, _ = service.scoped_entries(Conn({}), {}, {'max_fee': '0.3'}, rates={}, aux=aux)
     assert [x['symbol'] for x in selected] == ['E1', 'EQ']

@@ -7,6 +7,7 @@ import pytest
 
 from engine.analytics.series import compute
 from engine.analytics.admin import service
+from engine.analytics.admin import universe_verdicts
 from engine.analytics.explorer import strategy
 from engine.shared.db import connect
 from tests.dbutil import reset_data
@@ -64,7 +65,7 @@ def conn():
 
 
 def verdicts(conn, name):
-    return {v['symbol']: v for v in service.judge_universe(conn, strategy.validate(strategy.preset(name)))}
+    return {v['symbol']: v for v in universe_verdicts.judge_universe(conn, strategy.validate(strategy.preset(name)))}
 
 
 def data_reasons(v):
@@ -72,7 +73,7 @@ def data_reasons(v):
 
 
 def test_missing_reason_distinguishes_history_break_calendar_and_coverage():
-    f = service._missing_reason
+    f = universe_verdicts._missing_reason
     assert f(50, 126, None, None) == 'history'                       # moins de 127 clôtures
     assert f(50, 126, None, 10) == 'history'                         # l'historique court passe avant tout
     assert f(300, 126, None, 40) == 'break'                          # rupture plus récente que la fenêtre

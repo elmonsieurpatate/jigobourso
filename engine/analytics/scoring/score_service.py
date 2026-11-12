@@ -92,7 +92,7 @@ def _key(config, version):
 
 def score_book(conn, config, data_version):
     """Scores légers de tout l'univers, mis en cache selon les seuls paramètres de score et la version des données."""
-    from ..admin.service import packed, unpacked
+    from ..admin.universe_verdicts import packed, unpacked
     key = _key(config, data_version)
     with conn.cursor() as cur:
         cur.execute('SELECT data_version, payload FROM result_cache WHERE cache_key=%s', (key,))

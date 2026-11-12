@@ -11,7 +11,7 @@ from engine.market.collect import latest_rates, to_eur_factor
 from . import criteria as CR
 from ..admin import scores_admin
 from . import score_service
-from ..admin import service
+from ..admin import universe_verdicts
 
 CONFIG = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))), 'app', 'config', 'secondary_metadata_groups.json')
 ACCENTS = str.maketrans({'é': 'e', 'è': 'e', 'ê': 'e', 'ë': 'e', 'à': 'a', 'â': 'a', 'ä': 'a', 'á': 'a', 'ã': 'a', 'å': 'a', 'î': 'i', 'ï': 'i', 'í': 'i', 'ì': 'i', 'ô': 'o', 'ö': 'o', 'ó': 'o',
@@ -115,7 +115,7 @@ def _base(conn, request):
     if not scores_admin.known(name):
         name = 'growth_v4'
     cfg = scores_admin.build_config(conn, name)
-    book = score_service.score_book(conn, cfg, service.data_version(conn))
+    book = score_service.score_book(conn, cfg, universe_verdicts.data_version(conn))
     return name, cfg, book
 
 

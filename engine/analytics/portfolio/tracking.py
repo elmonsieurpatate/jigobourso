@@ -9,7 +9,7 @@ import datetime
 import statistics
 from collections import defaultdict
 
-from ..admin import service
+from ..admin import universe_verdicts
 from ..explorer import strategy
 from ..market_views.repository import recommendable_candidates
 from ..series.series import prepare_series
@@ -128,7 +128,7 @@ def record_snapshot(conn):
                 if getattr(exc, 'args', [None])[0] not in (1054,):
                     raise
                 continue
-        total += _store(conn, day.isoformat(), name, _top_picks(service.judge_universe(conn, config)), 'live')
+        total += _store(conn, day.isoformat(), name, _top_picks(universe_verdicts.judge_universe(conn, config)), 'live')
     return day.isoformat(), total
 
 

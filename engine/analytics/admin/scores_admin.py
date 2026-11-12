@@ -626,13 +626,13 @@ def _search(conn, q):
 def simulate(conn, request):
     """Décomposition des deux scores d'un titre réel avec la configuration enregistrée ou un brouillon. Aucune donnée n'est inventée : sans données, la réponse le dit."""
     refresh(conn)
-    from . import service
+    from . import universe_verdicts
     name = request.get('strategy')
     if not known(name):
         raise ValueError('Stratégie V4 inconnue')
     draft = request.get('draft') or {}
     cfg = build_config(conn, name, draft.get('profile'), draft.get('global'))
-    book = score_service.score_book(conn, cfg, service.data_version(conn))
+    book = score_service.score_book(conn, cfg, universe_verdicts.data_version(conn))
     eq = score_service.params_for(cfg, 'equity')
     gran = _granularity(eq)
     meta = {'granularity': gran, 'periods': [dict(id=p['id'], sessions=p['sessions']) for p in eq['periods']]}
@@ -702,9 +702,9 @@ def coverage(conn):
 
 def monitor(conn):
     """Suivi : titres notés, couverture, fraîcheur des données, origine de la liquidité, dernières erreurs de calcul."""
-    from . import service
+    from . import universe_verdicts
     cfg = build_config(conn, 'growth_v4')
-    book = score_service.score_book(conn, cfg, service.data_version(conn))
+    book = score_service.score_book(conn, cfg, universe_verdicts.data_version(conn))
     counts = {'simple': {'ok': 0, 'partiel': 0, 'inconnu': 0}, 'complex': {'ok': 0, 'partiel': 0, 'inconnu': 0}}
     covs = []
     for e in book.values():
@@ -950,13 +950,13 @@ def ranking(conn, request):
     """Résultat principal d'un réglage : titres notés et classés, indisponibles, répartition des notes, poids réels des périodes et effet par rapport au réglage enregistré.
     Aucun filtre n'intervient : les seuils facultatifs ne retirent aucun titre de ce classement."""
     refresh(conn)
-    from . import service
+    from . import universe_verdicts
     name = request.get('strategy')
     if not known(name):
         raise ValueError('Stratégie V4 inconnue')
     draft = request.get('draft') or {}
     cfg = build_config(conn, name, draft.get('profile'), draft.get('global'))
-    version = service.data_version(conn)
+    version = universe_verdicts.data_version(conn)
     book = score_service.score_book(conn, cfg, version)
     with conn.cursor() as cur:
         cur.execute('SELECT COUNT(*) AS n FROM v_recommendable')

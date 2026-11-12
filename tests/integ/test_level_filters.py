@@ -7,6 +7,8 @@ import pytest
 
 from engine.analytics.series import compute
 from engine.analytics.admin import service
+from engine.analytics.admin import title_sheet
+from engine.analytics.admin import universe_verdicts
 from engine.shared.db import connect
 from tests.dbutil import reset_data
 
@@ -82,7 +84,7 @@ def test_level_filters_cumulate_and_report_the_counts_of_each_level():
 def test_the_sheet_carries_the_assessment_and_pills_with_their_period():
     conn = connect()
     seed(conn)
-    sheet = service.instrument_sheet(conn, {'listing_id': 2, 'config': 'fast', 'view': {}, 'fetch_profile': False})
+    sheet = title_sheet.instrument_sheet(conn, {'listing_id': 2, 'config': 'fast', 'view': {}, 'fetch_profile': False})
     a = sheet['assessment']
     assert a['label'] in ('Très favorable', 'Favorable', 'Mitigé', 'Défavorable', 'Indéterminé') and a['period'] == '1 mois' and a['closing']
     periods = {s['key']: s.get('period') for s in sheet['signals']}
@@ -112,8 +114,8 @@ def test_rejected_default_proximity_is_applied_before_pagination_without_reranki
     pages=[service.explore(conn,{**request,'view':{**request['view'],'page':page}}) for page in (1,2,3)]
     assert all(r['ordering']=='proximity' and r['scope_counts']['retained']==0 for r in pages)
     actual=[r['id'] for page in pages for r in page['rows']]
-    verdicts=service.judge_universe(conn,cfg)
-    expected=[v['key'] for v in sorted(verdicts,key=lambda v:(*service.criteria_proximity(v['reasons']),v['symbol']))]
+    verdicts=universe_verdicts.judge_universe(conn,cfg)
+    expected=[v['key'] for v in sorted(verdicts,key=lambda v:(*universe_verdicts.criteria_proximity(v['reasons']),v['symbol']))]
     assert actual==expected and len(set(actual))==6
     all_rows=service.explore(conn,{'config':cfg,'view':{'status':'all','sort':'proximity','tradable':False}})
     assert all_rows['ordering']=='rank' # A broad symbol search does not claim to show only near misses.

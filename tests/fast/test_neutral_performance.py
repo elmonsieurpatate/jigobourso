@@ -3,7 +3,7 @@ import datetime as dt
 import pytest
 from engine.analytics.series import history
 from engine.analytics.portfolio import performance
-from engine.analytics.admin.service import criteria_proximity
+from engine.analytics.admin.universe_verdicts import criteria_proximity
 
 
 def trade(i, day, side, qty, price, lid=1, fees=0, fx=1):

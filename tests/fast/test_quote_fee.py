@@ -29,7 +29,7 @@ def test_analyst_rating_and_fund_assets_are_read_and_validated():
 
 
 def test_analyst_consensus_is_translated_without_inventing_anything():
-    from engine.analytics.admin.service import analyst_view
+    from engine.analytics.market_views.market_facts import analyst_view
     assert analyst_view('1.8 - Buy')['text'] == 'Achat (1,8)'
     assert analyst_view('2.7 - Hold')['text'] == 'Conserver (2,7)'
     assert analyst_view('1.3 - Strong Buy')['text'] == 'Achat fort (1,3)'
@@ -39,7 +39,7 @@ def test_analyst_consensus_is_translated_without_inventing_anything():
 
 
 def test_size_class_uses_euros_and_ignores_pence():
-    from engine.analytics.admin.service import _size_class
+    from engine.analytics.market_views.market_facts import size_class as _size_class
     rates = {'EUR': 1.0, 'USD': 0.9}
     assert _size_class(180e6, 'USD', rates) == 'micro-capitalisation'
     assert _size_class(5e9, 'EUR', rates) == 'capitalisation moyenne'
@@ -48,7 +48,7 @@ def test_size_class_uses_euros_and_ignores_pence():
 
 
 def test_activity_note_explains_without_touching_thresholds():
-    from engine.analytics.admin.service import _activity_note
+    from engine.analytics.admin.title_sheet import _activity_note
     assert _activity_note({'avg_volume_3m': 100, 'avg_volume_10d': 110}) == []
     assert _activity_note({'avg_volume_3m': None, 'avg_volume_10d': 5}) == []
     note = _activity_note({'avg_volume_3m': 191393, 'avg_volume_10d': 487130})[0]

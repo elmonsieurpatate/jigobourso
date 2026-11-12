@@ -1,7 +1,7 @@
 """SELECT-only snapshot for the requested week/month configuration, no ranking changes."""
 import json
 from engine.shared.db import connect
-from engine.analytics.admin import service
+from engine.analytics.admin import universe_verdicts
 from engine.analytics.explorer import strategy
 c=connect()
 with c.cursor() as cur:
@@ -13,7 +13,7 @@ for p in cfg['periods']:
  for k in ('min_r2','min_er','min_return','max_return','max_volatility','max_drawdown'):p[k]=None
  p['min_slope']=strategy.SLOPE_LEVELS['very_strong'] if p['enabled'] else None
 cfg['ranking']={'mode':'performance','weights':{}}
-rows=service.judge_universe(c,cfg);kept=[r for r in rows if r['status']=='retained' and r['group']=='equity']
+rows=universe_verdicts.judge_universe(c,cfg);kept=[r for r in rows if r['status']=='retained' and r['group']=='equity']
 result=[]
 for r in rows:
  if r['symbol'] not in ('CXM','AR','DOW'):continue

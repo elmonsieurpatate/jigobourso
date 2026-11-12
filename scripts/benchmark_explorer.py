@@ -10,7 +10,7 @@ import json
 sys.path.insert(0,os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from engine.analytics.explorer import explorer_config as C
 from engine.analytics.explorer import strategy as S
-from engine.analytics.admin.service import packed
+from engine.analytics.admin.universe_verdicts import packed
 
 c=C.empty()
 for p in c['periods']:p['enabled']=True

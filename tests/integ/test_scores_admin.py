@@ -67,7 +67,7 @@ def test_simulation_monitor_and_profiles_use_real_data_and_stay_independent_of_c
 
 
 def test_general_ranking_rates_every_evaluable_title_and_filters_remove_none():
-    from engine.analytics.admin import service
+    from engine.analytics.admin import universe_verdicts
     conn = connect()
     reset_data(conn)
     seed(conn)
@@ -93,12 +93,12 @@ def test_general_ranking_rates_every_evaluable_title_and_filters_remove_none():
     A.save(conn, {'profile': dict(p, name='growth_v4')})
     assert A.ranking(conn, {'strategy': 'growth_v4'})['summary'] == s
     cfg = A.build_config(conn, 'growth_v4')
-    verdicts = service.judge_universe(conn, cfg)
+    verdicts = universe_verdicts.judge_universe(conn, cfg)
     assert {v['status'] for v in verdicts} == {'retained'}
     # filtres activés : le verdict peut écarter, mais le classement général garde les deux titres
     p['filters'] = {'enabled': True}
     A.save(conn, {'profile': dict(p, name='growth_v4')})
-    assert {v['status'] for v in service.judge_universe(conn, A.build_config(conn, 'growth_v4'))} == {'rejected'}
+    assert {v['status'] for v in universe_verdicts.judge_universe(conn, A.build_config(conn, 'growth_v4'))} == {'rejected'}
     assert A.ranking(conn, {'strategy': 'growth_v4'})['summary'] == s
     # effet d'un changement de poids : comparaison avec le réglage enregistré
     p['weights_mode'], p['weights'] = 'custom', {'week': 90, 'month': 10}
@@ -112,8 +112,8 @@ def test_per_strategy_normalisations_persist_change_only_their_strategy_and_the_
     conn = connect()
     reset_data(conn)
     seed(conn)
-    from engine.analytics.admin import service
-    ver = service.data_version(conn)
+    from engine.analytics.admin import universe_verdicts
+    ver = universe_verdicts.data_version(conn)
     before = {n: {e['id']: (e['simple'], e['complex']) for e in S.score_book(conn, A.build_config(conn, n), ver).values()} for n in ('growth_v4', 'rebound')}
     key_before = S._key(A.build_config(conn, 'rebound'), ver)
     p = A.clean_profile(A.profile_of(A.base_config('rebound')))
@@ -136,7 +136,7 @@ def test_per_strategy_normalisations_persist_change_only_their_strategy_and_the_
 
 def test_stored_profile_without_new_fields_is_still_valid_and_momentum_strategies_use_series_state():
     from engine.analytics.scoring import score_service as S
-    from engine.analytics.admin import service
+    from engine.analytics.admin import universe_verdicts
     conn = connect()
     reset_data(conn)
     seed(conn)
@@ -150,7 +150,7 @@ def test_stored_profile_without_new_fields_is_still_valid_and_momentum_strategie
         cur.execute('UPDATE series_state SET momentum_6m=45, momentum_12m=80 WHERE listing_id=1')
         cur.execute('UPDATE series_state SET momentum_6m=-10, momentum_12m=-20 WHERE listing_id=2')
     conn.commit()
-    ver = service.data_version(conn)
+    ver = universe_verdicts.data_version(conn)
     book = S.score_book(conn, A.build_config(conn, 'momentum_6m'), ver)
     assert book[1]['complex'] is not None and book[1]['complex'] > book[2]['complex']
     det = S.details(conn, A.build_config(conn, 'momentum_6m'), [1])[1]['complex']['contributions']['momentum']

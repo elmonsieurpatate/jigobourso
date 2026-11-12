@@ -98,11 +98,12 @@ export MYSQL_PWD="$JIGO_DB_PASSWORD" PYTHONPATH="$ROOT"
 .venv/bin/python - <<'PY'
 from engine.shared.db import connect
 from engine.analytics.admin import service
+from engine.analytics.admin import universe_verdicts
 from engine.analytics.explorer import strategy
 
 conn = connect()
 for name in ('regular', 'momentum_risk'):
-    verdicts = service.judge_universe(conn, strategy.preset(name))
+    verdicts = universe_verdicts.judge_universe(conn, strategy.preset(name))
     retained = sum(v['status'] == 'retained' for v in verdicts)
     unknown = sum(v['status'] == 'unknown' for v in verdicts)
     print(f'diagnostic Explorer {name}: {retained} retenus, {unknown} non évaluables sur {len(verdicts)}')
