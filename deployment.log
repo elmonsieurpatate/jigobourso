@@ -1,2 +1,8 @@
 == Validation du déploiement : quick
 == Contrôles du serveur (lecture seule)
+== Mode rapide : diagnostic exhaustif des classements non exécuté
+== Contrôle des fichiers SQL : ajouts seulement
+== Mode rapide : essai isolé Hostinger non exécuté
+== Version des pages : ?v=202611121542
+== Transfert du code
+== Dépendances Python, migrations de schéma, contrôles
