@@ -8,6 +8,8 @@ liquidité = minima du préfiltre (réglables dans l'administration) multipliés
 """
 import math
 
+from ..shared.text import fr
+from ..shared.numbers import finite
 from ..explorer import strategy
 
 R2_OK = strategy.R2_LEVELS['balanced']        # 0,75
@@ -32,20 +34,12 @@ def period_label(sessions):
     return PERIODS.get(sessions) or (f'{sessions} séances' if sessions else None)
 
 
-def _num(v):
-    try:
-        v = float(v)
-        return v if math.isfinite(v) else None
-    except (TypeError, ValueError):
-        return None
-
-
 def _eur(v):
     return f'{v / 1e6:.1f} M€'.replace('.', ',') if v >= 1e6 else f'{round(v / 1e3):d} k€'
 
 
 def regularity(r2, sessions=None, extra=''):
-    r2, win, period = _num(r2), f' sur {sessions} séances' if sessions else '', period_label(sessions)
+    r2, win, period = finite(r2), f' sur {sessions} séances' if sessions else '', period_label(sessions)
     tip = f'Vert : R² ≥ {R2_OK:.2f} · orange : ≥ {R2_WARN:.2f} (seuil du profil « croissance régulière ») · rouge : en dessous.'
     if r2 is None:
         return sig('regularity', 'unknown', 'Régularité inconnue', 'Régularité non calculable (historique trop court ou rupture de cours).', tip, period=period)
@@ -59,7 +53,7 @@ def regularity(r2, sessions=None, extra=''):
 
 
 def risk(vol, dd, sessions=None):
-    vol, dd, win, period = _num(vol), _num(dd), f' sur {sessions} séances' if sessions else '', period_label(sessions)
+    vol, dd, win, period = finite(vol), finite(dd), f' sur {sessions} séances' if sessions else '', period_label(sessions)
     tip = (f'Vert : variation ≤ {VOL_OK:g} %/séance et repli ≤ {DD_OK:g} % (profil « faible volatilité») · orange : jusqu\'à {RISK_FACTOR:g} fois · rouge : au-delà.')
     if vol is None and dd is None:
         return sig('risk', 'unknown', 'Volatilité inconnue', 'Volatilité et repli non calculables.', tip, period=period)
@@ -86,7 +80,7 @@ FLOOR_FACTOR = 2.0                             # sous 2 fois le minimum du préf
 def liquidity_levels(kind, prefilter=None):
     """(plancher, confort) en €/jour : sous le plancher « limitée » (masquée par le filtre), jusqu'au confort « à surveiller », au-delà « facilement négociable »."""
     rule = (prefilter or {}).get('liquidity_etf' if kind == 'etf' else 'liquidity_equity') or {}
-    minimum = _num(rule.get('min_eur')) or DEFAULT_MIN_LIQUIDITY['etf' if kind == 'etf' else 'equity']
+    minimum = finite(rule.get('min_eur')) or DEFAULT_MIN_LIQUIDITY['etf' if kind == 'etf' else 'equity']
     return minimum * FLOOR_FACTOR, minimum * LIQ_FACTOR
 
 
@@ -94,7 +88,7 @@ def liquidity(daily_eur, kind, prefilter=None, quote_age_days=None):
     """Statut de négociabilité d'un titre : une seule source pour la pastille, le filtre « Titres facilement négociables » et la fiche. Mesure : volume moyen 3 mois × cours
     (estimation Yahoo, pas du volume exécuté). Une donnée absente ou périmée donne « non déterminée », jamais « limitée »."""
     floor, comfort = liquidity_levels(kind, prefilter)
-    daily_eur = _num(daily_eur)
+    daily_eur = finite(daily_eur)
     tip = f'Facilement négociable : ≥ {_eur(comfort)}/jour · à surveiller : ≥ {_eur(floor)} · limitée : en dessous. Volume moyen 3 mois × cours (estimation Yahoo).'
     period = LIQUIDITY_PERIOD
     values = {'daily_eur': daily_eur, 'floor_eur': floor, 'comfort_eur': comfort, 'quote_age_days': quote_age_days}
@@ -113,7 +107,7 @@ def liquidity(daily_eur, kind, prefilter=None, quote_age_days=None):
 def row_signals(aux, kind, ref_sessions, prefilter=None, quote_age_days=None):
     """Les trois pastilles d'une ligne de classement, depuis les mesures de la fenêtre de référence (les mêmes que les colonnes du tableau)."""
     aux = aux or {}
-    price, volume = _num(aux.get('price_eur')), _num(aux.get('volume'))
+    price, volume = finite(aux.get('price_eur')), finite(aux.get('volume'))
     return [regularity(aux.get('r2'), ref_sessions), risk(aux.get('volatility'), aux.get('drawdown'), ref_sessions),
             liquidity(price * volume if price is not None and volume is not None else None, kind, prefilter, quote_age_days)]
 
@@ -140,7 +134,7 @@ def _pct(v):
 def trend_class(slope, perf):
     """Tendance de la fenêtre de référence : 'strong' (forte), 'steady' (soutenue), 'gentle' (douce), 'flat' (pas de tendance nette), 'down' (baisse) ; None si non mesurée.
     Les niveaux de pente sont ceux des profils de stratégie (temps pour doubler : 2 ans, 4 ans, 8 ans)."""
-    slope, perf = _num(slope), _num(perf)
+    slope, perf = finite(slope), finite(perf)
     if slope is None or perf is None:
         return None
     if perf < 0:
@@ -155,7 +149,7 @@ def trend_class(slope, perf):
 
 def contradiction(measures):
     """Tendance récente qui contredit celle de fond, d'après les performances déjà mesurées : repli récent après une hausse de fond, ou rebond récent dans une baisse de fond. None sinon (ou si les mesures manquent)."""
-    perf = {n: _num((m or {}).get('perf')) for n, m in (measures or {}).items()}
+    perf = {n: finite((m or {}).get('perf')) for n, m in (measures or {}).items()}
     for short in (21, 5):
         for long in (252, 126, 63, 21):
             if long <= short or perf.get(short) is None or perf.get(long) is None:
@@ -172,10 +166,6 @@ def _lc(text):
     return text[:1].lower() + text[1:]
 
 
-def _fr(v, digits=3):
-    return f'{v:.{digits}f}'.replace('.', ',')
-
-
 def assessment(measures, ref, pills, quality=None):
     """Appréciation descriptive du profil : Très favorable / Favorable / Mitigé / Défavorable / Indéterminé, avec points forts et points de vigilance.
     `measures` : {séances: mesures}, `ref` : fenêtre de la stratégie, `pills` : signaux de la fiche (régularité, risque, négociabilité, données, risques spécifiques ETF).
@@ -183,7 +173,7 @@ def assessment(measures, ref, pills, quality=None):
     measures = {int(k): v for k, v in (measures or {}).items() if v}
     by_key = {p['key']: p for p in pills or []}
     m = measures.get(ref) or {}
-    trend, period, perf, slope, r2 = trend_class(m.get('slope'), m.get('perf')), period_label(ref), _num(m.get('perf')), _num(m.get('slope')), _num(m.get('r2'))
+    trend, period, perf, slope, r2 = trend_class(m.get('slope'), m.get('perf')), period_label(ref), finite(m.get('perf')), finite(m.get('slope')), finite(m.get('r2'))
     reg, rsk, liq, data, spec = (by_key.get(k) for k in ('regularity', 'risk', 'liquidity', 'data', 'risks'))
     up = trend in ('strong', 'steady', 'gentle')
     strengths, cautions, unknowns, big, minor = [], [], [], [], []       # big : risques importants (rouge) ; minor : points de vigilance (orange)
@@ -230,7 +220,7 @@ def assessment(measures, ref, pills, quality=None):
     contra = contradiction(measures)
     if contra:
         cautions.append(_lc(contra['text'].rstrip('.')))
-    horizons = [{'period': period_label(n), 'perf': _num(measures[n].get('perf'))} for n in sorted(measures) if _num(measures[n].get('perf')) is not None]
+    horizons = [{'period': period_label(n), 'perf': finite(measures[n].get('perf'))} for n in sorted(measures) if finite(measures[n].get('perf')) is not None]
     why = None
     if trend is None:
         why = f'tendance non mesurée sur {period}'
@@ -259,7 +249,7 @@ def assessment(measures, ref, pills, quality=None):
     else:
         code, reason = 'mixed', f'{len(minor)} points de vigilance : ' + ', '.join(minor[:3]) + '.'
     label, level = APPRECIATIONS[code]
-    facts = [f'Période de la stratégie : {period}. Pente {_fr(slope)} %/séance, performance {_pct(perf)}.'] if trend is not None else []
+    facts = [f'Période de la stratégie : {period}. Pente {fr(slope, 3)} %/séance, performance {_pct(perf)}.'] if trend is not None else []
     return {'code': code, 'level': level, 'label': label, 'period': period, 'reason': reason, 'strengths': strengths, 'cautions': cautions, 'unknowns': unknowns,
             'contradiction': contra, 'horizons': horizons, 'facts': facts, 'rules': [{'label': l, 'rule': r} for l, r in APPRECIATION_RULES], 'closing': CLOSING,
             'nothing_flagged': not cautions and not unknowns and code != 'undetermined'}
@@ -325,7 +315,7 @@ def similarity(analysis):
 
 def composition(profile):
     tip = f'Poids des dix premières lignes déclarées par Yahoo : vert < {TOP10_WARN:g} % · orange < {TOP10_BAD:g} % · rouge au-delà. Date effective de la composition inconnue.'
-    top10 = _num((profile or {}).get('top10_weight'))
+    top10 = finite((profile or {}).get('top10_weight'))
     if top10 is None:
         return sig('composition', 'unknown', 'Composition inconnue', 'Pondérations des dix premières lignes non fournies ou incomplètes.', tip)
     text = f'Les dix premières lignes pèsent {top10:.0f} % du fonds.'

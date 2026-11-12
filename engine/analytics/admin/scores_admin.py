@@ -6,6 +6,7 @@ Le moteur (scores.py) n'est jamais modifié ici : l'administration ne règle que
 Les seuils de conformité (pente, R², rendement) filtrent ; ils n'entrent jamais dans une note."""
 import copy
 
+from ..shared.dates import iso
 from engine.shared import settings
 
 from ..scoring import criteria as _CR
@@ -388,7 +389,7 @@ def strategies(conn):
         active = [p for p in SCORING_PERIODS if current['periods'][p]['enabled']]
         out.append({'name': name, 'label': sp['label'], 'note': sp['note'], 'engine': 'v4', 'sort': cfg['ranking'].get('sort'), 'defaults': profile_of(base), 'current': current,
                     'customised': name in stored, 'official': official_clean(conn, name), 'modified': profile_diff(current, official_clean(conn, name)) if name in V4_STRATEGIES else [],
-                    'auto_weights': auto_weights(glob['kappa'], active), 'saved_at': _iso(settings.saved_at(conn, PROFILES)) if name in stored else None})
+                    'auto_weights': auto_weights(glob['kappa'], active), 'saved_at': iso(settings.saved_at(conn, PROFILES)) if name in stored else None})
     return out
 
 
@@ -553,18 +554,11 @@ def personal(conn):
     return out
 
 
-def _iso(v):
-    import datetime
-    if isinstance(v, datetime.datetime):
-        return v.isoformat(sep=' ')
-    return v.isoformat() if isinstance(v, datetime.date) else v
-
-
 def state(conn):
     cur = score_service.admin_defaults(conn)
     stored = settings.get(conn, score_service.SETTING, None)
     return {'design': design(), 'formula': formula(), 'version': SC.VERSION, 'period_labels': PERIOD_LABELS, 'scoring_periods': list(SCORING_PERIODS),
-            'global': {'kappa': cur['kappa'], 'threshold': cur['threshold'], 'anchor': cur['anchor'], 'customised': bool(stored), 'saved_at': _iso(settings.saved_at(conn, score_service.SETTING)) if stored else None},
+            'global': {'kappa': cur['kappa'], 'threshold': cur['threshold'], 'anchor': cur['anchor'], 'customised': bool(stored), 'saved_at': iso(settings.saved_at(conn, score_service.SETTING)) if stored else None},
             'strategies': strategies(conn), 'references': references(), 'personal': personal(conn), 'volume_collection': bool(settings.get(conn, 'volume_collection', False))}
 
 
@@ -703,7 +697,7 @@ def coverage(conn):
     by = {r['source']: int(r['n']) for r in rows}
     known = by.get('daily', 0) + by.get('estimated', 0)
     return {'universe': total, 'daily': by.get('daily', 0), 'estimated': by.get('estimated', 0), 'unknown': max(0, total - known),
-            'computed_at': _iso(max((r['at'] for r in rows if r['at']), default=None)), 'volume_checked_at': _iso(max((r['checked'] for r in rows if r['checked']), default=None)), 'score_inputs': inputs}
+            'computed_at': iso(max((r['at'] for r in rows if r['at']), default=None)), 'volume_checked_at': iso(max((r['checked'] for r in rows if r['checked']), default=None)), 'score_inputs': inputs}
 
 
 def monitor(conn):
@@ -730,11 +724,11 @@ def monitor(conn):
                        ORDER BY started_at DESC LIMIT 12""")
         jobs = cur.fetchall()
     last_ok = next((j for j in jobs if j['status'] in ('completed', 'completed_with_errors')), None)
-    problems = [dict(id=j['id'], type=j['job_type'], status=j['status'], at=_iso(j['started_at']), errors=int(j['items_error'] or 0), summary=j['summary']) for j in jobs
+    problems = [dict(id=j['id'], type=j['job_type'], status=j['status'], at=iso(j['started_at']), errors=int(j['items_error'] or 0), summary=j['summary']) for j in jobs
                 if j['status'] in ('failed', 'interrupted', 'completed_with_errors')][:5]
     return {'rated': len(book), 'counts': counts, 'coverage': {'median': covs[len(covs) // 2] if covs else None, 'min': covs[0] if covs else None, 'full': sum(1 for c in covs if c >= 0.999)},
-            'freshness': {'last_close': _iso(fresh.get('last_close')), 'computed_at': _iso(fresh.get('computed_at')), 'stale_titles': stale},
-            'last_success': None if not last_ok else dict(type=last_ok['job_type'], at=_iso(last_ok['finished_at'] or last_ok['started_at'])),
+            'freshness': {'last_close': iso(fresh.get('last_close')), 'computed_at': iso(fresh.get('computed_at')), 'stale_titles': stale},
+            'last_success': None if not last_ok else dict(type=last_ok['job_type'], at=iso(last_ok['finished_at'] or last_ok['started_at'])),
             'liquidity': coverage(conn), 'problems': problems, 'volume_collection': bool(settings.get(conn, 'volume_collection', False))}
 
 

@@ -13,6 +13,7 @@ Seuils de risque : bandes de σ63 et centiles mesurés (table BANDS), jamais opt
 import datetime
 import math
 
+from ..shared.text import fr
 from ..series import measures
 
 MODEL_VERSION = 1
@@ -56,10 +57,6 @@ def band_of(sigma):
         if sigma <= b[0]:
             return i, b
     return len(BANDS) - 1, BANDS[-1]
-
-
-def fr(x, d=1):
-    return f'{x:.{d}f}'.replace('.', ',')
 
 
 def _m6_series(closes, breaks):

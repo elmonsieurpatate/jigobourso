@@ -7,6 +7,7 @@ la barre n'est alors pas évaluée au lieu de déclencher une alerte à tort. Le
 """
 import math
 
+from ..shared.text import fr
 from ..series.series import BREAK_RATIO
 
 # Fenêtres (séances) par horizon de stratégie : (récente, longue, horizon du seuil de recul).
@@ -52,10 +53,6 @@ def _vol(closes):
     return 100 * math.sqrt(sum((x - m) ** 2 for x in r) / (len(r) - 1))
 
 
-def _fr(x, digits=1):
-    return f'{x:.{digits}f}'.replace('.', ',')
-
-
 def assess(strategy, closes, drop_pct, drop_override=None, ma50=None):
     """closes : clôtures corrigées des splits jusqu'à aujourd'hui (au moins la fenêtre longue) ; drop_pct : recul (%) depuis le plus haut depuis l'achat.
 
@@ -79,30 +76,30 @@ def assess(strategy, closes, drop_pct, drop_override=None, ma50=None):
     signals = []
     # 1. Tendance : pente récente comparée à la pente longue.
     if r['slope'] > 0 and r['slope'] >= 0.5 * max(lg['slope'], 0):
-        pts, txt = 0, f"Tendance intacte : pente récente {_fr(r['slope'], 2)} %/séance sur {recent} séances (longue : {_fr(lg['slope'], 2)} %)."
+        pts, txt = 0, f"Tendance intacte : pente récente {fr(r['slope'], 2)} %/séance sur {recent} séances (longue : {fr(lg['slope'], 2)} %)."
     elif r['slope'] <= 0 and lg['slope'] <= 0:
-        pts, txt = 2, f"Tendance cassée : pente récente {_fr(r['slope'], 2)} %/séance et pente sur {long_} séances {_fr(lg['slope'], 2)} %."
+        pts, txt = 2, f"Tendance cassée : pente récente {fr(r['slope'], 2)} %/séance et pente sur {long_} séances {fr(lg['slope'], 2)} %."
     else:
-        pts, txt = 1, f"Tendance qui ralentit : pente récente {_fr(r['slope'], 2)} %/séance contre {_fr(lg['slope'], 2)} % sur {long_} séances."
+        pts, txt = 1, f"Tendance qui ralentit : pente récente {fr(r['slope'], 2)} %/séance contre {fr(lg['slope'], 2)} % sur {long_} séances."
     signals.append({'kind': 'slope', 'points': pts, 'label': 'Tendance', 'message': txt})
     # 2. Recul depuis le plus haut observé depuis l'achat : seuil proportionnel à la nervosité du titre, sauf réglage personnel.
     thr = float(drop_override) if drop_override is not None else min(DROP_MAX, max(DROP_MIN, K * sigma * math.sqrt(horizon)))
     d = drop_pct or 0.0
     pts = 2 if d >= thr else 1 if d >= 0.5 * thr else 0
     signals.append({'kind': 'drop', 'points': pts, 'label': 'Recul', 'value': round(d, 1), 'threshold': round(thr, 1),
-                    'message': f"Recul de {_fr(d)} % depuis le plus haut depuis l'achat (seuil {_fr(thr)} %{', réglé par vous' if drop_override is not None else ' = ' + _fr(K, 0) + ' × volatilité × √' + str(horizon)})."})
+                    'message': f"Recul de {fr(d)} % depuis le plus haut depuis l'achat (seuil {fr(thr)} %{', réglé par vous' if drop_override is not None else ' = ' + fr(K, 0) + ' × volatilité × √' + str(horizon)})."})
     # 3. Stabilité : régularité de la hausse maintenant, comparée à la fenêtre précédente.
     before = _fit(closes[-(long_ + 1 + recent):-recent]) if len(closes) >= long_ + 1 + recent else None
     if before is None:
-        pts, txt = 0, f"Régularité (R²) : {_fr(lg['r2'], 2)} sur {long_} séances."
+        pts, txt = 0, f"Régularité (R²) : {fr(lg['r2'], 2)} sur {long_} séances."
     else:
         fall = before['r2'] - lg['r2']
         pts = 2 if lg['r2'] < 0.3 and fall >= 0.4 else 1 if lg['r2'] < 0.5 and fall >= 0.2 else 0
-        txt = f"Régularité (R²) : {_fr(lg['r2'], 2)} contre {_fr(before['r2'], 2)} auparavant." + (' La hausse devient erratique.' if pts else '')
+        txt = f"Régularité (R²) : {fr(lg['r2'], 2)} contre {fr(before['r2'], 2)} auparavant." + (' La hausse devient erratique.' if pts else '')
     signals.append({'kind': 'stability', 'points': pts, 'label': 'Stabilité', 'message': txt})
     score = sum(s['points'] for s in signals)
     level = 'act' if score >= 4 or d >= thr else 'watch' if score >= 2 else 'ok'
     out = {'level': level, 'score': score, 'max': 6, 'signals': signals, 'drop_threshold': round(thr, 1), 'windows': [recent, long_], 'reason': None}
     if ma50 and closes[-1] > ma50 * (1 + EXTENDED / 100):
-        out['info'] = f"Information : le cours est {_fr(100 * (closes[-1] / ma50 - 1), 0)} % au-dessus de sa moyenne 50 jours (très étendu). Ce n'est pas un ordre de vente."
+        out['info'] = f"Information : le cours est {fr(100 * (closes[-1] / ma50 - 1), 0)} % au-dessus de sa moyenne 50 jours (très étendu). Ce n'est pas un ordre de vente."
     return out

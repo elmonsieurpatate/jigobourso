@@ -1,6 +1,7 @@
 """Données de l'administration : une page = un appel (FinanceDatabase, Yahoo Finance, Actions / ETF, historique des traitements)."""
 import datetime
 
+from ..shared.dates import iso
 from engine.catalogue import rules as cat_rules
 from engine.jobs import tasks
 from engine.market import collect, hours, prefilter
@@ -10,12 +11,6 @@ from ..explorer import funnel
 LEVELS = {'catalogue': cat_rules, 'prefilter': prefilter}
 SETTING = {'catalogue': 'catalogue_rules', 'prefilter': 'prefilter'}
 GROUPS = {'products': 'Produits', 'markets': 'Places de cotation', 'quality': 'Qualité des lignes'}
-
-
-def _iso(v):
-    if isinstance(v, datetime.datetime):
-        return v.isoformat(sep=' ')
-    return v.isoformat() if hasattr(v, 'isoformat') else v
 
 
 def _level(conn, name):
@@ -56,7 +51,7 @@ def _last_job(conn, job_type):
         cur.execute("""SELECT id, job_type, trigger_by, status, started_at, finished_at, items_ok, items_error, summary, TIMESTAMPDIFF(SECOND, started_at, finished_at) duration_s
                        FROM jobs WHERE job_type=%s ORDER BY id DESC LIMIT 1""", (job_type,))
         r = cur.fetchone()
-    return None if not r else {**r, 'started_at': _iso(r['started_at']), 'finished_at': _iso(r['finished_at'])}
+    return None if not r else {**r, 'started_at': iso(r['started_at']), 'finished_at': iso(r['finished_at'])}
 
 
 def _running(conn):
@@ -64,7 +59,7 @@ def _running(conn):
     with conn.cursor() as cur:
         cur.execute("SELECT id, job_type, started_at, summary FROM jobs WHERE status IN ('queued','running') AND job_type IN %s ORDER BY id LIMIT 1", (tasks.JOBS,))
         r = cur.fetchone()
-    return None if not r else {'id': r['id'], 'job_type': r['job_type'], 'started_at': _iso(r['started_at']), 'progress': r['summary']}
+    return None if not r else {'id': r['id'], 'job_type': r['job_type'], 'started_at': iso(r['started_at']), 'progress': r['summary']}
 
 
 def jobs_list(conn, request):
@@ -126,7 +121,7 @@ def fdb_state(conn):
         p['name'] = cat_rules.MARKET_NAMES.get(p['mic'], '')
         p['hours_known'] = hours.known(p['mic'])
         p['default'] = p['mic'] in cat_rules.DEFAULT_MARKETS
-    return {'import': {'last': _last_job(conn, 'fdb_import'), 'load': None if not load else {'commit': load['source_commit'][:8], 'loaded_at': _iso(load['loaded_at']), 'rows_read': load['rows_read']},
+    return {'import': {'last': _last_job(conn, 'fdb_import'), 'load': None if not load else {'commit': load['source_commit'][:8], 'loaded_at': iso(load['loaded_at']), 'rows_read': load['rows_read']},
                        'raw_rows': raw, 'source': 'FinanceDatabase (github.com/JerBouma/FinanceDatabase)'},
             'filters': level, 'places': sorted(places.values(), key=lambda p: (-(p['equity'] + p['etf']), p['mic'])), 'categories': categories,
             'last_filter': _last_job(conn, 'fdb_filter'), 'funnel': funnel.last_run(conn, 'catalogue'), 'running': _running(conn)}
@@ -153,7 +148,7 @@ def yahoo_state(conn):
     level = _level(conn, 'prefilter')
     final = kinds.get('equity', 0) + kinds.get('etf', 0)
     coverage = tasks.history_coverage(conn) if final else {'absent': 0, 'partial': 0, 'complete': 0, 'last_day': None, 'gap_titles': 0, 'gap_days': 0, 'gap_small': 0}
-    return {'info': {'last': info, 'stats': stats.get('yahoo_info'), 'quotes': q['n'], 'quote_at': _iso(q['t']), 'asked_now': len(tasks.info_set(conn))},
+    return {'info': {'last': info, 'stats': stats.get('yahoo_info'), 'quotes': q['n'], 'quote_at': iso(q['t']), 'asked_now': len(tasks.info_set(conn))},
             'filters': level, 'funnel': funnel.last_run(conn, 'yahoo'), 'last_filter': filt, 'pending': pending,
             'final': {'equity': kinds.get('equity', 0), 'etf': kinds.get('etf', 0), 'total': final, 'held_extra': held_extra, 'coverage': coverage,
                       'last_history': hist, 'stats': stats.get('history'), 'cron_daily': stats.get('daily'), 'cron_intraday': stats.get('intraday'), 'full': collect.FULL_SESSIONS},
@@ -262,7 +257,7 @@ def titles(conn, req):
         elif r['in_final'] and r['d_state'] == 'absent':
             r['issue'] = 'Aucun historique quotidien reçu : lancez « Importer / mettre à jour les historiques »'
         for k in ('price_time', 'quote_at', 'last_close_date'):
-            r[k] = _iso(r[k])
+            r[k] = iso(r[k])
         r['price'] = None if r['price'] is None else float(r['price'])
         r['in_fdb_universe'] = r['removed_step'] is None
     return {'total': total, 'raw_total': raw_total, 'page': page, 'pages': max(1, -(-total // 50)), 'rows': rows, 'full': collect.FULL_SESSIONS,

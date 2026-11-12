@@ -10,16 +10,9 @@ import datetime
 import math
 
 from .series import prepare_series
+from ..shared.numbers import finite
 from ..market_views import session
 from ..portfolio import performance
-
-
-def _num(v):
-    try:
-        x = float(v)
-    except (TypeError, ValueError):
-        return None
-    return x if math.isfinite(x) else None
 
 
 def applied_splits(bars, splits):
@@ -39,7 +32,7 @@ def _load(conn, ids, start):
             bars.setdefault(r['listing_id'], []).append((r['price_date'].isoformat(), float(r['close_px']), None if r['adj_close_px'] is None else float(r['adj_close_px'])))
         cur.execute(f"SELECT listing_id, event_date, ratio FROM corporate_events WHERE listing_id IN ({marks}) AND kind IN ('split','reverse_split')", list(ids))
         for r in cur.fetchall():
-            splits.setdefault(r['listing_id'], []).append((r['event_date'].isoformat(), _num(r['ratio'])))
+            splits.setdefault(r['listing_id'], []).append((r['event_date'].isoformat(), finite(r['ratio'])))
         cur.execute(f'SELECT l.id, COALESCE(p.currency, l.currency) cur, l.symbol, i.name, p.price, p.price_time FROM listings l JOIN instruments i ON i.id=l.instrument_id LEFT JOIN latest_prices p ON p.listing_id=l.id WHERE l.id IN ({marks})', list(ids))
         meta = {r['id']: r for r in cur.fetchall()}
         unit = {k: v['cur'] for k, v in meta.items()}
@@ -89,7 +82,7 @@ def build(transactions, bars, splits, unit, fx, meta, today=None, bars15=None):
     quote_observed = {}
     for lid in series:
         m = meta.get(lid) or {}
-        live, when = _num(m.get('price')), m.get('price_time')
+        live, when = finite(m.get('price')), m.get('price_time')
         day_live = when.date().isoformat() if hasattr(when, 'date') else (str(when)[:10] if when else None)
         if live and day_live and (not series[lid] or day_live >= series[lid][-1][0]) and day_live <= today:
             series[lid].append((today, live))
@@ -115,8 +108,8 @@ def build(transactions, bars, splits, unit, fx, meta, today=None, bars15=None):
     for day in calendar:
         while k < len(txs) and str(txs[k]['trade_at'])[:10] <= day:
             t = txs[k]; k += 1
-            qty, price, fees = _num(t['quantity']) or 0.0, _num(t['unit_price']) or 0.0, _num(t.get('fees')) or 0.0
-            rate = _num(t.get('fx_to_eur')) or (1.0 if (t.get('currency') or '').upper() == 'EUR' else None)
+            qty, price, fees = finite(t['quantity']) or 0.0, finite(t['unit_price']) or 0.0, finite(t.get('fees')) or 0.0
+            rate = finite(t.get('fx_to_eur')) or (1.0 if (t.get('currency') or '').upper() == 'EUR' else None)
             if rate is None:
                 notes.append(f"Transaction n° {t.get('id')} sans taux de change : ignorée dans l'évolution.")
                 continue
@@ -219,7 +212,7 @@ def market_history(holdings, bars, splits, unit, meta, today, bars15, fx=None):
         observed = {d: c for d, c in zip(dates, closes) if d <= today}
         when = m.get('price_time')
         day = str(when)[:10] if when else None
-        live = _num(m.get('price'))
+        live = finite(m.get('price'))
         if live is not None and live > 0 and day and day <= today and (not observed or day >= max(observed)):
             observed[day] = live
         info = {'key': str(lid), 'symbol': m.get('symbol') or str(lid).removeprefix('S'),

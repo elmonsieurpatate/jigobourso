@@ -10,6 +10,7 @@ Valeurs par défaut tirées de research/RESULTATS_SORTIES.md (test chronologique
 """
 import datetime
 
+from ..shared.text import fr
 from . import risk as risk_bar
 from ..explorer import strategy
 from ..series.loader import load_bars_and_splits
@@ -17,10 +18,6 @@ from ..series.series import prepare_series
 
 RANK_LIMIT = 50
 
-
-def fr(x, digits=1):
-    """Nombre à la française (virgule décimale) pour les messages."""
-    return f'{x:.{digits}f}'.replace('.', ',')
 
 DEFAULT_DAYS = 182
 DEFAULT_DROP = 20.0

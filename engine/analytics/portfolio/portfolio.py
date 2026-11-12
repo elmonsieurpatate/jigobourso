@@ -5,33 +5,25 @@ current cohort from its latest acquisition; individual historical peaks are neve
 Accounting PMP results remain exclusively in ledger.php.
 """
 import datetime as dt
-import math
 
 from engine.market import hours
 from ..series import signals
 from ..explorer import strategy
-
-
-def number(value):
-    try:
-        value = float(value)
-        return value if math.isfinite(value) else None
-    except (TypeError, ValueError):
-        return None
+from ..shared.numbers import finite
 
 
 def protection(lots, dates, closes, euro_rates, current_eur, current_native, today, basis_cost=None, current_date=None):
-    qty = sum(number(l.get('remaining')) or 0 for l in lots)
-    costs = [number(l.get('remaining_cost')) for l in lots]
+    qty = sum(finite(l.get('remaining')) or 0 for l in lots)
+    costs = [finite(l.get('remaining_cost')) for l in lots]
     start = max((l['trade_date'] for l in lots), default=None)
     unavailable = {'available': False, 'start': start, 'reason': 'Coût ou historique insuffisant pour suivre les gains de ces achats.'}
     if not start or qty <= 0 or any(c is None for c in costs) or sum(costs) <= 0:
         return unavailable
     if any(l.get('manual_split') for l in lots):
         return dict(unavailable, reason='Correction de split saisie manuellement : suivi par lot non comparable ; le résultat comptable reste disponible.')
-    cost = number(basis_cost) if basis_cost is not None else sum(costs)
+    cost = finite(basis_cost) if basis_cost is not None else sum(costs)
     if cost is None or cost <= 0: return unavailable
-    current_eur, current_native = number(current_eur), number(current_native)
+    current_eur, current_native = finite(current_eur), finite(current_native)
     observed = [(d, c, euro_rates.get(d)) for d, c in zip(dates, closes) if start <= d <= today]
     # Older-than-retained history cannot establish a true peak since acquisition.
     complete = not any(l.get('history_incomplete') for l in lots) and bool(dates and dates[0] <= start and observed and all(rate is not None for _, _, rate in observed))
@@ -119,7 +111,7 @@ def diagnose(position, lot_info, state, measures, personal, today):
     if reliable: reasons.sort(key=lambda r: (('info','watch','act').index(r['level']), r['kind'] in ('momentum','ma50','stop'), r['kind'] != 'duration'), reverse=True)
     if not reliable:
         reasons.insert(0, {'kind': 'data', 'level': 'info', 'action': 'vérifier les données', 'message': 'Cours ancien, données insuffisantes ou indicateurs non fiables : aucun diagnostic rassurant n’est possible.'})
-    gain = number(position.get('unrealized'))
+    gain = finite(position.get('unrealized'))
     personal_text = 'Résultat personnel indisponible.' if gain is None else 'Position bénéficiaire depuis les achats.' if gain > 0 else 'Position en perte depuis les achats.' if gain < 0 else 'Position à l’équilibre.'
     labels = {'normal': 'Normal', 'watch': 'À surveiller', 'act': 'À examiner', 'unknown': 'Données insuffisantes'}
     next_step = {'normal': 'Aucun signal notable selon les règles disponibles ; continuer le suivi.',
@@ -148,7 +140,7 @@ def enrich(conn, request, series, alerts, today):
     with conn.cursor() as cur:
         if ids:
             cur.execute('SELECT listing_id,sessions,slope,perf,volatility,drawdown FROM strategy_metrics WHERE listing_id IN (%s) AND sessions IN (5,21,63,126,252)' % ','.join(['%s'] * len(ids)), ids)
-            for r in cur.fetchall(): metrics.setdefault(r['listing_id'], {})[r['sessions']] = {k: number(r[k]) for k in ('slope', 'perf', 'volatility', 'drawdown')}
+            for r in cur.fetchall(): metrics.setdefault(r['listing_id'], {})[r['sessions']] = {k: finite(r[k]) for k in ('slope', 'perf', 'volatility', 'drawdown')}
         currencies = sorted({{'GBp': 'GBP', 'GBX': 'GBP', 'ZAc': 'ZAR', 'ZAC': 'ZAR', 'ILA': 'ILS'}.get(p.get('price_currency'), p.get('price_currency')) for p in positions if p.get('price_currency') and p['price_currency'] != 'EUR'})
         if currencies:
             cur.execute('SELECT currency,rate_date,to_eur FROM fx_rates WHERE currency IN (%s) ORDER BY rate_date' % ','.join(['%s'] * len(currencies)), currencies)

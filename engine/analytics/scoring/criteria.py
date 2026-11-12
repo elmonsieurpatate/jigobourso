@@ -11,6 +11,8 @@ performance, volatilité et repli en % ; volume en titres/jour.
 """
 import operator
 
+from ..shared.numbers import finite
+
 RETAINED, EXCLUDED, UNDETERMINED = 'retained', 'excluded', 'undetermined'
 PERIODS = {'day': 1, 'week': 5, 'month': 21, 'quarter': 63, 'half': 126, 'year': 252, 'two_year': 504}
 PERIOD_LABELS = {'day': 'Jour', 'week': 'Semaine', 'month': 'Mois', 'quarter': 'Trimestre', 'half': '6 mois', 'year': '1 an', 'two_year': '2 ans'}
@@ -20,17 +22,9 @@ OPS = {'>=': operator.ge, '<=': operator.le, '>': operator.gt, '<': operator.lt,
 REFERENCE = 21                                           # volatilité et repli sont mesurés sur un mois
 
 
-def _num(v):
-    try:
-        f = float(v)
-    except (TypeError, ValueError):
-        return None
-    return f if f == f and abs(f) != float('inf') else None
-
-
 def default_spec(periods):
     """Critères d'une stratégie intégrée depuis `ranking_table.criteria()['criteria'][id]['periods']` : {période: {slope, r2}} (valeur absente = pas de seuil)."""
-    return {'periods': {k: {'enabled': True, 'slope': _num(v.get('slope')) or 0.0, 'r2': _num(v.get('r2')) or 0.0} for k, v in (periods or {}).items()}, 'extra': [], 'join': 'and'}
+    return {'periods': {k: {'enabled': True, 'slope': finite(v.get('slope')) or 0.0, 'r2': finite(v.get('r2')) or 0.0} for k, v in (periods or {}).items()}, 'extra': [], 'join': 'and'}
 
 
 def normalize(spec):
@@ -46,19 +40,19 @@ def normalize(spec):
         if k not in PERIODS or not isinstance(v, dict) or v.get('enabled') is False:
             continue
         if k == 'day':                                       # Jour (1 séance) : seule la variation sert de critère ; ni pente ni R² sur une séance. Activée sans seuil : aucun critère.
-            val = _num(v.get('return'))
+            val = finite(v.get('return'))
             if v.get('enabled') is True and val is not None and not isinstance(spec.get('tree'), dict):      # avec un arbre de règles, la règle Jour de l'arbre fait foi
                 primary.append({'metric': 'return', 'period': 'day', 'op': '>=', 'value': val})
             continue
         for metric in ('slope', 'r2'):
-            val = _num(v.get(metric))
+            val = finite(v.get(metric))
             if val is not None and val > 0:
                 primary.append({'metric': metric, 'period': k, 'op': '>=', 'value': val})
     tree = spec.get('tree')
     leaves = _leaves(tree) if isinstance(tree, dict) else None
     if leaves is not None:                                   # règles « variation 1J » de l'arbre : critères principaux (ET), comme pente et R², pas des seuils facultatifs
         for x in leaves:
-            val = _num(x.get('value'))
+            val = finite(x.get('value'))
             if x.get('metric') == 'return' and x.get('period') == 'day' and x.get('op') in OPS and val is not None:
                 primary.append({'metric': 'return', 'period': 'day', 'op': x['op'], 'value': val})
         leaves = [x for x in leaves if not (x.get('metric') == 'return' and x.get('period') == 'day')]
@@ -66,7 +60,7 @@ def normalize(spec):
     for x in source:
         if not isinstance(x, dict) or x.get('metric') not in ('volatility', 'drawdown', 'return', 'volume') or x.get('op') not in OPS:
             continue
-        val = _num(x.get('value'))
+        val = finite(x.get('value'))
         if val is None:
             continue
         period = x.get('period') if x.get('period') in PERIODS else 'month'
@@ -89,13 +83,13 @@ def measure(metrics, metric, period):
     if metric in ('slope', 'r2'):
         if period == 'day':
             return None                                      # pente et R² n'existent pas sur une séance : jamais inventés
-        return _num((m.get(PERIODS[period]) or {}).get(metric))
+        return finite((m.get(PERIODS[period]) or {}).get(metric))
     if metric in ('volatility', 'drawdown'):
-        return _num((m.get(REFERENCE) or {}).get(metric))
+        return finite((m.get(REFERENCE) or {}).get(metric))
     if metric == 'return':
-        return _num((m.get(PERIODS[period]) or {}).get('perf'))
+        return finite((m.get(PERIODS[period]) or {}).get('perf'))
     if metric == 'volume':
-        return _num(metrics.get('avg_volume'))
+        return finite(metrics.get('avg_volume'))
     return None
 
 
