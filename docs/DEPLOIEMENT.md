@@ -39,7 +39,7 @@ Les nouveaux choix deviennent disponibles quand ce workflow est publié sur `mai
 - Après transfert : import du moteur, `php -l`, puis contrôle public (accueil 200, version `?v=` servie, `api/auth/me`). Le fichier `.deployed` (hors web) note commit et date.
 - Secret requis : `HOSTINGER_SSH_PRIVATE_KEY` (environnement GitHub `production`). Clé d'hôte épinglée dans le workflow. Résultat publié sans secret sur la branche `deployment-status` (`status.json`, `deployment.log`).
 - Lancement manuel : onglet Actions › `diagnostic` (lecture seule), `deploy` ou `rollback`.
-- `scripts/oneshot/drop_legacy_tables.sh` n'est jamais appelé par le déploiement.
+- Le nettoyage des anciennes tables (V1, `codex_*`) a été fait à la main le 12/11/2026 (sauvegarde de 37 tables dans `~/backup-tables-obsoletes-20261112.sql.gz` sur le serveur) ; le script `drop_legacy_tables.sh` est retiré (tag `archive/v1-migration`).
 
 # Mise en production et bascule (à exécuter seulement après accord explicite)
 

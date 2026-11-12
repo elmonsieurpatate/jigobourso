@@ -73,7 +73,7 @@ Réalisé : `need_post` exige Origin ou Referer, `body()` exige `application/jso
 ### 3.2 Moteur / scripts
 - [x] Supprimer les imports inutilisés : `clean_window, find_breaks, usable_closes, window_metrics, technical_state` (`service.py`, `compute.py`, `strategy.py`, `tracking.py`) après vérification qu'aucun appelant ne fait `service.clean_window` ; `cli.py` (`run_job`), `market/intraday.py` (`json`), `watch.py` (`math`), `scripts/explain_current_ranking.py` (`importlib`, `math`, `sys`)
 - [x] Uniformiser l'import `__import__('engine.analytics.strategy_docs', ...)` dans `cli.py:54`
-- [x] Archiver les scripts de migration V1→V2 une fois la migration confirmée : `migrate_legacy.py`, `export_user_data.py`, `drop_legacy_tables.sh`, `bootstrap_real.py`, `engine/migration/legacy.py` → supprimés (tag `archive/v1-migration`) ; `drop_legacy_tables.sh` déplacé dans `scripts/oneshot/` ; `bootstrap_real.py` conservé (`make dev-db`)
+- [x] Archiver les scripts de migration V1→V2 une fois la migration confirmée : `migrate_legacy.py`, `export_user_data.py`, `drop_legacy_tables.sh`, `bootstrap_real.py`, `engine/migration/legacy.py` → supprimés (tag `archive/v1-migration`) ; `drop_legacy_tables.sh` retiré après nettoyage de la base le 12/11/2026 (V1, `codex_*`, `saved_*`, `jb_*` supprimées : 1 536 → 477 Mo) ; `bootstrap_real.py` conservé (`make dev-db`)
 - [ ] Regrouper `verify_{etf,financial,momentum}_release.py`, `prepare_financial_release.py` et les `verify_*`/`check_*` PHP dans `scripts/release/` avec un point d'entrée Makefile
 - [x] `scripts/test_secondary_filters.sh` : migrer vers `tests/e2e` ou supprimer s'il double `tests/e2e/secondary-*`
 - [x] Déplacer ou documenter les `.php` de `scripts/` (`create_user`, `check_*`, `verify_*`) → `ops/`
