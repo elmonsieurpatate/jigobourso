@@ -383,7 +383,7 @@
   const statusBadge=row=>{const [t,c]=STATUS[row.status]||STATUS.undetermined;return `<i class="ct-status ${c}" title="Statut de la stratégie : ${t.toLowerCase()}. Détail dans la fiche du titre.">${t}</i>`;};
   // base = titres notés (recherche texte comprise) ; scoped = base moins les filtres secondaires (c'est le périmètre des compteurs) ; rows = scoped selon Retenues / Exclues / Toutes.
   function visibleRows(){
-    const needle=tableState.J.fold(query.trim());
+    const needle=J.fold(tableState.query.trim());
     const base=needle?intrinsicRows.filter(r=>J.fold(r.symbol+' '+r.name+' '+(r.isin||'')).includes(needle)):intrinsicRows;
     const scoped=applySecondary(base);
     const counts={retained:0,excluded:0,undetermined:0,all:scoped.length};

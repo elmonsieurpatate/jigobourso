@@ -55,3 +55,19 @@ def test_no_local_copy_of_core_helpers():
                     continue                      # simple mention dans un commentaire
                 bad.append(f'{name}:{line} {why}')
     assert not bad, '\n'.join(bad)
+
+
+def test_no_undefined_reference_through_local_state():
+    """Reliquat de remplacement automatique : `tableState.J.fold(...)` plantait l'affichage de l'explorateur."""
+    for name, src in scripts():
+        assert not re.search(r'[A-Za-z_$]\w*\.J\.(?!\$)', src), f'{name}: référence « x.J.… » invalide'
+
+
+def test_page_scripts_have_valid_syntax():
+    """Chaque script de page passe `node --check` (syntaxe seulement, pas d'exécution)."""
+    node = shutil.which('node')
+    if not node:
+        pytest.skip('node absent')
+    for name, _ in scripts():
+        r = subprocess.run([node, '--check', os.path.join(ASSETS, name)], capture_output=True, text=True)
+        assert r.returncode == 0, f'{name}: {r.stderr[:300]}'
