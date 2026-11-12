@@ -1,2 +1,19 @@
 == Validation du déploiement : quick
 == Contrôles du serveur (lecture seule)
+== Mode rapide : diagnostic exhaustif des classements non exécuté
+== Contrôle des fichiers SQL : ajouts seulement
+== Mode rapide : essai isolé Hostinger non exécuté
+== Version des pages : ?v=202611121558
+== Transfert du code
+== Dépendances Python, migrations de schéma, contrôles
+moteur importable
+== Contrôle d'intégrité financière
+PHP valide
+== Mode rapide : vérifications exhaustives des calculs et ETF non exécutées
+== Vérification publique
+site OK : menus de test 200, versions vérifiées, API filtres protégées (401)
+site OK : accueil 200, version 202611121558 servie, API répond (200)
+== Vérification des métadonnées du classement test (lecture seule)
+site OK : catalogue : 31739 instruments, 40654 cotations ; affectations exhaustives
+site OK : correspondances de repli : pays 2, secteurs/ETF 9228, MIC 0
+Déploiement terminé : 8708eea2dc2adec1d0550c7b705c80f3653f55e6
