@@ -117,7 +117,7 @@
 
   function header(pl) {
     const g = pl.gain || {}, st = pl.strategy || {}, label = st.label ? esc(st.label) : 'Stratégie non définie';
-    return `<div class="ps-head"><div class="ps-id"><div class="ps-t"><strong>${esc(pl.symbol)}</strong><span class="ps-chip ${st.support === 'undefined' ? 'neutral' : ''}" title="Stratégie de surveillance de la position">${label}</span></div><small>${esc(pl.name || '')}</small></div>
+    return `<div class="ps-head"><div class="ps-id"><div class="ps-t"><strong>${esc(pl.symbol)}</strong><span class="badge ${st.support === 'undefined' ? '' : 'info'}" title="Stratégie de surveillance de la position">${label}</span></div><small>${esc(pl.name || '')}</small></div>
       <div class="ps-gain ${cl(g.pct)}"><strong>${pc(g.pct)}</strong><span>${sgn(g.eur)}</span></div></div>`;
   }
 
@@ -136,11 +136,11 @@
     const hl = ok ? `<p class="psr-hl">Plus-haut depuis l’entrée : <b>${eur(pl.prices.high)}</b> · recul <b class="${pl.recul_pct > 0.004 ? 'down' : ''}">${pc(-pl.recul_pct)}</b></p>` : '';
     return `<article class="psr st-${sk}" data-ps-row="${id}" aria-label="Suivi ${esc(pl.symbol)}">
       <div class="psr-id"><button type="button" class="psr-name"${key} title="Ouvrir le détail de la position"><strong>${esc(pl.symbol)}</strong><small>${esc(pl.name || '')}</small></button>
-        <span class="ps-chip ${st.support === 'undefined' ? 'neutral' : ''}" title="Stratégie de surveillance de la position">${st.label ? esc(st.label) : 'Stratégie non définie'}</span></div>
+        <span class="badge ${st.support === 'undefined' ? '' : 'info'}" title="Stratégie de surveillance de la position">${st.label ? esc(st.label) : 'Stratégie non définie'}</span></div>
       <div class="psr-gain ${cl(g.pct)}"><strong>${pc(g.pct)}</strong><span>${sgn(g.eur)}</span></div>
       <div class="psr-gauge">${ok ? gauge(pl, { compact: true }) : '<span class="ps-na">jauge indisponible</span>'}</div>
       <div class="psr-adv ps-advice ${S.tone} st-${sk}" role="status"><span class="ps-state">${esc(S.label)}</span> <span class="psr-msg">${esc(a.message || a.headline || 'Suivi indisponible.')}</span></div>
-      <div class="psr-act"><button type="button" class="btn small psr-cfg" data-ps-cfg="${id}">Configurer</button><button type="button" class="btn small psr-exp" data-ps-exp="${id}" aria-expanded="false" aria-controls="psr-more-${id}" aria-label="Afficher l’explication et les détails" title="Explication et détails"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
+      <div class="psr-act"><button type="button" class="btn sm psr-cfg" data-ps-cfg="${id}">Configurer</button><button type="button" class="btn sm psr-exp" data-ps-exp="${id}" aria-expanded="false" aria-controls="psr-more-${id}" aria-label="Afficher l’explication et les détails" title="Explication et détails"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
       <div class="psr-more" id="psr-more-${id}" hidden>${adviceBox(pl)}${hl}</div></article>`;
   }
 
@@ -156,7 +156,7 @@
       ${(pl.notes || []).length ? `<ul class="ps-notes">${pl.notes.map(n => `<li>${esc(n)}</li>`).join('')}</ul>` : ''}
       ${originsLine(pl)}
       <div class="ps-foot"><p>${ICON.i}<span><b>Protection automatique</b> : repère de risque fondé sur le plus-haut depuis l’ouverture et la volatilité, jamais un ordre de vente ${sug ? `(${esc(J.num(pl.suggested.distance_pct, 1))} % sous le plus-haut : pire repli à 21 séances dépassé dans 1 cas sur 10 pour une volatilité comparable)` : ''}. Les couleurs de la jauge sont des zones de prix, pas une garantie de faible risque. Aucun objectif de gain automatique.${tg && tg.mode === 'custom' && isNum(tg.custom) ? ` Objectif personnel : ${esc(eur(tg.custom))}.` : ''}</span></p>
-        <button type="button" class="btn small ps-set" data-ps-settings>${ICON.gear} Configurer</button></div>
+        <button type="button" class="btn sm ps-set" data-ps-settings>${ICON.gear} Configurer</button></div>
       <details class="ps-method"><summary>Méthode et limites</summary><div>${esc((pl.strategy && pl.strategy.note) || '')}<p>Calculs sur les clôtures corrigées des splits, en euros au change du jour. Étude : un seul cycle d’environ 14 mois, ~9 600 titres ; les seuils (bandes de volatilité, centile 90) ne sont pas validés sur d’autres cycles. L’alerte de tendance (momentum 6−1 négatif) a un effet historique modeste et ne prédit pas la baisse suivante. Le dernier mois est exclu du momentum.</p></div></details></section>`;
     host.querySelector('[data-ps-settings]').onclick = () => configure(ctx);
   }
@@ -187,7 +187,7 @@
           <div class="ps-rule-val"><label class="check"><input type="radio" name="m-${r.key}" value="auto" ${custom ? '' : 'checked'}> ${r.key === 'target' ? 'Aucun objectif' : 'Automatique'}</label>
             <label class="check"><input type="radio" name="m-${r.key}" value="custom" ${custom ? 'checked' : ''}> Personnalisé</label>
             <input data-val inputmode="decimal" aria-label="${esc(r.label)} personnalisé (${esc(unit)})" value="${esc(i.value)}" placeholder="${esc(unit)}" ${custom ? '' : 'disabled'}>
-            <button type="button" class="btn small" data-reset ${custom ? '' : 'hidden'}>Rétablir l’automatique</button></div>` : (r.available ? '' : '')}
+            <button type="button" class="btn sm" data-reset ${custom ? '' : 'hidden'}>Rétablir l’automatique</button></div>` : (r.available ? '' : '')}
         <p class="small muted">${esc(HELP[r.key])}${r.note && !(hasVal && r.key === 'target') ? ' ' + esc(r.note) : ''}</p></fieldset>`; };
     const post = (r, d) => J.post('tracking/rules', Object.assign({ portfolio_id: ctx.portfolio, listing_id: ctx.listing, rule: r }, d));
     const d = J.dialog({ title: 'Configurer le suivi · ' + (pl.symbol || ''), body: `<p class="small muted">Toutes les règles sont automatiques par défaut. Une valeur personnelle devient la référence pour CETTE règle seulement : le moteur continue de calculer sa suggestion sans l’écraser. Une protection est un repère de surveillance, jamais une vente.</p>

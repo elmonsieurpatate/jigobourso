@@ -117,25 +117,28 @@ Réalisé le 12/11/2026. Chargement vérifié sur une copie servie par PHP aprè
 
 ### 6.1 Tokens et thème
 - [x] Fusionner les deux `:root` d'`app.css` (l.2/10 et 183-184)
-- [ ] Créer des tokens sémantiques dans `app.css` : `--info`, `--danger`, `--warn`, `--ok` + variantes `-soft` / `-ink`, avec valeurs sombres
-- [ ] Refactorer `plan-suivi.css` (≈ 20 hex sombres en dur, l.16-140), `classement-test.css` (l.2,5,45,46, dont code mort), `admin-categories-test.css` (l.2, 88-91), `help.css:38` pour n'utiliser que `var()`
+- [x] Créer des tokens sémantiques dans `assets/tokens.css` : `--info`, `--danger`, `--warn`, `--ok`, `--caution` + variantes `-soft` / `-ink`, avec valeurs sombres (+ `--on-solid`, `--ring`, `--sp-*`, `--radius-*`, `--shadow-pop`, `--chart-*`)
+- [x] Refactorer `plan-suivi.css`, `explorer.css` (ex `classement-test.css`), `filtres.css` (ex `admin-categories-test.css`), `help.css` pour n'utiliser que `var()` : plus aucune couleur en dur hors `tokens.css` dans les 10 feuilles. Les violets propres à `.ct`/`.ac` sont remplacés par l'accent commun.
 
 ### 6.2 Structure
-- [ ] Scinder `app.css` (87 Ko) en `tokens.css`, `base.css`, `components.css` (ou au minimum sections claires) ; sortir les styles de page (portefeuille, `.px-alert` l.529, `.lot-alerts`)
-- [ ] Fixer l'ordre de chargement : base → composants → page, identique sur toutes les pages
-- [ ] Supprimer les `!important` et `all:unset` (`admin-scores.css:121`)
-- [ ] Dédoublonner `.card` (app.css:30, 250) et `th` (l.46, 126)
+- [x] Scinder `app.css` (87 Ko) en `tokens.css`, `base.css` (46 Ko après suppression de 446 règles mortes dont `.px-alert` et `.lot-alerts`), `components.css`. Les styles propres à la page Portefeuilles sont dans `pf.css`.
+- [x] Fixer l'ordre de chargement : `theme-init.js` → tokens → base → composants → page, identique sur les 19 pages
+- [x] Supprimer les `!important` et `all:unset` : `all:unset` 0 ; `!important` 52 → 1 (le reset global `[hidden]`, légitime), les conflits sont résolus par la spécificité
+- [x] Dédoublonner `.card` et `th` (une seule définition dans `components.css`)
 
 ### 6.3 Composants dupliqués (≈ 15 variantes → ≈ 6 composants)
-- [ ] Bouton : `.btn` + variantes `.sm/.md/.icon/.ghost` ; éliminer `.ac .btn`, `.ct … .btn`, `help.css:32`, `admin-scores.css:105`, `.ac-icon-button`, `.ct-slider-row button`, `.ct-segment button`, `.ac-order-buttons button`
-- [ ] Carte / panneau : unifier `.card`, `.ct-panel`, `.ac-panel`, `.ac-information`, `.ct-preview`, `.kpi-strip .card` ; vérifier `.sui-*` et `.pf-*`
-- [ ] Tableau : unifier `table`, `.table-wrap`, `.table-scroll`, `table.dense`, `table.cmp`, `.ac-table-wrap`, `.ct-table-wrap`, `.as-rktable`
-- [ ] Pastille / badge (famille la plus fragmentée) : unifier `.badge`, `.tag`, `.chip`, `.chip-s`, `.pills`, `.pill-ok/-warn`, `.ac-status`, `.ac-count`, `.ac-category-chip`, `.ac-demo-badge`, `.ac-subtle-badge`, `.ct-tag`, `.ct-and`
-- [ ] Toast : un seul composant pour `#ct-feedback` et `#ac-feedback` (+ `aria-live`)
-- [ ] Onglets / segments : unifier `.ac-tab`, `.ac-mode-tabs`, `.ct-segment`/`.ct-seg`, `.pills`
+- [x] Bouton : `.btn` + `.primary/.danger/.ghost/.sm/.icon` ; surcharges de taille retirées partout, `.icon-btn`, `.px-btn`, `.ac-icon-button`, `.ac-order-buttons button`, `.ct-segment button` migrés. `.ct-slider-row button` et `.ct-fold` migrés aussi. Seul `.sui-pick-btn` (sélecteur de stratégie à menu déroulant, pas un bouton d'action) garde sa mise en page propre.
+- [x] Carte / panneau : `.card` + `.flush/.tight/.flat/.inset` ; `.ct-panel`, `.ac-panel`, `.ac-information`, `.ct-preview` n'ont plus que leur mise en page ; `.sui-card` supprimé (mort). `.kpi-strip .card` garde sa bordure d'accent.
+- [x] Tableau : `table`, `.dense`, `.table-wrap` + `.tall/.boxed` ; `.table-scroll`, `.ac-table-wrap`, `.ct-table-wrap`, `.as-rktable` ramenés dessus. `table.cmp` reste en variante dans `base.css`.
+- [x] Pastille / badge : `.badge` + `.ok/.warn/.danger/.info/.accent/.outline/.sm` ; `.tag`, `.chip`, `.chip-s`, `.pill-ok`, `.ac-status`, `.ac-count`, `.ac-demo-badge`, `.ac-subtle-badge`, `.ct-tag`, `.ct-and` migrés (balisage et CSS). `.ps-chip`, `.px-chip`, `.sui-badge` migrés. Seul `.ac-category-chip` garde une règle (couleur de catégorie dynamique, une seule définition).
+- [x] Toast : un seul `.toast` (`J.toast`, `#ct-feedback`, `#ac-feedback`, `role=status`)
+- [x] Onglets / segments : `.tabs` (`.ac-mode-tabs`, `.ct-builder-tabs`) et `.seg` (`.ct-segment`, `.pills`). `.ac-tab` (mort) supprimé.
 
 ### 6.4 Renommage des prototypes
-- [ ] Renommer les fichiers `-test` / `-demo` en production (`classement-test.*`, `admin-categories-test.*`, `admin-categories-demo.js`) vers des noms définitifs, factoriser reset et composants redéclarés sous `.ct` / `.ac`
+- [x] Renommer les fichiers `-test` / `-demo` : `explorer.{css,js}`, `explorer-filters.js`, `filtres.{css,js}`, `filtres-catalogue.js`, `admin-filtres.html` (redirection 301 de l'ancienne URL). Les routes API `classement-test/*` ne sont pas renommées (backend).
+- [x] Factoriser le reset redéclaré sous `.ct` / `.ac` : remonté dans `base.css` (contrôles de formulaire, focus), `.eyebrow` et `h1` communs, modale `<dialog>` dans `components.css`
+
+**Fait en plus (hors liste) :** `theme-init.js` (le thème sombre s'applique enfin sur les pages de connexion, sans flash), mise en page centrée des pages de connexion, 172 `style="margin…"` du JS remplacés par des utilitaires `.mt-*`/`.mb-*` (reste ≈ 130 pour l'étape 8), `docs/DESIGN.md`. Total CSS 223 Ko → 175 Ko.
 
 ## Étape 7 : Noyau JS commun 🟠
 

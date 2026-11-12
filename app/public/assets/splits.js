@@ -18,7 +18,7 @@
     const state=r.state,ratio=+(r.reviewed_ratio||r.proposed_ratio),isOpen=state==='pending',editable=isOpen||state==='rejected';
     const old=ratio>=1?1:1/ratio,next=ratio>=1?ratio:1;
     const history=(r.history||[]).map(h=>`<li><b>${esc(labels[h.decision]||h.decision)}</b> · ${esc(J.dateTime(h.created_at))} · administrateur #${h.actor_id}${h.ratio?' · ratio ×'+num(h.ratio):''}<br>${esc(h.note||'')}${h.source_url?`<br><a href="${esc(h.source_url)}" target="_blank" rel="noopener noreferrer">Source enregistrée ↗</a>`:''}</li>`).join('');
-    return `<article class="sr-card" data-lid="${r.listing_id}" data-day="${esc(r.event_date)}"><header class="sr-title"><div><h2>${esc(r.symbol)} · ${esc(r.name)}</h2><small>${esc(r.isin||'ISIN non renseigné')} · ${esc(r.mic)}</small></div><span class="badge ${state==='pending'?'wait':state==='applied'||state==='confirmed'?'ok':''}">${esc(labels[state])}</span></header>
+    return `<article class="sr-card" data-lid="${r.listing_id}" data-day="${esc(r.event_date)}"><header class="sr-title"><div><h2>${esc(r.symbol)} · ${esc(r.name)}</h2><small>${esc(r.isin||'ISIN non renseigné')} · ${esc(r.mic)}</small></div><span class="badge ${state==='pending'?'warn':state==='applied'||state==='confirmed'?'ok':''}">${esc(labels[state])}</span></header>
       <p class="sr-meta">Saut du <b>${date(r.event_date)}</b> · variation à la détection ${J.pct(100*(+r.price_ratio-1),2)} · ratio proposé × ${num(ratio)}</p>
       <div class="sr-prices"><div><small>Clôture précédente</small><strong>${price(r.price_before,r.currency)}</strong></div><span aria-hidden="true">→</span><div><small>Clôture du jour</small><strong>${price(r.price_after,r.currency)}</strong></div></div>
       <p class="small muted">${r.vendor_state==='confirmed'?'Split confirmé.':r.vendor_state==='real_move'?'Yahoo n’a pas confirmé de split lors du dernier contrôle.':'Saut détecté, sans confirmation à ce stade.'} ${r.checked_at?'Dernier contrôle : '+date(r.checked_at)+'.':''}</p>
@@ -32,12 +32,12 @@
     try{
       const d=await J.api('admin/splits',{params:{state:view,q:query,page,sort,min_ratio:minRatio}});if(sequence!==loadSequence)return;rows=d.rows;page=d.page;
       $('#sr-rows').dataset.state=view;
-      $('#sr-tabs').innerHTML=Object.entries(labels).map(([k,v])=>`<button class="btn small" data-filter="${k}" aria-current="${k===filter}">${esc(v)} <b>${k==='all'?Object.values(d.counts).reduce((a,n)=>a+n,0):d.counts[k]||0}</b></button>`).join('');
+      $('#sr-tabs').innerHTML=Object.entries(labels).map(([k,v])=>`<button class="btn sm" data-filter="${k}" aria-current="${k===filter}">${esc(v)} <b>${k==='all'?Object.values(d.counts).reduce((a,n)=>a+n,0):d.counts[k]||0}</b></button>`).join('');
       $('#sr-summary').textContent=`${d.total} cas · page ${page} / ${d.pages}. Les décisions s’appliquent aux données de marché communes.`;
       $('#sr-recompute').hidden=!d.recompute_pending;
       $('#sr-rows').innerHTML=rows.length?rows.map(card).join(''):'<div class="sr-empty card"><h2>Aucun cas dans cette vue</h2><p class="muted">Utilisez « Tous » pour voir les opérations déjà traitées, ou lancez une détection.</p></div>';
       document.querySelectorAll('.sr-form').forEach(f=>preview(f.closest('.sr-card')));
-      $('#sr-pages').innerHTML=`<button class="btn small" data-page="${page-1}" ${page===1?'disabled':''}>Précédente</button><span>${page} / ${d.pages}</span><button class="btn small" data-page="${page+1}" ${page===d.pages?'disabled':''}>Suivante</button>`;
+      $('#sr-pages').innerHTML=`<button class="btn sm" data-page="${page-1}" ${page===1?'disabled':''}>Précédente</button><span>${page} / ${d.pages}</span><button class="btn sm" data-page="${page+1}" ${page===d.pages?'disabled':''}>Suivante</button>`;
     }catch(e){if(sequence===loadSequence)say(e.message||'Impossible de charger les splits.',true);}
     finally{if(sequence===loadSequence){$('#sr-refresh').disabled=false;$('#sr-rows').setAttribute('aria-busy','false');}}
   }

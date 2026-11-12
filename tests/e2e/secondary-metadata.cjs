@@ -1,6 +1,6 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 const config=JSON.parse(fs.readFileSync('app/config/secondary_metadata_groups.json','utf8'));
-const sandbox={window:{},Intl};vm.runInNewContext(fs.readFileSync('app/public/assets/classement-test-filters.js','utf8'),sandbox);
+const sandbox={window:{},Intl};vm.runInNewContext(fs.readFileSync('app/public/assets/explorer-filters.js','utf8'),sandbox);
 const F=sandbox.window.ClassementTestSecondary;
 const definitions=JSON.parse(fs.readFileSync('app/config/explorer_secondary_filters.json','utf8'));
 const financial=definitions.filters.find(f=>f.id==='volatility');financial.measures[0].categories[0].active=false;

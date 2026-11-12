@@ -46,7 +46,7 @@ J.txDialog = function ({ portfolios, portfolioId, listing, tx, side: initialSide
       const q = J.$('#tx-q', d); if (!q) return; let t;
       q.oninput = () => { clearTimeout(t); chosen = null; t = setTimeout(async () => {
         const r = await J.api('listings/search', { params: { q: q.value } });
-        J.$('#tx-hits', d).innerHTML = r.results.map(x => `<div><a href="#" data-id="${x.id}">${J.esc(x.name)} — ${J.esc(x.symbol)} (${J.esc(x.mic)})</a> ${x.status === 'excluded' ? '<span class="badge ko">exclu</span>' : ''}</div>`).join('') || '<span class="muted">Aucun résultat : le symbole saisi sera enregistré tel quel.</span>';
+        J.$('#tx-hits', d).innerHTML = r.results.map(x => `<div><a href="#" data-id="${x.id}">${J.esc(x.name)} — ${J.esc(x.symbol)} (${J.esc(x.mic)})</a> ${x.status === 'excluded' ? '<span class="badge danger">exclu</span>' : ''}</div>`).join('') || '<span class="muted">Aucun résultat : le symbole saisi sera enregistré tel quel.</span>';
         J.$$('#tx-hits a', d).forEach(a => a.onclick = e => { e.preventDefault(); chosen = r.results.find(x => x.id == a.dataset.id); q.value = chosen.name + ' — ' + chosen.symbol; J.$('#tx-hits', d).textContent = ''; if (chosen.price) J.$('#tx-price', d).value = +chosen.price; J.$('#tx-cur', d).value = chosen.price_currency === 'GBp' ? 'GBX' : chosen.price_currency || chosen.currency || ''; J.$('#tx-fx', d).value = ''; hint(); });
       }, 250); };
     },

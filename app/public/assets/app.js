@@ -34,7 +34,7 @@ J.ago = s => { if (!s) return '–'; const m = (Date.now() - new Date(s.replace(
 J.priceLabel = r => r.price_stale ? 'Cours ancien' : ({ intraday: 'Cours différé', daily: 'Clôture', quote: 'Dernier cours' }[r.price_source || r.source] || 'Cours');
 
 /* ───── statuts et explications ───── */
-J.statusBadge = (status, label) => `<span class="badge ${{ retained: 'ok', rejected: 'ko', unknown: 'wait', excluded: 'ko' }[status] || ''}">${J.esc(label || status)}</span>`;
+J.statusBadge = (status, label) => `<span class="badge ${{ retained: 'ok', rejected: 'danger', unknown: 'warn', excluded: 'danger' }[status] || ''}">${J.esc(label || status)}</span>`;
 J.PERIODS = { day: 'Dernier jour', week: 'Dernière semaine', month: 'Dernier mois', quarter: 'Trois mois', half: 'Six mois', year: 'Un an' };
 J.CRITERIA = {
   min_slope: ['pente', '% / séance', 'slope'], min_r2: ['régularité (R²)', '', 'r2'], min_er: ['efficacité (ER)', '', 'er'], min_return: ['performance', '%', 'perf'],
@@ -100,9 +100,9 @@ J.barChart = function (el, data, { unit = '€' } = {}) {
 };
 
 /* ───── dialogues, messages ───── */
-J.toast = function (msg) { const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.remove(), 3200); };
+J.toast = function (msg) { const t = document.createElement('div'); t.className = 'toast'; t.setAttribute('role', 'status'); t.setAttribute('aria-live', 'polite'); t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.remove(), 3200); };
 /* Protection des gains (version du 3 novembre) : meilleur gain observé, gain actuel, gain rendu, barre « part du gain conservée », statut coloré. */
-J.INSIGHT = { normal: ['ok', 'Normal'], watch: ['wait', 'À surveiller'], act: ['ko', 'À examiner'], unknown: ['', 'Données insuffisantes'] };
+J.INSIGHT = { normal: ['ok', 'Normal'], watch: ['warn', 'À surveiller'], act: ['danger', 'À examiner'], unknown: ['', 'Données insuffisantes'] };
 J.insightBadge = i => { const c = J.INSIGHT[(i && i.status) || 'unknown'] || J.INSIGHT.unknown; return `<span class="badge ${c[0]}">${J.esc((i && i.label) || c[1])}</span>`; };
 J.keptShare = g => { const used = Math.max(0, g.peak_gain_pct); return Math.max(0, Math.min(100, used > 0 ? 100 * Math.max(0, g.gain_pct) / used : 0)); };
 J.gainProtection = (g, px, compact) => {
@@ -124,7 +124,7 @@ J.riskDetail = r => !r || !r.level ? '' : r.level === 'na' ? `<p class="small mu
 
 J.dialog = function ({ title, body, actions = [], onopen }) {
   const d = document.createElement('dialog');
-  d.innerHTML = `<form method="dialog"><div class="head"><h2 style="margin:0">${J.esc(title)}</h2><button class="btn small" value="x" aria-label="Fermer">✕</button></div><div class="body">${body}</div><div class="foot"></div></form>`;
+  d.innerHTML = `<form method="dialog"><div class="head"><h2 class="m-0">${J.esc(title)}</h2><button class="btn sm" value="x" aria-label="Fermer">✕</button></div><div class="body">${body}</div><div class="foot"></div></form>`;
   const foot = d.querySelector('.foot');
   actions.forEach(a => { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn ' + (a.cls || ''); b.textContent = a.label; b.onclick = async () => { try { b.disabled = true; const keep = await a.run(d); if (!keep) d.close(); } catch (e) { J.formError(d, e.message); } finally { b.disabled = false; } }; foot.appendChild(b); });
   document.body.appendChild(d); d.addEventListener('close', () => d.remove()); d.showModal(); if (onopen) onopen(d); return d;
@@ -177,7 +177,7 @@ J.NAV = (admin) => [
   { id: 'bilan', label: 'Bilans', icon: 'chart', file: ['bilan.html'], children: [{ label: 'Bilan global', href: 'bilan.html', on: () => true }] },
   { sec: 'Méthode' },
   { id: 'suivi', label: 'Suivi des classements', icon: 'pulse', file: ['suivi.html'], href: 'suivi.html' },
-  ...(admin ? [{ sec: 'Administration technique' }, { id: 'admin', label: 'Administration', icon: 'shield', file: ['admin.html', 'admin-categories-test.html', 'donnees.html', 'splits.html'], children: [
+  ...(admin ? [{ sec: 'Administration technique' }, { id: 'admin', label: 'Administration', icon: 'shield', file: ['admin.html', 'admin-filtres.html', 'donnees.html', 'splits.html'], children: [
     { label: 'FinanceDatabase', href: 'admin.html#fdb', on: (q, h) => !h || h === '#fdb' }, { label: 'Yahoo Finance', href: 'admin.html#yahoo', on: (q, h) => h === '#yahoo' },
     { label: 'Actions / ETF', href: 'admin.html#titres', on: (q, h) => h === '#titres' }, { label: 'Cron', href: 'admin.html#cron', on: (q, h) => h === '#cron' }, { label: 'Journaux', href: 'admin.html#logs', on: (q, h) => h === '#logs' },
     { label: 'Splits', href: 'splits.html', on: () => true }, { label: 'Données', href: 'donnees.html', on: () => true }, { label: 'Utilisateurs', href: 'admin.html#users', on: (q, h) => h === '#users' }, { label: 'Réglages', href: 'admin.html#settings', on: (q, h) => h === '#settings' },
@@ -204,9 +204,9 @@ J.buildShell = function (page, user) {
     <nav class="side-scroll" id="nav">${html}</nav>
     <div class="side-foot"><button class="who" id="user-btn" type="button" title="Mon compte"><span class="avatar">${J.esc(initial)}</span><span><b>${J.esc(user.username)}</b><span>${user.is_admin ? 'Administrateur' : 'Utilisateur'}</span></span></button>
       <button class="nv" id="collapse-btn" type="button" title="Réduire le menu">${J.icon('panel')}<span class="lbl">Réduire le menu</span></button></div></aside><div class="side-scrim" id="scrim"></div>
-    <header class="hdr"><button class="icon-btn" id="menu-btn" type="button" aria-label="Afficher ou masquer le menu" aria-controls="side" aria-expanded="true">${J.icon('menu', '')}</button><div class="crumbs" id="crumbs"></div><span class="grow"></span>
+    <header class="hdr"><button class="btn icon" id="menu-btn" type="button" aria-label="Afficher ou masquer le menu" aria-controls="side" aria-expanded="true">${J.icon('menu', '')}</button><div class="crumbs" id="crumbs"></div><span class="grow"></span>
       <form id="quick-form" class="quick" role="search">${J.icon('search', '')}<input id="quick" type="search" placeholder="Rechercher un titre, un ISIN…" aria-label="Rechercher un titre"></form>
-      <button class="icon-btn" id="theme-btn" type="button" aria-label="Changer de thème" title="Thème clair / sombre"></button></header>`);
+      <button class="btn icon" id="theme-btn" type="button" aria-label="Changer de thème" title="Thème clair / sombre"></button></header>`);
   const body = document.body, side = J.$('#side'), btn = J.$('#menu-btn');
   const sync = () => { const open = narrow() ? body.classList.contains('side-open') : !body.classList.contains('side-collapsed'); btn.setAttribute('aria-expanded', open); J.$('#collapse-btn .lbl').textContent = 'Réduire le menu'; };
   const toggle = () => { if (narrow()) body.classList.toggle('side-open'); else { body.classList.toggle('side-collapsed'); store.set('jigo_side', body.classList.contains('side-collapsed') ? 'collapsed' : 'open'); closeFly(); } sync(); };

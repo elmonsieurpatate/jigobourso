@@ -44,7 +44,7 @@ public_check() {                                  # accueil servi avec la bonne 
   case "$me" in 200|401) ;; *) echo "api/auth/me : HTTP $me" >&2; return 4 ;; esac
   if [ -n "$expect" ] && [ -f app/routes/secondary_filters.php ]; then
     local page endpoint
-    for page in mes-filtres.html admin-categories-test.html; do
+    for page in mes-filtres.html admin-filtres.html; do
       code=$(curl -s -o "$RUNNER_TEMP/$page" -w '%{http_code}' "$base/$page")
       test "$code" = 200 && grep -q "?v=$expect" "$RUNNER_TEMP/$page" || { echo "menu de test $page : contrôle HTTP/version échoué" >&2; return 4; }
     done

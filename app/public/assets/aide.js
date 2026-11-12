@@ -58,7 +58,7 @@
     const pct = Math.round(100 * list.filter(x => seen.has(x.id)).length / list.length);
     $('#h-main').innerHTML = `<nav class="h-crumb" aria-label="Fil d’Ariane">${crumbs}</nav>
       <header class="h-head"><span class="h-ico" style="background:color-mix(in srgb, ${c.color || '#2563eb'} 16%, transparent);color:${c.color || '#2563eb'}">${c.icon || ''}</span><div><h1>${E(c.title)}</h1>${c.lead ? `<p class="h-lead">${c.lead}</p>` : ''}</div></header>
-      ${hasExpert ? `<div class="h-levelbar">${level === 'expert' ? `Vous lisez la version <b>Expert</b> (formules, paramètres, limites). <button class="btn small" data-level="beginner">Revenir au niveau Débutant</button>` : `Version <b>Débutant</b>. Envie d’aller plus loin ? <button class="btn small" data-level="expert">Approfondir (Expert)</button>`}</div>` : ''}
+      ${hasExpert ? `<div class="h-levelbar">${level === 'expert' ? `Vous lisez la version <b>Expert</b> (formules, paramètres, limites). <button class="btn sm" data-level="beginner">Revenir au niveau Débutant</button>` : `Version <b>Débutant</b>. Envie d’aller plus loin ? <button class="btn sm" data-level="expert">Approfondir (Expert)</button>`}</div>` : ''}
       <article class="h-body">${body}</article>
       ${c.quiz ? '' : ''}
       <footer class="h-nav">${prev ? `<a class="btn" href="#/${E(prev.id)}">← ${E(prev.title)}</a>` : '<span></span>'}<span class="h-prog" title="Progression"><i style="width:${pct}%"></i><small>${list.filter(x => seen.has(x.id)).length} / ${list.length} chapitres vus</small></span>${next ? `<a class="btn primary" href="#/${E(next.id)}">${E(next.title)} →</a>` : '<span></span>'}</footer>`;
@@ -79,7 +79,7 @@
   function closeDrawer() { root.classList.remove('toc-open'); }
 
   /* ───── amorçage ───── */
-  root.innerHTML = `<div class="h-top"><button class="btn small h-burger" type="button" id="h-burger" aria-expanded="false" aria-controls="h-side">☰ Sommaire</button>
+  root.innerHTML = `<div class="h-top"><button class="btn sm h-burger" type="button" id="h-burger" aria-expanded="false" aria-controls="h-side">☰ Sommaire</button>
     <div class="help-mode" role="group" aria-label="Niveau de détail"><button type="button" data-mode="beginner" aria-pressed="${level === 'beginner'}">Débutant</button><button type="button" data-mode="expert" aria-pressed="${level === 'expert'}">Expert</button></div></div>
     <div class="h-layout"><aside class="h-side" id="h-side" aria-label="Sommaire de l’aide"><label class="h-search"><span class="sr-only">Rechercher dans l’aide</span><input id="h-q" type="search" placeholder="Rechercher : pente, ETF, lots…" autocomplete="off"></label><nav id="h-toc"></nav></aside><div class="h-read"><div id="h-main" class="h-main" tabindex="-1"><div class="empty"><span class="spinner"></span></div></div></div></div>`;
   $$('[data-mode]').forEach(b => b.onclick = () => setLevel(b.dataset.mode));

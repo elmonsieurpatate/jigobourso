@@ -26,6 +26,6 @@ def test_csp_and_transport_headers():
 
 def test_dynamic_html_escapes_catalogue_codes():
     # Les codes de place (mic) viennent d'un catalogue tiers : ils passent par J.esc dans les modèles HTML.
-    for name in ('admin.js', 'classement-test.js'):
+    for name in ('admin.js', 'explorer.js'):
         js = open(os.path.join(PUBLIC, 'assets', name), encoding='utf-8').read()
         assert not re.search(r'\$\{(p\.mic|m)\}', js), name

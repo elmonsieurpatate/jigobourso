@@ -1,6 +1,6 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
 const root=path.join(__dirname,'../..'),sandbox={window:{},Intl};
-vm.runInNewContext(fs.readFileSync(path.join(root,'app/public/assets/classement-test-filters.js'),'utf8'),sandbox);
+vm.runInNewContext(fs.readFileSync(path.join(root,'app/public/assets/explorer-filters.js'),'utf8'),sandbox);
 const F=sandbox.window.ClassementTestSecondary,payload=JSON.parse(fs.readFileSync(path.join(root,'app/config/classement_test_categories.json'),'utf8')),cats=F.normalize(payload);
 const freeze=x=>{if(x&&typeof x==='object'){Object.values(x).forEach(freeze);Object.freeze(x);}return x;};
 const rows=freeze([

@@ -14,19 +14,19 @@ window.JEtf = {
     const up = t => t.charAt(0).toUpperCase() + t.slice(1), pc = v => (v > 0 ? '+' : v < 0 ? '−' : '') + J.num(Math.abs(v), 0) + ' %';
     const strengths = a.strengths.length ? up(a.strengths.join(', ')) + '.' : 'Aucun point fort net repéré.';
     const cautions = a.cautions.length ? up(a.cautions.join(' ; ')) + '.' : 'Rien de gênant repéré par nos indicateurs (ce n’est pas une garantie).';
-    return `<div class="card assess"><div class="row between wrap-s"><h2 style="margin:0">Résumé du profil</h2><span class="sig ${J.esc(a.level)} big" title="Appréciation descriptive, construite à partir des indicateurs ci-dessous. Aucun effet sur le score ni le classement."><i aria-hidden="true"></i><b>${J.esc(a.label)}</b></span></div>
+    return `<div class="card assess"><div class="row between wrap-s"><h2 class="m-0">Résumé du profil</h2><span class="sig ${J.esc(a.level)} big" title="Appréciation descriptive, construite à partir des indicateurs ci-dessous. Aucun effet sur le score ni le classement."><i aria-hidden="true"></i><b>${J.esc(a.label)}</b></span></div>
       <p class="reason">${J.esc(a.reason)}</p>
       <p><b>Points forts :</b> ${J.esc(strengths)}</p><p><b>Points de vigilance :</b> ${J.esc(cautions)}</p>
       ${a.unknowns.length ? `<p class="muted"><b>Non évalué :</b> ${J.esc(a.unknowns.join(', '))} (l’inconnu reste inconnu : il n’est ni favorable ni défavorable).</p>` : ''}
       ${a.horizons.length ? `<p class="small muted">Performance par période : ${a.horizons.map(h => `${J.esc(h.period)} <b class="${J.cls(h.perf)}">${pc(h.perf)}</b>`).join(' · ')}. Période de la stratégie : <b>${J.esc(a.period || '')}</b>.</p>` : ''}
       <details class="why"><summary>Comment cette appréciation est construite</summary><div class="small muted"><p>Aucune note chiffrée ni nouvelle formule : des règles lisibles appliquées aux indicateurs existants (pente et performance de la période de la stratégie, pastilles de régularité, volatilité et négociabilité, qualité des données). ${J.esc((a.facts || []).join(' '))}</p>
         <ul>${a.rules.map(r => `<li><b>${J.esc(r.label)}</b> : ${J.esc(r.rule)}</li>`).join('')}</ul><p>Les avis des analystes n’y entrent pas. Un titre n’est jamais « favorable » s’il présente un risque important, même s’il monte fortement.</p></div></details>
-      <p class="small muted" style="margin:8px 0 0">${J.esc(a.closing)}</p></div>`;
+      <p class="small muted mt-2">${J.esc(a.closing)}</p></div>`;
   },
   reading(list) {
     if (!list || !list.length) return '';
     return `<div class="card"><h2>Lecture rapide</h2><ul class="reading">${list.map(s => `<li><span class="sig ${J.esc(s.level)}"><i aria-hidden="true"></i><b>${J.esc(s.label)}${s.period ? ' · ' + J.esc(s.period) : ''}</b></span> <span>${J.esc(s.text)}</span>${s.tip ? `<details class="why"><summary>Seuil</summary><span class="small muted">${J.esc(s.tip)}</span></details>` : ''}</li>`).join('')}</ul>
-      <p class="small muted" style="margin:8px 0 0">${this.LEGEND} Information pédagogique, distincte du score : une bonne tendance ne dit rien du risque ni de la diversification.</p></div>`;
+      <p class="small muted mt-2">${this.LEGEND} Information pédagogique, distincte du score : une bonne tendance ne dit rien du risque ni de la diversification.</p></div>`;
   },
   similar(a, cmp) {
     if (!a) return '<p class="muted">Analyse pas encore préparée.</p>';
@@ -48,7 +48,7 @@ window.JEtf = {
     };
     const head = c.rows.map((r, i) => `<th>${i ? `<a href="titre.html?id=${r.id}" target="_blank" rel="noopener">${J.esc(r.symbol)}</a>` : J.esc(r.symbol)}${i ? `<div class="small muted">corr. ${J.num(r.coefficient, 2)}</div>` : '<div class="small muted">cet ETF</div>'}</th>`).join('');
     const line = (label, f) => `<tr><td class="muted">${label}</td>${c.rows.map(r => `<td>${J.esc(f(r))}</td>`).join('')}</tr>`;
-    return `<h3 style="margin:14px 0 6px">Ce qui les différencie</h3><div class="table-wrap cmp-wrap"><table class="dense cmp"><thead><tr><th></th>${head}</tr></thead><tbody>
+    return `<h3 class="mt-4 mb-2">Ce qui les différencie</h3><div class="table-wrap cmp-wrap"><table class="dense cmp"><thead><tr><th></th>${head}</tr></thead><tbody>
       ${line('Frais annuels', fmt.fee)}${line('Liquidité', fmt.liq)}${line('Place · devise', r => (r.mic || '?') + ' · ' + (r.currency || '?'))}${line('Émetteur', r => r.family || 'inconnu')}${line('Actifs sous gestion', fmt.aum)}${line('Distribution', fmt.yld)}${line('Écart de performance 1 an (EUR)', fmt.gap)}${line('Lignes communes (10 premières)', fmt.ov)}</tbody></table></div>
       <p class="small muted">${J.esc(c.note)} Valeurs inconnues = non fournies, jamais complétées. Le « rendement de distribution » explique souvent un écart de cours entre un ETF qui distribue et son jumeau qui capitalise. Aucune recommandation.</p>`;
   },
@@ -73,7 +73,7 @@ window.JEtf = {
     const groups = c?.groups || [];
     if (!groups.length) return '';
     const missing = c.sample - (c.analysed || 0);
-    return groups.map(g => `<div class="notice warn etf-concentration-banner"><span class="tag grp">Groupe ${J.esc(g.id)}</span> <b>${g.size} des ${c.sample} premiers ETF de cette vue</b> évoluent presque comme un seul${g.label ? ' (' + J.esc(g.label) + ')' : ''} : ${g.symbols.map(J.esc).join(', ')}. Ils portent l’étiquette « Groupe ${J.esc(g.id)} » dans le tableau. Corrélation hebdomadaire en EUR ≥ ${J.num(0.97, 2)} sur 52 semaines, lien direct avec le premier du groupe (la plus faible : ${J.num(g.min_coefficient, 2)})${g.unstable ? ' · <span class="sig warn"><i></i>résultat instable</span>' : ''}.</div>`).join('') +
+    return groups.map(g => `<div class="notice warn etf-concentration-banner"><span class="badge sm warn outline">Groupe ${J.esc(g.id)}</span> <b>${g.size} des ${c.sample} premiers ETF de cette vue</b> évoluent presque comme un seul${g.label ? ' (' + J.esc(g.label) + ')' : ''} : ${g.symbols.map(J.esc).join(', ')}. Ils portent l’étiquette « Groupe ${J.esc(g.id)} » dans le tableau. Corrélation hebdomadaire en EUR ≥ ${J.num(0.97, 2)} sur 52 semaines, lien direct avec le premier du groupe (la plus faible : ${J.num(g.min_coefficient, 2)})${g.unstable ? ' · <span class="sig warn"><i></i>résultat instable</span>' : ''}.</div>`).join('') +
       `<p class="small muted etf-concentration-note">Information seulement : scores et ordre inchangés. Une corrélation ne prouve pas des participations communes.${missing > 0 ? ` ${missing} ETF de la sélection sans analyse récente.` : ''}</p>`;
   },
   portfolio(a) {

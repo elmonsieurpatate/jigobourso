@@ -57,7 +57,7 @@
     const w = c => c.width ? ` style="width:${c.width}px;min-width:${c.width}px"` : '';
     return `<div class="ac-frame ${device}"><div class="ac-scroll"><table class="ac-table"><thead><tr>${cols.map(c => `<th${w(c)}${meta(c.id).hint ? ` title="${E(meta(c.id).hint)}"` : ''}>${E(meta(c.id).label)}${prim && prim.key === c.id ? (prim.dir === 'asc' ? ' ↑' : ' ↓') : ''}</th>`).join('')}</tr></thead>
       <tbody>${SAMPLE.map(r => `<tr>${cols.map(c => `<td${w(c)}>${sample(c.id, r)}</td>`).join('')}</tr>`).join('')}</tbody></table></div></div>
-      <p class="small muted" style="margin:6px 0 0">Valeurs d’exemple : seuls l’ordre, la visibilité et les largeurs sont réels. ${device === 'mobile' ? 'Cadre de 375 px ; le tableau défile horizontalement.' : ''}</p>`;
+      <p class="small muted mt-2">Valeurs d’exemple : seuls l’ordre, la visibilité et les largeurs sont réels. ${device === 'mobile' ? 'Cadre de 375 px ; le tableau défile horizontalement.' : ''}</p>`;
   }
 
   // ───────── sections ─────────
@@ -69,9 +69,9 @@
         <span class="ac-pos">${i + 1}</span>
         <label class="ac-vis"><input type="checkbox" data-vis="${E(c.id)}" ${c.visible ? 'checked' : ''} ${c.id === 'name' ? 'disabled title="Colonne d’identification : toujours visible"' : ''}><span class="ac-name"${meta(c.id).hint ? ` title="${E(meta(c.id).hint)}"` : ''}>${E(meta(c.id).label)}</span> <span class="small muted">${E(meta(c.id).group || '')}</span></label>
         <span class="ac-width"><select data-wmode="${E(c.id)}" aria-label="Largeur de ${E(meta(c.id).label)}"><option value="auto" ${c.width ? '' : 'selected'}>Auto</option><option value="custom" ${c.width ? 'selected' : ''}>Fixe</option></select>${c.width ? `<input type="number" min="48" max="480" step="1" value="${c.width}" data-w="${E(c.id)}" aria-label="Largeur en pixels"> <span class="small muted">px</span>` : ''}</span>
-        <span class="ac-move"><button type="button" class="btn small" data-up="${E(c.id)}" ${i === 0 ? 'disabled' : ''} aria-label="Monter ${E(meta(c.id).label)}">↑</button><button type="button" class="btn small" data-down="${E(c.id)}" ${i === draft.columns.length - 1 ? 'disabled' : ''} aria-label="Descendre ${E(meta(c.id).label)}">↓</button></span></li>`).join('');
+        <span class="ac-move"><button type="button" class="btn sm" data-up="${E(c.id)}" ${i === 0 ? 'disabled' : ''} aria-label="Monter ${E(meta(c.id).label)}">↑</button><button type="button" class="btn sm" data-down="${E(c.id)}" ${i === draft.columns.length - 1 ? 'disabled' : ''} aria-label="Descendre ${E(meta(c.id).label)}">↓</button></span></li>`).join('');
     const visible = draft.columns.filter(c => c.visible).length;
-    return `<div class="card"><div class="row between wrap-s"><h2 style="margin:0">Colonnes <span class="small muted">${visible} visible${visible > 1 ? 's' : ''} sur ${draft.columns.length}</span></h2>
+    return `<div class="card"><div class="row between wrap-s"><h2 class="m-0">Colonnes <span class="small muted">${visible} visible${visible > 1 ? 's' : ''} sur ${draft.columns.length}</span></h2>
         <span class="small muted">Une colonne masquée garde sa position. Elle reste utilisable pour le tri.</span></div>
       <ol class="ac-list" id="ac-list">${rows}</ol></div>`;
   }
@@ -84,16 +84,16 @@
         ${s ? seg([['asc', 'Croissant'], ['desc', 'Décroissant']], s.dir, 'data-sortdir="' + i + '" data-v') : ''}</div>`;
     };
     const n = draft.sort.length;
-    return `<div class="card"><h2 style="margin:0 0 4px">Tri par défaut</h2>
-      <p class="small muted" style="margin:0 0 8px">Appliqué à l’ouverture de la page, sur tous les résultats (pas seulement la page affichée). Un clic sur une colonne reste prioritaire pendant la consultation. Les valeurs absentes sont toujours en dernier ; les égalités sont départagées par le rang général puis l’identifiant. Le rang global ne change jamais avec le tri.</p>
+    return `<div class="card"><h2 class="mb-1">Tri par défaut</h2>
+      <p class="small muted mb-2">Appliqué à l’ouverture de la page, sur tous les résultats (pas seulement la page affichée). Un clic sur une colonne reste prioritaire pendant la consultation. Les valeurs absentes sont toujours en dernier ; les égalités sont départagées par le rang général puis l’identifiant. Le rang global ne change jamais avec le tri.</p>
       ${row(0)}${n >= 1 ? row(1) : ''}${n >= 2 ? row(2) : ''}</div>`;
   }
   function filtersSection() {
     const f = draft.filters;
-    return `<div class="card"><h2 style="margin:0 0 8px">Filtres et affichage initiaux</h2>
+    return `<div class="card"><h2 class="mb-2">Filtres et affichage initiaux</h2>
       <div class="ac-filter"><span>Statut de stratégie</span>${seg(VERDICTS, f.verdict, 'data-verdict')}</div>
       ${page === 'explorer' ? `<div class="ac-filter"><span>Lignes par page</span><select data-pagesize aria-label="Lignes par page">${[25, 50, 100].map(n => `<option value="${n}" ${f.page_size === n ? 'selected' : ''}>${n}</option>`).join('')}</select></div>` : ''}
-      <p class="small muted" style="margin:8px 0 0">Valeurs initiales : l’utilisateur peut ensuite les changer pendant sa consultation. Les catégories des filtres secondaires (pays, secteur, place, type d’actif…) se règlent dans <a href="admin-categories-test.html">Filtres et catégories</a>.</p></div>`;
+      <p class="small muted mt-2">Valeurs initiales : l’utilisateur peut ensuite les changer pendant sa consultation. Les catégories des filtres secondaires (pays, secteur, place, type d’actif…) se règlent dans <a href="admin-filtres.html">Filtres et catégories</a>.</p></div>`;
   }
 
   function paint() {
@@ -102,7 +102,7 @@
         <div class="small muted">Quatre configurations indépendantes : modifier celle-ci ne touche pas les trois autres. ${data.saved[key()] ? 'Configuration enregistrée.' : 'Valeurs par défaut (rien d’enregistré).'}</div></div>
       ${notice ? `<div class="notice ${notice.err ? 'err' : 'ok'}" role="status">${E(notice.text)}</div>` : ''}
       <div class="ac-grid"><div>${columnsSection()}${sortSection()}${filtersSection()}</div>
-        <div class="ac-side"><div class="card"><h2 style="margin:0 0 8px">Aperçu</h2>${preview()}</div></div></div>
+        <div class="ac-side"><div class="card"><h2 class="mb-2">Aperçu</h2>${preview()}</div></div></div>
       <div class="ac-actions" role="group" aria-label="Actions"><span class="small ${d ? 'warn' : 'muted'}">${d ? 'Modifications non enregistrées.' : 'Aucune modification.'}</span>
         <button class="btn" data-act="reset" ${busy ? 'disabled' : ''}>Réinitialiser aux valeurs par défaut</button><button class="btn" data-act="cancel" ${d && !busy ? '' : 'disabled'}>Annuler les modifications</button><button class="btn primary" data-act="save" ${d && !busy ? '' : 'disabled'}>Enregistrer</button></div>`;
   }

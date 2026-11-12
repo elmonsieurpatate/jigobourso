@@ -88,7 +88,7 @@
     const d = el.querySelector('[data-demo=fastdemo]'); if (!d || !facts) return;
     const s = facts.strategies.find(x => x.id === 'fast'), wk = s.criteria.week.slope, mo = s.criteria.month.slope, T = window.HELP_TITLES || {};
     const list = Object.entries(T).map(([n, t]) => [n, t.closes, t.desc]); list.push(['Pic d’un jour', HM.path([[0, 100], [250, 100], [251, 100], [252, 108]], 0.001, 8), 'plat pendant un an, puis +8 % hier']);
-    const rows = list.map(([n, cl, desc]) => { const w = HM.windowOf(cl, 5), m = HM.windowOf(cl, 21), okw = w.slope >= wk, okm = m.slope >= mo; return `<tr><th scope="row">${n}<br><small class="muted">${desc}</small></th><td class="n ${okw ? 'good' : 'bad'}">${HC.f1(w.slope, 3)}</td><td class="n ${okm ? 'good' : 'bad'}">${HC.f1(m.slope, 3)}</td><td><span class="badge ${okw && okm ? 'ok' : 'ko'}">${okw && okm ? 'retenu' : 'exclu'}</span></td></tr>`; }).join('');
+    const rows = list.map(([n, cl, desc]) => { const w = HM.windowOf(cl, 5), m = HM.windowOf(cl, 21), okw = w.slope >= wk, okm = m.slope >= mo; return `<tr><th scope="row">${n}<br><small class="muted">${desc}</small></th><td class="n ${okw ? 'good' : 'bad'}">${HC.f1(w.slope, 3)}</td><td class="n ${okm ? 'good' : 'bad'}">${HC.f1(m.slope, 3)}</td><td><span class="badge ${okw && okm ? 'ok' : 'danger'}">${okw && okm ? 'retenu' : 'exclu'}</span></td></tr>`; }).join('');
     d.innerHTML = `<span class="fic">Titres fictifs · seuils réels</span><div class="sui-scroll"><table><thead><tr><th>Titre</th><th class="n">Pente semaine<br><small>(seuil ${HC.f1(wk, 3)})</small></th><th class="n">Pente mois<br><small>(seuil ${HC.f1(mo, 3)})</small></th><th>Verdict</th></tr></thead><tbody>${rows}</tbody></table></div><p class="small muted">Vert = la pente atteint le seuil. Il faut deux verts pour être retenu.</p>`;
   }
   ORDER.forEach(id => {
@@ -107,7 +107,7 @@
         <h2>Comment la note est construite</h2>
         <p>Durées utilisées pour la note : ${s.periods.map(p => `<b>${p.label}</b> (${f(100 * p.weight, 0)} %)`).join(', ')}.</p>
         <p>Dans le score complexe, ce qui pèse le plus : ${top}.</p>${weightsStack(s, c)}
-        <div class="two" style="margin-top:14px"><div class="hdemo" style="margin:0"><b>Avantages</b><ul>${d.pros.map(x => `<li>${x}</li>`).join('')}</ul></div><div class="hdemo" style="margin:0"><b>Limites</b><ul>${d.cons.map(x => `<li>${x}</li>`).join('')}</ul></div></div>
+        <div class="two mt-4"><div class="hdemo m-0"><b>Avantages</b><ul>${d.pros.map(x => `<li>${x}</li>`).join('')}</ul></div><div class="hdemo m-0"><b>Limites</b><ul>${d.cons.map(x => `<li>${x}</li>`).join('')}</ul></div></div>
         ${H.warn(`<ul>${d.fake.map(x => `<li>${x}</li>`).join('')}</ul>`, 'Risques de faux signaux')}
         <h2>Par rapport aux autres</h2><ul>${d.vs.map(([o, t]) => `<li>${t} <a href="#/strat-${o}">Voir la fiche</a></li>`).join('')}</ul>
         <p>Rappel : cette fiche décrit un profil de prix passé, pas une promesse. <a href="#/strat-comparaison">Comparer les 7 stratégies</a>.</p>

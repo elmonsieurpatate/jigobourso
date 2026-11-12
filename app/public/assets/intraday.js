@@ -152,11 +152,11 @@
       const d = data;
       if (!d.supported) { host.innerHTML = `<div class="notice">${J.esc(d.note)}</div>`; return; }
       const F = fmt(d.tz), last = d.last_bar_utc ? t(d.last_bar_utc) : null;
-      const chips = [`<span class="chip">Barres de ${d.interval_minutes} min · aucune interpolation</span>`, `<span class="chip">Fuseau de la place : ${J.esc(d.tz)}</span>`,
-        `<span class="chip">Source : ${J.esc(d.source)}</span>`,
+      const chips = [`<span class="badge outline">Barres de ${d.interval_minutes} min · aucune interpolation</span>`, `<span class="badge outline">Fuseau de la place : ${J.esc(d.tz)}</span>`,
+        `<span class="badge outline">Source : ${J.esc(d.source)}</span>`,
         d.market_open ? '<span class="badge ok">Place ouverte</span>' : '<span class="badge">Place fermée</span>',
-        d.delayed ? `<span class="badge wait">Différé · ${d.lag_minutes} min</span>` : '',
-        last ? `<span class="chip">Dernière barre : ${F.day(last)} ${F.time(last)} ${F.zone(last)}</span>` : ''].join('');
+        d.delayed ? `<span class="badge warn">Différé · ${d.lag_minutes} min</span>` : '',
+        last ? `<span class="badge outline">Dernière barre : ${F.day(last)} ${F.time(last)} ${F.zone(last)}</span>` : ''].join('');
       const cards = d.sessions.map((s, i) => {
         const m = s.summary, older = i < d.sessions.length - 1;
         return `<div class="sess-card ${older ? 'older' : 'latest'}"><div class="small muted">${older ? 'Séance précédente' : (s.in_progress ? 'Séance en cours' : 'Dernière séance')}</div>
@@ -165,11 +165,11 @@
           <div class="sess-line"><span class="${J.cls(m.change_pct)}"><b>${J.pct(m.change_pct)}</b> sur la séance</span><span>Volume <b>${m.volume === null ? 'absent' : J.num(m.volume, 0)}</b>${m.volume_complete ? '' : ' <span class="warn">(partiel)</span>'}</span></div>
           <div class="small muted">${s.count}/${s.expected} barres${s.missing.length ? ` · <span class="warn">${s.missing.length} trou(s)</span>` : ''}${s.in_progress ? ' · en cours' : s.complete ? ' · complète' : ' · incomplète'}</div></div>`;
       }).join('');
-      host.innerHTML = `<div class="row between wrap-s" style="margin-bottom:10px"><div class="chips">${chips}</div>
-        <div class="row gap-s"><span class="seg" id="imode"><button data-m="candles" class="${mode === 'candles' ? 'on' : ''}">Bougies</button><button data-m="line" class="${mode === 'line' ? 'on' : ''}">Ligne</button></span><button class="btn small" id="irefresh" title="Relire les barres chez Yahoo Finance">↻ Actualiser</button></div></div>
+      host.innerHTML = `<div class="row between wrap-s mb-3"><div class="chips">${chips}</div>
+        <div class="row gap-s"><span class="seg" id="imode"><button data-m="candles" class="${mode === 'candles' ? 'on' : ''}">Bougies</button><button data-m="line" class="${mode === 'line' ? 'on' : ''}">Ligne</button></span><button class="btn sm" id="irefresh" title="Relire les barres chez Yahoo Finance">↻ Actualiser</button></div></div>
         <div class="sess-cards">${cards}</div><div id="ichart"></div>
         <div class="legend small muted"><span><i class="lg up"></i> clôture ≥ ouverture</span><span><i class="lg down"></i> clôture &lt; ouverture</span><span><i class="lg hole"></i> créneau sans donnée</span><span><i class="lg dash"></i> clôture de la séance précédente</span><span>Survolez le graphique pour le détail de chaque barre.</span></div>
-        ${d.notes.length ? `<div class="notice warn" style="margin-top:10px">${d.notes.map(n => `<div>${J.esc(n)}</div>`).join('')}</div>` : ''}`;
+        ${d.notes.length ? `<div class="notice warn mt-3">${d.notes.map(n => `<div>${J.esc(n)}</div>`).join('')}</div>` : ''}`;
       J.intradayChart(J.$('#ichart', host), d, { mode });
       J.$$('#imode button', host).forEach(b => b.onclick = () => { mode = b.dataset.m; render(); });
       J.$('#irefresh', host).onclick = () => load(true);

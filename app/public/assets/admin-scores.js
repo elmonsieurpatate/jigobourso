@@ -110,10 +110,10 @@
   function paintBody() {
     const st = strat(), isV4 = st && st.engine === 'v4';
     $('#as-tabs').innerHTML = TABS.filter(t => !(MINE && t[0] === 'suivi')).map(([k, t]) => `<button data-a="tab" data-v="${k}" class="${tab === k ? 'on' : ''}">${t}</button>`).join('');
-    $('#as-err').innerHTML = error ? `<div class="notice err" style="margin-bottom:12px">${E(error)}</div>` : '';
+    $('#as-err').innerHTML = error ? `<div class="notice err mb-3">${E(error)}</div>` : '';
     $('#as-body').innerHTML = tab === 'config' ? configView(st, isV4) : tab === 'profils' ? profilesView() : tab === 'simulation' ? simulationView(isV4) : monitorView();
     if (MINE && tab === 'config') {       // réglages communs : propres à l'administration, lecture seule pour un utilisateur
-      $('#as-body').insertAdjacentHTML('afterbegin', '<div class="notice" style="margin-bottom:12px">Les réglages communs (priorité aux périodes courtes, seuil de fiabilité, ancrage) sont fixés par l’administration. Vos adaptations se font dans « Profils de stratégies » et ne concernent que votre compte.</div>');
+      $('#as-body').insertAdjacentHTML('afterbegin', '<div class="notice mb-3">Les réglages communs (priorité aux périodes courtes, seuil de fiabilité, ancrage) sont fixés par l’administration. Vos adaptations se font dans « Profils de stratégies » et ne concernent que votre compte.</div>');
       document.querySelectorAll('#as-body [data-a=kappa],#as-body [data-a=anchor],#as-body [data-a=thr]').forEach(e => { e.disabled = true; });
     }
     if (tab === 'suivi' && !mon && !monErr && !MINE) loadMonitor();
@@ -142,7 +142,7 @@
           return `<div class="as-period"><label><input type="checkbox" data-a="active" data-p="${id}" ${on ? 'checked' : ''}> ${E(labels()[id])} <span class="muted">(${x.sessions} séance${x.sessions > 1 ? 's' : ''})</span></label>
             ${!on ? '<span class="as-w muted">—</span>' : custom ? `<span class="as-w"><input type="number" class="as-num" data-a="pw" data-p="${id}" min="0" max="100" step="0.1" value="${p.weights[id] ?? 0}"> %</span>` : `<span class="as-w as-pill">${w && w[id] !== undefined ? fmt(w[id], 1) + ' %' : '…'}</span>`}</div>`; }).join('')}
         <div class="as-total ${Math.abs(total - 100) <= 0.05 ? 'ok' : 'ko'}" id="pw-total">Pondération totale : <b>${fmt(total, 1)} %</b>${Math.abs(total - 100) > 0.05 && ids.length ? ' — doit faire 100 %' : ''}</div>
-        ${custom ? '<button class="btn small" data-a="pw-auto">Répartir automatiquement</button>' : ''}
+        ${custom ? '<button class="btn sm" data-a="pw-auto">Répartir automatiquement</button>' : ''}
         <p class="as-hint">${ids.length} période${ids.length > 1 ? 's' : ''} active${ids.length > 1 ? 's' : ''} sur ${S.scoring_periods.length}. <b>Jour</b> (1 séance) est facultatif : désactivé et à 0 % par défaut, il n’a jamais de poids automatique. Pour l’utiliser, passez en mode Personnalisé et donnez-lui un poids ; seule la variation d’une séance est notée (ni R², ni volatilité, ni repli sur une séance : il faut au moins ${S.formula.min_sessions} séances pour les mesurer). Tant qu’il reste à 0 %, les notes ne changent pas.</p></div>
       <div class="card"><div class="row between"><div class="seg"><button data-a="score" data-v="simple" class="${scoreTab === 'simple' ? 'on' : ''}">Score simple</button><button data-a="score" data-v="complex" class="${scoreTab === 'complex' ? 'on' : ''}">Score complexe</button></div><span class="badge accent">Note sur 100</span></div>
         ${scoreTab === 'simple' ? simpleView() : complexView(p)}</div>
@@ -170,9 +170,9 @@
     return `<h3 class="as-h">Score complexe (qualité globale) <span class="as-i" title="Somme pondérée de notes 0-100. Ces poids sont propres au profil ; les valeurs proposées sont celles du profil de référence « Croissance rapide ».">ⓘ</span></h3>
       <div class="as-total ${Math.abs(total - 100) <= 0.05 ? 'ok' : 'ko'}">Total : <b id="cw-total">${fmt(total, 1)} %</b></div>
       ${COMPLEX.map(([k, n, d]) => `<div class="as-cw"><span title="${E(d)}">${n}</span><input type="number" class="as-num" data-a="cw" data-k="${k}" min="0" max="100" step="0.5" value="${cw[k] ?? 0}"><span class="as-bar-bg"><span class="as-bar-fg" id="cwb-${k}" style="width:${Math.min(100, cw[k] || 0)}%"></span></span><span class="as-pct" id="cwp-${k}">${fmt(cw[k], 0)} %</span></div>`).join('')}
-      <div class="row gap-s" style="margin-top:10px"><button class="btn small" data-a="cw-norm">Normaliser à 100</button><button class="btn small" data-a="cw-ref">Valeurs de référence</button></div>
+      <div class="row gap-s mt-3"><button class="btn sm" data-a="cw-norm">Normaliser à 100</button><button class="btn sm" data-a="cw-ref">Valeurs de référence</button></div>
       ${tuningCard(p)}
-      <h3 class="as-h" style="margin-top:14px">Ancrage récent (λ = ${fmt(draft.global.anchor, 2)})</h3>
+      <h3 class="as-h mt-4">Ancrage récent (λ = ${fmt(draft.global.anchor, 2)})</h3>
       <div class="as-formula">Note finale = somme pondérée × <b>(1 − λ × (1 − g))</b>, où g = min(1, dynamique de la période la plus courte ÷ 32), entre 0 et 1.</div>
       <p class="as-hint">Si la période courte (la semaine) garde une dynamique d’au moins 32 sur 100, g = 1 et rien n’est retiré. Plus elle faiblit, plus la note baisse, jusqu’à −λ (−50 % à λ = 0,5) pour une semaine plate ou négative. <b>λ = 0 neutralise l’ancrage.</b> Réglage commun à toutes les stratégies (onglet « Configuration du moteur »). Il ne concerne pas le score simple.</p>
       <p class="as-hint">Sur la base actuelle, la semaine faible pèse déjà dans la dynamique et dans les composantes amorties par g : l’ancrage s’y ajoute. Pour un titre à semaine plate, les deux premiers canaux retirent environ 35 % de la note et l’ancrage 0,5 porte la perte totale à environ 68 %. Le classement reste stable (corrélation de rang 0,996 entre λ = 0 et λ = 0,5, 93 titres communs sur le top 100) : l’ancrage sert surtout à départager les titres encore actifs de ceux qui ont calé.</p>
@@ -188,15 +188,15 @@
         : `<input type="number" class="as-num" data-a="tune" data-k="${k}" min="${R[k][0]}" max="${R[k][1]}" step="${k === 'sat_a' ? 1 : 0.05}" value="${cur}"> <span class="muted as-unit">${unit}</span>`;
       const shown = k === 'vol_mode' ? VOLMODES[dflt] : k === 'momentum_horizon' ? HORIZONS[dflt] : dflt;
       return `<div class="as-tune"><div class="as-tune-head"><b>${n}</b> <span class="as-i" title="${E(help)}">ⓘ</span></div><div class="as-tune-ctl">${input}</div>
-        <p class="as-hint">${E(help)}</p><p class="as-hint as-tune-def">Valeur par défaut : <b>${E(shown)}</b>${k in R ? ` · bornes ${R[k][0]} à ${R[k][1]}` : ''} ${same ? '' : `<button class="btn small" data-a="tune-reset" data-k="${k}">Valeur par défaut</button>`}</p></div>`;
+        <p class="as-hint">${E(help)}</p><p class="as-hint as-tune-def">Valeur par défaut : <b>${E(shown)}</b>${k in R ? ` · bornes ${R[k][0]} à ${R[k][1]}` : ''} ${same ? '' : `<button class="btn sm" data-a="tune-reset" data-k="${k}">Valeur par défaut</button>`}</p></div>`;
     };
-    return `<h3 class="as-h" style="margin-top:14px">Normalisations de cette stratégie (réglages avancés)</h3>
+    return `<h3 class="as-h mt-4">Normalisations de cette stratégie (réglages avancés)</h3>
       <p class="as-hint">Propres à la stratégie sélectionnée : elles changent les notes de cette stratégie et d’aucune autre.</p>${TUNING.map(field).join('')}`;
   }
 
   function historicView(st) {
     return `<div class="notice warn"><b>Moteur historique.</b> « ${E(st.label)} » utilise encore le classement par percentiles : il ne passe pas par les scores V4 et ne se règle pas ici. Aucun de ses réglages n’est modifié par cette page.</div>
-      <p class="as-hint" style="margin-top:12px">Périodes actives : ${st.periods.length ? st.periods.map(i => E(labels()[i] || i)).join(', ') : 'aucune'}.</p>
+      <p class="as-hint mt-3">Périodes actives : ${st.periods.length ? st.periods.map(i => E(labels()[i] || i)).join(', ') : 'aucune'}.</p>
       ${st.components.length ? `<div class="table-wrap"><table><thead><tr><th>Composante</th><th>Période</th><th class="num">Poids</th></tr></thead><tbody>${st.components.map(c => `<tr><td>${E(c.metric)}</td><td>${E(labels()[c.period] || c.period)}</td><td class="num">${fmt(c.weight, 2)}</td></tr>`).join('')}</tbody></table></div>` : '<p class="muted">Aucune composante de score pondérée.</p>'}`;
   }
 
@@ -204,7 +204,7 @@
     const row = s => {
       if (s.engine === 'v4') {
         const p = draft.profiles[s.name], ids = active(p), w = p.weights_mode === 'custom' ? p.weights : (s.name === sel ? autoWeights(p) : s.auto_weights);
-        return `<tr><td><b>${E(s.label)}</b><br><small class="muted">${E(s.note)}</small></td><td><span class="badge ok">Moteur commun V4</span></td><td>${ids.map(i => `${E(labels()[i])}${w && w[i] !== undefined ? ' <b>' + fmt(w[i], 1) + ' %</b>' : ''}`).join('<br>') || '—'}</td><td>${p.weights_mode === 'custom' ? 'Personnalisée' : 'Automatique'}</td><td>${s.customised ? '<span class="badge wait">Modifié</span>' : 'Valeurs initiales'}</td><td class="num"><button class="btn small" data-a="open" data-v="${E(s.name)}">Configurer</button></td></tr>`;
+        return `<tr><td><b>${E(s.label)}</b><br><small class="muted">${E(s.note)}</small></td><td><span class="badge ok">Moteur commun V4</span></td><td>${ids.map(i => `${E(labels()[i])}${w && w[i] !== undefined ? ' <b>' + fmt(w[i], 1) + ' %</b>' : ''}`).join('<br>') || '—'}</td><td>${p.weights_mode === 'custom' ? 'Personnalisée' : 'Automatique'}</td><td>${s.customised ? '<span class="badge warn">Modifié</span>' : 'Valeurs initiales'}</td><td class="num"><button class="btn sm" data-a="open" data-v="${E(s.name)}">Configurer</button></td></tr>`;
       }
       return `<tr class="as-legacy"><td>${E(s.label)}</td><td><span class="badge">Ancien moteur</span></td><td>${s.periods.map(i => E(labels()[i] || i)).join('<br>') || '—'}</td><td>Percentiles</td><td>Préservé</td><td></td></tr>`;
     };
@@ -223,7 +223,7 @@
       <ul class="as-hint as-list"><li><b>Historique suffisant</b> : note normale.</li>
         <li><b>Données incomplètes ou historique réduit</b> (une période, une mesure ou la liquidité manque) : la note est calculée sur les composantes disponibles, dont les poids sont renormalisés — sans bonus ni pénalité. Le titre est classé et marqué « incomplet » avec sa couverture.</li>
         <li><b>Calcul impossible</b> (aucune période mesurable, ou aucune régularité mesurable) : note « indisponible » avec la raison ; jamais un zéro ni une note favorable inventés.</li></ul>
-      <label class="row gap-s" style="margin-top:8px"><input type="checkbox" data-a="fresh" ${p.technical.require_fresh ? 'checked' : ''}> Exiger des cours récents (contrôle technique : un cours périmé rend le titre non évaluable)</label>
+      <label class="row gap-s mt-2"><input type="checkbox" data-a="fresh" ${p.technical.require_fresh ? 'checked' : ''}> Exiger des cours récents (contrôle technique : un cours périmé rend le titre non évaluable)</label>
       <p class="as-hint">Seuil de fiabilité : <b>${fmt(100 * draft.global.threshold, 0)} %</b> de couverture (réglage commun, onglet « Configuration du moteur »). En dessous, la note est calculée mais signalée « peu fiable » ; aucun titre n’est supprimé.</p></div>`;
   }
 
@@ -234,7 +234,7 @@
   }
 
   function rankTop(rows) {
-    return rows.length ? `<table class="as-mini"><tbody>${rows.map(r => `<tr><td class="num">${r.rank}</td><td><b>${E(r.symbol)}</b> <span class="muted">${E(r.name)}</span></td><td class="num">${fmt(r.score, 1)}</td><td>${r.status === 'partiel' ? '<span class="badge wait">incomplet</span>' : ''}</td></tr>`).join('')}</tbody></table>` : '<p class="muted">Aucun titre noté.</p>';
+    return rows.length ? `<table class="as-mini"><tbody>${rows.map(r => `<tr><td class="num">${r.rank}</td><td><b>${E(r.symbol)}</b> <span class="muted">${E(r.name)}</span></td><td class="num">${fmt(r.score, 1)}</td><td>${r.status === 'partiel' ? '<span class="badge warn">incomplet</span>' : ''}</td></tr>`).join('')}</tbody></table>` : '<p class="muted">Aucun titre noté.</p>';
   }
 
   // Courbe de cours : points réels uniquement, rien d'interpolé. Vert si la période finit au-dessus de son début, rouge sinon.
@@ -271,7 +271,7 @@
         ${marks.map(k => `<line class="mk" x1="${X(k.i).toFixed(1)}" x2="${X(k.i).toFixed(1)}" y1="${m.t}" y2="${m.t + ih}"/><text class="t mkt" x="${(X(k.i) + 3).toFixed(1)}" y="${m.t + 10}">début ${E(k.lab.toLowerCase())}</text>`).join('')}
         ${xt.map((i, k) => `<text class="t" x="${X(i).toFixed(1)}" y="${H - 7}" text-anchor="${i === 0 ? 'start' : i === pts.length - 1 ? 'end' : 'middle'}">${dShort(pts[i].d)}</text>`).join('')}
         <polyline points="${line}" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
-        <line id="as-cur" class="cur" x1="0" x2="0" y1="${m.t}" y2="${m.t + ih}" style="display:none"/><circle id="as-dot" r="4.5" cx="0" cy="0" style="display:none"/>
+        <line id="as-cur" class="cur" x1="0" x2="0" y1="${m.t}" y2="${m.t + ih}"/ style="display:none"><circle id="as-dot" r="4.5" cx="0" cy="0"/  style="display:none">
         <rect id="as-hit" x="${m.l}" y="${m.t}" width="${iw}" height="${ih}" fill="transparent"/></svg>
       <p class="as-hint">Cours de clôture réels sur les ${n} dernières séances (du ${dShort(pts[0].d)} au ${dShort(pts[pts.length - 1].d)})${chg === null ? '' : ' · <b>' + (chg >= 0 ? '+' : '') + fmt(chg, 1) + ' %</b>'}. Survolez ou touchez le graphique pour lire le cours de chaque séance.</p></div>`;
   }
@@ -293,7 +293,7 @@
   // Statut de stratégie (critères de recherche) : même moteur que le Classement et la fiche ; il ne change ni la note ni le rang.
   const STATUS = { retained: ['Retenue', 'ok'], excluded: ['Exclue', 'no'], undetermined: ['Indéterminée', 'na'] };
   const statusBadge = st => { if (!st) return ''; const [t, k] = STATUS[st] || STATUS.undetermined; return `<i class="as-status ${k}" title="Statut de la stratégie : ${t.toLowerCase()}. Détail dans la fiche du titre.">${t}</i>`; };
-  const verdictBar = (n) => `<div class="seg" role="radiogroup" aria-label="Statut de stratégie : titres affichés">${[['retained', 'Retenues'], ['excluded', 'Exclues'], ['all', 'Toutes']].map(([k, l]) => `<button data-a="rk-verdict" data-v="${k}" role="radio" aria-checked="${rkVerdict === k}" class="${rkVerdict === k ? 'on' : ''}">${l} <b>${J.num(n ? n[k] : 0, 0)}</b></button>`).join('')}</div>${n && n.undetermined ? `<span class="as-hint" style="margin:0">${J.num(n.undetermined, 0)} indéterminé${n.undetermined > 1 ? 's' : ''} (données manquantes), visible${n.undetermined > 1 ? 's' : ''} dans « Toutes ».</span>` : ''}${c0ctx()}`;
+  const verdictBar = (n) => `<div class="seg" role="radiogroup" aria-label="Statut de stratégie : titres affichés">${[['retained', 'Retenues'], ['excluded', 'Exclues'], ['all', 'Toutes']].map(([k, l]) => `<button data-a="rk-verdict" data-v="${k}" role="radio" aria-checked="${rkVerdict === k}" class="${rkVerdict === k ? 'on' : ''}">${l} <b>${J.num(n ? n[k] : 0, 0)}</b></button>`).join('')}</div>${n && n.undetermined ? `<span class="as-hint m-0">${J.num(n.undetermined, 0)} indéterminé${n.undetermined > 1 ? 's' : ''} (données manquantes), visible${n.undetermined > 1 ? 's' : ''} dans « Toutes ».</span>` : ''}${c0ctx()}`;
   const c0ctx = () => rank && rank.listing && rank.listing.context === 'missing' ? '<span class="as-hint" style="margin:0;color:var(--warn)">Critères de cette stratégie introuvables : statuts indéterminés.</span>' : '';
   function rowHtml(r, which, pick) {
     return `<div class="as-rk ${pick ? 'pick' : ''}" ${pick ? `data-a="sim-pick" data-id="${r.id}" tabindex="0" role="button"` : ''}><span class="as-rk-n">${r.rank ?? '—'}</span>
@@ -311,18 +311,18 @@
           <div class="as-tile"><span>Données incomplètes</span><b>${J.num(x.reduced_history, 0)}</b><small>${J.num(x.unreliable, 0)} sous le seuil de fiabilité</small></div></div>
         ${dist(x.distribution)}
         ${rel ? `<p class="as-hint"><b>Effet de vos modifications :</b> ${J.num(rel.score_changed, 0)} notes changent ; rang médian déplacé de ${J.num(rel.median_shift, 0)} ; ${J.num(rel.moved_over_10, 0)} titres bougent de plus de 10 places ; dans le top ${rel.top} : ${rel.top_entered} entrée${rel.top_entered > 1 ? 's' : ''}, ${rel.top_left} sortie${rel.top_left > 1 ? 's' : ''}.</p>` : ''}</div>`; };
-    return `<div class="card"><div class="row between" style="flex-wrap:wrap;gap:8px"><h3 class="as-h" style="margin:0">Classement général sur la base actuelle</h3><button class="btn small" data-a="conf-run">${confBusy ? 'Calcul…' : 'Recalculer'}</button></div>
-      <div class="row gap-s" style="flex-wrap:wrap;margin:8px 0"><span class="muted">Stratégie :</span> ${stratPicker()}<span class="as-hint" style="margin:0">${c ? granText(c.granularity) : ''}</span></div>
+    return `<div class="card"><div class="row between" style="flex-wrap:wrap;gap:8px"><h3 class="as-h m-0">Classement général sur la base actuelle</h3><button class="btn sm" data-a="conf-run">${confBusy ? 'Calcul…' : 'Recalculer'}</button></div>
+      <div class="row gap-s" style="flex-wrap:wrap;margin:8px 0"><span class="muted">Stratégie :</span> ${stratPicker()}<span class="as-hint m-0">${c ? granText(c.granularity) : ''}</span></div>
       ${confStale ? '<p class="as-hint" style="color:var(--warn)">Réglages modifiés depuis ce calcul : cliquez sur « Recalculer ».</p>' : ''}
-      ${confBusy && !c ? '<div class="empty"><span class="spinner"></span></div>' : !c ? `<p class="muted">${confFail ? 'Calcul impossible : voir le message ci-dessus.' : 'Calcul au premier affichage.'}</p>` : s.universe === 0 ? '<div class="notice warn" style="margin-top:8px">Aucun titre dans cette base : rien à noter. Aucune valeur d’exemple n’est affichée.</div>' : `
+      ${confBusy && !c ? '<div class="empty"><span class="spinner"></span></div>' : !c ? `<p class="muted">${confFail ? 'Calcul impossible : voir le message ci-dessus.' : 'Calcul au premier affichage.'}</p>` : s.universe === 0 ? '<div class="notice warn mt-2">Aucun titre dans cette base : rien à noter. Aucune valeur d’exemple n’est affichée.</div>' : `
         <p class="as-hint">Stratégie « ${E(st ? st.label : '')} » : ${granText(c.granularity)}. Tous les titres évaluables sont notés et classés, du meilleur au moins bon. Le rang est le rang général : choisir une catégorie ne le change pas.</p>
         <div class="row between" style="flex-wrap:wrap;gap:8px"><div class="seg"><button data-a="rk-which" data-v="simple" class="${rkWhich === 'simple' ? 'on' : ''}">Classé par score simple</button><button data-a="rk-which" data-v="complex" class="${rkWhich === 'complex' ? 'on' : ''}">Classé par score complexe</button></div>${verdictBar(c.listing.counts)}</div>
-        <div class="as-chips" style="margin:8px 0"><button class="btn small ${rkCat ? '' : 'primary'}" data-a="rk-cat" data-v="">Toutes <b>${J.num(c.listing.categories.reduce((a, x) => a + x.count, 0), 0)}</b></button>
-          ${c.listing.categories.map(k => `<button class="btn small ${rkCat === k.id ? 'primary' : ''}" data-a="rk-cat" data-v="${E(k.id)}"><i class="as-dot" style="background:${E(k.color || '#999')}"></i> ${E(k.name)} <b>${J.num(k.count, 0)}</b></button>`).join('')}</div>
+        <div class="as-chips mt-2 mb-2"><button class="btn sm ${rkCat ? '' : 'primary'}" data-a="rk-cat" data-v="">Toutes <b>${J.num(c.listing.categories.reduce((a, x) => a + x.count, 0), 0)}</b></button>
+          ${c.listing.categories.map(k => `<button class="btn sm ${rkCat === k.id ? 'primary' : ''}" data-a="rk-cat" data-v="${E(k.id)}"><i class="as-dot" style="background:${E(k.color || '#999')}"></i> ${E(k.name)} <b>${J.num(k.count, 0)}</b></button>`).join('')}</div>
         ${c.listing.rows.length ? rankTable(c.listing.rows) : '<p class="muted">Aucun titre dans cette catégorie.</p>'}
         <p class="as-hint">* note calculée sur des données incomplètes. Ce classement porte sur tous les titres notés ; la page Classement présente les mêmes titres, dans le même ordre, avec les mêmes notes et les mêmes rangs (rang commun « = » pour des notes strictement identiques). Seuls ses filtres secondaires peuvent masquer des lignes.</p>
-        ${c.listing.rows.length < c.listing.total ? `<div style="margin-top:8px"><button class="btn small" data-a="rk-more" ${rkMore ? 'disabled' : ''}>${rkMore ? 'Chargement…' : `Afficher la suite (${c.listing.rows.length} sur ${J.num(c.listing.total, 0)})`}</button></div>` : `<p class="as-hint">${J.num(c.listing.total, 0)} titre${c.listing.total > 1 ? 's' : ''}.</p>`}
-        <div class="as-ranks" style="margin-top:14px">${block('simple', 'Score simple')}${block('complex', 'Score complexe')}</div>
+        ${c.listing.rows.length < c.listing.total ? `<div class="mt-2"><button class="btn sm" data-a="rk-more" ${rkMore ? 'disabled' : ''}>${rkMore ? 'Chargement…' : `Afficher la suite (${c.listing.rows.length} sur ${J.num(c.listing.total, 0)})`}</button></div>` : `<p class="as-hint">${J.num(c.listing.total, 0)} titre${c.listing.total > 1 ? 's' : ''}.</p>`}
+        <div class="as-ranks mt-4">${block('simple', 'Score simple')}${block('complex', 'Score complexe')}</div>
         ${s.unavailable_reasons.length ? `<p class="as-hint"><b>Pourquoi une note est indisponible :</b> ${s.unavailable_reasons.map(r => `${E(r.reason)} (${J.num(r.count, 0)})`).join(' · ')}${s.no_inputs ? ` · ${J.num(s.no_inputs, 0)} titres sans mesures de score calculées` : ''}.</p>` : s.no_inputs ? `<p class="as-hint">${J.num(s.no_inputs, 0)} titres sans mesures de score calculées.</p>` : ''}
         <p class="as-hint">Moteur de notation version ${c.engine_version}. Poids réels des périodes : ${c.weights.map(w => `${E(labels()[w.id])} <b>${fmt(100 * w.weight, 1)} %</b>`).join(' · ')} (κ = ${fmt(c.kappa, 2)}${c.weights.some(w => w.custom) ? ', poids personnalisés' : ', automatiques'}).</p>`}</div>`;
   }
@@ -356,7 +356,7 @@
     const cols = l.columns.filter(c => SC_COLS[c.id] && c.visible);
     const prim = rkSorts[0] || { key: rkWhich, dir: 'desc' };
     const w = c => c.width ? ` style="width:${c.width}px;min-width:${c.width}px"` : '';
-    return `<div class="as-rkwrap"><table class="as-rktable" id="as-rktable"><thead><tr>${cols.map(c => `<th scope="col" class="${SC_COLS[c.id].cls || ''}"${w(c)}${tip(c.id)} ${SC_COLS[c.id].nosort ? '' : `aria-sort="${prim.key === c.id ? (prim.dir === 'asc' ? 'ascending' : 'descending') : 'none'}"`}>${SC_COLS[c.id].nosort ? E(label(c.id)) : `<button type="button" data-a="rk-sort" data-v="${E(c.id)}">${E(label(c.id))}${prim.key === c.id ? (prim.dir === 'asc' ? ' ↑' : ' ↓') : ''}</button>`}</th>`).join('')}</tr></thead>
+    return `<div class="as-rkwrap"><table class="dense as-rktable" id="as-rktable"><thead><tr>${cols.map(c => `<th scope="col" class="${SC_COLS[c.id].cls || ''}"${w(c)}${tip(c.id)} ${SC_COLS[c.id].nosort ? '' : `aria-sort="${prim.key === c.id ? (prim.dir === 'asc' ? 'ascending' : 'descending') : 'none'}"`}>${SC_COLS[c.id].nosort ? E(label(c.id)) : `<button type="button" data-a="rk-sort" data-v="${E(c.id)}">${E(label(c.id))}${prim.key === c.id ? (prim.dir === 'asc' ? ' ↑' : ' ↓') : ''}</button>`}</th>`).join('')}</tr></thead>
       <tbody>${rows.map(r => `<tr>${cols.map(c => `<td class="${SC_COLS[c.id].cls || ''}"${w(c)} data-label="${E(label(c.id))}">${SC_COLS[c.id].cell(r)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
   }
   const rankBody = (extra) => { const body = { strategy: sel, which: rkWhich, category: rkCat, verdict: rkVerdict, sort: rkSorts, limit: 25, ...extra }; if (dirty()) body.draft = { global: draft.global, profile: payload() }; return body; };
@@ -375,12 +375,12 @@
 
   // ───────────── simulation ─────────────
   function simulationView(isV4) {
-    if (!isV4) return `<div class="notice warn">La simulation porte sur une stratégie V4. Choisissez-en une ci-dessous.<div style="margin-top:8px">${stratPicker()}</div></div>`;
-    const cands = sim && sim.candidates && sim.candidates.length > 1 ? `<div class="as-chips"><span class="muted">Autres correspondances :</span> ${sim.candidates.map(c => `<button class="btn small" data-a="sim-pick" data-id="${c.id}">${E(c.symbol)} <span class="muted">${E(c.name)}</span></button>`).join(' ')}</div>` : '';
+    if (!isV4) return `<div class="notice warn">La simulation porte sur une stratégie V4. Choisissez-en une ci-dessous.<div class="mt-2">${stratPicker()}</div></div>`;
+    const cands = sim && sim.candidates && sim.candidates.length > 1 ? `<div class="as-chips"><span class="muted">Autres correspondances :</span> ${sim.candidates.map(c => `<button class="btn sm" data-a="sim-pick" data-id="${c.id}">${E(c.symbol)} <span class="muted">${E(c.name)}</span></button>`).join(' ')}</div>` : '';
     return `<div class="card"><div class="row gap-s" style="flex-wrap:wrap;margin-bottom:8px"><span class="muted">Stratégie :</span> ${stratPicker()}</div>
-        ${sim && sim.granularity ? `<p class="as-hint" style="margin:0 0 8px">${granText({ periods: sim.periods, sessions: sim.granularity })}</p>` : ''}
+        ${sim && sim.granularity ? `<p class="as-hint mb-2">${granText({ periods: sim.periods, sessions: sim.granularity })}</p>` : ''}
         <div class="as-searchrow"><input id="as-q" class="as-search" type="search" enterkeyhint="search" placeholder="Symbole, nom ou ISIN d’un titre noté" value="${E(simQ)}"><button class="btn primary" data-a="sim-run">Décomposer</button></div>
-        <label class="row gap-s as-chk" style="margin-top:8px"><input type="checkbox" data-a="use-draft" ${useDraft ? 'checked' : ''}> avec mes modifications non enregistrées</label>${cands}</div>
+        <label class="row gap-s as-chk mt-2"><input type="checkbox" data-a="use-draft" ${useDraft ? 'checked' : ''}> avec mes modifications non enregistrées</label>${cands}</div>
       <div id="as-sim">${simBusy ? '<div class="empty"><span class="spinner"></span></div>' : simBody()}</div>`;
   }
 
@@ -396,7 +396,7 @@
       return `<td class="num">${val === null || val === undefined ? '<span class="muted">indisponible</span>' : fmt(unit === '%' ? val * (['up_fraction', 'spike_share'].includes(key) ? 100 : 1) : val, d) + (unit ? ' ' + unit : '')}${note === null || note === undefined ? '' : `<br><small class="muted">note ${fmt(note, 0)}</small>`}</td>`; };
     const rows = [['Croissance (Dynamique)', 'growth', '%', 2], ['Régularité (R²)', 'r2', '', 2], ['Séances positives', 'up_fraction', '%', 0], ['Plus gros pic ÷ hausse nette', 'spike_share', '%', 0], ['Accélération (écart de pente)', 'accel', '', 3], ['Volatilité (par séance)', 'volatility', '%', 2], ['Drawdown', 'drawdown', '%', 1]];
     const s = r.simple, c = r.complex, liq = r.liquidity || {};
-    return `<div class="card"><div class="row between" style="flex-wrap:wrap;gap:12px"><div><h3 class="as-h" style="margin:0">${E(sim.title.name)}</h3><span class="muted">${E(sim.title.symbol)} · ${E(sim.title.mic)} · ${sim.title.kind === 'etf' ? 'ETF' : 'Action'}</span></div><div class="as-scores">${sc(s, 's')}${sc(c, 'c')}</div></div>
+    return `<div class="card"><div class="row between" style="flex-wrap:wrap;gap:12px"><div><h3 class="as-h m-0">${E(sim.title.name)}</h3><span class="muted">${E(sim.title.symbol)} · ${E(sim.title.mic)} · ${sim.title.kind === 'etf' ? 'ETF' : 'Action'}</span></div><div class="as-scores">${sc(s, 's')}${sc(c, 'c')}</div></div>
       ${sim.tuning ? `<p class="as-hint">Normalisations utilisées par le calcul : saturation de dynamique <b>${fmt(sim.tuning.sat_a, 1)}</b> · référence d’accélération <b>${fmt(sim.tuning.accel_ref, 2)}</b> · volatilité <b>${E(VOLMODES[sim.tuning.vol_mode] || sim.tuning.vol_mode)}</b> · momentum <b>${E(HORIZONS[sim.tuning.momentum_horizon] || sim.tuning.momentum_horizon)}</b>.</p>` : ''}
       ${chartCard()}
       <div class="table-wrap"><table class="as-dec"><thead><tr><th>Mesure</th>${ids.map(i => `<th class="num">${E(L[i])}<br><small class="muted">poids réel ${fmt(100 * ((r.weights_effective || {})[i] || 0), 1)} %${r.periods[i] ? '' : ' (période sans données)'}</small></th>`).join('')}</tr></thead><tbody>
@@ -428,7 +428,7 @@
     if (!mon) return '<div class="empty"><span class="spinner"></span></div>';
     const m = mon, l = m.liquidity, n = m.rated, pct = (a, b) => b ? fmt(100 * a / b, 0) + ' %' : '—';
     const stat = k => `<div class="as-tile"><span>${k === 'simple' ? 'Score simple' : 'Score complexe'}</span><b>${J.num(m.counts[k].ok + m.counts[k].partiel, 0)}</b><small>notés et classés · ${J.num(m.counts[k].ok, 0)} complets · ${J.num(m.counts[k].partiel, 0)} incomplets · ${J.num(m.counts[k].inconnu + Math.max(0, l.universe - n), 0)} indisponibles</small></div>`;
-    return `${n === 0 ? '<div class="notice warn" style="margin-bottom:12px"><b>Aucun titre noté.</b> Les mesures de score se remplissent au calcul nocturne ; cette base n’en contient pas encore. Aucune valeur d’exemple n’est affichée.</div>' : ''}
+    return `${n === 0 ? '<div class="notice warn mb-3"><b>Aucun titre noté.</b> Les mesures de score se remplissent au calcul nocturne ; cette base n’en contient pas encore. Aucune valeur d’exemple n’est affichée.</div>' : ''}
       <div class="as-tiles"><div class="as-tile"><span>Titres notés</span><b>${J.num(n, 0)}</b><small>sur ${J.num(l.universe, 0)} titres recommandables</small></div>${stat('simple')}${stat('complex')}
         <div class="as-tile"><span>Couverture des données</span><b>${m.coverage.median === null ? '—' : fmt(100 * m.coverage.median, 0) + ' %'}</b><small>médiane · minimum ${m.coverage.min === null ? '—' : fmt(100 * m.coverage.min, 0) + ' %'} · ${J.num(m.coverage.full, 0)} complets</small></div></div>
       <div class="as-grid2"><div class="card"><h3 class="as-h">Fraîcheur des données</h3><table class="as-mini"><tbody>
@@ -441,7 +441,7 @@
         <tr><td>Estimée (moyenne trimestrielle)</td><td class="num">${J.num(l.estimated, 0)}</td><td class="num">${pct(l.estimated, l.universe)}</td></tr>
         <tr><td>Inconnue</td><td class="num">${J.num(l.unknown, 0)}</td><td class="num">${pct(l.unknown, l.universe)}</td></tr></tbody></table>
         <p class="as-hint">Collecte des volumes quotidiens : <b>${m.volume_collection ? 'activée' : 'désactivée'}</b> · dernière vérification : ${l.volume_checked_at ? E(J.dateTime(l.volume_checked_at)) : 'jamais'}. L’estimation surestime d’environ 12 % en médiane.</p></div></div>
-      <div class="card"><div class="row between"><h3 class="as-h" style="margin:0">Erreurs de calcul récentes</h3><button class="btn small" data-a="mon-refresh">Actualiser</button></div>
+      <div class="card"><div class="row between"><h3 class="as-h m-0">Erreurs de calcul récentes</h3><button class="btn sm" data-a="mon-refresh">Actualiser</button></div>
         ${m.problems.length ? `<table class="as-mini"><tbody>${m.problems.map(p => `<tr><td>${E(J.dateTime(p.at))}</td><td>${E(p.type)}</td><td><span class="badge ${p.status === 'failed' ? 'ko' : 'wait'}">${E(p.status)}</span></td><td>${p.errors ? J.num(p.errors, 0) + ' erreur(s)' : ''} ${E(p.summary || '')}</td></tr>`).join('')}</tbody></table>` : '<p class="muted">Aucune erreur récente enregistrée.</p>'}</div>`;
   }
 

@@ -292,7 +292,7 @@ def test_classement_proposes_every_v4_strategy():
     root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     assert sorted(scores_specs.CT_BUILTIN.values()) == sorted(scores_specs.V4_STRATEGIES)
     php = open(os.path.join(root, 'app', 'services', 'ct_strategies.php'), encoding='utf-8').read()
-    js = open(os.path.join(root, 'app', 'public', 'assets', 'classement-test.js'), encoding='utf-8').read()
+    js = open(os.path.join(root, 'app', 'public', 'assets', 'explorer.js'), encoding='utf-8').read()
     crit = R.criteria()['criteria']
     assert 'ranking/criteria' in js and '.3,.6' not in js and '[.07,.56]' not in js         # aucune valeur de critère recopiée dans la page
     for ct_id, name in scores_specs.CT_BUILTIN.items():

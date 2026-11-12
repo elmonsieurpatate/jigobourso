@@ -8,11 +8,11 @@
   const rowsOf = d => d.length ? `<div class="sui-scroll"><table class="sui-cmp"><thead><tr><th>Paramètre</th><th>Officiel</th><th>Le vôtre</th></tr></thead><tbody>${d.map(x => `<tr class="mod"><td>${esc(x.key)}</td><td>${esc(val(x.official))}</td><td>${esc(val(x.mine))}</td></tr>`).join('')}</tbody></table></div>` : '';
   const statusBlock = r => {
     const st = status[r.id]; if (!st || st.kind !== 'builtin') return '';
-    const part = (label, p, act) => `<div class="row gap-s small" style="align-items:center"><b>${label}</b> ${SUI.badge(p.state)}${p.modified ? ` <span class="muted">${p.modified} paramètre${p.modified > 1 ? 's' : ''} modifié${p.modified > 1 ? 's' : ''}</span> <button class="btn small" data-act="${act}" data-id="${esc(r.id)}">${J.icon('undo', 'sui-ic')} Restaurer</button>` : ''}</div>`;
+    const part = (label, p, act) => `<div class="row gap-s small" style="align-items:center"><b>${label}</b> ${SUI.badge(p.state)}${p.modified ? ` <span class="muted">${p.modified} paramètre${p.modified > 1 ? 's' : ''} modifié${p.modified > 1 ? 's' : ''}</span> <button class="btn sm" data-act="${act}" data-id="${esc(r.id)}">${J.icon('undo', 'sui-ic')} Restaurer</button>` : ''}</div>`;
     const showing = open.has('*') || open.has(r.id);
     return `<div style="margin-top:8px;display:grid;gap:4px">${part('Critères de recherche', st.criteria, 'restore-criteria')}${part('Calcul des scores', st.scores, 'restore-scores')}
-      <div class="row gap-s">${st.status === 'adapted' ? `<button class="btn small" data-act="compare" data-id="${esc(r.id)}" aria-expanded="${showing}">${J.icon('compare', 'sui-ic')} Comparer à l’officielle</button><button class="btn small" data-act="restore-all" data-id="${esc(r.id)}">Tout restaurer</button>` : ''}<a class="btn small" href="mes-scores.html">Modifier les scores</a><a class="btn small" href="index.html?strategy=${encodeURIComponent(r.id)}">Modifier les critères</a></div>
-      ${showing && st.status === 'adapted' ? `${st.criteria.details.length ? '<h4 style="margin:8px 0 4px">Critères de recherche</h4>' + rowsOf(st.criteria.details) : ''}${st.scores.details.length ? '<h4 style="margin:8px 0 4px">Calcul des scores</h4>' + rowsOf(st.scores.details) : ''}` : ''}</div>`;
+      <div class="row gap-s">${st.status === 'adapted' ? `<button class="btn sm" data-act="compare" data-id="${esc(r.id)}" aria-expanded="${showing}">${J.icon('compare', 'sui-ic')} Comparer à l’officielle</button><button class="btn sm" data-act="restore-all" data-id="${esc(r.id)}">Tout restaurer</button>` : ''}<a class="btn sm" href="mes-scores.html">Modifier les scores</a><a class="btn sm" href="index.html?strategy=${encodeURIComponent(r.id)}">Modifier les critères</a></div>
+      ${showing && st.status === 'adapted' ? `${st.criteria.details.length ? '<h4 class="mt-2 mb-1">Critères de recherche</h4>' + rowsOf(st.criteria.details) : ''}${st.scores.details.length ? '<h4 class="mt-2 mb-1">Calcul des scores</h4>' + rowsOf(st.scores.details) : ''}` : ''}</div>`;
   };
   const post = body => J.post('classement-test/strategies/save', { revision: view.revision, ...body });
   const meta = id => ({ icon: 'trending-up', description: '', enabled: true, ...((view.meta || {})[id] || {}) });
@@ -26,25 +26,25 @@
     const m = meta(r.id);
     return `<form class="ms-form" data-id="${esc(r.id)}" style="margin-top:12px;display:grid;gap:12px">
       <label class="field">Nom<input name="name" maxlength="60" value="${esc(r.name)}" ${r.builtin ? 'readonly title="Le nom d’une stratégie fournie ne change pas"' : ''} autocomplete="off"></label>
-      <fieldset style="border:0;padding:0;margin:0"><legend class="small muted" style="margin-bottom:6px">Icône</legend><div class="row gap-s" role="radiogroup" aria-label="Icône">${view.icons.map(ic => `<label style="cursor:pointer"><input type="radio" name="icon" value="${esc(ic)}" ${ic === m.icon ? 'checked' : ''} style="position:absolute;opacity:0"><span class="ms-ic" style="display:inline-flex;width:38px;height:38px;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:10px;" title="${esc(ic)}">${SUI.glyph(ic)}</span></label>`).join('')}</div></fieldset>
+      <fieldset style="border:0;padding:0;margin:0"><legend class="small muted mb-2">Icône</legend><div class="row gap-s" role="radiogroup" aria-label="Icône">${view.icons.map(ic => `<label class="pointer"><input type="radio" name="icon" value="${esc(ic)}" ${ic === m.icon ? 'checked' : ''} style="position:absolute;opacity:0"><span class="ms-ic" style="display:inline-flex;width:38px;height:38px;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:10px;" title="${esc(ic)}">${SUI.glyph(ic)}</span></label>`).join('')}</div></fieldset>
       <label class="field">Explications <span class="small muted">(300 caractères max)</span><textarea name="description" rows="3" maxlength="300">${esc(m.description)}</textarea></label>
-      <div class="row gap-s"><button type="submit" class="btn small primary">Enregistrer</button><button type="button" class="btn small" data-act="cancel">Annuler</button>${r.builtin ? `<button type="button" class="btn small" data-act="restore" data-id="${esc(r.id)}" title="Remet les réglages d’origine (seuils, périodes, filtres)" style="margin-left:auto">Restaurer par défaut</button>` : ''}</div></form>`;
+      <div class="row gap-s"><button type="submit" class="btn sm primary">Enregistrer</button><button type="button" class="btn sm" data-act="cancel">Annuler</button>${r.builtin ? `<button type="button" class="btn sm" data-act="restore" data-id="${esc(r.id)}" title="Remet les réglages d’origine (seuils, périodes, filtres)" style="margin-left:auto">Restaurer par défaut</button>` : ''}</div></form>`;
   }
   function render(msg, err) {
     SUI.setMeta(view.meta);
     const custom = view.items.filter(i => !i.builtin).length;
-    page.innerHTML = (msg ? `<div class="notice ${err ? 'err' : ''}" role="status" style="margin-bottom:12px">${esc(msg)}</div>` : '') +
-      `<div class="row between" style="margin-bottom:12px"><span class="muted">${custom} / ${view.max_custom} stratégie(s) personnelle(s)</span><a class="btn primary" href="index.html">Créer depuis le Classement test</a></div>` +
+    page.innerHTML = (msg ? `<div class="notice ${err ? 'err' : ''} mb-3" role="status">${esc(msg)}</div>` : '') +
+      `<div class="row between mb-3"><span class="muted">${custom} / ${view.max_custom} stratégie(s) personnelle(s)</span><a class="btn primary" href="index.html">Créer depuis le Classement test</a></div>` +
       rows().map(r => {
         const m = meta(r.id), off = !m.enabled;
         return `<div class="card tight" style="margin-bottom:10px;${off ? 'opacity:.8' : ''}"><div class="row between" style="align-items:flex-start">
-          <div class="row" style="flex-wrap:nowrap;align-items:flex-start;min-width:0">${SUI.ico(r.id, r.builtin ? 'builtin' : 'personal')}<div style="min-width:0"><b>${esc(r.name)}</b> ${SUI.badge(status[r.id] ? status[r.id].status : r.builtin ? 'official' : 'personal')} ${off ? ' <span class="tag">Désactivée</span>' : ''}${r.id === view.selected ? ' <span class="tag open">Dernière utilisée</span>' : ''}
+          <div class="row" style="flex-wrap:nowrap;align-items:flex-start;min-width:0">${SUI.ico(r.id, r.builtin ? 'builtin' : 'personal')}<div style="min-width:0"><b>${esc(r.name)}</b> ${SUI.badge(status[r.id] ? status[r.id].status : r.builtin ? 'official' : 'personal')} ${off ? ' <span class="badge sm">Désactivée</span>' : ''}${r.id === view.selected ? ' <span class="badge sm ok outline">Dernière utilisée</span>' : ''}
           <div class="small muted" style="white-space:pre-line;max-width:70ch">${esc(m.description || 'Aucune explication.')} <a href="aide.html#strategie-${esc(r.builtin ? r.id : 'personnelles')}">Fiche d’aide</a></div>${statusBlock(r)}
           <div class="small muted">${r.row ? (r.builtin ? 'Réglages modifiés' : 'Enregistrée') + ' le ' + esc(when(r.row.updated_at)) : 'Valeurs d’origine'}</div></div></div>
-          <div class="row gap-s"><label class="row gap-s small" style="cursor:pointer"><input type="checkbox" data-act="toggle" data-id="${esc(r.id)}" ${m.enabled ? 'checked' : ''}> Active</label>
-          <button class="btn small" data-act="edit" data-id="${esc(r.id)}">Modifier</button>
-          ${m.enabled ? `<a class="btn small primary" href="index.html?strategy=${encodeURIComponent(r.id)}">Ouvrir</a>` : ''}
-          ${r.builtin ? '' : `<button class="btn small" data-act="copy" data-id="${esc(r.id)}">Dupliquer</button><button class="btn small danger" data-act="delete" data-id="${esc(r.id)}">Supprimer</button>`}</div></div>
+          <div class="row gap-s"><label class="row gap-s small pointer"><input type="checkbox" data-act="toggle" data-id="${esc(r.id)}" ${m.enabled ? 'checked' : ''}> Active</label>
+          <button class="btn sm" data-act="edit" data-id="${esc(r.id)}">Modifier</button>
+          ${m.enabled ? `<a class="btn sm primary" href="index.html?strategy=${encodeURIComponent(r.id)}">Ouvrir</a>` : ''}
+          ${r.builtin ? '' : `<button class="btn sm" data-act="copy" data-id="${esc(r.id)}">Dupliquer</button><button class="btn sm danger" data-act="delete" data-id="${esc(r.id)}">Supprimer</button>`}</div></div>
           ${editing === r.id ? form(r) : ''}</div>`;
       }).join('');
     J.$$('[data-act]', page).forEach(b => { const a = b.dataset.act; if (a === 'toggle') b.onchange = () => act(a, b.dataset.id, b.checked); else b.onclick = () => a === 'cancel' ? (editing = null, render()) : act(a, b.dataset.id); });
