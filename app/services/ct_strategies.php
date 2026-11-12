@@ -231,11 +231,3 @@ function ct_write_once(int $uid, array $req): array {
         return ct_view($doc);
     });
 }
-/** Réglages de scores PERSONNELS : mêmes commandes du moteur que l'administration, mais toujours dans le compte de l'utilisateur connecté (références officielles jamais modifiées). */
-function my_ranking_request(array $u, array $b): array {
-    $specs = []; foreach ((ct_all((int)$u['id'])['items'] ?? []) as $it) if (is_array($it['config'] ?? null)) $specs[$it['id']] = $it['config'];
-    return ['user_id' => (int)$u['id'], 'strategy' => str_in($b, 'strategy', 40), 'ct_specs' => (object)$specs, 'sort' => is_array($b['sort'] ?? null) ? array_slice($b['sort'], 0, 3) : [],
-        'verdict' => in_array($b['verdict'] ?? '', ['retained', 'excluded', 'undetermined'], true) ? $b['verdict'] : 'all', 'draft' => is_array($b['draft'] ?? null) ? $b['draft'] : null,
-        'which' => ($b['which'] ?? '') === 'complex' ? 'complex' : 'simple', 'category' => isset($b['category']) && is_string($b['category']) ? mb_substr($b['category'], 0, 60) : null,
-        'offset' => max(0, (int)($b['offset'] ?? 0)), 'limit' => max(1, min(100, (int)($b['limit'] ?? 25)))];
-}

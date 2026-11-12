@@ -54,12 +54,12 @@ Réalisé : `need_post` exige Origin ou Referer, `body()` exige `application/jso
   - [x] `routes/tracking.php:18-23` `track_custom_names`, `track_label`
   - [x] `routes/admin.php:3,19` `log_tail`, `system_counts`
   - [x] `routes/cron.php:9-36` `cron_reject`, `cron_presented_key`, `cron_tick`
-  - [x] `routes/ct_strategies.php:4` `my_ranking_request`
+  - [x] `routes/ct_strategies.php:4` `my_ranking_request` (puis fusionné dans `services/scores.php`)
   - [x] `routes/auth.php:92` `setting_value` → `lib/` ou `services/`
 - [x] Ajouter les `require_once` explicites manquants (`lib/mail.php`, `db.php`, `http.php`, `own_portfolio`, `str_in`, `q`) : aujourd'hui dépendance à l'ordre de chargement de `public/api.php`
-- [ ] Fusionner `admin/scores/ranking` et `my_ranking_request` en un service unique (`user_id` optionnel) ; idem `admin/scores/simulate` / `my/scores/simulate`
+- [x] Fusionner `admin/scores/ranking` et `my_ranking_request` en un service unique (`user_id` optionnel) ; idem `admin/scores/simulate` / `my/scores/simulate`
 - [x] Introduire un helper `tx(callable)` pour remplacer les `beginTransaction/try/rollBack` manuels (`login`, `auth/password`, `portfolios.php:155`)
-- [ ] Unifier la validation du mot de passe (`admin/user/create` via `str_in` vs `valid_password`) avec `password_input`
+- [x] Unifier la validation du mot de passe (`admin/user/create` via `str_in` vs `valid_password`) avec `password_input`
 
 ## Étape 3 : Élimination du legacy et du code mort
 
@@ -107,7 +107,7 @@ Procéder en deux temps : déplacement avec shims de ré-export (`from .series.c
 ## Étape 6 : Design system CSS 🟠
 
 ### 6.1 Tokens et thème
-- [ ] Fusionner les deux `:root` d'`app.css` (l.2/10 et 183-184)
+- [x] Fusionner les deux `:root` d'`app.css` (l.2/10 et 183-184)
 - [ ] Créer des tokens sémantiques dans `app.css` : `--info`, `--danger`, `--warn`, `--ok` + variantes `-soft` / `-ink`, avec valeurs sombres
 - [ ] Refactorer `plan-suivi.css` (≈ 20 hex sombres en dur, l.16-140), `classement-test.css` (l.2,5,45,46, dont code mort), `admin-categories-test.css` (l.2, 88-91), `help.css:38` pour n'utiliser que `var()`
 
@@ -152,7 +152,7 @@ Procéder en deux temps : déplacement avec shims de ré-export (`from .series.c
 - [ ] Harmoniser le style PHP : espaces, lignes > 250 car. (`lib/auth.php:17-50`, `routes/auth.php:48-60`, `admin.php`, `alerts.php`)
 - [ ] Borner la pagination `$page` (`admin.php:91`, `admin/catalogue`) ; lier `$size`/`OFFSET` en paramètres (`admin.php:93`)
 - [ ] Revoir `JSON_PARTIAL_OUTPUT_ON_ERROR` (masque les erreurs d'encodage) ; envoyer `send_welcome_mail` après `out_then` plutôt que de façon synchrone
-- [ ] Fusionner les doublons `.card`/`th` résiduels, nettoyer le CSS mort détecté après les étapes 6–7
+- [x] Fusionner les doublons `.card`/`th` résiduels, nettoyer le CSS mort détecté après les étapes 6–7
 - [ ] Unifier la stack de tests e2e (`.cjs`, `.php`, seeds Python : 3 technologies)
 - [ ] Mettre à jour README / docs d'architecture (sous-paquets analytics, `scripts/release/`, `scripts/oneshot/`, `ops/`)
 - [ ] Rejouer toute la suite de tests et une vérification de déploiement ; supprimer les shims restants

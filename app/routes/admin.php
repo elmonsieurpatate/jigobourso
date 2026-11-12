@@ -2,10 +2,12 @@
 require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/http.php';
 require_once __DIR__ . '/../lib/config.php';
+require_once __DIR__ . '/../lib/account.php';
 require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/engine.php';
 require_once __DIR__ . '/../services/admin.php';
 require_once __DIR__ . '/../services/ct_strategies.php';
+require_once __DIR__ . '/../services/scores.php';
 
 return [
     'admin/splits' => function () {
@@ -28,7 +30,7 @@ return [
     },
     'admin/user/create' => function () {
         need_post(); require_admin(); $b = body();
-        return ['id' => create_user(str_in($b, 'username', 30), str_in($b, 'password', 200), str_in($b, 'email', 190, false) ?: null, !empty($b['is_admin']))];
+        return ['id' => create_user(str_in($b, 'username', 30), password_input($b, 'password'), str_in($b, 'email', 190, false) ?: null, !empty($b['is_admin']))];
     },
     'admin/user/update' => function () {
         need_post(); $me = require_admin(); $b = body();
@@ -151,18 +153,8 @@ return [
         need_post(); require_admin(); $b = body();
         return engine_call('scores-preview', ['kappa' => $b['kappa'] ?? null, 'periods' => is_array($b['periods'] ?? null) ? $b['periods'] : []]);
     },
-    'admin/scores/simulate' => function () {
-        need_post(); require_admin(); $b = body();
-        return engine_call('scores-simulate', ['strategy' => str_in($b, 'strategy', 40), 'q' => isset($b['q']) ? mb_substr((string)$b['q'], 0, 80) : '',
-                                              'listing_id' => isset($b['listing_id']) ? (int)$b['listing_id'] : null, 'draft' => is_array($b['draft'] ?? null) ? $b['draft'] : null]);
-    },
-    'admin/scores/ranking' => function () {
-        need_post(); $adm = require_admin(); $b = body();
-        $specs = []; foreach ((ct_all((int)$adm['id'])['items'] ?? []) as $it) if (is_array($it['config'] ?? null)) $specs[$it['id']] = $it['config'];
-        return engine_call('scores-ranking', ['strategy' => str_in($b, 'strategy', 40), 'ct_specs' => (object)$specs, 'sort' => is_array($b['sort'] ?? null) ? array_slice($b['sort'], 0, 3) : [], 'verdict' => in_array($b['verdict'] ?? '', ['retained', 'excluded', 'undetermined'], true) ? $b['verdict'] : 'all', 'draft' => is_array($b['draft'] ?? null) ? $b['draft'] : null,
-            'which' => ($b['which'] ?? '') === 'complex' ? 'complex' : 'simple', 'category' => isset($b['category']) && is_string($b['category']) ? mb_substr($b['category'], 0, 60) : null,
-            'offset' => max(0, (int)($b['offset'] ?? 0)), 'limit' => max(1, min(100, (int)($b['limit'] ?? 25)))]);
-    },
+    'admin/scores/simulate' => function () { need_post(); require_admin(); return engine_call('scores-simulate', scores_simulate_request(body())); },
+    'admin/scores/ranking' => function () { need_post(); $adm = require_admin(); return engine_call('scores-ranking', scores_ranking_request($adm, body())); },
     'admin/scores/monitor' => function () { require_admin(); return engine_call('scores-monitor', []); },
     'admin/run' => function () {
         need_post(); require_admin();

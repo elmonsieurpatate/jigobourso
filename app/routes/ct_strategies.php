@@ -3,6 +3,7 @@ require_once __DIR__ . '/../lib/http.php';
 require_once __DIR__ . '/../lib/engine.php';
 require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../services/ct_strategies.php';
+require_once __DIR__ . '/../services/scores.php';
 return [
     'classement-test/strategies' => function () { $u = require_user(); return ct_read((int)$u['id']); },
     'classement-test/strategies/save' => function () { need_post(); $u = require_user(); return ct_write((int)$u['id'], body()); },
@@ -25,10 +26,6 @@ return [
         need_post(); $u = require_user(); $b = body();
         return engine_call('scores-preview', ['user_id' => (int)$u['id'], 'kappa' => $b['kappa'] ?? null, 'periods' => is_array($b['periods'] ?? null) ? $b['periods'] : []]);
     },
-    'my/scores/simulate' => function () {
-        need_post(); $u = require_user(); $b = body();
-        return engine_call('scores-simulate', ['user_id' => (int)$u['id'], 'strategy' => str_in($b, 'strategy', 40), 'q' => isset($b['q']) ? mb_substr((string)$b['q'], 0, 80) : '',
-            'listing_id' => isset($b['listing_id']) ? (int)$b['listing_id'] : null, 'draft' => is_array($b['draft'] ?? null) ? $b['draft'] : null]);
-    },
-    'my/scores/ranking' => function () { need_post(); $u = require_user(); return engine_call('scores-ranking', my_ranking_request($u, body())); },
+    'my/scores/simulate' => function () { need_post(); $u = require_user(); return engine_call('scores-simulate', scores_simulate_request(body(), (int)$u['id'])); },
+    'my/scores/ranking' => function () { need_post(); $u = require_user(); return engine_call('scores-ranking', scores_ranking_request($u, body(), (int)$u['id'])); },
 ];
