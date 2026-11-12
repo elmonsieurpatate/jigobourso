@@ -53,7 +53,7 @@ Ce document a été exécuté le 28/10/2026 (voir « Bascule effectuée »). Ava
 - **Retour arrière immédiat** : `cd public_html && cp -p .htaccess.legacy-20261028 .htaccess` (l'ancien site revient, ses tables sont intactes). Les transactions saisies dans V2 après la bascule seraient à reporter à la main.
 - **Restent à faire** : observation 2 semaines, puis nettoyage des anciennes tables (après dump et accord) ; changer le mot de passe de test `jigo/jigo` ; retirer dans hPanel d'éventuelles anciennes tâches qui lanceraient `cron_scan.sh` ou `worker.py` (inutiles désormais).
 
-## Répétition générale (faite le 28/10/2026, base jetable neuve, `scripts/rehearsal.sh`)
+## Répétition générale (faite le 28/10/2026, base jetable neuve)
 Rejoue de zéro les étapes 2 à 6 ci-dessous, avec les vraies données Yahoo et votre export (lecture seule). Résultat : **toutes les étapes sans erreur, parcours e2e entièrement vert** (connexion, Explorer, fiche action et ETF, portefeuilles migrés, Suivi, bilan, administration, mobile).
 
 | Étape | Durée mesurée (local) |
