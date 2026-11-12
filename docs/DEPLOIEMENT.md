@@ -39,7 +39,7 @@ Les nouveaux choix deviennent disponibles quand ce workflow est publié sur `mai
 - Après transfert : import du moteur, `php -l`, puis contrôle public (accueil 200, version `?v=` servie, `api/auth/me`). Le fichier `.deployed` (hors web) note commit et date.
 - Secret requis : `HOSTINGER_SSH_PRIVATE_KEY` (environnement GitHub `production`). Clé d'hôte épinglée dans le workflow. Résultat publié sans secret sur la branche `deployment-status` (`status.json`, `deployment.log`).
 - Lancement manuel : onglet Actions › `diagnostic` (lecture seule), `deploy` ou `rollback`.
-- `scripts/drop_legacy_tables.sh` n'est jamais appelé par le déploiement.
+- `scripts/oneshot/drop_legacy_tables.sh` n'est jamais appelé par le déploiement.
 
 # Mise en production et bascule (à exécuter seulement après accord explicite)
 
@@ -76,7 +76,7 @@ Pré-requis : **accord explicite de l'utilisateur**. Durée totale prévue ≈ 4
 2. [ ] **Tables V2 à côté** : exécuter `db/schema.sql` (noms sans préfixe : aucune collision avec `jb_*`, `fdp_*`, `jy_*`). Vérifier : 26 tables/vues créées, anciennes tables intactes (comptage de lignes avant/après).
 3. [ ] **Moteur** : copier `engine/` ; venv Python 3.9 avec `PyMySQL` seul ; variables `JIGO_DB_*` dans un fichier hors de la racine web (droits 600).
 4. [ ] **Données** : `python -m engine.cli catalogue --source <clone>` ; `python scripts/bootstrap_real.py` ; `python -m engine.cli nightly` ; `python -m engine.cli tick` ; `python -m engine.cli suivi-backfill --sessions 30`. Contrôle : ≈ 40 650 cotations, ≈ 9 400 sélectionnées, ≈ 4 M clôtures, jobs `completed`.
-5. [ ] **Vos comptes** : `python scripts/migrate_legacy.py <export>` : contrôle « conforme à l'export », 7/7 transactions rattachées, mots de passe inchangés. Refuse si des comptes existent déjà.
+5. [ ] **Vos comptes** : `python scripts/migrate_legacy.py <export>` (script archivé : `git show archive/v1-migration:scripts/migrate_legacy.py`) : contrôle « conforme à l'export », 7/7 transactions rattachées, mots de passe inchangés. Refuse si des comptes existent déjà.
 6. [ ] **Site en parallèle** : `app/` sur un sous-domaine de test (même base). Lancer `tests/e2e/smoke.mjs` contre lui ; ouvrir à la main Explorer, une fiche ETF, Portefeuilles, Suivi.
 7. [ ] **Bascule** : pointer le domaine sur `app/public` ; remplacer les 3 anciens crons par un seul `python -m engine.cli tick` toutes les 15 min. **Point de non-retour doux** : l'ancien code et l'ancienne base restent en place.
 8. [ ] **Après bascule (J+0)** : le tick suivant se déroule (page Administration > Traitements) ; première nuit : nightly 02:00 UTC terminé, un instantané « vécu » dans Suivi.
