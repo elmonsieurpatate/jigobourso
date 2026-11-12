@@ -17,8 +17,25 @@ RewriteRule ^classement-test\.html$ index.html [R=301,L]
   Header always unset X-Powered-By
   Header unset X-Powered-By
 </IfModule>
+# Cache. Les pages référencent chaque CSS/JS avec ?v=<identifiant du déploiement> (marqueur __BUILD__ remplacé par ops/deploy.sh) :
+# une ressource versionnée ne change jamais à la même adresse, elle se garde un an. Les pages, elles, se revalident à chaque visite.
+<IfModule mod_rewrite.c>
+  RewriteCond %{QUERY_STRING} (^|&)v=
+  RewriteRule \.(css|js)$ - [E=ASSET_VERSIONED:1]
+</IfModule>
+<IfModule mod_headers.c>
+  Header set Cache-Control "public, max-age=31536000, immutable" env=ASSET_VERSIONED
+  <FilesMatch "\.html$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
+</IfModule>
 <IfModule mod_expires.c>
   ExpiresActive On
-  ExpiresByType text/css "access plus 1 hour"
-  ExpiresByType application/javascript "access plus 1 hour"
+  ExpiresByType image/svg+xml "access plus 1 month"
+  ExpiresByType image/png "access plus 1 month"
+  ExpiresByType image/jpeg "access plus 1 month"
+  ExpiresByType image/webp "access plus 1 month"
+  ExpiresByType image/x-icon "access plus 1 month"
+  ExpiresByType image/vnd.microsoft.icon "access plus 1 month"
+  ExpiresByType font/woff2 "access plus 1 month"
 </IfModule>

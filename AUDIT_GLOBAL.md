@@ -107,9 +107,11 @@ Réalisé le 12/11/2026 : 35 modules déplacés en 6 sous-paquets (`git mv`, his
 
 ## Étape 5 : Cache-busting et déploiement frontend 🔴
 
-- [ ] Une seule version globale (`BUILD_ID` ou hash de contenu) injectée dans tous les HTML par un script de build/déploiement ; aujourd'hui `app.js` a 6 versions de `?v=` différentes, idem `table-layout.js`, `strategies-ui.js`
-- [ ] `.htaccess` : ajouter `Cache-Control: immutable` pour les assets versionnés ; `Expires` pour images, SVG, JSON
-- [ ] Revoir `ExpiresByType … "access plus 1 hour"` (`.htaccess:16-18`) une fois la version unifiée
+- [x] Une seule version globale (`BUILD_ID` ou hash de contenu) injectée dans tous les HTML par un script de build/déploiement ; aujourd'hui `app.js` a 6 versions de `?v=` différentes, idem `table-layout.js`, `strategies-ui.js` : 121 références réparties sur 19 pages, 20 versions différentes (`?v=202611060053`, `-nav1`, `-clean1`, `-personal`…) ramenées au seul marqueur `?v=__BUILD__`, remplacé par `ops/deploy.sh` (l'ancien `sed` ne traitait que les versions purement numériques et laissait les suffixes) ; test `tests/fast/test_asset_versions.py`
+- [x] `.htaccess` : ajouter `Cache-Control: immutable` pour les assets versionnés ; `Expires` pour images, SVG, JSON : `immutable` (un an) pour tout CSS/JS portant `?v=`, `no-cache` pour les pages HTML, `Expires` d'un mois pour images, SVG, polices ; pas de règle sur le JSON (les réponses de l'API sont du JSON dynamique, aucun fichier JSON statique n'est servi)
+- [x] Revoir `ExpiresByType … "access plus 1 hour"` (`.htaccess:16-18`) une fois la version unifiée : règles CSS/JS d'une heure supprimées, remplacées par `immutable` sur les ressources versionnées
+
+Réalisé le 12/11/2026. Chargement vérifié sur une copie servie par PHP après substitution : 19 pages, 121 fichiers en 200, une seule version. **À vérifier après déploiement** (les en-têtes Apache ne se testent pas en local) : `curl -sI 'https://jigobourso.turnjoy.dev/assets/app.js?v=<version>'` doit afficher `Cache-Control: public, max-age=31536000, immutable` ; `curl -sI https://jigobourso.turnjoy.dev/index.html` doit afficher `Cache-Control: no-cache`.
 
 ## Étape 6 : Design system CSS 🟠
 

@@ -183,7 +183,9 @@ remote_sh "cd $root && set -a && . ./private/env && set +a && php" < <(sed "s@__
 remote_sh "cd $root && set -a && . ./private/env && set +a && php" < scripts/verify_account_release.php > "$RUNNER_TEMP/account-before.json"
 
 echo "== Version des pages : ?v=$version"
-sed -i -E "s/(assets\/[a-z0-9_.-]+\.(js|css))\?v=[0-9]+/\1?v=$version/g" app/public/*.html
+# Une seule version pour tous les fichiers CSS/JS : le marqueur __BUILD__ des pages est remplacé par l'identifiant de ce déploiement.
+sed -i "s/__BUILD__/$version/g" app/public/*.html
+if grep -l "__BUILD__" app/public/*.html; then echo "marqueur de version restant dans les pages ci-dessus" >&2; exit 4; fi
 
 echo "== Sauvegarde du code distant (garde les 5 dernières)"
 backup=$(remote_sh "ROOT=$root DOMAIN=$domain BACKUPS=$backups SHA=$sha bash -s" <<'REMOTE'

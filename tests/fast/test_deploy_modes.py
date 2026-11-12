@@ -81,10 +81,10 @@ def isolated_deployment(tmp_path, mode, fail_public=False):
     for script in ('check_financial_integrity.php', 'verify_account_release.php'):
         shutil.copy(ROOT / 'scripts' / script, project / 'scripts' / script)
     (project / 'db/schema.sql').write_text('CREATE TABLE example (id INT);\n')
-    (project / 'app/public/index.html').write_text('<script src="assets/app.js?v=123"></script>')
+    (project / 'app/public/index.html').write_text('<script src="assets/app.js?v=__BUILD__"></script>')
     (project / 'app/routes/secondary_filters.php').write_text('<?php // fixture')
     for page in ('mes-filtres.html', 'admin-categories-test.html'):
-        (project / 'app/public' / page).write_text('<script src="assets/app.js?v=123"></script>')
+        (project / 'app/public' / page).write_text('<script src="assets/app.js?v=__BUILD__"></script>')
     (project / 'requirements.txt').write_text('')
     (project / 'README.md').write_text('fixture')
     commands = tmp_path / 'commands.jsonl'
