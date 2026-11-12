@@ -1,12 +1,13 @@
 -- Jigobourso v2 — schéma cible (MariaDB 10.11+/11.8, InnoDB, utf8mb4).
 -- Construit dans une base séparée ; aucune table existante n'est touchée.
+-- Toutes les tables sont en CREATE TABLE IF NOT EXISTS (relecture sans effet sur une base existante) ; toute évolution passe par db/migrations/ et est reportée ici.
 -- Principes : clé primaire = clé fonctionnelle ; aucun index secondaire sans besoin démontré ;
 -- valeurs courtes (ENUM, CHAR ascii) ; une seule génération de tables.
 
 SET NAMES utf8mb4;
 
 -- ───────────── CATALOGUE ─────────────
-CREATE TABLE instruments (
+CREATE TABLE IF NOT EXISTS instruments (
   id        INT UNSIGNED NOT NULL AUTO_INCREMENT,
   group_key VARCHAR(40) CHARACTER SET ascii NOT NULL,           -- 'isin:…' | 'figi:…' | 'sym:MIC:SYMBOL' : regroupe les cotations d'un même produit
   isin      CHAR(12) CHARACTER SET ascii NULL,
@@ -19,7 +20,7 @@ CREATE TABLE instruments (
   KEY ix_instrument_isin (isin)
 ) ENGINE=InnoDB ROW_FORMAT=COMPRESSED KEY_BLOCK_SIZE=8;
 
-CREATE TABLE listings (
+CREATE TABLE IF NOT EXISTS listings (
   id               INT UNSIGNED NOT NULL AUTO_INCREMENT,        -- identifiant propre à la V2 ; la migration rattache les anciennes transactions par (place, symbole)
   instrument_id    INT UNSIGNED NOT NULL,
   mic              CHAR(4) CHARACTER SET ascii NOT NULL,
@@ -41,7 +42,7 @@ CREATE TABLE listings (
 -- et les classements. Une cotation détenue (portfolio_transactions) reste collectée et visible dans son portefeuille
 -- quel que soit son statut ; elle n'est jamais présentée comme une nouvelle recommandation.
 
-CREATE TABLE catalogue_loads (
+CREATE TABLE IF NOT EXISTS catalogue_loads (
   id            INT UNSIGNED NOT NULL AUTO_INCREMENT,
   source_commit CHAR(40) CHARACTER SET ascii NOT NULL,
   loaded_at     DATETIME NOT NULL,
@@ -52,7 +53,7 @@ CREATE TABLE catalogue_loads (
 ) ENGINE=InnoDB;
 
 -- ───────────── PRIX ─────────────
-CREATE TABLE daily_prices (                                     -- clôtures DÉFINITIVES, 400 séances glissantes
+CREATE TABLE IF NOT EXISTS daily_prices (                                     -- clôtures DÉFINITIVES, 400 séances glissantes
   listing_id   INT UNSIGNED NOT NULL,
   price_date   DATE NOT NULL,
   close_px     DECIMAL(16,6) NOT NULL,
@@ -62,7 +63,7 @@ CREATE TABLE daily_prices (                                     -- clôtures DÉ
   CONSTRAINT fk_daily_listing FOREIGN KEY (listing_id) REFERENCES listings(id)
 ) ENGINE=InnoDB ROW_FORMAT=COMPRESSED KEY_BLOCK_SIZE=8;
 
-CREATE TABLE intraday_prices (                                  -- barres de 15 min normalisées sur leur créneau
+CREATE TABLE IF NOT EXISTS intraday_prices (                                  -- barres de 15 min normalisées sur leur créneau
   listing_id  INT UNSIGNED NOT NULL,
   slot_start  DATETIME NOT NULL,                                -- UTC, multiple de 15 minutes
   close_px    DECIMAL(16,6) NOT NULL,
@@ -75,7 +76,7 @@ CREATE TABLE intraday_prices (                                  -- barres de 15 
   CONSTRAINT fk_intraday_listing FOREIGN KEY (listing_id) REFERENCES listings(id)
 ) ENGINE=InnoDB ROW_FORMAT=COMPRESSED KEY_BLOCK_SIZE=8;
 
-CREATE TABLE latest_prices (                                    -- une ligne par cotation : ce que l'interface affiche
+CREATE TABLE IF NOT EXISTS latest_prices (                                    -- une ligne par cotation : ce que l'interface affiche
   listing_id    INT UNSIGNED NOT NULL,
   price         DECIMAL(16,6) NULL,
   price_time    DATETIME NULL,
@@ -92,14 +93,14 @@ CREATE TABLE latest_prices (                                    -- une ligne par
   CONSTRAINT fk_latest_listing FOREIGN KEY (listing_id) REFERENCES listings(id)
 ) ENGINE=InnoDB;
 
-CREATE TABLE fx_rates (
+CREATE TABLE IF NOT EXISTS fx_rates (
   currency  CHAR(3) CHARACTER SET ascii NOT NULL,
   rate_date DATE NOT NULL,
   to_eur    DECIMAL(18,8) NOT NULL,
   PRIMARY KEY (currency, rate_date)
 ) ENGINE=InnoDB;
 
-CREATE TABLE corporate_events (
+CREATE TABLE IF NOT EXISTS corporate_events (
   listing_id INT UNSIGNED NOT NULL,
   event_date DATE NOT NULL,
   kind       ENUM('split','reverse_split','suspect') NOT NULL,
@@ -108,7 +109,7 @@ CREATE TABLE corporate_events (
   CONSTRAINT fk_event_listing FOREIGN KEY (listing_id) REFERENCES listings(id)
 ) ENGINE=InnoDB;
 
-CREATE TABLE price_gaps (                                       -- trous de collecte 15 min par place et séance
+CREATE TABLE IF NOT EXISTS price_gaps (                                       -- trous de collecte 15 min par place et séance
   mic          CHAR(4) CHARACTER SET ascii NOT NULL,
   session_date DATE NOT NULL,
   state        ENUM('to_repair','repaired','unrecoverable') NOT NULL,
@@ -120,7 +121,7 @@ CREATE TABLE price_gaps (                                       -- trous de coll
 -- ───────────── ANALYSE ─────────────
 -- Les périodes de stratégie ont un nombre de séances réglable (1 à 252) et sept seuils chacune.
 -- Les mesures sont donc stockées PAR TITRE ET PAR NOMBRE DE SÉANCES (fenêtre), pas en colonnes fixes.
-CREATE TABLE strategy_metrics (
+CREATE TABLE IF NOT EXISTS strategy_metrics (
   listing_id   INT UNSIGNED NOT NULL,
   sessions     SMALLINT UNSIGNED NOT NULL,                      -- longueur de la fenêtre (1..252)
   slope        DECIMAL(12,6) NULL,                              -- % par séance = 100·expm1(pente log)
@@ -140,7 +141,7 @@ CREATE TABLE strategy_metrics (
 -- Les mesures peuvent être NULL alors que coverage et le nombre de clôtures expliquent la fenêtre non évaluable.
 
 -- score_inputs : séances positives, concentration V1, accélération (pente de la fenêtre moins celle de la fenêtre précédente) ; NULL = indisponible, jamais 0.
-CREATE TABLE score_inputs (
+CREATE TABLE IF NOT EXISTS score_inputs (
   listing_id   INT UNSIGNED NOT NULL,
   sessions     SMALLINT UNSIGNED NOT NULL,
   up_fraction  DECIMAL(8,6) NULL,
@@ -152,7 +153,7 @@ CREATE TABLE score_inputs (
 ) ENGINE=InnoDB;
 -- liquidity_state : valeur échangée moyenne par séance, en euros. source 'daily' = volumes quotidiens réels (daily_prices.volume) ;
 -- 'estimated' = volume moyen 3 mois × cours (estimation, signalée partout) ; jamais mélangées.
-CREATE TABLE liquidity_state (
+CREATE TABLE IF NOT EXISTS liquidity_state (
   listing_id    INT UNSIGNED NOT NULL,
   turnover_eur  DECIMAL(20,2) NULL,
   days          SMALLINT UNSIGNED NULL,                         -- séances de volume réel utilisées (source 'daily')
@@ -163,7 +164,7 @@ CREATE TABLE liquidity_state (
   CONSTRAINT fk_liquidity_listing FOREIGN KEY (listing_id) REFERENCES listings(id)
 ) ENGINE=InnoDB;
 
-CREATE TABLE series_state (                                     -- état de la série et indicateurs techniques, 1 ligne / cotation
+CREATE TABLE IF NOT EXISTS series_state (                                     -- état de la série et indicateurs techniques, 1 ligne / cotation
   listing_id      INT UNSIGNED NOT NULL,
   computed_at     DATETIME NOT NULL,
   last_close_date DATE NULL,
@@ -192,7 +193,7 @@ CREATE TABLE series_state (                                     -- état de la s
 -- de stratégie de l'utilisateur et sont calculés à la demande par le moteur.
 
 -- ───────────── EXPLOITATION ─────────────
-CREATE TABLE jobs (
+CREATE TABLE IF NOT EXISTS jobs (
   id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   job_type    VARCHAR(24) CHARACTER SET ascii NOT NULL,
   trigger_by  ENUM('cron','admin','system') NOT NULL DEFAULT 'cron',
@@ -207,7 +208,7 @@ CREATE TABLE jobs (
   KEY ix_jobs_type_start (job_type, started_at)
 ) ENGINE=InnoDB;
 
-CREATE TABLE job_logs (
+CREATE TABLE IF NOT EXISTS job_logs (
   id        BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   job_id    BIGINT UNSIGNED NOT NULL,
   level     ENUM('warning','error') NOT NULL,
@@ -219,7 +220,7 @@ CREATE TABLE job_logs (
   CONSTRAINT fk_log_job FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
-CREATE TABLE settings (
+CREATE TABLE IF NOT EXISTS settings (
   name       VARCHAR(64) CHARACTER SET ascii NOT NULL,
   value_json JSON NOT NULL,
   updated_at DATETIME NOT NULL,
@@ -231,7 +232,7 @@ CREATE TABLE settings (
 -- Supprimés : jb_positions (ancien registre, remplacé par portfolio_transactions), jb_notes (vide, D8),
 -- jb_pf_backups (sauvegardes JSON d'un ancien format), jb_settings par utilisateur (rejoint users.prefs_json),
 -- jb_app_settings (rejoint settings : le mot d'invitation d'inscription y vit).
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
   id         INT UNSIGNED NOT NULL AUTO_INCREMENT,
   username   VARCHAR(30) NOT NULL,
   email      VARCHAR(190) NULL,
@@ -246,7 +247,7 @@ CREATE TABLE users (
   UNIQUE KEY uq_user_email (email)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE sessions (
+CREATE TABLE IF NOT EXISTS sessions (
   token_hash CHAR(64) CHARACTER SET ascii NOT NULL,
   user_id    INT UNSIGNED NOT NULL,
   created_at DATETIME NOT NULL,
@@ -260,7 +261,7 @@ CREATE TABLE sessions (
   CONSTRAINT fk_session_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE login_attempts (
+CREATE TABLE IF NOT EXISTS login_attempts (
   id       BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   username VARCHAR(30) NOT NULL,
   ip       VARCHAR(45) NOT NULL,
@@ -270,7 +271,7 @@ CREATE TABLE login_attempts (
   KEY ix_attempt_ip (ip, at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE portfolios (
+CREATE TABLE IF NOT EXISTS portfolios (
   id               BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   user_id          INT UNSIGNED NOT NULL,
   name             VARCHAR(100) NOT NULL,
@@ -285,7 +286,7 @@ CREATE TABLE portfolios (
   CONSTRAINT fk_portfolio_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE portfolio_transactions (
+CREATE TABLE IF NOT EXISTS portfolio_transactions (
   id            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   portfolio_id  BIGINT UNSIGNED NOT NULL,
   listing_id    INT UNSIGNED NULL,                              -- NULL = titre saisi à la main, hors catalogue
@@ -308,7 +309,7 @@ CREATE TABLE portfolio_transactions (
   CONSTRAINT fk_tx_listing FOREIGN KEY (listing_id) REFERENCES listings(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE etf_profiles (                                     -- fiche pédagogique ETF, mise en cache
+CREATE TABLE IF NOT EXISTS etf_profiles (                                     -- fiche pédagogique ETF, mise en cache
   listing_id  INT UNSIGNED NOT NULL,
   fetched_at  DATETIME NOT NULL,
   version     SMALLINT NOT NULL,
@@ -319,7 +320,7 @@ CREATE TABLE etf_profiles (                                     -- fiche pédago
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ───────────── SUIVI DES CLASSEMENTS ET CACHE ─────────────
-CREATE TABLE ranking_snapshots (                                -- meilleurs titres de chaque stratégie, chaque soir (preuve datée)
+CREATE TABLE IF NOT EXISTS ranking_snapshots (                                -- meilleurs titres de chaque stratégie, chaque soir (preuve datée)
   snap_date  DATE NOT NULL,                                     -- dernière séance connue au moment du calcul
   preset     VARCHAR(40) CHARACTER SET ascii NOT NULL,
   listing_id INT UNSIGNED NOT NULL,
@@ -332,7 +333,7 @@ CREATE TABLE ranking_snapshots (                                -- meilleurs tit
   CONSTRAINT fk_snap_listing FOREIGN KEY (listing_id) REFERENCES listings(id)
 ) ENGINE=InnoDB;
 
-CREATE TABLE ranking_outcomes (                                 -- rendement (%) d'un titre classé, N séances après le classement
+CREATE TABLE IF NOT EXISTS ranking_outcomes (                                 -- rendement (%) d'un titre classé, N séances après le classement
   snap_date  DATE NOT NULL,
   preset     VARCHAR(40) CHARACTER SET ascii NOT NULL,
   listing_id INT UNSIGNED NOT NULL,
@@ -342,7 +343,7 @@ CREATE TABLE ranking_outcomes (                                 -- rendement (%)
   PRIMARY KEY (snap_date, preset, listing_id, horizon)
 ) ENGINE=InnoDB;
 
-CREATE TABLE universe_outcomes (                                -- référence : rendement médian de tout l'univers recommandable ce jour-là
+CREATE TABLE IF NOT EXISTS universe_outcomes (                                -- référence : rendement médian de tout l'univers recommandable ce jour-là
   snap_date  DATE NOT NULL,
   grp        ENUM('equity','etf') NOT NULL,
   horizon    TINYINT UNSIGNED NOT NULL,
@@ -352,7 +353,7 @@ CREATE TABLE universe_outcomes (                                -- référence :
   PRIMARY KEY (snap_date, grp, horizon)
 ) ENGINE=InnoDB;
 
-CREATE TABLE result_cache (                                     -- verdicts de l'Explorer par configuration, invalidés par data_version
+CREATE TABLE IF NOT EXISTS result_cache (                                     -- verdicts de l'Explorer par configuration, invalidés par data_version
   cache_key    CHAR(40) CHARACTER SET ascii NOT NULL,
   data_version VARCHAR(80) CHARACTER SET ascii NOT NULL,
   built_at     DATETIME NOT NULL,
@@ -384,31 +385,6 @@ CREATE TABLE IF NOT EXISTS position_levels (                    -- « filet de s
   PRIMARY KEY (portfolio_id, listing_id),
   CONSTRAINT fk_levels_portfolio FOREIGN KEY (portfolio_id) REFERENCES portfolios(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
-
--- Recherches enregistrées par l'utilisateur : critères + filtres, réutilisables (ajout du 28/10/2026, additif)
-CREATE TABLE IF NOT EXISTS saved_searches (
-  id         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  user_id    INT UNSIGNED NOT NULL,
-  name       VARCHAR(80) NOT NULL,
-  config     JSON NOT NULL,
-  view       JSON NOT NULL,
-  created_at DATETIME NOT NULL,
-  updated_at DATETIME NOT NULL,
-  PRIMARY KEY (id),
-  UNIQUE KEY uq_search_name (user_id, name),
-  CONSTRAINT fk_search_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Réglage personnel d'une stratégie de départ (critères + filtres), remplaçable et réinitialisable (ajout du 01/11/2026, additif)
-CREATE TABLE IF NOT EXISTS saved_presets (
-  user_id    INT UNSIGNED NOT NULL,
-  preset     VARCHAR(40) NOT NULL,
-  config     JSON NOT NULL,
-  view       JSON NOT NULL,
-  updated_at DATETIME NOT NULL,
-  PRIMARY KEY (user_id, preset),
-  CONSTRAINT fk_preset_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- ───────────── Pilotage de la chaîne FinanceDatabase → Yahoo → filtrage (ajout du 28/10/2026, additif) ─────────────
 CREATE TABLE IF NOT EXISTS catalogue_raw (                       -- données brutes du dernier import FinanceDatabase : permet de réappliquer les règles sans retélécharger

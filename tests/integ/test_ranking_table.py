@@ -115,7 +115,6 @@ def test_classement_and_scores_admin_rank_the_same_titles_in_the_same_order_with
 
 
 def test_identical_raw_scores_share_a_rank_and_the_order_is_deterministic():
-    from engine.analytics import scores_admin as A
     conn = connect()
     reset_data(conn)
     seed(conn)

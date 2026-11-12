@@ -4,6 +4,9 @@ DirectoryIndex index.html
 # api/xxx -> api.php?r=xxx (compatible avec les URLs des tâches cron de l'hébergeur)
 RewriteEngine On
 RewriteRule ^api/([A-Za-z0-9/_-]+)$ api.php?r=$1 [QSA,L]
+# anciennes pages remplacées (liens et favoris conservés)
+RewriteRule ^alertes\.html$ portefeuilles.html [R=301,L]
+RewriteRule ^classement-test\.html$ index.html [R=301,L]
 <IfModule mod_headers.c>
   Header always set X-Content-Type-Options "nosniff"
   Header always set X-Frame-Options "DENY"

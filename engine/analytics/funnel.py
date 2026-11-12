@@ -253,7 +253,7 @@ def explain(conn, q):
                         y.append({'key': 'no_data', 'label': 'Cours reçu de Yahoo', 'result': 'removed', 'detail': 'aucun cours exploitable : le titre reste candidat'})
                     elif l['status'] != 'candidate':
                         step = prefilter.step_of(l['excluded_reason'])
-                        pm, vm = ycfg['price']['min_eur'], None
+                        pm = ycfg['price']['min_eur']
                         y.append({'key': 'no_data', 'label': 'Cours reçu de Yahoo', 'result': 'passed', 'detail': f'{pe:,.2f} €'.replace(',', ' ') if pe is not None else 'oui'})
                         age = (datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None) - l['price_time']).total_seconds() / 86400 if l['price_time'] else None
                         mx = ycfg['stale']['max_days']

@@ -3,7 +3,7 @@ import datetime
 import os
 import pytest
 from engine.shared.db import connect
-from engine.market import collect, hours, intraday
+from engine.market import collect, intraday
 from tests.dbutil import reset_data
 
 pytestmark = pytest.mark.integration

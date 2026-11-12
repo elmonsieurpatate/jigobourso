@@ -83,7 +83,7 @@ def isolated_deployment(tmp_path, mode, fail_public=False):
     (project / 'db/schema.sql').write_text('CREATE TABLE example (id INT);\n')
     (project / 'app/public/index.html').write_text('<script src="assets/app.js?v=123"></script>')
     (project / 'app/routes/secondary_filters.php').write_text('<?php // fixture')
-    for page in ('classement-test.html', 'admin-categories-test.html'):
+    for page in ('mes-filtres.html', 'admin-categories-test.html'):
         (project / 'app/public' / page).write_text('<script src="assets/app.js?v=123"></script>')
     (project / 'requirements.txt').write_text('')
     (project / 'README.md').write_text('fixture')

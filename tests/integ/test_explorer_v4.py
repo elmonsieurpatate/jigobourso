@@ -1,11 +1,10 @@
 """Explorer V4: real SQL, the existing selection engine and authenticated PHP API."""
 import copy
-import datetime
 import os
 import pytest
 from engine.shared.db import connect
 from engine.analytics import service, strategy, explorer_config as C
-from tests.integ.test_api import server, world, login, Client
+from tests.integ.test_api import server, world, login, Client  # noqa: F401  (fixtures)
 from tests.integ.test_tracking_cache import seed, NOW
 
 pytestmark=pytest.mark.integration
@@ -54,17 +53,15 @@ def test_quoted_prices_do_not_change_last_day_closing_return(monkeypatch):
     c.close()
 
 
-def test_library_typed_saves_auth_validation_and_legacy_preservation(world):
+def test_library_typed_saves_auth_and_validation(world):
     a=login(world,'alice','alice-secret-1234');b=login(world,'bob','bob-secret-12345');cfg=C.upgrade(strategy.preset('fast'))
     assert Client(world).call('explorer/library')[0]==401
-    assert a.call('search/save',{'name':'Ancienne','config':strategy.preset('regular'),'view':{'q':'Alpha'}})[0]==200
     status,res=a.call('explorer/library/save',{'kind':'strategy','name':'Ma stratégie','payload':{'config':cfg,'universe':{'q':'SHOULD_NOT_LEAK'}}})
     assert status==200,res
     id=res['id'];items=a.call('explorer/library')[1]['items'];saved=next(i for i in items if i['id']==id)
     assert 'universe' not in saved['payload']
     assert isinstance(saved['payload']['config']['asset_rules'],dict)
     assert isinstance(saved['payload']['config']['ranking']['weights'],dict)
-    legacy=next(i for i in items if i['legacy']);assert legacy['payload']['config']['version']==3
     assert b.call('explorer/library')[1]['items']==[]
     assert b.call('explorer/library/save',{'id':id,'kind':'strategy','name':'Vol','payload':{'config':cfg}})[0]==404
     assert b.call('explorer/library/delete',{'id':id})[0]==200
@@ -76,8 +73,6 @@ def test_library_typed_saves_auth_validation_and_legacy_preservation(world):
     bad=copy.deepcopy(cfg);bad['periods'][0]['min_r2']=.8
     assert a.call('explorer/library/save',{'kind':'strategy','name':'Invalide','payload':{'config':bad}})[0] in (400,422)
     assert a.call('explorer/library/delete',{'id':id})[0]==200
-    legacy2=next(i for i in a.call('explorer/library')[1]['items'] if i['legacy'])
-    assert legacy2==legacy
 
 
 def test_quoted_volume_selection_cache_invalidates_without_a_price_job(monkeypatch):

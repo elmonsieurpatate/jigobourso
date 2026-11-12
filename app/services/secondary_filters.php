@@ -82,7 +82,6 @@ function secondary_initialize(): void {
         }
     }
 }
-function secondary_setting(string $name): array { return secondary_decode(q('SELECT value_json FROM settings WHERE name=?',[$name])->fetchColumn()); }
 function secondary_find(array $definitions,string $id): array {
     foreach($definitions['filters'] as $f) if($f['id']===$id)return $f;
     throw new ApiError('Filtre inconnu.',404);

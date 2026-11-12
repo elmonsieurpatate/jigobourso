@@ -2,7 +2,7 @@ import datetime
 import os
 import pytest
 from engine.shared.db import connect
-from engine.analytics import compute, strategy
+from engine.analytics import strategy
 from engine.analytics.repository import recommendable_candidates
 from engine.jobs import tasks
 from engine.jobs.runner import run_job

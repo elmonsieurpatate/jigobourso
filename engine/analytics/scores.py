@@ -260,7 +260,6 @@ def _complex(avail, comps, weights, eff, period_cover, liquidity_score, threshol
     total = coverage = avail_w = 0.0                # avail_w : poids des composantes disponibles = dénominateur de la moyenne (cohérent avec `total`) ; coverage : fiabilité, information seulement
     contributions = {}
     wsum = float(sum(cw.values())) or 1.0
-    ref_w = sum(weights.get(p['id'], 0.0) for p in avail) or 1.0
     day_w = sum(eff.get(p['id'], 0.0) for p in avail if p['sessions'] == DAY_SESSIONS)
     others = 1.0 - day_w if day_w < 1.0 else 1.0           # part des périodes à plus d'une séance : Jour n'a que la dynamique, son absence de R², volatilité… n'abaisse pas la fiabilité
     for key, weight in cw.items():

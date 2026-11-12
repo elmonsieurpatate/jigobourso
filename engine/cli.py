@@ -25,7 +25,7 @@ def _close_all():
 
 
 def _admin_commands():
-    from engine.analytics import adminsvc, funnel
+    from engine.analytics import adminsvc, funnel, strategy_docs
     from engine.jobs import schedule, tasks
     from engine.shared import settings
     from engine.analytics import scores_admin, ranking_table
@@ -68,7 +68,7 @@ def _admin_commands():
         'ranking-curves': ranking_table.curves,
         'ranking-verdicts': ranking_table.verdicts,
         'strategies-status': scores_admin.strategies_status,
-        'help-facts': lambda conn, r: __import__('engine.analytics.strategy_docs', fromlist=['facts']).facts(conn, r),
+        'help-facts': lambda conn, r: strategy_docs.facts(conn, r),
         'scores-user-save': scores_admin.user_save,
         'scores-user-state': scores_admin.user_state,
         'ranking-criteria': ranking_table.criteria,
@@ -194,7 +194,6 @@ def _main(argv=None):
         print(json.dumps(load(conn, args.source, commit), ensure_ascii=False))
     else:
         from engine.jobs import tasks
-        from engine.jobs.runner import run_job
         from engine.market import hours
         from engine.market.yahoo import YahooClient
         conn = connect()

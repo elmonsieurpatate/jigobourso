@@ -3,6 +3,7 @@ import copy
 import math
 import pytest
 from engine.analytics import strategy as S, explorer_config as C, configurable_score as R
+from engine.analytics.measures import window_metrics
 from engine.analytics.explorer_metrics import path_metrics
 
 
@@ -36,7 +37,7 @@ def test_empty_and_zero_are_distinct():
 
 
 def test_last_day_is_close_return_and_unavailable_statistics_rejected():
-    m=S.window_metrics([100,99]);assert m['slope']==pytest.approx(-1) and m['r2'] is None
+    m=window_metrics([100,99]);assert m['slope']==pytest.approx(-1) and m['r2'] is None
     c=C.empty();c['periods'][0].update(enabled=True,min_r2=0)
     with pytest.raises(ValueError):C.validate(c)
 
@@ -126,7 +127,7 @@ def test_log_regression_exact_period_growth_and_stability():
     for n in [5,21,63,126,252]:
         expected=12.5;b=math.log1p(expected/100)/n
         prices=[100*math.exp(i*b) for i in range(n+1)]
-        m=S.window_metrics(prices)
+        m=window_metrics(prices)
         assert C.period_slope(m['slope'],n)==pytest.approx(expected)
         assert m['r2']==pytest.approx(1) and m['perf']==pytest.approx(expected)
         assert m['volatility']==pytest.approx(0,abs=1e-10) and m['drawdown']==0

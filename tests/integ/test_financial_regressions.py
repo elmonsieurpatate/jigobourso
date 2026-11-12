@@ -2,7 +2,7 @@
 import datetime as dt, os
 import pytest
 if not os.environ.get('JIGO_TEST_DATABASE'):pytest.skip('disposable DB only',allow_module_level=True)
-from tests.integ.test_api import server,world,login
+from tests.integ.test_api import server,world,login  # noqa: F401  (fixtures)
 from engine.shared.db import connect
 from engine.analytics.compute import compute_all
 from engine.analytics.service import instrument_sheet

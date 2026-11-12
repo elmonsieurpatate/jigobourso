@@ -1,4 +1,4 @@
-import os,datetime as dt,json
+import os,datetime as dt
 assert os.environ.get('JIGO_TEST_DATABASE')=='1' and os.environ['JIGO_DB_NAME']=='jigobourso_it'
 from engine.shared.db import connect
 from tests.dbutil import reset_data

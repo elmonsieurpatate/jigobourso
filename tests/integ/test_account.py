@@ -1,9 +1,8 @@
 """HTTP round-trips with real PHP and disposable MariaDB; mail captured outside web root."""
 import datetime as dt,json,os,re,socket,subprocess,sys,time
-from pathlib import Path
 import pytest
 from engine.shared.db import connect
-from tests.integ.test_api import world,Client,login,ROOT
+from tests.integ.test_api import world,Client,login,ROOT  # noqa: F401  (fixtures)
 pytestmark=pytest.mark.integration
 if not os.environ.get('JIGO_TEST_DATABASE'):pytest.skip('disposable DB only',allow_module_level=True)
 MAILDIR=None

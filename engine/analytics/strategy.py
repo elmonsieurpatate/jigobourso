@@ -16,8 +16,7 @@ import math
 from . import explorer_config, configurable_score
 from collections import defaultdict
 
-from .measures import window_metrics, technical_state
-from .series import usable_closes, find_breaks, clean_window, analyze_series, momentum_6_1, momentum_12_1
+from .series import analyze_series, momentum_6_1, momentum_12_1
 
 VERSION = 3
 PERIOD_IDS = ('day', 'week', 'month', 'quarter', 'half', 'year')

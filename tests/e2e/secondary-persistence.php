@@ -13,15 +13,14 @@ if(($argv[1]??'')==='seed'){
     }
     q('INSERT INTO settings(name,value_json,updated_at) VALUES (?,?,?)',['explorer_growth','{"weights":{"force":35},"historical":"preserve"}',now_utc()]);
     q('INSERT INTO settings(name,value_json,updated_at) VALUES (?,?,?)',['catalogue_rules','{"preserve":true}',now_utc()]);
-    q('INSERT INTO saved_searches(user_id,name,config,view,created_at,updated_at) VALUES (?,?,?,?,?,?)',[$adminId,'Recherche à préserver','{"strategy":"legacy"}','{}',now_utc(),now_utc()]);
-    q('INSERT INTO saved_presets(user_id,preset,config,view,updated_at) VALUES (?,?,?,?,?)',[$adminId,'fast','{"legacy":true}','{}',now_utc()]);
+    q("INSERT INTO explorer_saved(user_id,kind,name,payload,created_at,updated_at) VALUES (?,'search',?,?,?,?)",[$adminId,'Recherche à préserver','{"schema":4,"config":{},"universe":{}}',now_utc(),now_utc()]);
     q('INSERT INTO portfolios(user_id,name,strategy_config,created_at,updated_at) VALUES (?,?,?,?,?)',[$adminId,'Portefeuille à conserver','{"legacy":true}',now_utc(),now_utc()]);
     $pf=(int)db()->lastInsertId();
     q("INSERT INTO portfolio_transactions(portfolio_id,symbol,side,quantity,unit_price,currency,fx_to_eur,fees,trade_at,created_at) VALUES (?,'KEEP','buy',1,10,'EUR',1,0.25,'2026-11-04',?)",[$pf,now_utc()]);
     q('INSERT INTO result_cache(cache_key,data_version,built_at,payload) VALUES (?,?,?,?)',[str_repeat('a',40),'preserve',now_utc(),'{"score":77,"rank":1}']);
     echo "Fixtures privées prêtes.\n";exit;
 }
-$untouched=function(){return hash('sha256',json_encode([q('SELECT * FROM settings WHERE name NOT IN (?,?) ORDER BY name',[SECONDARY_DEFINITIONS,SECONDARY_DEFAULTS])->fetchAll(),q('SELECT * FROM saved_searches ORDER BY id')->fetchAll(),q('SELECT * FROM saved_presets ORDER BY user_id,preset')->fetchAll(),q('SELECT id,prefs_json FROM users ORDER BY id')->fetchAll(),q('SELECT * FROM instruments ORDER BY id')->fetchAll(),q('SELECT * FROM listings ORDER BY id')->fetchAll(),q('SELECT * FROM portfolios ORDER BY id')->fetchAll(),q('SELECT * FROM portfolio_transactions ORDER BY id')->fetchAll(),q('SELECT * FROM result_cache ORDER BY cache_key')->fetchAll()]));};
+$untouched=function(){return hash('sha256',json_encode([q('SELECT * FROM settings WHERE name NOT IN (?,?) ORDER BY name',[SECONDARY_DEFINITIONS,SECONDARY_DEFAULTS])->fetchAll(),q('SELECT * FROM explorer_saved ORDER BY id')->fetchAll(),q('SELECT id,prefs_json FROM users ORDER BY id')->fetchAll(),q('SELECT * FROM instruments ORDER BY id')->fetchAll(),q('SELECT * FROM listings ORDER BY id')->fetchAll(),q('SELECT * FROM portfolios ORDER BY id')->fetchAll(),q('SELECT * FROM portfolio_transactions ORDER BY id')->fetchAll(),q('SELECT * FROM result_cache ORDER BY cache_key')->fetchAll()]));};
 $original=$untouched();$state=secondary_read();$check(count($state['definitions']['filters'])===15,'15 filtres (13 existants + 2 scores V4)');
 $check(count(array_filter($state['definitions']['filters'],fn($f)=>$f['editable']))===11,'11 éditables');
 $raw=q('SELECT name,value_json,updated_at FROM settings WHERE name IN (?,?) ORDER BY name',[SECONDARY_DEFINITIONS,SECONDARY_DEFAULTS])->fetchAll();secondary_initialize();secondary_read();

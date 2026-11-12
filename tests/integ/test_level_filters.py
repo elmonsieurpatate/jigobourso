@@ -100,7 +100,6 @@ def test_the_trend_curve_covers_the_longest_period_of_the_strategy():
         p['enabled'] = p['id'] == 'year'
     year = service.explore(conn, {'config': cfg, 'view': {'status': 'all', 'tradable': False, 'page_size': 50}})
     assert year['curve_label'] == '1 an' and all(len(r['curve']) == 66 for r in year['rows'])              # 253 clôtures ramenées à 66 points
-    r = year['rows'][0]
 
 
 def test_rejected_default_proximity_is_applied_before_pagination_without_reranking_retained():

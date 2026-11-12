@@ -1,6 +1,5 @@
 """Numerical oracles: hand-computable returns, splits and independent clock freshness."""
 import datetime as dt
-import math
 import pytest
 from engine.analytics.series import analyze_series
 from engine.market import hours

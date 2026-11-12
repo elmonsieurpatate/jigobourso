@@ -165,7 +165,7 @@ J.icon = (n, cls = 'ic') => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden
 J.NAV = (admin) => [
   { id: 'aide', label: 'Aide', icon: 'help', file: ['aide.html'], href: 'aide.html' },
   { sec: 'Marchés' },
-  { id: 'explorer', label: 'Explorer', icon: 'compass', file: ['index.html', 'titre.html', 'mes-filtres.html', 'mes-strategies.html', 'mes-scores.html', 'mes-colonnes.html', 'classement-test.html'], children: [
+  { id: 'explorer', label: 'Explorer', icon: 'compass', file: ['index.html', 'titre.html', 'mes-filtres.html', 'mes-strategies.html', 'mes-scores.html', 'mes-colonnes.html'], children: [
     { label: 'Recherche et résultats', href: 'index.html', icon: 'search', on: () => true },
     { label: 'Mes stratégies', href: 'mes-strategies.html', icon: 'target', on: (q, h) => h !== '#criteres' },
     { label: 'Mes critères de recherche', href: 'mes-strategies.html#criteres', icon: 'sliders', on: (q, h) => h === '#criteres' },

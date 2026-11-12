@@ -259,7 +259,7 @@ def history(conn, client, now, log):
 
 
 # ───────── entretien : purges et sauvegarde ─────────
-BACKUP_TABLES = ('users', 'portfolios', 'portfolio_transactions', 'position_levels', 'saved_searches', 'settings')     # ce qui n'est pas reconstructible depuis Yahoo
+BACKUP_TABLES = ('users', 'portfolios', 'portfolio_transactions', 'position_levels', 'explorer_saved', 'settings')     # ce qui n'est pas reconstructible depuis Yahoo
 BACKUP_KEEP = 14
 
 

@@ -109,9 +109,8 @@ return [
         return ['ok' => true];
     },
     'alerts/refresh' => function () {
-        need_post(); $u = require_user();
-        if (!ALERTS_EXECUTION_ENABLED) return ['disabled' => true, 'rules' => 0, 'triggered' => 0];   // ancien moteur désactivé : aucune évaluation
-        return engine_call('watch-run', ['user_id' => (int)$u['id']]);
+        need_post(); require_user();
+        return ['disabled' => true, 'rules' => 0, 'triggered' => 0];   // ancien moteur désactivé : aucune évaluation
     },
     'alerts/prefs' => function () {
         need_post(); $u = require_user(); $b = body(); $prefs = $u['prefs_json'] ? (json_decode($u['prefs_json'], true) ?: []) : [];

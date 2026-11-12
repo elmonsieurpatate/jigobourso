@@ -18,8 +18,7 @@ from engine.market.collect import effective_expected_close, latest_rates, to_eur
 from engine.market.calendar import window_calendars, session_dates
 from . import signals, strategy, explorer_config, explorer_metrics, score_service, liquidity
 from . import geography
-from .measures import window_metrics
-from .series import usable_closes, find_breaks, clean_window, analyze_series, prepare_series, data_corrections
+from .series import analyze_series, prepare_series, data_corrections
 
 # PEA : actions d'une société dont le siège est dans l'UE ou l'EEE (Islande, Liechtenstein et Norvège compris ; pas le Royaume-Uni ni la Suisse),
 # achetées sur une place européenne (c'est ce que les courtiers acceptent dans un PEA). Une action américaine d'une société irlandaise n'est donc

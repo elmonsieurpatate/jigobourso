@@ -183,7 +183,7 @@ def _rules(pos, plan, strat, key):
     """Les cinq règles de surveillance d'une position : valeur automatique (calculée par le moteur), valeur personnalisée (jamais écrasée), valeur effective, état.
     Une règle personnalisée remplace la valeur automatique pour CETTE règle seulement ; le moteur continue de calculer sa suggestion. Aucune règle n'ordonne de vente."""
     pr, risk, mom, recul = plan['prices'], plan.get('risk'), plan.get('momentum') or {}, plan['recul_pct']
-    cur, fx = pr['current'], pr['fx']
+    cur = pr['current']
     out = []
     # filet de protection : automatique = plus-haut × (1 − repli au centile 90) ; personnalisé = position_levels.stop_px (devise de cotation)
     c = _cfg(pos, 'stop'); stop = pos.get('stop_px')

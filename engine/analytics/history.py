@@ -80,8 +80,6 @@ def build(transactions, bars, splits, unit, fx, meta, today=None, bars15=None):
         dates, closes, _, _ = prepare_series(b, ev)
         series[lid] = list(zip(dates, closes))
         applied[lid] = applied_splits(b, ev)
-    free = {lid: [str(t['trade_at'])[:10] for t in txs if t.get('listing_id') and int(t['listing_id']) == lid and t['side'] == 'buy' and (_num(t['unit_price']) or 0) == 0]
-            for lid in applied}
     first = str(txs[0]['trade_at'])[:10]
     calendar = sorted({d for lid in series for d, _ in series[lid] if first <= d <= today} | {str(t['trade_at'])[:10] for t in txs})
     if calendar and calendar[-1] < today and series:

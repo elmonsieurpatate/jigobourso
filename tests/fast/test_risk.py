@@ -1,5 +1,4 @@
 """Barre de risque d'un achat : trois signaux notés, niveaux, cas non évaluables, réglages personnels."""
-import math
 
 from engine.analytics import risk
 

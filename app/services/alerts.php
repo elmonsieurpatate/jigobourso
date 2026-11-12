@@ -1,5 +1,5 @@
 <?php
-// Règles d'alerte par position : modèles de stratégie, import des anciens niveaux, historique, envoi des e-mails (désactivé). Aucune vente automatique.
+// Règles d'alerte par position : modèles de stratégie, import des anciens niveaux, historique. Aucune vente automatique.
 require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/http.php';
 require_once __DIR__ . '/../lib/engine.php';
@@ -98,23 +98,4 @@ function alert_apply_template(array $u, int $pid, int $lid, string $key, string 
     return $plan + ['added' => count($plan['add']), 'updated' => count($plan['update']), 'kept' => count($plan['keep'])];
 }
 
-/** Ancien système « Surveillance » désactivé : les règles restent stockées, rien n'est évalué ni envoyé. Verrou unique côté PHP (miroir de watch.LEGACY_EXECUTION_ENABLED). */
-const ALERTS_EXECUTION_ENABLED = false;
-
-/** Envoie un e-mail par utilisateur pour les alertes nouvellement déclenchées (une seule fois par déclenchement) ; appelé par le cron. Aucun ordre de vente, simple information. */
-function alerts_mail_pending(): int {
-    if (!ALERTS_EXECUTION_ENABLED) return 0;   // ancien moteur désactivé : aucune notification, aucune écriture
-    $sent = 0;
-    $rows = q("SELECT r.*, u.email, u.username, u.prefs_json FROM alert_rules r JOIN users u ON u.id = r.user_id WHERE r.enabled = 1 AND r.state = 'triggered' AND r.acked_at IS NULL AND (r.notified_at IS NULL OR r.notified_at < r.triggered_at) AND u.email IS NOT NULL AND u.email <> ''")->fetchAll();
-    $by = []; foreach ($rows as $r) $by[$r['user_id']][] = $r;
-    foreach ($by as $uid => $list) {
-        $prefs = $list[0]['prefs_json'] ? (json_decode($list[0]['prefs_json'], true) ?: []) : [];
-        if (array_key_exists('alert_email', $prefs) && !$prefs['alert_email']) { foreach ($list as $r) q('UPDATE alert_rules SET notified_at = ? WHERE id = ?', [now_utc(), $r['id']]); continue; }
-        $lines = [];
-        foreach ($list as $r) { $l = q('SELECT symbol FROM listings WHERE id = ?', [$r['listing_id']])->fetch(); $lines[] = '• ' . ($l['symbol'] ?? '?') . ' : ' . (ALERT_LABELS[$r['kind']] ?? $r['kind']) . ' ' . rtrim(rtrim(number_format((float)$r['threshold'], 4, ',', ' '), '0'), ',') . ' (valeur observée ' . ($r['last_value'] === null ? 'indisponible' : rtrim(rtrim(number_format((float)$r['last_value'], 4, ',', ' '), '0'), ',')) . ')'; }
-        $body = "Bonjour " . $list[0]['username'] . ",\n\nVos règles de surveillance ont détecté :\n" . implode("\n", $lines) . "\n\nCeci est une information, pas un ordre de vente. Consultez le centre d'alertes pour le détail et pour gérer ces règles.\n";
-        try { if (send_account_mail($list[0]['email'], count($list) > 1 ? count($list) . ' alertes Jigobourso' : 'Alerte Jigobourso', $body)) { foreach ($list as $r) q('UPDATE alert_rules SET notified_at = ? WHERE id = ?', [now_utc(), $r['id']]); $sent++; } } catch (Throwable $e) { error_log('alerts mail: transport failure'); }
-    }
-    return $sent;
-}
 const ALERT_LABELS = ['price_below' => 'cours inférieur à', 'price_above' => 'cours supérieur à', 'target' => 'objectif de cours', 'gain_pct_above' => 'gain d’au moins (%)', 'loss_pct' => 'perte d’au moins (%)', 'gain_eur_above' => 'gain d’au moins (€)', 'loss_eur' => 'perte d’au moins (€)', 'drawdown_from_high' => 'recul depuis le sommet (%)', 'gain_giveback' => 'gain rendu (points)', 'daily_move' => 'variation sur une séance (%)', 'slope_min' => 'pente sous', 'r2_min' => 'R² sous', 'vol_max' => 'volatilité au-dessus de', 'drawdown_max' => 'recul maximal au-dessus de', 'momentum_min' => 'progression sous', 'ma_below' => 'cours sous la moyenne mobile', 'momentum6_min' => 'momentum 6 mois (6−1) sous', 'momentum12_min' => 'momentum 12 mois (12−1) sous', 'er_min' => 'régularité sous', 'ma_falling' => 'moyenne mobile en baisse', 'gap_ma20_max' => 'écart à la moyenne 20 séances au-dessus de'];

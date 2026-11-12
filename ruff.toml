@@ -1,11 +1,9 @@
 # Linter Python : erreurs réelles seulement (syntaxe, noms indéfinis, redéfinitions, formats).
-# F401 (imports inutilisés) et F841 (variables inutilisées) sont volontairement exclus ici :
-# leur nettoyage est l'objet de l'Étape 3.2 de AUDIT_GLOBAL.md, après quoi on les réactive.
 target-version = "py39"
 extend-exclude = [".venv", "private", "logs", "data"]
 
 [lint]
-select = ["E9", "F5", "F6", "F7", "F82", "F811"]
+select = ["E9", "F401", "F5", "F6", "F7", "F82", "F811", "F841"]
 
 [lint.per-file-ignores]
 # Les tests réimportent les fixtures pytest (`world`, `server`) : ce n'est pas une redéfinition fautive.

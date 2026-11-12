@@ -2,7 +2,7 @@ import datetime
 import os
 import pytest
 from engine.shared.db import connect
-from engine.market import collect, hours
+from engine.market import collect
 from tests.fakes import FakeYahoo
 from tests.dbutil import reset_data
 

@@ -4,7 +4,7 @@ import json
 import math
 import os
 import pytest
-from engine.analytics import etf, service, strategy
+from engine.analytics import etf
 from engine.shared.db import connect
 from tests.dbutil import reset_data
 

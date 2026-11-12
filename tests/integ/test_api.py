@@ -144,12 +144,9 @@ def test_saved_filter_preserves_search_visibility_and_status(world):
     a = login(world, 'alice', 'alice-secret-1234')
     config = a.call('strategy/presets')[1]['presets']['regular']
     view = {'q': '  VOO  ', 'tradable': False, 'status': 'all', 'kind': 'large_etf', 'geo_region': 'us', 'sort': 'perf', 'dir': 'desc', 'icon': '⚡', 'description': 'ETF rapides'}
-    assert a.call('search/save', {'name': 'ETF complets', 'config': config, 'view': view})[0] == 200
-    stored = a.call('searches')[1]['searches'][0]['view']
-    assert stored == {'q': 'VOO', 'tradable': False, 'status': 'all', 'kind': 'large_etf', 'geo_region': 'us', 'sort': 'perf', 'dir': 'desc', 'icon': '⚡', 'description': 'ETF rapides'}
-    assert a.call('preset/save', {'preset': 'regular', 'config': config, 'view': view})[0] == 200
-    preset = a.call('presets/mine')[1]['presets']['regular']['view']
-    assert preset == stored
+    assert a.call('explorer/library/save', {'kind': 'search', 'name': 'ETF complets', 'payload': {'config': config, 'universe': view}})[0] == 200
+    item = next(i for i in a.call('explorer/library')[1]['items'] if i['name'] == 'ETF complets')
+    assert item['payload']['universe'] == {'q': 'VOO', 'tradable': False, 'status': 'all', 'kind': 'large_etf', 'geo_region': 'us', 'sort': 'perf', 'dir': 'desc', 'icon': '⚡', 'description': 'ETF rapides'}
 
 
 def test_delete_portfolio_needs_confirmation(world):
@@ -189,7 +186,7 @@ def test_lot_alerts_follow_each_purchase(world):
     a = login(world, 'alice', 'alice-secret-1234')
     pf = a.call('portfolio/create', {'name': 'Alertes'})[1]['id']
     add = lambda side, q, p, d: a.call('tx/add', {'portfolio_id': pf, 'listing_id': 1, 'side': side, 'quantity': q, 'unit_price': p, 'trade_at': d})
-    first = add('buy', 10, 100, '2026-03-02')[1]['id']
+    add('buy', 10, 100, '2026-03-02')
     second = add('buy', 5, 140, '2026-06-01')[1]['id']
     sale = add('sell', 12, 130, '2026-07-01')[1]['id']
     conn = connect()

@@ -1,6 +1,5 @@
 """Ancien moteur d'alertes (« Surveillance ») : désactivé. Les règles restent stockées, intactes ; plus aucune évaluation, aucun événement, aucune notification,
 par aucun point d'entrée réel (tick planifié, CLI, API, e-mails du cron). Le Plan de suivi reste lisible. Exécuter avec PHP 8.3 (voir Makefile : integ)."""
-import glob
 import json
 import os
 import re
@@ -60,21 +59,7 @@ def test_every_real_entry_point_is_closed(world):
     # tick planifié et cron : plus d'appel au moteur ni aux e-mails
     tasks = open(os.path.join(ROOT, 'engine/jobs/tasks.py'), encoding='utf-8').read()
     assert not re.search(r'^[^#\n]*watch\.run_all|from \.\.analytics import watch', tasks, re.M)
-    cron = open(os.path.join(ROOT, 'app/routes/cron.php'), encoding='utf-8').read()
-    assert not re.search(r'^[^/\n]*alerts_mail_pending\(', cron, re.M)
     assert snapshot(conn) == before
-
-
-def test_no_notification_is_sent_for_old_rules(world, tmp_path):
-    a, pf, rid, rid2, conn = scenario(world)
-    before = snapshot(conn)
-    code = "require " + json.dumps(ROOT + '/app/lib/mail.php') + "; require " + json.dumps(ROOT + '/app/routes/alerts.php') + "; echo json_encode(alerts_mail_pending());"
-    r = subprocess.run(['php', '-r', code], cwd=ROOT, capture_output=True, text=True, env=dict(os.environ, JIGO_TEST_MAIL_DIR=str(tmp_path)), timeout=60)
-    assert r.returncode == 0, r.stdout + r.stderr
-    assert json.loads(r.stdout.strip().splitlines()[-1]) == 0
-    assert glob.glob(str(tmp_path / '*.json')) == []        # aucun e-mail
-    after = snapshot(conn)
-    assert after == before and all(x['notified_at'] is None for x in after[0] if x['id'] == rid2)   # pas même « notifié » : rien n'a été touché
 
 
 def test_new_tracking_plan_still_works_and_old_rules_remain_readable(world):

@@ -1,6 +1,6 @@
 """Surveillance : modèles de règles par stratégie (seuils lus dans la configuration réelle de la stratégie) et évaluation des règles d'un portefeuille.
 Une règle est évaluée sur des données réelles ; sans donnée suffisante son état est « insufficient », jamais « normal ». Aucune vente automatique : une règle ne fait que signaler."""
-import datetime, math
+import datetime
 from . import measures, strategy, history
 from .series import prepare_series
 

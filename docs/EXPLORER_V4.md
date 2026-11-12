@@ -159,13 +159,9 @@ L’import ne contient ni code exécutable ni requête vers un fournisseur.
 
 Migration additive `20261104_explorer_saved.sql` : nouvelle table `explorer_saved`,
 clé étrangère utilisateur, unicité utilisateur/type/nom, limite 150 objets par compte.
-Les tables `saved_searches` et `saved_presets` restent intactes. Les anciennes
-sauvegardes combinées sont identifiées comme recherches historiques ; elles ne
-sont pas renommées abusivement « stratégies financières ». Leurs identifiants
-`legacy-search:<id>` et `legacy-preset:<clé>` restent stables. Renommer/supprimer une
-ancienne recherche est une action explicite ; le renommage préserve sa configuration.
-Une personnalisation de profil historique à clé fixe peut être dupliquée pour
-recevoir un autre nom. Sa désactivation est une préférence d’affichage locale.
+Les anciennes tables `saved_searches` et `saved_presets` ne sont plus lues ni écrites
+par l'application : `scripts/oneshot/migrate_saved_to_explorer.py` copie leur contenu
+dans `explorer_saved` (kind `search`, idempotent) ; elles se suppriment ensuite à la main.
 
 « Tout remettre à zéro » prépare une configuration vide : aucune période, aucun
 seuil, aucune contribution ni filtre d’univers ; aucun score artificiel. La fraîcheur

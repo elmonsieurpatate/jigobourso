@@ -79,7 +79,6 @@ def test_general_ranking_rates_every_evaluable_title_and_filters_remove_none():
     lst = r['listing']
     assert r['granularity']['sessions'] == 21 and lst['which'] == 'simple' and lst['total'] == 2 and [x['rank'] for x in lst['rows']] == [1, 2]
     assert all(len(x['curve']) <= 22 for x in lst['rows']) and sum(c['count'] for c in lst['categories']) == 2
-    one = next(c for c in lst['categories'] if c['count'])
     sub = A.ranking(conn, {'strategy': 'growth_v4', 'which': 'complex', 'category': None})['listing']
     assert sub['which'] == 'complex'
     sim0 = A.simulate(conn, {'strategy': 'growth_v4', 'q': 'UP.DE'})

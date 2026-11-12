@@ -1,7 +1,6 @@
 """Stratégies « Momentum 6 mois » (J−126 → J−21) et « Momentum 12 mois » (J−252 → J−21) : mesure, jugement, classement, suivi, et garantie que les quatre profils existants ne changent pas."""
 import datetime
 import hashlib
-import importlib.util
 import json
 import math
 import os

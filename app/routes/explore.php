@@ -9,7 +9,6 @@ require_once __DIR__ . '/../services/ct_strategies.php';
 
 return [
     'explorer/library' => function () { $u=require_user();return explorer_library_list((int)$u['id']); },
-    'explorer/library/legacy' => function () { need_post();$u=require_user();return explorer_legacy_action((int)$u['id'],body()); },
     'explorer/library/save' => function () { need_post();$u=require_user();return explorer_library_save((int)$u['id'],body()); },
     'explorer/library/delete' => function () { need_post();$u=require_user();q('DELETE FROM explorer_saved WHERE id=? AND user_id=?',[(int)(body()['id']??0),$u['id']]);return ['ok'=>true]; },
     'explorer/detail' => function () { need_post();$u=require_user();$b=body();$view=clean_view($b['view']??[]);$view['owned_ids']=held_listing_ids((int)$u['id']);return engine_call('sheet',['listing_id'=>(int)($b['id']??0),'config'=>$b['config']??'regular','view'=>$view,'fetch_profile'=>false]); },
@@ -105,48 +104,6 @@ return [
             foreach ($v['positions'] as $pos) if ($pos['listing_id'] === $id) $sheet['holdings'][] = ['portfolio_id' => (int)$p['id'], 'portfolio' => $p['name'], 'qty' => $pos['qty'], 'avg_cost' => $pos['avg_cost'], 'value' => $pos['value'], 'unrealized' => $pos['unrealized'], 'unrealized_pct' => $pos['unrealized_pct']];
         }
         return $sheet;
-    },
-    'searches' => function () {
-        $u = require_user();
-        $rows = q('SELECT id, name, config, view, updated_at FROM saved_searches WHERE user_id = ? ORDER BY name', [$u['id']])->fetchAll();
-        foreach ($rows as &$r) { $r['config'] = json_decode($r['config'], true); $r['view'] = json_decode($r['view'], true) ?: new stdClass(); }
-        return ['searches' => $rows];
-    },
-    'search/save' => function () {
-        need_post(); $u = require_user(); $b = body();
-        $name = str_in($b, 'name', 80);
-        $config = engine_call('validate-config', is_array($b['config'] ?? null) ? $b['config'] : []);
-        $view = clean_view($b['view'] ?? []);
-        if (!q('SELECT 1 FROM saved_searches WHERE user_id = ? AND name = ?', [$u['id'], $name])->fetch() && (int)q('SELECT COUNT(*) FROM saved_searches WHERE user_id = ?', [$u['id']])->fetchColumn() >= 50) throw new ApiError('50 recherches enregistrées au maximum', 422);
-        q('INSERT INTO saved_searches(user_id, name, config, view, created_at, updated_at) VALUES (?,?,?,?,?,?) ON DUPLICATE KEY UPDATE config = VALUES(config), view = VALUES(view), updated_at = VALUES(updated_at)',
-          [$u['id'], $name, json_encode($config), json_encode($view ?: new stdClass()), now_utc(), now_utc()]);
-        return ['ok' => true];
-    },
-    'presets/mine' => function () {
-        $u = require_user();
-        $out = [];
-        foreach (q('SELECT preset, config, view, updated_at FROM saved_presets WHERE user_id = ?', [$u['id']])->fetchAll() as $r)
-            $out[$r['preset']] = ['config' => json_decode($r['config'], true), 'view' => json_decode($r['view'], true) ?: new stdClass(), 'updated_at' => $r['updated_at']];
-        return ['presets' => $out ?: new stdClass()];
-    },
-    'preset/save' => function () {
-        need_post(); $u = require_user(); $b = body();
-        $preset = (string)($b['preset'] ?? '');
-        if (!in_array($preset, array_keys(engine_call('presets', [])['presets']), true)) throw new ApiError('Stratégie inconnue', 422);
-        $config = engine_call('validate-config', is_array($b['config'] ?? null) ? $b['config'] : []);
-        q('INSERT INTO saved_presets(user_id, preset, config, view, updated_at) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE config = VALUES(config), view = VALUES(view), updated_at = VALUES(updated_at)',
-          [$u['id'], $preset, json_encode($config), json_encode(clean_view($b['view'] ?? []) ?: new stdClass()), now_utc()]);
-        return ['ok' => true];
-    },
-    'preset/reset' => function () {
-        need_post(); $u = require_user();
-        q('DELETE FROM saved_presets WHERE user_id = ? AND preset = ?', [$u['id'], (string)(body()['preset'] ?? '')]);
-        return ['ok' => true];
-    },
-    'search/delete' => function () {
-        need_post(); $u = require_user();
-        q('DELETE FROM saved_searches WHERE id = ? AND user_id = ?', [(int)(body()['id'] ?? 0), $u['id']]);
-        return ['ok' => true];
     },
     'listings/search' => function () {
         require_user();

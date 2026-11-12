@@ -10,7 +10,6 @@ from engine.jobs import schedule, tasks
 from engine.jobs.runner import run_job
 from engine.market import collect
 from tests.dbutil import reset_data
-from tests.fakes import FakeYahoo
 
 pytestmark = pytest.mark.integration
 if not os.environ.get('JIGO_TEST_DATABASE'):

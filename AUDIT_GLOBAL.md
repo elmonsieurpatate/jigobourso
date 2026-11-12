@@ -18,7 +18,7 @@ Légende : 🔴 haute · 🟠 moyenne · 🟢 basse
 - [x] Vérifier que la suite `tests/fast` passe avant de commencer (baseline)
 
 Réalisé : `ruff.toml` + `make lint` (ruff + `php8.3 -l`, serveur en PHP 8.2), `make check`, `tests/integ/test_job_runner.py`, `tests/integ/test_funnel_injection.py`, `tests/fast/test_schema_migrations.py`. Baseline : `tests/fast` 660 verts (6 tests périmés corrigés), `make integ` 332 verts (php8.3 et venv forcés dans le PATH).
-À suivre : F401/F841 de ruff sont exclus de `ruff.toml` jusqu'à l'Étape 3.2 ; la branche `quality` de `funnel.items` est du code mort.
+À suivre : la branche `quality` de `funnel.items` est du code mort (F401/F841 de ruff réactivés à l’Étape 3.2).
 
 ## Étape 1 : Sécurité et robustesse des fondations 🔴
 
@@ -64,23 +64,27 @@ Réalisé : `need_post` exige Origin ou Referer, `body()` exige `application/jso
 ## Étape 3 : Élimination du legacy et du code mort
 
 ### 3.1 Backend / DB
-- [ ] Migrer les données `saved_searches` / `saved_presets` vers `explorer_saved`, puis supprimer `routes/explore.php:109-146`, `services/explorer_library.php` (couche legacy) et les deux anciennes tables
-- [ ] Supprimer `alerts_mail_pending`, `ALERTS_EXECUTION_ENABLED`, `ALERT_LABELS` (si inutilisée ailleurs) dans `routes/alerts.php`
-- [ ] Supprimer `secondary_setting` (`services/secondary_filters.php:87`)
+- [x] Migrer les données `saved_searches` / `saved_presets` vers `explorer_saved`, puis supprimer `routes/explore.php:109-146`, `services/explorer_library.php` (couche legacy) et les deux anciennes tables
+- [x] Supprimer `alerts_mail_pending`, `ALERTS_EXECUTION_ENABLED`, `ALERT_LABELS` (si inutilisée ailleurs) dans `routes/alerts.php`
+- [x] Supprimer `secondary_setting` (`services/secondary_filters.php:87`)
 - [ ] Supprimer l'alias cron legacy `yahoo-history-cron`
-- [ ] Aligner le style de `schema.sql` (`CREATE TABLE IF NOT EXISTS` mixte) et le rendre cohérent avec `db/migrations/`
+- [x] Aligner le style de `schema.sql` (`CREATE TABLE IF NOT EXISTS` mixte) et le rendre cohérent avec `db/migrations/`
 
 ### 3.2 Moteur / scripts
-- [ ] Supprimer les imports inutilisés : `clean_window, find_breaks, usable_closes, window_metrics, technical_state` (`service.py`, `compute.py`, `strategy.py`, `tracking.py`) après vérification qu'aucun appelant ne fait `service.clean_window` ; `cli.py` (`run_job`), `market/intraday.py` (`json`), `watch.py` (`math`), `scripts/explain_current_ranking.py` (`importlib`, `math`, `sys`)
-- [ ] Uniformiser l'import `__import__('engine.analytics.strategy_docs', ...)` dans `cli.py:54`
+- [x] Supprimer les imports inutilisés : `clean_window, find_breaks, usable_closes, window_metrics, technical_state` (`service.py`, `compute.py`, `strategy.py`, `tracking.py`) après vérification qu'aucun appelant ne fait `service.clean_window` ; `cli.py` (`run_job`), `market/intraday.py` (`json`), `watch.py` (`math`), `scripts/explain_current_ranking.py` (`importlib`, `math`, `sys`)
+- [x] Uniformiser l'import `__import__('engine.analytics.strategy_docs', ...)` dans `cli.py:54`
 - [ ] Archiver les scripts de migration V1→V2 une fois la migration confirmée : `migrate_legacy.py`, `export_user_data.py`, `drop_legacy_tables.sh`, `bootstrap_real.py`, `engine/migration/legacy.py` → `scripts/oneshot/` ou tag git
 - [ ] Regrouper `verify_{etf,financial,momentum}_release.py`, `prepare_financial_release.py` et les `verify_*`/`check_*` PHP dans `scripts/release/` avec un point d'entrée Makefile
-- [ ] `scripts/test_secondary_filters.sh` : migrer vers `tests/e2e` ou supprimer s'il double `tests/e2e/secondary-*`
-- [ ] Déplacer ou documenter les `.php` de `scripts/` (`create_user`, `check_*`, `verify_*`) → `ops/`
+- [x] `scripts/test_secondary_filters.sh` : migrer vers `tests/e2e` ou supprimer s'il double `tests/e2e/secondary-*`
+- [x] Déplacer ou documenter les `.php` de `scripts/` (`create_user`, `check_*`, `verify_*`) → `ops/`
 
 ### 3.3 Frontend
-- [ ] Supprimer `assets/multiselect.js` (orphelin) ou le brancher s'il est prévu
-- [ ] Remplacer `alertes.html` et `classement-test.html` (meta refresh) par des redirections 301 `.htaccess`, puis supprimer les pages
+- [x] Supprimer `assets/multiselect.js` (orphelin) ou le brancher s'il est prévu
+- [x] Remplacer `alertes.html` et `classement-test.html` (meta refresh) par des redirections 301 `.htaccess`, puis supprimer les pages
+
+Réalisé : routes `searches`, `search/*`, `presets/*`, `explorer/library/legacy`, `explorer_legacy_action` et tables `saved_*` retirées du code et de `schema.sql` (aucune référence active, `git grep` ; `codex_*` : aucune occurrence) ; copie des données par `scripts/oneshot/migrate_saved_to_explorer.py` (testé, idempotent) ; sauvegarde quotidienne : `saved_searches` remplacée par `explorer_saved` ; `alerts_mail_pending`, `ALERTS_EXECUTION_ENABLED`, `secondary_setting` supprimés (`ALERT_LABELS` conservée : 3 usages dans `routes/alerts.php`) ; `schema.sql` tout en `CREATE TABLE IF NOT EXISTS` ; F401/F841 nettoyés et réactivés dans `ruff.toml` ; `scripts/README.md` ; `alertes.html`/`classement-test.html` → 301, `multiselect.js` supprimé (le contrôle de déploiement vise désormais `mes-filtres.html`).
+**Reste ouvert** : (1) alias cron `yahoo-history-cron` : la tâche hPanel de production l'appelle encore (même chantier que `?k=` de l'Étape 1.1), à retirer après migration vers `api/cron` ; (2) archivage des scripts V1→V2 (`migrate_legacy.py`, `export_user_data.py`, `drop_legacy_tables.sh`, `bootstrap_real.py`, `engine/migration/legacy.py`) : bascule non confirmée (checklist `docs/DEPLOIEMENT.md` non cochée), `bootstrap_real.py` sert à `make dev-db`, `legacy.py` est testé ; (3) regroupement des `verify_*`/`prepare_*` dans `scripts/release/` : `ops/deploy.sh` et `test_deploy_modes.py` les appellent par chemin, à faire avec le déploiement.
+**À l'application en production** : lancer `migrate_saved_to_explorer.py --go` AVANT le déploiement (le nouveau code ne lit plus les anciennes tables), puis `DROP TABLE saved_presets, saved_searches` à la main après sauvegarde. Reste de CSS `.ms-*` (app.css) sans usage : à retirer à l'Étape 6.
 
 ## Étape 4 : Découpage du moteur `engine/analytics/` (37 fichiers → 7 sous-paquets)
 

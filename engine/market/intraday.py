@@ -6,7 +6,6 @@ Les bougies complètes (ouverture, haut, bas, volume) sont lues chez Yahoo (API 
 """
 import datetime
 import hashlib
-import json
 from zoneinfo import ZoneInfo
 
 from . import hours
