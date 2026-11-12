@@ -82,3 +82,6 @@
 .mf-chip{display:inline-flex;align-items:center;gap:6px;padding:2px 10px;border:1px solid var(--line);border-radius:999px;font-size:.82rem;background:var(--surface)}
 .mf-chip i{width:9px;height:9px;border-radius:50%;display:inline-block}
 .mf-chip.off{opacity:.4;text-decoration:line-through}
+
+/* Éditeur personnel de stratégies. */
+.ms-ic{cursor:pointer}input:checked+.ms-ic{border-color:var(--accent);background:var(--accent-soft);box-shadow:0 0 0 2px var(--accent)}input:focus-visible+.ms-ic{outline:2px solid var(--accent)}.ms-form textarea{width:100%;font:inherit}

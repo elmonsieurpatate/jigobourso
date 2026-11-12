@@ -4,7 +4,7 @@
   --brand: #0a2540; --brand-2: #123a63; --gold: #e3a82b; --nav-ink: #dbe7f5;
   --accent: #2563eb; --accent-ink: #ffffff; --accent-soft: #e1ebfd;
   --up: #0f7a45; --up-soft: #e4f4ec; --down: #b3261e; --down-soft: #fbe9e7; --warn: #8a5a00; --warn-soft: #fbf1dc; --info-soft: #e3edfd; --info: #1d4ed8;
-  --radius: 14px; --shadow: 0 1px 2px rgba(16, 24, 40, .06), 0 6px 20px rgba(16, 24, 40, .05);
+  --radius: 16px; --shadow: 0 1px 2px rgba(16, 24, 40, .06), 0 6px 20px rgba(16, 24, 40, .05);
   --font: "Inter", "Segoe UI Variable", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
 }
 :root[data-theme="dark"] {
@@ -118,7 +118,7 @@ footer.wrap { color: var(--muted); font-size: .8rem; padding-bottom: 30px; }
 /* ═════════ Identité Jigobourso (v2.1) ═════════ */
 body { font-size: 14.5px; letter-spacing: .005em; }
 h1 { font-size: 1.7rem; font-weight: 800; letter-spacing: -.02em; }
-.card { border-radius: 16px; } .card h2 { display: flex; align-items: center; gap: 8px; }
+.card h2 { display: flex; align-items: center; gap: 8px; }
 .card.flat { box-shadow: none; } .card.tight { padding: 12px 14px; }
 .page-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; } .page-head p { margin: 2px 0 0; color: var(--muted); max-width: 70ch; }
 .kpi-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
@@ -233,8 +233,7 @@ body.side-collapsed .side .nv { justify-content: center; padding: 10px 0; } body
 [hidden] { display: none !important; }
 .rtable .nm { max-width: 260px; }
 /* Account forms: full-size input, accessible visibility control. */
-.pw-wrap{position:relative;display:flex;align-items:center;min-width:0;width:100%}.pw-wrap input{width:100%;padding-right:86px}.pw-wrap .pw-eye{position:absolute;right:5px;min-height:36px;background:var(--card);font-size:.78rem}.auth-wrap{max-width:460px;padding-top:7vh}.auth-links{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:16px}.account-note{font-size:.88rem;color:var(--muted)}
-.pw-wrap input{padding-right:52px}.pw-wrap .pw-eye{width:42px;height:42px;min-height:42px;display:grid;place-items:center;padding:0}
+.pw-wrap{position:relative;display:flex;align-items:center;min-width:0;width:100%}.pw-wrap input{width:100%;padding-right:52px}.pw-wrap .pw-eye{position:absolute;right:5px;width:42px;height:42px;min-height:42px;display:grid;place-items:center;padding:0;background:var(--surface);font-size:.78rem}.auth-wrap{max-width:460px;padding-top:7vh}.auth-brand{font-size:1.6rem}.auth-message{margin-top:16px}.auth-links{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:16px}.account-note{font-size:.88rem;color:var(--muted)}
 
 /* Pastilles d'information (ETF et indicateurs) : point + mot ; la couleur n'est jamais seule */
 .sig { display: inline-flex; align-items: center; gap: 5px; font-size: .72rem; color: var(--muted); max-width: 100%; margin-right: 8px; } .sigs .sig { white-space: nowrap; }
