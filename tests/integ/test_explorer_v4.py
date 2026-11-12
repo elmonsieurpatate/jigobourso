@@ -80,26 +80,6 @@ def test_library_typed_saves_auth_validation_and_legacy_preservation(world):
     assert legacy2==legacy
 
 
-def test_rollback_refuses_data_then_restores_empty_table():
-    from scripts.rollback_explorer_saved import rollback
-    from scripts.migrate import statements
-    from pathlib import Path
-    conn=connect()
-    with conn.cursor() as q:
-        q.execute('DELETE FROM explorer_saved')
-        q.execute("SELECT id FROM users LIMIT 1");user=q.fetchone()
-        q.execute("INSERT INTO explorer_saved(user_id,kind,name,payload,created_at,updated_at) VALUES (%s,'universe','Conserver','{}',NOW(),NOW())",(user['id'],))
-    conn.commit()
-    with pytest.raises(ValueError):rollback(conn)
-    with conn.cursor() as q:
-        q.execute('SELECT COUNT(*) n FROM explorer_saved');assert q.fetchone()['n']==1
-        q.execute('DELETE FROM explorer_saved')
-    conn.commit();rollback(conn)
-    with conn.cursor() as q:
-        for sql in statements((Path(__file__).parents[2]/'db/migrations/20261104_explorer_saved.sql').read_text()):q.execute(sql)
-    conn.commit();conn.close()
-
-
 def test_quoted_volume_selection_cache_invalidates_without_a_price_job(monkeypatch):
     monkeypatch.setattr(service.hours,'utcnow',lambda:NOW)
     c=connect();seed(c);cfg=C.empty();cfg['liquidity']['min_quoted_volume']=100

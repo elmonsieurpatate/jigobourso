@@ -160,7 +160,7 @@ def test_explicit_actions_start_now_and_deploy_starts_the_recalculation_detached
     admin = (ROOT / 'app/routes/admin.php').read_text()
     for job in ("'maintenance'", "'metrics'", "'etf'"):
         assert job in admin
-    assert admin.count("engine_spawn('job'") == 1                                  # un seul lanceur, détaché : aucune requête HTTP n'attend le calcul
+    assert admin.count("engine_spawn('job'") == 2                                  # lanceur unique, toujours détaché (actions explicites + décision de split) : aucune requête HTTP n'attend le calcul
     assert tasks.COMPUTE == ('maintenance', 'metrics', 'etf')
     assert set(tasks.COMPUTE) <= set(tasks.MANUAL_LABELS)
     deploy = (ROOT / 'ops/deploy.sh').read_text()

@@ -13,10 +13,12 @@ class Cur:
     def __exit__(self, *a): return False
     def execute(self, sql, args=()):
         self.c.sql = sql
-        if 'daily_prices' in sql:
+        if 'corporate_events' in sql:
+            self.rows = []
+        elif 'daily_prices' in sql:
             ids = [a for a in args if isinstance(a, int)]
             import datetime
-            self.rows = [{'listing_id': i, 'price_date': datetime.date(2026, 9, 1) + datetime.timedelta(days=k), 'px': 100 + k} for i in ids for k in range(self.c.points)]
+            self.rows = [{'listing_id': i, 'price_date': datetime.date(2026, 9, 1) + datetime.timedelta(days=k), 'close_px': 100 + k, 'adj_close_px': 100 + k} for i in ids for k in range(self.c.points)]
         else:
             ids = list(args)
             self.rows = [{'id': i, 'symbol': 'S%d' % i, 'mic': 'XPAR', 'name': 'N%d' % i, 'kind': 'equity', 'isin': None} for i in ids]
@@ -80,7 +82,7 @@ def test_dated_series_has_iso_dates_and_prices():
             def ex(sql, args=()):
                 orig(sql, args)
                 if 'daily_prices' in sql:
-                    c.rows = [{'listing_id': 1, 'price_date': datetime.date(2026, 10, 1) + datetime.timedelta(days=k), 'px': 100 + k} for k in range(30)]
+                    c.rows = [{'listing_id': 1, 'price_date': datetime.date(2026, 10, 1) + datetime.timedelta(days=k), 'close_px': 100 + k, 'adj_close_px': 100 + k} for k in range(30)]
             c.execute = ex
             return c
     out = A.dated_series(C2(), 1, 21)
