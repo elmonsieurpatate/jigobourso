@@ -4,7 +4,24 @@ import json
 import subprocess
 import sys
 
-from engine.shared.db import connect
+from engine.shared import db as _db
+
+_opened = []
+
+
+def connect():
+    """Connexion suivie : `main` ferme toutes celles qu'une commande a ouvertes, y compris en cas d'erreur (aucune n'est laissée au ramasse-miettes)."""
+    conn = _db.connect()
+    _opened.append(conn)
+    return conn
+
+
+def _close_all():
+    while _opened:
+        try:
+            _opened.pop().close()
+        except Exception:      # noqa: BLE001 : connexion déjà fermée par le serveur ; rien à faire
+            pass
 
 
 def _admin_commands():
@@ -141,6 +158,13 @@ def serve(cmd):
 
 
 def main(argv=None):
+    try:
+        return _main(argv)
+    finally:
+        _close_all()
+
+
+def _main(argv=None):
     ap = argparse.ArgumentParser(prog='engine')
     sub = ap.add_subparsers(dest='cmd', required=True)
     cat = sub.add_parser('catalogue', help='charger le catalogue depuis un clone FinanceDatabase')

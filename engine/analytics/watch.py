@@ -196,7 +196,7 @@ def run_all(conn, now=None, user_id=None, force=False):
     DÉSACTIVÉ : renvoie immédiatement, sans lire ni écrire alert_rules / alert_events."""
     if not LEGACY_EXECUTION_ENABLED:
         return {'disabled': True, 'rules': 0, 'triggered': 0}
-    now = now or datetime.datetime.utcnow()
+    now = now or datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
     with conn.cursor() as cur:
         if not force and user_id is None:
             cur.execute('SELECT MAX(last_eval_at) m FROM alert_rules')

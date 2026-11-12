@@ -21,5 +21,7 @@ function cfg(string $name, $default = null) {
     }
     return ($file[$name] ?? '') !== '' ? $file[$name] : $default;
 }
+// URL publique du site, sans barre finale (liens des e-mails). JIGO_BASE_URL la fixe par installation ; le défaut est la production actuelle.
+function base_url(): string { return rtrim((string)cfg('JIGO_BASE_URL', 'https://jigobourso.turnjoy.dev'), '/'); }
 function engine_root(): string { return cfg('JIGO_ENGINE_ROOT', dirname(__DIR__, 2)); }
 function python_bin(): string { return cfg('JIGO_PYTHON', engine_root() . '/.venv/bin/python'); }

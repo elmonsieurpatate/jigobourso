@@ -131,3 +131,59 @@ def test_errors_and_failure_are_recorded(conn):
         cur.execute("SELECT level, message FROM job_logs WHERE job_id=%s", (jid,))
         rows = cur.fetchall()
     assert rows and rows[0]['level'] == 'error' and len(rows[0]['message']) <= 400
+
+
+def test_heartbeat_keeps_a_long_running_job_alive(conn):
+    """Un traitement démarré depuis longtemps mais qui bat encore n'est pas périmé ; sans battement récent il l'est."""
+    stale = runner.stale_minutes('catchup') + 5
+    alive, dead = add_job(conn, 'catchup', 'running', stale), add_job(conn, 'metrics', 'running', stale + 60)
+    with conn.cursor() as cur:
+        cur.execute('UPDATE jobs SET updated_at=%s WHERE id=%s', (runner._now(), alive))
+        cur.execute('UPDATE jobs SET updated_at=%s WHERE id=%s', (runner._now() - datetime.timedelta(minutes=500), dead))
+    conn.commit()
+    runner.recover_interrupted(conn)
+    assert status_of(conn, alive)['status'] == 'running' and status_of(conn, dead)['status'] == 'interrupted'
+
+
+def test_progress_step_and_log_refresh_the_heartbeat_and_long_traces_are_kept(conn):
+    seen = {}
+
+    def work(log):
+        with conn.cursor() as cur:
+            cur.execute('UPDATE jobs SET updated_at=%s WHERE id=%s', (runner._now() - datetime.timedelta(hours=2), log.job_id))
+        conn.commit()
+        log.progress('en cours')
+        seen['progress'] = beat(log.job_id)
+        with conn.cursor() as cur:
+            cur.execute('UPDATE jobs SET updated_at=%s WHERE id=%s', (runner._now() - datetime.timedelta(hours=2), log.job_id))
+        conn.commit()
+        log('warning', 'x' * 1000)
+        seen['log'] = beat(log.job_id)
+        return 1, 0, 'ok'
+
+    def beat(jid):
+        with conn.cursor() as cur:
+            cur.execute('SELECT updated_at FROM jobs WHERE id=%s', (jid,))
+            return cur.fetchone()['updated_at']
+    jid = runner.run_job(conn, 'catchup', work)
+    limit = runner._now() - datetime.timedelta(minutes=5)
+    assert seen['progress'] > limit and seen['log'] > limit
+    with conn.cursor() as cur:
+        cur.execute('SELECT CHAR_LENGTH(message) m, CHAR_LENGTH(detail) d FROM job_logs WHERE job_id=%s', (jid,))
+        row = cur.fetchone()
+    assert row['m'] == 400 and row['d'] == 1000
+
+
+def test_housekeeping_purges_expired_attempts_and_sessions(conn):
+    now = runner._now()
+    old = now - datetime.timedelta(days=3)
+    with conn.cursor() as cur:
+        cur.execute("INSERT INTO users(username,pass_hash,created_at) VALUES ('hk','x',%s)", (now,))
+        uid = cur.lastrowid
+        cur.executemany('INSERT INTO login_attempts(username,ip,at) VALUES (%s,%s,%s)', [('old', '1.1.1.1', old), ('new', '1.1.1.1', now)])
+        cur.executemany('INSERT INTO sessions(token_hash,user_id,created_at,last_seen,expires_at,ip,ua) VALUES (%s,%s,%s,%s,%s,%s,%s)',
+                        [('a' * 64, uid, old, old, old, '', ''), ('b' * 64, uid, now, now, now + datetime.timedelta(days=1), '', '')])
+    conn.commit()
+    from engine.jobs import tasks
+    out = tasks.housekeeping(conn, now.replace(tzinfo=datetime.timezone.utc))
+    assert out['login_attempts'] == 1 and out['sessions'] == 1

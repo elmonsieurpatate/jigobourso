@@ -198,6 +198,7 @@ CREATE TABLE jobs (
   trigger_by  ENUM('cron','admin','system') NOT NULL DEFAULT 'cron',
   status      ENUM('queued','running','completed','completed_with_errors','failed','paused','interrupted') NOT NULL,
   started_at  DATETIME NOT NULL,
+  updated_at  DATETIME NULL,
   finished_at DATETIME NULL,
   items_ok    INT UNSIGNED NULL,
   items_error INT UNSIGNED NOT NULL DEFAULT 0,
@@ -211,6 +212,7 @@ CREATE TABLE job_logs (
   job_id    BIGINT UNSIGNED NOT NULL,
   level     ENUM('warning','error') NOT NULL,
   message   VARCHAR(400) NOT NULL,
+  detail    TEXT NULL,
   logged_at DATETIME NOT NULL,
   PRIMARY KEY (id),
   KEY ix_job_logs_job (job_id),
@@ -567,7 +569,8 @@ CREATE TABLE IF NOT EXISTS alert_rules (
   updated_at    DATETIME NOT NULL,
   PRIMARY KEY (id),
   KEY idx_alert_user (user_id, portfolio_id, listing_id),
-  CONSTRAINT fk_alert_portfolio FOREIGN KEY (portfolio_id) REFERENCES portfolios(id) ON DELETE CASCADE
+  CONSTRAINT fk_alert_portfolio FOREIGN KEY (portfolio_id) REFERENCES portfolios(id) ON DELETE CASCADE,
+  CONSTRAINT fk_alert_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 CREATE TABLE IF NOT EXISTS alert_events (
   id        BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -580,7 +583,8 @@ CREATE TABLE IF NOT EXISTS alert_events (
   message   VARCHAR(255) NULL,
   PRIMARY KEY (id),
   KEY idx_event_user (user_id, at),
-  CONSTRAINT fk_event_rule FOREIGN KEY (rule_id) REFERENCES alert_rules(id) ON DELETE CASCADE
+  CONSTRAINT fk_event_rule FOREIGN KEY (rule_id) REFERENCES alert_rules(id) ON DELETE CASCADE,
+  CONSTRAINT fk_event_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 CREATE TABLE IF NOT EXISTS lot_origin (
   transaction_id BIGINT UNSIGNED NOT NULL,

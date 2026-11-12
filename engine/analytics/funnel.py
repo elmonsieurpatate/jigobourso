@@ -62,6 +62,7 @@ def yahoo_funnel(conn, cfg=None):
     with conn.cursor() as cur:
         counts = {}
         for key, cond in YAHOO_WHERE.items():
+            assert key in YAHOO_WHERE and cond is YAHOO_WHERE[key]      # SQL issu uniquement de la table constante YAHOO_WHERE
             cur.execute(f'SELECT COUNT(*) n FROM listings l WHERE {cond}')
             counts[key] = cur.fetchone()['n']
         cur.execute("""SELECT SUM(p.listing_id IS NULL OR p.quote_at IS NULL) no_quote, SUM(p.listing_id IS NOT NULL AND p.quote_at IS NOT NULL AND p.price IS NULL) no_price
@@ -93,7 +94,7 @@ def yahoo_funnel(conn, cfg=None):
 def snapshot(conn, stage, job_id=None):
     steps = catalogue_funnel(conn) if stage == 'catalogue' else yahoo_funnel(conn)
     import json
-    now = datetime.datetime.utcnow().replace(microsecond=0)
+    now = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None, microsecond=0)
     with conn.cursor() as cur:
         cur.executemany('INSERT INTO funnel_steps(job_id,stage,seq,step_key,label,rule_text,before_n,removed_n,kept_n,info_json,created_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',
                         [(job_id, stage, s['seq'], s['key'], s['label'], s['rule'][:400], s['before'], s['removed'], s['kept'], json.dumps(s['info'], ensure_ascii=False), now) for s in steps])
@@ -132,18 +133,33 @@ def _like(q):
     return '%' + q.replace('%', '').replace('_', '').strip() + '%'
 
 
-def items(conn, stage, step, q='', kind='', mic='', page=1, quality=''):
-    page = max(1, int(page))
-    rates = latest_rates(conn) if stage == 'yahoo' else None
+# Colonnes filtrables par stage : seuls ces identifiants fixes entrent dans le SQL, les valeurs saisies sont toujours liées (%s).
+FILTER_COLUMNS = {
+    'catalogue': {'name': 'r.name', 'symbol': 'r.symbol', 'isin': 'COALESCE(r.isin,"")', 'kind': 'r.kind', 'mic': 'r.mic'},
+    'yahoo': {'name': 'i.name', 'symbol': 'l.symbol', 'isin': 'COALESCE(i.isin,"")', 'kind': 'i.kind', 'mic': 'l.mic'},
+}
+
+
+def _filters(stage, q, kind, mic):
+    col = FILTER_COLUMNS[stage]
     where, args = [], []
     if q:
-        where.append('(LOWER(NAME_COL) LIKE %s OR LOWER(SYMBOL_COL) LIKE %s OR LOWER(ISIN_COL) LIKE %s)')
+        where.append(f'(LOWER({col["name"]}) LIKE %s OR LOWER({col["symbol"]}) LIKE %s OR LOWER({col["isin"]}) LIKE %s)')
         args += [_like(q.lower())] * 3
     if kind:
-        where.append('KIND_COL=%s'); args.append(kind)
+        where.append(f'{col["kind"]}=%s'); args.append(kind)
     if mic:
-        where.append('MIC_COL=%s'); args.append(mic)
-    extra = ' AND '.join(where)
+        where.append(f'{col["mic"]}=%s'); args.append(mic)
+    return ' AND '.join(where), args
+
+
+def items(conn, stage, step, q='', kind='', mic='', page=1, quality=''):
+    page = max(1, int(page))
+    if stage not in FILTER_COLUMNS:
+        raise ValueError('Entonnoir inconnu')
+    rates = latest_rates(conn) if stage == 'yahoo' else None
+    extra, args = _filters(stage, q, kind, mic)
+    limit_args = [PAGE, (page - 1) * PAGE]
     with conn.cursor() as cur:
         if stage == 'catalogue':
             if step == 'raw':
@@ -158,16 +174,16 @@ def items(conn, stage, step, q='', kind='', mic='', page=1, quality=''):
                 cond = 'r.removed_step=%s'; args = [step] + args
             else:
                 raise ValueError('Étape inconnue')
-            cond_all = cond + (' AND ' + extra.replace('NAME_COL', 'r.name').replace('SYMBOL_COL', 'r.symbol').replace('ISIN_COL', 'COALESCE(r.isin,"")').replace('KIND_COL', 'r.kind').replace('MIC_COL', 'r.mic') if extra else '')
+            cond_all = cond + (' AND ' + extra if extra else '')
             cur.execute(f'SELECT COUNT(*) n FROM catalogue_raw r WHERE {cond_all}', args)
             total = cur.fetchone()['n']
-            cur.execute(f'SELECT r.kind, r.mic, r.symbol, r.isin, r.name, r.country, r.category, r.currency, r.removed_step, r.removed_reason FROM catalogue_raw r WHERE {cond_all} ORDER BY r.name, r.mic LIMIT {PAGE} OFFSET {(page - 1) * PAGE}', args)
+            cur.execute(f'SELECT r.kind, r.mic, r.symbol, r.isin, r.name, r.country, r.category, r.currency, r.removed_step, r.removed_reason FROM catalogue_raw r WHERE {cond_all} ORDER BY r.name, r.mic LIMIT %s OFFSET %s', args + limit_args)
             rows = cur.fetchall()
         else:
             if step not in YAHOO_WHERE:
                 raise ValueError('Étape inconnue')
             cond = YAHOO_WHERE[step].replace('%', '%%')
-            cond_all = cond + (' AND ' + extra.replace('NAME_COL', 'i.name').replace('SYMBOL_COL', 'l.symbol').replace('ISIN_COL', 'COALESCE(i.isin,"")').replace('KIND_COL', 'i.kind').replace('MIC_COL', 'l.mic') if extra else '')
+            cond_all = cond + (' AND ' + extra if extra else '')
             join = 'LEFT JOIN series_state s ON s.listing_id=l.id' if step == 'history' else ''
             if step == 'history' and quality:
                 cond_all += ' AND COALESCE(s.quality,"none")=%s'; args.append(quality)
@@ -176,7 +192,7 @@ def items(conn, stage, step, q='', kind='', mic='', page=1, quality=''):
             cur.execute(f"""SELECT l.id, l.symbol, l.mic, l.currency, l.status, l.excluded_reason, l.is_primary, i.name, i.isin, i.kind, i.country, p.price, p.currency price_currency, p.avg_volume_3m, p.quote_at, p.price_time,
                                    {'s.quality,' if step == 'history' else ''} (SELECT COUNT(*) FROM portfolio_transactions t WHERE t.listing_id=l.id) held
                             FROM listings l JOIN instruments i ON i.id=l.instrument_id LEFT JOIN latest_prices p ON p.listing_id=l.id {join}
-                            WHERE {cond_all} ORDER BY i.name, l.mic LIMIT {PAGE} OFFSET {(page - 1) * PAGE}""", args)
+                            WHERE {cond_all} ORDER BY i.name, l.mic LIMIT %s OFFSET %s""", args + limit_args)
             rows = cur.fetchall()
             for r in rows:
                 f = to_eur_factor(r['price_currency'] or r['currency'], rates)
@@ -239,7 +255,7 @@ def explain(conn, q):
                         step = prefilter.step_of(l['excluded_reason'])
                         pm, vm = ycfg['price']['min_eur'], None
                         y.append({'key': 'no_data', 'label': 'Cours reçu de Yahoo', 'result': 'passed', 'detail': f'{pe:,.2f} €'.replace(',', ' ') if pe is not None else 'oui'})
-                        age = (datetime.datetime.utcnow() - l['price_time']).total_seconds() / 86400 if l['price_time'] else None
+                        age = (datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None) - l['price_time']).total_seconds() / 86400 if l['price_time'] else None
                         mx = ycfg['stale']['max_days']
                         y.append({'key': 'stale', 'label': 'Dernier cours récent', 'result': 'removed' if step == 'stale' else 'passed',
                                   'detail': ('âge inconnu' if age is None else f'{age:.0f} jours ') + (f'> {mx:g} jours' if step == 'stale' else f'≤ {mx:g} jours' if ycfg['stale']['enabled'] and age is not None else '(règle désactivée)' if not ycfg['stale']['enabled'] else '')})

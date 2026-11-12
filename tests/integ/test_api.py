@@ -27,11 +27,13 @@ class Client:
         self.base = base
         self.opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
 
-    def call(self, route, body=None, params='', origin=None):
+    def call(self, route, body=None, params='', origin=None, headers=None):
         req = urllib.request.Request(f'{self.base}/api.php?r={route}{params}', data=json.dumps(body).encode() if body is not None else None,
                                      method='POST' if body is not None else 'GET', headers={'Content-Type': 'application/json'})
-        if origin:
-            req.add_header('Origin', origin)
+        if origin != '':                                                  # Origin envoyée par défaut, comme un navigateur ; origin='' simule un client sans Origin ni Referer
+            req.add_header('Origin', origin or self.base)
+        for k, v in (headers or {}).items():
+            req.headers.pop(k.capitalize(), None); req.add_header(k, v)
         try:
             with self.opener.open(req, timeout=60) as r:
                 return r.status, json.loads(r.read().decode() or 'null')

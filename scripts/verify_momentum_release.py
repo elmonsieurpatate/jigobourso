@@ -33,6 +33,7 @@ def main():
         cur.execute('SELECT l.mic, MAX(s.last_close_date) d FROM series_state s JOIN listings l ON l.id=s.listing_id GROUP BY l.mic')
         market_latest = {r['mic']: r['d'].isoformat() for r in cur.fetchall()}
     for column, window in (('momentum_6m', 126), ('momentum_12m', 252)):
+        assert column in ('momentum_6m', 'momentum_12m')      # identifiant SQL interpolé : liste blanche explicite
         with conn.cursor() as cur:
             cur.execute(f'SELECT s.listing_id, s.{column} v, s.last_close_date d, l.mic FROM series_state s JOIN listings l ON l.id=s.listing_id WHERE s.{column} IS NOT NULL')
             stored = {r['listing_id']: (float(r['v']), r['d'].isoformat(), r['mic']) for r in cur.fetchall()}

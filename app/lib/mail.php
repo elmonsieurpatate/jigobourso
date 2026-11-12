@@ -13,7 +13,7 @@ function send_account_mail(string $email, string $subject, string $message): boo
         return file_put_contents($file, json_encode(['to'=>$email,'subject'=>$subject,'body'=>$message])) !== false;
     }
     if (!mail_available()) return false;
-    $from = cfg('JIGO_MAIL_FROM', 'noreply@jigobourso.turnjoy.dev');
+    $from = cfg('JIGO_MAIL_FROM', 'noreply@' . (parse_url(base_url(), PHP_URL_HOST) ?: 'localhost'));
     if (!filter_var($from,FILTER_VALIDATE_EMAIL) || !filter_var($email,FILTER_VALIDATE_EMAIL) || preg_match('/[\r\n]/',$subject.$from.$email)) return false;
     $headers = ['From'=>'Jigobourso <'.$from.'>', 'MIME-Version'=>'1.0', 'Content-Type'=>'text/plain; charset=UTF-8'];
     try { return mail($email, '=?UTF-8?B?'.base64_encode($subject).'?=', $message, $headers); }

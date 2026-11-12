@@ -269,7 +269,7 @@ def extended_metrics(conn,universe,windows):
     # Only cache complete universe batches: a detail request must not poison it.
     with conn.cursor() as q:
         q.execute('SELECT COUNT(*) n FROM v_recommendable');complete=q.fetchone()['n']==len(universe)
-        if complete:q.execute('REPLACE INTO result_cache(cache_key,data_version,built_at,payload) VALUES (%s,%s,%s,%s)',(key,version,datetime.datetime.utcnow().replace(microsecond=0),packed(result)))
+        if complete:q.execute('REPLACE INTO result_cache(cache_key,data_version,built_at,payload) VALUES (%s,%s,%s,%s)',(key,version,datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None, microsecond=0),packed(result)))
     if complete:conn.commit()
     return result
 
@@ -289,15 +289,15 @@ def cached_verdicts(conn, config):
     if hit and hit['data_version'] == version:
         return [dict(zip(ENTRY_FIELDS, e)) for e in unpacked(hit['payload'])]
     with conn.cursor() as cur:        # garde-fou : chaque configuration inédite évalue tout l'univers ; on borne le nombre de calculs par heure pour protéger la base partagée
-        cur.execute("SELECT COUNT(*) n FROM result_cache WHERE built_at > %s AND data_version <> 'intraday-fetch'", (datetime.datetime.utcnow() - datetime.timedelta(hours=1),))
+        cur.execute("SELECT COUNT(*) n FROM result_cache WHERE built_at > %s AND data_version <> 'intraday-fetch'", (datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None) - datetime.timedelta(hours=1),))
         if cur.fetchone()['n'] >= MAX_NEW_CONFIGS_PER_HOUR:
             raise ValueError('Trop de réglages différents ont été calculés depuis une heure : réessayez un peu plus tard, ou utilisez un des quatre profils de départ.')
     entries = [[v['key'], v['symbol'], v['row']['name'], v['row']['isin'], v['row']['kind'], v['row']['mic'], v['row']['country'], v['status'], v['group'], v['rank'],
                 None if v['score'] is None else round(v['score'], 4), v['row']['category'], _fails(v), v['row'].get('instrument_id'), v['row'].get('currency'), v['row'].get('price_currency'), v['row'].get('net_assets'), criteria_proximity(v['reasons']),compact_parts(v),v.get('score_missing',0)] for v in judge_universe(conn, config)]
     with conn.cursor() as cur:
         cur.execute('REPLACE INTO result_cache(cache_key, data_version, built_at, payload) VALUES (%s,%s,%s,%s)',
-                    (key, version, datetime.datetime.utcnow().replace(microsecond=0), packed(entries) if config.get('version')==4 else json.dumps(entries, ensure_ascii=False, separators=(',', ':'))))
-        cur.execute('DELETE FROM result_cache WHERE built_at < %s', (datetime.datetime.utcnow() - datetime.timedelta(days=3),))
+                    (key, version, datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None, microsecond=0), packed(entries) if config.get('version')==4 else json.dumps(entries, ensure_ascii=False, separators=(',', ':'))))
+        cur.execute('DELETE FROM result_cache WHERE built_at < %s', (datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None) - datetime.timedelta(days=3),))
     conn.commit()
     return [dict(zip(ENTRY_FIELDS, e)) for e in entries]
 
@@ -1010,7 +1010,7 @@ def _etf_profile(conn, listing_id, symbol, allow_fetch):
     """Fiche pédagogique en cache ; rafraîchie à la demande (au plus tous les 30 jours, une tentative par jour en cas d'échec)."""
     from engine.market import etf_profile
     from engine.market.yahoo import YahooClient
-    now = datetime.datetime.utcnow().replace(microsecond=0)
+    now = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None, microsecond=0)
     with conn.cursor() as cur:
         cur.execute('SELECT fetched_at, version, state, data_json FROM etf_profiles WHERE listing_id=%s', (listing_id,))
         row = cur.fetchone()

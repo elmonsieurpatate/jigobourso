@@ -33,6 +33,8 @@ function body(): array {
     if ($b !== null) return $b;
     $raw = file_get_contents('php://input');
     if ($raw === '' || $raw === false) return $b = [];
+    // Corps JSON obligatoire : un formulaire HTML classique (text/plain, x-www-form-urlencoded) ne peut pas atteindre l'API depuis un autre site sans pré-vérification CORS.
+    if (stripos((string)($_SERVER['CONTENT_TYPE'] ?? $_SERVER['HTTP_CONTENT_TYPE'] ?? ''), 'application/json') !== 0) throw new ApiError('Content-Type application/json requis', 415);
     $d = json_decode($raw, true);
     if (!is_array($d)) throw new ApiError('Corps JSON invalide');
     return $b = $d;
@@ -40,11 +42,12 @@ function body(): array {
 function need_post(): void {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') throw new ApiError('Méthode POST requise', 405);
     // Contrôle d'origine : une écriture doit venir de ce site.
-    $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
-    if ($origin !== '') {
-        $host = parse_url($origin, PHP_URL_HOST) . (parse_url($origin, PHP_URL_PORT) ? ':' . parse_url($origin, PHP_URL_PORT) : '');
-        if (strcasecmp($host, $_SERVER['HTTP_HOST'] ?? '') !== 0) throw new ApiError('Origine refusée', 403);
-    }
+    // Origin sinon Referer (certains navigateurs omettent Origin) ; ni l'un ni l'autre : refus, un navigateur envoie toujours l'un des deux sur un POST.
+    $source = ($_SERVER['HTTP_ORIGIN'] ?? '') !== '' ? $_SERVER['HTTP_ORIGIN'] : ($_SERVER['HTTP_REFERER'] ?? '');
+    if ($source === '') throw new ApiError('Origine absente', 403);
+    $port = parse_url($source, PHP_URL_PORT);
+    $host = parse_url($source, PHP_URL_HOST) . ($port ? ':' . $port : '');
+    if (strcasecmp($host, $_SERVER['HTTP_HOST'] ?? '') !== 0) throw new ApiError('Origine refusée', 403);
 }
 function str_in(array $a, string $k, int $max = 200, bool $required = true): string {
     $v = isset($a[$k]) && is_scalar($a[$k]) ? trim((string)$a[$k]) : '';

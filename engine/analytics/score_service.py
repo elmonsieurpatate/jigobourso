@@ -106,7 +106,7 @@ def score_book(conn, config, data_version):
         entries.append([lid, _r(s['score']), s['status'], _r(s['coverage'], 4), _r(c['score']), c['status'], _r(c['coverage'], 4), s.get('why') or c.get('why')])
     with conn.cursor() as cur:
         cur.execute('REPLACE INTO result_cache(cache_key, data_version, built_at, payload) VALUES (%s,%s,%s,%s)',
-                    (key, data_version, datetime.datetime.utcnow().replace(microsecond=0), packed(entries)))
+                    (key, data_version, datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None, microsecond=0), packed(entries)))
     conn.commit()
     return {e[0]: dict(zip(FIELDS, e)) for e in entries}
 

@@ -112,6 +112,7 @@ def verify(conn, data):
     problems = []
     with conn.cursor() as cur:
         for table, key, label in (('users', 'jb_users', 'comptes'), ('portfolios', 'jb_portfolios', 'portefeuilles'), ('portfolio_transactions', 'jb_portfolio_transactions', 'transactions')):
+            assert table in ('users', 'portfolios', 'portfolio_transactions')      # identifiant SQL interpolé : liste blanche explicite
             cur.execute(f'SELECT COUNT(*) n FROM {table}')
             if cur.fetchone()['n'] != len(data[key]):
                 problems.append(f'{label} : {cur.fetchone()} au lieu de {len(data[key])}')

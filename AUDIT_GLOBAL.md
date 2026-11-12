@@ -23,24 +23,28 @@ Réalisé : `ruff.toml` + `make lint` (ruff + `php8.3 -l`, serveur en PHP 8.2), 
 ## Étape 1 : Sécurité et robustesse des fondations 🔴
 
 ### 1.1 Backend PHP
-- [ ] `lib/http.php:44-50` `need_post` : refuser si `Origin` et `Referer` sont absents ; exiger `Content-Type: application/json` dans `body()` (🟠)
-- [ ] `lib/auth.php:9` `client_ip()` : définir une liste de proxys de confiance ; documenter la confiance accordée à `X-Forwarded-Proto` (🟠)
+- [x] `lib/http.php:44-50` `need_post` : refuser si `Origin` et `Referer` sont absents ; exiger `Content-Type: application/json` dans `body()` (🟠)
+- [x] `lib/auth.php:9` `client_ip()` : définir une liste de proxys de confiance ; documenter la confiance accordée à `X-Forwarded-Proto` (🟠)
 - [ ] `routes/cron.php:19-22` : retirer la clé via `?k=` (fuite dans les logs d'accès) au profit de l'en-tête, après migration du cron (🟠)
-- [ ] `routes/admin.php` `admin/system` : masquer ou hacher le code d'invitation renvoyé (🟠)
-- [ ] `lib/account.php:26,93,100` et `lib/mail.php` : externaliser le domaine codé en dur vers `JIGO_BASE_URL` (🟠)
+- [x] `routes/admin.php` `admin/system` : masquer ou hacher le code d'invitation renvoyé (🟠)
+- [x] `lib/account.php:26,93,100` et `lib/mail.php` : externaliser le domaine codé en dur vers `JIGO_BASE_URL` (🟠)
 
 ### 1.2 Moteur Python
-- [ ] `engine/analytics/funnel.py:161-170` : remplacer l'interpolation par `.replace()` par une table de colonnes par stage ; passer `LIMIT/OFFSET` en paramètres (🔴)
-- [ ] Whitelister (assertion explicite) les identifiants SQL dynamiques : `scripts/verify_momentum_release.py:37`, `engine/migration/legacy.py:115`, `engine/analytics/funnel.py:65` (🔴)
-- [ ] `engine/jobs/runner.py` : ajouter un heartbeat (`updated_at`) rafraîchi par `progress`/`step`, calculer le stale sur le dernier battement (un job > seuil, ex. `catchup` > 8 min, peut être doublé) (🔴)
-- [ ] Vérifier le fuseau de `jobs.started_at` vs `utcnow()` ; remplacer `datetime.utcnow()` (déprécié 3.12) (🟠)
-- [ ] Logs de jobs tronqués à 400 car. (trace à 380) : passer en colonne TEXT ou ajouter un log fichier (🟠)
-- [ ] Vérifier la fermeture des connexions DB (`connect()` sans `finally conn.close()` visible, `cli.py:119`) ; revoir `read_timeout=900` (🟠)
+- [x] `engine/analytics/funnel.py:161-170` : remplacer l'interpolation par `.replace()` par une table de colonnes par stage ; passer `LIMIT/OFFSET` en paramètres (🔴)
+- [x] Whitelister (assertion explicite) les identifiants SQL dynamiques : `scripts/verify_momentum_release.py:37`, `engine/migration/legacy.py:115`, `engine/analytics/funnel.py:65` (🔴)
+- [x] `engine/jobs/runner.py` : ajouter un heartbeat (`updated_at`) rafraîchi par `progress`/`step`, calculer le stale sur le dernier battement (un job > seuil, ex. `catchup` > 8 min, peut être doublé) (🔴)
+- [x] Vérifier le fuseau de `jobs.started_at` vs `utcnow()` ; remplacer `datetime.utcnow()` (déprécié 3.12) (🟠)
+- [x] Logs de jobs tronqués à 400 car. (trace à 380) : passer en colonne TEXT ou ajouter un log fichier (🟠)
+- [x] Vérifier la fermeture des connexions DB (`connect()` sans `finally conn.close()` visible, `cli.py:119`) ; revoir `read_timeout=900` (🟠)
 
 ### 1.3 Base de données
-- [ ] Ajouter les FK `user_id` sur `alert_rules` (`schema.sql:545`) et `alert_events` (🟠)
-- [ ] Vérifier qu'une tâche purge `login_attempts`, `account_attempts`, `sessions` expirées (🟠)
-- [ ] Contrôler par `EXPLAIN` le JOIN `alert_events` sur `rule_id` (`routes/alerts.php:147`) (🟢)
+- [x] Ajouter les FK `user_id` sur `alert_rules` (`schema.sql:545`) et `alert_events` (🟠)
+- [x] Vérifier qu'une tâche purge `login_attempts`, `account_attempts`, `sessions` expirées (🟠)
+- [x] Contrôler par `EXPLAIN` le JOIN `alert_events` sur `rule_id` (`routes/alerts.php:147`) (🟢)
+
+Réalisé : `need_post` exige Origin ou Referer, `body()` exige `application/json` (415) ; `client_ip()`/`https()` ne croient `X-Forwarded-*` que d'un proxy listé dans `JIGO_TRUSTED_PROXIES` ; code d'invitation masqué ; `base_url()` (`JIGO_BASE_URL`, défaut = production) ; `funnel.items` : table de colonnes par stage + `LIMIT/OFFSET` liés, listes blanches explicites ; heartbeat `jobs.updated_at` (stale sur le dernier battement) et `job_logs.detail` TEXT (migrations `20261112_*`) ; `utcnow()` remplacé (reste `etf.py`, dont un test fige l'horloge) ; connexions de `cli.py` toutes fermées ; FK `user_id` sur `alert_rules`/`alert_events` ; purge déjà assurée par `tasks.housekeeping` (test ajouté) ; `EXPLAIN` du JOIN : index `idx_event_user` + `PRIMARY`.
+**Reste ouvert** : retrait de `?k=` du cron. Le code accepte déjà `JIGO_CRON_QUERY_KEY=0` pour le refuser, mais la tâche hPanel de production l'utilise encore : migrer vers `X-Cron-Key`, puis activer ce réglage (et changer la clé).
+**À l'application en production** : la migration `alert_user_fk` échoue sans rien modifier s'il existe des lignes orphelines ; `read_timeout=900` conservé (requêtes longues volontaires).
 
 ## Étape 2 : Architecture backend : terminer le refactor routes → services 🔴
 

@@ -193,3 +193,18 @@ def test_bilan_keeps_other_portfolios_results_when_one_transaction_is_incomplete
     b = a.call('bilan')[1]
     assert not b['integrity']['ok'] and b['totals']['partial'] and len(b['totals']['excluded']) == 1
     assert abs(b['totals']['realized'] - 50.0) < 1e-6 and b['realized_by_year'] == {'2026': 50.0}
+
+
+def test_write_requires_origin_or_referer_and_json_content_type(world):
+    a = login(world, 'alice', 'alice-secret-1234')
+    assert a.call('portfolio/create', {'name': 'X'}, origin='')[0] == 403                                   # ni Origin ni Referer
+    assert a.call('portfolio/create', {'name': 'X'}, origin='http://evil.invalid')[0] == 403
+    assert a.call('portfolio/create', {'name': 'Via Referer'}, origin='', headers={'Referer': world + '/portefeuilles.html'})[0] == 200
+    assert a.call('portfolio/create', {'name': 'X'}, headers={'Content-Type': 'text/plain'})[0] == 415      # formulaire « simple » d'un autre site
+
+
+def test_admin_system_never_returns_the_invite_code_in_clear(world):
+    a = login(world, 'alice', 'alice-secret-1234')
+    assert a.call('admin/settings', {'name': 'invite_code', 'value': 'bonjour1'})[0] == 200
+    code, data = a.call('admin/system')
+    assert code == 200 and 'bonjour1' not in str(data) and data['settings']['invite_code'].startswith('b•')

@@ -5,8 +5,24 @@ require_once __DIR__ . '/http.php';
 const SESSION_DAYS = 30;
 const COOKIE = 'jigo_s';
 
-function client_ip(): string { return substr($_SERVER['REMOTE_ADDR'] ?? '', 0, 45); }
-function https(): bool { return (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https'; }
+// Proxys de confiance : adresses IP exactes, séparées par des virgules, dans JIGO_TRUSTED_PROXIES (vide par défaut = aucun).
+// Seule une requête qui arrive d'un de ces proxys peut faire croire X-Forwarded-For / X-Forwarded-Proto ; sinon ces en-têtes (forgeables par n'importe quel client) sont ignorés.
+function trusted_proxies(): array { return array_values(array_filter(array_map('trim', explode(',', (string)cfg('JIGO_TRUSTED_PROXIES', ''))))); }
+function from_trusted_proxy(): bool { return in_array($_SERVER['REMOTE_ADDR'] ?? '', trusted_proxies(), true); }
+function client_ip(): string {
+    $ip = (string)($_SERVER['REMOTE_ADDR'] ?? '');
+    if (from_trusted_proxy() && !empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+        // Parcours depuis la droite (le plus proche de nous) : la première adresse qui n'est pas un proxy de confiance est le client ; les adresses plus à gauche sont forgeables.
+        foreach (array_reverse(array_map('trim', explode(',', (string)$_SERVER['HTTP_X_FORWARDED_FOR']))) as $hop) {
+            if (filter_var($hop, FILTER_VALIDATE_IP) === false) break;
+            $ip = $hop;
+            if (!in_array($hop, trusted_proxies(), true)) break;
+        }
+    }
+    return substr($ip, 0, 45);
+}
+// Sert uniquement à poser l'attribut Secure du cookie de session : X-Forwarded-Proto n'est cru que s'il vient d'un proxy de confiance.
+function https(): bool { return (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (from_trusted_proxy() && ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https'); }
 
 function login_blocked(string $username, int $limit = 5): bool {
     $n = q('SELECT COUNT(*) FROM login_attempts WHERE username = ? AND at > ?', [$username, gmdate('Y-m-d H:i:s', time() - 900)])->fetchColumn();

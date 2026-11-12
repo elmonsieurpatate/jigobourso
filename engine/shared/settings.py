@@ -21,7 +21,7 @@ def saved_at(conn, name):
 def put(conn, name, value):
     with conn.cursor() as cur:
         cur.execute('INSERT INTO settings(name, value_json, updated_at) VALUES (%s,%s,%s) ON DUPLICATE KEY UPDATE value_json=VALUES(value_json), updated_at=VALUES(updated_at)',
-                    (name, json.dumps(value, ensure_ascii=False), datetime.datetime.utcnow().replace(microsecond=0)))
+                    (name, json.dumps(value, ensure_ascii=False), datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None, microsecond=0)))
     conn.commit()
 
 
@@ -42,5 +42,5 @@ def prefilter_rules(conn):
 def mark_applied(conn, level, config):
     """Mémorise la configuration réellement appliquée par la dernière exécution (pour signaler « modifié, pas encore appliqué »)."""
     applied = get(conn, 'rules_applied', {})
-    applied[level] = {'hash': digest(config), 'at': datetime.datetime.utcnow().replace(microsecond=0).isoformat(sep=' ')}
+    applied[level] = {'hash': digest(config), 'at': datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None, microsecond=0).isoformat(sep=' ')}
     put(conn, 'rules_applied', applied)

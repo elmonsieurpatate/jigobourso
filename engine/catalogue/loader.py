@@ -160,7 +160,7 @@ def sync_listings(conn, config=None):
 def record_load(conn, read, commit):
     with conn.cursor() as cur:
         cur.execute('INSERT INTO catalogue_loads(source_commit,loaded_at,rows_read,rows_kept,rules_json) VALUES (%s,%s,%s,%s,%s)',
-                    (commit, datetime.datetime.utcnow().replace(microsecond=0), read, 0, '{}'))
+                    (commit, datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None, microsecond=0), read, 0, '{}'))
     conn.commit()
 
 

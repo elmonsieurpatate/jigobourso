@@ -170,7 +170,7 @@ def latest_rates(conn):
 def apply_prefilter(conn, now=None):
     """Décide selected / excluded pour les cotations ayant un Quote. Ne touche jamais aux exclusions par les règles du catalogue."""
     params = setting(conn, 'prefilter', {})
-    now = naive_utc(now) if now else datetime.datetime.utcnow()
+    now = naive_utc(now) if now else datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
     rates = latest_rates(conn)
     changed = {'selected': 0, 'excluded': 0}
     with conn.cursor() as cur:

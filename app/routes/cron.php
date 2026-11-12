@@ -18,7 +18,9 @@ function cron_reject(string $why, int $code): void {
 // La clé peut être fournie dans l'en-tête X-Cron-Key (préférable : elle n'apparaît pas dans les journaux d'accès) ou, comme avant, dans ?k=.
 function cron_presented_key(): string {
     $h = (string)($_SERVER['HTTP_X_CRON_KEY'] ?? '');
-    return $h !== '' ? $h : (string)($_GET['k'] ?? '');
+    if ($h !== '') return $h;
+    // Forme ?k= (fuit dans les journaux d'accès) : acceptée tant que le cron hPanel n'est pas migré vers l'en-tête ; JIGO_CRON_QUERY_KEY=0 la refuse.
+    return cfg('JIGO_CRON_QUERY_KEY', '1') === '0' ? '' : (string)($_GET['k'] ?? '');
 }
 
 function cron_tick(): array {
