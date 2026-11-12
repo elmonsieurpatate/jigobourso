@@ -1,5 +1,5 @@
 """Moteur unique de décision des critères de recherche : retenue / exclue / indéterminée, unités, indépendance des scores."""
-from engine.analytics import criteria as CR
+from engine.analytics.scoring import criteria as CR
 
 
 def spec(**periods):

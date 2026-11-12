@@ -4,7 +4,8 @@ import os
 
 import pytest
 
-from engine.analytics import compute, scores_admin as A
+from engine.analytics.series import compute
+from engine.analytics.admin import scores_admin as A
 from engine.shared.db import connect
 from tests.dbutil import reset_data
 
@@ -66,7 +67,7 @@ def test_simulation_monitor_and_profiles_use_real_data_and_stay_independent_of_c
 
 
 def test_general_ranking_rates_every_evaluable_title_and_filters_remove_none():
-    from engine.analytics import service
+    from engine.analytics.admin import service
     conn = connect()
     reset_data(conn)
     seed(conn)
@@ -107,11 +108,11 @@ def test_general_ranking_rates_every_evaluable_title_and_filters_remove_none():
 
 
 def test_per_strategy_normalisations_persist_change_only_their_strategy_and_the_cache_key():
-    from engine.analytics import score_service as S
+    from engine.analytics.scoring import score_service as S
     conn = connect()
     reset_data(conn)
     seed(conn)
-    from engine.analytics import service
+    from engine.analytics.admin import service
     ver = service.data_version(conn)
     before = {n: {e['id']: (e['simple'], e['complex']) for e in S.score_book(conn, A.build_config(conn, n), ver).values()} for n in ('growth_v4', 'rebound')}
     key_before = S._key(A.build_config(conn, 'rebound'), ver)
@@ -134,7 +135,8 @@ def test_per_strategy_normalisations_persist_change_only_their_strategy_and_the_
 
 
 def test_stored_profile_without_new_fields_is_still_valid_and_momentum_strategies_use_series_state():
-    from engine.analytics import score_service as S, service
+    from engine.analytics.scoring import score_service as S
+    from engine.analytics.admin import service
     conn = connect()
     reset_data(conn)
     seed(conn)
@@ -156,10 +158,10 @@ def test_stored_profile_without_new_fields_is_still_valid_and_momentum_strategie
 
 
 def test_global_settings_never_override_profile_complex_weights():
-    from engine.analytics import score_service as S
+    from engine.analytics.scoring import score_service as S
     from engine.shared import settings
     conn = connect()
     reset_data(conn)
     settings.put(conn, S.SETTING, {'kappa': 0.7, 'threshold': 0.75, 'complex_weights': {'dynamics': 90, 'liquidity': 10}})      # ancien réglage global résiduel
     conn.commit()
-    assert S.params_for(A.build_config(conn, 'growth_v4'), 'equity')['complex_weights'] == {k: float(v) for k, v in __import__('engine.analytics.scores', fromlist=['x']).COMPLEX_WEIGHTS.items()}
+    assert S.params_for(A.build_config(conn, 'growth_v4'), 'equity')['complex_weights'] == {k: float(v) for k, v in __import__('engine.analytics.scoring.scores', fromlist=['x']).COMPLEX_WEIGHTS.items()}

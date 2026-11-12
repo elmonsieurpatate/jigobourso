@@ -2,7 +2,8 @@
 import copy
 import datetime
 
-from engine.analytics import strategy, watch
+from engine.analytics.explorer import strategy
+from engine.analytics.portfolio import watch
 
 
 def tpl(name, cfg=None):

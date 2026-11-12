@@ -1,7 +1,8 @@
 """Résumé du profil : appréciation descriptive, période sur les pastilles, filtres de niveau (masquage seul, sans effet sur rang ni score)."""
 import pathlib
 
-from engine.analytics import service, signals
+from engine.analytics.admin import service
+from engine.analytics.series import signals
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 

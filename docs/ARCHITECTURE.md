@@ -36,7 +36,7 @@ Hypothèse à confirmer (réglable dans `settings`, pas de décision bloquante) 
 - **Prix** : `daily_prices` (400 séances), `intraday_prices` (15 min), `latest_prices`, `fx_rates`, `corporate_events`, `price_gaps`.
 - **Analyse** : `strategy_metrics` (par titre et par fenêtre), `series_state` (indicateurs techniques, ruptures, qualité).
 - **Exploitation** : `jobs`, `job_logs`, `settings`, `result_cache` (verdicts de l'Explorer par configuration ; invalidé quand `data_version` change : calcul nocturne, jeu recommandable, traitement terminé ; ≈ 0,25 s au lieu de ≈ 1,5 s).
-- **Suivi** : `ranking_snapshots`, `ranking_outcomes`, `universe_outcomes` (`engine/analytics/tracking.py`, alimentées par `nightly`).
+- **Suivi** : `ranking_snapshots`, `ranking_outcomes`, `universe_outcomes` (`engine/analytics/portfolio/tracking.py`, alimentées par `nightly`).
 - **Utilisateurs** : `users`, `sessions`, `login_attempts`, `portfolios` (`strategy_config` JSON), `portfolio_transactions`, `etf_profiles`.
 - **Vues** : `v_collect_set`, `v_recommendable`.
 
@@ -123,7 +123,7 @@ Parcours, dans l'ordre, tout est manuel dans l'administration :
   - Verrous : un traitement « en cours » depuis plus longtemps que son type ne le permet (catchup 8 min, maintenance/metrics/etf 45, intraday 20, daily 45) est marqué « interrupted » au passage suivant (`runner.STALE_MINUTES`) ; la maintenance (~2 min) ne suit qu'une collecte quotidienne qui a ajouté des clôtures (`maintenance_pending`), pas chaque nouvelle tentative qui n'apporte rien.
   - Démarrage immédiat : une demande explicite n'attend jamais le cron. `admin/run` (entretien, indicateurs, ETF seuls, et les cinq traitements du catalogue) lance `engine.cli job` détaché (`engine_spawn`, la requête HTTP rend la main en ~0,1 s) ; le déploiement lance l'entretien de la même façon, une fois terminé. `maintenance`, `metrics` et `etf` partagent un seul verrou (`runner.COMPUTE`) : jamais deux à la fois, cron compris ; un traitement en échec garde son erreur dans `jobs` et se relance par le même bouton. Le cron ne sert qu'aux tâches périodiques et au rattrapage (dont la nouvelle tentative 30 min après un échec).
 - **Filtre Yahoo « dernier cours trop ancien »** (`prefilter.py`, règle `stale`, 10 jours par défaut, activable et modifiable) : écarte les titres morts dont le cours figé passait prix et liquidité. Appliqué seulement quand l'administrateur relance « Filtrer » ; la page Yahoo signale « modifié, pas encore appliqué » après l'ajout de la règle.
-- **Entonnoirs** (`engine/analytics/funnel.py`) : avant / écartés / conservés à chaque étape, titres consultables, « pourquoi ce titre a disparu » ; figés dans `funnel_steps`.
+- **Entonnoirs** (`engine/analytics/explorer/funnel.py`) : avant / écartés / conservés à chaque étape, titres consultables, « pourquoi ce titre a disparu » ; figés dans `funnel_steps`.
 - **Page Actions / ETF** (`adminsvc.titles`) : tous les titres connus avec statut FinanceDatabase, statut Yahoo, présence dans le catalogue, motif exact, état des historiques.
 - **Tables ajoutées** (fin de `db/schema.sql`, additives) : `catalogue_raw`, `funnel_steps`, `job_steps`.
 - **Tests** : `make fast`, `make integ` (dont `test_catalogue_flow.py`, parcours complet avec faux Yahoo), e2e navigateur `tests/e2e/smoke.mjs` (général) et `tests/e2e/admin.mjs` (administration).

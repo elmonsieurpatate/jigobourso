@@ -1,4 +1,4 @@
-/* Calculs pédagogiques de l'aide : reproduction fidèle (JavaScript) des mesures et des scores du moteur Python (engine/analytics/measures.py, score_inputs.py, scores.py).
+/* Calculs pédagogiques de l'aide : reproduction fidèle (JavaScript) des mesures et des scores du moteur Python (engine/analytics/series/measures.py, score_inputs.py, scores.py).
    Aucune donnée réelle ni aucun réglage de l'utilisateur n'est lu ni modifié : tout travaille sur des exemples fictifs.
    Un test (tests/fast/test_help_math.py) compare ces fonctions au moteur Python sur plusieurs cas : toute divergence fait échouer le test. */
 (function (root) {

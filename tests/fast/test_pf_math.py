@@ -2,7 +2,7 @@
 (résultat du portefeuille = somme des positions, flux neutralisés) et le traitement des données manquantes sont vérifiés ici sur un historique réel du moteur."""
 import datetime as dt, json, shutil, subprocess, pathlib
 import pytest
-from engine.analytics import history
+from engine.analytics.series import history
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 node = shutil.which('node')

@@ -8,7 +8,12 @@ import copy
 
 from engine.shared import settings
 
-from . import criteria as _CR, explorer_config as C, score_categories, score_service, scores as SC, strategy as LEGACY
+from ..scoring import criteria as _CR
+from ..explorer import explorer_config as C
+from ..scoring import score_categories
+from ..scoring import score_service
+from ..scoring import scores as SC
+from ..explorer import strategy as LEGACY
 
 PROFILES = 'scores_profiles'                                    # références OFFICIELLES communes (administrateur) : jamais modifiées par un utilisateur
 USER = {'id': None}                                             # utilisateur de la requête en cours (un processus par appel) : ses adaptations se superposent aux références
@@ -462,7 +467,7 @@ LABELS = {'growth_v4': 'Croissance rapide', 'growth_regular': 'Croissance régul
 def strategies_status(conn, request):
     """Statut de chaque stratégie intégrée et personnelle de l'utilisateur : une seule entrée par stratégie intégrée, Officielle ou Adaptée ; critères et scores jugés séparément.
     `ct_items` : stratégies enregistrées par l'utilisateur (surcharges de critères et stratégies personnelles)."""
-    from . import ranking_table
+    from ..scoring import ranking_table
     refresh(conn)
     items = {i['id']: i for i in (request.get('ct_items') or []) if isinstance(i, dict) and isinstance(i.get('id'), str)}
     crit = ranking_table.criteria()['criteria']
@@ -815,7 +820,7 @@ def _definitions(conn):
     d = settings.get(conn, score_categories.SETTING)
     if isinstance(d, dict) and d.get('filters'):
         return d
-    path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), CATEGORY_FILE)
+    path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))), CATEGORY_FILE)
     try:
         with open(path, encoding='utf-8') as f:
             return json.load(f)
@@ -825,7 +830,7 @@ def _definitions(conn):
 
 def _closes(conn, ids, sessions):
     """Dernières clôtures sur la même base ajustée que la fiche et les performances."""
-    from .series import prepare_series
+    from ..series.series import prepare_series
     ids = list(ids)
     out = {i: [] for i in ids}
     if not ids or sessions < 1:
@@ -937,7 +942,7 @@ def _ct_id(name):
 
 def _statuses(conn, book, name, request):
     """Statut de stratégie (critères de recherche) de chaque titre noté : même moteur que le Classement et la fiche. Ne touche ni scores ni rangs."""
-    from . import ranking_table
+    from ..scoring import ranking_table
     ct_id = _ct_id(name)
     spec = (request.get('ct_specs') or {}).get(ct_id) if ct_id else None
     norm = ranking_table.norm_of({'ct_id': ct_id, 'spec': spec})

@@ -4,8 +4,8 @@ import pytest
 if not os.environ.get('JIGO_TEST_DATABASE'):pytest.skip('disposable DB only',allow_module_level=True)
 from tests.integ.test_api import server,world,login  # noqa: F401  (fixtures)
 from engine.shared.db import connect
-from engine.analytics.compute import compute_all
-from engine.analytics.service import instrument_sheet
+from engine.analytics.series.compute import compute_all
+from engine.analytics.admin.service import instrument_sheet
 
 def add(a,pf,side,qty,price,date='2026-10-01',**extra):
     return a.call('tx/add',dict(portfolio_id=pf,listing_id=1,side=side,quantity=qty,unit_price=price,trade_at=date,**extra))

@@ -1,5 +1,5 @@
 /* Plan de suivi d'une position : jauge de prix, conseil (Conserver / Surveiller / Réévaluer / Sortie à envisager), règles automatiques ou personnalisées.
-   Données calculées par le moteur (engine/analytics/position_plan.py, route tracking/state) ; ce fichier ne fait que les afficher et enregistrer les réglages demandés.
+   Données calculées par le moteur (engine/analytics/portfolio/position_plan.py, route tracking/state) ; ce fichier ne fait que les afficher et enregistrer les réglages demandés.
    Une seule source : la ligne de « Suivi des positions » et la carte du détail d'une position utilisent les mêmes fonctions (gauge, adviceBox) et les mêmes données.
    Aucune vente automatique, aucun objectif de gain inventé, aucune valeur personnelle écrasée sans action explicite de l'utilisateur. */
 (function (root) {

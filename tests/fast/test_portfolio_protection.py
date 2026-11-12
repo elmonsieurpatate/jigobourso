@@ -1,7 +1,7 @@
 import datetime as dt
 import pytest
 
-from engine.analytics.portfolio import protection, diagnose
+from engine.analytics.portfolio.portfolio import protection, diagnose
 from engine.market import hours
 
 DAYS = ['2026-01-01', '2026-01-02', '2026-01-03']

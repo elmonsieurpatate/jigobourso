@@ -5,7 +5,7 @@ Deux filtres numériques ajoutés à l'administration existante « Filtres et ca
 - Filtres `score_simple` (mesure `score_simple_v4`) et `score_complex` (mesure `score_complex_v4`), unité « /100 », groupe Principal, visibles.
 - Les 13 filtres existants et leurs réglages enregistrés ne sont pas touchés : l'initialisation n'ajoute que les deux filtres manquants (testé sur une configuration à 13 filtres).
 - Les filtres n'agissent que sur l'affichage : ils ne modifient jamais une note, un rang global ni le calcul. Un score partiel est une note numérique rangée dans sa catégorie ; seule une note indisponible va dans « Inconnu ».
-- Raccordement à Explorer : **non fait** (le filtrage des 13 filtres existants n'est pas non plus raccordé à cette étape). `engine/analytics/score_categories.py` prépare le terme : `assign` (note → catégorie), `select` (lignes retenues, inchangées), `default_selection`. Aucune note n'est simulée.
+- Raccordement à Explorer : **non fait** (le filtrage des 13 filtres existants n'est pas non plus raccordé à cette étape). `engine/analytics/scoring/score_categories.py` prépare le terme : `assign` (note → catégorie), `select` (lignes retenues, inchangées), `default_selection`. Aucune note n'est simulée.
 
 ## Catégories proposées (modifiables)
 Convention des filtres existants : ]min ; max]. Extrémités ouvertes (−∞ / +∞) : tout [0 ; 100] est couvert, sans trou ni chevauchement ; « Inconnu » = note indisponible. Toutes incluses par défaut.

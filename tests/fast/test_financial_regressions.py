@@ -1,8 +1,9 @@
 """Permanent regression tests for pagination, holdings, freshness and splits."""
 import datetime as dt
 from unittest.mock import patch
-from engine.analytics import service as S, strategy as T
-from engine.analytics.compute import _compute_one
+from engine.analytics.admin import service as S
+from engine.analytics.explorer import strategy as T
+from engine.analytics.series.compute import _compute_one
 
 def test_excluded_search_page_two_must_not_repeat_page_one():
     excluded=[{'id':i,'symbol':f'EX{i}','status':'excluded'} for i in range(1,51)]

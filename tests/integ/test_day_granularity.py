@@ -6,7 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from engine.analytics import ranking_table as R, scores_admin as A
+from engine.analytics.scoring import ranking_table as R
+from engine.analytics.admin import scores_admin as A
 from engine.shared.db import connect
 from tests.dbutil import reset_data
 from tests.integ.test_scores_admin import seed

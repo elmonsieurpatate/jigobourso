@@ -10,7 +10,8 @@ import datetime
 import math
 
 from .series import prepare_series
-from . import session, performance
+from ..market_views import session
+from ..portfolio import performance
 
 
 def _num(v):

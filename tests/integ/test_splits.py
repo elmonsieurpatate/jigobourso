@@ -4,7 +4,7 @@ import os
 
 import pytest
 
-from engine.analytics import compute
+from engine.analytics.series import compute
 from engine.market import splits
 from engine.shared.db import connect
 from tests.dbutil import reset_data

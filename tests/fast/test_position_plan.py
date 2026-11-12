@@ -3,7 +3,7 @@ Aucune base : les séries sont synthétiques. Un test par exigence du cahier des
 import datetime
 import math
 
-from engine.analytics import position_plan as pp
+from engine.analytics.portfolio import position_plan as pp
 
 
 def days(n, start='2025-01-01'):

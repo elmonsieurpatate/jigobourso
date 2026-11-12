@@ -2,7 +2,7 @@
 from contextlib import contextmanager
 
 import pytest
-from engine.analytics import ranking_table as R
+from engine.analytics.scoring import ranking_table as R
 
 
 class Connection:

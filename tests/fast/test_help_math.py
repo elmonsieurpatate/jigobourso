@@ -7,7 +7,9 @@ from pathlib import Path
 
 import pytest
 
-from engine.analytics import measures as M, score_inputs as SI, scores as S
+from engine.analytics.series import measures as M
+from engine.analytics.scoring import score_inputs as SI
+from engine.analytics.scoring import scores as S
 
 ROOT = Path(__file__).resolve().parents[2]
 pytestmark = pytest.mark.skipif(shutil.which('node') is None, reason='node absent')

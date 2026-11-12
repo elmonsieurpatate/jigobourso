@@ -40,9 +40,9 @@ def parse_profile(payload):
            'top10_weight': round(sum(h['weight'] for h in holdings), 1) if len(holdings) == 10 and all(h['weight'] is not None for h in holdings) else None,
            'stock_position': None if _raw(top.get('stockPosition')) is None else round(_raw(top['stockPosition']) * 100, 1),
            'bond_position': None if _raw(top.get('bondPosition')) is None else round(_raw(top['bondPosition']) * 100, 1)}
-    from engine.analytics.etf import profile_data
+    from engine.analytics.market_views.etf import profile_data
     out = profile_data(out)
-    from engine.analytics.geography import etf_region
+    from engine.analytics.market_views.geography import etf_region
     out['geography_region'] = etf_region(out.get('category'))
     return out if any(out[k] for k in ('holdings', 'sectors', 'expense_ratio', 'family', 'total_assets', 'category')) else None
 

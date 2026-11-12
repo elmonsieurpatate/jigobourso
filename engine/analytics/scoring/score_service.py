@@ -10,7 +10,8 @@ import hashlib
 import json
 from collections import defaultdict
 
-from . import explorer_config as C, scores as SC
+from ..explorer import explorer_config as C
+from . import scores as SC
 
 CACHE_FORMAT = 1
 FIELDS = ('id', 'simple', 'simple_status', 'simple_coverage', 'complex', 'complex_status', 'complex_coverage', 'why')
@@ -91,7 +92,7 @@ def _key(config, version):
 
 def score_book(conn, config, data_version):
     """Scores légers de tout l'univers, mis en cache selon les seuls paramètres de score et la version des données."""
-    from .service import packed, unpacked
+    from ..admin.service import packed, unpacked
     key = _key(config, data_version)
     with conn.cursor() as cur:
         cur.execute('SELECT data_version, payload FROM result_cache WHERE cache_key=%s', (key,))
@@ -189,7 +190,7 @@ def apply_admin(conn, config):
     if config.get('version') != 4:
         return config
     if config.get('ranking', {}).get('mode') == C.SCORES_MODE:
-        from . import scores_admin
+        from ..admin import scores_admin
         if scores_admin.known(config.get('name')):
             prof = scores_admin.stored_profiles(conn).get(config['name'])
             config = scores_admin.apply_profile(config, scores_admin.clean_profile(prof)) if prof else scores_admin.neutral(config)

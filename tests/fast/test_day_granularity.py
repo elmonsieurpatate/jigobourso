@@ -7,8 +7,12 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from engine.analytics import criteria as CR, explorer_config as C, score_service as S, scores as SC, scores_admin as A
-from engine.analytics.measures import dated_technical_state
+from engine.analytics.scoring import criteria as CR
+from engine.analytics.explorer import explorer_config as C
+from engine.analytics.scoring import score_service as S
+from engine.analytics.scoring import scores as SC
+from engine.analytics.admin import scores_admin as A
+from engine.analytics.series.measures import dated_technical_state
 from engine.market import hours
 from engine.market.calendar import session_dates
 from engine.shared import settings

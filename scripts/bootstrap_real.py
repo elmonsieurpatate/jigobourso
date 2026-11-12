@@ -6,7 +6,7 @@ from engine.shared.db import connect
 from engine.market import collect, hours
 from engine.market.yahoo import YahooClient
 from engine.catalogue import loader
-from engine.analytics import compute
+from engine.analytics.series import compute
 
 conn, client, now = connect(), YahooClient(), hours.utcnow()
 t0 = time.time()

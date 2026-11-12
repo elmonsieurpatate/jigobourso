@@ -2,7 +2,7 @@
 import datetime as dt
 import json
 from engine.shared.db import connect
-from engine.analytics.series import analyze_series
+from engine.analytics.series.series import analyze_series
 from engine.market import hours
 from engine.market.calendar import session_dates, window_calendars
 from engine.market.collect import effective_expected_close, to_eur_factor

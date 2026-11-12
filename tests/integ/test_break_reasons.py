@@ -5,7 +5,9 @@ import os
 
 import pytest
 
-from engine.analytics import compute, service, strategy
+from engine.analytics.series import compute
+from engine.analytics.admin import service
+from engine.analytics.explorer import strategy
 from engine.shared.db import connect
 from tests.dbutil import reset_data
 

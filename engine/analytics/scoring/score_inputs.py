@@ -8,7 +8,7 @@
 Une clôture absente rend ces mesures indisponibles (None) : on ne comble jamais un trou.
 """
 import math
-from .measures import window_metrics
+from ..series.measures import window_metrics
 
 
 def _values(dates, observations):

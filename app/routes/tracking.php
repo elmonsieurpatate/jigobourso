@@ -1,5 +1,5 @@
 <?php
-// Plan de suivi des positions : tendance, risque, protection indicative et conseil (moteur : engine/analytics/position_plan.py).
+// Plan de suivi des positions : tendance, risque, protection indicative et conseil (moteur : engine/analytics/portfolio/position_plan.py).
 // Lecture seule pour les données financières : rien n'est vendu, aucun niveau personnel n'est modifié, aucune transaction n'est touchée.
 // Écritures, toujours à la demande explicite de l'utilisateur et sur UNE position : stratégie de surveillance (position_watch), filet de protection et objectif personnels (position_levels),
 // réglage des règles (position_plan_rules : activation, seuil de recul personnalisé). Jamais les transactions, les lots, ni les anciennes règles d'alerte (alert_rules).

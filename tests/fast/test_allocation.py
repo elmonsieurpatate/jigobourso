@@ -1,7 +1,7 @@
 """Répartition par zone et écart à la cible (stratégie prudente)."""
 import pytest
 
-from engine.analytics import allocation as al
+from engine.analytics.portfolio import allocation as al
 
 CTX = {1: ('etf', None, {'category': 'United States Stock'}), 2: ('etf', None, {'category': 'Europe Stock'}), 3: ('etf', None, {'category': 'Diversified Emerging Mkts'}),
        4: ('etf', None, {'category': 'World Large-Cap Blend'}), 5: ('equity', 'France', None), 6: ('equity', 'United States', None)}

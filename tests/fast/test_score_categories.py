@@ -5,7 +5,8 @@ import pathlib
 
 import pytest
 
-from engine.analytics import score_categories as SCAT, scores as SC
+from engine.analytics.scoring import score_categories as SCAT
+from engine.analytics.scoring import scores as SC
 
 CONFIG = pathlib.Path(__file__).resolve().parents[2] / 'app' / 'config' / 'explorer_secondary_filters.json'
 DEFS = json.loads(CONFIG.read_text(encoding='utf-8'))

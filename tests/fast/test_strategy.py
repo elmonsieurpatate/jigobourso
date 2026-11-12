@@ -1,5 +1,5 @@
 import pytest
-from engine.analytics import strategy as S
+from engine.analytics.explorer import strategy as S
 
 
 def bars(rate, n=300, noise=0.0, start=100.0):

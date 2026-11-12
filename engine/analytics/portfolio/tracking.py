@@ -9,9 +9,10 @@ import datetime
 import statistics
 from collections import defaultdict
 
-from . import service, strategy
-from .repository import recommendable_candidates
-from .series import prepare_series
+from ..admin import service
+from ..explorer import strategy
+from ..market_views.repository import recommendable_candidates
+from ..series.series import prepare_series
 from engine.market.calendar import window_calendars, session_dates, next_session_dates
 
 HORIZONS = (1, 3, 5, 21, 63)      # séances ; 21 et 63 ajoutés avec le Momentum 6 mois (ils s'appliquent à toutes les stratégies suivies, sans changer aucune d'elles)

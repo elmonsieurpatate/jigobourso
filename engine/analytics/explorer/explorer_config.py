@@ -170,7 +170,7 @@ def validate(raw):
 def validate_scoring(raw,periods):
     """Paramètres des scores V4 : κ des poids automatiques, poids de granularité personnalisés (optionnels), poids du score complexe, seuil de couverture.
     Ils ne contiennent aucun critère de conformité : changer un filtre ne change jamais une note."""
-    from . import scores as SC
+    from ..scoring import scores as SC
     raw=raw if isinstance(raw,dict) else {}
     kappa=number(raw.get('kappa',SC.KAPPA),0,0.95,'κ');kappa=SC.KAPPA if kappa is None else kappa
     ids=[p['id'] for p in periods]

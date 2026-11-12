@@ -1,6 +1,6 @@
 # Administration des scores V4
 
-Page : **Administration → Scores** (`admin.html#scores`). Un moteur de notation commun (`engine/analytics/scores.py`, formules inchangées) ; l'administration ne règle que des paramètres.
+Page : **Administration → Scores** (`admin.html#scores`). Un moteur de notation commun (`engine/analytics/scoring/scores.py`, formules inchangées) ; l'administration ne règle que des paramètres.
 
 ## Quatre espaces
 1. **Configuration du moteur** : stratégie V4 choisie, granularités actives (poids automatiques ou personnalisés, total 100 %), score simple (formule et composantes en lecture seule), score complexe (poids du profil, total 100 %), réglages communs (priorité aux périodes courtes = κ, couverture minimale).

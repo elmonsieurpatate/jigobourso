@@ -31,8 +31,8 @@ Réalisé : `ruff.toml` + `make lint` (ruff + `php8.3 -l`, serveur en PHP 8.2), 
 - [x] `lib/account.php:26,93,100` et `lib/mail.php` : externaliser le domaine codé en dur vers `JIGO_BASE_URL` (🟠)
 
 ### 1.2 Moteur Python
-- [x] `engine/analytics/funnel.py:161-170` : remplacer l'interpolation par `.replace()` par une table de colonnes par stage ; passer `LIMIT/OFFSET` en paramètres (🔴)
-- [x] Whitelister (assertion explicite) les identifiants SQL dynamiques : `scripts/verify_momentum_release.py:37`, `engine/migration/legacy.py:115`, `engine/analytics/funnel.py:65` (🔴)
+- [x] `engine/analytics/explorer/funnel.py:161-170` : remplacer l'interpolation par `.replace()` par une table de colonnes par stage ; passer `LIMIT/OFFSET` en paramètres (🔴)
+- [x] Whitelister (assertion explicite) les identifiants SQL dynamiques : `scripts/verify_momentum_release.py:37`, `engine/migration/legacy.py:115`, `engine/analytics/explorer/funnel.py:65` (🔴)
 - [x] `engine/jobs/runner.py` : ajouter un heartbeat (`updated_at`) rafraîchi par `progress`/`step`, calculer le stale sur le dernier battement (un job > seuil, ex. `catchup` > 8 min, peut être doublé) (🔴)
 - [x] Vérifier le fuseau de `jobs.started_at` vs `utcnow()` ; remplacer `datetime.utcnow()` (déprécié 3.12) (🟠)
 - [x] Logs de jobs tronqués à 400 car. (trace à 380) : passer en colonne TEXT ou ajouter un log fichier (🟠)
@@ -73,7 +73,7 @@ Réalisé : `need_post` exige Origin ou Referer, `body()` exige `application/jso
 
 ### 3.2 Moteur / scripts
 - [x] Supprimer les imports inutilisés : `clean_window, find_breaks, usable_closes, window_metrics, technical_state` (`service.py`, `compute.py`, `strategy.py`, `tracking.py`) après vérification qu'aucun appelant ne fait `service.clean_window` ; `cli.py` (`run_job`), `market/intraday.py` (`json`), `watch.py` (`math`), `scripts/explain_current_ranking.py` (`importlib`, `math`, `sys`)
-- [x] Uniformiser l'import `__import__('engine.analytics.strategy_docs', ...)` dans `cli.py:54`
+- [x] Uniformiser l'import `__import__('engine.analytics.explorer.strategy_docs', ...)` dans `cli.py:54`
 - [x] Archiver les scripts de migration V1→V2 une fois la migration confirmée : `migrate_legacy.py`, `export_user_data.py`, `drop_legacy_tables.sh`, `bootstrap_real.py`, `engine/migration/legacy.py` → supprimés (tag `archive/v1-migration`) ; `drop_legacy_tables.sh` retiré après nettoyage de la base le 12/11/2026 (V1, `codex_*`, `saved_*`, `jb_*` supprimées : 1 536 → 477 Mo) ; `bootstrap_real.py` conservé (`make dev-db`)
 - [ ] Regrouper `verify_{etf,financial,momentum}_release.py`, `prepare_financial_release.py` et les `verify_*`/`check_*` PHP dans `scripts/release/` avec un point d'entrée Makefile
 - [x] `scripts/test_secondary_filters.sh` : migrer vers `tests/e2e` ou supprimer s'il double `tests/e2e/secondary-*`
@@ -89,19 +89,21 @@ Réalisé : routes `searches`, `search/*`, `presets/*`, `explorer/library/legacy
 
 ## Étape 4 : Découpage du moteur `engine/analytics/` (37 fichiers → 7 sous-paquets)
 
-Procéder en deux temps : déplacement avec shims de ré-export (`from .series.compute import *`) pendant une release, puis nettoyage des shims.
+Réalisé le 12/11/2026 : 35 modules déplacés en 6 sous-paquets (`git mv`, historique conservé), imports internes et externes réécrits, **sans shims** (le dossier `series/` et `portfolio/` reprennent le nom des anciens modules, déplacés dans `series/series.py` et `portfolio/portfolio.py`). Fonctions mortes supprimées : `applies`, `session_slope`, `default_selection`. `ops/deploy.sh` mis à jour (chemins du hash du moteur). Chemins relatifs aux fichiers de config corrigés (`ranking_table`, `scores_admin`).
+**À l'application en production** : tous les fichiers du moteur ayant changé de chemin, le hash du moteur change, et le déploiement le traite comme un changement du moteur et lance en arrière-plan le traitement `maintenance` (recalcul des données dérivées ; attendu, sans effet visible).
 
-- [ ] Créer `series/` : series, compute, history, history_refresh, measures, liquidity, signals
-- [ ] Créer `scoring/` : scores, score_service, score_inputs, score_categories, configurable_score, criteria, ranking_table
-- [ ] Créer `explorer/` : explorer_config, explorer_metrics, strategy, strategy_docs, funnel
-- [ ] Créer `portfolio/` : portfolio, allocation, performance, position_plan, tracking, watch, alerts, risk
-- [ ] Créer `market_views/` : etf, geography, overview, repository, session
-- [ ] Créer `admin/` : adminsvc + `service.py` (1080 lignes) et `scores_admin.py` (986 lignes) découpés (lecture / écriture)
-- [ ] Créer `shared/` : helpers de chargement communs
-- [ ] Factoriser le chargement prix/splits (`alerts.py:96-104`, `position_plan.py:310-314`, `compute.py:~48`) → `series/loader.load_bars_and_splits(conn, ids)`
-- [ ] Corriger le N+1 `adminsvc.py:184-185` (un `COUNT(*)` par `lid`) → un seul `GROUP BY listing_id`
-- [ ] Confirmer par une lecture plus profonde les doublons/N+1 des modules non lus
-- [ ] Retirer les shims, mettre à jour `cli.py`, routes PHP et tests
+- [x] Créer `series/` : series, compute, history, history_refresh, measures, liquidity, signals
+- [x] Créer `scoring/` : scores, score_service, score_inputs, score_categories, configurable_score, criteria, ranking_table
+- [x] Créer `explorer/` : explorer_config, explorer_metrics, strategy, strategy_docs, funnel
+- [x] Créer `portfolio/` : portfolio, allocation, performance, position_plan, tracking, watch, alerts, risk
+- [x] Créer `market_views/` : etf, geography, overview, repository, session
+- [x] Créer `admin/` : `adminsvc`, `service`, `scores_admin` déplacés
+- [ ] Découper `admin/service.py` (1079 lignes) et `admin/scores_admin.py` (986 lignes) en lecture / écriture : reporté (état partagé entre les deux, de nombreux tests s'appuient sur leurs noms internes)
+- [ ] Créer `shared/` : sans objet pour l'instant (le chargeur commun est dans `series/loader.py` ; les `_num`/`_iso` des modules diffèrent légèrement et ne sont pas fusionnés)
+- [x] Factoriser le chargement prix/splits (`alerts.py:96-104`, `position_plan.py:310-314`, `compute.py:~48`) → `series/loader.load_bars_and_splits(conn, ids)` : `series/loader.py` (`load_bars`, `load_splits`, `load_bars_and_splits`) utilisé par `alerts`, `position_plan` et `compute` ; `history._load`, `service`, `scores_admin` gardent leur requête (autre forme : volumes, devises, fenêtres)
+- [x] Corriger le N+1 `adminsvc.py:184-185` (un `COUNT(*)` par `lid`) → un seul `GROUP BY listing_id` : `_intraday_statuses` (2 requêtes `GROUP BY` par place au lieu de 2 `COUNT` par ligne)
+- [x] Confirmer par une lecture plus profonde les doublons/N+1 des modules non lus : balayage automatique des `execute` dans une boucle ; les restes sont soit par lots (`compute`, `explorer_metrics`, `etf`, `_closes`), soit de taille constante (`funnel`) ; à surveiller : `tracking.update_outcomes` (une écriture par ligne, tâche de nuit) et `watch.run_all` (moteur désactivé)
+- [x] Retirer les shims, mettre à jour `cli.py`, routes PHP et tests : aucun shim n'a subsisté, tous les imports (`cli.py`, `tasks.py`, scripts, tests, `ops/deploy.sh`) pointent vers les nouveaux chemins
 
 ## Étape 5 : Cache-busting et déploiement frontend 🔴
 

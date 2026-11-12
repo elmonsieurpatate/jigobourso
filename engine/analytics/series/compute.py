@@ -2,14 +2,16 @@
 import datetime
 import json
 
+from .loader import load_splits
 from .series import analyze_series, momentum_6_1, momentum_12_1, MOMENTUM_LONG, MOMENTUM_LONG_12
-from . import strategy, liquidity as liq
-from .score_inputs import window_inputs
-from .scores import MIN_SESSIONS
-from ..market import collect
-from ..market.calendar import session_dates, window_calendars
-from ..market.hours import expected_last_close  # noqa: F401 (conservé pour compatibilité)
-from ..shared.db import ensure
+from ..explorer import strategy
+from . import liquidity as liq
+from ..scoring.score_inputs import window_inputs
+from ..scoring.scores import MIN_SESSIONS
+from ...market import collect
+from ...market.calendar import session_dates, window_calendars
+from ...market.hours import expected_last_close  # noqa: F401 (conservé pour compatibilité)
+from ...shared.db import ensure
 
 BASE_WINDOWS = (1, 5, 21, 63, 126, 252)
 
@@ -38,13 +40,10 @@ def compute_all(conn, now, batch=400):
 
     Les clôtures sont lues par lots de `batch` cotations : la mémoire reste de l'ordre de la centaine de Mo (hébergement mutualisé)."""
     windows = wanted_windows(conn)
+    splits = load_splits(conn)
     with conn.cursor() as cur:
         cur.execute('SELECT listing_id, mic FROM v_collect_set')
         mics = {r['listing_id']: r['mic'] for r in cur.fetchall()}
-        cur.execute('SELECT listing_id, event_date, ratio FROM corporate_events WHERE kind IN (%s,%s)', ('split', 'reverse_split'))
-        splits = {}
-        for r in cur.fetchall():
-            splits.setdefault(r['listing_id'], []).append((r['event_date'].isoformat(), float(r['ratio']) if r['ratio'] else None))
         cur.execute("""SELECT d.listing_id, MAX(d.price_date) last_date FROM daily_prices d
                        JOIN v_collect_set c ON c.listing_id=d.listing_id GROUP BY d.listing_id""")
         market_latest = {}

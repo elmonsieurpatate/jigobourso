@@ -3,7 +3,9 @@ import copy
 import os
 import pytest
 from engine.shared.db import connect
-from engine.analytics import service, strategy, explorer_config as C
+from engine.analytics.admin import service
+from engine.analytics.explorer import strategy
+from engine.analytics.explorer import explorer_config as C
 from tests.integ.test_api import server, world, login, Client  # noqa: F401  (fixtures)
 from tests.integ.test_tracking_cache import seed, NOW
 
@@ -87,7 +89,7 @@ def test_quoted_volume_selection_cache_invalidates_without_a_price_job(monkeypat
 
 
 def test_turnover_uses_raw_split_prices_volumes_and_dated_fx(monkeypatch):
-    from engine.analytics.explorer_metrics import load
+    from engine.analytics.explorer.explorer_metrics import load
     from engine.market.calendar import session_dates
     monkeypatch.setattr(service.hours,'utcnow',lambda:NOW)
     conn=connect();seed(conn);dates=session_dates('XETR','2026-10-27',6)

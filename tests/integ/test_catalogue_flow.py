@@ -5,7 +5,7 @@ import os
 import pytest
 from engine.shared.db import connect
 from engine.shared import settings
-from engine.analytics import adminsvc
+from engine.analytics.admin import adminsvc
 from engine.jobs import tasks, schedule
 from engine.market import collect, hours
 from engine.market import intraday as intra

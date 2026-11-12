@@ -1,5 +1,5 @@
 import datetime as dt
-from engine.analytics import history_refresh as r
+from engine.analytics.series import history_refresh as r
 
 class Cursor:
  def __init__(self,rows):self.rows=rows

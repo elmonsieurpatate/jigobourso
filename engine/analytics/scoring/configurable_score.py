@@ -1,6 +1,6 @@
 """Configurable contributions shared by all user strategies; no V1-specific branch."""
 import math
-from . import explorer_config as C
+from ..explorer import explorer_config as C
 
 
 def active_components(config):

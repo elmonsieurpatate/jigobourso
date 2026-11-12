@@ -1,5 +1,5 @@
 """Regroupement des ETF quasi identiques sur toute une page : lien direct avec le chef (jamais de chaînage), couverture de change respectée, rien de masqué."""
-from engine.analytics import etf
+from engine.analytics.market_views import etf
 
 
 def etf_entry(name, near=(), fee=None, currency='EUR'):

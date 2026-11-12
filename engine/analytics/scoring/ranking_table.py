@@ -8,9 +8,12 @@ import os
 
 from engine.market.collect import latest_rates, to_eur_factor
 
-from . import criteria as CR, scores_admin, score_service, service
+from . import criteria as CR
+from ..admin import scores_admin
+from . import score_service
+from ..admin import service
 
-CONFIG = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'app', 'config', 'secondary_metadata_groups.json')
+CONFIG = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))), 'app', 'config', 'secondary_metadata_groups.json')
 ACCENTS = str.maketrans({'é': 'e', 'è': 'e', 'ê': 'e', 'ë': 'e', 'à': 'a', 'â': 'a', 'ä': 'a', 'á': 'a', 'ã': 'a', 'å': 'a', 'î': 'i', 'ï': 'i', 'í': 'i', 'ì': 'i', 'ô': 'o', 'ö': 'o', 'ó': 'o',
                          'ò': 'o', 'õ': 'o', 'û': 'u', 'ü': 'u', 'ú': 'u', 'ù': 'u', 'ç': 'c', 'ñ': 'n', 'ý': 'y', 'ÿ': 'y'})
 MISSING = {'', 'unknown', 'inconnu', 'inconnue', 'n/a', 'n.a.', 'none', 'null', 'not available', 'unavailable', '-', '—'}

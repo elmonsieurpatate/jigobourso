@@ -3,7 +3,10 @@ import copy
 
 import pytest
 
-from engine.analytics import explorer_config as C, score_service as S, scores as SC, scores_admin as A
+from engine.analytics.explorer import explorer_config as C
+from engine.analytics.scoring import score_service as S
+from engine.analytics.scoring import scores as SC
+from engine.analytics.admin import scores_admin as A
 from engine.shared import settings
 
 
@@ -161,7 +164,7 @@ def test_complex_weights_per_profile_change_the_key_but_not_conformity(memory):
 
 def test_historic_strategies_are_untouched_by_profiles(memory):
     A.save(None, {'profile': profile()})
-    from engine.analytics import strategy
+    from engine.analytics.explorer import strategy
     cfg = C.editable(strategy.preset('regular'))
     assert S.apply_admin(None, cfg) == S.apply_global(None, cfg)
 
@@ -275,7 +278,7 @@ def test_anchor_is_a_common_setting_validated_persisted_and_part_of_the_cache_ke
 
 
 def test_strategies_current_profile_always_carries_sessions():
-    from engine.analytics import scores_admin as A
+    from engine.analytics.admin import scores_admin as A
     cur = A.clean_profile(A.profile_of(A.base_config('growth_v4')))
     assert 'sessions' not in cur['periods']['week']                    # clean_profile ne le garde pas : strategies() doit le rajouter
 
@@ -283,7 +286,7 @@ def test_strategies_current_profile_always_carries_sessions():
 def test_classement_proposes_every_v4_strategy():
     """Chaque stratégie V4 de l'administration a son entrée dans le Classement ; ses critères de recherche viennent du moteur (V4_STRATEGIES), pas d'une copie dans la page."""
     import os
-    from engine.analytics import ranking_table as R
+    from engine.analytics.scoring import ranking_table as R
     root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     assert sorted(A.CT_BUILTIN.values()) == sorted(A.V4_STRATEGIES)
     php = open(os.path.join(root, 'app', 'services', 'ct_strategies.php'), encoding='utf-8').read()
@@ -321,7 +324,8 @@ KEYS = ('dynamics', 'r2', 'up_days', 'concentration', 'volatility', 'drawdown', 
 
 def test_the_seven_strategies_keep_their_scoring_part_and_have_search_criteria_apart():
     """Deux parties séparées : SCORES (barème, poids, saturation, score par défaut) et STRATÉGIE (granularités, pente, R²). Aucun rendement, volatilité ni drawdown n'est un seuil."""
-    from engine.analytics import score_service as SS, scores as SC
+    from engine.analytics.scoring import score_service as SS
+    from engine.analytics.scoring import scores as SC
     for name, (cw, weights, sat, accel, sort) in SPEC_SCORES.items():
         cfg = A.V4_STRATEGIES[name]['build']()
         params = SS.params_for(cfg, 'equity')
@@ -336,7 +340,8 @@ def test_the_seven_strategies_keep_their_scoring_part_and_have_search_criteria_a
 
 def test_rebound_keeps_the_half_year_loaded_as_context_so_the_rebound_note_works():
     """Le semestre n'a ni pente ni R² (poids 0), mais il doit rester une période chargée : la note « contexte de rebond » lit son rendement."""
-    from engine.analytics import score_service as SS, scores as SC
+    from engine.analytics.scoring import score_service as SS
+    from engine.analytics.scoring import scores as SC
     cfg = A.V4_STRATEGIES['rebound']['build']()
     half = next(p for p in cfg['periods'] if p['id'] == 'half')
     assert half['enabled'] and half['min_slope'] is None and half['min_r2'] is None and half['max_return'] is None

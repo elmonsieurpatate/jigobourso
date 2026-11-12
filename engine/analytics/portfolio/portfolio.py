@@ -8,7 +8,8 @@ import datetime as dt
 import math
 
 from engine.market import hours
-from . import signals, strategy
+from ..series import signals
+from ..explorer import strategy
 
 
 def number(value):
@@ -153,7 +154,7 @@ def enrich(conn, request, series, alerts, today):
             cur.execute('SELECT currency,rate_date,to_eur FROM fx_rates WHERE currency IN (%s) ORDER BY rate_date' % ','.join(['%s'] * len(currencies)), currencies)
             for r in cur.fetchall(): fx.setdefault(r['currency'], {})[str(r['rate_date'])] = float(r['to_eur'])
     from engine.market.collect import to_eur_factor
-    from .history import _Carry
+    from ..series.history import _Carry
     result = {}
     for p in positions:
         lid = p.get('listing_id'); own = [l for l in lots if l.get('listing_id') == lid] if lid else []
@@ -176,7 +177,7 @@ def enrich(conn, request, series, alerts, today):
             if str(l['tx_id']) in alerts:
                 alerts[str(l['tx_id'])]['protection'] = dict(protection([l], *args, current_date=str(p.get('price_time') or '')[:10] or None), currency=p.get('price_currency'))
         personal = dict(protection(own, *args, basis_cost=p.get('cost'), current_date=str(p.get('price_time') or '')[:10] or None), currency=p.get('price_currency'))
-        from .service import expected_close, last_collection
+        from ..admin.service import expected_close, last_collection
         context = dict(p, portfolio_config=(request.get('portfolio_strategy') or {}).get('config'), expected_close=expected_close(conn, p['mic']), collected_at=last_collection(conn, p['mic'])) if p.get('mic') else p
         result[p['key']] = diagnose(context, [alerts[str(l['tx_id'])] for l in own if str(l['tx_id']) in alerts], state, metrics.get(lid, {}), personal, today.isoformat())
     return result

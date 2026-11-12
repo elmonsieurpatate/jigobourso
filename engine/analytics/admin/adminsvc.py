@@ -5,7 +5,7 @@ from engine.catalogue import rules as cat_rules
 from engine.jobs import tasks
 from engine.market import collect, hours, prefilter
 from engine.shared import settings
-from . import funnel
+from ..explorer import funnel
 
 LEVELS = {'catalogue': cat_rules, 'prefilter': prefilter}
 SETTING = {'catalogue': 'catalogue_rules', 'prefilter': 'prefilter'}
@@ -169,24 +169,35 @@ FINAL_EXPR = "((r.removed_step IS NULL AND l.status='selected' AND l.is_primary=
 D_EXPR = f"CASE WHEN NOT {FINAL_EXPR} THEN 'na' WHEN s.closes_count IS NULL OR s.closes_count=0 THEN 'absent' WHEN s.closes_count>=%s THEN 'complete' ELSE 'partial' END"
 
 
-def _intraday_status(conn, mic, lid, now):
+def _intraday_statuses(conn, rows, now):
+    """{listing_id: 'complete' | 'partial' | 'absent' | 'na'} pour les lignes de la page : 2 requêtes GROUP BY par place (et non 2 par ligne)."""
     from engine.market import intraday as intra
-    if not hours.known(mic):
-        return 'na'
-    cur_day = hours.session_date(mic, now)
-    prev = cur_day - datetime.timedelta(days=1)
-    while prev.weekday() >= 5:
-        prev -= datetime.timedelta(days=1)
-    expected = max(1, hours.expected_slots(mic))
-    counts = []
+    out, by_mic = {}, {}
+    for r in rows:
+        if not (r['in_final'] and r['lid']):
+            continue
+        if not hours.known(r['mic']):
+            out[r['lid']] = 'na'
+        else:
+            by_mic.setdefault(r['mic'], []).append(r['lid'])
     with conn.cursor() as cur:
-        for day in (prev, cur_day):
-            a, b = intra.session_window(mic, day)
-            cur.execute('SELECT COUNT(*) n FROM intraday_prices WHERE listing_id=%s AND slot_start>=%s AND slot_start<%s', (lid, a, b))
-            counts.append(cur.fetchone()['n'])
-    if all(c >= 0.8 * expected for c in counts):
-        return 'complete'
-    return 'partial' if any(counts) else 'absent'
+        for mic, lids in by_mic.items():
+            cur_day = hours.session_date(mic, now)
+            prev = cur_day - datetime.timedelta(days=1)
+            while prev.weekday() >= 5:
+                prev -= datetime.timedelta(days=1)
+            expected = max(1, hours.expected_slots(mic))
+            counts = {lid: [] for lid in lids}
+            marks = ','.join(['%s'] * len(lids))
+            for day in (prev, cur_day):
+                a, b = intra.session_window(mic, day)
+                cur.execute(f'SELECT listing_id, COUNT(*) n FROM intraday_prices WHERE listing_id IN ({marks}) AND slot_start>=%s AND slot_start<%s GROUP BY listing_id', lids + [a, b])
+                found = {x['listing_id']: x['n'] for x in cur.fetchall()}
+                for lid in lids:
+                    counts[lid].append(found.get(lid, 0))
+            for lid, c in counts.items():
+                out[lid] = 'complete' if all(n >= 0.8 * expected for n in c) else ('partial' if any(c) else 'absent')
+    return out
 
 
 def titles(conn, req):
@@ -229,6 +240,9 @@ def titles(conn, req):
         rows = cur.fetchall()
         info_done = bool(settings.get(conn, 'last_stats', {}).get('yahoo_info'))
     for r in rows:
+        r['in_final'] = bool(r['in_final'])
+    intraday = _intraday_statuses(conn, rows, now)
+    for r in rows:
         r['fdb_state'] = 'kept' if r['removed_step'] is None else 'removed'
         reason = None
         if r['removed_step']:
@@ -241,7 +255,7 @@ def titles(conn, req):
             reason = {'stage': 'En attente', 'rule': None, 'detail': 'informations Yahoo non reçues' if r['quote_at'] is None else 'filtrage Yahoo à lancer'}
         r['reason'] = reason
         r['in_final'], r['held'] = bool(r['in_final']), bool(r['held'])
-        r['intraday_state'] = _intraday_status(conn, r['mic'], r['lid'], now) if r['in_final'] and r['lid'] else 'na'
+        r['intraday_state'] = intraday.get(r['lid'], 'na') if r['in_final'] and r['lid'] else 'na'
         r['issue'] = None
         if r['y_state'] == 'pending' and r['quote_at'] is None and info_done:
             r['issue'] = 'Yahoo n’a renvoyé aucune information lors du dernier import'

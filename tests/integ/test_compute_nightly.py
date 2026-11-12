@@ -2,8 +2,8 @@ import datetime
 import os
 import pytest
 from engine.shared.db import connect
-from engine.analytics import strategy
-from engine.analytics.repository import recommendable_candidates
+from engine.analytics.explorer import strategy
+from engine.analytics.market_views.repository import recommendable_candidates
 from engine.jobs import tasks
 from engine.jobs.runner import run_job
 from tests.dbutil import reset_data

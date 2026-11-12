@@ -1,7 +1,12 @@
 """Scores V4 : formules, poids de 1 à 6 granularités, données manquantes, indépendance vis-à-vis des filtres, liquidité, mesures d'entrée."""
 import math
 import pytest
-from engine.analytics import scores as SC, score_inputs as SI, liquidity as LQ, explorer_config as C, strategy as S, score_service as SS
+from engine.analytics.scoring import scores as SC
+from engine.analytics.scoring import score_inputs as SI
+from engine.analytics.series import liquidity as LQ
+from engine.analytics.explorer import explorer_config as C
+from engine.analytics.explorer import strategy as S
+from engine.analytics.scoring import score_service as SS
 
 
 def M(slope, r2, up, spike, vol, dd, accel=None, r2p=None):
@@ -356,7 +361,7 @@ def test_score_does_not_depend_on_other_titles_in_the_universe():
 
 
 def test_spike_share_criterion_in_path_metrics():
-    from engine.analytics.explorer_metrics import path_metrics
+    from engine.analytics.explorer.explorer_metrics import path_metrics
     m = path_metrics([100, 101, 140, 141, 142])
     assert m['spike_share'] == pytest.approx(math.log1p(140 / 101 - 1) / math.log(1.42))
     assert path_metrics([100, 99, 98])['spike_share'] == 1.0

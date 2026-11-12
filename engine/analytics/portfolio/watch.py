@@ -1,8 +1,10 @@
 """Surveillance : modèles de règles par stratégie (seuils lus dans la configuration réelle de la stratégie) et évaluation des règles d'un portefeuille.
 Une règle est évaluée sur des données réelles ; sans donnée suffisante son état est « insufficient », jamais « normal ». Aucune vente automatique : une règle ne fait que signaler."""
 import datetime
-from . import measures, strategy, history
-from .series import prepare_series
+from ..series import measures
+from ..explorer import strategy
+from ..series import history
+from ..series.series import prepare_series
 
 SESSIONS = strategy.DEFAULT_SESSIONS
 GRAN = {'day': 'jour', 'week': 'semaine', 'month': 'mois', 'quarter': 'trimestre', 'half': 'semestre', 'year': 'année'}
@@ -147,7 +149,7 @@ def _one(r, lid, dates, closes, meta, line, hdates, brk=()):
         if len(closes) < 2: return _res('insufficient', None, 'Historique de cours insuffisant.')
         val = abs(100 * (closes[-1] / closes[-2] - 1)); return _res('triggered' if val >= thr else 'normal', val)
     if kind in ('momentum6_min', 'momentum12_min'):
-        from . import series as _s
+        from ..series import series as _s
         need = 127 if kind == 'momentum6_min' else 253
         if len(closes) < need: return _res('insufficient', None, f'Historique insuffisant : {need} clôtures nécessaires, {len(closes)} disponibles.')
         fn = _s.momentum_6_1 if kind == 'momentum6_min' else _s.momentum_12_1

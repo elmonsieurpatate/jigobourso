@@ -7,7 +7,7 @@ import subprocess
 
 import pytest
 
-from engine.analytics import watch
+from engine.analytics.portfolio import watch
 from engine.shared.db import connect
 from tests.integ.test_api import ROOT, login, server, world  # noqa: F401  (fixtures)
 
@@ -58,7 +58,7 @@ def test_every_real_entry_point_is_closed(world):
     assert r.returncode == 0 and json.loads(r.stdout.strip().splitlines()[-1]).get('disabled') is True, r.stdout + r.stderr
     # tick planifié et cron : plus d'appel au moteur ni aux e-mails
     tasks = open(os.path.join(ROOT, 'engine/jobs/tasks.py'), encoding='utf-8').read()
-    assert not re.search(r'^[^#\n]*watch\.run_all|from \.\.analytics import watch', tasks, re.M)
+    assert not re.search(r'^[^#\n]*watch\.run_all|from \.\.analytics\.portfolio import watch', tasks, re.M)
     assert snapshot(conn) == before
 
 

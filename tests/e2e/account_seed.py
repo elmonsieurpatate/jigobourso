@@ -2,7 +2,7 @@ import os,runpy,datetime as dt
 assert os.environ.get('JIGO_TEST_DATABASE')=='1' and os.environ.get('JIGO_DB_NAME')=='jigobourso_it'
 runpy.run_path('tests/e2e/financial_seed.py')
 from engine.shared.db import connect
-from engine.analytics.compute import compute_all
+from engine.analytics.series.compute import compute_all
 c=connect()
 with c.cursor() as q:
  for i in range(3,46):

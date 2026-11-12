@@ -5,7 +5,8 @@ import pytest
 from engine.shared.db import connect
 from engine.shared import settings
 from engine.catalogue import loader
-from engine.analytics import funnel, adminsvc
+from engine.analytics.explorer import funnel
+from engine.analytics.admin import adminsvc
 from engine.jobs import schedule, tasks
 from engine.jobs.runner import run_job
 from engine.market import collect

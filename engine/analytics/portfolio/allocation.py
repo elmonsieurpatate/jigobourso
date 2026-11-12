@@ -4,7 +4,7 @@ Valeurs ACTUELLES en euros, fournies par le registre PHP. Zone d'une action : pa
 zone d'un ETF : catégorie géographique explicite du fonds (Yahoo/Morningstar). Un ETF « Monde » ou sans catégorie reste « autre » : rien n'est deviné.
 Le calcul est descriptif : il dit combien il faudrait acheter ou vendre par zone pour revenir à la cible, il ne passe aucun ordre.
 """
-from . import geography
+from ..market_views import geography
 
 ZONES = ('us', 'eu', 'emerging')
 LABELS = {'us': 'États-Unis', 'eu': 'Europe', 'emerging': 'Émergents', 'other': 'Autre ou inconnue'}
@@ -44,7 +44,7 @@ def zone_of(kind, country, profile_data):
 
 def _context(conn, ids):
     """{listing_id: (kind, country, données du profil ETF)} en lecture seule."""
-    from . import etf
+    from ..market_views import etf
     if not ids:
         return {}
     with conn.cursor() as cur:

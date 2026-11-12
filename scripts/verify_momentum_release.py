@@ -5,10 +5,11 @@ import random
 import sys
 
 from engine.shared.db import connect
-from engine.analytics import service, strategy
+from engine.analytics.admin import service
+from engine.analytics.explorer import strategy
 import os
 
-from engine.analytics.series import prepare_series
+from engine.analytics.series.series import prepare_series
 from engine.market.calendar import session_dates
 
 SAMPLE = 150

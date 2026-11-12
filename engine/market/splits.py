@@ -18,7 +18,7 @@ import datetime
 
 import pymysql.err
 
-from engine.analytics.series import BREAK_RATIO
+from engine.analytics.series.series import BREAK_RATIO
 from engine.market.yahoo import RateLimited
 
 # Ratios usuels parts nouvelles / anciennes (2 = deux pour un) ; leur inverse est le regroupement correspondant.

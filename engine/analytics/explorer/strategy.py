@@ -13,10 +13,11 @@ l'appelant ne lui fournit que des cotations recommandables (`v_recommendable`) ;
 """
 import copy
 import math
-from . import explorer_config, configurable_score
+from . import explorer_config
+from ..scoring import configurable_score
 from collections import defaultdict
 
-from .series import analyze_series, momentum_6_1, momentum_12_1
+from ..series.series import analyze_series, momentum_6_1, momentum_12_1
 
 VERSION = 3
 PERIOD_IDS = ('day', 'week', 'month', 'quarter', 'half', 'year')

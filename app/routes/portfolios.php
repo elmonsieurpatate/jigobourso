@@ -8,7 +8,7 @@ require_once __DIR__ . '/../lib/engine.php';
 require_once __DIR__ . '/../services/transactions.php';
 require_once __DIR__ . '/../services/portfolio_access.php';
 
-const LOT_STRATEGIES = ['regular', 'fast', 'recovery', 'low_volatility', 'momentum', 'momentum12', 'momentum_risk', 'prudent'];   // engine/analytics/alerts.py STRATEGIES
+const LOT_STRATEGIES = ['regular', 'fast', 'recovery', 'low_volatility', 'momentum', 'momentum12', 'momentum_risk', 'prudent'];   // engine/analytics/portfolio/alerts.py STRATEGIES
 
 return [
     'portfolios' => function () {

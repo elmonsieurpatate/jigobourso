@@ -1,6 +1,11 @@
 """Faits de référence des sept stratégies officielles, lus dans le code réellement exécuté (jamais recopiés) : critères de recherche, granularités, poids, constantes de formule.
 Le centre d'aide et les fiches de « Mes stratégies » les affichent tels quels : si une valeur change dans le moteur, la documentation change avec elle."""
-from . import ranking_table, scores as SC, scores_admin as A, strategy as LEGACY, explorer_config as C, score_service
+from ..scoring import ranking_table
+from ..scoring import scores as SC
+from ..admin import scores_admin as A
+from . import strategy as LEGACY
+from . import explorer_config as C
+from ..scoring import score_service
 
 
 def facts(conn, request=None):

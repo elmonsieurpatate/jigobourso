@@ -7,7 +7,7 @@ import math
 import datetime
 from bisect import bisect_right
 from collections import defaultdict
-from .series import prepare_series
+from ..series.series import prepare_series
 from engine.market.calendar import window_calendars
 from engine.market.collect import to_eur_factor
 

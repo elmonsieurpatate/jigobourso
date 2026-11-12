@@ -24,7 +24,7 @@ Rien n'est migré ni supprimé : un utilisateur sans entrée personnelle voit le
 ## Interface
 Menu Explorer : Recherche et résultats, Mes stratégies, Mes critères de recherche, Mes paramètres de scores, Mes colonnes et tris, Mes filtres et catégories. Menu d'administration technique : FinanceDatabase, Yahoo Finance, Actions / ETF, Cron, Journaux, Utilisateurs, Réglages. Page `aide.html` pour tous (rubriques réservées aux administrateurs masquées aux autres).
 
-Composants partagés : `strategies-ui.js` / `.css` (icône par stratégie, badge, fenêtre d'information au clic et au clavier, sélecteur groupé accessible, bandeau). Aide interactive : `aide.js` (coque) + `help-ch-*.js` (chapitres) + `help-math.js` (calculs fictifs identiques au moteur, testés) + `help-charts.js` ; les chiffres des fiches viennent du moteur (`help/facts`, `engine/analytics/strategy_docs.py`), jamais recopiés.
+Composants partagés : `strategies-ui.js` / `.css` (icône par stratégie, badge, fenêtre d'information au clic et au clavier, sélecteur groupé accessible, bandeau). Aide interactive : `aide.js` (coque) + `help-ch-*.js` (chapitres) + `help-math.js` (calculs fictifs identiques au moteur, testés) + `help-charts.js` ; les chiffres des fiches viennent du moteur (`help/facts`, `engine/analytics/explorer/strategy_docs.py`), jamais recopiés.
 
 ## Points à connaître
 - Les réglages communs des scores (κ, seuil de couverture, ancrage) restent fixés par l'administration ; ils sont en lecture seule dans « Mes paramètres de scores ».

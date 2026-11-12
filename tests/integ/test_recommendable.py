@@ -5,8 +5,8 @@ import os
 import pytest
 from engine.shared.db import connect
 from tests.dbutil import reset_data
-from engine.analytics import strategy as S
-from engine.analytics.repository import recommendable_candidates
+from engine.analytics.explorer import strategy as S
+from engine.analytics.market_views.repository import recommendable_candidates
 
 pytestmark = pytest.mark.integration
 if not os.environ.get('JIGO_TEST_DATABASE'):

@@ -101,7 +101,7 @@ Recherches enregistrées : critères + filtres + tri (table `explorer_saved`, ty
 ## Négociabilité : le filtre « Titres facilement négociables »
 
 - **Mesure unique** : valeur échangée par jour ≈ volume moyen sur 3 mois (Yahoo Quote) × cours converti en euros. C'est une estimation fournisseur, pas du volume exécuté. C'est la seule donnée de volume fiable que nous stockons (pas de volume journalier, pas de spread).
-- **Trois niveaux, un seul calcul** (`engine.analytics.signals.liquidity`, utilisé par le filtre, la pastille du classement et la fiche) : *facilement négociable* ≥ 4 × le minimum du préfiltre, *à surveiller* entre 2 × et 4 ×, *négociabilité limitée* en dessous de 2 ×. Avec les minimums actuels (1 M€ action, 250 k€ ETF) : actions 2 M€ / 4 M€, ETF 500 k€ / 1 M€. Justification : un ordre de 10 000 € ne doit pas dépasser environ 0,5 % de la valeur échangée en un jour pour une action et 2 % pour un ETF (les teneurs de marché élargissent la liquidité réelle des ETF).
+- **Trois niveaux, un seul calcul** (`engine.analytics.series.signals.liquidity`, utilisé par le filtre, la pastille du classement et la fiche) : *facilement négociable* ≥ 4 × le minimum du préfiltre, *à surveiller* entre 2 × et 4 ×, *négociabilité limitée* en dessous de 2 ×. Avec les minimums actuels (1 M€ action, 250 k€ ETF) : actions 2 M€ / 4 M€, ETF 500 k€ / 1 M€. Justification : un ordre de 10 000 € ne doit pas dépasser environ 0,5 % de la valeur échangée en un jour pour une action et 2 % pour un ETF (les teneurs de marché élargissent la liquidité réelle des ETF).
 - **Données absentes ou plus vieilles que 10 jours** : « négociabilité non déterminée », jamais « limitée ». Ces titres restent affichés.
 - **Le filtre masque seulement, après le classement.** Rang et score restent ceux du catalogue (aucun recalcul) ; les suivants remontent dans la liste (colonne « # » = position dans la liste filtrée). Désactivé, l'ordre et les scores sont identiques à avant. La pagination s'applique après le filtre. Un titre détenu n'est jamais masqué ; un titre trouvé par son symbole ou son ISIN exact reste affiché avec sa mention. Le Suivi des classements n'est pas filtré.
 - **Indicateurs complémentaires, jamais des critères** : part des créneaux de 15 min avec une bougie (note de fiche sous 70 %), et, pour un ETF européen dont le nom indique des actions américaines, rappel que les échanges peuvent être moins fréquents avant l'ouverture de Wall Street. Une bougie manquante n'est pas une absence d'échange.
@@ -129,7 +129,7 @@ Régressions : `make fast`, `make integ`, puis `tests/e2e/portfolio-audit.cjs` s
 
 ## Moteur de scores V4 unique et sept stratégies (06/11/2026)
 
-**Un seul moteur de notation** : `engine/analytics/scores.py` (`score_title`) pour le score simple et le score complexe, alimenté par `score_service.py` (cache selon les paramètres et la version des données) et réglé par `scores_admin.py`. Toutes les stratégies passent par lui : seuls leurs réglages diffèrent.
+**Un seul moteur de notation** : `engine/analytics/scoring/scores.py` (`score_title`) pour le score simple et le score complexe, alimenté par `score_service.py` (cache selon les paramètres et la version des données) et réglé par `scores_admin.py`. Toutes les stratégies passent par lui : seuls leurs réglages diffèrent.
 
 **Réglages propres à chaque stratégie** (profil enregistré dans `scores_profiles`, valeurs par défaut explicites, bornes validées, retour à la valeur par défaut dans l'administration) :
 
@@ -179,7 +179,7 @@ Deux mécanismes séparés. Les **scores V4** (simple, complexe) et leurs **rang
 - **Exclue** : au moins un critère actif est mesuré et non respecté ;
 - **Indéterminée** : aucun critère n'est violé mais une mesure nécessaire manque. Jamais une exclusion ; visible dans « Toutes ».
 
-Moteur unique : `engine/analytics/criteria.py` (`normalize`, `evaluate`, `counts`), alimenté par `strategy_metrics`, utilisé par `ranking_table` (Classement, `ranking/table` et `ranking/verdicts` pour les critères en cours de modification), par `scores_admin.ranking` (page Scores/Classement, filtre `verdict`) et par la fiche (`service._v4_strategy`). Le navigateur n'évalue plus rien.
+Moteur unique : `engine/analytics/scoring/criteria.py` (`normalize`, `evaluate`, `counts`), alimenté par `strategy_metrics`, utilisé par `ranking_table` (Classement, `ranking/table` et `ranking/verdicts` pour les critères en cours de modification), par `scores_admin.ranking` (page Scores/Classement, filtre `verdict`) et par la fiche (`service._v4_strategy`). Le navigateur n'évalue plus rien.
 
 Pages : sélecteur **Retenues | Exclues | Toutes** (Classement : Retenues par défaut ; Scores : Toutes par défaut), compteurs réels sur le périmètre courant (filtres secondaires, recherche), badge « Statut stratégie » dans les tableaux. Le détail (mesure, seuil, résultat par critère) n'est que dans la fiche.
 
@@ -200,7 +200,7 @@ Granularité Jour et colonne « Var. 1J (%) » : voir `docs/ADMIN_SCORES_V4.md` 
 
 ## Barre de risque d'un achat (portefeuille)
 
-Pour chaque achat détenu, une barre verte / orange / rouge résume l'état du cours depuis l'achat (`engine/analytics/risk.py`). C'est un repère : rien n'est vendu automatiquement et rien n'est prédit.
+Pour chaque achat détenu, une barre verte / orange / rouge résume l'état du cours depuis l'achat (`engine/analytics/portfolio/risk.py`). C'est un repère : rien n'est vendu automatiquement et rien n'est prédit.
 
 Trois signaux, notés de 0 à 2 : **tendance** (pente récente comparée à la pente longue, sur des fenêtres qui dépendent de la stratégie : rapide 21/63 séances, régulière 63/126, Momentum 126/252), **recul** depuis le plus haut observé depuis l'achat (seuil = 2 × volatilité quotidienne × √horizon, entre 6 % et 30 % ; serré pour les stratégies rapides, large pour les longues) et **stabilité** (R² qui s'effondre par rapport à la fenêtre précédente). Somme 0-1 : tendance intacte ; 2-3 : à surveiller ; 4-6 ou recul au-delà du seuil : vente à envisager. Un cours très au-dessus de sa moyenne 50 jours (+25 %) n'est qu'une information, jamais notée.
 

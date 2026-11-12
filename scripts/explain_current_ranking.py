@@ -1,7 +1,8 @@
 """SELECT-only snapshot for the requested week/month configuration, no ranking changes."""
 import json
 from engine.shared.db import connect
-from engine.analytics import service,strategy
+from engine.analytics.admin import service
+from engine.analytics.explorer import strategy
 c=connect()
 with c.cursor() as cur:
  cur.execute('SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ')

@@ -1,5 +1,5 @@
 import pytest
-from engine.analytics import session
+from engine.analytics.market_views import session
 
 T=['2026-11-02T09:00:00','2026-11-02T09:15:00','2026-11-02T09:30:00']
 B={1:list(zip(T,[100,101,102])),2:list(zip(T,[100,99,98]))}

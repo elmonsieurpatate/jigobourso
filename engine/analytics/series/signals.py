@@ -8,7 +8,7 @@ liquidité = minima du préfiltre (réglables dans l'administration) multipliés
 """
 import math
 
-from . import strategy
+from ..explorer import strategy
 
 R2_OK = strategy.R2_LEVELS['balanced']        # 0,75
 R2_WARN = strategy.R2_LEVELS['flexible']      # 0,556 : seuil du profil « croissance régulière »

@@ -2,9 +2,11 @@
 import copy
 import math
 import pytest
-from engine.analytics import strategy as S, explorer_config as C, configurable_score as R
-from engine.analytics.measures import window_metrics
-from engine.analytics.explorer_metrics import path_metrics
+from engine.analytics.explorer import strategy as S
+from engine.analytics.explorer import explorer_config as C
+from engine.analytics.scoring import configurable_score as R
+from engine.analytics.series.measures import window_metrics
+from engine.analytics.explorer.explorer_metrics import path_metrics
 
 
 def setup_config():

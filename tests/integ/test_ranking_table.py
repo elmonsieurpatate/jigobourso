@@ -3,7 +3,7 @@ import os
 
 import pytest
 
-from engine.analytics import ranking_table as R
+from engine.analytics.scoring import ranking_table as R
 from engine.shared.db import connect
 from tests.dbutil import reset_data
 from tests.integ.test_scores_admin import seed
@@ -37,7 +37,7 @@ def test_table_has_scores_ranks_groups_and_unknowns_stay_none():
 
 
 def test_sheet_carries_the_same_v4_scores_as_the_ranking():
-    from engine.analytics import service
+    from engine.analytics.admin import service
     conn = connect()
     reset_data(conn)
     seed(conn)
@@ -50,7 +50,7 @@ def test_sheet_carries_the_same_v4_scores_as_the_ranking():
 
 def test_personal_classement_strategies_get_their_own_score_profile_and_ranking():
     import json
-    from engine.analytics import scores_admin as A
+    from engine.analytics.admin import scores_admin as A
     conn = connect()
     reset_data(conn)
     seed(conn)
@@ -81,7 +81,7 @@ def _extra_titles(conn):
     """Un jumeau exact de UP.DE (notes strictement identiques) et deux titres en baisse identiques (notes simples à 0) : de vrais ex æquo."""
     import datetime
     import exchange_calendars as xc
-    from engine.analytics import compute
+    from engine.analytics.series import compute
     calendar = xc.get_calendar('XETR', start='2026-01-05', end='2027-01-31')
     days = [d.date() for d in calendar.sessions if d.date() >= datetime.date(2026, 1, 5)][:260]
     now = datetime.datetime(2026, 10, 28, 2, 10, tzinfo=datetime.timezone.utc)
@@ -97,7 +97,7 @@ def _extra_titles(conn):
 
 
 def test_classement_and_scores_admin_rank_the_same_titles_in_the_same_order_with_the_same_notes_and_ranks():
-    from engine.analytics import scores_admin as A
+    from engine.analytics.admin import scores_admin as A
     conn = connect()
     reset_data(conn)
     seed(conn)
@@ -150,7 +150,7 @@ def test_three_modes_counts_cover_every_evaluable_title_and_never_change_scores_
 
 
 def test_live_verdicts_endpoint_equals_table_statuses_and_scores_admin_listing():
-    from engine.analytics import scores_admin as A
+    from engine.analytics.admin import scores_admin as A
     conn = connect()
     reset_data(conn)
     seed(conn)
@@ -199,7 +199,7 @@ def test_missing_context_is_undetermined_and_builtin_defaults_come_from_the_cent
 
 
 def test_sheet_status_and_scores_equal_the_ranking_in_every_context():
-    from engine.analytics import service
+    from engine.analytics.admin import service
     conn = connect()
     reset_data(conn)
     seed(conn)
@@ -221,7 +221,7 @@ def test_sheet_status_and_scores_equal_the_ranking_in_every_context():
 
 
 def test_sheet_measures_use_the_units_of_the_criteria():
-    from engine.analytics import service
+    from engine.analytics.admin import service
     conn = connect()
     reset_data(conn)
     seed(conn)
@@ -233,7 +233,7 @@ def test_sheet_measures_use_the_units_of_the_criteria():
 
 
 def test_scores_listing_sort_covers_the_whole_list_and_never_changes_global_ranks():
-    from engine.analytics import scores_admin as A
+    from engine.analytics.admin import scores_admin as A
     conn = connect()
     reset_data(conn)
     seed(conn)
@@ -259,8 +259,8 @@ def test_scores_listing_sort_covers_the_whole_list_and_never_changes_global_rank
 @pytest.mark.parametrize('basis', ['raw', 'adjusted', 'partial'])
 def test_ranking_and_simulation_curves_use_the_same_split_basis_as_the_sheet(basis):
     import datetime
-    from engine.analytics import scores_admin as A
-    from engine.analytics.series import prepare_series
+    from engine.analytics.admin import scores_admin as A
+    from engine.analytics.series.series import prepare_series
     conn = connect()
     try:
         reset_data(conn)

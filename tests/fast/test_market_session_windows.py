@@ -2,9 +2,9 @@ import math
 
 import pytest
 
-from engine.analytics import strategy
-from engine.analytics.measures import dated_window_metrics, window_metrics
-from engine.analytics.series import analyze_series
+from engine.analytics.explorer import strategy
+from engine.analytics.series.measures import dated_window_metrics, window_metrics
+from engine.analytics.series.series import analyze_series
 from engine.market.calendar import session_dates
 
 

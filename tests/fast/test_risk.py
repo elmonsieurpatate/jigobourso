@@ -1,6 +1,6 @@
 """Barre de risque d'un achat : trois signaux notés, niveaux, cas non évaluables, réglages personnels."""
 
-from engine.analytics import risk
+from engine.analytics.portfolio import risk
 
 
 def path(n, daily, start=100.0, wobble=0.0):

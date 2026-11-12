@@ -11,8 +11,9 @@ Valeurs par défaut tirées de research/RESULTATS_SORTIES.md (test chronologique
 import datetime
 
 from . import risk as risk_bar
-from . import strategy
-from .series import prepare_series
+from ..explorer import strategy
+from ..series.loader import load_bars_and_splits
+from ..series.series import prepare_series
 
 RANK_LIMIT = 50
 
@@ -92,15 +93,8 @@ def _series(conn, ids):
     if not ids:
         return out
     marks = ','.join(['%s'] * len(ids))
+    bars, splits = load_bars_and_splits(conn, ids)
     with conn.cursor() as cur:
-        cur.execute(f'SELECT listing_id, price_date, close_px, adj_close_px FROM daily_prices WHERE listing_id IN ({marks}) ORDER BY listing_id, price_date', list(ids))
-        bars = {}
-        for r in cur.fetchall():
-            bars.setdefault(r['listing_id'], []).append((r['price_date'].isoformat(), float(r['close_px']), None if r['adj_close_px'] is None else float(r['adj_close_px'])))
-        cur.execute(f"SELECT listing_id, event_date, ratio FROM corporate_events WHERE listing_id IN ({marks}) AND kind IN ('split','reverse_split')", list(ids))
-        splits = {}
-        for r in cur.fetchall():
-            splits.setdefault(r['listing_id'], []).append((r['event_date'].isoformat(), float(r['ratio']) if r['ratio'] else None))
         cur.execute(f'SELECT listing_id, close_px, ma50, ma200, momentum_6m, quality, last_close_date FROM series_state WHERE listing_id IN ({marks})', list(ids))
         states = {r['listing_id']: {'close': None if r['close_px'] is None else float(r['close_px']), 'ma50': None if r['ma50'] is None else float(r['ma50']),
                                     'quality': r['quality'], 'last_close_date': str(r['last_close_date']) if r['last_close_date'] else None, 'ma200': None if r['ma200'] is None else float(r['ma200']),
@@ -113,7 +107,7 @@ def _series(conn, ids):
 
 def _ranks(conn, name, config):
     """{listing_id: rang} des titres retenus par la stratégie (verdicts en cache, comme l'Explorer)."""
-    from . import service
+    from ..admin import service
     cfg = strategy.validate(config) if config else strategy.validate(strategy.preset(name))
     return {e['id']: e['rank'] for e in service.cached_verdicts(conn, cfg) if e['status'] == 'retained' and e.get('rank') is not None}
 
@@ -153,7 +147,7 @@ def lot_alerts(conn, request, today=None):
 
 def curves(lots, series, points=90):
     """Courbe de chaque titre détenu depuis son plus ancien achat encore détenu (série corrigée des splits, au plus `points` valeurs) et dates de ses achats."""
-    from .service import downsample
+    from ..admin.service import downsample
     out = {}
     for lid in sorted({int(l['listing_id']) for l in lots}):
         buys = sorted(l['trade_date'] for l in lots if int(l['listing_id']) == lid)

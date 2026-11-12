@@ -8,8 +8,9 @@ import sys
 import time
 import json
 sys.path.insert(0,os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from engine.analytics import explorer_config as C, strategy as S
-from engine.analytics.service import packed
+from engine.analytics.explorer import explorer_config as C
+from engine.analytics.explorer import strategy as S
+from engine.analytics.admin.service import packed
 
 c=C.empty()
 for p in c['periods']:p['enabled']=True

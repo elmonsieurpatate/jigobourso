@@ -1,6 +1,6 @@
 import json
 
-from engine.analytics import service
+from engine.analytics.admin import service
 
 
 class Cursor:

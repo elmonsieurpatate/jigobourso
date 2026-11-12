@@ -6,7 +6,7 @@ assert os.environ.get('JIGO_TEST_DATABASE') == '1'
 assert os.environ.get('JIGO_DB_HOST') == '127.0.0.1'
 assert os.environ.get('JIGO_DB_NAME') == 'jigobourso_portfolio_audit'
 from engine.shared.db import connect
-from engine.analytics.compute import compute_all
+from engine.analytics.series.compute import compute_all
 from tests.dbutil import reset_data
 c=connect();reset_data(c)
 subprocess.run(['php','scripts/create_user.php','editor_test','editor-local-only-password','--admin'],check=True)

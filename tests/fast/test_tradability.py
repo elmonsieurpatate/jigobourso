@@ -1,7 +1,8 @@
-"""Filtre « Titres facilement négociables » : un seul calcul (engine.analytics.signals.liquidity) pour le filtre, la pastille et la fiche."""
+"""Filtre « Titres facilement négociables » : un seul calcul (engine.analytics.series.signals.liquidity) pour le filtre, la pastille et la fiche."""
 import pytest
 
-from engine.analytics import service, signals
+from engine.analytics.admin import service
+from engine.analytics.series import signals
 
 CFG = {'liquidity_equity': {'min_eur': 1_000_000}, 'liquidity_etf': {'min_eur': 250_000}}
 

@@ -25,10 +25,13 @@ def _close_all():
 
 
 def _admin_commands():
-    from engine.analytics import adminsvc, funnel, strategy_docs
+    from engine.analytics.admin import adminsvc
+    from engine.analytics.explorer import funnel
+    from engine.analytics.explorer import strategy_docs
     from engine.jobs import schedule, tasks
     from engine.shared import settings
-    from engine.analytics import scores_admin, ranking_table
+    from engine.analytics.admin import scores_admin
+    from engine.analytics.scoring import ranking_table
     from engine.market import split_review
 
     def stage(r):
@@ -84,7 +87,10 @@ def serve(cmd):
     """Commandes appelées par PHP : JSON en entrée, JSON en sortie, code 2 + {"error"} en cas de demande invalide."""
     import decimal
     import datetime as dt
-    from engine.analytics import scores_admin, service, strategy, tracking
+    from engine.analytics.admin import scores_admin
+    from engine.analytics.admin import service
+    from engine.analytics.explorer import strategy
+    from engine.analytics.portfolio import tracking
 
     def plain(o):
         if isinstance(o, decimal.Decimal):
@@ -97,7 +103,7 @@ def serve(cmd):
         request = json.load(sys.stdin)
         scores_admin.set_user((request.get('user_id') or (request.get('ct') or {}).get('user_id')) if isinstance(request, dict) else None)      # adaptations de scores propres à l'utilisateur de la requête
         if cmd == 'presets':
-            from .analytics import explorer_config as C
+            from .analytics.explorer import explorer_config as C
             result = {'presets': {name: strategy.preset(name) for name in strategy.PRESETS}, 'labels': strategy.LABELS,
                       'version':4,'empty':C.empty(),'metrics':sorted(C.METRICS),'bounds':C.BOUNDS,'slope_levels': strategy.SLOPE_LEVELS, 'r2_levels': strategy.R2_LEVELS, 'rank_modes': list(strategy.RANK_MODES), 'experimental': list(strategy.EXPERIMENTAL)}
         elif cmd == 'intraday':
@@ -105,34 +111,34 @@ def serve(cmd):
             from engine.market.yahoo import YahooClient
             result = intraday.view(connect(), int(request['listing_id']), client=YahooClient() if request.get('fetch', True) else None)
         elif cmd == 'etf-portfolio':
-            from .analytics import etf
+            from .analytics.market_views import etf
             result = etf.portfolio(connect(), request.get('positions', []))
         elif cmd == 'lot-alerts':
-            from .analytics import alerts
+            from .analytics.portfolio import alerts
             result = alerts.lot_alerts(connect(), request)
         elif cmd == 'position-plan':
-            from .analytics import position_plan
+            from .analytics.portfolio import position_plan
             result = position_plan.run(connect(), request)
         elif cmd == 'portfolio-refresh':
-            from .analytics import history_refresh
+            from .analytics.series import history_refresh
             result=history_refresh.refresh(connect(),int(request['listing_id']))
         elif cmd == 'watch-template':
-            from .analytics import watch
+            from .analytics.portfolio import watch
             result = {'rules': watch.template(request['name'], request.get('config'))}
         elif cmd == 'watch-run':
-            from .analytics import watch
+            from .analytics.portfolio import watch
             result = watch.run_all(connect(), user_id=int(request['user_id']), force=True)
         elif cmd == 'watch-eval':
-            from .analytics import watch
+            from .analytics.portfolio import watch
             result = watch.evaluate(connect(), request)
         elif cmd == 'portfolio-history':
-            from .analytics import history
+            from .analytics.series import history
             result = history.portfolio_history(connect(), request)
         elif cmd == 'allocation':
-            from .analytics import allocation
+            from .analytics.portfolio import allocation
             result = allocation.portfolio_allocation(connect(), request)
         elif cmd == 'overview':
-            from .analytics import overview
+            from .analytics.market_views import overview
             result = overview.data_overview(connect())
         elif cmd == 'filter-metadata-coverage':
             result = service.filter_metadata_coverage(connect())
@@ -141,7 +147,7 @@ def serve(cmd):
         elif cmd in ADMIN:
             result = ADMIN[cmd](connect(), request)
         elif cmd == 'validate-config':
-            from .analytics import explorer_config as C
+            from .analytics.explorer import explorer_config as C
             result = C.editable(request) if request.get('_editable') else C.upgrade(request) if request.get('_upgrade') else strategy.validate(request)
         else:
             conn = connect()
@@ -210,13 +216,13 @@ def _main(argv=None):
         elif args.cmd == 'job':
             print(tasks.run_manual(conn, YahooClient(), args.name, now, args.trigger))
         elif args.cmd == 'suivi-backfill':
-            from engine.analytics import tracking
+            from engine.analytics.portfolio import tracking
             print(tracking.backfill(conn, args.sessions, log=lambda m: print(m, file=sys.stderr)), tracking.update_outcomes(conn))
         elif args.cmd == 'metrics':
-            from engine.analytics import compute
+            from engine.analytics.series import compute
             print(compute.compute_all(conn, now))
         elif args.cmd == 'etf':
-            from engine.analytics import etf
+            from engine.analytics.market_views import etf
             print(etf.build(conn, now))
     return 0
 

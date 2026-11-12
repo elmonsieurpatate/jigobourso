@@ -3,8 +3,8 @@ import datetime
 import os
 import re
 
-from engine.analytics import alerts as al
-from engine.analytics import strategy
+from engine.analytics.portfolio import alerts as al
+from engine.analytics.explorer import strategy
 
 TODAY = datetime.date(2026, 11, 2)
 LOT = {'trade_date': '2026-03-02'}
@@ -61,7 +61,7 @@ def test_curves_start_at_the_oldest_open_purchase():
 
 
 def test_momentum_alert_preserves_the_percentage_unit_from_series():
-    from engine.analytics.series import momentum_6_1
+    from engine.analytics.series.series import momentum_6_1
     closes = [100.0] * 105 + [90.0] * 22
     momentum = momentum_6_1([str(i) for i in range(127)], closes, [])
     assert round(momentum, 6) == -10

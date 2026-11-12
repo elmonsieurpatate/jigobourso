@@ -1,7 +1,7 @@
 """Entonnoir de l'administration : `funnel.items` reçoit des paramètres venus du navigateur ; aucun ne doit atteindre le SQL autrement que lié ou validé."""
 import os
 import pytest
-from engine.analytics import funnel
+from engine.analytics.explorer import funnel
 from engine.shared.db import connect
 from tests.dbutil import reset_data
 

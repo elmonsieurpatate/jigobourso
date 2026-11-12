@@ -3,7 +3,7 @@ import datetime as dt
 import runpy
 runpy.run_path('tests/e2e/explorer-editor-seed.py')
 from engine.shared.db import connect
-from engine.analytics.compute import compute_all
+from engine.analytics.series.compute import compute_all
 c=connect()
 today=dt.date.today();days=[];d=today-dt.timedelta(days=1)
 while len(days)<3:

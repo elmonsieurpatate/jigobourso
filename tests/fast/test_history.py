@@ -1,7 +1,7 @@
 """Évolution du portefeuille jour par jour : valeur, apports nets, résultat cumulé, ventes, splits, change."""
 import datetime
 
-from engine.analytics import history as h
+from engine.analytics.series import history as h
 
 TODAY = datetime.date(2026, 1, 9)
 

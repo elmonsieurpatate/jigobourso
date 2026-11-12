@@ -1,5 +1,5 @@
 /* Portefeuille V4 : un seul espace, deux zones (Vue d'ensemble, Transactions), détail en panneau avec le Plan de suivi.
-   Calculs : pf-math.js. Tracé : J.financialChart (financial-chart.js, moteur partagé). Plan de suivi : plan-suivi.js (calculs : engine/analytics/position_plan.py). Couleurs : variables du thème. */
+   Calculs : pf-math.js. Tracé : J.financialChart (financial-chart.js, moteur partagé). Plan de suivi : plan-suivi.js (calculs : engine/analytics/portfolio/position_plan.py). Couleurs : variables du thème. */
 (function (root) {
   'use strict';
   const PFM = root.PFM, isNum = PFM.isNum;

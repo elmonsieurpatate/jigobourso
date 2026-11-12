@@ -12,8 +12,8 @@ import json
 import math
 from collections import defaultdict
 
-from .series import prepare_series
-from ..shared.db import ensure
+from ..series.series import prepare_series
+from ...shared.db import ensure
 
 WEEKS = 52                 # fenêtre : 52 semaines calendaires
 MIN_WEEKS = 40             # rendements hebdomadaires indépendants exigés dans chaque série de même jour de semaine
@@ -578,7 +578,7 @@ def compare(conn, lid, limit=4):
 
 def portfolio(conn, positions):
     """Valeur ACTUELLE en EUR, pas quantités ni coûts d'acquisition. Inconnu explicite. Familles d'ETF presque identiques pesées en valeur."""
-    from . import signals
+    from ..series import signals
     items = [p for p in positions if p.get('kind') == 'etf' and p.get('listing_id')]
     cached = load(conn, [int(p['listing_id']) for p in items], True)
     unpriced = sum(number(p.get('value')) is None for p in positions)

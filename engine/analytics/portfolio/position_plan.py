@@ -13,7 +13,7 @@ Seuils de risque : bandes de σ63 et centiles mesurés (table BANDS), jamais opt
 import datetime
 import math
 
-from . import measures
+from ..series import measures
 
 MODEL_VERSION = 1
 SIGMA_WINDOW = 63
@@ -301,20 +301,12 @@ def _d(iso):
 
 def _load(conn, ids):
     """{listing_id: (dates, closes, breaks)} : clôtures corrigées des splits (prepare_series) et ruptures de cours non expliquées."""
-    from .series import prepare_series
+    from ..series.loader import load_bars_and_splits
+    from ..series.series import prepare_series
     out = {}
     if not ids:
         return out
-    marks = ','.join(['%s'] * len(ids))
-    with conn.cursor() as cur:
-        cur.execute(f'SELECT listing_id, price_date, close_px, adj_close_px FROM daily_prices WHERE listing_id IN ({marks}) ORDER BY listing_id, price_date', list(ids))
-        bars = {}
-        for r in cur.fetchall():
-            bars.setdefault(r['listing_id'], []).append((r['price_date'].isoformat(), float(r['close_px']), None if r['adj_close_px'] is None else float(r['adj_close_px'])))
-        cur.execute(f"SELECT listing_id, event_date, ratio FROM corporate_events WHERE listing_id IN ({marks}) AND kind IN ('split','reverse_split')", list(ids))
-        splits = {}
-        for r in cur.fetchall():
-            splits.setdefault(r['listing_id'], []).append((r['event_date'].isoformat(), float(r['ratio']) if r['ratio'] else None))
+    bars, splits = load_bars_and_splits(conn, ids)
     for lid in ids:
         dates, closes, _basis, breaks = prepare_series(bars.get(lid, []), splits.get(lid, ()))
         out[lid] = (dates, closes, breaks)

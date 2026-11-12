@@ -7,7 +7,7 @@ la barre n'est alors pas évaluée au lieu de déclencher une alerte à tort. Le
 """
 import math
 
-from .series import BREAK_RATIO
+from ..series.series import BREAK_RATIO
 
 # Fenêtres (séances) par horizon de stratégie : (récente, longue, horizon du seuil de recul).
 HORIZONS = {

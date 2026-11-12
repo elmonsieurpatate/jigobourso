@@ -1,8 +1,8 @@
 import math
 
 import pytest
-from engine.analytics.measures import window_metrics, technical_state, dated_technical_state
-from engine.analytics.series import usable_closes, find_breaks, clean_window
+from engine.analytics.series.measures import window_metrics, technical_state, dated_technical_state
+from engine.analytics.series.series import usable_closes, find_breaks, clean_window
 
 
 def geometric(rate, n, start=100.0):
@@ -95,7 +95,7 @@ def test_window_crossing_break_is_refused():
 
 
 # ── Corrections de données identifiables (changements d'unité, cours aberrants isolés) ──
-from engine.analytics.series import data_corrections, drop_isolated_spikes, normalize_units, prepare_series  # noqa: E402
+from engine.analytics.series.series import data_corrections, drop_isolated_spikes, normalize_units, prepare_series  # noqa: E402
 
 
 def _dates(n, start=(2026, 1, 5)):

@@ -2,7 +2,8 @@
 import json
 import os
 
-from engine.analytics import score_categories, scores_admin as A
+from engine.analytics.scoring import score_categories
+from engine.analytics.admin import scores_admin as A
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 

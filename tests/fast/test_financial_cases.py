@@ -1,7 +1,7 @@
 """Numerical oracles: hand-computable returns, splits and independent clock freshness."""
 import datetime as dt
 import pytest
-from engine.analytics.series import analyze_series
+from engine.analytics.series.series import analyze_series
 from engine.market import hours
 from engine.market.collect import to_eur_factor
 
@@ -57,7 +57,7 @@ def test_unknown_split_also_invalidates_crossing_moving_average():
     assert m[21] is None
 
 def test_tracking_forward_return_uses_the_same_split_basis():
-    from engine.analytics.tracking import forward_returns
+    from engine.analytics.portfolio.tracking import forward_returns
     bars=[('2026-10-01',100,None),('2026-10-02',50,None),('2026-10-05',55,None)]
     result=forward_returns(bars,'2026-10-01',[1,2],[('2026-10-02',2)])
     assert result[1]==pytest.approx(0) and result[2]==pytest.approx(10)

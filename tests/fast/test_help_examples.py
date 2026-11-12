@@ -1,7 +1,8 @@
 """Les chiffres de l'exemple « Zébulon » et des échelles de notes écrits dans l'aide (help-content.js, aide.js) doivent rester ceux du moteur : si une règle change, ce test échoue et l'aide est à mettre à jour."""
 import pytest
 
-from engine.analytics import scores as S, strategy as LEGACY
+from engine.analytics.scoring import scores as S
+from engine.analytics.explorer import strategy as LEGACY
 
 
 def slope_for(total, n):

@@ -2,7 +2,7 @@ import os,datetime as dt
 assert os.environ.get('JIGO_TEST_DATABASE')=='1' and os.environ['JIGO_DB_NAME']=='jigobourso_it'
 from engine.shared.db import connect
 from tests.dbutil import reset_data
-from engine.analytics.compute import compute_all
+from engine.analytics.series.compute import compute_all
 con=connect();reset_data(con)
 dates=[];d=dt.date.today()
 while len(dates)<400:

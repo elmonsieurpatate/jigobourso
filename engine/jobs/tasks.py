@@ -15,7 +15,10 @@ import subprocess
 import tempfile
 import time
 
-from engine.analytics import compute, etf, funnel, tracking
+from engine.analytics.series import compute
+from engine.analytics.market_views import etf
+from engine.analytics.explorer import funnel
+from engine.analytics.portfolio import tracking
 from engine.catalogue import loader
 from engine.market import catchup, collect, hours, splits
 from engine.market.yahoo import RateLimited

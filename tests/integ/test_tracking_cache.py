@@ -2,7 +2,10 @@ import datetime
 import os
 import pytest
 from engine.shared.db import connect
-from engine.analytics import compute, service, strategy, tracking
+from engine.analytics.series import compute
+from engine.analytics.admin import service
+from engine.analytics.explorer import strategy
+from engine.analytics.portfolio import tracking
 from tests.dbutil import reset_data
 
 pytestmark = pytest.mark.integration

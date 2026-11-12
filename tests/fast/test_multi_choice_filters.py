@@ -1,5 +1,5 @@
 """Filtres pays et catégorie à choix multiple (valeurs séparées par « | »)."""
-from engine.analytics import service
+from engine.analytics.admin import service
 
 
 def test_choices_accepts_pipe_separated_text_and_lists():

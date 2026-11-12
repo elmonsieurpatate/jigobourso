@@ -16,9 +16,14 @@ from engine.shared import settings as settings_mod
 from engine.market import hours
 from engine.market.collect import effective_expected_close, latest_rates, to_eur_factor
 from engine.market.calendar import window_calendars, session_dates
-from . import signals, strategy, explorer_config, explorer_metrics, score_service, liquidity
-from . import geography
-from .series import analyze_series, prepare_series, data_corrections
+from ..series import signals
+from ..explorer import strategy
+from ..explorer import explorer_config
+from ..explorer import explorer_metrics
+from ..scoring import score_service
+from ..series import liquidity
+from ..market_views import geography
+from ..series.series import analyze_series, prepare_series, data_corrections
 
 # PEA : actions d'une société dont le siège est dans l'UE ou l'EEE (Islande, Liechtenstein et Norvège compris ; pas le Royaume-Uni ni la Suisse),
 # achetées sur une place européenne (c'est ce que les courtiers acceptent dans un PEA). Une action américaine d'une société irlandaise n'est donc
@@ -553,7 +558,7 @@ def explore(conn, request):
     detail = {v['key']: v for v in judge_universe(conn, config, wanted)} if wanted else {}
     score_detail = score_service.details(conn, config, wanted)
     out = []
-    from . import etf
+    from ..market_views import etf
     etf_top = [e['id'] for e in rows if e.get('group') == 'etf'][:10]          # dix premiers ETF de la vue, avant pagination, dans l'ordre déjà déterminé
     etf_concentration = etf.concentration(conn, etf_top)
     page_etf = [e['id'] for e in page_rows if e not in excluded_hits and e.get('group') == 'etf']
@@ -624,7 +629,7 @@ def explore(conn, request):
 
 def filter_metadata_coverage(conn):
     """Couverture AUM et région sur les instruments recommandables; compte sans double compte des cotations."""
-    from . import etf
+    from ..market_views import etf
     profiles = etf.read_profiles(conn)
     rates = latest_rates(conn)
     with conn.cursor() as cur:
@@ -817,7 +822,7 @@ def instrument_sheet(conn, request):
         sheet['verdict'] = {'status': 'unknown', 'status_label': 'Non analysé', 'note': 'Aucune cotation Yahoo exploitable pour le moment : ce titre n’est pas encore analysé.'}
     if u['kind'] == 'etf':
         sheet['etf_profile'] = _etf_profile(conn, lid, u['symbol'], bool(request.get('fetch_profile')))     # une seule requête Yahoo, pour l'ETF ouvert, profil de plus de 30 jours ou d'ancienne version
-        from . import etf
+        from ..market_views import etf
         sheet['etf_analysis'] = etf.load(conn, [lid]).get(lid)
         sheet['etf_compare'] = etf.compare(conn, lid)
     sheet['strategy'] = {'name': config.get('name'), 'ranking': config['ranking']['mode'], 'source': request.get('source') or None, 'experimental': config.get('name') in strategy.EXPERIMENTAL or config['ranking']['mode'] in strategy.MOMENTUM_WINDOWS or config['ranking']['mode'] == strategy.RISK_MOMENTUM,
@@ -955,7 +960,7 @@ def _sheet_tradability(conn, u, rates):
 
 def _sheet_signals(conn, sheet, u, config, closes, state):
     """« Lecture rapide » de la fiche : mêmes seuils que les pastilles du classement, avec les détails pédagogiques de la V1 (séances en hausse, poids du meilleur jour)."""
-    from . import signals
+    from ..series import signals
     ref = _reference_window(config)
     m = (sheet.get('measures') or {}).get(str(ref)) or {}
     facts = signals.history_facts(closes, ref) if m.get('coverage') in (None, 1.0) else {}
@@ -967,7 +972,7 @@ def _sheet_signals(conn, sheet, u, config, closes, state):
                                 m.get('coverage', state.get('coverage_252')), m.get('observations', state.get('observed_252')),
                                 m.get('expected_closes', state.get('expected_252')))]
     if u['kind'] == 'etf':
-        from . import etf
+        from ..market_views import etf
         analysis = etf.load(conn, [u['id']]).get(u['id'])
         prof = (sheet.get('etf_profile') or {}).get('data') or {}
         out += [signals.similarity(analysis), signals.composition(prof),
@@ -1029,7 +1034,7 @@ def _etf_profile(conn, listing_id, symbol, allow_fetch):
             conn.commit()
             return {'state': state, 'fetched_at': now.isoformat(sep=' '), 'data': data}
     if row:
-        from .etf import profile_data
+        from ..market_views.etf import profile_data
         data = profile_data(json.loads(row['data_json']) or {})
         if row['version'] < 2:
             data['holdings'] = [dict(h, weight=None if h['weight'] == 0 else h['weight']) for h in data['holdings']]
@@ -1041,7 +1046,8 @@ def _etf_profile(conn, listing_id, symbol, allow_fetch):
 def _scores_v4(conn, lid, ct=None):
     """Scores V4 du titre (simple, complexe, rangs généraux, contributions) avec la stratégie V4 du contexte (celle du Classement dont la fiche est ouverte) ; None si le titre n'est pas noté. Lecture seule.
     Mêmes scores et mêmes rangs que le Classement : retenu ou exclu, la note et le rang ne changent pas."""
-    from . import scores, scores_admin
+    from ..scoring import scores
+    from . import scores_admin
     ct = ct or {}
     name = 'growth_v4'
     if ct.get('id'):
@@ -1064,7 +1070,8 @@ V4_STATUS_LABELS = {'retained': 'Retenue', 'excluded': 'Exclue', 'undetermined':
 
 def _v4_strategy(conn, lid, ct):
     """Verdict de la stratégie du Classement pour ce titre : même moteur (`criteria`) et mêmes mesures (`strategy_metrics`) que le tableau. Sans contexte fiable : indéterminé, jamais « retenue »."""
-    from . import criteria as CR, ranking_table
+    from ..scoring import criteria as CR
+    from ..scoring import ranking_table
     ct = ct or {}
     ct_id, state = ct.get('id'), ct.get('state') or 'missing'
     base = {'id': ct_id, 'label': ct.get('label'), 'state': state, 'checks': [], 'active': 0, 'join': None}

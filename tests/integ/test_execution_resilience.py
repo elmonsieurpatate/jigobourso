@@ -5,7 +5,8 @@ import time
 
 import pytest
 
-from engine.analytics import compute, etf
+from engine.analytics.series import compute
+from engine.analytics.market_views import etf
 from engine.jobs.runner import run_job
 from engine.shared.db import connect
 from tests.dbutil import reset_data

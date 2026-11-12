@@ -1,4 +1,4 @@
-from engine.analytics.geography import equity_region, etf_region
+from engine.analytics.market_views.geography import equity_region, etf_region
 
 
 def test_equity_regions_use_issuer_country_names():

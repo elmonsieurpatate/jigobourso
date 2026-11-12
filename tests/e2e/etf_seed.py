@@ -5,7 +5,7 @@ import math
 import os
 assert os.environ.get('JIGO_TEST_DATABASE') == '1' and os.environ.get('JIGO_DB_NAME') == 'jigobourso_it'
 from engine.shared.db import connect
-from engine.analytics import etf
+from engine.analytics.market_views import etf
 c = connect()
 with c.cursor() as q:
     q.execute('SELECT price_date,close_px FROM daily_prices WHERE listing_id=1 ORDER BY price_date')
