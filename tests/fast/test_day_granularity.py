@@ -12,6 +12,8 @@ from engine.analytics.explorer import explorer_config as C
 from engine.analytics.scoring import score_service as S
 from engine.analytics.scoring import scores as SC
 from engine.analytics.admin import scores_admin as A
+from engine.analytics.admin import scores_profiles
+from engine.analytics.admin import scores_specs
 from engine.analytics.series.measures import dated_technical_state
 from engine.market import hours
 from engine.market.calendar import session_dates
@@ -156,25 +158,25 @@ def test_day_alone_cannot_produce_a_regularity_so_the_score_is_unknown():
 
 def test_automatic_weights_ignore_day_and_do_not_move_other_weights():
     assert SC.resolve_weights(WITH_DAY) == {'day': 0.0, **SC.resolve_weights(WEEK_MONTH)}
-    assert A.auto_weights(0.7, ['day', 'week', 'month']) == {'day': 0.0, **A.auto_weights(0.7, ['week', 'month'])}
+    assert scores_profiles.auto_weights(0.7, ['day', 'week', 'month']) == {'day': 0.0, **scores_profiles.auto_weights(0.7, ['week', 'month'])}
 
 
 # ───────────── profils et stratégies ─────────────
 
 def test_builtin_strategies_keep_day_disabled_and_at_zero_percent():
-    for name in A.V4_STRATEGIES:
-        base = A.base_config(name)
+    for name in scores_specs.V4_STRATEGIES:
+        base = scores_profiles.base_config(name)
         day = next(p for p in base['periods'] if p['id'] == 'day')
         assert not day['enabled']
-        prof = A.profile_of(base)
+        prof = scores_profiles.profile_of(base)
         assert prof['periods']['day']['enabled'] is False and prof['periods']['day']['sessions'] == 1
         assert 'day' not in (prof['weights'] or {}) or not prof['weights']['day']
-        assert all(p['id'] != 'day' for p in S.params_for(A.neutral(base), 'equity')['periods'])
+        assert all(p['id'] != 'day' for p in S.params_for(scores_profiles.neutral(base), 'equity')['periods'])
 
 
 def test_day_enabled_without_weight_changes_nothing_not_even_the_cache_key():
-    for name in A.V4_STRATEGIES:
-        base = A.neutral(A.base_config(name))
+    for name in scores_specs.V4_STRATEGIES:
+        base = scores_profiles.neutral(scores_profiles.base_config(name))
         before = S._key(base, 7)
         on = copy.deepcopy(base)
         next(p for p in on['periods'] if p['id'] == 'day')['enabled'] = True
@@ -182,7 +184,7 @@ def test_day_enabled_without_weight_changes_nothing_not_even_the_cache_key():
 
 
 def test_custom_weights_saved_before_day_existed_stay_valid_and_unchanged():
-    cfg = A.neutral(A.base_config('growth_v4'))
+    cfg = scores_profiles.neutral(scores_profiles.base_config('growth_v4'))
     cfg['scoring']['weights'] = {'week': 40.0, 'month': 60.0}
     next(p for p in cfg['periods'] if p['id'] == 'day')['enabled'] = True
     got = S.params_for(cfg, 'equity')
@@ -193,7 +195,7 @@ def test_custom_weights_saved_before_day_existed_stay_valid_and_unchanged():
 
 
 def _profile(name='growth_v4'):
-    p = A.profile_of(A.base_config(name))
+    p = scores_profiles.profile_of(scores_profiles.base_config(name))
     for x in p['periods'].values():
         x.pop('sessions')
     return dict(p, name=name)
@@ -204,16 +206,16 @@ def test_profile_saved_before_day_loads_with_day_disabled():
     legacy = copy.deepcopy(p)
     del legacy['periods']['day']
     legacy.pop('day_filter')
-    clean = A.clean_profile(legacy)
+    clean = scores_profiles.clean_profile(legacy)
     assert clean['periods']['day']['enabled'] is False and clean['periods']['day']['min_return'] is None
-    assert clean['periods']['week'] == A.clean_profile(p)['periods']['week']
+    assert clean['periods']['week'] == scores_profiles.clean_profile(p)['periods']['week']
 
 
 def test_old_last_day_filter_is_carried_into_the_day_granularity():
     legacy = _profile()
     del legacy['periods']['day']
     legacy['day_filter'] = {'enabled': True, 'min_return': 1.5}
-    clean = A.clean_profile(legacy)
+    clean = scores_profiles.clean_profile(legacy)
     assert clean['periods']['day']['enabled'] and clean['periods']['day']['min_return'] == 1.5
 
 
@@ -225,12 +227,12 @@ def test_day_roundtrip_activation_deactivation_and_weights():
     A.save(None, {'profile': p})
     cur = next(s for s in A.state(None)['strategies'] if s['name'] == 'growth_v4')['current']
     assert cur['periods']['day']['enabled'] and cur['weights']['day'] == 10.0 and cur['periods']['day']['sessions'] == 1
-    cfg = A.build_config(None, 'growth_v4')
+    cfg = scores_profiles.build_config(None, 'growth_v4')
     assert [(x['id'], x['weight']) for x in S.params_for(cfg, 'equity')['periods']] == [('day', 10.0), ('week', 45.0), ('month', 45.0)]
     p['periods']['day']['enabled'] = False
     p['weights'] = {'week': 50.0, 'month': 50.0}
     A.save(None, {'profile': p})
-    cfg = A.build_config(None, 'growth_v4')
+    cfg = scores_profiles.build_config(None, 'growth_v4')
     assert [x['id'] for x in S.params_for(cfg, 'equity')['periods']] == ['week', 'month']
 
 
@@ -239,10 +241,10 @@ def test_day_in_custom_mode_without_a_weight_counts_as_zero_and_total_must_stay_
     p['periods']['day']['enabled'] = True
     p['weights_mode'] = 'custom'
     p['weights'] = {'week': 50.0, 'month': 50.0}
-    assert A.clean_profile(p)['weights'] == {'day': 0.0, 'week': 50.0, 'month': 50.0}
+    assert scores_profiles.clean_profile(p)['weights'] == {'day': 0.0, 'week': 50.0, 'month': 50.0}
     p['weights'] = {'day': 10.0, 'week': 50.0, 'month': 50.0}
     with pytest.raises(ValueError):
-        A.clean_profile(p)
+        scores_profiles.clean_profile(p)
 
 
 def test_day_alone_is_refused_in_automatic_mode_and_has_no_slope_or_r2_threshold():
@@ -251,10 +253,10 @@ def test_day_alone_is_refused_in_automatic_mode_and_has_no_slope_or_r2_threshold
         p['periods'][pid]['enabled'] = False
     p['periods']['day']['enabled'] = True
     with pytest.raises(ValueError):
-        A.clean_profile(p)
+        scores_profiles.clean_profile(p)
     q = _profile()
     q['periods']['day'].update(enabled=True, min_slope=0.5, min_r2=0.9, max_volatility=3.0, min_return=1.0)
-    day = A.clean_profile(q)['periods']['day']
+    day = scores_profiles.clean_profile(q)['periods']['day']
     assert day['min_slope'] is None and day['min_r2'] is None and day['max_volatility'] is None and day['min_return'] == 1.0
 
 
@@ -309,4 +311,4 @@ def test_legacy_specs_without_day_are_unchanged():
 
 
 def test_scoring_periods_expose_day_first_with_a_label():
-    assert A.SCORING_PERIODS[0] == 'day' and A.PERIOD_LABELS['day'] == 'Jour' and C.SESSIONS['day'] == 1
+    assert scores_specs.SCORING_PERIODS[0] == 'day' and scores_profiles.PERIOD_LABELS['day'] == 'Jour' and C.SESSIONS['day'] == 1

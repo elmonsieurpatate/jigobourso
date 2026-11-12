@@ -198,8 +198,8 @@ echo "$name"
 REMOTE
 )
 echo "sauvegarde : $backup"
-# Le recalcul n'est demandé que si le code qui produit les données dérivées (engine/, db/) change. service.py et signals.py ne font qu'afficher (lecture seule) : les exclure évite un recalcul pour une retouche d'affichage.
-engine_before=$(remote_sh "cd $root && find engine db -type f ! -name '*.pyc' ! -path engine/analytics/admin/service.py ! -path engine/analytics/series/signals.py | LC_ALL=C sort | xargs sha256sum | sha256sum | cut -c1-16" 2>/dev/null || true)
+# Le recalcul n'est demandé que si le code qui produit les données dérivées (engine/, db/) change. service.py (et les modules qui en sont issus : universe_verdicts, title_sheet, market_facts) et signals.py ne font qu'afficher (lecture seule) : les exclure évite un recalcul pour une retouche d'affichage.
+engine_before=$(remote_sh "cd $root && find engine db -type f ! -name '*.pyc' ! -path engine/analytics/admin/service.py ! -path engine/analytics/admin/universe_verdicts.py ! -path engine/analytics/admin/title_sheet.py ! -path engine/analytics/market_views/market_facts.py ! -path engine/analytics/series/signals.py | LC_ALL=C sort | xargs sha256sum | sha256sum | cut -c1-16" 2>/dev/null || true)
 
 set +e
 (
@@ -322,7 +322,7 @@ fi
 
 remote_sh "ROOT=$root SHA=$sha VERSION=$version BEFORE=$engine_before bash -s" <<'REMOTE'
 cd "$ROOT"
-hash=$(find engine db -type f ! -name '*.pyc' ! -path engine/analytics/admin/service.py ! -path engine/analytics/series/signals.py | LC_ALL=C sort | xargs sha256sum | sha256sum | cut -c1-16)
+hash=$(find engine db -type f ! -name '*.pyc' ! -path engine/analytics/admin/service.py ! -path engine/analytics/admin/universe_verdicts.py ! -path engine/analytics/admin/title_sheet.py ! -path engine/analytics/market_views/market_facts.py ! -path engine/analytics/series/signals.py | LC_ALL=C sort | xargs sha256sum | sha256sum | cut -c1-16)
 printf 'commit=%s\nversion=%s\ndate=%s\nengine_hash=%s\n' "$SHA" "$VERSION" "$(date -u +%FT%TZ)" "$hash" > .deployed
 if [ "$hash" = "$BEFORE" ]; then
   echo "moteur et schéma inchangés : aucun recalcul"

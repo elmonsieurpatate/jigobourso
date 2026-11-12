@@ -9,7 +9,9 @@ import os
 from engine.market.collect import latest_rates, to_eur_factor
 
 from . import criteria as CR
-from ..admin import scores_admin
+from ..admin import scores_specs
+from ..admin import scores_profiles
+from ..admin import scores_ranking
 from . import score_service
 from ..admin import universe_verdicts
 
@@ -71,14 +73,14 @@ CRITERIA_FIELDS = {'min_slope': 'slope', 'min_r2': 'r2'}      # critères de REC
 
 
 def criteria(conn=None, request=None):
-    """Critères de recherche historiques des stratégies intégrées, lus dans la source centralisée `scores_admin.V4_STRATEGIES` : {identifiant du Classement: {période: {critère: valeur}}}.
+    """Critères de recherche historiques des stratégies intégrées, lus dans la source centralisée `scores_specs.V4_STRATEGIES` : {identifiant du Classement: {période: {critère: valeur}}}.
     Ce sont des critères de RECHERCHE (affichage) : ils n'entrent ni dans les notes ni dans les rangs. Une stratégie sans critère (Momentum) renvoie des périodes vides."""
     out = {}
-    for ct_id, name in scores_admin.CT_BUILTIN.items():
-        cfg = scores_admin.V4_STRATEGIES[name]['build']()
+    for ct_id, name in scores_specs.CT_BUILTIN.items():
+        cfg = scores_specs.V4_STRATEGIES[name]['build']()
         per = {}
         for p in cfg['periods']:
-            if p['id'] in scores_admin.SCORING_PERIODS and p.get('enabled'):
+            if p['id'] in scores_specs.SCORING_PERIODS and p.get('enabled'):
                 per[p['id']] = {CRITERIA_FIELDS[f]: p[f] for f in CRITERIA_FIELDS if p.get(f) is not None}
         out[ct_id] = {'name': name, 'periods': per}
     return {'criteria': out}
@@ -107,14 +109,14 @@ def norm_of(request):
 
 
 def _base(conn, request):
-    scores_admin.refresh(conn)
+    scores_specs.refresh(conn)
     if request.get('ct_id'):                                                       # stratégie du Classement : ses propres réglages de scores
-        name = scores_admin.resolve(conn, request['ct_id'], request.get('user_id') or 0)
+        name = scores_specs.resolve(conn, request['ct_id'], request.get('user_id') or 0)
     else:
         name = request.get('strategy') or 'growth_v4'
-    if not scores_admin.known(name):
+    if not scores_specs.known(name):
         name = 'growth_v4'
-    cfg = scores_admin.build_config(conn, name)
+    cfg = scores_profiles.build_config(conn, name)
     book = score_service.score_book(conn, cfg, universe_verdicts.data_version(conn))
     return name, cfg, book
 
@@ -144,11 +146,11 @@ def table(conn, request):
     name, cfg, book = _base(conn, request)
     norm = norm_of(request)
     ids = evaluable(book)
-    simple, rank_s, pos_s = scores_admin.ordered(book, 'simple')            # même fonction que l'administration des scores : même ordre, mêmes rangs
-    complex_, rank_c, pos_c = scores_admin.ordered(book, 'complex')
+    simple, rank_s, pos_s = scores_ranking.ordered(book, 'simple')            # même fonction que l'administration des scores : même ordre, mêmes rangs
+    complex_, rank_c, pos_c = scores_ranking.ordered(book, 'complex')
     tie_s, tie_c = _ties(rank_s), _ties(rank_c)
     data = _fetch(conn, ids) if ids else {}
-    curves = scores_admin.series(conn, ids, REFERENCE) if ids and request.get('include_curves', True) is not False else {}
+    curves = scores_ranking.series(conn, ids, REFERENCE) if ids and request.get('include_curves', True) is not False else {}
     rates = latest_rates(conn)
     groups = _config()
     rows = []
@@ -187,7 +189,7 @@ def table(conn, request):
         cur.execute('SELECT COUNT(*) AS n FROM v_recommendable')
         universe = int(cur.fetchone()['n'])
     counts = CR.counts(r['status'] for r in rows)
-    return {'strategy': name, 'label': scores_admin.spec(name)['label'], 'counts': counts, 'context': 'missing' if norm is None else 'ok', 'reference_sessions': REFERENCE, 'universe': universe, 'evaluated': len(rows),
+    return {'strategy': name, 'label': scores_specs.spec(name)['label'], 'counts': counts, 'context': 'missing' if norm is None else 'ok', 'reference_sessions': REFERENCE, 'universe': universe, 'evaluated': len(rows),
             'scored': {'simple': len(simple), 'complex': len(complex_)}, 'default_sort': 'complex', 'rows': rows}      # tri par défaut systématique : score complexe
 
 
@@ -196,4 +198,4 @@ def curves(conn, request):
     ids = request.get('ids')
     if not isinstance(ids, list) or len(ids) > 100 or any(type(i) is not int or i <= 0 for i in ids):
         raise ValueError('Une page de 100 identifiants de titres maximum est requise')
-    return {'curves': scores_admin.series(conn, list(dict.fromkeys(ids)), REFERENCE) if ids else {}}
+    return {'curves': scores_ranking.series(conn, list(dict.fromkeys(ids)), REFERENCE) if ids else {}}

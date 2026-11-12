@@ -4,6 +4,7 @@ import os
 import pytest
 
 from engine.analytics.admin import scores_admin as A
+from engine.analytics.admin import scores_specs
 from engine.analytics.explorer import strategy_docs
 from engine.shared.db import connect
 from tests.dbutil import reset_data
@@ -18,7 +19,7 @@ SEVEN = ['growth_v4', 'growth_regular', 'calm_rise', 'rebound', 'momentum_6m', '
 def fresh():
     conn = connect()
     reset_data(conn)
-    A.set_user(None)
+    scores_specs.set_user(None)
     return conn
 
 
@@ -38,7 +39,7 @@ def by_id(status):
 
 def test_seven_official_strategies_one_entry_each_and_all_official():
     conn = fresh()
-    A.set_user(1)
+    scores_specs.set_user(1)
     st = A.strategies_status(conn, {'ct_items': []})['strategies']
     assert [s['name'] for s in st] == SEVEN
     assert {s['status'] for s in st} == {'official'}
@@ -47,21 +48,21 @@ def test_seven_official_strategies_one_entry_each_and_all_official():
 
 def test_adaptation_is_private_and_independent_between_users():
     conn = fresh()
-    A.set_user(1)
+    scores_specs.set_user(1)
     A.user_save(conn, {'name': 'growth_v4', 'profile': tweaked(conn, 'growth_v4')})
     assert by_id(A.strategies_status(conn, {}))['growth_v4']['status'] == 'adapted'
     assert by_id(A.strategies_status(conn, {}))['growth_v4']['scores']['modified'] >= 1
     assert by_id(A.strategies_status(conn, {}))['growth_v4']['criteria']['state'] == 'official'
-    A.set_user(2)
+    scores_specs.set_user(2)
     assert by_id(A.strategies_status(conn, {}))['growth_v4']['status'] == 'official'        # l'autre utilisateur ne voit rien
-    A.set_user(1)
+    scores_specs.set_user(1)
     A.user_save(conn, {'reset': 'profile', 'name': 'growth_v4'})
     assert by_id(A.strategies_status(conn, {}))['growth_v4']['status'] == 'official'
 
 
 def test_saving_profile_identical_to_official_returns_to_official():
     conn = fresh()
-    A.set_user(3)
+    scores_specs.set_user(3)
     A.user_save(conn, {'name': 'calm_rise', 'profile': tweaked(conn, 'calm_rise')})
     assert by_id(A.strategies_status(conn, {}))['calm_rise']['status'] == 'adapted'
     A.user_save(conn, {'name': 'calm_rise', 'profile': A.official_clean(conn, 'calm_rise')})
@@ -70,7 +71,7 @@ def test_saving_profile_identical_to_official_returns_to_official():
 
 def test_criteria_and_scores_are_judged_separately():
     conn = fresh()
-    A.set_user(4)
+    scores_specs.set_user(4)
     item = {'id': 'growth_v4', 'builtin': True, 'config': {'periods': {'week': {'slope': 0.5}}}}
     st = by_id(A.strategies_status(conn, {'ct_items': [item]}))['growth_v4']
     assert st['criteria']['state'] in ('official', 'adapted') and st['scores']['state'] == 'official'

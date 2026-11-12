@@ -8,6 +8,7 @@ import pytest
 
 from engine.analytics.scoring import ranking_table as R
 from engine.analytics.admin import scores_admin as A
+from engine.analytics.admin import scores_ranking
 from engine.shared.db import connect
 from tests.dbutil import reset_data
 from tests.integ.test_scores_admin import seed
@@ -36,7 +37,7 @@ def last_two(conn, lid):
 
 
 def scores(conn, name='growth_v4', **extra):
-    rows = A.ranking(conn, {'strategy': name, 'which': 'simple', 'limit': 100, **extra})['listing']['rows']
+    rows = scores_ranking.ranking(conn, {'strategy': name, 'which': 'simple', 'limit': 100, **extra})['listing']['rows']
     return {r['symbol']: (r['simple'], r['complex'], r['rank']) for r in rows}
 
 
@@ -46,7 +47,7 @@ def test_var_1j_is_the_move_between_the_last_two_closed_sessions_in_every_table(
     seed(conn)
     want = {'UP.DE': last_two(conn, 1), 'ZIG.DE': last_two(conn, 2)}
     rows = {r['symbol']: r for r in R.table(conn, {})['rows']}
-    adm = {r['symbol']: r for r in A.ranking(conn, {'strategy': 'growth_v4', 'which': 'simple', 'limit': 100})['listing']['rows']}
+    adm = {r['symbol']: r for r in scores_ranking.ranking(conn, {'strategy': 'growth_v4', 'which': 'simple', 'limit': 100})['listing']['rows']}
     with conn.cursor() as cur:
         cur.execute('SELECT listing_id, perf FROM strategy_metrics WHERE sessions=1')
         one = {r['listing_id']: float(r['perf']) for r in cur.fetchall()}
@@ -61,10 +62,10 @@ def test_scores_listing_sorts_on_var_1j_without_changing_global_ranks():
     conn = connect()
     clean(conn)
     seed(conn)
-    base = A.ranking(conn, {'strategy': 'growth_v4', 'which': 'simple', 'limit': 100})['listing']['rows']
+    base = scores_ranking.ranking(conn, {'strategy': 'growth_v4', 'which': 'simple', 'limit': 100})['listing']['rows']
     ranks = {r['symbol']: r['rank'] for r in base}
     for direction in ('desc', 'asc'):
-        rows = A.ranking(conn, {'strategy': 'growth_v4', 'which': 'simple', 'limit': 100, 'sort': [{'key': 'change', 'dir': direction}]})['listing']['rows']
+        rows = scores_ranking.ranking(conn, {'strategy': 'growth_v4', 'which': 'simple', 'limit': 100, 'sort': [{'key': 'change', 'dir': direction}]})['listing']['rows']
         values = [r['change'] for r in rows]
         assert values == sorted(values, reverse=direction == 'desc')
         assert {r['symbol']: r['rank'] for r in rows} == ranks
@@ -112,7 +113,7 @@ def test_day_weight_changes_scores_only_when_it_has_a_weight():
     p['weights'] = {}
     A.save(conn, {'profile': p})
     assert scores(conn) == before                                                     # désactivé : retour exact aux notes initiales
-    sim = A.simulate(conn, {'strategy': 'growth_v4', 'q': 'UP.DE'})
+    sim = scores_ranking.simulate(conn, {'strategy': 'growth_v4', 'q': 'UP.DE'})
     assert [x['id'] for x in sim['periods']] == ['week', 'month']
     clean(conn)
 

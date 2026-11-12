@@ -97,16 +97,17 @@ def _extra_titles(conn):
 
 
 def test_classement_and_scores_admin_rank_the_same_titles_in_the_same_order_with_the_same_notes_and_ranks():
-    from engine.analytics.admin import scores_admin as A
+    from engine.analytics.admin import scores_specs
+    from engine.analytics.admin import scores_ranking
     conn = connect()
     reset_data(conn)
     seed(conn)
     _extra_titles(conn)
-    for ct_id, name in A.CT_BUILTIN.items():
+    for ct_id, name in scores_specs.CT_BUILTIN.items():
         t = R.table(conn, {'ct_id': ct_id, 'user_id': 1})
         assert t['strategy'] == name
         for which in ('simple', 'complex'):
-            admin = A.ranking(conn, {'strategy': name, 'which': which, 'limit': 100})['listing']['rows']
+            admin = scores_ranking.ranking(conn, {'strategy': name, 'which': which, 'limit': 100})['listing']['rows']
             mine = sorted((r for r in t['rows'] if r[which] is not None), key=lambda r: r['pos_' + which])
             assert [r['id'] for r in mine] == [r['id'] for r in admin], (name, which)                           # mêmes titres, même ordre
             assert [r[which] for r in mine] == [r[which] for r in admin] and [r['rank_' + which] for r in mine] == [r['rank'] for r in admin], (name, which)
@@ -150,7 +151,7 @@ def test_three_modes_counts_cover_every_evaluable_title_and_never_change_scores_
 
 
 def test_live_verdicts_endpoint_equals_table_statuses_and_scores_admin_listing():
-    from engine.analytics.admin import scores_admin as A
+    from engine.analytics.admin import scores_ranking
     conn = connect()
     reset_data(conn)
     seed(conn)
@@ -162,7 +163,7 @@ def test_live_verdicts_endpoint_equals_table_statuses_and_scores_admin_listing()
     for mode in ('retained', 'excluded', 'all'):
         ids = []
         for which in ('simple', 'complex'):
-            L = A.ranking(conn, {'strategy': 'growth_v4', 'which': which, 'limit': 100, 'verdict': mode, 'ct_specs': {'fast': spec}})['listing']
+            L = scores_ranking.ranking(conn, {'strategy': 'growth_v4', 'which': which, 'limit': 100, 'verdict': mode, 'ct_specs': {'fast': spec}})['listing']
             assert L['counts'] == {**{k: sum(1 for r in t['rows'] if r['status'] == k and r[which] is not None) for k in ('retained', 'excluded', 'undetermined')},
                                    'all': sum(1 for r in t['rows'] if r[which] is not None)}
             expected = [r for r in t['rows'] if r[which] is not None and (mode == 'all' or r['status'] == mode)]
@@ -233,13 +234,13 @@ def test_sheet_measures_use_the_units_of_the_criteria():
 
 
 def test_scores_listing_sort_covers_the_whole_list_and_never_changes_global_ranks():
-    from engine.analytics.admin import scores_admin as A
+    from engine.analytics.admin import scores_ranking
     conn = connect()
     reset_data(conn)
     seed(conn)
     _extra_titles(conn)
     def rows(sort, limit=100, offset=0, which='simple'):
-        return A.ranking(conn, {'strategy': 'growth_v4', 'which': which, 'limit': limit, 'offset': offset, 'sort': sort})['listing']['rows']
+        return scores_ranking.ranking(conn, {'strategy': 'growth_v4', 'which': which, 'limit': limit, 'offset': offset, 'sort': sort})['listing']['rows']
     default = rows([])
     rank = {r['id']: r['rank'] for r in default}
     asc, desc = rows([{'key': 'simple', 'dir': 'asc'}]), rows([{'key': 'simple', 'dir': 'desc'}])
@@ -259,7 +260,7 @@ def test_scores_listing_sort_covers_the_whole_list_and_never_changes_global_rank
 @pytest.mark.parametrize('basis', ['raw', 'adjusted', 'partial'])
 def test_ranking_and_simulation_curves_use_the_same_split_basis_as_the_sheet(basis):
     import datetime
-    from engine.analytics.admin import scores_admin as A
+    from engine.analytics.admin import scores_ranking
     from engine.analytics.series.series import prepare_series
     conn = connect()
     try:
@@ -275,8 +276,8 @@ def test_ranking_and_simulation_curves_use_the_same_split_basis_as_the_sheet(bas
         conn.commit()
         expected_dates, expected, _, _ = prepare_series([(d.isoformat(), p, a) for d, p, a in zip(days, raw, adjusted)], [(days[1].isoformat(), 250)])
         assert expected == pytest.approx([5.0, 5.0, 5.005])
-        assert A.series(conn, [1], 2)[1] == pytest.approx(expected)
-        detail = A.dated_series(conn, 1, 2)
+        assert scores_ranking.series(conn, [1], 2)[1] == pytest.approx(expected)
+        detail = scores_ranking.dated_series(conn, 1, 2)
         assert [r['d'] for r in detail] == expected_dates and [r['p'] for r in detail] == pytest.approx(expected)
         assert R.curves(conn, {'ids': [1]})['curves'][1] == pytest.approx(expected)
     finally:

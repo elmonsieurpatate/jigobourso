@@ -285,15 +285,16 @@ def _scores_v4(conn, lid, ct=None):
     """Scores V4 du titre (simple, complexe, rangs généraux, contributions) avec la stratégie V4 du contexte (celle du Classement dont la fiche est ouverte) ; None si le titre n'est pas noté. Lecture seule.
     Mêmes scores et mêmes rangs que le Classement : retenu ou exclu, la note et le rang ne changent pas."""
     from ..scoring import scores
-    from . import scores_admin
+    from . import scores_specs
+    from . import scores_ranking
     ct = ct or {}
     name = 'growth_v4'
     if ct.get('id'):
-        scores_admin.refresh(conn)
-        name = scores_admin.resolve(conn, ct['id'], int(ct.get('user_id') or 0))
-        name = name if scores_admin.known(name) else 'growth_v4'
+        scores_specs.refresh(conn)
+        name = scores_specs.resolve(conn, ct['id'], int(ct.get('user_id') or 0))
+        name = name if scores_specs.known(name) else 'growth_v4'
     try:
-        sim = scores_admin.simulate(conn, {'strategy': name, 'listing_id': lid})
+        sim = scores_ranking.simulate(conn, {'strategy': name, 'listing_id': lid})
     except Exception:                                                                        # noqa: BLE001 : la fiche reste complète sans ce bloc
         return None
     result = sim.get('result')

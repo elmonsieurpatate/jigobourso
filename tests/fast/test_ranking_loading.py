@@ -30,7 +30,7 @@ def ranking(monkeypatch):
         curves.append(ids)
         return {i: [100, 101] for i in ids}
     monkeypatch.setattr(R, '_fetch', fetch)
-    monkeypatch.setattr(R.scores_admin, 'series', series)
+    monkeypatch.setattr(R.scores_ranking, 'series', series)
     monkeypatch.setattr(R, 'latest_rates', lambda conn: {})
     return Connection(), fetched, curves
 

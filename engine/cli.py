@@ -31,6 +31,7 @@ def _admin_commands():
     from engine.jobs import schedule, tasks
     from engine.shared import settings
     from engine.analytics.admin import scores_admin
+    from engine.analytics.admin import scores_ranking
     from engine.analytics.scoring import ranking_table
     from engine.market import split_review
 
@@ -61,9 +62,9 @@ def _admin_commands():
         'scores-state': lambda conn, r: scores_admin.state(conn),
         'scores-save': scores_admin.save,
         'scores-preview': scores_admin.preview,
-        'scores-simulate': scores_admin.simulate,
+        'scores-simulate': scores_ranking.simulate,
         'scores-monitor': lambda conn, r: scores_admin.monitor(conn),
-        'scores-ranking': scores_admin.ranking,
+        'scores-ranking': scores_ranking.ranking,
         'split-reviews': split_review.state,
         'split-review-decide': split_review.decide,
         'split-review-scan': split_review.scan,
@@ -87,7 +88,7 @@ def serve(cmd):
     """Commandes appelées par PHP : JSON en entrée, JSON en sortie, code 2 + {"error"} en cas de demande invalide."""
     import decimal
     import datetime as dt
-    from engine.analytics.admin import scores_admin
+    from engine.analytics.admin import scores_specs
     from engine.analytics.admin import service
     from engine.analytics.admin import title_sheet
     from engine.analytics.explorer import strategy
@@ -102,7 +103,7 @@ def serve(cmd):
     ADMIN.update(_admin_commands())
     try:
         request = json.load(sys.stdin)
-        scores_admin.set_user((request.get('user_id') or (request.get('ct') or {}).get('user_id')) if isinstance(request, dict) else None)      # adaptations de scores propres à l'utilisateur de la requête
+        scores_specs.set_user((request.get('user_id') or (request.get('ct') or {}).get('user_id')) if isinstance(request, dict) else None)      # adaptations de scores propres à l'utilisateur de la requête
         if cmd == 'presets':
             from .analytics.explorer import explorer_config as C
             result = {'presets': {name: strategy.preset(name) for name in strategy.PRESETS}, 'labels': strategy.LABELS,

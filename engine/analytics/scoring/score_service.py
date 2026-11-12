@@ -190,8 +190,9 @@ def apply_admin(conn, config):
     if config.get('version') != 4:
         return config
     if config.get('ranking', {}).get('mode') == C.SCORES_MODE:
-        from ..admin import scores_admin
-        if scores_admin.known(config.get('name')):
-            prof = scores_admin.stored_profiles(conn).get(config['name'])
-            config = scores_admin.apply_profile(config, scores_admin.clean_profile(prof)) if prof else scores_admin.neutral(config)
+        from ..admin import scores_specs
+        from ..admin import scores_profiles
+        if scores_specs.known(config.get('name')):
+            prof = scores_profiles.stored_profiles(conn).get(config['name'])
+            config = scores_profiles.apply_profile(config, scores_profiles.clean_profile(prof)) if prof else scores_profiles.neutral(config)
     return apply_global(conn, config)
