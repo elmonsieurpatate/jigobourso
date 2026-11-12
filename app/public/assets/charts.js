@@ -1,11 +1,9 @@
 /* Graphique de cours quotidien : étendue, moyennes mobiles, volumes, infobulle. Dépend de app.js (J). */
 'use strict';
 (() => {
-  const NS = 'http://www.w3.org/2000/svg';
-  const el = (n, a = {}, t) => { const e = document.createElementNS(NS, n); for (const [k, v] of Object.entries(a)) e.setAttribute(k, v); if (t !== undefined) e.textContent = t; return e; };
-  const dec = p => (p < 1 ? 4 : p < 10 ? 3 : 2);
+  const el = J.svg, dec = J.priceDec;
   const sma = (vals, n) => vals.map((_, i) => (i + 1 < n ? null : vals.slice(i + 1 - n, i + 1).reduce((a, b) => a + b, 0) / n));
-  const ticks = (lo, hi, n = 5) => { const span = hi - lo || 1, raw = span / n, mag = Math.pow(10, Math.floor(Math.log10(raw))), step = [1, 2, 2.5, 5, 10].map(m => m * mag).find(s => s >= raw) || mag * 10, out = []; for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) out.push(+v.toFixed(8)); return out; };
+  const ticks = J.ticks;
 
   /* Courbes modernes et compactes (évolution du portefeuille).
      xs : dates ISO (ou date-heure si opts.time) ; series : [{ id, label, values, color, area, dash, width }]
@@ -124,8 +122,7 @@
     [[iMax, 'haut'], [iMin, 'bas']].forEach(([i, t]) => { svg.append(el('circle', { cx: X(i), cy: Y(vals[i]), r: 3.5, class: 'extreme' }), el('text', { x: Math.min(Math.max(X(i), 60), W - R - 40), y: Y(vals[i]) + (t === 'haut' ? -8 : 15), class: 'axis', 'text-anchor': 'middle' }, f(vals[i]))); });
     svg.append(el('line', { x1: L, x2: W - R, y1: Y(vals[n - 1]), y2: Y(vals[n - 1]), class: 'lastline' }), el('rect', { x: W - R + 2, y: Y(vals[n - 1]) - 9, width: R - 4, height: 18, rx: 4, class: 'lasttag' }), el('text', { x: W - R + 6, y: Y(vals[n - 1]) + 4, class: 'lasttext' }, f(vals[n - 1])));
     const cross = el('line', { y1: T, y2: opts.volume ? VT + VH : T + PH, class: 'cross', visibility: 'hidden' }), dot = el('circle', { r: 4.5, class: 'hdot', visibility: 'hidden' }); svg.append(cross, dot);
-    const tip = document.createElement('div'); tip.className = 'chart-tip'; tip.hidden = true;
-    const wrap = document.createElement('div'); wrap.className = 'chart-wrap'; wrap.append(svg, tip); host.append(wrap);
+    const tip = J.chartBox(host, svg);
     const move = ev => {
       const r = svg.getBoundingClientRect(), px = ((ev.touches ? ev.touches[0].clientX : ev.clientX) - r.left) * W / r.width, i = Math.max(0, Math.min(n - 1, Math.round((px - L) / ((W - L - R) / (n - 1)))));
       cross.setAttribute('x1', X(i)); cross.setAttribute('x2', X(i)); cross.setAttribute('visibility', 'visible'); dot.setAttribute('cx', X(i)); dot.setAttribute('cy', Y(vals[i])); dot.setAttribute('visibility', 'visible');

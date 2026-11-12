@@ -197,7 +197,7 @@
   function historicView(st) {
     return `<div class="notice warn"><b>Moteur historique.</b> « ${E(st.label)} » utilise encore le classement par percentiles : il ne passe pas par les scores V4 et ne se règle pas ici. Aucun de ses réglages n’est modifié par cette page.</div>
       <p class="as-hint mt-3">Périodes actives : ${st.periods.length ? st.periods.map(i => E(labels()[i] || i)).join(', ') : 'aucune'}.</p>
-      ${st.components.length ? `<div class="table-wrap"><table><thead><tr><th>Composante</th><th>Période</th><th class="num">Poids</th></tr></thead><tbody>${st.components.map(c => `<tr><td>${E(c.metric)}</td><td>${E(labels()[c.period] || c.period)}</td><td class="num">${fmt(c.weight, 2)}</td></tr>`).join('')}</tbody></table></div>` : '<p class="muted">Aucune composante de score pondérée.</p>'}`;
+      ${st.components.length ? `<div class="table-wrap"><table>${J.table.head(["Composante", "Période", ["Poids", 'num']])}<tbody>${st.components.map(c => `<tr><td>${E(c.metric)}</td><td>${E(labels()[c.period] || c.period)}</td><td class="num">${fmt(c.weight, 2)}</td></tr>`).join('')}</tbody></table></div>` : '<p class="muted">Aucune composante de score pondérée.</p>'}`;
   }
 
   function profilesView() {
@@ -210,7 +210,7 @@
     };
     const pe = S.personal, st = strat(), p = st && st.engine === 'v4' ? prof() : null;
     return `<div class="card"><h3 class="as-h">Profils de stratégies</h3>
-      <div class="table-wrap"><table><thead><tr><th>Stratégie</th><th>Moteur</th><th>Granularités et poids</th><th>Pondération</th><th>État</th><th></th></tr></thead><tbody>
+      <div class="table-wrap"><table>${J.table.head(["Stratégie", "Moteur", "Granularités et poids", "Pondération", "État", ""])}<tbody>
       <tr class="as-group"><td colspan="6">Moteur commun V4 — mêmes calculs de score, seuls les réglages changent</td></tr>${v4().map(row).join('')}
 </tbody></table></div>
       <p class="as-hint">Stratégies personnelles : ${pe.total ? `${pe.total} enregistrée${pe.total > 1 ? 's' : ''}, dont ${pe.common_engine} sur le moteur commun et ${pe.historic} sur un ancien moteur (non migrées).` : 'aucune enregistrée sur cette base.'}${pe.configurable.length ? ' Configurables ici : ' + pe.configurable.map(c => E(c.name)).join(', ') + '.' : ''}</p></div>
@@ -248,8 +248,6 @@
   }
   // Graphique interactif : cours réels, axes datés, fenêtre au choix (granularités de notation), lecture au survol ou au toucher.
   let chart = null;
-  const dFull = d => new Date(d + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
-  const dShort = d => new Date(d + 'T00:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
   const winSessions = () => { const w = (sim.windows || []), act = w.filter(x => x.active).map(x => x.sessions); return w.some(x => x.sessions === simWin) ? simWin : (act.length ? Math.max(...act) : (w.length ? w[w.length - 1].sessions : 0)); };
   function chartCard() {
     const all = sim.curve || [], wins = sim.windows || [], L = labels();
@@ -269,16 +267,16 @@
       <svg id="as-ch" class="as-ch ${up ? 'up' : 'dn'}" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Courbe des cours sur ${n} séances">
         ${yt.map(v => `<line class="g" x1="${m.l}" x2="${W - m.r}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}"/><text class="t" x="${m.l - 6}" y="${(Y(v) + 4).toFixed(1)}" text-anchor="end">${fmt(v, hi - lo < 5 ? 2 : hi - lo < 50 ? 1 : 0)}</text>`).join('')}
         ${marks.map(k => `<line class="mk" x1="${X(k.i).toFixed(1)}" x2="${X(k.i).toFixed(1)}" y1="${m.t}" y2="${m.t + ih}"/><text class="t mkt" x="${(X(k.i) + 3).toFixed(1)}" y="${m.t + 10}">début ${E(k.lab.toLowerCase())}</text>`).join('')}
-        ${xt.map((i, k) => `<text class="t" x="${X(i).toFixed(1)}" y="${H - 7}" text-anchor="${i === 0 ? 'start' : i === pts.length - 1 ? 'end' : 'middle'}">${dShort(pts[i].d)}</text>`).join('')}
+        ${xt.map((i, k) => `<text class="t" x="${X(i).toFixed(1)}" y="${H - 7}" text-anchor="${i === 0 ? 'start' : i === pts.length - 1 ? 'end' : 'middle'}">${J.dayShort(pts[i].d)}</text>`).join('')}
         <polyline points="${line}" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
         <line id="as-cur" class="cur" x1="0" x2="0" y1="${m.t}" y2="${m.t + ih}"/ style="display:none"><circle id="as-dot" r="4.5" cx="0" cy="0"/  style="display:none">
         <rect id="as-hit" x="${m.l}" y="${m.t}" width="${iw}" height="${ih}" fill="transparent"/></svg>
-      <p class="as-hint">Cours de clôture réels sur les ${n} dernières séances (du ${dShort(pts[0].d)} au ${dShort(pts[pts.length - 1].d)})${chg === null ? '' : ' · <b>' + (chg >= 0 ? '+' : '') + fmt(chg, 1) + ' %</b>'}. Survolez ou touchez le graphique pour lire le cours de chaque séance.</p></div>`;
+      <p class="as-hint">Cours de clôture réels sur les ${n} dernières séances (du ${J.dayShort(pts[0].d)} au ${J.dayShort(pts[pts.length - 1].d)})${chg === null ? '' : ' · <b>' + (chg >= 0 ? '+' : '') + fmt(chg, 1) + ' %</b>'}. Survolez ou touchez le graphique pour lire le cours de chaque séance.</p></div>`;
   }
   function readout(i) {
     if (!chart) return '';
     const x = chart.pts[i], prev = chart.pts[i - 1], since = chart.first ? (x.p / chart.first - 1) * 100 : null, day = prev && prev.p ? (x.p / prev.p - 1) * 100 : null, sg = v => (v >= 0 ? '+' : '') + fmt(v, 1) + ' %';
-    return `<b>${E(dFull(x.d))}</b> · cours <b>${fmt(x.p, 2)}</b>${since === null ? '' : ` · <span class="${since >= 0 ? 'pos' : 'neg'}">${sg(since)}</span> depuis le début`}${day === null ? '' : ` · <span class="${day >= 0 ? 'pos' : 'neg'}">${sg(day)}</span> sur la séance`}`;
+    return `<b>${E(J.dayFull(x.d))}</b> · cours <b>${fmt(x.p, 2)}</b>${since === null ? '' : ` · <span class="${since >= 0 ? 'pos' : 'neg'}">${sg(since)}</span> depuis le début`}${day === null ? '' : ` · <span class="${day >= 0 ? 'pos' : 'neg'}">${sg(day)}</span> sur la séance`}`;
   }
   function chartMove(e) {
     const hit = e.target.closest && e.target.closest('#as-hit'); if (!hit || !chart) return;
@@ -352,11 +350,10 @@
     const l = layoutNow(), cat = l.catalog || Object.keys(SC_COLS).map(id => ({ id, label: id }));
     const label = id => (cat.find(c => c.id === id) || {}).label || id;
     const hint = id => (cat.find(c => c.id === id) || {}).hint || '';
-    const tip = id => hint(id) ? ` title="${E(hint(id))}"` : '';
     const cols = l.columns.filter(c => SC_COLS[c.id] && c.visible);
     const prim = rkSorts[0] || { key: rkWhich, dir: 'desc' };
     const w = c => c.width ? ` style="width:${c.width}px;min-width:${c.width}px"` : '';
-    return `<div class="as-rkwrap"><table class="dense as-rktable" id="as-rktable"><thead><tr>${cols.map(c => `<th scope="col" class="${SC_COLS[c.id].cls || ''}"${w(c)}${tip(c.id)} ${SC_COLS[c.id].nosort ? '' : `aria-sort="${prim.key === c.id ? (prim.dir === 'asc' ? 'ascending' : 'descending') : 'none'}"`}>${SC_COLS[c.id].nosort ? E(label(c.id)) : `<button type="button" data-a="rk-sort" data-v="${E(c.id)}">${E(label(c.id))}${prim.key === c.id ? (prim.dir === 'asc' ? ' ↑' : ' ↓') : ''}</button>`}</th>`).join('')}</tr></thead>
+    return `<div class="as-rkwrap"><table class="dense as-rktable" id="as-rktable">${J.table.head(cols.map(c => ({ label: E(label(c.id)), cls: SC_COLS[c.id].cls || '', scope: 'col', title: hint(c.id) || '', width: c.width, sort: SC_COLS[c.id].nosort ? '' : c.id })), prim)}
       <tbody>${rows.map(r => `<tr>${cols.map(c => `<td class="${SC_COLS[c.id].cls || ''}"${w(c)} data-label="${E(label(c.id))}">${SC_COLS[c.id].cell(r)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
   }
   const rankBody = (extra) => { const body = { strategy: sel, which: rkWhich, category: rkCat, verdict: rkVerdict, sort: rkSorts, limit: 25, ...extra }; if (dirty()) body.draft = { global: draft.global, profile: payload() }; return body; };
@@ -399,10 +396,10 @@
     return `<div class="card"><div class="row between" style="flex-wrap:wrap;gap:12px"><div><h3 class="as-h m-0">${E(sim.title.name)}</h3><span class="muted">${E(sim.title.symbol)} · ${E(sim.title.mic)} · ${sim.title.kind === 'etf' ? 'ETF' : 'Action'}</span></div><div class="as-scores">${sc(s, 's')}${sc(c, 'c')}</div></div>
       ${sim.tuning ? `<p class="as-hint">Normalisations utilisées par le calcul : saturation de dynamique <b>${fmt(sim.tuning.sat_a, 1)}</b> · référence d’accélération <b>${fmt(sim.tuning.accel_ref, 2)}</b> · volatilité <b>${E(VOLMODES[sim.tuning.vol_mode] || sim.tuning.vol_mode)}</b> · momentum <b>${E(HORIZONS[sim.tuning.momentum_horizon] || sim.tuning.momentum_horizon)}</b>.</p>` : ''}
       ${chartCard()}
-      <div class="table-wrap"><table class="as-dec"><thead><tr><th>Mesure</th>${ids.map(i => `<th class="num">${E(L[i])}<br><small class="muted">poids réel ${fmt(100 * ((r.weights_effective || {})[i] || 0), 1)} %${r.periods[i] ? '' : ' (période sans données)'}</small></th>`).join('')}</tr></thead><tbody>
+      <div class="table-wrap"><table class="as-dec">${J.table.head(['Mesure', ...ids.map(i => ({ label: `${E(L[i])}<br><small class="muted">poids réel ${fmt(100 * ((r.weights_effective || {})[i] || 0), 1)} %${r.periods[i] ? '' : ' (période sans données)'}</small>`, num: true }))])}<tbody>
         ${rows.map(([n, k, u, d]) => `<tr><td>${n}</td>${ids.map(i => cell(r.periods[i], k, u, d, i)).join('')}</tr>`).join('')}</tbody></table></div>
       <div class="as-two"><div><h4 class="as-h">Score simple (pente × R²)</h4>${s.score === null ? `<p class="muted">${E(s.why || '')}</p>` : `<p>100 × Dynamique <b>${fmt(s.dynamics, 2)}</b> × Régularité <b>${fmt(s.quality, 2)}</b> = <b>${fmt(s.score, 1)}</b></p>
-          <table class="as-mini"><thead><tr><th>Période</th><th class="num">Poids réel</th><th class="num">Pente</th><th class="num">R²</th><th class="num">Fiabilité R²</th></tr></thead><tbody>${Object.entries(s.parts || {}).map(([k, v]) => `<tr><td>${E(L[k] || k)}</td><td class="num">${fmt(100 * v.weight, 1)} %</td><td class="num">${fmt(v.slope, 2)} %/s</td><td class="num">${v.r2 === null ? '<span class="muted">indisponible</span>' : fmt(v.r2, 2)}</td><td class="num">${v.r2_reliability === null ? '—' : fmt(100 * v.r2_reliability, 0) + ' %'}</td></tr>`).join('')}</tbody></table>
+          <table class="as-mini">${J.table.head(["Période", ["Poids réel", 'num'], ["Pente", 'num'], ["R²", 'num'], ["Fiabilité R²", 'num']])}<tbody>${Object.entries(s.parts || {}).map(([k, v]) => `<tr><td>${E(L[k] || k)}</td><td class="num">${fmt(100 * v.weight, 1)} %</td><td class="num">${fmt(v.slope, 2)} %/s</td><td class="num">${v.r2 === null ? '<span class="muted">indisponible</span>' : fmt(v.r2, 2)}</td><td class="num">${v.r2_reliability === null ? '—' : fmt(100 * v.r2_reliability, 0) + ' %'}</td></tr>`).join('')}</tbody></table>
           <p class="as-hint">Complétude : couverture ${fmt(100 * (s.coverage || 0), 0)} % ${s.status === 'ok' ? '(pente et R² mesurés sur toutes les périodes)' : '(une période n’a pas de R² ou de pente : elle sort du calcul, poids renormalisés)'}.</p>`}</div>
         <div><h4 class="as-h">Score complexe (somme pondérée)</h4>${c.score === null ? `<p class="muted">${E(c.why || '')}</p>` : `<table class="as-mini"><tbody>${Object.entries(c.contributions).map(([k, v]) => `<tr><td>${E(CLABEL[k] || k)}</td><td class="num">${v.value === null ? '<span class="muted">indisponible — hors calcul</span>' : `poids ${fmt(100 * v.weight, 1)} %${Math.abs(v.weight_effective - v.weight) > 0.0005 ? ' → réel ' + fmt(100 * v.weight_effective, 1) + ' %' : ''}`}</td><td class="num">${v.value === null ? '' : 'note ' + fmt(v.value, 0)}</td><td class="num">${v.points === null ? '' : '<b>+' + fmt(v.points_effective, 1) + '</b>'}</td></tr>`).join('')}</tbody></table><p class="as-hint">Total ${fmt(c.raw_total, 1)} × ancrage récent ${fmt(c.anchor, 2)} (λ = ${fmt(c.anchor_lambda, 2)}, vigueur de la période courte ${fmt(100 * (c.anchor_gate ?? 0), 0)} %) = <b>${fmt(c.score, 1)}</b>. Complétude : couverture ${fmt(100 * (c.coverage || 0), 0)} %${c.status === 'ok' ? '' : ' — score partiel, composantes absentes hors calcul'}.</p>`}</div></div>
       <p class="as-hint">Liquidité : ${liq.turnover_eur != null ? fmt(liq.turnover_eur / 1e6, 1) + ' M€/jour (' + (liq.source === 'daily' ? 'volumes quotidiens réels' : 'estimée, moyenne trimestrielle') + ') · note ' + fmt(liq.note, 0) : 'indisponible'}. ${r.missing && (r.missing.secondary.length || r.missing.optional_periods.length || r.missing.required_periods.length) ? '<b>Qualité des données :</b> périodes sans historique : ' + (E(r.missing.required_periods.concat(r.missing.optional_periods).join(', ')) || 'aucune') + ' · mesures indisponibles : ' + (E(r.missing.secondary.join(', ')) || 'aucune') + '. Elles sortent du calcul et les poids restants sont renormalisés (ni bonus ni pénalité).' : '<b>Qualité des données :</b> complète.'}</p></div>`;
@@ -498,6 +495,8 @@
   }
 
   async function onClick(e) {
+    const sb = e.target.closest('[data-sort]');
+    if (sb) { const v = sb.dataset.sort; rkSorts = [J.table.nextSort(rkSorts[0], v, SC_COLS[v].dir || 'desc')]; if (['simple', 'complex'].includes(v)) { rkWhich = v; rkCat = null; } return runConf(true); }
     const t = e.target.closest('[data-a]'); if (!t || t.tagName === 'INPUT' || t.tagName === 'SELECT') return;
     const a = t.dataset.a, v = t.dataset.v;
     if (a === 'tab') { tab = v; error = ''; paint(); }
@@ -510,7 +509,6 @@
     else if (a === 'open') { sel = v; tab = 'profils'; sim = null; rank = null; paint(); }
     else if (a === 'conf-run') { runConf(true); }
     else if (a === 'rk-which') { rkWhich = v; rkSorts = [{ key: v, dir: 'desc' }]; rkCat = null; runConf(true); }
-    else if (a === 'rk-sort') { const same = rkSorts[0] && rkSorts[0].key === v; rkSorts = [{ key: v, dir: same ? (rkSorts[0].dir === 'desc' ? 'asc' : 'desc') : (SC_COLS[v].dir || 'desc') }]; if (['simple', 'complex'].includes(v)) { rkWhich = v; rkCat = null; } runConf(true); }
     else if (a === 'rk-cat') { rkCat = v || null; runConf(true); }
     else if (a === 'rk-verdict') { rkVerdict = v; runConf(true); }
     else if (a === 'rk-more') rankMore();

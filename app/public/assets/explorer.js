@@ -275,7 +275,7 @@
     $('#ct-filter-source').textContent=(categoryPayload.source_label||'Catégories administrateur')+' · bornes en lecture seule'+(Object.keys(state.secondaryMetadataPreviousByUser[userKey]||{}).length?' · anciennes préférences regroupées : vérifiez vos sélections':'');
     const manage=document.createElement('a');manage.href='mes-filtres.html';manage.textContent='Configurer mes filtres';$('#ct-filter-source').append(' · ',manage);
     if(categoryPayload.schema===2)document.querySelector('.ct-filter-logic').textContent='Un filtre retient un titre si l’une de ses catégories est cochée ; les filtres se combinent. Les scores et les rangs ne changent jamais.';
-    const drawIndicator=([k,c])=>`<div class="ct-multi" data-indicator="${k}"><button type="button" class="ct-multi-trigger" data-open-filter="${k}" title="${esc(c.label)} · ${esc(c.unit)}" aria-expanded="${activeFilter===k}" aria-controls="ct-list-${k}"><span>${esc(c.label)}</span><b data-count="${k}">${state.filters[k].length} / ${c.options.length}</b><span aria-hidden="true">⌄</span></button><div class="ct-multi-popup" id="ct-list-${k}" ${activeFilter===k?'':'hidden'}><label class="ct-category-search"><span aria-hidden="true">⌕</span><input type="search" data-category-search="${k}" placeholder="Rechercher une catégorie…" aria-label="Rechercher une catégorie : ${esc(c.label)}" value="${activeFilter===k?esc(filterQuery):''}"></label><div class="ct-category-options" role="group" aria-label="Catégories : ${esc(c.label)}">${c.options.map(o=>`<label class="ct-category-option" data-search-text="${esc(o.label.toLocaleLowerCase('fr'))}"><input type="checkbox" data-filter="${k}" data-category="${o.id}" ${state.filters[k].includes(o.id)?'checked':''}><i style="background:${o.color}" aria-hidden="true"></i><span>${esc(o.label)}</span><small>${esc(o.range)}</small></label>`).join('')}</div><p class="ct-no-category" hidden>Aucune catégorie correspondante.</p><footer><span data-selected-count="${k}">${state.filters[k].length} / ${c.options.length} sélectionnées</span><button type="button" data-all-indicator="${k}">Tout sélectionner</button><button type="button" data-close-filter="${k}" aria-label="Fermer ${esc(c.label)}">Fermer</button></footer></div></div>`;
+    const drawIndicator=([k,c])=>`<div class="ct-multi" data-indicator="${k}"><button type="button" class="ct-multi-trigger" data-open-filter="${k}" title="${esc(c.label)} · ${esc(c.unit)}" aria-expanded="${activeFilter===k}" aria-controls="ct-list-${k}"><span>${esc(c.label)}</span><b data-count="${k}">${state.filters[k].length} / ${c.options.length}</b><span aria-hidden="true">⌄</span></button><div class="ct-multi-popup" id="ct-list-${k}" ${activeFilter===k?'':'hidden'}><label class="ct-category-search"><span aria-hidden="true">⌕</span><input type="search" data-category-search="${k}" placeholder="Rechercher une catégorie…" aria-label="Rechercher une catégorie : ${esc(c.label)}" value="${activeFilter===k?esc(filterQuery):''}"></label><div class="ct-category-options" role="group" aria-label="Catégories : ${esc(c.label)}">${c.options.map(o=>`<label class="ct-category-option" data-search-text="${esc(J.fold(o.label))}"><input type="checkbox" data-filter="${k}" data-category="${o.id}" ${state.filters[k].includes(o.id)?'checked':''}><i style="background:${o.color}" aria-hidden="true"></i><span>${esc(o.label)}</span><small>${esc(o.range)}</small></label>`).join('')}</div><p class="ct-no-category" hidden>Aucune catégorie correspondante.</p><footer><span data-selected-count="${k}">${state.filters[k].length} / ${c.options.length} sélectionnées</span><button type="button" data-all-indicator="${k}">Tout sélectionner</button><button type="button" data-close-filter="${k}" aria-label="Fermer ${esc(c.label)}">Fermer</button></footer></div></div>`;
     const primaryKeys=categoryPayload.schema===2?['volatility','liquidity','volume','positive','spikes','concentration']:['volatility','turnover_eur','avg_volume','drawdown','up_fraction','gain_share'];
     const isPrimary=([k,c])=>categoryPayload.schema===2?c.group==='main':primaryKeys.includes(k);
     const primary=Object.entries(categories).filter(isPrimary),other=Object.entries(categories).filter(e=>!isPrimary(e));
@@ -298,7 +298,7 @@
     renderRanking();
   }
   function searchCategories(key,query) {
-    const popup=$(`#ct-list-${key}`),needle=query.trim().toLocaleLowerCase('fr');let shown=0;
+    const popup=$(`#ct-list-${key}`),needle=J.fold(query.trim());let shown=0;
     popup.querySelectorAll('[data-search-text]').forEach(el=>{el.hidden=!el.dataset.searchText.includes(needle);if(!el.hidden)shown++;});
     popup.querySelector('.ct-no-category').hidden=shown!==0;
   }
@@ -383,8 +383,8 @@
   const statusBadge=row=>{const [t,c]=STATUS[row.status]||STATUS.undetermined;return `<i class="ct-status ${c}" title="Statut de la stratégie : ${t.toLowerCase()}. Détail dans la fiche du titre.">${t}</i>`;};
   // base = titres notés (recherche texte comprise) ; scoped = base moins les filtres secondaires (c'est le périmètre des compteurs) ; rows = scoped selon Retenues / Exclues / Toutes.
   function visibleRows(){
-    const needle=tableState.query.trim().toLocaleLowerCase('fr');
-    const base=needle?intrinsicRows.filter(r=>(r.symbol+' '+r.name+' '+(r.isin||'')).toLocaleLowerCase('fr').includes(needle)):intrinsicRows;
+    const needle=tableState.J.fold(query.trim());
+    const base=needle?intrinsicRows.filter(r=>J.fold(r.symbol+' '+r.name+' '+(r.isin||'')).includes(needle)):intrinsicRows;
     const scoped=applySecondary(base);
     const counts={retained:0,excluded:0,undetermined:0,all:scoped.length};
     for(const r of scoped)counts[r.status in counts?r.status:'undetermined']++;
@@ -412,7 +412,7 @@
     if(key==='sector'){const g=sectorLabel(row);return row.category?`<b>${esc(row.category)}</b><span class="ct-sub">${esc(g||'')}</span>`:'<span class="ct-missing">Inconnu</span>';}
     if(key==='price')return `${eur(row.price)}${row.currency&&row.currency!=='EUR'&&row.priceNative!==null?`<span class="ct-sub">${esc(J.num(row.priceNative,0,2))} ${esc(row.currency)}</span>`:''}`;
     if(key==='change')return `<span class="${row.change>0?'up':row.change<0?'down':''}">${percent(row.change,true)}</span>`;
-    if(key==='last_close')return row.lastClose?esc(new Date(row.lastClose+'T00:00:00').toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'})):'—';
+    if(key==='last_close')return row.lastClose?esc(J.dayNumeric(row.lastClose)):'—';
     if(key==='slope')return `<span class="${row.slope>0?'up':row.slope<0?'down':''}">${percent(row.slope,true)}</span>`;
     if(key==='r2')return row.r2===null?'—':fmt(row.r2);
     if(key==='volatility')return tinted(MEASURE.volatility,row.volatility,percent(row.volatility));
@@ -438,21 +438,14 @@
     if(loading){$('#ct-table-body').innerHTML='<tr class="ct-loading"><td colspan="20"><span class="spinner"></span> Recherche en cours…</td></tr>';$('#ct-empty-results').hidden=true;$('#ct-result-count').textContent='';return;}
     const selected=shownColumns().map(c=>({key:c.id,label:labelOf(c.id),width:c.width}));
     const {base,scoped,counts,rows:filtered}=visibleRows();
-    const rows=[...filtered].sort((a,b)=>{
-      for(const {key,dir} of tableState.sorts){                      // jusqu'à trois critères ; valeurs absentes toujours en dernier ; nombres comparés comme des nombres
-        const av=REG[key].val(a),bv=REG[key].val(b),an=av==null||Number.isNaN(av),bn=bv==null||Number.isNaN(bv);
-        if(an&&bn)continue;if(an)return 1;if(bn)return -1;
-        const c=typeof av==='string'?av.localeCompare(bv,'fr'):av-bv;if(c)return dir==='asc'?c:-c;
-      }
-      return (a[posKey()]??1e9)-(b[posKey()]??1e9)||a.id-b.id;                // égalités : ordre général du classement, puis identifiant (déterministe)
-    });
+    const rows=J.table.sortRows(filtered,tableState.sorts,(r,k)=>REG[k].val(r),(a,b)=>(a[posKey()]??1e9)-(b[posKey()]??1e9)||a.id-b.id);   // jusqu'à trois critères ; égalités : ordre général du classement, puis identifiant (déterministe)
     const pages=Math.max(1,Math.ceil(rows.length/tableState.pageSize));tableState.page=Math.min(Math.max(1,tableState.page),pages);
     const start=(tableState.page-1)*tableState.pageSize,pageRows=rows.slice(start,start+tableState.pageSize);
     if(selected.some(c=>c.key==='trend'))loadPageCurves(pageRows);
     $('#ct-result-count').textContent=loadError?'':`${num0(rows.length)} titre${rows.length>1?'s':''}`+(rows.length!==intrinsicRows.length?` sur ${num0(intrinsicRows.length)} évalués`:'');
     const wstyle=w=>w?` style="width:${w}px;min-width:${w}px;max-width:none"`:'';
     const cls=key=>key==='rank'?'ct-rank-cell':key==='name'?'ct-name-heading':'';
-    $('#ct-table-head').innerHTML=selected.map(({key,label,width})=>`<th scope="col" class="${cls(key)}"${wstyle(width)}${hintOf(key)?` title="${esc(hintOf(key))}"`:''} ${REG[key].nosort?'':`aria-sort="${key===sortKey()?(sortDir()==='asc'?'ascending':'descending'):'none'}"`}>${REG[key].nosort?esc(label):`<button type="button" data-sort-column="${esc(key)}" aria-label="Trier par ${esc(label)}"${key==='rank'?` title="Rang général sur tous les titres notés (${scoreKeyOf()==='simple'?'score simple':'score complexe'}), conservé lors du filtrage et du tri"`:''}>${esc(label)}${key===sortKey()?(sortDir()==='asc'?' ↑':' ↓'):''}</button>`}</th>`).join('');
+    $('#ct-table-head').innerHTML=J.table.headRow(selected.map(({key,label,width})=>({label:esc(label),scope:'col',cls:cls(key),width,title:key==='rank'?`Rang général sur tous les titres notés (${scoreKeyOf()==='simple'?'score simple':'score complexe'}), conservé lors du filtrage et du tri`:hintOf(key)||'',sort:REG[key].nosort?'':key})),{key:sortKey(),dir:sortDir()});
     $('#ct-table-body').innerHTML=pageRows.map(row=>`<tr data-row="${row.id}">${selected.map(({key,label,width})=>`<td class="ct-cell-${esc(key)} ${key==='rank'?'ct-rank-cell':''}" data-label="${esc(label)}"${wstyle(width)}>${rowCell(row,key)}</td>`).join('')}</tr>`).join('');
     $('#ct-empty-results').hidden=rows.length!==0||!!loadError;
     const searched=!!tableState.query.trim(),masked=base.length-scoped.length,unevaluated=Math.max(0,universe-intrinsicRows.length);
@@ -480,7 +473,7 @@
       if(context===applied)renderRanking();
     }
   }
-  function sortBy(key){if(!REG[key]||REG[key].nosort)return;tableState.userSorted=true;const same=sortKey()===key;tableState.sorts=[{key,dir:same?(sortDir()==='desc'?'asc':'desc'):(REG[key].dir||'desc')}];tableState.page=1;renderRanking();}
+  function sortBy(key){if(!REG[key]||REG[key].nosort)return;tableState.userSorted=true;tableState.sorts=[J.table.nextSort({key:sortKey(),dir:sortDir()},key,REG[key].dir||'desc')];tableState.page=1;renderRanking();}
   function render() {
     renderStrategies();
     document.querySelectorAll('[data-mode]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.mode===state.mode));
@@ -490,7 +483,7 @@
   $('#ct-page').addEventListener('click',e=>{
     const b=e.target.closest('button');if(!b)return;
     if(b.dataset.demoPage!==undefined){tableState.page=Number(b.dataset.demoPage);renderRanking();}
-    else if(b.dataset.sortColumn)sortBy(b.dataset.sortColumn);
+    else if(b.dataset.sort)sortBy(b.dataset.sort);
     else if(b.dataset.openFilter){const k=b.dataset.openFilter,was=activeFilter;closeFilter();if(was!==k){activeFilter=k;$(`#ct-list-${k}`).hidden=false;$(`[data-open-filter="${k}"]`).setAttribute('aria-expanded','true');$(`#ct-list-${k} input[type=search]`).value='';searchCategories(k,'');if(!matchMedia('(max-width:700px)').matches&&!matchMedia('(pointer:coarse)').matches)$(`#ct-list-${k} input[type=search]`).focus();positionFilter(k);}}
     else if(b.dataset.closeFilter)closeFilter(true);
     else if(b.dataset.allIndicator){tableState.page=1;const k=b.dataset.allIndicator;state.filters[k]=categories[k].options.map(o=>o.id);saveLocalSelection(k);$(`#ct-list-${k}`).querySelectorAll('input[type=checkbox]').forEach(el=>el.checked=true);filterSummary();}

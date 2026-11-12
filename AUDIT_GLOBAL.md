@@ -125,6 +125,7 @@ Réalisé le 12/11/2026. Chargement vérifié sur une copie servie par PHP aprè
 - [x] Fixer l'ordre de chargement : `theme-init.js` → tokens → base → composants → page, identique sur les 19 pages
 - [x] Supprimer les `!important` et `all:unset` : `all:unset` 0 ; `!important` 52 → 1 (le reset global `[hidden]`, légitime), les conflits sont résolus par la spécificité
 - [x] Dédoublonner `.card` et `th` (une seule définition dans `components.css`)
+- [x] Règles CSS à déclarations identiques fusionnées (41 groupes : un jeu de déclarations, plusieurs sélecteurs) ; détecteur : aucun groupe restant de ≥3 déclarations
 
 ### 6.3 Composants dupliqués (≈ 15 variantes → ≈ 6 composants)
 - [x] Bouton : `.btn` + `.primary/.danger/.ghost/.sm/.icon` ; surcharges de taille retirées partout, `.icon-btn`, `.px-btn`, `.ac-icon-button`, `.ac-order-buttons button`, `.ct-segment button` migrés. `.ct-slider-row button` et `.ct-fold` migrés aussi. Seul `.sui-pick-btn` (sélecteur de stratégie à menu déroulant, pas un bouton d'action) garde sa mise en page propre.
@@ -147,9 +148,15 @@ Réalisé le 12/11/2026. Chargement vérifié sur une copie servie par PHP aprè
 - [x] Remplacer les formateurs locaux par `J.num` / `J.pct` / `J.eur` : `fmt`, `eur`, `percent`, `num0`, `score1` de `explorer.js` ; `fmt` d'`admin-scores.js` ; `nf` d'`admin.js` ; `num` de `splits.js` ; `eur`/`pc`/`sg`/`pt` de `pf-home.js` et `plan-suivi.js` ; `f1` de `help-charts.js`. Nouveaux : `J.int`, `J.isNum`, `J.numS`/`J.pctS`/`J.eurS` (vrai signe −), `J.dayShort`/`J.dayFull`. Non touchés, volontairement : `etf.js` `fmt` (textes de libellés, pas un formateur de nombre), `intraday.js` `fmt` (fuseaux horaires, `Intl.DateTimeFormat` spécifique), `financial-chart.js` `fmtTime` (déjà basé sur `J.date`), modules testés sans navigateur (`pf-math.js`, `admin-categories-model.js`, `explorer-filters.js`).
 - [x] Ajouter `J.store` (get/set/remove/has/subscribe/scope/fn/text, repli mémoire si `localStorage` est indisponible) et `J.dom.h()` ; `secondary-filter-store.js` exposé en `J.store.filters`. Tous les accès à `localStorage` des scripts passent par `J.store` (exceptions : `core.js` et `theme-init.js`, exécuté avant le noyau).
 - [x] Nouveau fichier `assets/core.js` (noyau : `$`, `esc`, API, formats, `store`, `dom`), chargé avant `app.js` (coque : navigation, graphiques SVG, dialogues, thème) sur les 19 pages. Tests : `tests/e2e/core-interactions.cjs` (22 vérifications navigateur : thème, menu, classement Simple/Expert, aide, filtres, 9 pages sans erreur JS, toast) et `tests/e2e/core.cjs` (formats, stockage, DOM). Garde-fou : `tests/fast/test_js_core.py` (test Node du noyau `tests/e2e/core.cjs` + interdiction de recréer des copies locales).
-- [ ] Reste hors périmètre de cette passe : appels API (`J.api` est déjà le seul `fetch` des scripts, rien à fusionner) ; `table-layout.js` reste le module commun des tableaux ; styles inline (étape 8).
-- [ ] Regrouper les helpers de graphiques (`charts.js`, `financial-chart.js`, `intraday.js`, `help-charts.js`, `pf-math.js`) dans un module commun
-- [ ] Découper `admin-categories-demo.js` (2 848 lignes), `classement-test.js` (625), `admin-scores.js` (549)
+- [x] Tableaux : tous les en-têtes passent par `J.table.head` / `headRow` (admin, admin-scores, admin-columns, aide, bilan, donnees, etf, filtres, mes-strategies, pf-home, portefeuilles, suivi, titre). Les trois tableaux triables (explorateur, titres admin, positions du portefeuille, classement des scores) utilisent `button[data-sort]` + `aria-sort` + `J.table.sortRows` / `nextSort` / `onSort`. Les corps de tableau restent propres à chaque page (cellules métier) ; `table-layout.js` (largeurs de colonnes) reste un module à part
+- [x] Composants : `seg`, `pills`, `badge` locaux, `J.statusBadge` et `J.insightBadge` passent par `J.seg` / `J.badge` ; `J.tabs` disponible
+- [x] Dates et casse : `toLocale…` et `Intl.DateTimeFormat` supprimés des pages (`J.dayFull` / `dayShort` / `dayNumeric` / `dateTimeShort` / `tz` / `fold`). Restent hors noyau : `admin-categories-model.js` (module sans dépendance, volontairement autonome) et les chapitres `help-ch-*`
+- [x] `J.dom.h` utilisé par `J.toast`, `J.dialog`, `J.formError`, `J.chartBox`
+- [x] Appels API : `J.api` / `J.post` est déjà le seul `fetch` des scripts, rien à fusionner
+- [x] Garde-fou `tests/fast/test_js_core.py` étendu (dates, composants, en-têtes) ; `tests/e2e/core.cjs` et `core-interactions.cjs` (tri compris)
+- [x] Helpers de graphiques communs : `J.svg`, `J.ticks`, `J.priceDec`, `J.chartBox` dans `core.js` (copies supprimées de `charts.js` et `intraday.js`). `pf-math.js` (calcul de portefeuille) et `help-charts.js` (schémas pédagogiques) n'ont rien en commun avec les graphiques de cours
+- [x] `filtres-catalogue.js` (2 848 lignes de données) découpé : un fichier `filtres-catalogue-<id>.js` par filtre (13) + `-indicators`, contenu strictement identique à l'original (vérifié) ; test `admin-categories-model.cjs` adapté
+- [ ] `explorer.js` (617 lignes) et `admin-scores.js` (547) restent d'un seul tenant : chacun est une seule fermeture à état partagé, sans couverture de test suffisante (l'explorateur est vide sur la base locale) pour les scinder sans risque de régression. Ils ne contiennent plus aucune copie du noyau
 
 ## Étape 8 : CSP, styles inline et accessibilité 🟠
 

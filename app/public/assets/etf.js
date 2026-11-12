@@ -46,9 +46,9 @@ window.JEtf = {
       gap: r => r.gap_log != null ? (r.gap_log >= 0 ? '+' : '') + J.num(100 * r.gap_log, 1) + ' pts' : '–',
       ov: r => r.overlap ? J.num(r.overlap.shared_weight, 1) + ' % (borne basse)' : (r === c.rows[0] ? '–' : 'composition non comparable'),
     };
-    const head = c.rows.map((r, i) => `<th>${i ? `<a href="titre.html?id=${r.id}" target="_blank" rel="noopener">${J.esc(r.symbol)}</a>` : J.esc(r.symbol)}${i ? `<div class="small muted">corr. ${J.num(r.coefficient, 2)}</div>` : '<div class="small muted">cet ETF</div>'}</th>`).join('');
+    const head = c.rows.map((r, i) => `${i ? `<a href="titre.html?id=${r.id}" target="_blank" rel="noopener">${J.esc(r.symbol)}</a>` : J.esc(r.symbol)}${i ? `<div class="small muted">corr. ${J.num(r.coefficient, 2)}</div>` : '<div class="small muted">cet ETF</div>'}`);
     const line = (label, f) => `<tr><td class="muted">${label}</td>${c.rows.map(r => `<td>${J.esc(f(r))}</td>`).join('')}</tr>`;
-    return `<h3 class="mt-4 mb-2">Ce qui les différencie</h3><div class="table-wrap cmp-wrap"><table class="dense cmp"><thead><tr><th></th>${head}</tr></thead><tbody>
+    return `<h3 class="mt-4 mb-2">Ce qui les différencie</h3><div class="table-wrap cmp-wrap"><table class="dense cmp">${J.table.head(['', ...head])}<tbody>
       ${line('Frais annuels', fmt.fee)}${line('Liquidité', fmt.liq)}${line('Place · devise', r => (r.mic || '?') + ' · ' + (r.currency || '?'))}${line('Émetteur', r => r.family || 'inconnu')}${line('Actifs sous gestion', fmt.aum)}${line('Distribution', fmt.yld)}${line('Écart de performance 1 an (EUR)', fmt.gap)}${line('Lignes communes (10 premières)', fmt.ov)}</tbody></table></div>
       <p class="small muted">${J.esc(c.note)} Valeurs inconnues = non fournies, jamais complétées. Le « rendement de distribution » explique souvent un écart de cours entre un ETF qui distribue et son jumeau qui capitalise. Aucune recommandation.</p>`;
   },

@@ -24,7 +24,7 @@
   const icon = (id, kind) => glyph(META[id] && META[id].icon) || J.icon(kind === 'personal' ? 'user' : (ICON[id] || 'target'), 'sui-ic');
   const ico = (id, kind) => `<span class="sui-ico" aria-hidden="true" style="${tint(META[id] && META[id].icon)}">${icon(id, kind)}</span>`;
   const desc = (id, kind) => (META[id] && META[id].description) || SHORT[kind === 'personal' ? 'personal' : id] || '';
-  const badge = st => `<span class="badge sm ${{ adapted: 'info', personal: 'ok' }[st] || ''}">${E(STATUS[st] || st)}</span>`;
+  const badge = st => J.badge(STATUS[st] || st, { adapted: 'info', personal: 'ok' }[st] || '', { sm: true });
   let pop = null;
   function closePop() { if (pop) { pop.remove(); pop = null; document.removeEventListener('keydown', onKey, true); } }
   function onKey(e) { if (e.key === 'Escape') closePop(); }

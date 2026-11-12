@@ -44,6 +44,9 @@ def test_no_local_copy_of_core_helpers():
             (r'(?:const|let|var)\s+(?:esc|E)\s*=\s*\w+\s*=>\s*String', 'copie locale de esc'),
             (r'replace\(/\[&<>', "échappement HTML refait à la main"),
             (r'new Intl\.NumberFormat', 'formatage de nombre hors J.num/J.pct/J.eur'),
+            (r'\.toLocale\w*String\(|\.toLocaleDateString\(|\.toLocaleLowerCase\(|Intl\.DateTimeFormat', 'date/casse hors J.date*/J.fold'),
+            (r'(?:const|let|var)\s+(?:seg|pills|badge|tabs)\s*=\s*\(?\w+[^=\n]*=>\s*`<', 'constructeur de composant local (utiliser J.seg/J.badge/J.tabs)'),
+            (r'<thead>(?!<tr>\$\{J\.table\.headRow)|<th[ >][^$]*</th>', 'en-tête de tableau écrit à la main (utiliser J.table.head/headRow)'),
             (r'\blocalStorage\b', 'accès direct à localStorage (utiliser J.store)'),
         ]:
             for m in re.finditer(pat, js):

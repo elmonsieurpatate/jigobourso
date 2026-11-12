@@ -2,7 +2,7 @@
 'use strict';
 
 /* ───── statuts et explications ───── */
-J.statusBadge = (status, label) => `<span class="badge ${{ retained: 'ok', rejected: 'danger', unknown: 'warn', excluded: 'danger' }[status] || ''}">${J.esc(label || status)}</span>`;
+J.statusBadge = (status, label) => J.badge(label || status, { retained: 'ok', rejected: 'danger', unknown: 'warn', excluded: 'danger' }[status] || '');
 J.PERIODS = { day: 'Dernier jour', week: 'Dernière semaine', month: 'Dernier mois', quarter: 'Trois mois', half: 'Six mois', year: 'Un an' };
 J.CRITERIA = {
   min_slope: ['pente', '% / séance', 'slope'], min_r2: ['régularité (R²)', '', 'r2'], min_er: ['efficacité (ER)', '', 'er'], min_return: ['performance', '%', 'perf'],
@@ -68,10 +68,10 @@ J.barChart = function (el, data, { unit = '€' } = {}) {
 };
 
 /* ───── dialogues, messages ───── */
-J.toast = function (msg) { const t = document.createElement('div'); t.className = 'toast'; t.setAttribute('role', 'status'); t.setAttribute('aria-live', 'polite'); t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.remove(), 3200); };
+J.toast = function (msg) { const t = J.dom.h('div.toast', { role: 'status', 'aria-live': 'polite', text: msg }); document.body.appendChild(t); setTimeout(() => t.remove(), 3200); };
 /* Protection des gains (version du 3 novembre) : meilleur gain observé, gain actuel, gain rendu, barre « part du gain conservée », statut coloré. */
 J.INSIGHT = { normal: ['ok', 'Normal'], watch: ['warn', 'À surveiller'], act: ['danger', 'À examiner'], unknown: ['', 'Données insuffisantes'] };
-J.insightBadge = i => { const c = J.INSIGHT[(i && i.status) || 'unknown'] || J.INSIGHT.unknown; return `<span class="badge ${c[0]}">${J.esc((i && i.label) || c[1])}</span>`; };
+J.insightBadge = i => { const c = J.INSIGHT[(i && i.status) || 'unknown'] || J.INSIGHT.unknown; return J.badge((i && i.label) || c[1], c[0]); };
 J.keptShare = g => { const used = Math.max(0, g.peak_gain_pct); return Math.max(0, Math.min(100, used > 0 ? 100 * Math.max(0, g.gain_pct) / used : 0)); };
 J.gainProtection = (g, px, compact) => {
   if (!g || !g.available) return `<p class="small muted">${J.esc((g && g.reason) || 'Sommet depuis l’achat indisponible.')}</p>`;
@@ -91,13 +91,13 @@ J.riskDetail = r => !r || !r.level ? '' : r.level === 'na' ? `<p class="small mu
   `<ul class="rbar-why">${(r.signals || []).map(x => `<li class="p${x.points}"><b>${J.esc(x.label)}</b> ${J.esc(x.message)}</li>`).join('')}${r.info ? `<li class="info">${J.esc(r.info)}</li>` : ''}</ul>`;
 
 J.dialog = function ({ title, body, actions = [], onopen }) {
-  const d = document.createElement('dialog');
+  const d = J.dom.h('dialog');
   d.innerHTML = `<form method="dialog"><div class="head"><h2 class="m-0">${J.esc(title)}</h2><button class="btn sm" value="x" aria-label="Fermer">✕</button></div><div class="body">${body}</div><div class="foot"></div></form>`;
   const foot = d.querySelector('.foot');
-  actions.forEach(a => { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn ' + (a.cls || ''); b.textContent = a.label; b.onclick = async () => { try { b.disabled = true; const keep = await a.run(d); if (!keep) d.close(); } catch (e) { J.formError(d, e.message); } finally { b.disabled = false; } }; foot.appendChild(b); });
+  actions.forEach(a => { const b = J.dom.h('button.btn', { type: 'button', class: a.cls, text: a.label, on: { click: async () => { try { b.disabled = true; const keep = await a.run(d); if (!keep) d.close(); } catch (e) { J.formError(d, e.message); } finally { b.disabled = false; } } } }); foot.appendChild(b); });
   document.body.appendChild(d); d.addEventListener('close', () => d.remove()); d.showModal(); if (onopen) onopen(d); return d;
 };
-J.formError = (d, msg) => { let e = d.querySelector('.notice.err'); if (!e) { e = document.createElement('div'); e.className = 'notice err'; d.querySelector('.body').appendChild(e); } e.textContent = msg; };
+J.formError = (d, msg) => { let e = d.querySelector('.notice.err'); if (!e) { e = J.dom.h('div.notice.err'); d.querySelector('.body').appendChild(e); } e.textContent = msg; };
 J.confirm = (title, text, okLabel = 'Confirmer') => new Promise(res => { let done = false; const d = J.dialog({ title, body: `<p>${J.esc(text)}</p>`, actions: [{ label: 'Annuler', run: () => { } }, { label: okLabel, cls: 'primary', run: () => { done = true; } }] }); d.addEventListener('close', () => res(done)); });
 J.field = (label, input) => `<label class="field">${J.esc(label)}${input}</label>`;
 

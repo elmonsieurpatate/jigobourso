@@ -92,7 +92,7 @@
 
   const measuresCard = () => {
     const periodSlope = (x, n) => x == null ? null : 100 * Math.expm1(n * Math.log1p(x / 100));
-    return `<div class="card"><h2>Mesures par période</h2><div class="table-wrap"><table><thead><tr><th>Période</th><th class="num">Séances</th><th class="num" title="Unité des critères de la stratégie">Pente (% par séance)</th><th class="num">Pente (% sur période)</th><th class="num">R²</th><th class="num">Performance (%)</th><th class="num">Volatilité (%)</th><th class="num">Repli max. (%)</th></tr></thead><tbody>
+    return `<div class="card"><h2>Mesures par période</h2><div class="table-wrap"><table>${J.table.head(['Période', ['Séances', 'num'], { label: 'Pente (% par séance)', num: true, title: 'Unité des critères de la stratégie' }, ['Pente (% sur période)', 'num'], ['R²', 'num'], ['Performance (%)', 'num'], ['Volatilité (%)', 'num'], ['Repli max. (%)', 'num']])}<tbody>
       ${periodRows.map(({ n, m }) => `<tr><td>${J.esc(labelFor(n))}</td><td class="num">${n}</td><td class="num ${J.cls(m.slope)}">${J.num(m.slope, 3)}</td><td class="num ${J.cls(m.slope)}">${J.num(m.slope_period ?? periodSlope(m.slope, n), 2)}</td><td class="num">${J.num(m.r2, 2)}</td><td class="num ${J.cls(m.perf)}">${J.pct(m.perf)}</td><td class="num">${m.volatility === null || m.volatility === undefined ? '—' : J.num(m.volatility, 1)}</td><td class="num">${m.drawdown === null || m.drawdown === undefined ? '—' : J.num(m.drawdown, 1)}</td></tr>`).join('')}</tbody></table></div>
       <p class="small muted mt-2">Les seuils de pente des stratégies s’expriment en % par séance : comparez-les à la première colonne. La pente « sur période » (composée sur le nombre de séances) sert à la lecture seulement et ne se compare jamais directement à un seuil par séance.</p></div>`;
   };
@@ -133,7 +133,7 @@
           <div class="small muted mt-1">Les critères de recherche (pente et R² par granularité, règles Expert) décident « retenue / exclue ». Ils ne modifient ni les scores V4 ni les rangs.</div></div>
         ${headline}
         <div class="card"><div class="row between"><h2 class="m-0">Statut de la stratégie</h2>${v4Badge(x)}</div>${sentence}
-          ${x.checks.length ? `<div class="table-wrap"><table class="dense"><thead><tr><th>Critère</th><th>Granularité</th><th class="num">Mesuré</th><th class="num">Exigé</th><th>Résultat</th></tr></thead><tbody>${x.checks.map(c => `<tr><td>${J.esc(c.label)}${c.optional ? ' <span class="small muted">(règle Expert)</span>' : ''}</td><td>${J.esc(c.period_label)}</td><td class="num">${fmtCheck(c.metric, c.value)}</td><td class="num">${OPS[c.op] || c.op} ${fmtCheck(c.metric, c.threshold)}</td><td>${mark[c.result]}</td></tr>`).join('')}</tbody></table></div>
+          ${x.checks.length ? `<div class="table-wrap"><table class="dense">${J.table.head(["Critère", "Granularité", ["Mesuré", 'num'], ["Exigé", 'num'], "Résultat"])}<tbody>${x.checks.map(c => `<tr><td>${J.esc(c.label)}${c.optional ? ' <span class="small muted">(règle Expert)</span>' : ''}</td><td>${J.esc(c.period_label)}</td><td class="num">${fmtCheck(c.metric, c.value)}</td><td class="num">${OPS[c.op] || c.op} ${fmtCheck(c.metric, c.threshold)}</td><td>${mark[c.result]}</td></tr>`).join('')}</tbody></table></div>
           ${x.join === 'or' ? '<p class="small muted">Règles Expert combinées avec OU : une seule suffit.</p>' : ''}` : ''}</div>
         ${measuresCard()}`;
     },
@@ -191,7 +191,7 @@
       <div class="row gap-s" style="flex-wrap:wrap;gap:12px"><div class="kpi"><span class="l">Score simple</span><span class="v">${f1(sv.simple.score)}</span><span class="small muted">${rkTxt('simple')}</span></div>
       <div class="kpi"><span class="l">Score complexe</span><span class="v">${f1(sv.complex.score)}</span><span class="small muted">${rkTxt('complex')}</span></div>
       <div class="kpi"><span class="l">Liquidité</span><span class="v">${liq.turnover_eur === null || liq.turnover_eur === undefined ? 'inconnue' : J.num(liq.turnover_eur / 1e6, 2) + ' M€/j'}</span><span class="small muted">${liq.source === 'daily' ? 'volumes quotidiens réels' : liq.source === 'estimated' ? 'estimée (volume moyen 3 mois)' : ''}</span></div></div>
-      ${parts ? `<details class="mt-3"><summary class="small">Contributions au score complexe</summary><div class="table-wrap"><table><thead><tr><th>Composante</th><th class="num">Note</th><th class="num">Poids</th></tr></thead><tbody>${parts}</tbody></table></div></details>` : ''}</div>`);
+      ${parts ? `<details class="mt-3"><summary class="small">Contributions au score complexe</summary><div class="table-wrap"><table>${J.table.head(["Composante", ["Note", 'num'], ["Poids", 'num']])}<tbody>${parts}</tbody></table></div></details>` : ''}</div>`);
   }
   J.$('#add').onclick = async () => { const p = await J.api('portfolios'); if (!p.portfolios.length) { const n = await J.post('portfolio/create', { name: 'Portefeuille principal' }); p.portfolios.push({ id: n.id, name: 'Portefeuille principal' }); } J.txDialog({ portfolios: p.portfolios, portfolioId: (p.portfolios.find(x => x.is_default) || p.portfolios[0]).id, listing: { id: s.id, symbol: s.symbol, name: s.name, currency: s.currency, price: s.price }, onDone: () => location.reload() }); };
   open(location.hash.slice(1) || 'cours');

@@ -105,7 +105,7 @@
     expert: ({ H, facts }) => {
       const lq = facts && facts.common.liquidity;
       return `<h2>Note de liquidité</h2>
-      <p>Montant médian échangé par jour <code>M</code> (en euros). Note = <code>100 × clamp( log₁₀(M / ${lq ? lq.floor_eur.toLocaleString('fr-FR') : '2 000 000'}) / log₁₀(${lq ? lq.ceil_eur.toLocaleString('fr-FR') : '50 000 000'} / ${lq ? lq.floor_eur.toLocaleString('fr-FR') : '2 000 000'}) , 0, 1 )</code>.</p>
+      <p>Montant médian échangé par jour <code>M</code> (en euros). Note = <code>100 × clamp( log₁₀(M / ${lq ? J.int(lq.floor_eur) : '2 000 000'}) / log₁₀(${lq ? J.int(lq.ceil_eur) : '50 000 000'} / ${lq ? J.int(lq.floor_eur) : '2 000 000'}) , 0, 1 )</code>.</p>
       <p>Autrement dit : 0 en dessous du plancher, 100 au plafond, progression logarithmique entre les deux (chaque doublement du montant rapporte autant de points).</p>
       <div class="hdemo" data-demo="liq"></div>
       ${H.warn('<p>Limite : le volume Yahoo est celui de la place principale ; il ignore une partie des échanges hors marché. Une donnée absente donne une liquidité « inconnue » : la composante est alors retirée du score complexe, qui est recalculé sur les autres composantes.</p>')}`;

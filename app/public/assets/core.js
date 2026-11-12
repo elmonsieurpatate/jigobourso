@@ -88,3 +88,81 @@ J.dom = {
   },
 };
 
+
+/* ───── dates : tout `toLocale…` / `Intl.DateTimeFormat` des pages passe par ici ───── */
+J.dayNumeric = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '–';   // 05/11/2026
+J.dateTimeShort = s => { try { return new Date(String(s).replace(' ', 'T') + (/Z|[+-]\d\d:?\d\d$/.test(s) ? '' : 'Z')).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }); } catch (e) { return ''; } };
+J.fold = s => String(s ?? '').toLocaleLowerCase('fr');                    // comparaison de recherche insensible à la casse
+
+/* ───── graphiques SVG : briques communes à charts.js et intraday.js ───── */
+J.svg = (name, attrs = {}, text) => { const e = document.createElementNS('http://www.w3.org/2000/svg', name); for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); if (text !== undefined) e.textContent = text; return e; };
+J.priceDec = p => (p < 1 ? 4 : p < 10 ? 3 : 2);                              // décimales d'un cours selon son ordre de grandeur
+J.ticks = (lo, hi, n = 5) => {                                                // graduations « rondes » entre lo et hi
+  const span = hi - lo || 1, raw = span / n, mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const step = [1, 2, 2.5, 5, 10].map(m => m * mag).find(s => s >= raw) || mag * 10, out = [];
+  for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) out.push(+v.toFixed(8));
+  return out;
+};
+J.chartBox = (host, svg) => { const tip = J.dom.h('div.chart-tip'); tip.hidden = true; host.append(J.dom.h('div.chart-wrap', svg, tip)); return tip; };   // enveloppe + infobulle
+J.tz = tz => ({                                                           // formats d'un fuseau (graphiques intraday)
+  time: ms => new Intl.DateTimeFormat('fr-FR', { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false }).format(ms),
+  day: ms => new Intl.DateTimeFormat('fr-FR', { timeZone: tz, weekday: 'short', day: 'numeric', month: 'short' }).format(ms),
+  dayLong: ms => new Intl.DateTimeFormat('fr-FR', { timeZone: tz, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(ms),
+  minute: ms => +new Intl.DateTimeFormat('en-GB', { timeZone: tz, minute: 'numeric' }).format(ms),
+  zone: ms => (new Intl.DateTimeFormat('fr-FR', { timeZone: tz, timeZoneName: 'short' }).formatToParts(ms).find(p => p.type === 'timeZoneName') || {}).value || tz,
+});
+
+/* ───── composants HTML partagés : badge, segment (choix exclusif), onglets ───── */
+// kind : '' | ok | warn | danger | info | accent ; opts : { sm, outline, cls, title }
+J.badge = (text, kind = '', opts = {}) => `<span class="badge${kind ? ' ' + kind : ''}${opts.sm ? ' sm' : ''}${opts.outline ? ' outline' : ''}${opts.cls ? ' ' + opts.cls : ''}"${opts.title ? ` title="${J.esc(opts.title)}"` : ''}>${J.esc(text)}</span>`;
+// items : [[valeur, libellé]] ; attr : nom de l'attribut portant la valeur (défaut data-v) ; opts : { id, radio, label }
+J.seg = (items, cur, attr = 'data-v', opts = {}) => `<div class="seg"${opts.id ? ` id="${J.esc(opts.id)}"` : ''}${opts.radio ? ' role="radiogroup"' : ''}${opts.label ? ` aria-label="${J.esc(opts.label)}"` : ''}>${items.map(([v, l]) =>
+  `<button type="button"${opts.radio ? ` role="radio" aria-checked="${v === cur}"` : ''} class="${v === cur ? 'on' : ''}" ${attr}="${J.esc(v)}">${l}</button>`).join('')}</div>`;
+J.tabs = (items, cur, attr = 'data-tab', opts = {}) => `<div class="tabs${opts.big ? ' big' : ''}" role="tablist"${opts.label ? ` aria-label="${J.esc(opts.label)}"` : ''}>${items.map(([v, l, n]) =>
+  `<button type="button" role="tab" aria-selected="${v === cur}" class="${v === cur ? 'on' : ''}" ${attr}="${J.esc(v)}">${l}${n === undefined ? '' : ` <span class="count">${J.esc(n)}</span>`}</button>`).join('')}</div>`;
+
+/* ───── tableaux : en-têtes, tri, ligne vide, rendu complet ─────
+   Colonne : 'Libellé' | ['Libellé', 'num'] | { label, num, cls, title, sort: 'clé', width, scope }. Tri courant : { key, dir: 'asc'|'desc' }.
+   Une colonne triable porte un <button data-sort="clé"> et aria-sort ; le clic se branche avec J.table.onSort(racine, fn). */
+J.table = (() => {
+  const norm = c => typeof c === 'string' ? { label: c } : Array.isArray(c) ? { label: c[0], num: c[1] === 'num', ...(typeof c[1] === 'object' ? c[1] : {}) } : c;
+  const arrow = (key, sort) => sort && sort.key === key ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : '';
+  const th = (c, sort) => { c = norm(c);
+    const cls = [c.num ? 'num' : '', c.cls || ''].filter(Boolean).join(' ');
+    const attrs = `${cls ? ` class="${cls}"` : ''}${c.scope ? ` scope="${c.scope}"` : ''}${c.title ? ` title="${J.esc(c.title)}"` : ''}${c.width ? ` style="width:${c.width}px;min-width:${c.width}px"` : ''}`;
+    if (!c.sort) return `<th${attrs}>${c.label}</th>`;
+    const on = sort && sort.key === c.sort;
+    return `<th${attrs} aria-sort="${on ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}"><button type="button" data-sort="${J.esc(c.sort)}">${c.label}${arrow(c.sort, sort)}</button></th>`; };
+  const headRow = (cols, sort) => cols.map(c => th(c, sort)).join('');
+  const T = {
+    th, headRow,
+    head: (cols, sort) => `<thead><tr>${headRow(cols, sort)}</tr></thead>`,
+    empty: (cols, msg, cls = 'muted') => `<tr><td colspan="${cols.length}" class="${cls}">${msg}</td></tr>`,
+    // rows : tableau de lignes ; chaque ligne = tableau de cellules (HTML) ou { cells, cls, attrs } ; la classe num vient de la colonne
+    body(cols, rows, opts = {}) {
+      if (!rows.length) return `<tbody>${opts.empty === undefined ? '' : T.empty(cols, opts.empty)}</tbody>`;
+      const cn = cols.map(norm);
+      return `<tbody>${rows.map(r => { const o = Array.isArray(r) ? { cells: r } : r;
+        return `<tr${o.cls ? ` class="${o.cls}"` : ''}${o.attrs ? ' ' + o.attrs : ''}>${o.cells.map((c, i) => `<td${cn[i] && cn[i].num ? ' class="num"' : ''}>${c}</td>`).join('')}</tr>`; }).join('')}</tbody>`;
+    },
+    // tableau complet dans son conteneur défilant : { cols, rows, cls, sort, empty, wrap }
+    render: ({ cols, rows, cls = '', sort = null, empty, wrap = 'table-wrap' }) =>
+      `<div class="${wrap}"><table${cls ? ` class="${cls}"` : ''}>${T.head(cols, sort)}${T.body(cols, rows, { empty })}</table></div>`,
+    // comparaison : valeurs absentes toujours en dernier, nombres comme des nombres, textes en français
+    cmp(a, b, dir = 'asc') {
+      const na = a === null || a === undefined || (typeof a === 'number' && isNaN(a)), nb2 = b === null || b === undefined || (typeof b === 'number' && isNaN(b));
+      if (na || nb2) return na && nb2 ? 0 : na ? 1 : -1;
+      const c = typeof a === 'string' || typeof b === 'string' ? String(a).localeCompare(String(b), 'fr') : a - b;
+      return dir === 'asc' ? c : -c;
+    },
+    // tri stable sur un ou plusieurs critères [{ key, dir }] ; val(ligne, clé) ; tie(a, b) départage les égalités
+    sortRows(rows, sorts, val, tie) {
+      return rows.map((r, i) => [r, i]).sort((A, B) => { for (const { key, dir } of sorts) { const c = T.cmp(val(A[0], key), val(B[0], key), dir); if (c) return c; }
+        return (tie ? tie(A[0], B[0]) : 0) || A[1] - B[1]; }).map(a => a[0]);
+    },
+    // prochain tri au clic sur une colonne : même clé → inverse la direction ; sinon direction par défaut de la colonne
+    nextSort: (cur, key, defDir = 'asc') => cur && cur.key === key ? { key, dir: cur.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: defDir },
+    onSort(root, fn) { root.addEventListener('click', e => { const b = e.target.closest('[data-sort]'); if (b && root.contains(b)) fn(b.dataset.sort, b); }); },
+  };
+  return T;
+})();

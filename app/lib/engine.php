@@ -43,15 +43,20 @@ function explorer_config_shape(array $config): array {
 
 // Appelle le moteur Python (python -m engine.cli <commande>) : JSON sur stdin, JSON sur stdout, délai maximal ENGINE_TIMEOUT.
 // stderr va dans un fichier temporaire (jamais dans un tube : un tube plein bloquerait les deux processus).
-function engine_call(string $command, array $request) {
-    $request=explorer_config_shape($request);
-    if (isset($request['config']) && is_array($request['config'])) $request['config']=explorer_config_shape($request['config']);
+// Environnement transmis au moteur Python : les variables demandées si elles sont définies, plus PATH, HOME et PYTHONPATH.
+function engine_env(array $keys): array {
     $env = [];
-    foreach (['JIGO_DB_HOST', 'JIGO_DB_PORT', 'JIGO_DB_SOCKET', 'JIGO_DB_NAME', 'JIGO_DB_USER', 'JIGO_DB_PASSWORD', 'PATH', 'HOME'] as $k) {
+    foreach ([...$keys, 'PATH', 'HOME'] as $k) {
         $v = cfg($k);
         if ($v !== null) $env[$k] = $v;
     }
     $env['PYTHONPATH'] = engine_root();
+    return $env;
+}
+function engine_call(string $command, array $request) {
+    $request=explorer_config_shape($request);
+    if (isset($request['config']) && is_array($request['config'])) $request['config']=explorer_config_shape($request['config']);
+    $env = engine_env(['JIGO_DB_HOST', 'JIGO_DB_PORT', 'JIGO_DB_SOCKET', 'JIGO_DB_NAME', 'JIGO_DB_USER', 'JIGO_DB_PASSWORD']);
     $slot = engine_acquire();
     $errFile = tempnam(sys_get_temp_dir(), 'jigo-eng-');
     try {
@@ -103,12 +108,7 @@ function engine_call(string $command, array $request) {
 function engine_spawn(string $command, string $log, array $args = []): int {
     if (!function_exists('proc_open')) throw new ApiError('proc_open indisponible sur cet hébergement', 503);
     $sh = 'nohup ' . escapeshellarg(python_bin()) . ' -m engine.cli ' . escapeshellarg($command) . implode('', array_map(fn($a) => ' ' . escapeshellarg((string)$a), $args)) . ' >> ' . escapeshellarg($log) . ' 2>&1 < /dev/null & echo $!';
-    $env = [];
-    foreach (['JIGO_DB_HOST', 'JIGO_DB_PORT', 'JIGO_DB_SOCKET', 'JIGO_DB_NAME', 'JIGO_DB_USER', 'JIGO_DB_PASSWORD', 'JIGO_DATA_DIR', 'JIGO_BACKUP_DIR', 'JIGO_FDB_REF', 'PATH', 'HOME'] as $k) {
-        $v = cfg($k);
-        if ($v !== null) $env[$k] = $v;
-    }
-    $env['PYTHONPATH'] = engine_root();
+    $env = engine_env(['JIGO_DB_HOST', 'JIGO_DB_PORT', 'JIGO_DB_SOCKET', 'JIGO_DB_NAME', 'JIGO_DB_USER', 'JIGO_DB_PASSWORD', 'JIGO_DATA_DIR', 'JIGO_BACKUP_DIR', 'JIGO_FDB_REF']);
     $proc = @proc_open(['/bin/sh', '-c', $sh], [0 => ['file', '/dev/null', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, engine_root(), $env, ['bypass_shell' => true]);
     if (!is_resource($proc)) throw new ApiError('Impossible de démarrer le moteur', 503);
     $pid = trim((string)stream_get_contents($pipes[1]));

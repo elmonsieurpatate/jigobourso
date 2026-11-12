@@ -45,4 +45,28 @@ assert.strictEqual(el.tag, 'button');  assert.strictEqual(el.id, 'go');  assert.
 assert.strictEqual(el.attrs.type, 'button');  assert.ok(!('disabled' in el.attrs));  assert.strictEqual(el.dataset.id, '7');
 assert.strictEqual(el.children.map(c => c.text).join(''), 'Gox2');  assert.ok(el.listeners.click);
 assert.strictEqual(J.dom.h('p', 'texte').children[0].text, 'texte', 'enfants sans attributs');
+// tableaux
+const th = J.table.th(['Nom', 'num'] ); assert.strictEqual(th, '<th class="num">Nom</th>');
+assert.strictEqual(J.table.head(['A', { label: 'B', sort: 'b', num: true }], { key: 'b', dir: 'desc' }), '<thead><tr><th>A</th><th class="num" aria-sort="descending"><button type="button" data-sort="b">B ▼</button></th></tr></thead>');
+assert.ok(J.table.head([{ label: 'B', sort: 'b' }], { key: 'x', dir: 'asc' }).includes('aria-sort="none"'));
+assert.strictEqual(J.table.empty(['a', 'b'], 'Rien'), '<tr><td colspan="2" class="muted">Rien</td></tr>');
+assert.strictEqual(J.table.body(['A', ['B', 'num']], [['x', '1'], { cells: ['y', '2'], cls: 'on', attrs: 'data-id="3"' }]), '<tbody><tr><td>x</td><td class="num">1</td></tr><tr class="on" data-id="3"><td>y</td><td class="num">2</td></tr></tbody>');
+const rows = [{ n: 'b', v: 2 }, { n: 'a', v: null }, { n: 'c', v: 3 }, { n: 'd', v: 2 }];
+const val = (r, k) => r[k];
+eq(J.table.sortRows(rows, [{ key: 'v', dir: 'asc' }], val).map(r => r.n), ['b', 'd', 'c', 'a'], 'asc : absent en dernier, tri stable');
+eq(J.table.sortRows(rows, [{ key: 'v', dir: 'desc' }], val).map(r => r.n), ['c', 'b', 'd', 'a'], 'desc : absent toujours en dernier');
+eq(J.table.sortRows(rows, [{ key: 'v', dir: 'asc' }, { key: 'n', dir: 'desc' }], val).map(r => r.n), ['d', 'b', 'c', 'a'], 'deux critères');
+eq(J.table.sortRows([{ n: 'é' }, { n: 'e' }, { n: 'z' }], [{ key: 'n', dir: 'asc' }], val).map(r => r.n), ['e', 'é', 'z'], 'texte en français');
+eq(J.table.nextSort({ key: 'a', dir: 'asc' }, 'a'), { key: 'a', dir: 'desc' });  eq(J.table.nextSort({ key: 'a', dir: 'desc' }, 'b', 'desc'), { key: 'b', dir: 'desc' });
+let hit = null; const root = { addEventListener(_, f) { this.f = f; }, contains: () => true };
+J.table.onSort(root, (k) => { hit = k; }); root.f({ target: { closest: () => ({ dataset: { sort: 'zz' } }) } }); assert.strictEqual(hit, 'zz');
+// composants
+assert.strictEqual(J.badge('Ok', 'ok', { sm: true }), '<span class="badge ok sm">Ok</span>');  assert.ok(J.badge('<b>', '').includes('&lt;b&gt;'));
+assert.strictEqual(J.seg([['a', 'A'], ['b', 'B']], 'b', 'data-v', { id: 's' }), '<div class="seg" id="s"><button type="button" class="" data-v="a">A</button><button type="button" class="on" data-v="b">B</button></div>');
+assert.ok(J.seg([['a', 'A']], 'a', 'data-x', { radio: true }).includes('role="radio" aria-checked="true"'));
+assert.ok(J.tabs([['t1', 'Un', 3], ['t2', 'Deux']], 't1').includes('aria-selected="true" class="on" data-tab="t1">Un <span class="count">3</span>'));
+// dates
+assert.strictEqual(J.dayNumeric('2026-11-05'), '05/11/2026');  assert.strictEqual(J.dayShort('2026-11-05'), '5 nov.');  assert.strictEqual(J.dayNumeric(null), '–');
+assert.strictEqual(J.fold('ÉCOLE'), 'école');  assert.strictEqual(J.tz('Europe/Paris').time(Date.UTC(2026, 0, 1, 11, 5)), '12:05');
+eq(J.ticks(0, 10, 5), [0, 2, 4, 6, 8, 10]);  eq([J.priceDec(0.5), J.priceDec(5), J.priceDec(50)], [4, 3, 2]);
 console.log('core.js : OK');

@@ -31,7 +31,7 @@ const res=[];const ok=(n,c,d='')=>{res.push([c?'OK ':'KO ',n,d]);};
  ok('aide : chapitre vu mémorisé',await p.evaluate(()=>localStorage.getItem('jigo_help_seen')!==null));
  // mes stratégies / filtres / colonnes / scores / splits / bilan / suivi : chargement sans erreur et contenu
  for(const [pg,sel] of [['mes-strategies.html','.card'],['mes-filtres.html','#ac-category-rows tr'],['mes-colonnes.html','h1'],['mes-scores.html','h1'],['splits.html','h1'],['bilan.html','h1'],['suivi.html','h1'],['donnees.html','.card'],['portefeuilles.html','h1']]){
-  const before=errs.length;await p.goto(BASE+pg);await p.waitForTimeout(1500);
+  const before=errs.length;await p.goto(BASE+pg);await p.waitForSelector(sel,{timeout:8000}).catch(()=>{});await p.waitForTimeout(500);
   ok(pg+' : charge et affiche',(await p.locator(sel).count())>0&&errs.length===before,errs.slice(before).join(' / '));
  }
  // portefeuilles : préférences mémorisées via J.store.fn
@@ -43,6 +43,19 @@ const res=[];const ok=(n,c,d='')=>{res.push([c?'OK ':'KO ',n,d]);};
  ok('filtres : store.filters branché',await p.evaluate(()=>!!J.store.filters&&typeof J.store.filters.load==='function'));
  ok('filtres : liste de catégories',(await p.locator('#ac-category-rows tr').count())>0);
  await p.locator('#ac-category-rows button[aria-label*="Modifier"], #ac-category-rows .btn.icon').first().click().catch(()=>{});await p.waitForTimeout(300);
+ // tri des tableaux : un seul mécanisme (button[data-sort] + aria-sort), explorateur puis admin
+ await p.goto(BASE+'index.html');await p.waitForSelector('#ct-table-body');await p.click('text=Appliquer les réglages').catch(()=>{});await p.waitForTimeout(2500);
+ if(await p.locator('#ct-table-head [data-sort]').count()){
+  const key=await p.locator('#ct-table-head [data-sort]').first().getAttribute('data-sort'),ar=()=>p.locator(`#ct-table-head [data-sort="${key}"]`).evaluate(b=>b.parentElement.getAttribute('aria-sort'));
+  await p.locator(`#ct-table-head [data-sort="${key}"]`).click();await p.waitForTimeout(400);const s1=await ar();
+  await p.locator(`#ct-table-head [data-sort="${key}"]`).click();await p.waitForTimeout(400);const s2=await ar();
+  ok('explorateur : clic de tri puis inversion (aria-sort)',['ascending','descending'].includes(s1)&&s1!==s2,s1+'→'+s2);
+ } else ok('explorateur : tri non vérifié (base sans titre classé)',true,'ignoré');
+ await p.goto(BASE+'admin.html#titres');await p.waitForSelector('th [data-sort="mic"]');
+ const ariaMic=()=>p.locator('th [data-sort="mic"]').evaluate(b=>b.parentElement.getAttribute('aria-sort'));
+ await p.locator('th [data-sort="mic"]').click();await p.waitForFunction(()=>document.querySelector('th [data-sort="mic"]')?.parentElement.getAttribute('aria-sort')==='ascending');const a1=await ariaMic();
+ await p.locator('th [data-sort="mic"]').click();await p.waitForFunction(()=>document.querySelector('th [data-sort="mic"]')?.parentElement.getAttribute('aria-sort')==='descending').catch(()=>{});const a2=await ariaMic();
+ ok('admin titres : tri croissant puis décroissant (une seule écoute par rendu)',a1==='ascending'&&a2==='descending',a1+'→'+a2);
  // toast
  await p.evaluate(()=>J.toast('essai'));ok('toast accessible (role=status)',await p.evaluate(()=>!!document.querySelector('.toast[role=status]')));
  await b.close();

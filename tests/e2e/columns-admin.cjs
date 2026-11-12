@@ -6,7 +6,7 @@ const must=(c,m)=>{if(!c)throw new Error(m);};
  const browser=await chromium.launch({executablePath:process.env.JIGO_CHROMIUM,args:['--no-sandbox']}),log={};
  const login=async(w=1280)=>{const ctx=await browser.newContext({viewport:{width:w,height:1000}}),p=await ctx.newPage();p.setDefaultTimeout(30000);p.errors=[];p.on('pageerror',e=>p.errors.push(e.message));
    await p.goto(BASE+'login.html');await p.fill('#u','review_user');await p.fill('#p','review-local-password');await p.click('#auth-form button.primary');await p.waitForURL('**/index.html');return {ctx,p};};
- const heads=p=>p.$$eval('#ct-table-head th',t=>t.map(x=>x.textContent.replace(/[↑↓]/g,'').trim()));
+ const heads=p=>p.$$eval('#ct-table-head th',t=>t.map(x=>x.textContent.replace(/[↑↓▲▼]/g,'').trim()));
  const ready=async p=>{await p.waitForFunction(()=>document.querySelector('#ct-strategy-count')?.textContent.trim().length>0,null,{timeout:60000});await p.waitForTimeout(400);};
  let {ctx,p}=await login();
  try{
@@ -49,7 +49,7 @@ const must=(c,m)=>{if(!c)throw new Error(m);};
   must(JSON.stringify(all)===JSON.stringify([...all].sort((a,b)=>a.localeCompare(b,'fr'))),'Tri par nom sur plusieurs pages : '+all.join(','));
   // clic manuel prioritaire ; tri sur colonne masquée via la liste ; valeurs numériques
   await p.locator('[data-demo-page="1"]').first().click();
-  await p.locator('[data-sort-column="price"]').click();const pr=await p.$$eval('#ct-table-body td.ct-cell-price',c=>c.map(x=>parseFloat(x.textContent.replace(/[^\d,]/g,'').replace(',','.'))));
+  await p.locator('[data-sort="price"]').click();const pr=await p.$$eval('#ct-table-body td.ct-cell-price',c=>c.map(x=>parseFloat(x.textContent.replace(/[^\d,]/g,'').replace(',','.'))));
   must(pr.every((v,i)=>!i||pr[i-1]>=v),'Clic manuel : cours décroissant numérique '+pr.join());
   await p.selectOption('#ct-sort','drawdown');await p.locator('#ct-columns').evaluate(e=>e.closest('details').open=true);
   await p.locator('[data-column="drawdown"]').check();
@@ -72,10 +72,10 @@ const must=(c,m)=>{if(!c)throw new Error(m);};
   must(JSON.stringify(await heads(p))===JSON.stringify(hd.filter(x=>true)),'Après reconnexion');
   // Scores / Classement : configuration propre, inchangée par la précédente
   await p.goto(BASE+'admin.html#scores');await p.waitForSelector('[data-a="tab"]');await p.locator('[data-a="tab"]',{hasText:'Profils'}).click();await p.waitForSelector('#as-rktable',{timeout:60000});
-  const sh=await p.$$eval('#as-rktable th',t=>t.map(x=>x.textContent.replace(/[↑↓]/g,'').trim()));log.scores=sh;
+  const sh=await p.$$eval('#as-rktable th',t=>t.map(x=>x.textContent.replace(/[↑↓▲▼]/g,'').trim()));log.scores=sh;
   must(JSON.stringify(sh)===JSON.stringify(['Rang','Titre','Statut stratégie','Tendance (courbe)','Score simple','Score complexe']),'Scores par défaut : '+JSON.stringify(sh));
   const rk0=await p.$$eval('#as-rktable tbody tr',r=>r.map(x=>[x.querySelector('td').textContent.trim(),x.querySelectorAll('td')[1].textContent.trim()]));
-  await p.locator('[data-a="rk-sort"][data-v="name"]').click();await p.waitForTimeout(1500);
+  await p.locator('#as-rktable [data-sort="name"]').click();await p.waitForTimeout(1500);
   const rk1=await p.$$eval('#as-rktable tbody tr',r=>r.map(x=>[x.querySelector('td').textContent.trim(),x.querySelectorAll('td')[1].textContent.trim()]));
   const nm=rk1.map(x=>x[1].toLowerCase());must(JSON.stringify(nm)===JSON.stringify([...nm].sort((a,b)=>a.localeCompare(b,'fr'))),'Scores : tri par titre');
   const m0=Object.fromEntries(rk0.map(x=>[x[1],x[0]]));for(const [r,n] of rk1)if(m0[n]!==undefined)must(m0[n]===r,'Scores : le rang global change avec le tri');

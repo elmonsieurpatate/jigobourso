@@ -4,11 +4,17 @@ class ApiError extends Exception {
     public $status;
     public function __construct(string $message, int $status = 400) { parent::__construct($message); $this->status = $status; }
 }
-function out($data, int $status = 200): void {
+function json_text($data): string {
+    return (string)json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PARTIAL_OUTPUT_ON_ERROR);
+}
+function json_headers(int $status): void {
     http_response_code($status);
     header('Content-Type: application/json; charset=utf-8');
     header('Cache-Control: no-store');
-    echo json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PARTIAL_OUTPUT_ON_ERROR);
+}
+function out($data, int $status = 200): void {
+    json_headers($status);
+    echo json_text($data);
     exit;
 }
 // Envoie la réponse, puis exécute $after sans faire attendre le client (travail lent : e-mail). Sans fin de requête anticipée
@@ -18,11 +24,9 @@ function out_then($data, callable $after, int $status = 200): void {
     $finish = function_exists('fastcgi_finish_request') ? 'fastcgi_finish_request' : (function_exists('litespeed_finish_request') ? 'litespeed_finish_request' : null);
     $run = function () use ($after) { try { $after(); } catch (Throwable $e) { error_log('after-response: ' . $e->getMessage() . ' @' . basename($e->getFile()) . ':' . $e->getLine()); } };
     if (!$finish) { $run(); out($data, $status); }
-    $json = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PARTIAL_OUTPUT_ON_ERROR);
-    http_response_code($status);
-    header('Content-Type: application/json; charset=utf-8');
-    header('Cache-Control: no-store');
-    header('Content-Length: ' . strlen((string)$json));
+    $json = json_text($data);
+    json_headers($status);
+    header('Content-Length: ' . strlen($json));
     echo $json;
     $finish();
     $run();

@@ -17,7 +17,7 @@
     : '<td colspan="6" class="muted small">pas encore de résultat</td>';
   function draw() {
     const p = s.presets[preset], g = p.groups[group];
-    J.$('#table').innerHTML = `<div class="table-wrap"><table><thead><tr><th>Horizon</th><th class="num">Cas</th><th class="num">Moyenne</th><th class="num">Médiane</th><th class="num">En hausse</th><th class="num">Écart vs univers</th><th class="num">Battent l’univers</th></tr></thead><tbody>
+    J.$('#table').innerHTML = `<div class="table-wrap"><table>${J.table.head(["Horizon", ["Cas", 'num'], ["Moyenne", 'num'], ["Médiane", 'num'], ["En hausse", 'num'], ["Écart vs univers", 'num'], ["Battent l’univers", 'num']])}<tbody>
       ${s.horizons.map(h => `<tr><td>${HZ[h]}</td>${stat(g[h])}</tr>`).join('')}</tbody></table></div>
       <p class="small muted">« Écart vs univers » : rendement moyen des titres classés moins rendement moyen de tous les ${GROUPS[group].toLowerCase()} analysés le même jour, sur le même horizon, en points de pourcentage. Les classements de jours voisins se chevauchent : « Cas » ne compte donc pas autant d’observations indépendantes. Les jours « reconstitués » utilisent l’univers actuel (biais de survie).</p>`;
     J.$$('#presets button').forEach(b => b.classList.toggle('on', b.dataset.p === preset));
@@ -32,7 +32,7 @@
     J.$('#recent').innerHTML = dates.map(d => {
       const rows = byDay[d], origin = rows.some(r => r.origin === 'rebuilt') ? ' · reconstitué' : '';
       const cell = (e, h) => e.returns[h] === undefined ? '<td class="num muted">–</td>' : `<td class="num ${J.cls(e.returns[h])}">${J.pct(e.returns[h], 1)}</td>`;
-      return `<details><summary>${J.date(d)}${origin} · ${rows.length} titre(s)</summary><div class="table-wrap"><table><thead><tr><th>Titre</th><th>Stratégie</th><th class="num">Rang</th><th class="num">+1 séance</th><th class="num">+3</th><th class="num">+5</th></tr></thead><tbody>
+      return `<details><summary>${J.date(d)}${origin} · ${rows.length} titre(s)</summary><div class="table-wrap"><table>${J.table.head(["Titre", "Stratégie", ["Rang", 'num'], ["+1 séance", 'num'], ["+3", 'num'], ["+5", 'num']])}<tbody>
         ${rows.map(e => `<tr><td><a href="titre.html?id=${e.id}"><b>${J.esc(e.symbol)}</b></a> <span class="small muted">${J.esc(e.name)}</span></td><td class="small">${J.esc(s.presets[e.preset].label)}</td><td class="num">${e.rank}</td>${[1, 3, 5].map(h => cell(e, h)).join('')}</tr>`).join('')}</tbody></table></div></details>`;
     }).join('') || '<div class="empty">Rien à afficher pour ce choix.</div>';
   }

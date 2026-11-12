@@ -55,13 +55,13 @@
     const cols = draft.columns.filter(c => c.visible);
     const prim = draft.sort[0];
     const w = c => c.width ? ` style="width:${c.width}px;min-width:${c.width}px"` : '';
-    return `<div class="ac-frame ${device}"><div class="ac-scroll"><table class="ac-table"><thead><tr>${cols.map(c => `<th${w(c)}${meta(c.id).hint ? ` title="${E(meta(c.id).hint)}"` : ''}>${E(meta(c.id).label)}${prim && prim.key === c.id ? (prim.dir === 'asc' ? ' ↑' : ' ↓') : ''}</th>`).join('')}</tr></thead>
+    return `<div class="ac-frame ${device}"><div class="ac-scroll"><table class="ac-table"><thead><tr>${J.table.headRow(cols.map(c => ({ label: E(meta(c.id).label) + (prim && prim.key === c.id ? (prim.dir === 'asc' ? ' ▲' : ' ▼') : ''), title: meta(c.id).hint || '', width: c.width })))}</tr></thead>
       <tbody>${SAMPLE.map(r => `<tr>${cols.map(c => `<td${w(c)}>${sample(c.id, r)}</td>`).join('')}</tr>`).join('')}</tbody></table></div></div>
       <p class="small muted mt-2">Valeurs d’exemple : seuls l’ordre, la visibilité et les largeurs sont réels. ${device === 'mobile' ? 'Cadre de 375 px ; le tableau défile horizontalement.' : ''}</p>`;
   }
 
   // ───────── sections ─────────
-  const seg = (items, cur, attr) => `<div class="seg" role="radiogroup">${items.map(([v, l]) => `<button type="button" role="radio" aria-checked="${v === cur}" class="${v === cur ? 'on' : ''}" ${attr}="${v}">${l}</button>`).join('')}</div>`;
+  const seg = (items, cur, attr) => J.seg(items, cur, attr, { radio: true });
 
   function columnsSection() {
     const rows = draft.columns.map((c, i) => `<li class="ac-row ${c.visible ? '' : 'off'}" data-id="${E(c.id)}">

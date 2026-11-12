@@ -2,32 +2,13 @@
    Aucune interpolation : un créneau sans donnée est dessiné comme un trou. Dépend de app.js (J). */
 'use strict';
 (() => {
-  const NS = 'http://www.w3.org/2000/svg';
   const SLOT = 15 * 60000;
-  const dec = p => (p < 1 ? 4 : p < 10 ? 3 : 2);
+  const dec = J.priceDec;
   const t = iso => new Date(iso).getTime();
 
-  const fmt = tz => ({
-    time: ms => new Intl.DateTimeFormat('fr-FR', { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false }).format(ms),
-    day: ms => new Intl.DateTimeFormat('fr-FR', { timeZone: tz, weekday: 'short', day: 'numeric', month: 'short' }).format(ms),
-    dayLong: ms => new Intl.DateTimeFormat('fr-FR', { timeZone: tz, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(ms),
-    minute: ms => +new Intl.DateTimeFormat('en-GB', { timeZone: tz, minute: 'numeric' }).format(ms),
-    zone: ms => (new Intl.DateTimeFormat('fr-FR', { timeZone: tz, timeZoneName: 'short' }).formatToParts(ms).find(p => p.type === 'timeZoneName') || {}).value || tz,
-  });
+  const fmt = J.tz;
 
-  function el(name, attrs = {}, text) {
-    const e = document.createElementNS(NS, name);
-    for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
-    if (text !== undefined) e.textContent = text;
-    return e;
-  }
-  const niceTicks = (lo, hi, n = 5) => {
-    const span = hi - lo || 1, raw = span / n, mag = Math.pow(10, Math.floor(Math.log10(raw)));
-    const step = [1, 2, 2.5, 5, 10].map(m => m * mag).find(s => s >= raw) || mag * 10;
-    const out = [];
-    for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) out.push(+v.toFixed(8));
-    return out;
-  };
+  const el = J.svg, niceTicks = J.ticks;
 
   /* Dessine le graphique dans `host` (un div). opts : { mode: 'candles' | 'line' }. Renvoie rien ; remplace le contenu. */
   J.intradayChart = function (host, d, opts = {}) {
@@ -118,8 +99,7 @@
     svg.append(el('text', { x: W - R + 6, y: Y(lc) + 4, class: 'lasttext' }, fp(lc)));
     // réticule et infobulle
     const cross = el('line', { y1: TOP, y2: VTOP + VH, class: 'cross', visibility: 'hidden' }); svg.append(cross);
-    const tip = document.createElement('div'); tip.className = 'chart-tip'; tip.hidden = true;
-    const wrap = document.createElement('div'); wrap.className = 'chart-wrap'; wrap.append(svg, tip); host.append(wrap);
+    const tip = J.chartBox(host, svg);
     const slots = [];     // toutes les positions de survol : barres et trous
     dom.forEach(x => { const s = x.s; for (let i = x.lo; i < x.hi; i++) { const ms = x.open + i * SLOT, bi = s.bars.findIndex(b => t(b[0]) === ms); slots.push({ x: x.X(i) + step / 2, ms, bar: bi >= 0 ? s.bars[bi] : null, s, i }); } });
     const move = ev => {

@@ -1,0 +1,1288 @@
+/* Indicateurs de référence du catalogue par défaut. */
+window.AdminCategoryDemo.indicators = [
+  {
+    "id": "volatility",
+    "name": "Volatilité",
+    "description": "Dispersion des variations quotidiennes des cours, en pourcentage par séance.",
+    "unit": "%/séance",
+    "kind": "numeric",
+    "domain": [],
+    "supportsUnknown": true,
+    "categories": [
+      {
+        "id": "volatility-very-low",
+        "name": "Très faible",
+        "min": null,
+        "max": 0.75,
+        "minIncluded": false,
+        "maxIncluded": true,
+        "color": "#08a02f",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Variations quotidiennes très limitées dans cette démonstration."
+      },
+      {
+        "id": "volatility-c0",
+        "name": "Faible",
+        "min": 0.75,
+        "max": 1.5,
+        "minIncluded": false,
+        "maxIncluded": true,
+        "color": "#a8db6c",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Amplitude quotidienne limitée."
+      },
+      {
+        "id": "volatility-c1",
+        "name": "Modérée",
+        "min": 1.5,
+        "max": 3,
+        "minIncluded": false,
+        "maxIncluded": true,
+        "color": "#f7d400",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Variations quotidiennes intermédiaires."
+      },
+      {
+        "id": "volatility-c2",
+        "name": "Élevée",
+        "min": 3,
+        "max": 5,
+        "minIncluded": false,
+        "maxIncluded": true,
+        "color": "#ff9c28",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Variations quotidiennes importantes."
+      },
+      {
+        "id": "volatility-c3",
+        "name": "Très élevée",
+        "min": 5,
+        "max": null,
+        "minIncluded": false,
+        "maxIncluded": false,
+        "color": "#f04452",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Très forte amplitude quotidienne."
+      },
+      {
+        "id": "volatility-c4",
+        "name": "Inconnue",
+        "min": null,
+        "max": null,
+        "minIncluded": false,
+        "maxIncluded": false,
+        "color": "#a5afbf",
+        "active": true,
+        "unknown": true,
+        "values": [],
+        "description": "Volatilité indisponible."
+      }
+    ]
+  },
+  {
+    "id": "turnover_eur",
+    "name": "Montant historique",
+    "description": "Montant moyen négocié calculé sur les volumes historiques et les cours convertis en euros.",
+    "unit": "€/jour",
+    "kind": "numeric",
+    "domain": [],
+    "supportsUnknown": true,
+    "categories": [
+      {
+        "id": "turnover_eur-c0",
+        "name": "Limité",
+        "min": null,
+        "max": 1000000,
+        "minIncluded": false,
+        "maxIncluded": true,
+        "color": "#f04452",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Classe « limité » pour cet indicateur."
+      },
+      {
+        "id": "turnover_eur-c1",
+        "name": "Intermédiaire",
+        "min": 1000000,
+        "max": 2000000,
+        "minIncluded": false,
+        "maxIncluded": true,
+        "color": "#ff9625",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Classe « intermédiaire » pour cet indicateur."
+      },
+      {
+        "id": "turnover_eur-c2",
+        "name": "Important",
+        "min": 2000000,
+        "max": 4000000,
+        "minIncluded": false,
+        "maxIncluded": true,
+        "color": "#a8d85d",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Classe « important » pour cet indicateur."
+      },
+      {
+        "id": "turnover_eur-c3",
+        "name": "Très important",
+        "min": 4000000,
+        "max": null,
+        "minIncluded": false,
+        "maxIncluded": false,
+        "color": "#10a039",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Classe « très important » pour cet indicateur."
+      },
+      {
+        "id": "turnover_eur-c4",
+        "name": "Inconnue",
+        "min": null,
+        "max": null,
+        "minIncluded": false,
+        "maxIncluded": false,
+        "color": "#a5afbf",
+        "active": true,
+        "unknown": true,
+        "values": [],
+        "description": "Donnée absente pour cette mesure."
+      }
+    ]
+  },
+  {
+    "id": "quoted_turnover",
+    "name": "Montant coté Yahoo · trois mois",
+    "description": "Montant quotidien estimé à partir du volume moyen coté Yahoo sur trois mois. Source distincte de l’historique.",
+    "unit": "€/jour",
+    "kind": "numeric",
+    "domain": [],
+    "supportsUnknown": true,
+    "categories": [
+      {
+        "id": "quoted_turnover-c0",
+        "name": "Limité",
+        "min": null,
+        "max": 1000000,
+        "minIncluded": false,
+        "maxIncluded": true,
+        "color": "#f04452",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Classe « limité » pour cet indicateur."
+      },
+      {
+        "id": "quoted_turnover-c1",
+        "name": "Intermédiaire",
+        "min": 1000000,
+        "max": 2000000,
+        "minIncluded": false,
+        "maxIncluded": true,
+        "color": "#ff9625",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Classe « intermédiaire » pour cet indicateur."
+      },
+      {
+        "id": "quoted_turnover-c2",
+        "name": "Important",
+        "min": 2000000,
+        "max": 4000000,
+        "minIncluded": false,
+        "maxIncluded": true,
+        "color": "#a8d85d",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Classe « important » pour cet indicateur."
+      },
+      {
+        "id": "quoted_turnover-c3",
+        "name": "Très important",
+        "min": 4000000,
+        "max": null,
+        "minIncluded": false,
+        "maxIncluded": false,
+        "color": "#10a039",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Classe « très important » pour cet indicateur."
+      },
+      {
+        "id": "quoted_turnover-c4",
+        "name": "Inconnue",
+        "min": null,
+        "max": null,
+        "minIncluded": false,
+        "maxIncluded": false,
+        "color": "#a5afbf",
+        "active": true,
+        "unknown": true,
+        "values": [],
+        "description": "Donnée absente pour cette mesure."
+      }
+    ]
+  },
+  {
+    "id": "avg_volume",
+    "name": "Volume historique",
+    "description": "Volume moyen historique, en titres par séance, sans mesurer la croissance des volumes.",
+    "unit": "titres/séance",
+    "kind": "numeric",
+    "domain": [],
+    "supportsUnknown": true,
+    "categories": [
+      {
+        "id": "avg_volume-c0",
+        "name": "Très faible",
+        "min": null,
+        "max": 10000,
+        "minIncluded": false,
+        "maxIncluded": true,
+        "color": "#10a039",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Classe « très faible » pour cet indicateur."
+      },
+      {
+        "id": "avg_volume-c1",
+        "name": "Faible",
+        "min": 10000,
+        "max": 100000,
+        "minIncluded": false,
+        "maxIncluded": true,
+        "color": "#a3d85d",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Classe « faible » pour cet indicateur."
+      },
+      {
+        "id": "avg_volume-c2",
+        "name": "Moyen",
+        "min": 100000,
+        "max": 1000000,
+        "minIncluded": false,
+        "maxIncluded": true,
+        "color": "#f4c900",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Classe « moyen » pour cet indicateur."
+      },
+      {
+        "id": "avg_volume-c3",
+        "name": "Important",
+        "min": 1000000,
+        "max": null,
+        "minIncluded": false,
+        "maxIncluded": false,
+        "color": "#ff9625",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Classe « important » pour cet indicateur."
+      },
+      {
+        "id": "avg_volume-c4",
+        "name": "Inconnue",
+        "min": null,
+        "max": null,
+        "minIncluded": false,
+        "maxIncluded": false,
+        "color": "#a5afbf",
+        "active": true,
+        "unknown": true,
+        "values": [],
+        "description": "Donnée absente pour cette mesure."
+      }
+    ]
+  },
+  {
+    "id": "up_fraction",
+    "name": "Séances positives",
+    "description": "Part des séances dont la variation est strictement positive sur la fenêtre de référence.",
+    "unit": "%",
+    "kind": "numeric",
+    "domain": [],
+    "supportsUnknown": true,
+    "categories": [
+      {
+        "id": "up_fraction-c0",
+        "name": "Peu fréquentes",
+        "min": null,
+        "max": 40,
+        "minIncluded": false,
+        "maxIncluded": true,
+        "color": "#f04452",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Classe « peu fréquentes » pour cet indicateur."
+      },
+      {
+        "id": "up_fraction-c1",
+        "name": "Partagées",
+        "min": 40,
+        "max": 55.00000000000001,
+        "minIncluded": false,
+        "maxIncluded": true,
+        "color": "#ff9625",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Classe « partagées » pour cet indicateur."
+      },
+      {
+        "id": "up_fraction-c2",
+        "name": "Fréquentes",
+        "min": 55.00000000000001,
+        "max": 70,
+        "minIncluded": false,
+        "maxIncluded": true,
+        "color": "#a8d85d",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Classe « fréquentes » pour cet indicateur."
+      },
+      {
+        "id": "up_fraction-c3",
+        "name": "Très fréquentes",
+        "min": 70,
+        "max": null,
+        "minIncluded": false,
+        "maxIncluded": false,
+        "color": "#10a039",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Classe « très fréquentes » pour cet indicateur."
+      },
+      {
+        "id": "up_fraction-c4",
+        "name": "Inconnue",
+        "min": null,
+        "max": null,
+        "minIncluded": false,
+        "maxIncluded": false,
+        "color": "#a5afbf",
+        "active": true,
+        "unknown": true,
+        "values": [],
+        "description": "Donnée absente pour cette mesure."
+      }
+    ]
+  },
+  {
+    "id": "largest_day",
+    "name": "Meilleure séance",
+    "description": "Meilleure variation quotidienne observée sur la fenêtre de référence.",
+    "unit": "%",
+    "kind": "numeric",
+    "domain": [],
+    "supportsUnknown": true,
+    "categories": [
+      {
+        "id": "largest_day-c0",
+        "name": "Limitée",
+        "min": null,
+        "max": 3,
+        "minIncluded": false,
+        "maxIncluded": true,
+        "color": "#10a039",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Classe « limitée » pour cet indicateur."
+      },
+      {
+        "id": "largest_day-c1",
+        "name": "Marquée",
+        "min": 3,
+        "max": 7,
+        "minIncluded": false,
+        "maxIncluded": true,
+        "color": "#a3d85d",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Classe « marquée » pour cet indicateur."
+      },
+      {
+        "id": "largest_day-c2",
+        "name": "Forte",
+        "min": 7,
+        "max": 15,
+        "minIncluded": false,
+        "maxIncluded": true,
+        "color": "#f4c900",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Classe « forte » pour cet indicateur."
+      },
+      {
+        "id": "largest_day-c3",
+        "name": "Très forte",
+        "min": 15,
+        "max": null,
+        "minIncluded": false,
+        "maxIncluded": false,
+        "color": "#ff9625",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Classe « très forte » pour cet indicateur."
+      },
+      {
+        "id": "largest_day-c4",
+        "name": "Inconnue",
+        "min": null,
+        "max": null,
+        "minIncluded": false,
+        "maxIncluded": false,
+        "color": "#a5afbf",
+        "active": true,
+        "unknown": true,
+        "values": [],
+        "description": "Donnée absente pour cette mesure."
+      }
+    ]
+  },
+  {
+    "id": "worst_day",
+    "name": "Pire séance",
+    "description": "Pire variation quotidienne observée sur la fenêtre de référence.",
+    "unit": "%",
+    "kind": "numeric",
+    "domain": [],
+    "supportsUnknown": true,
+    "categories": [
+      {
+        "id": "worst_day-c0",
+        "name": "Très forte baisse",
+        "min": null,
+        "max": -10,
+        "minIncluded": false,
+        "maxIncluded": true,
+        "color": "#f04452",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Classe « très forte baisse » pour cet indicateur."
+      },
+      {
+        "id": "worst_day-c1",
+        "name": "Forte baisse",
+        "min": -10,
+        "max": -5,
+        "minIncluded": false,
+        "maxIncluded": true,
+        "color": "#ff9625",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Classe « forte baisse » pour cet indicateur."
+      },
+      {
+        "id": "worst_day-c2",
+        "name": "Baisse modérée",
+        "min": -5,
+        "max": -2,
+        "minIncluded": false,
+        "maxIncluded": true,
+        "color": "#a8d85d",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Classe « baisse modérée » pour cet indicateur."
+      },
+      {
+        "id": "worst_day-c3",
+        "name": "Baisse limitée",
+        "min": -2,
+        "max": null,
+        "minIncluded": false,
+        "maxIncluded": false,
+        "color": "#10a039",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Classe « baisse limitée » pour cet indicateur."
+      },
+      {
+        "id": "worst_day-c4",
+        "name": "Inconnue",
+        "min": null,
+        "max": null,
+        "minIncluded": false,
+        "maxIncluded": false,
+        "color": "#a5afbf",
+        "active": true,
+        "unknown": true,
+        "values": [],
+        "description": "Donnée absente pour cette mesure."
+      }
+    ]
+  },
+  {
+    "id": "gain_share",
+    "name": "Meilleure hausse log / hausses positives log",
+    "description": "Part de la meilleure hausse logarithmique dans la somme des hausses logarithmiques positives.",
+    "unit": "%",
+    "kind": "numeric",
+    "domain": [],
+    "supportsUnknown": true,
+    "categories": [
+      {
+        "id": "gain_share-c0",
+        "name": "Répartie",
+        "min": null,
+        "max": 20,
+        "minIncluded": false,
+        "maxIncluded": true,
+        "color": "#10a039",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Classe « répartie » pour cet indicateur."
+      },
+      {
+        "id": "gain_share-c1",
+        "name": "Modérée",
+        "min": 20,
+        "max": 40,
+        "minIncluded": false,
+        "maxIncluded": true,
+        "color": "#a3d85d",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Classe « modérée » pour cet indicateur."
+      },
+      {
+        "id": "gain_share-c2",
+        "name": "Concentrée",
+        "min": 40,
+        "max": 60,
+        "minIncluded": false,
+        "maxIncluded": true,
+        "color": "#f4c900",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Classe « concentrée » pour cet indicateur."
+      },
+      {
+        "id": "gain_share-c3",
+        "name": "Très concentrée",
+        "min": 60,
+        "max": null,
+        "minIncluded": false,
+        "maxIncluded": false,
+        "color": "#ff9625",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Classe « très concentrée » pour cet indicateur."
+      },
+      {
+        "id": "gain_share-c4",
+        "name": "Inconnue",
+        "min": null,
+        "max": null,
+        "minIncluded": false,
+        "maxIncluded": false,
+        "color": "#a5afbf",
+        "active": true,
+        "unknown": true,
+        "values": [],
+        "description": "Donnée absente pour cette mesure."
+      }
+    ]
+  },
+  {
+    "id": "gain_net_share",
+    "name": "Meilleure hausse simple / gain net simple",
+    "description": "Rapport de la meilleure hausse simple au gain net simple. Peut dépasser 100 %.",
+    "unit": "%",
+    "kind": "numeric",
+    "domain": [],
+    "supportsUnknown": true,
+    "categories": [
+      {
+        "id": "gain_net_share-c0",
+        "name": "Limitée",
+        "min": null,
+        "max": 25,
+        "minIncluded": false,
+        "maxIncluded": true,
+        "color": "#10a039",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Classe « limitée » pour cet indicateur."
+      },
+      {
+        "id": "gain_net_share-c1",
+        "name": "Modérée",
+        "min": 25,
+        "max": 50,
+        "minIncluded": false,
+        "maxIncluded": true,
+        "color": "#a3d85d",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Classe « modérée » pour cet indicateur."
+      },
+      {
+        "id": "gain_net_share-c2",
+        "name": "Importante",
+        "min": 50,
+        "max": 100,
+        "minIncluded": false,
+        "maxIncluded": true,
+        "color": "#f4c900",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Classe « importante » pour cet indicateur."
+      },
+      {
+        "id": "gain_net_share-c3",
+        "name": "Supérieure au gain net",
+        "min": 100,
+        "max": null,
+        "minIncluded": false,
+        "maxIncluded": false,
+        "color": "#ff9625",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Classe « supérieure au gain net » pour cet indicateur."
+      },
+      {
+        "id": "gain_net_share-c4",
+        "name": "Inconnue",
+        "min": null,
+        "max": null,
+        "minIncluded": false,
+        "maxIncluded": false,
+        "color": "#a5afbf",
+        "active": true,
+        "unknown": true,
+        "values": [],
+        "description": "Donnée absente pour cette mesure."
+      }
+    ]
+  },
+  {
+    "id": "log_net_share",
+    "name": "Meilleure hausse log / gain net log",
+    "description": "Rapport de la meilleure hausse logarithmique au gain net logarithmique. Distinct des deux autres concentrations.",
+    "unit": "%",
+    "kind": "numeric",
+    "domain": [],
+    "supportsUnknown": true,
+    "categories": [
+      {
+        "id": "log_net_share-c0",
+        "name": "Limitée",
+        "min": null,
+        "max": 25,
+        "minIncluded": false,
+        "maxIncluded": true,
+        "color": "#10a039",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Classe « limitée » pour cet indicateur."
+      },
+      {
+        "id": "log_net_share-c1",
+        "name": "Modérée",
+        "min": 25,
+        "max": 50,
+        "minIncluded": false,
+        "maxIncluded": true,
+        "color": "#a3d85d",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Classe « modérée » pour cet indicateur."
+      },
+      {
+        "id": "log_net_share-c2",
+        "name": "Importante",
+        "min": 50,
+        "max": 100,
+        "minIncluded": false,
+        "maxIncluded": true,
+        "color": "#f4c900",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Classe « importante » pour cet indicateur."
+      },
+      {
+        "id": "log_net_share-c3",
+        "name": "Supérieure au gain net",
+        "min": 100,
+        "max": null,
+        "minIncluded": false,
+        "maxIncluded": false,
+        "color": "#ff9625",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Classe « supérieure au gain net » pour cet indicateur."
+      },
+      {
+        "id": "log_net_share-c4",
+        "name": "Inconnue",
+        "min": null,
+        "max": null,
+        "minIncluded": false,
+        "maxIncluded": false,
+        "color": "#a5afbf",
+        "active": true,
+        "unknown": true,
+        "values": [],
+        "description": "Donnée absente pour cette mesure."
+      }
+    ]
+  },
+  {
+    "id": "drawdown",
+    "name": "Repli maximal",
+    "description": "Recul maximal observé depuis un sommet précédent, exprimé en amplitude positive.",
+    "unit": "%",
+    "kind": "numeric",
+    "domain": [],
+    "supportsUnknown": true,
+    "categories": [
+      {
+        "id": "drawdown-c0",
+        "name": "Faible",
+        "min": null,
+        "max": 5,
+        "minIncluded": false,
+        "maxIncluded": true,
+        "color": "#10a039",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Classe « faible » pour cet indicateur."
+      },
+      {
+        "id": "drawdown-c1",
+        "name": "Modéré",
+        "min": 5,
+        "max": 10,
+        "minIncluded": false,
+        "maxIncluded": true,
+        "color": "#a3d85d",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Classe « modéré » pour cet indicateur."
+      },
+      {
+        "id": "drawdown-c2",
+        "name": "Élevé",
+        "min": 10,
+        "max": 20,
+        "minIncluded": false,
+        "maxIncluded": true,
+        "color": "#f4c900",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Classe « élevé » pour cet indicateur."
+      },
+      {
+        "id": "drawdown-c3",
+        "name": "Très élevé",
+        "min": 20,
+        "max": null,
+        "minIncluded": false,
+        "maxIncluded": false,
+        "color": "#ff9625",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Classe « très élevé » pour cet indicateur."
+      },
+      {
+        "id": "drawdown-c4",
+        "name": "Inconnue",
+        "min": null,
+        "max": null,
+        "minIncluded": false,
+        "maxIncluded": false,
+        "color": "#a5afbf",
+        "active": true,
+        "unknown": true,
+        "values": [],
+        "description": "Donnée absente pour cette mesure."
+      }
+    ]
+  },
+  {
+    "id": "perf-week",
+    "name": "1 semaine · ≈ 5 séances",
+    "description": "Variation observée entre les bornes de la fenêtre de référence, indépendante du score.",
+    "unit": "%",
+    "kind": "numeric",
+    "domain": [],
+    "supportsUnknown": true,
+    "categories": [
+      {
+        "id": "perf-week-c0",
+        "name": "Nul ou négatif",
+        "min": null,
+        "max": 0,
+        "minIncluded": false,
+        "maxIncluded": true,
+        "color": "#f04452",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Classe « nul ou négatif » pour cet indicateur."
+      },
+      {
+        "id": "perf-week-c1",
+        "name": "Hausse limitée",
+        "min": 0,
+        "max": 5,
+        "minIncluded": false,
+        "maxIncluded": true,
+        "color": "#ff9625",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Classe « hausse limitée » pour cet indicateur."
+      },
+      {
+        "id": "perf-week-c2",
+        "name": "Hausse marquée",
+        "min": 5,
+        "max": 15,
+        "minIncluded": false,
+        "maxIncluded": true,
+        "color": "#a8d85d",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Classe « hausse marquée » pour cet indicateur."
+      },
+      {
+        "id": "perf-week-c3",
+        "name": "Hausse forte",
+        "min": 15,
+        "max": null,
+        "minIncluded": false,
+        "maxIncluded": false,
+        "color": "#10a039",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Classe « hausse forte » pour cet indicateur."
+      },
+      {
+        "id": "perf-week-c4",
+        "name": "Inconnue",
+        "min": null,
+        "max": null,
+        "minIncluded": false,
+        "maxIncluded": false,
+        "color": "#a5afbf",
+        "active": true,
+        "unknown": true,
+        "values": [],
+        "description": "Donnée absente pour cette mesure."
+      }
+    ]
+  },
+  {
+    "id": "perf-month",
+    "name": "1 mois · ≈ 21 séances",
+    "description": "Variation observée entre les bornes de la fenêtre de référence, indépendante du score.",
+    "unit": "%",
+    "kind": "numeric",
+    "domain": [],
+    "supportsUnknown": true,
+    "categories": [
+      {
+        "id": "perf-month-c0",
+        "name": "Nul ou négatif",
+        "min": null,
+        "max": 0,
+        "minIncluded": false,
+        "maxIncluded": true,
+        "color": "#f04452",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Classe « nul ou négatif » pour cet indicateur."
+      },
+      {
+        "id": "perf-month-c1",
+        "name": "Hausse limitée",
+        "min": 0,
+        "max": 5,
+        "minIncluded": false,
+        "maxIncluded": true,
+        "color": "#ff9625",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Classe « hausse limitée » pour cet indicateur."
+      },
+      {
+        "id": "perf-month-c2",
+        "name": "Hausse marquée",
+        "min": 5,
+        "max": 15,
+        "minIncluded": false,
+        "maxIncluded": true,
+        "color": "#a8d85d",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Classe « hausse marquée » pour cet indicateur."
+      },
+      {
+        "id": "perf-month-c3",
+        "name": "Hausse forte",
+        "min": 15,
+        "max": null,
+        "minIncluded": false,
+        "maxIncluded": false,
+        "color": "#10a039",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Classe « hausse forte » pour cet indicateur."
+      },
+      {
+        "id": "perf-month-c4",
+        "name": "Inconnue",
+        "min": null,
+        "max": null,
+        "minIncluded": false,
+        "maxIncluded": false,
+        "color": "#a5afbf",
+        "active": true,
+        "unknown": true,
+        "values": [],
+        "description": "Donnée absente pour cette mesure."
+      }
+    ]
+  },
+  {
+    "id": "perf-quarter",
+    "name": "3 mois · ≈ 63 séances",
+    "description": "Variation observée entre les bornes de la fenêtre de référence, indépendante du score.",
+    "unit": "%",
+    "kind": "numeric",
+    "domain": [],
+    "supportsUnknown": true,
+    "categories": [
+      {
+        "id": "perf-quarter-c0",
+        "name": "Nul ou négatif",
+        "min": null,
+        "max": 0,
+        "minIncluded": false,
+        "maxIncluded": true,
+        "color": "#f04452",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Classe « nul ou négatif » pour cet indicateur."
+      },
+      {
+        "id": "perf-quarter-c1",
+        "name": "Hausse limitée",
+        "min": 0,
+        "max": 5,
+        "minIncluded": false,
+        "maxIncluded": true,
+        "color": "#ff9625",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Classe « hausse limitée » pour cet indicateur."
+      },
+      {
+        "id": "perf-quarter-c2",
+        "name": "Hausse marquée",
+        "min": 5,
+        "max": 15,
+        "minIncluded": false,
+        "maxIncluded": true,
+        "color": "#a8d85d",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Classe « hausse marquée » pour cet indicateur."
+      },
+      {
+        "id": "perf-quarter-c3",
+        "name": "Hausse forte",
+        "min": 15,
+        "max": null,
+        "minIncluded": false,
+        "maxIncluded": false,
+        "color": "#10a039",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Classe « hausse forte » pour cet indicateur."
+      },
+      {
+        "id": "perf-quarter-c4",
+        "name": "Inconnue",
+        "min": null,
+        "max": null,
+        "minIncluded": false,
+        "maxIncluded": false,
+        "color": "#a5afbf",
+        "active": true,
+        "unknown": true,
+        "values": [],
+        "description": "Donnée absente pour cette mesure."
+      }
+    ]
+  },
+  {
+    "id": "quality",
+    "name": "Continuité des données",
+    "description": "État de continuité de l’historique : complet, partiel ou rupture. Aucune nouvelle mesure n’est créée ici.",
+    "unit": "code 0 complète / 1 partielle / 2 rupture",
+    "kind": "enum",
+    "domain": [
+      {
+        "value": "0",
+        "label": "Complète"
+      },
+      {
+        "value": "1",
+        "label": "Partielle"
+      },
+      {
+        "value": "2",
+        "label": "Rupture"
+      }
+    ],
+    "supportsUnknown": true,
+    "categories": [
+      {
+        "id": "quality-c0",
+        "name": "Complète",
+        "min": null,
+        "max": null,
+        "minIncluded": false,
+        "maxIncluded": false,
+        "color": "#10a039",
+        "active": true,
+        "unknown": false,
+        "values": [
+          "0"
+        ],
+        "description": "Classe « complète » pour cet indicateur."
+      },
+      {
+        "id": "quality-c1",
+        "name": "Partielle",
+        "min": null,
+        "max": null,
+        "minIncluded": false,
+        "maxIncluded": false,
+        "color": "#f4c900",
+        "active": true,
+        "unknown": false,
+        "values": [
+          "1"
+        ],
+        "description": "Classe « partielle » pour cet indicateur."
+      },
+      {
+        "id": "quality-c2",
+        "name": "Rupture",
+        "min": null,
+        "max": null,
+        "minIncluded": false,
+        "maxIncluded": false,
+        "color": "#f04452",
+        "active": true,
+        "unknown": false,
+        "values": [
+          "2"
+        ],
+        "description": "Classe « rupture » pour cet indicateur."
+      },
+      {
+        "id": "quality-c3",
+        "name": "Inconnue",
+        "min": null,
+        "max": null,
+        "minIncluded": false,
+        "maxIncluded": false,
+        "color": "#a5afbf",
+        "active": true,
+        "unknown": true,
+        "values": [],
+        "description": "Donnée absente pour cette mesure."
+      }
+    ]
+  },
+  {
+    "id": "freshness",
+    "name": "Fraîcheur des clôtures",
+    "description": "État de fraîcheur des clôtures. Catégories fondées sur des états, pas sur un intervalle numérique éditable.",
+    "unit": "code 0 récent / 1 ancien",
+    "kind": "enum",
+    "domain": [
+      {
+        "value": "0",
+        "label": "À jour"
+      },
+      {
+        "value": "1",
+        "label": "Ancienne"
+      }
+    ],
+    "supportsUnknown": true,
+    "categories": [
+      {
+        "id": "freshness-c0",
+        "name": "À jour",
+        "min": null,
+        "max": null,
+        "minIncluded": false,
+        "maxIncluded": false,
+        "color": "#10a039",
+        "active": true,
+        "unknown": false,
+        "values": [
+          "0"
+        ],
+        "description": "Classe « à jour » pour cet indicateur."
+      },
+      {
+        "id": "freshness-c1",
+        "name": "Ancienne",
+        "min": null,
+        "max": null,
+        "minIncluded": false,
+        "maxIncluded": false,
+        "color": "#ff9625",
+        "active": true,
+        "unknown": false,
+        "values": [
+          "1"
+        ],
+        "description": "Classe « ancienne » pour cet indicateur."
+      },
+      {
+        "id": "freshness-c2",
+        "name": "Inconnue",
+        "min": null,
+        "max": null,
+        "minIncluded": false,
+        "maxIncluded": false,
+        "color": "#a5afbf",
+        "active": true,
+        "unknown": true,
+        "values": [],
+        "description": "Donnée absente pour cette mesure."
+      }
+    ]
+  },
+  {
+    "id": "coverage",
+    "name": "Couverture des historiques",
+    "description": "Proportion de clôtures disponibles par rapport aux séances attendues. Valeur entre 0 et 1.",
+    "unit": "%",
+    "kind": "numeric",
+    "domain": [],
+    "supportsUnknown": true,
+    "categories": [
+      {
+        "id": "coverage-c0",
+        "name": "Absente",
+        "min": null,
+        "max": 0,
+        "minIncluded": false,
+        "maxIncluded": true,
+        "color": "#f04452",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Classe « absente » pour cet indicateur."
+      },
+      {
+        "id": "coverage-c1",
+        "name": "Partielle",
+        "min": 0,
+        "max": 99.9999,
+        "minIncluded": false,
+        "maxIncluded": true,
+        "color": "#ff9625",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Classe « partielle » pour cet indicateur."
+      },
+      {
+        "id": "coverage-c2",
+        "name": "Complète",
+        "min": 99.9999,
+        "max": null,
+        "minIncluded": false,
+        "maxIncluded": false,
+        "color": "#10a039",
+        "active": true,
+        "unknown": false,
+        "values": [],
+        "description": "Classe « complète » pour cet indicateur."
+      },
+      {
+        "id": "coverage-c3",
+        "name": "Inconnue",
+        "min": null,
+        "max": null,
+        "minIncluded": false,
+        "maxIncluded": false,
+        "color": "#a5afbf",
+        "active": true,
+        "unknown": true,
+        "values": [],
+        "description": "Donnée absente pour cette mesure."
+      }
+    ]
+  }
+];

@@ -12,18 +12,18 @@ const BASE='http://127.0.0.1:18089/',must=(c,m)=>{if(!c)throw new Error(m);};
   await p.locator('#ct-strategy').selectOption('fast');await p.waitForTimeout(1200);
   await p.locator('#ct-verdict [data-verdict="all"]').click();await p.waitForTimeout(300);
   // 1. en-tête renommé, infobulle, jamais l'ancien intitulé
-  const heads=await p.$$eval('#ct-table-head th',t=>t.map(x=>({text:x.textContent.replace(/[↑↓]/g,'').trim(),title:x.getAttribute('title')})));
+  const heads=await p.$$eval('#ct-table-head th',t=>t.map(x=>({text:x.textContent.replace(/[↑↓▲▼]/g,'').trim(),title:x.getAttribute('title')})));
   const h=heads.find(x=>x.text==='Var. 1J (%)');
   must(h,'En-tête « Var. 1J (%) » absent : '+JSON.stringify(heads));
   must(h.title==='Variation du cours entre les deux dernières séances clôturées.','Infobulle : '+h.title);
   must(!heads.some(x=>/^Var\. ?%/.test(x.text)),'Ancien intitulé « Var. % » encore affiché');
   // 2. tri numérique sur la colonne
   const col=async()=>p.$$eval('#ct-table-body td.ct-cell-change',c=>c.map(x=>parseFloat(x.textContent.replace(/\s/g,'').replace('−','-').replace(',','.').replace(/[^\d.\-]/g,''))).filter(v=>!Number.isNaN(v)));
-  await p.locator('[data-sort-column="change"]').click();await p.waitForTimeout(300);
+  await p.locator('[data-sort="change"]').click();await p.waitForTimeout(300);
   let a=await col();must(a.length>1,'Pas assez de valeurs Var. 1J');
   const first=await p.$$eval('#ct-table-head th',t=>t.map(x=>x.getAttribute('aria-sort')));
   const asc=a.every((v,i)=>!i||a[i-1]<=v),desc=a.every((v,i)=>!i||a[i-1]>=v);must(asc||desc,'Tri numérique : '+a.join());
-  await p.locator('[data-sort-column="change"]').click();await p.waitForTimeout(300);
+  await p.locator('[data-sort="change"]').click();await p.waitForTimeout(300);
   const b=await col();must(asc?b.every((v,i)=>!i||b[i-1]>=v):b.every((v,i)=>!i||b[i-1]<=v),'Tri inversé : '+b.join());
   log.sorted=b.slice(0,5);
   // 3. critère de recherche Jour : statuts seulement, rangs et scores inchangés

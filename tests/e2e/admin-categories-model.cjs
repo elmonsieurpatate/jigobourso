@@ -1,6 +1,6 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const root=path.join(__dirname,'../../app/public/assets'),env={window:{},Intl};
-for(const file of['filtres-catalogue.js','admin-categories-model.js'])vm.runInNewContext(fs.readFileSync(path.join(root,file),'utf8'),env);
+for(const file of['filtres-catalogue.js',...[...fs.readFileSync(path.join(root,'..','mes-filtres.html'),'utf8').matchAll(/assets\/(filtres-catalogue-[^?"]+\.js)/g)].map(m=>m[1]),'admin-categories-model.js'])vm.runInNewContext(fs.readFileSync(path.join(root,file),'utf8'),env);
 const M=env.window.AdminCategoryModel,seed=env.window.AdminCategoryDemo,original=JSON.stringify(seed),vol=M.copy(seed.indicators.find(x=>x.id==='volatility'));
 assert.equal(seed.filters.length,13);assert.equal(seed.filters.filter(f=>f.editable).length,9);assert.equal(seed.filters.filter(f=>!f.editable).length,4);assert.ok(seed.filters.filter(f=>!f.editable).every(f=>f.measures.length===0&&f.provenance&&f.values.length));
 for(const i of seed.indicators){const r=M.validate(i,i.categories);assert.equal(r.valid,true,i.id);assert.equal(r.warnings.length,0,i.id);}

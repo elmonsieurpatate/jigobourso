@@ -5,7 +5,7 @@
   let view = null, editing = null, status = {}, open = new Set(location.hash === '#criteres' ? ['*'] : new URLSearchParams(location.search).getAll('id'));
   const loadStatus = async () => { try { status = Object.fromEntries((await J.api('strategies/status')).strategies.map(s => [s.id, s])); } catch (_) { status = {}; } };
   const val = v => v == null ? 'aucun seuil' : typeof v === 'object' ? JSON.stringify(v) : String(typeof v === 'number' ? +v.toFixed(4) : v);
-  const rowsOf = d => d.length ? `<div class="sui-scroll"><table class="sui-cmp"><thead><tr><th>Paramètre</th><th>Officiel</th><th>Le vôtre</th></tr></thead><tbody>${d.map(x => `<tr class="mod"><td>${esc(x.key)}</td><td>${esc(val(x.official))}</td><td>${esc(val(x.mine))}</td></tr>`).join('')}</tbody></table></div>` : '';
+  const rowsOf = d => d.length ? `<div class="sui-scroll"><table class="sui-cmp">${J.table.head(["Paramètre", "Officiel", "Le vôtre"])}<tbody>${d.map(x => `<tr class="mod"><td>${esc(x.key)}</td><td>${esc(val(x.official))}</td><td>${esc(val(x.mine))}</td></tr>`).join('')}</tbody></table></div>` : '';
   const statusBlock = r => {
     const st = status[r.id]; if (!st || st.kind !== 'builtin') return '';
     const part = (label, p, act) => `<div class="row gap-s small" style="align-items:center"><b>${label}</b> ${SUI.badge(p.state)}${p.modified ? ` <span class="muted">${p.modified} paramètre${p.modified > 1 ? 's' : ''} modifié${p.modified > 1 ? 's' : ''}</span> <button class="btn sm" data-act="${act}" data-id="${esc(r.id)}">${J.icon('undo', 'sui-ic')} Restaurer</button>` : ''}</div>`;
@@ -16,7 +16,7 @@
   };
   const post = body => J.post('classement-test/strategies/save', { revision: view.revision, ...body });
   const meta = id => ({ icon: 'trending-up', description: '', enabled: true, ...((view.meta || {})[id] || {}) });
-  const when = s => { try { return new Date(String(s).replace(' ', 'T') + (/Z|[+-]\d\d:?\d\d$/.test(s) ? '' : 'Z')).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }); } catch (_) { return ''; } };
+  const when = J.dateTimeShort;
   const rows = () => {
     const byId = Object.fromEntries(view.items.map(i => [i.id, i]));
     return [...Object.entries(view.builtin).map(([id, name]) => ({ id, name, builtin: true, row: byId[id] || null })),
