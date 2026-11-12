@@ -1,6 +1,6 @@
 /* Éléments partagés des stratégies (Explorer, Mes stratégies, Aide) : icône distincte par stratégie, badge de statut, fenêtre d'information, sélecteur groupé accessible. */
 (() => {
-  const E = s => J.esc(String(s ?? ''));
+  const E = J.esc;
   const ICON = { fast: 'rocket', regular: 'trend', calm: 'leaf', rebound: 'rebound', mom6: 'clock6', mom12: 'calendar', momrisk: 'shieldcheck' };
   const STATUS = { official: 'Officielle', adapted: 'Adaptée', personal: 'Personnelle' };
   const SHORT = {

@@ -1,6 +1,6 @@
 /* Inscription : validation claire, retour honnête sur l'e-mail de bienvenue, connexion automatique puis accueil vers l'aide. */
 (() => {
-  const $ = s => document.querySelector(s), E = J.esc, form = $('#register'), err = $('#err'), btn = $('#go');
+  const $ = J.$, E = J.esc, form = $('#register'), err = $('#err'), btn = $('#go');
   const fail = m => { err.textContent = m; err.hidden = false; err.scrollIntoView({ block: 'nearest' }); };
   J.api('auth/me').then(r => { if (r && r.user) location.href = 'index.html'; else if (r && r.registration_open === false) { form.querySelectorAll('input,button').forEach(x => x.disabled = true); fail('Les inscriptions sont fermées pour le moment. Contactez l’administrateur.'); } }).catch(() => { });
   form.onsubmit = async e => {

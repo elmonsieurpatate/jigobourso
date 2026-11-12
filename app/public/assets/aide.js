@@ -2,8 +2,8 @@
    Les chapitres sont déclarés dans help-ch-*.js (window.HELP_CHAPTERS.push({...})). Les chiffres des stratégies viennent du moteur (route help/facts) ; les exemples sont fictifs. */
 (async () => {
   const me = await J.init('aide'); if (!me) return;
-  const E = J.esc, root = J.$('#help'), $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
-  const store = { get: k => { try { return localStorage.getItem(k); } catch (_) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (_) { /* facultatif */ } } };
+  const E = J.esc, root = J.$('#help'), $ = J.$, $$ = J.$$;
+  const store = J.store.text;
   const GROUPS = [['demarrer', 'Pour démarrer'], ['bourse', 'Les bases de la bourse'], ['mesures', 'Lire un cours de bourse'], ['jigo', 'Jigobourso : chercher et noter'], ['strategies', 'Les 7 stratégies'], ['patrimoine', 'Mon portefeuille'], ['outils', 'Outils et fiabilité'], ['admin', 'Administration']];
   const ALIAS = { 'premiers-pas': 'bienvenue', parcours: 'parcours', bases: 'action-etf', strategies: 'strategies-vue', adaptees: 'adapter', criteres: 'criteres', scores: 'scores', classements: 'classements', indicateurs: 'indicateurs', fiches: 'fiches', portefeuille: 'portefeuille', gains: 'gains', performances: 'performance-portefeuille', colonnes: 'colonnes', donnees: 'donnees', glossaire: 'glossaire', faq: 'faq', administration: 'admin', explorer: 'explorer',
     'strategie-fast': 'strat-fast', 'strategie-regular': 'strat-regular', 'strategie-calm': 'strat-calm', 'strategie-rebound': 'strat-rebound', 'strategie-mom6': 'strat-mom6', 'strategie-mom12': 'strat-mom12', 'strategie-momrisk': 'strat-momrisk', 'strategie-personnelles': 'adapter' };

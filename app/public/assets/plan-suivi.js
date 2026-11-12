@@ -4,10 +4,10 @@
    Aucune vente automatique, aucun objectif de gain inventé, aucune valeur personnelle écrasée sans action explicite de l'utilisateur. */
 (function (root) {
   'use strict';
-  const isNum = v => typeof v === 'number' && isFinite(v);
-  const esc = s => J.esc(String(s == null ? '' : s));
-  const eur = (v, d = 2) => isNum(v) ? J.eur(v, d) : '–';
-  const pc = (v, d = 1, sign = true) => isNum(v) ? (sign && v > 0.004 ? '+' : v < -0.004 ? '−' : '') + J.num(Math.abs(v), d) + ' %' : '–';
+  const isNum = J.isNum;
+  const esc = J.esc;
+  const eur = J.eur;
+  const pc = (v, d = 1, sign = true) => J.pctS(v, d, sign);
   const sgn = v => isNum(v) ? (v > 0.004 ? '+' : v < -0.004 ? '−' : '') + J.eur(Math.abs(v), 2) : '–';
   const cl = v => isNum(v) ? (v > 0.004 ? 'up' : v < -0.004 ? 'down' : '') : '';
   const ICON = {

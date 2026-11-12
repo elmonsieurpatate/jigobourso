@@ -13,3 +13,9 @@ Toutes les pages référencent leurs fichiers avec le même marqueur : `assets/a
 Un fichier ajouté à une page prend donc `?v=__BUILD__`, comme les autres (le script `app.js` charge `passwords.js` avec la même chaîne de version). `tests/fast/test_asset_versions.py` vérifie que chaque référence porte le marqueur et que chaque fichier existe.
 
 Cache (`app/public/.htaccess`) : une ressource avec `?v=` se garde un an (`immutable`), les pages HTML se revalident à chaque visite (`no-cache`), les images, SVG et polices se gardent un mois. Les réponses JSON de l'API ne reçoivent aucune règle `Expires`.
+
+## Noyau JS commun
+
+`assets/core.js` est chargé avant `app.js` sur toutes les pages et définit `J` : `J.$` / `J.$$` (sélecteurs), `J.esc` (échappement HTML), `J.api` / `J.post` (seul accès réseau), formats français (`J.num`, `J.int`, `J.pct`, `J.eur`, `J.money`, signés `J.numS` / `J.pctS` / `J.eurS`, dates), `J.store` (stockage local JSON, jamais d'exception, abonnement) et `J.dom.h` (construction d'éléments). `app.js` ajoute la coque (navigation, graphiques, dialogues, thème, compte).
+
+Règle : un script de page ne redéfinit ni `$`, ni `esc`, ni un formateur de nombre, et n'appelle pas `localStorage` directement (`tests/fast/test_js_core.py` le vérifie). Un alias (`const $ = J.$`) est permis. `theme-init.js` lit `localStorage` lui-même : il doit s'exécuter avant tout le reste pour poser le thème sans flash.

@@ -1,7 +1,7 @@
 /* Administration → Colonnes : colonnes visibles, ordre, largeurs, tri par défaut et filtres initiaux des tableaux Explorer / Scores,
    pour l'ordinateur et le mobile (quatre configurations indépendantes). Aucun calcul : seulement des préférences d'affichage. */
 (() => {
-  const E = s => J.esc(String(s ?? ''));
+  const E = J.esc;
   const PAGES = [['explorer', 'Explorer / Stratégie'], ['scores', 'Scores / Classement']];
   const DEVICES = [['desktop', 'Ordinateur'], ['mobile', 'Mobile']];
   const VERDICTS = [['retained', 'Retenues'], ['excluded', 'Exclues'], ['all', 'Toutes']];

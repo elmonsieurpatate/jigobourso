@@ -11,7 +11,7 @@
     if (t.level === 'bad' || t.level === 'unknown') return `<div class="notice mb-3"><b>${J.esc(t.label)}</b><br>${J.esc(t.text)}${notes}<br>${meta}</div>`;
     return `<p class="small mb-3"><b>${J.esc(t.label)}.</b> ${J.esc(t.text)}${notes} ${meta}</p>`;
   };
-  const saved = (() => { try { return JSON.parse(new URLSearchParams(location.hash.slice(1)).get('explore')) || (() => { const state=JSON.parse(localStorage.getItem('jigo.explorer.v4.'+user.id));return state?.applied?{config:state.applied.config,view:state.applied.universe,preset:state.applied.preset}:JSON.parse(localStorage.getItem('jigo_explorer2')); })() || null; } catch (e) { return null; } })();
+  const saved = (() => { try { return JSON.parse(new URLSearchParams(location.hash.slice(1)).get('explore')) || (() => { const state=J.store.get('jigo.explorer.v4.'+user.id);return state?.applied?{config:state.applied.config,view:state.applied.universe,preset:state.applied.preset}:J.store.get('jigo_explorer2'); })() || null; } catch (e) { return null; } })();
   const pfList = (await J.api('portfolios').catch(() => ({ portfolios: [] }))).portfolios.filter(p => p.has_strategy);
   const P = await J.api('strategy/presets').catch(() => ({ presets: {} }));
   const PN = { regular: 'Croissance régulière', fast: 'Croissance rapide', recovery: 'Rebond', low_volatility: 'Hausse calme', momentum: 'Momentum 6 mois (essai)', momentum12: 'Momentum 12 mois (essai)', momentum_risk: 'Momentum ajusté du risque (essai)' };
@@ -26,7 +26,7 @@
     const key = params.get('ctx');
     if (key) {
       let draft = null;
-      try { const d = JSON.parse(localStorage.getItem('jigo_ct_ctx:' + key)); if (d && d.id === ctId && d.spec) draft = d.spec; } catch (e) { draft = null; }
+      try { const d = J.store.get('jigo_ct_ctx:' + key); if (d && d.id === ctId && d.spec) draft = d.spec; } catch (e) { draft = null; }
       if (draft) reqBody.ct.draft = draft; else reqBody.ct.draft_lost = true;
     }
     reqBody.source = 'Stratégie du Classement';

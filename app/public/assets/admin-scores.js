@@ -25,9 +25,9 @@
     ['Régularité', 'R² de chaque période, chacun pesant min(1, séances/21) car un R² sur peu de séances est bruité. Moyenne pondérée des périodes où le R² est mesuré.', 'facteur de 0 à 1']];
   const LASTDAY = 'Jour (1 séance) : granularité facultative, à 0 % par défaut. Quand elle a un poids, elle ne note que la variation entre les deux dernières séances clôturées (Dynamique) ; elle n’a ni R², ni volatilité, ni repli, ni accélération. Sans poids, la dernière séance compte comme les autres séances dans les mesures de chaque période.';
   const TABS = [['config', 'Configuration du moteur'], ['profils', 'Profils de stratégies'], ['simulation', 'Simulation & exemples'], ['suivi', 'Suivi des calculs']];
-  const $ = (s, r) => (r || document).querySelector(s);
-  const E = s => J.esc(String(s ?? ''));
-  const fmt = (v, d = 1) => v === null || v === undefined ? '—' : J.num(v, d);
+  const $ = J.$;
+  const E = J.esc;
+  const fmt = (v, d = 1) => J.num(v, d);
   const clone = o => JSON.parse(JSON.stringify(o));
 
   let MINE = false;

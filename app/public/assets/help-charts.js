@@ -1,9 +1,9 @@
 /* Graphiques pédagogiques de l'aide (SVG pur, sans dépendance) : courbes avec fenêtre surlignée et droite de tendance, barres, barres empilées. Tout est fictif et calculé dans le navigateur. */
 (function () {
   'use strict';
-  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const esc = J.esc;
   const PAL = ['#2563eb', '#f97316', '#16a34a', '#9333ea', '#e11d48', '#0891b2', '#ca8a04', '#db2777', '#4f46e5', '#65a30d'];
-  const f1 = (v, d = 1) => (+v).toLocaleString('fr-FR', { maximumFractionDigits: d, minimumFractionDigits: d });
+  const f1 = (v, d = 1) => J.num(+v, d);
   let uid = 0;
 
   /** Courbes. o: {w,h, series:[{name,values,color,dash,width}], highlight:{from,to,label,color}, line:{a,b,from,to,color,label} (droite y=exp(a+b·t)), residuals:{values,a,b}, marks:[{x,y,label}], xTitle, yTitle, legend:true} */

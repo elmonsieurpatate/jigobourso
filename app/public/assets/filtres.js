@@ -3,9 +3,9 @@
   'use strict';
   const personal=!!window.JigoSecondaryPersonal;
   if(!await J.init(personal?'explorer':'admin-filtres',{admin:!personal}))return;
-  const $=s=>document.querySelector(s),esc=J.esc,M=window.AdminCategoryModel;
+  const $=J.$,esc=J.esc,M=window.AdminCategoryModel;
   const crumbs=$('#crumbs');if(crumbs)crumbs.innerHTML=personal?'<span>Explorer</span><i>›</i><b>Mes filtres</b>':'<span>Administration</span><i>›</i><b>Filtres et catégories</b>';
-  const store=window.SecondaryFilterStore;
+  const store=J.store.filters;
   let loaded=await store.load(),defaults=loaded.defaults,filters=loaded.definitions.filters,saving=false;
   const offline=loaded.source==='offline';
   if(offline){$('.ac-demo-note').textContent='Aperçu hors ligne : changements en mémoire uniquement, perdus au rechargement.';$('.ac-demo-badge').textContent='Aperçu hors ligne';}

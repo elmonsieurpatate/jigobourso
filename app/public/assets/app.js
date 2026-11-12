@@ -1,37 +1,5 @@
-/* Jigobourso v2 — bibliothèque commune : API, formats, navigation, graphiques SVG, dialogues. Aucune dépendance. */
+/* Jigobourso v2 — coque de l'application : navigation, graphiques SVG, dialogues, thème, compte. Le noyau (J.$, J.esc, J.api, formats, J.store, J.dom) est dans core.js. */
 'use strict';
-const J = {};
-
-J.esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-J.$ = (sel, root = document) => root.querySelector(sel);
-J.$$ = (sel, root = document) => [...root.querySelectorAll(sel)];
-
-/* ───── API ───── */
-J.api = async function (route, { method = 'GET', body = null, params = {} } = {}) {
-  const qs = new URLSearchParams({ r: route, ...params });
-  const res = await fetch('api.php?' + qs, {
-    method, credentials: 'same-origin',
-    headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined,
-  });
-  let data = null;
-  try { data = await res.json(); } catch (e) { /* réponse non JSON */ }
-  if (res.status === 401 && !location.pathname.endsWith('login.html')) { location.href = 'login.html?next=' + encodeURIComponent(location.pathname.split('/').pop() + location.search); throw new Error('auth'); }
-  if (!res.ok) throw new Error((data && data.error) || 'Erreur ' + res.status);
-  return data;
-};
-J.post = (route, body) => J.api(route, { method: 'POST', body: body || {} });
-
-/* ───── formats (français) ───── */
-const nf = (d, o = {}) => new Intl.NumberFormat('fr-FR', { minimumFractionDigits: d, maximumFractionDigits: d, ...o });
-J.num = (v, d = 2) => (v === null || v === undefined || isNaN(v)) ? '–' : nf(d).format(v);
-J.pct = (v, d = 2, sign = true) => (v === null || v === undefined || isNaN(v)) ? '–' : nf(d, { signDisplay: sign ? 'exceptZero' : 'auto' }).format(v) + ' %';
-J.eur = (v, d = 2) => (v === null || v === undefined || isNaN(v)) ? '–' : new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', minimumFractionDigits: d, maximumFractionDigits: d }).format(v);
-J.money = (v, cur, d = 2) => { if (v === null || v === undefined || isNaN(v)) return '–'; try { return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: ((cur === 'GBp' || cur === 'GBX') ? 'GBP' : cur) || 'EUR', currencyDisplay: 'narrowSymbol', minimumFractionDigits: d, maximumFractionDigits: d }).format((cur === 'GBp' || cur === 'GBX') ? v / 100 : v); } catch (e) { return J.num(v, d) + ' ' + (cur || ''); } };
-J.cls = v => (v > 0 ? 'up' : v < 0 ? 'down' : '');
-J.date = s => { if (!s) return '–'; const d = new Date(s.replace(' ', 'T') + (s.length > 10 ? 'Z' : '')); return isNaN(d) ? s : d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' }); };
-J.dateTime = s => { if (!s) return '–'; const d = new Date(s.replace(' ', 'T') + 'Z'); return isNaN(d) ? s : d.toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }); };
-J.ago = s => { if (!s) return '–'; const m = (Date.now() - new Date(s.replace(' ', 'T') + 'Z')) / 60000; return m < 1 ? 'à l’instant' : m < 60 ? Math.round(m) + ' min' : m < 1440 ? Math.round(m / 60) + ' h' : Math.round(m / 1440) + ' j'; };
-J.priceLabel = r => r.price_stale ? 'Cours ancien' : ({ intraday: 'Cours différé', daily: 'Clôture', quote: 'Dernier cours' }[r.price_source || r.source] || 'Cours');
 
 /* ───── statuts et explications ───── */
 J.statusBadge = (status, label) => `<span class="badge ${{ retained: 'ok', rejected: 'danger', unknown: 'warn', excluded: 'danger' }[status] || ''}">${J.esc(label || status)}</span>`;
@@ -140,7 +108,7 @@ J.init = async function (page, { admin = false } = {}) {
   if (admin && !me.user.is_admin) { location.href = 'index.html'; return null; }
   J.user = me.user;
   const prefs = me.user.prefs || {};
-  J.applyTheme(prefs.theme || localStorage.getItem('jigo_theme') || 'auto');
+  J.applyTheme(prefs.theme || J.store.text.get('jigo_theme') || 'auto');
   document.body.classList.toggle('advanced', prefs.mode === 'advanced');
   J.buildShell(page, me.user);
   return me.user;
@@ -184,7 +152,7 @@ J.NAV = (admin) => [
     ] }] : [])
 ];
 J.buildShell = function (page, user) {
-  const file = location.pathname.split('/').pop() || 'index.html', store = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) { } } };
+  const file = location.pathname.split('/').pop() || 'index.html', store = J.store.text;
   const nav = J.NAV(user.is_admin), narrow = () => matchMedia('(max-width: 960px)').matches;
   const isOn = c => { const href = c.href.split('#')[0].split('?')[0]; return href === file && c.on(new URLSearchParams(location.search), location.hash); };
   let opened; try { opened = JSON.parse(store.get('jigo_nav_open') || '{}'); } catch (e) { opened = {}; }
@@ -233,7 +201,7 @@ J.buildShell = function (page, user) {
   themeIcon(); J.$('#user-btn').onclick = J.accountDialog; sync();
   window.addEventListener('hashchange', () => { J.$$('.sv', side).forEach(a => { const h = a.getAttribute('href'); if (h.includes('#') && h.split('#')[0] === file) a.classList.toggle('on', ('#' + h.split('#')[1]) === location.hash || (!location.hash && h.endsWith('#data'))); }); });
 };
-J.applyTheme = t => { const dark = t === 'dark' || (t === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches); document.documentElement.dataset.theme = dark ? 'dark' : 'light'; localStorage.setItem('jigo_theme', t); };
+J.applyTheme = t => { const dark = t === 'dark' || (t === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches); document.documentElement.dataset.theme = dark ? 'dark' : 'light'; J.store.text.set('jigo_theme', t); };
 J.accountDialog = function () {
   const prefs = J.user.prefs || {};
   J.dialog({
@@ -244,12 +212,11 @@ J.accountDialog = function () {
     { label: 'Enregistrer mes coordonnées', run: async d => { const r = await J.post('auth/account', { username: J.$('#account-name', d).value, email: J.$('#account-email', d).value, current: J.$('#pw0', d).value }); J.toast(r.message); J.user = (await J.api('auth/me')).user; const label=J.$('#user-btn b'); if(label)label.textContent=J.user.username; } },
     { label: 'Changer le mot de passe', run: async d => { await J.post('auth/password', { current: J.$('#pw0', d).value, new: J.$('#pw1', d).value }); J.toast('Mot de passe modifié'); } }],
     onopen: d => {
-      for (const [id, key, cur] of [['mode', 'mode', prefs.mode || 'simple'], ['theme', 'theme', prefs.theme || localStorage.getItem('jigo_theme') || 'auto']]) {
+      for (const [id, key, cur] of [['mode', 'mode', prefs.mode || 'simple'], ['theme', 'theme', prefs.theme || J.store.text.get('jigo_theme') || 'auto']]) {
         const seg = J.$('#' + id, d); J.$$('button', seg).forEach(b => { b.classList.toggle('on', b.dataset.v === cur); b.onclick = async () => { J.$$('button', seg).forEach(x => x.classList.toggle('on', x === b)); J.user.prefs = (await J.post('auth/prefs', { [key]: b.dataset.v })).prefs; if (key === 'theme') J.applyTheme(b.dataset.v); else { document.body.classList.toggle('advanced', b.dataset.v === 'advanced'); window.dispatchEvent(new Event('jigo-mode')); } }; });
       }
     },
   });
 };
-window.J = J;
 
 if (!document.querySelector('script[src*="passwords.js"]')) { const p=document.createElement('script'); p.src='assets/passwords.js'+new URL(document.currentScript.src).search; document.head.appendChild(p); }

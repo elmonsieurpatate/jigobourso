@@ -3,7 +3,7 @@
 (function (root) {
   'use strict';
   const PFM = root.PFM, isNum = PFM.isNum;
-  const store = (k, v) => { try { if (v === undefined) return JSON.parse(localStorage.getItem('jigo_pfx_' + k)); localStorage.setItem('jigo_pfx_' + k, JSON.stringify(v)); } catch (e) { return null; } };
+  const store = J.store.fn('jigo_pfx_');
   const PER = PFM.PERIODS, PERKEYS = PER.map(p => p[0]);
   const perName = k => (PER.find(x => x[0] === k) || [0, ''])[1];
   const INTRA = { '1d': 1, '2d': 2, '5d': 5, '1w': 7 };               // séances d'historique 15 min recherchées ; 2S et au-delà : quotidien
@@ -13,11 +13,11 @@
     det: Object.assign(mkBox('px-det', 'perso'), { per: 'all' }) };
   let C = null;
   const BARS = {};
-  const esc = s => J.esc(String(s == null ? '' : s));
-  const eur = (v, d = 2) => isNum(v) ? J.eur(v, d) : '–';
-  const sg = v => isNum(v) ? (v > 0.004 ? '+' : v < -0.004 ? '−' : '') + J.eur(Math.abs(v), 2) : '–';
-  const pc = (v, d = 2) => isNum(v) ? (v > 0.004 ? '+' : v < -0.004 ? '−' : '') + J.num(Math.abs(v), Math.abs(v) >= 1000 ? 0 : d) + ' %' : '–';
-  const pt = v => isNum(v) ? (v > 0.004 ? '+' : v < -0.004 ? '−' : '') + J.num(Math.abs(v), 2) + ' pt' : '–';
+  const esc = J.esc;
+  const eur = J.eur;
+  const sg = v => J.eurS(v);
+  const pc = (v, d = 2) => J.pctS(v, Math.abs(v) >= 1000 ? 0 : d);
+  const pt = v => isNum(v) ? J.numS(v, 2) + ' pt' : '–';
   const cl = v => isNum(v) ? (v > 0.004 ? 'up' : v < -0.004 ? 'down' : '') : '';
   const cssv = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim() || '#2563eb';
   const pal = () => ['#0891b2', '#d97706', '#7c3aed', '#db2777', '#65a30d', '#dc2626', '#059669', '#ca8a04', '#4f46e5', '#0d9488', '#9333ea', '#ea580c'];

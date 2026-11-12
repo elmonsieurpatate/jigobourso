@@ -2,11 +2,11 @@
 (async()=>{
   'use strict';
   if(!await J.init('admin',{admin:true}))return;
-  const $=s=>document.querySelector(s),esc=J.esc;
+  const $=J.$,esc=J.esc;
   const labels={pending:'À examiner',applied:'Appliqués',rejected:'Refusés',confirmed:'Confirmés automatiquement',all:'Tous'};
   let filter='pending',query='',page=1,rows=[],busy=false,loadSequence=0,sort='magnitude_desc',minRatio='1';
-  const format=new Intl.NumberFormat('fr-FR',{maximumFractionDigits:6});
-  const num=v=>v==null?'—':format.format(+v);
+  
+  const num=v=>v==null?'—':J.num(v,0,6);
   const date=v=>v?J.date(v):'—';
   const say=(text,error=false)=>{const el=$('#sr-feedback');el.hidden=false;el.className='notice'+(error?' err':'');el.textContent=text;};
   const price=(v,c)=>v==null?'—':num(v)+' '+esc(c||'');

@@ -142,10 +142,12 @@ Réalisé le 12/11/2026. Chargement vérifié sur une copie servie par PHP aprè
 
 ## Étape 7 : Noyau JS commun 🟠
 
-- [ ] Remplacer les copies locales de `$` par `J.$` : `classement-test.js:5`, `admin-categories-test.js:6`, `splits.js:5`, `register.js:3`, `admin-scores.js:28`
-- [ ] Supprimer les redéfinitions de `esc` (`help-charts.js:4`, `plan-suivi.js:8`, `pf-home.js:16`) au profit de `J.esc`
-- [ ] Remplacer les formateurs locaux par `J.num` / `J.pct` / `J.eur` : `fmt` (`classement-test.js:223`, `admin-scores.js:30`, `etf.js:41`, `financial-chart.js:10`, `intraday.js:10`), `pc`/`sg`/`eur` de `pf-home.js`
-- [ ] Ajouter `J.store` (get/set/subscribe + localStorage) et `J.dom.h()` ; y intégrer `secondary-filter-store.js`
+- [x] Remplacer les copies locales de `$` par `J.$` : `explorer.js`, `filtres.js`, `splits.js`, `register.js`, `admin-scores.js`, `aide.js` (+ `$$`)
+- [x] Supprimer les redéfinitions de `esc` (`help-charts.js`, `plan-suivi.js`, `pf-home.js`, et les enveloppes `E` de `admin-columns.js`, `admin-scores.js`, `strategies-ui.js`) au profit de `J.esc`
+- [x] Remplacer les formateurs locaux par `J.num` / `J.pct` / `J.eur` : `fmt`, `eur`, `percent`, `num0`, `score1` de `explorer.js` ; `fmt` d'`admin-scores.js` ; `nf` d'`admin.js` ; `num` de `splits.js` ; `eur`/`pc`/`sg`/`pt` de `pf-home.js` et `plan-suivi.js` ; `f1` de `help-charts.js`. Nouveaux : `J.int`, `J.isNum`, `J.numS`/`J.pctS`/`J.eurS` (vrai signe −), `J.dayShort`/`J.dayFull`. Non touchés, volontairement : `etf.js` `fmt` (textes de libellés, pas un formateur de nombre), `intraday.js` `fmt` (fuseaux horaires, `Intl.DateTimeFormat` spécifique), `financial-chart.js` `fmtTime` (déjà basé sur `J.date`), modules testés sans navigateur (`pf-math.js`, `admin-categories-model.js`, `explorer-filters.js`).
+- [x] Ajouter `J.store` (get/set/remove/has/subscribe/scope/fn/text, repli mémoire si `localStorage` est indisponible) et `J.dom.h()` ; `secondary-filter-store.js` exposé en `J.store.filters`. Tous les accès à `localStorage` des scripts passent par `J.store` (exceptions : `core.js` et `theme-init.js`, exécuté avant le noyau).
+- [x] Nouveau fichier `assets/core.js` (noyau : `$`, `esc`, API, formats, `store`, `dom`), chargé avant `app.js` (coque : navigation, graphiques SVG, dialogues, thème) sur les 19 pages. Tests : `tests/e2e/core-interactions.cjs` (22 vérifications navigateur : thème, menu, classement Simple/Expert, aide, filtres, 9 pages sans erreur JS, toast) et `tests/e2e/core.cjs` (formats, stockage, DOM). Garde-fou : `tests/fast/test_js_core.py` (test Node du noyau `tests/e2e/core.cjs` + interdiction de recréer des copies locales).
+- [ ] Reste hors périmètre de cette passe : appels API (`J.api` est déjà le seul `fetch` des scripts, rien à fusionner) ; `table-layout.js` reste le module commun des tableaux ; styles inline (étape 8).
 - [ ] Regrouper les helpers de graphiques (`charts.js`, `financial-chart.js`, `intraday.js`, `help-charts.js`, `pf-math.js`) dans un module commun
 - [ ] Découper `admin-categories-demo.js` (2 848 lignes), `classement-test.js` (625), `admin-scores.js` (549)
 

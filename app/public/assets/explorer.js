@@ -2,7 +2,7 @@
 (async () => {
   'use strict';
   const user = await J.init('explorer'); if (!user) return;
-  const $ = s => document.querySelector(s), esc = J.esc;
+  const $ = J.$, esc = J.esc;
   const periods = [['day','Jour',1],['week','Semaine',5],['month','Mois',21],['quarter','Trimestre',63],['half','6 mois',126],['year','1 an',252],['two_year','2 ans',504]];
   // Critères de RECHERCHE de chaque stratégie intégrée : lus dans le moteur (scores_admin.V4_STRATEGIES via ranking/criteria), jamais recopiés ici.
   // Ils filtrent l'affichage ; ils n'entrent ni dans les notes ni dans les rangs. Une stratégie sans critère (Momentum) a des seuils à 0 = aucun critère.
@@ -33,7 +33,7 @@
   let state = { mode:'simple',strategy:'fast',selected:'week',profiles:Object.fromEntries(Object.keys(profiles).map(id=>[id,fresh(id)])),filters:secondary.all(categories) };
   // Seules les sauvegardes explicites de cette page sont relues. Les préférences Explorer restent séparées.
   try {
-    const saved = JSON.parse(localStorage.getItem(key));
+    const saved = J.store.get(key);
     if (saved && saved.profiles && typeof saved.profiles==='object') for (const id of Object.keys(profiles)) if (!saved.profiles[id]) saved.profiles[id]=fresh(id); else withDay(saved.profiles[id]);     // stratégies ajoutées depuis la sauvegarde
     if (saved && ['simple','expert'].includes(saved.mode) && profiles[saved.strategy] && periods.some(([k])=>k===saved.selected) && Object.keys(profiles).every(id => {
       const p=saved.profiles?.[id]; return p && ['and','or'].includes(p.join) && Array.isArray(p.extra) && p.extra.every(x=>metrics[x.metric] && ['>=','<='].includes(x.op) && Number.isFinite(x.value) && x.value>=0) && periods.every(([k])=>k==='day' || typeof p.periods?.[k]?.enabled==='boolean' && Number.isFinite(p.periods[k].slope) && p.periods[k].slope>=.01 && p.periods[k].slope<=2 && Number.isFinite(p.periods[k].r2) && p.periods[k].r2>=0 && p.periods[k].r2<=1);
@@ -41,7 +41,7 @@
   } catch (_) { /* Stockage absent ou ancien : valeurs de démonstration. */ }
   const adminSelections=secondary.defaults(categoryPayload,categories);
   const userKey=String(user.id??'offline');
-  let rawLocal={};try{rawLocal=JSON.parse(localStorage.getItem(key)||'{}')||{};}catch(_){}
+  let rawLocal={};try{rawLocal=(J.store.get(key,{})||{});}catch(_){}
   const byUser=rawLocal.secondaryOverridesByUser||{};
   let overrides=Object.fromEntries(Object.entries(byUser[userKey]||{}).filter(([,v])=>v&&Array.isArray(v.selected)&&Array.isArray(v.known)));
   const metadataMigration=secondary.migrateOverrides(categoryPayload,overrides);
@@ -50,7 +50,7 @@
     const previous=rawLocal.secondaryMetadataPreviousByUser||{};
     rawLocal.secondaryMetadataPreviousByUser={...previous,[userKey]:{...(previous[userKey]||{}),...metadataMigration.previous}};
     rawLocal.secondaryOverridesByUser={...byUser,[userKey]:overrides};
-    try{localStorage.setItem(key,JSON.stringify(rawLocal));}catch(_){/* Current session still uses the migrated preferences. */}
+    try{J.store.set(key,rawLocal);}catch(_){/* Current session still uses the migrated preferences. */}
   }
   // Migrate explicit restrictive selections from the prior stable-label prototype once.
   if(!byUser[userKey]&&categoryPayload.schema===2&&rawLocal.filters&&rawLocal.categorySignature){
@@ -100,7 +100,7 @@
   const hintOf=id=>(catalogOf().find(c=>c.id===id)||{}).hint||LEGACY_HINTS[id]||'';
   // Préférences personnelles de visibilité (sélecteur « Colonnes ») : valables tant que l'administrateur n'a pas modifié cette configuration.
   const visKey='jigo_ct_vis_v5';
-  const personal=()=>{try{const v=JSON.parse(localStorage.getItem(visKey)||'null');return v&&v.rev===layout.revision&&v.dev===TableLayout.device()?v.vis:{};}catch(_){return {};}};
+  const personal=()=>{try{const v=J.store.get(visKey);return v&&v.rev===layout.revision&&v.dev===TableLayout.device()?v.vis:{};}catch(_){return {};}};
   let vis=personal();
   const shownColumns=()=>layout.columns.filter(c=>REG[c.id]&&(c.id==='name'||(c.id in vis?vis[c.id]:c.visible)));
   let intrinsicRows=[],loadError=null,scoreLabel='',loading=false,universe=0,defaultSort='complex';
@@ -174,7 +174,7 @@
   if(serverOk&&enabledIds().includes(serverView.selected))state.strategy=serverView.selected;else if(serverOk&&enabledIds().length)state.strategy=enabledIds()[0];
   {const want=new URLSearchParams(location.search).get('strategy');if(serverOk&&want&&enabledIds().includes(want))state.strategy=want;}
   for(const id of order()){const s=state.strategy;state.strategy=id;tree();state.strategy=s;saved[id]={p:cloneJSON(state.profiles[id]),o:cloneJSON(ovBy[id])};}
-  try{const l=JSON.parse(localStorage.getItem(key)||'{}')||{};if(['simple','expert'].includes(l.mode))state.mode=l.mode;}catch(_){/* préférences d'affichage facultatives */}
+  try{const l=(J.store.get(key,{})||{});if(['simple','expert'].includes(l.mode))state.mode=l.mode;}catch(_){/* préférences d'affichage facultatives */}
   overrides=ovBy[state.strategy];state.filters=filtersFor(overrides);
   state.selected=periods.find(([k])=>config().periods[k].enabled)?.[0]||state.selected;
   let applied=null;
@@ -220,7 +220,7 @@
     onopen:d=>{const i=d.querySelector('#ct-name-input');i.focus();i.select();}}).addEventListener('close',()=>{if(!done)resolve(null);});});}
   function uniqueCopyName(base){let n=`Copie de ${base}`,i=2;const taken=new Set(order().map(id=>names[id].toLowerCase()));while(taken.has(n.toLowerCase()))n=`Copie de ${base} (${i++})`;return n.slice(0,60);}
   window.addEventListener('beforeunload',e=>{if(anyDirty()){e.preventDefault();e.returnValue='';}});
-  const fmt = n => new Intl.NumberFormat('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:3}).format(n);
+  const fmt = n => J.num(n,2,3);
   let timer;
   function feedback(text) { $('#ct-feedback').textContent=text; clearTimeout(timer); timer=setTimeout(()=>$('#ct-feedback').textContent='',5500); }
   function number(value,min,max,fallback) { if(String(value).trim()==='') return fallback; const n=Number(String(value).replace(',','.'));return Number.isFinite(n)?Math.max(min,Math.min(max,n)):fallback; }
@@ -314,11 +314,10 @@
     if(old){$(`#ct-list-${old}`).hidden=true;$(`[data-open-filter="${old}"]`).setAttribute('aria-expanded','false');if(restoreFocus)$(`[data-open-filter="${old}"]`).focus();}
   }
   const MEASURE={volatility:'volatility',turnover:'turnover_eur',avgVolume:'avg_volume',drawdown:'drawdown',perfMonth:'perf-month',simple:'score_simple_v4',complex:'score_complex_v4'};
-  const eur=n=>n===null||n===undefined?'—':new Intl.NumberFormat('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:n>=1000?0:2}).format(n);
-  const money=eur;
-  function percent(n,sign=false){return n===null||n===undefined?'—':new Intl.NumberFormat('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2,signDisplay:sign?'exceptZero':'auto'}).format(n)+' %';}
-  const num0=n=>n===null||n===undefined?'—':new Intl.NumberFormat('fr-FR',{maximumFractionDigits:0}).format(n);
-  const score1=n=>n===null||n===undefined?'—':new Intl.NumberFormat('fr-FR',{minimumFractionDigits:1,maximumFractionDigits:1}).format(n);
+  const eur=n=>J.eur(n,n>=1000?0:2);
+    const percent=(n,sign=false)=>J.pct(n,2,sign);
+  const num0=J.int;
+  const score1=n=>J.num(n,1);
   // Catégories de l'administration : la couleur d'un chiffre est celle de la catégorie du filtre correspondant.
   const defs=(categoryPayload.definitions&&categoryPayload.definitions.filters)||[];
   const measureOf=Object.create(null),filterOfMeasure=Object.create(null);
@@ -341,7 +340,7 @@
     let q='titre.html?src=explorer&id='+encodeURIComponent(id)+'&ct='+encodeURIComponent(context.strategy);
     if(context.config){
       const json=JSON.stringify({id:context.strategy,spec:context.config}),k=ctxKey(json);
-      try{localStorage.setItem('jigo_ct_ctx:'+k,json);}catch(_){/* la fiche signalera un contexte introuvable */}
+      try{J.store.text.set('jigo_ct_ctx:'+k,json);}catch(_){/* la fiche signalera un contexte introuvable */}
       q+='&ctx='+k;
     }
     return q;
@@ -411,7 +410,7 @@
     if(key==='name')return `<a class="ct-company" href="${esc(sheetHref(row.id))}" target="_blank" rel="noopener" aria-label="Ouvrir la fiche de ${esc(row.symbol)} dans un nouvel onglet"><span class="ct-company-mark" style="--mark:${row.color}" aria-hidden="true">${esc(row.symbol.slice(0,2))}</span><span class="ct-company-text"><b>${esc(row.symbol)}${row.kind==='etf'?' <i class="ct-kind">ETF</i>':''}${row.held?' <i class="ct-kind held">détenu</i>':''}</b><span>${esc(row.name)}</span>${row.category?`<span class="ct-sub ct-sector">${esc(row.category)}</span>`:''}</span></a>`;
     if(key==='market')return `<b>${esc(row.mic)}</b><span class="ct-sub">${esc(row.country||'Pays inconnu')} · ${esc(row.currency||'—')}</span>`;
     if(key==='sector'){const g=sectorLabel(row);return row.category?`<b>${esc(row.category)}</b><span class="ct-sub">${esc(g||'')}</span>`:'<span class="ct-missing">Inconnu</span>';}
-    if(key==='price')return `${eur(row.price)}${row.currency&&row.currency!=='EUR'&&row.priceNative!==null?`<span class="ct-sub">${esc(new Intl.NumberFormat('fr-FR',{maximumFractionDigits:2}).format(row.priceNative))} ${esc(row.currency)}</span>`:''}`;
+    if(key==='price')return `${eur(row.price)}${row.currency&&row.currency!=='EUR'&&row.priceNative!==null?`<span class="ct-sub">${esc(J.num(row.priceNative,0,2))} ${esc(row.currency)}</span>`:''}`;
     if(key==='change')return `<span class="${row.change>0?'up':row.change<0?'down':''}">${percent(row.change,true)}</span>`;
     if(key==='last_close')return row.lastClose?esc(new Date(row.lastClose+'T00:00:00').toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'})):'—';
     if(key==='slope')return `<span class="${row.slope>0?'up':row.slope<0?'down':''}">${percent(row.slope,true)}</span>`;
@@ -515,7 +514,7 @@
     if(el.dataset.simple) el.value=config().periods[state.selected][el.dataset.simple];
     if(el.dataset.enabled){activatePeriod(el.dataset.enabled,el.checked);renderSimple();renderExpert();}
     if(el.dataset.filter){tableState.page=1;const list=state.filters[el.dataset.filter],id=el.dataset.category;state.filters[el.dataset.filter]=el.checked?[...new Set([...list,id])]:list.filter(v=>v!==id);saveLocalSelection(el.dataset.filter);filterSummary();}
-    if(el.dataset.column!==undefined){vis[el.dataset.column]=el.checked;try{localStorage.setItem(visKey,JSON.stringify({rev:layout.revision,dev:TableLayout.device(),vis}));}catch(_){/* préférence facultative */}renderColumns();}
+    if(el.dataset.column!==undefined){vis[el.dataset.column]=el.checked;try{J.store.set(visKey,{rev:layout.revision,dev:TableLayout.device(),vis});}catch(_){/* préférence facultative */}renderColumns();}
     if(el.dataset.ruleField){const r=at(el.closest('[data-path]').dataset.path),f=el.dataset.ruleField;r[f]=f==='value'?number(el.value,-1e12,1e12,r.value):el.value;if(f==='value')el.value=r.value;project();preview();}
     if(el.dataset.groupJoin!==undefined){at(el.dataset.groupJoin).join=el.value;project();preview();}
   });
@@ -525,7 +524,7 @@
   $('#ct-tab-rules').onclick=()=>$('#ct-rules').scrollIntoView({behavior:'smooth',block:'nearest'});
   $('#ct-tab-manage').onclick=()=>{$('#ct-filter-panel').open=true;$('#ct-filter-panel').scrollIntoView({behavior:'smooth',block:'start'});};
   $('#ct-tab-queries').onclick=()=>{
-    const has=localStorage.getItem(key)!==null;
+    const has=J.store.has(key);
     J.dialog({title:'Requêtes locales de test',body:`<p>${has?'Un état de recherche est enregistré sur cet appareil.':'Aucune recherche enregistrée sur cet appareil.'}</p><p>Chaque stratégie, avec ses règles et ses choix de filtres, est enregistrée dans votre compte avec « Enregistrer la stratégie ».</p>`,actions:[{label:'Fermer',run:()=>{}},...(has?[{label:'Recharger la sauvegarde',run:()=>location.reload()}]:[])]});
   };
   document.addEventListener('click',e=>{if(activeFilter&&!e.target.closest('.ct-multi'))closeFilter();});
@@ -550,7 +549,7 @@
   });
   $('#ct-save').onclick=()=>guarded(async()=>{
     const id=state.strategy;takeView(await post({action:'save',id,...currentPayload()}));markSaved(id);
-    try{localStorage.setItem(key,JSON.stringify({mode:state.mode}));}catch(_){/* préférences d'affichage seulement */}
+    try{J.store.set(key,{mode:state.mode});}catch(_){/* préférences d'affichage seulement */}
     feedback(`Stratégie « ${names[id]} » enregistrée.`);
   });
   $('#ct-duplicate').onclick=()=>guarded(async()=>{

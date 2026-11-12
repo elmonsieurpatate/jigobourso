@@ -1,4 +1,4 @@
-/* Un seul stockage persistant : API PHP -> settings. L'export hors ligne reste explicite. */
+/* Réglages des filtres secondaires : un seul stockage persistant (API PHP -> settings), exposé en J.store.filters. L'export hors ligne reste explicite. */
 (() => {
   'use strict';
   let state=null;
@@ -31,7 +31,7 @@
     return copy(state);
   }
   const strip=f=>{const c=copy(f);delete c.values;delete c.examples;return c;};
-  window.SecondaryFilterStore={load,
+  J.store.filters={load,
     save:filter=>write({action:'save',filter_id:filter.id,filter:strip(filter),revision:state.definitions.revision}),
     defaults:(id,measure,selection)=>write({action:'defaults',filter_id:id,measure_id:measure,selection,defaults_revision:state.defaults.revision}),
     order:ids=>write({action:'order',order:ids,revision:state.definitions.revision}),
