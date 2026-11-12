@@ -48,17 +48,17 @@ Réalisé : `need_post` exige Origin ou Referer, `body()` exige `application/jso
 
 ## Étape 2 : Architecture backend : terminer le refactor routes → services 🔴
 
-- [ ] Déplacer vers `services/` les helpers restés dans les routes :
-  - [ ] `routes/portfolios.php:9` `tx_fields` → `services/transactions.php`
-  - [ ] `routes/alerts.php:18-106` (10 helpers `alert_*`) → `services/alerts.php`
-  - [ ] `routes/tracking.php:18-23` `track_custom_names`, `track_label`
-  - [ ] `routes/admin.php:3,19` `log_tail`, `system_counts`
-  - [ ] `routes/cron.php:9-36` `cron_reject`, `cron_presented_key`, `cron_tick`
-  - [ ] `routes/ct_strategies.php:4` `my_ranking_request`
-  - [ ] `routes/auth.php:92` `setting_value` → `lib/` ou `services/`
-- [ ] Ajouter les `require_once` explicites manquants (`lib/mail.php`, `db.php`, `http.php`, `own_portfolio`, `str_in`, `q`) : aujourd'hui dépendance à l'ordre de chargement de `public/api.php`
+- [x] Déplacer vers `services/` les helpers restés dans les routes :
+  - [x] `routes/portfolios.php:9` `tx_fields` → `services/transactions.php`
+  - [x] `routes/alerts.php:18-106` (10 helpers `alert_*`) → `services/alerts.php`
+  - [x] `routes/tracking.php:18-23` `track_custom_names`, `track_label`
+  - [x] `routes/admin.php:3,19` `log_tail`, `system_counts`
+  - [x] `routes/cron.php:9-36` `cron_reject`, `cron_presented_key`, `cron_tick`
+  - [x] `routes/ct_strategies.php:4` `my_ranking_request`
+  - [x] `routes/auth.php:92` `setting_value` → `lib/` ou `services/`
+- [x] Ajouter les `require_once` explicites manquants (`lib/mail.php`, `db.php`, `http.php`, `own_portfolio`, `str_in`, `q`) : aujourd'hui dépendance à l'ordre de chargement de `public/api.php`
 - [ ] Fusionner `admin/scores/ranking` et `my_ranking_request` en un service unique (`user_id` optionnel) ; idem `admin/scores/simulate` / `my/scores/simulate`
-- [ ] Introduire un helper `tx(callable)` pour remplacer les `beginTransaction/try/rollBack` manuels (`login`, `auth/password`, `portfolios.php:155`)
+- [x] Introduire un helper `tx(callable)` pour remplacer les `beginTransaction/try/rollBack` manuels (`login`, `auth/password`, `portfolios.php:155`)
 - [ ] Unifier la validation du mot de passe (`admin/user/create` via `str_in` vs `valid_password`) avec `password_input`
 
 ## Étape 3 : Élimination du legacy et du code mort

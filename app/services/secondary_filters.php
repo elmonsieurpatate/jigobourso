@@ -21,8 +21,7 @@ function secondary_decode(string $json): array {
 }
 /** Ne complète que les structures manquantes, jamais une catégorie supprimée intentionnellement. */
 function secondary_initialize_once(): void {
-    $db = db(); $db->beginTransaction();
-    try {
+    tx(function () {
         // Lock rows exclusively in a fixed order. INSERT IGNORE on existing keys
         // would first take shared locks, then deadlock on concurrent lock upgrades.
         $documents=[];
@@ -68,8 +67,7 @@ function secondary_initialize_once(): void {
         foreach ([[SECONDARY_DEFINITIONS,$oldD,$definitions],[SECONDARY_DEFAULTS,$oldS,$defaults]] as [$name,$old,$next]) {
             if($old!==$next) { $next['revision']=(int)$old['revision']+1; q('UPDATE settings SET value_json=?,updated_at=? WHERE name=?',[secondary_json($next),now_utc(),$name]); }
         }
-        $db->commit();
-    } catch(Throwable $e) { if($db->inTransaction())$db->rollBack();throw $e; }
+    });
 }
 function secondary_initialize(): void {
     // A simultaneous very first insertion can contend on an InnoDB gap lock.
@@ -168,8 +166,8 @@ function secondary_validate_filter(array $candidate,array $canonical): void {
 }
 /** Atomic patch with optimistic revision: stale admin tabs never silently win. */
 function secondary_write(array $request): array {
-    secondary_initialize();$db=db();$db->beginTransaction();
-    try{
+    secondary_initialize();
+    tx(function () use ($request) {
         $d=secondary_decode(q('SELECT value_json FROM settings WHERE name=? FOR UPDATE',[SECONDARY_DEFINITIONS])->fetchColumn());
         $s=secondary_decode(q('SELECT value_json FROM settings WHERE name=? FOR UPDATE',[SECONDARY_DEFAULTS])->fetchColumn());
         if(($request['action']??null)==='order'){
@@ -180,7 +178,7 @@ function secondary_write(array $request): array {
             $byId=[];foreach($d['filters'] as $f)$byId[$f['id']]=$f;
             $next=array_map(fn($i)=>$byId[$i],$order);
             if($next!==$d['filters']){$d['filters']=$next;$d['revision']++;q('UPDATE settings SET value_json=?,updated_at=? WHERE name=?',[secondary_json($d),now_utc(),SECONDARY_DEFINITIONS]);}
-            $db->commit();return secondary_read();
+            return;
         }
         if(!is_string($request['filter_id']??null))throw new ApiError('Identifiant de filtre requis.',422);
         $id=$request['filter_id'];$stored=secondary_find($d,$id);$canonical=secondary_find(secondary_proposed(),$id);$action=$request['action']??'save';
@@ -211,7 +209,6 @@ function secondary_write(array $request): array {
         }else throw new ApiError('Action inconnue.',422);
         if($changedD){$d['revision']++;q('UPDATE settings SET value_json=?,updated_at=? WHERE name=?',[secondary_json($d),now_utc(),SECONDARY_DEFINITIONS]);}
         if($changedS){$s['revision']++;q('UPDATE settings SET value_json=?,updated_at=? WHERE name=?',[secondary_json($s),now_utc(),SECONDARY_DEFAULTS]);}
-        $db->commit();
-    }catch(Throwable $e){if($db->inTransaction())$db->rollBack();throw $e;}
+    });
     return secondary_read();
 }

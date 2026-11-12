@@ -21,3 +21,21 @@ function q(string $sql, array $args = []): PDOStatement {
     return $st;
 }
 function now_utc(): string { return gmdate('Y-m-d H:i:s'); }
+/**
+ * Exécute $work dans une transaction : commit si elle retourne, rollback si elle lève (l'exception est relancée).
+ * Réentrant : appelée dans une transaction déjà ouverte, elle exécute simplement $work (la transaction externe décide du commit).
+ * Pour écrire un état qui doit survivre à une erreur (ex. compteur d'échecs), retourner un résultat et lever après le tx().
+ */
+function tx(callable $work) {
+    $db = db();
+    if ($db->inTransaction()) return $work();
+    $db->beginTransaction();
+    try {
+        $result = $work();
+        $db->commit();
+        return $result;
+    } catch (Throwable $e) {
+        if ($db->inTransaction()) $db->rollBack();
+        throw $e;
+    }
+}

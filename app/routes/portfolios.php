@@ -1,26 +1,14 @@
 <?php
+require_once __DIR__ . '/../lib/db.php';
+require_once __DIR__ . '/../lib/http.php';
+require_once __DIR__ . '/../services/ledger.php';
+require_once __DIR__ . '/../services/alerts.php';
 require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/engine.php';
 require_once __DIR__ . '/../services/transactions.php';
 require_once __DIR__ . '/../services/portfolio_access.php';
 
 const LOT_STRATEGIES = ['regular', 'fast', 'recovery', 'low_volatility', 'momentum', 'momentum12', 'momentum_risk', 'prudent'];   // engine/analytics/alerts.py STRATEGIES
-
-function tx_fields(array $b): array {
-    $side = str_in($b, 'side', 4);
-    if (!in_array($side, ['buy', 'sell'], true)) throw new ApiError('Sens invalide (buy ou sell)');
-    $qty = num_in($b, 'quantity', true, 0.00000001);
-    $price = num_in($b, 'unit_price', true, 0);
-    $fees = num_in($b, 'fees', false, 0, 1e11) ?? 0.0;   // colonne DECIMAL(20,8) : 12 chiffres avant la virgule
-    $fx = num_in($b, 'fx_to_eur', false, 0);
-    $when = str_in($b, 'trade_at', 25);
-    if (!preg_match('/^\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2}(?::\d{2})?)?$/', $when)) throw new ApiError('Date invalide', 422);
-    $date = DateTimeImmutable::createFromFormat('!Y-m-d', substr($when, 0, 10), new DateTimeZone('UTC'));
-    if (!$date || $date->format('Y-m-d') !== substr($when, 0, 10)) throw new ApiError('Date invalide', 422);
-    $ts = strtotime($when . (strlen($when) <= 10 ? ' 12:00:00' : '') . ' UTC');
-    if ($ts === false || $ts > time() + 86400) throw new ApiError('Date invalide');
-    return [$side, $qty, $price, $fees, $fx, gmdate('Y-m-d H:i:s', $ts)];
-}
 
 return [
     'portfolios' => function () {
@@ -152,12 +140,10 @@ return [
     'portfolio/default' => function () {
         need_post(); $u = require_user();
         $p = own_portfolio((int)(body()['id'] ?? 0), $u);
-        $db = db(); $db->beginTransaction();
-        try {
+        tx(function () use ($u, $p) {
             q('UPDATE portfolios SET is_default = 0 WHERE user_id = ?', [$u['id']]);
             q('UPDATE portfolios SET is_default = 1 WHERE id = ?', [$p['id']]);
-            $db->commit();
-        } catch (Throwable $e) { if ($db->inTransaction()) $db->rollBack(); throw $e; }
+        });
         return ['ok' => true];
     },
     'portfolio/delete' => function () {

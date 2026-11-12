@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/../lib/http.php';
+require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../services/personal_secondary_filters.php';
 return [
     'explorer/secondary-filters/manage' => function () { $u=require_user();return secondary_user_read((int)$u['id']); },

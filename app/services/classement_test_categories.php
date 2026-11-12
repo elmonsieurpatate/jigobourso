@@ -1,5 +1,6 @@
 <?php
 // Adaptateur de lecture seul : aucune modification de l'administration ou des scores.
+require_once __DIR__ . '/../lib/http.php';
 function classement_test_categories(?array $saved): array {
     $proposed = json_decode(file_get_contents(__DIR__ . '/../config/classement_test_categories.json'), true, 512, JSON_THROW_ON_ERROR);
     if ($saved === null) return $proposed;

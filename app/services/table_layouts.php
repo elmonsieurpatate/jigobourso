@@ -110,8 +110,7 @@ function tl_write(array $req, ?int $uid = null): array {
     $action = $req['action'] ?? 'save';
     if (!in_array($action, ['save', 'reset'], true)) throw new ApiError('Action inconnue.', 422);
     $clean = $action === 'save' ? tl_clean($page, $dev, $req['config'] ?? null, true) : null;
-    $db = db(); $db->beginTransaction();
-    try {
+    tx(function () use ($key, $req, $page, $dev, $action, $clean) {
         q('INSERT IGNORE INTO settings(name,value_json,updated_at) VALUES (?,?,?)', [$key, tl_json(['schema' => 1, 'revision' => 0, 'layouts' => (object)[]]), now_utc()]);
         $doc = tl_decode(q('SELECT value_json FROM settings WHERE name=? FOR UPDATE', [$key])->fetchColumn());
         if (($req['revision'] ?? null) !== $doc['revision']) throw new ApiError('Ces réglages ont changé dans une autre session. Rechargez avant d’enregistrer.', 409);
@@ -120,7 +119,6 @@ function tl_write(array $req, ?int $uid = null): array {
         $doc['revision']++;
         if (!$doc['layouts']) $doc['layouts'] = (object)[];
         q('UPDATE settings SET value_json=?, updated_at=? WHERE name=?', [tl_json($doc), now_utc(), $key]);
-        $db->commit();
-    } catch (Throwable $e) { if ($db->inTransaction()) $db->rollBack(); throw $e; }
+    });
     return tl_read($uid);
 }

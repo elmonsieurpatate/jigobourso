@@ -1,5 +1,8 @@
 <?php
 /** Filtres de vue conservés dans une recherche ou un réglage enregistré : valeurs simples seulement, clés connues seulement. */
+require_once __DIR__ . '/../lib/db.php';
+require_once __DIR__ . '/../lib/http.php';
+require_once __DIR__ . '/../lib/engine.php';
 function clean_view($in): array {
     $view = [];
     if (!is_array($in)) return $view;

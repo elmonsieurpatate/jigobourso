@@ -1,5 +1,7 @@
 <?php
 /** Définitions et options personnelles de l'Explorer, indépendantes des stratégies. */
+require_once __DIR__ . '/../lib/db.php';
+require_once __DIR__ . '/../lib/http.php';
 require_once __DIR__ . '/secondary_filters.php';
 
 function secondary_user_key(int $userId): string { return 'explorer_secondary_user:' . $userId; }
@@ -40,8 +42,8 @@ function secondary_user_merge(array $base,array $doc): array {
 function secondary_user_read(int $userId): array { return secondary_user_merge(secondary_read(),secondary_user_document($userId)); }
 
 function secondary_user_write_once(int $userId,array $request): array {
-    $base=secondary_read();$db=db();$db->beginTransaction();
-    try{
+    $base=secondary_read();
+    tx(function () use ($userId,$request,$base) {
         // Même ordre de verrous que les réglages partagés ; l'identité vient toujours de la session.
         foreach([SECONDARY_DEFINITIONS=>'definitions',SECONDARY_DEFAULTS=>'defaults'] as $key=>$field){
             $now=secondary_decode(q('SELECT value_json FROM settings WHERE name=? FOR UPDATE',[$key])->fetchColumn());
@@ -85,8 +87,7 @@ function secondary_user_write_once(int $userId,array $request): array {
         }
         $doc['revision']++;
         q('INSERT INTO settings(name,value_json,updated_at) VALUES (?,?,?) ON DUPLICATE KEY UPDATE value_json=VALUES(value_json),updated_at=VALUES(updated_at)',[secondary_user_key($userId),secondary_json($doc),now_utc()]);
-        $db->commit();
-    }catch(Throwable $e){if($db->inTransaction())$db->rollBack();throw $e;}
+    });
     return secondary_user_read($userId);
 }
 function secondary_user_write(int $userId,array $request): array {

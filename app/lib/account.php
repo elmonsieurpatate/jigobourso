@@ -1,4 +1,7 @@
 <?php
+require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/http.php';
+require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/mail.php';
 function password_input(array $b, string $key): string {
@@ -46,8 +49,8 @@ function notify_account_change(array $u, string $what, ?string $detail = null): 
 }
 function consume_account_link(string $raw, string $purpose, callable $change): array {
     if (!preg_match('/^[a-f0-9]{64}$/D',$raw)) throw new ApiError('Lien invalide ou expiré. Demandez un nouveau lien.',422);
-    $hash=hash('sha256',$raw);$db=db();$db->beginTransaction();
-    try {
+    $hash=hash('sha256',$raw);
+    return tx(function () use ($hash,$purpose,$change) {
         $t=q('SELECT * FROM account_tokens WHERE token_hash=? AND purpose=?',[$hash,$purpose])->fetch();
         if (!$t) throw new ApiError('Lien invalide ou expiré. Demandez un nouveau lien.',422);
         // Same lock ordering for password changes and both token purposes.
@@ -57,13 +60,12 @@ function consume_account_link(string $raw, string $purpose, callable $change): a
             throw new ApiError('Lien invalide ou expiré. Demandez un nouveau lien.',422);
         $change($u,$t);
         q('UPDATE account_tokens SET used_at=? WHERE user_id=? AND used_at IS NULL',[now_utc(),$u['id']]);
-        $db->commit();
         return [$u,$t];
-    } catch (Throwable $e) { if ($db->inTransaction()) $db->rollBack(); throw $e; }
+    });
 }
 function update_account(array $u,array $b): array {
-    $db=db();$db->beginTransaction();
     try {
+      [$changing,$email,$staged]=tx(function () use ($u,$b) {
         $fresh=q('SELECT * FROM users WHERE id=? FOR UPDATE',[$u['id']])->fetch();
         if (!$fresh || !$fresh['active'] || !password_verify(password_input($b,'current'),$fresh['pass_hash'])) throw new ApiError('Mot de passe actuel incorrect',403);
         $name=str_in($b,'username',30);if (!preg_match('/^[A-Za-z0-9_.-]{3,30}$/D',$name)) throw new ApiError('Pseudo : 3 à 30 caractères, lettres, chiffres, point, tiret ou soulignement.',422);
@@ -76,13 +78,13 @@ function update_account(array $u,array $b): array {
             $staged=stage_account_link($fresh,'email',$email);
         }
         q('UPDATE users SET username=? WHERE id=?',[$name,$u['id']]);
-        $db->commit();
+        return [$changing,$email,$staged];
+      });
         // Envoi hors transaction : le verrou sur la ligne utilisateur n'est pas tenu pendant que le transport mail répond.
         if ($staged && !deliver_account_link($staged[0],$staged[1],'email',$email))
             throw new ApiError('Pseudo enregistré, mais l’envoi du lien de confirmation est impossible pour le moment. Votre adresse actuelle est conservée ; réessayez plus tard.',503);
         return ['ok'=>true,'email_pending'=>$changing,'message'=>$changing?'Pseudo enregistré. Confirmez la nouvelle adresse depuis le lien envoyé ; votre adresse actuelle reste active.':'Compte mis à jour.'];
     } catch(Throwable $e) {
-        if($db->inTransaction())$db->rollBack();
         if($e instanceof PDOException && $e->getCode()==='23000')throw new ApiError('Ces coordonnées ne sont pas disponibles.',409);
         throw $e;
     }

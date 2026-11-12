@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/ledger.php';
 require_once __DIR__ . '/../lib/http.php';
 
@@ -52,16 +53,15 @@ function validate_transaction_history(array $rows): void {
 }
 // All writers take the same portfolio row lock before reading the ledger: concurrent writes serialize.
 function write_transaction(int $userId, int $portfolioId, callable $change): array {
-    $db = db(); $db->beginTransaction();
-    try {
+    return tx(function () use ($userId, $portfolioId, $change) {
         $p = q('SELECT id FROM portfolios WHERE id = ? AND user_id = ? FOR UPDATE', [$portfolioId, $userId])->fetch();
         if (!$p) throw new ApiError('Portefeuille introuvable', 404);
         $rows = q('SELECT * FROM portfolio_transactions WHERE portfolio_id = ? ORDER BY trade_at, id FOR UPDATE', [$portfolioId])->fetchAll();
         $result = $change($rows);
         $after = q('SELECT * FROM portfolio_transactions WHERE portfolio_id = ? ORDER BY trade_at, id', [$portfolioId])->fetchAll();
         validate_transaction_history($after);
-        $db->commit(); return $result;
-    } catch (Throwable $e) { if ($db->inTransaction()) $db->rollBack(); throw $e; }
+        return $result;
+    });
 }
 // Achats encore (au moins en partie) détenus : les ventes consomment les achats les plus anciens d'abord (FIFO), quantités suivies à travers les splits
 // confirmés comme dans validate_transaction_history. Renvoie [{tx (ligne d'achat), remaining}] dans l'ordre chronologique. Sert aux alertes, pas au prix de revient.
@@ -110,4 +110,20 @@ function open_lots(array $rows): array {
     }
     usort($out, function ($a, $b) { return [$a['tx']['trade_at'], (int)$a['tx']['id']] <=> [$b['tx']['trade_at'], (int)$b['tx']['id']]; });
     return $out;
+}
+/** Champs d'une transaction saisie : valide et normalise (sens, quantité, prix, frais, change, date). */
+function tx_fields(array $b): array {
+    $side = str_in($b, 'side', 4);
+    if (!in_array($side, ['buy', 'sell'], true)) throw new ApiError('Sens invalide (buy ou sell)');
+    $qty = num_in($b, 'quantity', true, 0.00000001);
+    $price = num_in($b, 'unit_price', true, 0);
+    $fees = num_in($b, 'fees', false, 0, 1e11) ?? 0.0;   // colonne DECIMAL(20,8) : 12 chiffres avant la virgule
+    $fx = num_in($b, 'fx_to_eur', false, 0);
+    $when = str_in($b, 'trade_at', 25);
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2}(?::\d{2})?)?$/', $when)) throw new ApiError('Date invalide', 422);
+    $date = DateTimeImmutable::createFromFormat('!Y-m-d', substr($when, 0, 10), new DateTimeZone('UTC'));
+    if (!$date || $date->format('Y-m-d') !== substr($when, 0, 10)) throw new ApiError('Date invalide', 422);
+    $ts = strtotime($when . (strlen($when) <= 10 ? ' 12:00:00' : '') . ' UTC');
+    if ($ts === false || $ts > time() + 86400) throw new ApiError('Date invalide');
+    return [$side, $qty, $price, $fees, $fx, gmdate('Y-m-d H:i:s', $ts)];
 }

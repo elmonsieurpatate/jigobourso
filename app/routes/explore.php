@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/../lib/db.php';
+require_once __DIR__ . '/../lib/http.php';
 require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/engine.php';
 require_once __DIR__ . '/../services/ledger.php';

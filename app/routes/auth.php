@@ -1,4 +1,8 @@
 <?php
+require_once __DIR__ . '/../lib/db.php';
+require_once __DIR__ . '/../lib/http.php';
+require_once __DIR__ . '/../lib/auth.php';
+require_once __DIR__ . '/../lib/settings.php';
 require_once __DIR__ . '/../lib/account.php';
 
 return [
@@ -35,16 +39,15 @@ return [
         need_post();
         $u = require_user();
         $b = body();
-        $db=db();$db->beginTransaction();
-        try {
+        $fresh=tx(function () use ($u,$b) {
             $fresh=q('SELECT * FROM users WHERE id=? FOR UPDATE',[$u['id']])->fetch();
             if (!password_verify(password_input($b,'current'),$fresh['pass_hash'])) throw new ApiError('Mot de passe actuel incorrect',403);
             $new=password_input($b,'new');valid_password($new);
             q('UPDATE users SET pass_hash=? WHERE id=?',[password_hash($new,PASSWORD_DEFAULT),$u['id']]);
             q('UPDATE account_tokens SET used_at=? WHERE user_id=? AND used_at IS NULL',[now_utc(),$u['id']]);
             q('DELETE FROM sessions WHERE user_id=? AND token_hash<>?',[$u['id'],hash('sha256',$_COOKIE[COOKIE])]);
-            $db->commit();
-        } catch(Throwable $e) {if($db->inTransaction())$db->rollBack();throw $e;}
+            return $fresh;
+        });
         notify_account_change($fresh,'password');
         return ['ok' => true];
     },
@@ -88,8 +91,3 @@ return [
         return ['prefs' => $prefs];
     },
 ];
-
-function setting_value(string $name, $default) {
-    $r = q('SELECT value_json FROM settings WHERE name = ?', [$name])->fetch();
-    return $r ? json_decode($r['value_json'], true) : $default;
-}

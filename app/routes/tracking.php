@@ -3,24 +3,15 @@
 // Lecture seule pour les données financières : rien n'est vendu, aucun niveau personnel n'est modifié, aucune transaction n'est touchée.
 // Écritures, toujours à la demande explicite de l'utilisateur et sur UNE position : stratégie de surveillance (position_watch), filet de protection et objectif personnels (position_levels),
 // réglage des règles (position_plan_rules : activation, seuil de recul personnalisé). Jamais les transactions, les lots, ni les anciennes règles d'alerte (alert_rules).
+require_once __DIR__ . '/../lib/db.php';
+require_once __DIR__ . '/../lib/http.php';
 require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/engine.php';
 require_once __DIR__ . '/../services/transactions.php';
 require_once __DIR__ . '/../services/ct_strategies.php';
 require_once __DIR__ . '/../services/portfolio_access.php';
 require_once __DIR__ . '/../services/ledger.php';
-
-// identifiants de la page Classement -> modèles du moteur (mêmes sept stratégies)
-const TRACK_PRESET = ['fast' => 'fast', 'regular' => 'regular', 'calm' => 'low_volatility', 'rebound' => 'recovery', 'mom6' => 'momentum', 'mom12' => 'momentum12', 'momrisk' => 'momentum_risk'];
-const TRACK_RULES = ['stop', 'recul', 'trend', 'risk', 'target'];
-const TRACK_LABEL = ['fast' => 'Croissance rapide', 'regular' => 'Croissance régulière', 'calm' => 'Hausse calme', 'rebound' => 'Rebond', 'mom6' => 'Momentum 6 mois', 'mom12' => 'Momentum 12 mois', 'momrisk' => 'Momentum ajusté au risque'];
-
-function track_custom_names(int $uid): array {
-    $out = [];
-    foreach ((ct_all($uid)['items'] ?? []) as $it) if (empty($it['builtin'])) $out[$it['id']] = $it['name'] ?? $it['id'];
-    return $out;
-}
-function track_label(string $key, array $custom): string { return TRACK_LABEL[$key] ?? ($custom[$key] ?? $key); }
+require_once __DIR__ . '/../services/tracking.php';
 
 return [
     'tracking/state' => function () {
