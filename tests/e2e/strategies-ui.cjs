@@ -14,7 +14,7 @@ const api=(pg,route,body)=>pg.evaluate(async([r,b])=>{try{const j=b?await J.post
   // 1. menu : l'administration technique n'a que 7 entrées, absente pour un compte ordinaire ; menu Explorer personnel
   const sub=async(pg,id)=>pg.$$eval(`[data-sub="${id}"] .sv`,a=>a.map(x=>x.textContent.trim()));
   must(!(await U.pg.$('[data-sub="admin"]')),'Menu admin visible pour un compte ordinaire');
-  const adm=await sub(A.pg,'admin');must(JSON.stringify(adm)===JSON.stringify(['FinanceDatabase','Yahoo Finance','Actions / ETF','Cron','Journaux','Données','Utilisateurs','Réglages']),'Menu admin : '+adm);
+  const adm=await sub(A.pg,'admin');must(JSON.stringify(adm)===JSON.stringify(['FinanceDatabase','Yahoo Finance','Actions / ETF','Cron','Journaux','Splits','Données','Utilisateurs','Réglages']),'Menu admin : '+adm);
   const exp=await sub(U.pg,'explorer');must(JSON.stringify(exp)===JSON.stringify(['Recherche et résultats','Mes stratégies','Mes critères de recherche','Mes paramètres de scores','Mes colonnes et tris','Mes filtres et catégories']),'Menu Explorer : '+exp);
   must(await U.pg.$('#nav a[href="aide.html"]'),'Lien Aide absent');
   must(!(await U.pg.$('#nav a[href^="donnees.html"]')),'Menu Données visible pour un compte ordinaire');must((await api(U.pg,'data/overview')).json===null,'data/overview ouvert à un compte ordinaire');must((await api(A.pg,'data/overview')).json!==null,'data/overview refusé à l administrateur');
