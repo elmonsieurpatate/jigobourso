@@ -83,7 +83,7 @@ Tick toutes les 15 minutes : barres de 15 min des places ouvertes (+ dernier cr�
 4. Classement : rang et score sont des percentiles parmi les titres retenus de la sélection, par groupe (actions / ETF). Changer les filtres change donc le classement ; le score minimum s'applique après.
 5. Pagination, uniquement après les étapes précédentes. Les nombres « titres examinés sur N » et « résultats » sont affichés.
 La fiche d'un titre reçoit la même configuration et les mêmes filtres (depuis l'Explorer : `titre.html?src=explorer`) ; elle annonce « Verdict calculé selon … » et permet de choisir un profil ou la stratégie d'un portefeuille. Sans configuration transmise, le réglage par défaut est annoncé comme tel.
-Recherches enregistrées : critères + filtres + tri (`saved_searches`).
+Recherches enregistrées : critères + filtres + tri (table `explorer_saved`, type `search`).
 
 ## Limites connues des données et des calculs (audit fonctionnel du 29/10/2026)
 - **Rendements hors dividendes.** Les clôtures viennent de Yahoo (Spark) : ajustées des splits par Yahoo, pas des dividendes (`adj_close_px` reste vide). Un fonds ou une action qui distribue est donc désavantagé par rapport à une part de capitalisation de même performance totale.

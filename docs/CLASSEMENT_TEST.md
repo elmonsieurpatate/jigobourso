@@ -2,6 +2,8 @@
 
 # Classement test — prototype indépendant
 
+> **Historique** : la page `classement-test.html` n'existe plus ; `.htaccess` la redirige (301) vers `index.html`. Ce document décrit le prototype d'origine.
+
 Ouvrir `classement-test.html` après connexion, ou l’entrée **Classement test** du menu.
 Le prototype réutilise seulement la navigation, l’authentification et le thème communs.
 L’Explorer existant, ses préférences, ses appels API et les calculs financiers sont inchangés.

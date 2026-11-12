@@ -69,7 +69,10 @@ Rejoue de zéro les étapes 2 à 6 ci-dessous, avec les vraies données Yahoo et
 
 Prérequis du serveur vérifiés en lecture seule : PHP 8.2, Python 3.9, MariaDB 11.8, disque libre très large. Le code est compatible 3.9 et 7.4+.
 
-## Checklist de bascule (chaque case est réversible jusqu'à l'étape 7)
+## Checklist de bascule (historique : V1 est abandonné, la V2 est en production)
+Les anciennes tables (V1, `codex_*`) sont supprimées depuis le 12/11/2026 ; la base est descendue de 1 536 à 477 Mo. Cette checklist n'est plus à exécuter.
+
+(Version d'origine, chaque case était réversible jusqu'à l'étape 7.)
 Pré-requis : **accord explicite de l'utilisateur**. Durée totale prévue ≈ 45 min, dont ≈ 20 min d'amorçage ; pendant ce temps l'ancien site continue de fonctionner.
 
 1. [ ] **Sauvegarde** : dump complet de la base actuelle vers le poste local (lecture seule), copie de `public_html`. Vérifier taille et ouverture du dump.

@@ -6,7 +6,7 @@ PHP (site et API) · Python (moteur : catalogue, collecte, calculs) · MariaDB. 
 ```
 db/schema.sql     schéma unique            engine/   moteur Python (catalogue, market, analytics, jobs, migration)
 app/public/       pages, assets, api.php   app/      lib/ routes/ services/ (PHP)
-tests/            fast/ integ/ e2e/        scripts/  base locale, amorçage, migration, export
+tests/            fast/ integ/ e2e/        scripts/  base locale, amorçage, migrations SQL, vérifications de release
 docs/             ARCHITECTURE, METHODE, FONCTIONNALITES, VOLUMETRIE, DEPLOIEMENT
 ```
 

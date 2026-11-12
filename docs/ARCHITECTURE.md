@@ -59,7 +59,7 @@ db/schema.sql            schéma unique
 engine/                  Python : catalogue/ market/ analytics/ jobs/ shared/ cli.py
 app/                     PHP : public/ (HTML, assets/) routes/ services/ lib/
 tests/                   fast/ (sans base) integ/ (MariaDB jetable) fixtures/
-scripts/                 local_db.sh, volumetry_test.sql, outils de migration
+scripts/                 local_db.sh, migrate.py, vérifications de release, oneshot/ (voir scripts/README.md)
 docs/                    ARCHITECTURE.md, FONCTIONNALITES.md
 reference/               extraits de l'ancien code consultés pour la parité (non exécutés en production)
 ```

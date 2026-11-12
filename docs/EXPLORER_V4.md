@@ -159,9 +159,10 @@ L’import ne contient ni code exécutable ni requête vers un fournisseur.
 
 Migration additive `20261104_explorer_saved.sql` : nouvelle table `explorer_saved`,
 clé étrangère utilisateur, unicité utilisateur/type/nom, limite 150 objets par compte.
-Les anciennes tables `saved_searches` et `saved_presets` ne sont plus lues ni écrites
-par l'application : `scripts/oneshot/migrate_saved_to_explorer.py` copie leur contenu
-dans `explorer_saved` (kind `search`, idempotent) ; elles se suppriment ensuite à la main.
+Les anciennes tables `saved_searches` et `saved_presets`, leurs routes et la couche
+« historique » de la bibliothèque sont retirées (12/11/2026). Elles étaient vides en
+production ; `scripts/oneshot/migrate_saved_to_explorer.py` (idempotent) permet de copier
+leur contenu vers `explorer_saved` (kind `search`) sur une base qui en aurait encore.
 
 « Tout remettre à zéro » prépare une configuration vide : aucune période, aucun
 seuil, aucune contribution ni filtre d’univers ; aucun score artificiel. La fraîcheur
