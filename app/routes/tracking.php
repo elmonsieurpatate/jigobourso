@@ -7,7 +7,8 @@ require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/engine.php';
 require_once __DIR__ . '/../services/transactions.php';
 require_once __DIR__ . '/../services/ct_strategies.php';
-require_once __DIR__ . '/portfolios.php';
+require_once __DIR__ . '/../services/portfolio_access.php';
+require_once __DIR__ . '/../services/ledger.php';
 
 // identifiants de la page Classement -> modèles du moteur (mêmes sept stratégies)
 const TRACK_PRESET = ['fast' => 'fast', 'regular' => 'regular', 'calm' => 'low_volatility', 'rebound' => 'recovery', 'mom6' => 'momentum', 'mom12' => 'momentum12', 'momrisk' => 'momentum_risk'];

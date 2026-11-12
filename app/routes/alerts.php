@@ -4,7 +4,8 @@
 require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/engine.php';
 require_once __DIR__ . '/../services/ct_strategies.php';
-require_once __DIR__ . '/portfolios.php';
+require_once __DIR__ . '/../services/portfolio_access.php';
+require_once __DIR__ . '/../services/ledger.php';
 
 const ALERT_KINDS = ['price_below', 'price_above', 'target', 'gain_pct_above', 'loss_pct', 'gain_eur_above', 'loss_eur', 'drawdown_from_high', 'gain_giveback', 'daily_move', 'slope_min', 'r2_min', 'vol_max', 'drawdown_max', 'momentum_min', 'ma_below', 'momentum6_min', 'momentum12_min', 'er_min', 'ma_falling', 'gap_ma20_max'];
 const ALERT_TREND = ['slope_min', 'r2_min', 'vol_max', 'drawdown_max', 'momentum_min', 'momentum6_min', 'momentum12_min', 'er_min'];

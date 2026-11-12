@@ -5,41 +5,6 @@ require_once __DIR__ . '/../services/ledger.php';
 require_once __DIR__ . '/../services/explorer_library.php';
 require_once __DIR__ . '/../services/ct_strategies.php';
 
-function held_listing_ids(int $userId): array {
-    // Quantité nette > 0, splits confirmés compris (même règle que la valorisation des portefeuilles).
-    $rows = q("SELECT t.listing_id, t.side, t.quantity, t.unit_price, t.trade_at, t.id FROM portfolio_transactions t JOIN portfolios p ON p.id = t.portfolio_id
-               WHERE p.user_id = ? AND t.listing_id IS NOT NULL ORDER BY t.trade_at, t.id", [$userId])->fetchAll();
-    $events = split_events(array_map(function ($t) { return $t['listing_id']; }, $rows));
-    $freeBuys = free_buy_dates($rows);
-    $qty = []; $cursor = [];
-    foreach ($rows as $t) {
-        $lid = (int)$t['listing_id'];
-        $c = $cursor[$lid] ?? '';
-        $qty[$lid] = ($qty[$lid] ?? 0.0) * (isset($events[$lid]) ? pending_split_ratio($events[$lid], $freeBuys[$lid] ?? [], $c, substr($t['trade_at'], 0, 10)) : 1.0);
-        $cursor[$lid] = $c;
-        $qty[$lid] += $t['side'] === 'buy' ? (float)$t['quantity'] : -(float)$t['quantity'];
-    }
-    $today = gmdate('Y-m-d');
-    foreach ($qty as $lid => $q) if ($q > 0 && isset($events[$lid])) { $c = $cursor[$lid]; $qty[$lid] = $q * pending_split_ratio($events[$lid], $freeBuys[$lid] ?? [], $c, $today); }
-    return array_values(array_map('intval', array_keys(array_filter($qty, function ($q) { return $q > 0.000000001; }))));
-}
-
-/** Filtres de vue conservés dans une recherche ou un réglage enregistré : valeurs simples seulement, clés connues seulement. */
-function clean_view($in): array {
-    $view = [];
-    if (!is_array($in)) return $view;
-    foreach (['currency', 'min_aum', 'max_aum', 'kind', 'geo_region', 'market', 'country', 'category', 'budget', 'min_price', 'max_price', 'min_score', 'max_volatility', 'max_drawdown', 'min_volume', 'max_fee', 'cap', 'regularity', 'risk', 'liquidity', 'pea', 'owned_only', 'open_now', 'fresh_only', 'sort', 'dir'] as $k)
-        if (isset($in[$k]) && is_scalar($in[$k]) && $in[$k] !== '' && $in[$k] !== false) $view[$k] = $in[$k];
-    if (isset($view['kind']) && !in_array($view['kind'], ['all', 'equity', 'etf', 'large_etf'], true)) unset($view['kind']);
-    if (isset($view['geo_region']) && !in_array($view['geo_region'], ['us', 'eu', 'emerging'], true)) unset($view['geo_region']);
-    if (isset($in['q']) && is_scalar($in['q'])) $view['q'] = mb_substr(trim((string)$in['q']), 0, 100);
-    if (array_key_exists('tradable', $in) && is_bool($in['tradable'])) $view['tradable'] = $in['tradable'];
-    if (isset($in['status']) && in_array($in['status'], ['retained', 'rejected', 'unknown', 'all'], true)) $view['status'] = $in['status'];
-    if (isset($in['description']) && is_scalar($in['description'])) $view['description'] = mb_substr(trim((string)$in['description']), 0, 300);
-    if (isset($in['icon']) && in_array($in['icon'], ['📈', '⚡', '🔎', '🛡️', '🌱', '📊', '💼', '⭐'], true)) $view['icon'] = $in['icon'];
-    return $view;
-}
-
 return [
     'explorer/library' => function () { $u=require_user();return explorer_library_list((int)$u['id']); },
     'explorer/library/legacy' => function () { need_post();$u=require_user();return explorer_legacy_action((int)$u['id'],body()); },

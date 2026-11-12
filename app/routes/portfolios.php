@@ -2,14 +2,10 @@
 require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/engine.php';
 require_once __DIR__ . '/../services/transactions.php';
+require_once __DIR__ . '/../services/portfolio_access.php';
 
 const LOT_STRATEGIES = ['regular', 'fast', 'recovery', 'low_volatility', 'momentum', 'momentum12', 'momentum_risk', 'prudent'];   // engine/analytics/alerts.py STRATEGIES
 
-function own_portfolio(int $id, array $user): array {
-    $p = q('SELECT * FROM portfolios WHERE id = ? AND user_id = ?', [$id, $user['id']])->fetch();
-    if (!$p) throw new ApiError('Portefeuille introuvable', 404);
-    return $p;
-}
 function tx_fields(array $b): array {
     $side = str_in($b, 'side', 4);
     if (!in_array($side, ['buy', 'sell'], true)) throw new ApiError('Sens invalide (buy ou sell)');
