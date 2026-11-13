@@ -451,7 +451,7 @@ def _attach_curves(conn, rows, sessions=63, points=66):
         return
     with conn.cursor() as cur:
         cur.execute(f"SELECT listing_id, price_date, close_px FROM daily_prices WHERE listing_id IN ({','.join(['%s'] * len(ids))}) AND price_date >= %s ORDER BY listing_id, price_date",
-                    ids + [datetime.date.today() - datetime.timedelta(days=int(sessions * 1.6) + 12)])
+                    ids + [hours.utcnow().date() - datetime.timedelta(days=int(sessions * 1.6) + 12)])
         curves = defaultdict(list)
         for r in cur.fetchall():
             curves[r['listing_id']].append(float(r['close_px']))
