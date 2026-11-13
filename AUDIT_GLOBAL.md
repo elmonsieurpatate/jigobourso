@@ -1,7 +1,7 @@
 # AUDIT GLOBAL : plan directeur de nettoyage et de professionnalisation
 
 Date : 2026-11-12 · Branche d'origine : `chore/frontend-cleanup-20261112` (fusionnée dans `main`)
-**Avancement (12/11/2026)** : étapes 0 à 3 faites et déployées en production, base nettoyée (1 536 → 477 Mo). Cases restantes : retrait de `?k=` du cron (étape 1) et alias cron `yahoo-history-cron`, regroupement des scripts de release (étape 3). Étapes 4 à 9 : à faire.
+**Avancement (13/11/2026)** : étapes 0 à 7 faites et poussées sur `main` (0 à 3 déployées le 12/11 ; 4 à 7 poussées le 13/11, déploiement à confirmer). Cases restantes : retrait de `?k=` du cron (étape 1), alias cron `yahoo-history-cron` et regroupement des scripts de release (étape 3), scission d'`explorer.js` et `admin-scores.js` (étape 7). Étapes 8 et 9 : à faire.
 Audit en lecture seule, aucun code modifié. Sources : 3 sous-agents (Backend/DB, Moteur/scripts, Frontend).
 
 **Limites de l'audit** : les 37 modules `engine/analytics/` n'ont pas été lus en entier (doublons et N+1 à confirmer). `app/services/*` et `tests/` non lus par l'agent Backend. Les `innerHTML` du frontend restent à auditer. Aucun constat critique n'a été relevé nulle part : pas d'injection SQL avérée, pas de secret dans le code.
