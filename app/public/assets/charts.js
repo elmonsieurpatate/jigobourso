@@ -128,7 +128,7 @@
       cross.setAttribute('x1', X(i)); cross.setAttribute('x2', X(i)); cross.setAttribute('visibility', 'visible'); dot.setAttribute('cx', X(i)); dot.setAttribute('cy', Y(vals[i])); dot.setAttribute('visibility', 'visible');
       const prev = i ? vals[i - 1] : null, sinceStart = 100 * (vals[i] / vals[0] - 1), g = from + i;
       tip.innerHTML = `<b>${(opts.intraday ? J.dateTime : J.date)(view[i][0])}</b><div class="tip-grid"><span>Clôture</span><b>${f(vals[i])} ${J.esc(opts.unit || '')}</b>${prev ? `<span>Vs veille</span><b class="${J.cls(vals[i] - prev)}">${J.pct(100 * (vals[i] / prev - 1))}</b>` : ''}<span>Depuis le début de la période</span><b class="${J.cls(sinceStart)}">${J.pct(sinceStart)}</b>${m20[g] !== null ? `<span>Moy. 20 j</span><b>${f(m20[g])}</b>` : ''}${m50[g] !== null ? `<span>Moy. 50 j</span><b>${f(m50[g])}</b>` : ''}<span>Volume</span><b>${view[i][2] === null ? 'absent' : J.num(view[i][2], 0)}</b></div>`;
-      tip.hidden = false; const wr = wrap.getBoundingClientRect(), left = X(i) * r.width / W + (r.left - wr.left);
+      tip.hidden = false; const wr = svg.parentElement.getBoundingClientRect(), left = X(i) * r.width / W + (r.left - wr.left);
       tip.style.left = Math.min(Math.max(8, left + 14), wr.width - tip.offsetWidth - 8) + 'px'; tip.style.top = '8px';
     };
     const leave = () => { cross.setAttribute('visibility', 'hidden'); dot.setAttribute('visibility', 'hidden'); tip.hidden = true; };
