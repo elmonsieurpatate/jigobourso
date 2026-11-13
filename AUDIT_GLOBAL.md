@@ -1,7 +1,7 @@
 # AUDIT GLOBAL : plan directeur de nettoyage et de professionnalisation
 
 Date : 2026-11-12 · Branche d'origine : `chore/frontend-cleanup-20261112` (fusionnée dans `main`)
-**Avancement (13/11/2026)** : étapes 0 à 7 faites et poussées sur `main` (0 à 3 déployées le 12/11 ; 4 à 7 poussées le 13/11, déploiement à confirmer). Cases restantes : retrait de `?k=` du cron (étape 1), alias cron `yahoo-history-cron` et regroupement des scripts de release (étape 3), scission d'`explorer.js` et `admin-scores.js` (étape 7). Étapes 8 et 9 : à faire.
+**Avancement (13/11/2026)** : étapes 0 à 7 faites (0 à 3 déployées le 12/11 ; 4 à 7 poussées le 13/11, la scission d'`explorer.js` et `admin-scores.js` est commitée mais pas encore poussée). Cases restantes : retrait de `?k=` du cron (étape 1), alias cron `yahoo-history-cron` et regroupement des scripts de release (étape 3). Étapes 8 et 9 : à faire.
 Audit en lecture seule, aucun code modifié. Sources : 3 sous-agents (Backend/DB, Moteur/scripts, Frontend).
 
 **Limites de l'audit** : les 37 modules `engine/analytics/` n'ont pas été lus en entier (doublons et N+1 à confirmer). `app/services/*` et `tests/` non lus par l'agent Backend. Les `innerHTML` du frontend restent à auditer. Aucun constat critique n'a été relevé nulle part : pas d'injection SQL avérée, pas de secret dans le code.
@@ -156,7 +156,7 @@ Réalisé le 12/11/2026. Chargement vérifié sur une copie servie par PHP aprè
 - [x] Garde-fou `tests/fast/test_js_core.py` étendu (dates, composants, en-têtes) ; `tests/e2e/core.cjs` et `core-interactions.cjs` (tri compris)
 - [x] Helpers de graphiques communs : `J.svg`, `J.ticks`, `J.priceDec`, `J.chartBox` dans `core.js` (copies supprimées de `charts.js` et `intraday.js`). `pf-math.js` (calcul de portefeuille) et `help-charts.js` (schémas pédagogiques) n'ont rien en commun avec les graphiques de cours
 - [x] `filtres-catalogue.js` (2 848 lignes de données) découpé : un fichier `filtres-catalogue-<id>.js` par filtre (13) + `-indicators`, contenu strictement identique à l'original (vérifié) ; test `admin-categories-model.cjs` adapté
-- [ ] `explorer.js` (617 lignes) et `admin-scores.js` (547) restent d'un seul tenant : chacun est une seule fermeture à état partagé, sans couverture de test suffisante (l'explorateur est vide sur la base locale) pour les scinder sans risque de régression. Ils ne contiennent plus aucune copie du noyau
+- [x] `explorer.js` (617 → 480 lignes) scindé en `explorer-model.js` (logique pure : profils, arbre de règles, sauvegarde locale, filtres, lignes, tri ; testé sous Node par `tests/e2e/explorer-model.cjs`) et `explorer-view.js` (gabarits HTML purs) ; `admin-scores.js` (547 → 338) scindé en `admin-scores-view.js` (gabarits et libellés, lisant l'état par des accesseurs). Vérifié par des instantanés DOM identiques avant/après sur la base locale réelle (24 pour l'explorateur : Expert, règles, filtres, tri, pages, colonnes, stratégie ; 49 pour les scores : admin et « Mes paramètres », configuration, profils, simulation, suivi). Bug trouvé au passage et corrigé : l'onglet Profils de « Mes paramètres de scores » plantait (`S.personal` absent).
 
 ## Étape 8 : CSP, styles inline et accessibilité 🟠
 
