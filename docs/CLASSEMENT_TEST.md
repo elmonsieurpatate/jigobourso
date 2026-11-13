@@ -61,7 +61,7 @@ Les sélections personnelles sont sauvegardées avec l’empreinte de la configu
 
 ```sh
 node tests/e2e/classement-test-secondary-logic.cjs
-php tests/e2e/classement-test-categories.php
+php tests/php/classement-test-categories.php
 node tests/e2e/classement-test-secondary.cjs
 ```
 

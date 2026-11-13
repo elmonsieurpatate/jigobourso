@@ -1,5 +1,5 @@
 """Contrôle en LECTURE SEULE des deux stratégies Momentum sur une base réelle (essai isolé ou production) : valeurs stockées, cohérence avec la formule des tests chronologiques, classements du moteur.
-Usage : PYTHONPATH=$PWD python scripts/verify_momentum_release.py   (variables JIGO_DB_*)   Code de sortie 0 = tout est cohérent."""
+Usage : PYTHONPATH=$PWD python scripts/release/verify_momentum_release.py   (variables JIGO_DB_*)   Code de sortie 0 = tout est cohérent."""
 import json
 import random
 import sys

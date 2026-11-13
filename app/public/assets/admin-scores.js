@@ -143,7 +143,7 @@
     const hint = id => (cat.find(c => c.id === id) || {}).hint || '';
     const cols = l.columns.filter(c => SC_COLS[c.id] && c.visible);
     const prim = rkSorts[0] || { key: rkWhich, dir: 'desc' };
-    const w = c => c.width ? ` style="width:${c.width}px;min-width:${c.width}px"` : '';
+    const w = c => c.width ? ` data-style="width:${c.width}px;min-width:${c.width}px"` : '';
     return `<div class="as-rkwrap"><table class="dense as-rktable" id="as-rktable">${J.table.head(cols.map(c => ({ label: E(label(c.id)), cls: SC_COLS[c.id].cls || '', scope: 'col', title: hint(c.id) || '', width: c.width, sort: SC_COLS[c.id].nosort ? '' : c.id })), prim)}
       <tbody>${rows.map(r => `<tr>${cols.map(c => `<td class="${SC_COLS[c.id].cls || ''}"${w(c)} data-label="${E(label(c.id))}">${SC_COLS[c.id].cell(r)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
   }
@@ -165,7 +165,7 @@
   function simulationView(isV4) {
     if (!isV4) return `<div class="notice warn">La simulation porte sur une stratégie V4. Choisissez-en une ci-dessous.<div class="mt-2">${stratPicker()}</div></div>`;
     const cands = sim && sim.candidates && sim.candidates.length > 1 ? `<div class="as-chips"><span class="muted">Autres correspondances :</span> ${sim.candidates.map(c => `<button class="btn sm" data-a="sim-pick" data-id="${c.id}">${E(c.symbol)} <span class="muted">${E(c.name)}</span></button>`).join(' ')}</div>` : '';
-    return `<div class="card"><div class="row gap-s" style="flex-wrap:wrap;margin-bottom:8px"><span class="muted">Stratégie :</span> ${stratPicker()}</div>
+    return `<div class="card"><div class="row gap-s" data-style="flex-wrap:wrap;margin-bottom:8px"><span class="muted">Stratégie :</span> ${stratPicker()}</div>
         ${sim && sim.granularity ? `<p class="as-hint mb-2">${granText({ periods: sim.periods, sessions: sim.granularity })}</p>` : ''}
         <div class="as-searchrow"><input id="as-q" class="as-search" type="search" enterkeyhint="search" placeholder="Symbole, nom ou ISIN d’un titre noté" value="${E(simQ)}"><button class="btn primary" data-a="sim-run">Décomposer</button></div>
         <label class="row gap-s as-chk mt-2"><input type="checkbox" data-a="use-draft" ${useDraft ? 'checked' : ''}> avec mes modifications non enregistrées</label>${cands}</div>
@@ -184,7 +184,7 @@
       return `<td class="num">${val === null || val === undefined ? '<span class="muted">indisponible</span>' : fmt(unit === '%' ? val * (['up_fraction', 'spike_share'].includes(key) ? 100 : 1) : val, d) + (unit ? ' ' + unit : '')}${note === null || note === undefined ? '' : `<br><small class="muted">note ${fmt(note, 0)}</small>`}</td>`; };
     const rows = [['Croissance (Dynamique)', 'growth', '%', 2], ['Régularité (R²)', 'r2', '', 2], ['Séances positives', 'up_fraction', '%', 0], ['Plus gros pic ÷ hausse nette', 'spike_share', '%', 0], ['Accélération (écart de pente)', 'accel', '', 3], ['Volatilité (par séance)', 'volatility', '%', 2], ['Drawdown', 'drawdown', '%', 1]];
     const s = r.simple, c = r.complex, liq = r.liquidity || {};
-    return `<div class="card"><div class="row between" style="flex-wrap:wrap;gap:12px"><div><h3 class="as-h m-0">${E(sim.title.name)}</h3><span class="muted">${E(sim.title.symbol)} · ${E(sim.title.mic)} · ${sim.title.kind === 'etf' ? 'ETF' : 'Action'}</span></div><div class="as-scores">${sc(s, 's')}${sc(c, 'c')}</div></div>
+    return `<div class="card"><div class="row between" data-style="flex-wrap:wrap;gap:12px"><div><h3 class="as-h m-0">${E(sim.title.name)}</h3><span class="muted">${E(sim.title.symbol)} · ${E(sim.title.mic)} · ${sim.title.kind === 'etf' ? 'ETF' : 'Action'}</span></div><div class="as-scores">${sc(s, 's')}${sc(c, 'c')}</div></div>
       ${sim.tuning ? `<p class="as-hint">Normalisations utilisées par le calcul : saturation de dynamique <b>${fmt(sim.tuning.sat_a, 1)}</b> · référence d’accélération <b>${fmt(sim.tuning.accel_ref, 2)}</b> · volatilité <b>${E(VOLMODES[sim.tuning.vol_mode] || sim.tuning.vol_mode)}</b> · momentum <b>${E(HORIZONS[sim.tuning.momentum_horizon] || sim.tuning.momentum_horizon)}</b>.</p>` : ''}
       ${chartCard()}
       <div class="table-wrap"><table class="as-dec">${J.table.head(['Mesure', ...ids.map(i => ({ label: `${E(L[i])}<br><small class="muted">poids réel ${fmt(100 * ((r.weights_effective || {})[i] || 0), 1)} %${r.periods[i] ? '' : ' (période sans données)'}</small>`, num: true }))])}<tbody>

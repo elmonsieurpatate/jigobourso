@@ -36,7 +36,7 @@ Portefeuille : pondération par valeur actuelle en EUR, pas par nombre de parts 
 
 ## Couverture
 
-`scripts/verify_etf_release.py` ouvre une transaction READ ONLY et mesure deux périmètres : toutes les cotations ETF, puis les ETF sélectionnés et principaux. Compte séparément instruments, cotations, profils, lignes, poids, secteurs, frais ; les motifs sont indépendants et non additionnables. Ne fixe pas 4 676 comme dénominateur : compte la base réelle. Le rapport est un artefact privé de la livraison, conservé un jour, jamais publié sur la branche de statut.
+`scripts/release/verify_etf_release.py` ouvre une transaction READ ONLY et mesure deux périmètres : toutes les cotations ETF, puis les ETF sélectionnés et principaux. Compte séparément instruments, cotations, profils, lignes, poids, secteurs, frais ; les motifs sont indépendants et non additionnables. Ne fixe pas 4 676 comme dénominateur : compte la base réelle. Le rapport est un artefact privé de la livraison, conservé un jour, jamais publié sur la branche de statut.
 
 Aucune table utilisateur modifiée. Seule table ajoutée : `etf_analysis`, données dérivées remplaçables. Pas de fournisseur payant.
 

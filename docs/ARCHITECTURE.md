@@ -127,4 +127,4 @@ Parcours, dans l'ordre, tout est manuel dans l'administration :
 - **Entonnoirs** (`engine/analytics/explorer/funnel.py`) : avant / écartés / conservés à chaque étape, titres consultables, « pourquoi ce titre a disparu » ; figés dans `funnel_steps`.
 - **Page Actions / ETF** (`adminsvc.titles`) : tous les titres connus avec statut FinanceDatabase, statut Yahoo, présence dans le catalogue, motif exact, état des historiques.
 - **Tables ajoutées** (fin de `db/schema.sql`, additives) : `catalogue_raw`, `funnel_steps`, `job_steps`.
-- **Tests** : `make fast`, `make integ` (dont `test_catalogue_flow.py`, parcours complet avec faux Yahoo), e2e navigateur `tests/e2e/smoke.mjs` (général) et `tests/e2e/admin.mjs` (administration).
+- **Tests** : `make fast`, `make integ` (dont `test_catalogue_flow.py`, parcours complet avec faux Yahoo), e2e navigateur `tests/e2e/smoke.cjs` (général) et `tests/e2e/admin.cjs` (administration).

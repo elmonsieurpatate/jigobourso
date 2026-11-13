@@ -1,5 +1,5 @@
 import pytest
-from scripts.verify_financial_release import require_calculation
+from scripts.release.verify_financial_release import require_calculation
 
 
 def test_reference_mismatch_still_blocks_release_with_non_private_diagnostic(capsys):
@@ -14,7 +14,7 @@ def test_unknown_labels_cannot_publish_arbitrary_data(capsys):
 
 
 def test_failed_read_only_check_releases_its_snapshot(monkeypatch):
-    from scripts import verify_financial_release as v
+    from scripts.release import verify_financial_release as v
     class Cursor:
         def __enter__(self):return self
         def __exit__(self,*args):pass

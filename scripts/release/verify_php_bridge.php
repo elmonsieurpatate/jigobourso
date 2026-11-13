@@ -1,9 +1,9 @@
 <?php
 // Contrôle (lecture seule) du pont PHP → moteur d'analyse, tel que l'API l'utilise : profils, Explorer, fiche et Suivi pour les deux stratégies Momentum.
-// Usage : JIGO_DB_* dans l'environnement ; JIGO_ENGINE_ROOT et JIGO_PYTHON si besoin.   php scripts/verify_php_bridge.php   (code de sortie 0 = tout est cohérent)
+// Usage : JIGO_DB_* dans l'environnement ; JIGO_ENGINE_ROOT et JIGO_PYTHON si besoin.   php scripts/release/verify_php_bridge.php   (code de sortie 0 = tout est cohérent)
 if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }
-require_once __DIR__ . '/../app/lib/config.php';
-require_once __DIR__ . '/../app/lib/engine.php';
+require_once __DIR__ . '/../../app/lib/config.php';
+require_once __DIR__ . '/../../app/lib/engine.php';
 $problems = [];
 function check(bool $ok, string $what, array &$problems): void { echo ($ok ? 'ok     ' : 'ÉCHEC  ') . $what . "\n"; if (!$ok) $problems[] = $what; }
 try {

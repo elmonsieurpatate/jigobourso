@@ -74,7 +74,7 @@ L’export HTML autonome reste un **aperçu hors ligne explicitement signalé**,
 
 Tests ajoutés :
 
-- `tests/e2e/secondary-persistence.php` : MariaDB réelle, idempotence, sauvegardes, IDs, ordre, défauts distincts, validation, conflits et conservation de l’existant.
+- `tests/php/secondary-persistence.php` : MariaDB réelle, idempotence, sauvegardes, IDs, ordre, défauts distincts, validation, conflits et conservation de l’existant.
 - `tests/integ/test_secondary_filters.py` : intégration de ce scénario dans la suite existante.
 - `tests/e2e/secondary-persistence-browser.cjs` : vrai serveur PHP et authentification, autorisations, rechargements, visibilité, catalogue, préférences par utilisateur, restauration et sauvegardes concurrentes ; contrôles visuels clair/sombre à 1280/390/375 px.
 
@@ -93,7 +93,7 @@ Aucune donnée de production, aucun push ni déploiement dans cette étape.
 | Adaptateur client | `app/public/assets/secondary-filter-store.js` |
 | Chargement Explorer | `app/public/assets/classement-test.js`, `app/public/assets/classement-test-filters.js` |
 | Export hors ligne | `scripts/export_classement_test.py` |
-| Tests de persistance | `tests/e2e/secondary-persistence.php`, `tests/e2e/secondary-persistence-browser.cjs`, `tests/integ/test_secondary_filters.py`, `scripts/test_secondary_filters.sh` |
+| Tests de persistance | `tests/php/secondary-persistence.php`, `tests/e2e/secondary-persistence-browser.cjs`, `tests/integ/test_secondary_filters.py`, `scripts/test_secondary_filters.sh` |
 | Tests des maquettes adaptés | `tests/e2e/admin-categories-test.cjs`, `tests/e2e/classement-test.cjs`, `tests/e2e/classement-test-ranking.cjs`, `tests/e2e/classement-test-secondary.cjs` |
 | Documentation | ce fichier, renvois ajoutés à `docs/ADMIN_CATEGORIES_TEST.md` et `docs/CLASSEMENT_TEST.md` |
 
@@ -182,7 +182,7 @@ La validation utilise des fixtures déclarées synthétiques (France/XPAR et dou
 - Le test rapide `test_secondary_metadata.py` exécute les implémentations PHP et JavaScript sur tous les alias ISO livrés ainsi que 32 cas explicites. Régression couverte : `NA` est bien la Namibie, pas une absence de donnée.
 - Navigateur réel : **1280, 390, 375 px**, clair et sombre, aucun débordement horizontal. Captures supplémentaires du filtre géographique en lecture seule : `/tmp/jigo-secondary-tests.zxYZGT/browser/metadata-*.png`. Rapport navigateur : `/tmp/jigo-secondary-tests.zxYZGT/browser/results.json`.
 - Aperçu statique : `node tests/e2e/admin-categories-test.cjs` sur serveur local, **8 configurations réussies** (1600/1280/390/375 px, clair/sombre). Il utilise aussi les nouveaux groupes et seulement Actions/ETF.
-- `node tests/e2e/classement-test-secondary-logic.cjs`, `node tests/e2e/admin-categories-model.cjs`, `php tests/e2e/classement-test-categories.php` : **réussis**.
+- `node tests/e2e/classement-test-secondary-logic.cjs`, `node tests/e2e/admin-categories-model.cjs`, `php tests/php/classement-test-categories.php` : **réussis**.
 - Syntaxe PHP, JavaScript et `git diff --check` : **réussis**. Comparaison des neuf définitions financières avec le commit de départ : **strictement identiques**.
 
 Lors de ces validations préalables : aucun push, déploiement, changement du moteur financier, des stratégies, des scores ou du schéma SQL. Les migrations de préférences n’ont été exécutées que sur les bases et navigateurs isolés de test.
@@ -202,13 +202,13 @@ Lors de ces validations préalables : aucun push, déploiement, changement du mo
 - `tests/e2e/admin-categories-model.cjs`
 - `tests/e2e/admin-categories-test.cjs`
 - `tests/e2e/secondary-persistence-browser.cjs`
-- `tests/e2e/secondary-persistence.php`
+- `tests/php/secondary-persistence.php`
 - `tests/integ/test_secondary_filters.py`
 - `app/config/secondary_metadata_groups.json`
 - `app/services/secondary_metadata.php`
-- `tests/e2e/secondary-metadata-persistence.php`
+- `tests/php/secondary-metadata-persistence.php`
 - `tests/e2e/secondary-metadata.cjs`
-- `tests/e2e/secondary-metadata.php`
+- `tests/php/secondary-metadata.php`
 - `tests/fast/test_secondary_metadata.py`
 
 
@@ -218,4 +218,4 @@ Seul le filtre possède un état actif/inactif. La colonne de statut des catégo
 
 Les anciennes catégories masquées sont converties une seule fois en catégories visibles mais non sélectionnées dans les défauts administrateur. Cette migration dans `explorer_secondary_defaults` conserve les choix initiaux dans `category_selection_previous`, puis pose `category_selection_version: 1`. Les nouvelles configurations incluent toutes les catégories. Les choix locaux continuent à primer sur les défauts administrateur. Des bornes historiques qui se chevauchent restent conservées et sont signalées pour correction, pas supprimées automatiquement.
 
-Le déploiement Quick conserve les deux menus séparés. `scripts/check_secondary_catalogue.php` vérifie en lecture seule les données réellement stockées sur la cible : chaque instrument et chaque cotation doivent recevoir un groupe explicite. Les replis vers Autres/Inconnu sont comptés sans modifier le catalogue ni initialiser les réglages. Le contrôle public des pages et des droits API reste obligatoire.
+Le déploiement Quick conserve les deux menus séparés. `scripts/release/check_secondary_catalogue.php` vérifie en lecture seule les données réellement stockées sur la cible : chaque instrument et chaque cotation doivent recevoir un groupe explicite. Les replis vers Autres/Inconnu sont comptés sans modifier le catalogue ni initialiser les réglages. Le contrôle public des pages et des droits API reste obligatoire.

@@ -223,7 +223,7 @@
   // Catégories de l'administration : la couleur d'un chiffre est celle de la catégorie du filtre correspondant.
   const defs=(categoryPayload.definitions&&categoryPayload.definitions.filters)||[];
   const {categoryOf,rowOptions}=M.categories(defs);
-  const tinted=(measureId,value,text)=>{const c=categoryOf(measureId,value);return c&&c.color?`<span class="ct-cat" style="--cat:${esc(c.color)}" title="${esc(c.name)}">${text}</span>`:text;};
+  const tinted=(measureId,value,text)=>{const c=categoryOf(measureId,value);return c&&c.color?`<span class="ct-cat" data-style="--cat:${esc(c.color)}" title="${esc(c.name)}">${text}</span>`:text;};
   // La fiche s'ouvre dans une autre fenêtre : elle reçoit l'identifiant de la stratégie et, si les réglages ne sont pas enregistrés, un brouillon sous une clé de contexte (localStorage, même origine).
   // Brouillon introuvable côté fiche ⇒ elle l'indique et ne rend aucun verdict : jamais de remplacement silencieux par d'autres réglages.
   const ctxKey=M.ctxKey;
@@ -270,7 +270,7 @@
     if(key==='rank_simple'||key==='rank_complex'){const w=key==='rank_simple'?'Simple':'Complex',r=row['rank'+w],t=row['tie'+w];return r==null?'—':t>1?`<span title="Ex æquo : ${t} titres ont exactement ce score">=${r}</span>`:String(r);}
     {const m=/^(perf|slope|r2)_(week|quarter|half|year)$/.exec(key);if(m){const [,f,k]=m,v=f==='perf'?(row.perf||{})[k]:(row.periods[SESS[k]]||{})[f];
       return v==null?'—':f==='r2'?fmt(v):`<span class="${v>0?'up':v<0?'down':''}">${percent(v,true)}</span>`;}}
-    if(key==='name')return `<a class="ct-company" href="${esc(sheetHref(row.id))}" target="_blank" rel="noopener" aria-label="Ouvrir la fiche de ${esc(row.symbol)} dans un nouvel onglet"><span class="ct-company-mark" style="--mark:${row.color}" aria-hidden="true">${esc(row.symbol.slice(0,2))}</span><span class="ct-company-text"><b>${esc(row.symbol)}${row.kind==='etf'?' <i class="ct-kind">ETF</i>':''}${row.held?' <i class="ct-kind held">détenu</i>':''}</b><span>${esc(row.name)}</span>${row.category?`<span class="ct-sub ct-sector">${esc(row.category)}</span>`:''}</span></a>`;
+    if(key==='name')return `<a class="ct-company" href="${esc(sheetHref(row.id))}" target="_blank" rel="noopener" aria-label="Ouvrir la fiche de ${esc(row.symbol)} dans un nouvel onglet"><span class="ct-company-mark" data-style="--mark:${row.color}" aria-hidden="true">${esc(row.symbol.slice(0,2))}</span><span class="ct-company-text"><b>${esc(row.symbol)}${row.kind==='etf'?' <i class="ct-kind">ETF</i>':''}${row.held?' <i class="ct-kind held">détenu</i>':''}</b><span>${esc(row.name)}</span>${row.category?`<span class="ct-sub ct-sector">${esc(row.category)}</span>`:''}</span></a>`;
     if(key==='market')return `<b>${esc(row.mic)}</b><span class="ct-sub">${esc(row.country||'Pays inconnu')} · ${esc(row.currency||'—')}</span>`;
     if(key==='sector'){const g=sectorLabel(row);return row.category?`<b>${esc(row.category)}</b><span class="ct-sub">${esc(g||'')}</span>`:'<span class="ct-missing">Inconnu</span>';}
     if(key==='price')return `${eur(row.price)}${row.currency&&row.currency!=='EUR'&&row.priceNative!==null?`<span class="ct-sub">${esc(J.num(row.priceNative,0,2))} ${esc(row.currency)}</span>`:''}`;
@@ -306,7 +306,7 @@
     const start=(tableState.page-1)*tableState.pageSize,pageRows=rows.slice(start,start+tableState.pageSize);
     if(selected.some(c=>c.key==='trend'))loadPageCurves(pageRows);
     $('#ct-result-count').textContent=loadError?'':`${num0(rows.length)} titre${rows.length>1?'s':''}`+(rows.length!==intrinsicRows.length?` sur ${num0(intrinsicRows.length)} évalués`:'');
-    const wstyle=w=>w?` style="width:${w}px;min-width:${w}px;max-width:none"`:'';
+    const wstyle=w=>w?` data-style="width:${w}px;min-width:${w}px;max-width:none"`:'';
     const cls=key=>key==='rank'?'ct-rank-cell':key==='name'?'ct-name-heading':'';
     $('#ct-table-head').innerHTML=J.table.headRow(selected.map(({key,label,width})=>({label:esc(label),scope:'col',cls:cls(key),width,title:key==='rank'?`Rang général sur tous les titres notés (${scoreKeyOf()==='simple'?'score simple':'score complexe'}), conservé lors du filtrage et du tri`:hintOf(key)||'',sort:REG[key].nosort?'':key})),{key:sortKey(),dir:sortDir()});
     $('#ct-table-body').innerHTML=pageRows.map(row=>`<tr data-row="${row.id}">${selected.map(({key,label,width})=>`<td class="ct-cell-${esc(key)} ${key==='rank'?'ct-rank-cell':''}" data-label="${esc(label)}"${wstyle(width)}>${rowCell(row,key)}</td>`).join('')}</tr>`).join('');

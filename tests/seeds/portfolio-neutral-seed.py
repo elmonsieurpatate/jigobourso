@@ -1,7 +1,7 @@
 """Fixtures shared by the three requested regressions, isolated local DB only."""
 import datetime as dt
 import runpy
-runpy.run_path('tests/e2e/explorer-editor-seed.py')
+runpy.run_path('tests/seeds/explorer-editor-seed.py')
 from engine.shared.db import connect
 from engine.analytics.series.compute import compute_all
 c=connect()

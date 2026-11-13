@@ -6,7 +6,8 @@ function secondary_metadata_config(): array {
 }
 function secondary_metadata_key(?string $value): string {
     $value=mb_strtolower(trim($value??''));
-    $value=strtr($value,['é'=>'e','è'=>'e','ê'=>'e','ë'=>'e','à'=>'a','â'=>'a','ä'=>'a','á'=>'a','ã'=>'a','å'=>'a','î'=>'i','ï'=>'i','í'=>'i','ì'=>'i','ô'=>'o','ö'=>'o','ó'=>'o','ò'=>'o','õ'=>'o','û'=>'u','ü'=>'u','ú'=>'u','ù'=>'u','ç'=>'c','ñ'=>'n','ý'=>'y','ÿ'=>'y']);
+    $value=strtr($value,['é'=>'e','è'=>'e','ê'=>'e','ë'=>'e','à'=>'a','â'=>'a','ä'=>'a','á'=>'a','ã'=>
+        'a','å'=>'a','î'=>'i','ï'=>'i','í'=>'i','ì'=>'i','ô'=>'o','ö'=>'o','ó'=>'o','ò'=>'o','õ'=>'o','û'=>'u','ü'=>'u','ú'=>'u','ù'=>'u','ç'=>'c','ñ'=>'n','ý'=>'y','ÿ'=>'y']);
     return preg_replace('/\s+/u',' ',$value);
 }
 function secondary_metadata_classify(string $filter,?string $raw,?string $kind=null): array {

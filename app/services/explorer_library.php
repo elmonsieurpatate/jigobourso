@@ -22,7 +22,9 @@ function clean_view($in): array {
 /** Sauvegardes typées (stratégie, univers, recherche) de l'utilisateur. */
 function explorer_library_list(int $uid): array {
     $items = q('SELECT id,kind,name,payload,active,updated_at FROM explorer_saved WHERE user_id=? ORDER BY kind,name',[$uid])->fetchAll();
-    foreach ($items as &$item) { $item['id']=(string)$item['id'];$item['payload']=json_decode($item['payload'],true);if (isset($item['payload']['config']) && is_array($item['payload']['config'])) $item['payload']['config']=explorer_config_shape($item['payload']['config']);if (($item['payload']['universe']??null)===[])$item['payload']['universe']=new stdClass();$item['active']=(bool)$item['active'];
+    foreach ($items as &$item) { $item['id']=(string)$item['id'];$item['payload']=json_decode($item['payload'],true);if (isset($item['payload']['config']) &&
+        is_array($item['payload']['config'])) $item['payload']['config']=explorer_config_shape($item['payload']['config']);
+            if (($item['payload']['universe']??null)===[])$item['payload']['universe']=new stdClass();$item['active']=(bool)$item['active'];
         } unset($item);
     return ['items'=>$items];
 }

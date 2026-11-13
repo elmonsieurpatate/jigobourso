@@ -17,7 +17,7 @@
     fig: (svg, cap) => `<div class="hf">${svg}${cap ? `<figcaption>${cap}</figcaption>` : ''}</div>`,
     fold: (title, html, open) => `<details class="hd" ${open ? 'open' : ''}><summary>${title}</summary><div>${html}</div></details>`,
     steps: items => `<ol class="hs">${items.map((s, i) => `<li><span class="hs-n">${i + 1}</span><div><h4>${s[0]}</h4>${s[1]}</div></li>`).join('')}</ol>`,
-    cards: items => `<div class="hcards">${items.map(c => `<div class="hcard" ${c.href ? `data-go="${E(c.href)}" tabindex="0" role="link"` : ''}><span class="hcard-i" style="background:${c.bg || 'var(--accent-soft)'}">${c.icon || ''}</span><b>${c.title}</b><p>${c.text}</p></div>`).join('')}</div>`,
+    cards: items => `<div class="hcards">${items.map(c => `<div class="hcard" ${c.href ? `data-go="${E(c.href)}" tabindex="0" role="link"` : ''}><span class="hcard-i" data-style="background:${c.bg || 'var(--accent-soft)'}">${c.icon || ''}</span><b>${c.title}</b><p>${c.text}</p></div>`).join('')}</div>`,
     table: (head, rows, cls = '') => `<div class="sui-scroll"><table class="sui-cmp ${cls}">${J.table.head(head)}<tbody>${rows.map(r => `<tr>${r.map((c, i) => i ? `<td>${c}</td>` : `<th scope="row">${c}</th>`).join('')}</tr>`).join('')}</tbody></table></div>`,
     demo: (name, extra = '') => `<div class="hdemo" data-demo="${E(name)}" ${extra}></div>`,
     quiz: (id, qs) => `<section class="hq" data-quiz="${E(id)}"><h3>Testez-vous</h3>${qs.map((q, i) => `<div class="hq-q" data-i="${i}"><p><b>${i + 1}.</b> ${q.q}</p>${q.o.map((o, j) => `<button type="button" class="hq-o" data-j="${j}" data-ok="${j === q.a ? 1 : 0}">${o}</button>`).join('')}<div class="hq-r" hidden>${q.why}</div></div>`).join('')}<div class="hq-s small muted"></div></section>`,
@@ -35,8 +35,8 @@
     const matches = term ? search(term) : null;
     $('#h-toc').innerHTML = GROUPS.map(([gid, gl]) => {
       const cs = list.filter(c => c.group === gid && (!matches || matches.has(c.id))); if (!cs.length) return '';
-      return `<div class="ht-g"><div class="ht-gl">${E(gl)}</div>${cs.map(c => `<a href="#/${E(c.id)}" class="ht-i ${c.parent ? 'sub' : ''} ${current && current.id === c.id ? 'on' : ''} ${seen.has(c.id) ? 'seen' : ''}" data-id="${E(c.id)}">${c.icon ? `<span class="ht-ic" style="color:${c.color || 'var(--accent)'}">${c.icon}</span>` : ''}<span>${E(c.title)}</span>${seen.has(c.id) ? '<i class="ht-ok" aria-label="vu">✓</i>' : ''}</a>`).join('')}</div>`;
-    }).join('') || '<p class="muted small" style="padding:8px">Aucun résultat. Essayez un autre mot.</p>';
+      return `<div class="ht-g"><div class="ht-gl">${E(gl)}</div>${cs.map(c => `<a href="#/${E(c.id)}" class="ht-i ${c.parent ? 'sub' : ''} ${current && current.id === c.id ? 'on' : ''} ${seen.has(c.id) ? 'seen' : ''}" data-id="${E(c.id)}">${c.icon ? `<span class="ht-ic" data-style="color:${c.color || 'var(--accent)'}">${c.icon}</span>` : ''}<span>${E(c.title)}</span>${seen.has(c.id) ? '<i class="ht-ok" aria-label="vu">✓</i>' : ''}</a>`).join('')}</div>`;
+    }).join('') || '<p class="muted small" data-style="padding:8px">Aucun résultat. Essayez un autre mot.</p>';
   }
   let index = null;
   function buildIndex() { if (index) return; const clean = h => String(h).replace(/<[^>]+>/g, ' ').toLowerCase(); index = chapters().map(c => ({ id: c.id, title: c.title.toLowerCase(), kw: (c.keywords || '').toLowerCase(), text: clean(safe(c, 'beginner') + ' ' + safe(c, 'expert')) })); }
@@ -57,11 +57,11 @@
     if (!opts.silent) J.post('auth/prefs', { help_last: c.id }).then(r => { me.prefs = r.prefs; }).catch(() => { });
     const pct = Math.round(100 * list.filter(x => seen.has(x.id)).length / list.length);
     $('#h-main').innerHTML = `<nav class="h-crumb" aria-label="Fil d’Ariane">${crumbs}</nav>
-      <header class="h-head"><span class="h-ico" style="background:color-mix(in srgb, ${c.color || '#2563eb'} 16%, transparent);color:${c.color || '#2563eb'}">${c.icon || ''}</span><div><h1>${E(c.title)}</h1>${c.lead ? `<p class="h-lead">${c.lead}</p>` : ''}</div></header>
+      <header class="h-head"><span class="h-ico" data-style="background:color-mix(in srgb, ${c.color || '#2563eb'} 16%, transparent);color:${c.color || '#2563eb'}">${c.icon || ''}</span><div><h1>${E(c.title)}</h1>${c.lead ? `<p class="h-lead">${c.lead}</p>` : ''}</div></header>
       ${hasExpert ? `<div class="h-levelbar">${level === 'expert' ? `Vous lisez la version <b>Expert</b> (formules, paramètres, limites). <button class="btn sm" data-level="beginner">Revenir au niveau Débutant</button>` : `Version <b>Débutant</b>. Envie d’aller plus loin ? <button class="btn sm" data-level="expert">Approfondir (Expert)</button>`}</div>` : ''}
       <article class="h-body">${body}</article>
       ${c.quiz ? '' : ''}
-      <footer class="h-nav">${prev ? `<a class="btn" href="#/${E(prev.id)}">← ${E(prev.title)}</a>` : '<span></span>'}<span class="h-prog" title="Progression"><i style="width:${pct}%"></i><small>${list.filter(x => seen.has(x.id)).length} / ${list.length} chapitres vus</small></span>${next ? `<a class="btn primary" href="#/${E(next.id)}">${E(next.title)} →</a>` : '<span></span>'}</footer>`;
+      <footer class="h-nav">${prev ? `<a class="btn" href="#/${E(prev.id)}">← ${E(prev.title)}</a>` : '<span></span>'}<span class="h-prog" title="Progression"><i data-style="width:${pct}%"></i><small>${list.filter(x => seen.has(x.id)).length} / ${list.length} chapitres vus</small></span>${next ? `<a class="btn primary" href="#/${E(next.id)}">${E(next.title)} →</a>` : '<span></span>'}</footer>`;
     mount(c); renderToc($('#h-q').value); closeDrawer();
     if (!opts.keepScroll) window.scrollTo({ top: 0 });
     document.title = c.title + ' — Aide — Jigobourso';

@@ -31,7 +31,7 @@
   }
   async function poll(launchedAt, launchedJob) {
     if (polling) return; polling = true;
-    let bar = J.$('#runbar'); if (!bar) { page.insertAdjacentHTML('afterbegin', '<div id="runbar" class="notice" style="display:none"></div>'); bar = J.$('#runbar'); }
+    let bar = J.$('#runbar'); if (!bar) { page.insertAdjacentHTML('afterbegin', '<div id="runbar" class="notice" data-style="display:none"></div>'); bar = J.$('#runbar'); }
     let seen = false;
     const done = () => { polling = false; J.toast('Traitement terminé'); render(); };
     for (let i = 0; i < 2000; i++) {
@@ -48,7 +48,7 @@
     }
     polling = false;
   }
-  const runBar = () => '<div id="runbar" class="notice" style="display:none"></div>';
+  const runBar = () => '<div id="runbar" class="notice" data-style="display:none"></div>';
   const when = v => v ? J.dateTime(v) : 'jamais';
   const jobLine = j => j ? `<span class="badge ${STATE[j.status][0]}">${STATE[j.status][1]}</span> ${J.dateTime(j.started_at)} · durée ${dur(j.duration_s)}${j.items_error ? ` · <span class="warn">${j.items_error} erreurs</span>` : ''}<div class="small muted">${J.esc(j.summary || '')} <a href="#" data-job="${j.id}">Détail</a></div>` : '<span class="muted">Jamais lancé</span>';
   const bindJobLinks = () => J.$$('a[data-job]').forEach(a => a.onclick = e => { e.preventDefault(); jobDialog(a.dataset.job); });
@@ -58,10 +58,10 @@
     const row = r => {
       const c = r.current; let ctl = '';
       if (r.id === 'types') ctl = ['equity', 'etf'].map(k => `<label class="row gap-s small"><input type="checkbox" data-rule="types" data-f="${k}" ${c[k] ? 'checked' : ''}> ${k === 'etf' ? 'ETF' : 'Actions'}</label>`).join(' ');
-      else if (r.key) ctl = `<span class="row gap-s"><input type="number" aria-label="${J.esc(r.label)}" data-rule="${r.id}" data-f="${r.key}" step="${r.step}" min="0" max="${r.max}" value="${c[r.key]}" style="width:130px"> <span class="small muted">${J.esc(r.unit)}</span></span>`;
-      return `<div class="frow"><label class="row gap-s" style="align-items:flex-start"><input type="checkbox" data-rule="${r.id}" data-f="enabled" ${c.enabled ? 'checked' : ''}><span><b>${J.esc(r.label)}</b>${r.is_default ? '' : ' <span class="badge warn">modifié</span>'}<span class="small muted" style="display:block">${J.esc(r.role)}</span></span></label>
-        ${ctl ? `<div style="margin:4px 0 0 26px">${ctl}</div>` : ''}${r.id === 'markets' ? placePicker(r, places) : r.id === 'categories' ? catPicker(r, categories) : ''}
-        <details style="margin-left:26px"><summary class="small muted pointer">Pourquoi ce filtre ?</summary><p class="small">${J.esc(r.help)}</p></details></div>`;
+      else if (r.key) ctl = `<span class="row gap-s"><input type="number" aria-label="${J.esc(r.label)}" data-rule="${r.id}" data-f="${r.key}" step="${r.step}" min="0" max="${r.max}" value="${c[r.key]}" data-style="width:130px"> <span class="small muted">${J.esc(r.unit)}</span></span>`;
+      return `<div class="frow"><label class="row gap-s" data-style="align-items:flex-start"><input type="checkbox" data-rule="${r.id}" data-f="enabled" ${c.enabled ? 'checked' : ''}><span><b>${J.esc(r.label)}</b>${r.is_default ? '' : ' <span class="badge warn">modifié</span>'}<span class="small muted" data-style="display:block">${J.esc(r.role)}</span></span></label>
+        ${ctl ? `<div data-style="margin:4px 0 0 26px">${ctl}</div>` : ''}${r.id === 'markets' ? placePicker(r, places) : r.id === 'categories' ? catPicker(r, categories) : ''}
+        <details data-style="margin-left:26px"><summary class="small muted pointer">Pourquoi ce filtre ?</summary><p class="small">${J.esc(r.help)}</p></details></div>`;
     };
     const groups = {}; lv.rules.forEach(r => (groups[r.group] = groups[r.group] || []).push(r));
     const names = { ...lv.groups, liquidity: 'Prix, ancienneté du cours et liquidité' };
@@ -69,15 +69,15 @@
   }
   function placePicker(r, places) {
     const sel = new Set(r.current.values);
-    return `<div style="margin:6px 0 0 26px"><div class="row gap-s" style="flex-wrap:wrap"><input id="pl-q" type="search" placeholder="Chercher une place (nom ou code)" style="width:240px"><span class="small muted" id="pl-n"></span>
+    return `<div data-style="margin:6px 0 0 26px"><div class="row gap-s" data-style="flex-wrap:wrap"><input id="pl-q" type="search" placeholder="Chercher une place (nom ou code)" data-style="width:240px"><span class="small muted" id="pl-n"></span>
       <button class="btn sm" type="button" id="pl-all">Cocher les places affichées</button><button class="btn sm" type="button" id="pl-none">Décocher les places affichées</button><button class="btn sm" type="button" id="pl-def">Places par défaut</button></div>
-      <div id="pl-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:2px 12px;max-height:240px;overflow:auto;margin-top:6px;border:1px solid var(--line,#ddd);border-radius:8px;padding:8px">
+      <div id="pl-list" data-style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:2px 12px;max-height:240px;overflow:auto;margin-top:6px;border:1px solid var(--line,#ddd);border-radius:8px;padding:8px">
       ${places.map(p => `<label class="small" data-search="${J.esc((p.mic + ' ' + p.name).toLowerCase())}"><input type="checkbox" data-mic="${J.esc(p.mic)}" data-def="${p.default ? 1 : 0}" ${sel.has(p.mic) ? 'checked' : ''}> <b>${J.esc(p.mic)}</b> ${J.esc(p.name)} <span class="muted">${nf(p.equity)} act. · ${nf(p.etf)} ETF${p.hours_known ? '' : ' · pas de barres 15 min'}</span></label>`).join('') || '<span class="muted small">Importez FinanceDatabase pour voir toutes les places disponibles.</span>'}</div>
       <p class="small muted mt-1">Toutes les places présentes dans FinanceDatabase sont proposées. Les places sans horaires connus n’ont que les clôtures quotidiennes.</p></div>`;
   }
   function catPicker(r, cats) {
     const sel = new Set(r.current.values);
-    return `<details style="margin:6px 0 0 26px"><summary class="small pointer">Choisir les catégories à exclure (${r.current.values.length} cochées)</summary><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:2px 12px;max-height:200px;overflow:auto;margin-top:6px">
+    return `<details data-style="margin:6px 0 0 26px"><summary class="small pointer">Choisir les catégories à exclure (${r.current.values.length} cochées)</summary><div data-style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:2px 12px;max-height:200px;overflow:auto;margin-top:6px">
       ${(cats || []).map(c => `<label class="small"><input type="checkbox" data-cat="${J.esc(c.category)}" ${sel.has(c.category) ? 'checked' : ''}> ${J.esc(c.category)} <span class="muted">${nf(c.n)}</span></label>`).join('') || '<span class="muted small">Aucune catégorie : importez FinanceDatabase.</span>'}</div></details>`;
   }
   function bindForm() {
@@ -110,7 +110,7 @@
     return `<div class="table-wrap"><table class="funnel">${J.table.head(['Étape', 'Règle et seuil', ['Avant', 'num'], ['Écartés', 'num'], ['Conservés', 'num'], { label: '', width: 130 }, ...(onItems ? [''] : [])])}<tbody>
       ${steps.map(s => `<tr><td><b>${J.esc(s.label)}</b>${s.info && s.info.by_kind && Object.keys(s.info.by_kind).length ? `<div class="small muted">${Object.entries(s.info.by_kind).map(([k, v]) => `${nf(v)} ${k === 'etf' ? 'ETF' : 'actions'}`).join(' · ')}</div>` : ''}${s.info && s.info.quality ? `<div class="small muted">${Object.entries(s.info.quality).map(([k, v]) => `${nf(v)} ${J.esc(k)}`).join(' · ')}</div>` : ''}</td>
         <td class="small">${J.esc(s.rule)}${s.info && s.info.enabled === false ? ' <span class="badge">désactivée</span>' : ''}</td><td class="num">${nf(s.before)}</td><td class="num ${s.removed ? 'warn' : ''}">${s.removed ? '− ' + nf(s.removed) : '0'}</td><td class="num"><b>${nf(s.kept)}</b></td>
-        <td><div style="height:8px;background:var(--line,#ddd);border-radius:4px;overflow:hidden"><div style="width:${100 * s.kept / max}%;height:100%;background:var(--accent,#2a6)"></div></div></td>
+        <td><div data-style="height:8px;background:var(--line,#ddd);border-radius:4px;overflow:hidden"><div data-style="width:${100 * s.kept / max}%;height:100%;background:var(--accent,#2a6)"></div></div></td>
         ${onItems ? `<td class="num"><button class="btn sm" data-step="${s.key}">Voir les titres</button></td>` : ''}</tr>`).join('')}</tbody></table></div>`;
   }
   async function itemsPanel(stage, step, label, host) {
@@ -119,12 +119,12 @@
     async function load() {
       const r = await J.api('admin/funnel/items', { params: { stage, step, ...Object.fromEntries(Object.entries(st).filter(([, v]) => v !== '')) } });
       const cat = stage === 'catalogue';
-      host.innerHTML = `<div class="card" style="margin-top:14px;padding:0"><div class="row between" style="padding:14px 18px"><h3 class="m-0">Titres · ${J.esc(label)}</h3><button class="btn sm" id="ip-close">Fermer</button></div>
-        <div class="row" style="padding:0 18px 12px;gap:10px"><input id="ip-q" type="search" placeholder="Nom, symbole ou ISIN" value="${J.esc(st.q)}" style="flex:1;min-width:160px"><select id="ip-k"><option value="">Actions et ETF</option><option value="equity" ${st.kind === 'equity' ? 'selected' : ''}>Actions</option><option value="etf" ${st.kind === 'etf' ? 'selected' : ''}>ETF</option></select><input id="ip-m" placeholder="Place (ex. XETR)" value="${J.esc(st.mic)}" style="width:130px"></div>
+      host.innerHTML = `<div class="card" data-style="margin-top:14px;padding:0"><div class="row between" data-style="padding:14px 18px"><h3 class="m-0">Titres · ${J.esc(label)}</h3><button class="btn sm" id="ip-close">Fermer</button></div>
+        <div class="row" data-style="padding:0 18px 12px;gap:10px"><input id="ip-q" type="search" placeholder="Nom, symbole ou ISIN" value="${J.esc(st.q)}" data-style="flex:1;min-width:160px"><select id="ip-k"><option value="">Actions et ETF</option><option value="equity" ${st.kind === 'equity' ? 'selected' : ''}>Actions</option><option value="etf" ${st.kind === 'etf' ? 'selected' : ''}>ETF</option></select><input id="ip-m" placeholder="Place (ex. XETR)" value="${J.esc(st.mic)}" data-style="width:130px"></div>
         <div class="table-wrap"><table>${J.table.head(['Titre', 'Place', 'Type', cat ? 'Motif' : 'Statut / motif', ...(cat ? [] : [['Cours (€)', 'num'], ['Liquidité (€/jour)', 'num']])])}<tbody>
         ${r.rows.map(x => `<tr ${x.id ? `data-id="${x.id}"` : ''} class="pointer"><td><b>${J.esc(x.name)}</b>${x.held ? ' <span class="badge accent">détenu</span>' : ''}<div class="small muted">${J.esc(x.symbol)} · ${J.esc(x.isin || '')} · ${J.esc(x.country || '')}</div></td><td>${J.esc(x.mic)}</td><td>${x.kind === 'etf' ? 'ETF' : 'Action'}</td>
           <td class="small">${J.esc(cat ? (x.removed_reason || 'conservée') : (x.excluded_reason || x.status + (x.is_primary ? ' · principale' : '')))}</td>${cat ? '' : `<td class="num">${x.price_eur != null ? J.num(x.price_eur, 2) : '–'}</td><td class="num">${x.liquidity_eur != null ? J.num(x.liquidity_eur, 0) : '–'}</td>`}</tr>`).join('') || `<tr><td colspan="6" class="empty">Aucun titre.</td></tr>`}</tbody></table></div>
-        <div class="row between" style="padding:12px 18px"><span class="muted small">${nf(r.total)} titres</span><span class="row gap-s"><button class="btn sm" id="ip-p" ${r.page <= 1 ? 'disabled' : ''}>←</button><span class="small">Page ${r.page} / ${r.pages}</span><button class="btn sm" id="ip-n" ${r.page >= r.pages ? 'disabled' : ''}>→</button></span></div></div>`;
+        <div class="row between" data-style="padding:12px 18px"><span class="muted small">${nf(r.total)} titres</span><span class="row gap-s"><button class="btn sm" id="ip-p" ${r.page <= 1 ? 'disabled' : ''}>←</button><span class="small">Page ${r.page} / ${r.pages}</span><button class="btn sm" id="ip-n" ${r.page >= r.pages ? 'disabled' : ''}>→</button></span></div></div>`;
       const go = () => { st.q = J.$('#ip-q').value.trim(); st.kind = J.$('#ip-k').value; st.mic = J.$('#ip-m').value.trim().toUpperCase(); st.page = 1; load(); };
       let t; J.$('#ip-q').oninput = () => { clearTimeout(t); t = setTimeout(go, 350); }; J.$('#ip-k').onchange = go; J.$('#ip-m').onchange = go;
       J.$('#ip-p').onclick = () => { st.page--; load(); }; J.$('#ip-n').onclick = () => { st.page++; load(); }; J.$('#ip-close').onclick = () => host.innerHTML = '';
@@ -134,7 +134,7 @@
     await load();
   }
   function explainBox(host) {
-    host.innerHTML = `<div class="card"><h2>Pourquoi ce titre a-t-il disparu ?</h2><div class="row" style="gap:10px"><input id="ex-q" placeholder="Nom, symbole ou ISIN (ex. DVDG.DE)" style="flex:1"><button class="btn primary" id="ex-go">Expliquer</button></div><div id="ex-out" class="mt-3"></div></div>`;
+    host.innerHTML = `<div class="card"><h2>Pourquoi ce titre a-t-il disparu ?</h2><div class="row" data-style="gap:10px"><input id="ex-q" placeholder="Nom, symbole ou ISIN (ex. DVDG.DE)" data-style="flex:1"><button class="btn primary" id="ex-go">Expliquer</button></div><div id="ex-out" class="mt-3"></div></div>`;
     const go = async () => {
       const out = J.$('#ex-out', host); out.innerHTML = '<span class="spinner"></span>';
       try {
@@ -196,13 +196,13 @@
         ${filterForm(lv)}<div class="row gap-s"><button class="btn primary" id="go-filter" ${info.quotes ? '' : 'disabled title="Importez d’abord les informations Yahoo"'}>Filtrer</button><button class="btn" id="go-reset" ${lv.is_default ? 'disabled' : ''}>Valeurs par défaut</button></div>
         <h3 class="mt-4 mb-2">Résultats du filtrage</h3>${funnelBlock(f.steps, 'yahoo', f.run)}</div>
       <div id="explain" class="mt-4"></div>
-      <div class="card" style="margin-top:16px;border:2px solid var(--accent,#2a6)"><h2>C · Mon catalogue final et ses historiques</h2>
+      <div class="card" data-style="margin-top:16px;border:2px solid var(--accent,#2a6)"><h2>C · Mon catalogue final et ses historiques</h2>
         <div class="grid cols-4"><div class="kpi"><span class="l">Titres du catalogue</span><span class="v">${nf(fin.total)}</span><span class="small muted">${nf(fin.equity)} actions · ${nf(fin.etf)} ETF</span></div>
           <div class="kpi"><span class="l">Historique complet</span><span class="v">${nf(cov.complete)}</span><span class="small muted">${fin.full} séances ou plus</span></div>
           <div class="kpi"><span class="l">Historique incomplet</span><span class="v ${cov.partial ? 'warn' : ''}">${nf(cov.partial)}</span><span class="small muted">moins de ${fin.full} séances</span></div>
           <div class="kpi"><span class="l">Sans historique</span><span class="v ${cov.absent ? 'warn' : ''}">${nf(cov.absent)}</span></div></div>
         <p class="small muted mt-2 mb-2">Cotations principales retenues : ${nf(fin.total)}${fin.held_extra ? ` · ${fin.held_extra} titre(s) détenu(s) hors catalogue, toujours valorisés` : ''}. Dernière séance en base : ${cov.last_day ? J.date(cov.last_day) : '–'}. Dernière mise à jour des historiques : <b>${hist ? J.dateTime(hist.finished_at || hist.started_at) : 'jamais'}</b>.</p>
-        <button class="btn primary" id="go-history" style="font-size:16px;padding:12px 20px" ${fin.total ? '' : 'disabled title="Le catalogue final est vide : filtrez d’abord Yahoo"'}>Importer / mettre à jour les historiques</button>
+        <button class="btn primary" id="go-history" data-style="font-size:16px;padding:12px 20px" ${fin.total ? '' : 'disabled title="Le catalogue final est vide : filtrez d’abord Yahoo"'}>Importer / mettre à jour les historiques</button>
         <button class="btn ml-2" id="go-gaps" ${fin.total ? '' : 'disabled'} title="Un appel Yahoo par titre dont l’année est incomplète">Combler les clôtures manquantes</button>
         <button class="btn ml-2" id="go-volumes" ${fin.total ? '' : 'disabled'} title="Un appel Yahoo par titre : un an de volumes quotidiens">Collecter les volumes quotidiens</button>
         <p class="small mt-2">Volumes quotidiens : <b>${nf(cov.volume_checked)}</b> titres traités sur <b>${nf(cov.volume_titles)}</b> · liquidité réelle pour <b>${nf(cov.volume_real_liquidity)}</b> titres · <span class="${cov.volume_errors ? 'warn' : ''}">${nf(cov.volume_errors)} en échec (repris automatiquement)</span> · dernière collecte : <b>${cov.volume_last ? J.dateTime(cov.volume_last) : 'jamais'}</b>. L’entretien automatique renouvelle les volumes à chaque nouvelle séance.</p>
@@ -230,14 +230,14 @@
     const B = { kept: ['ok', 'Conservé'], removed: ['danger', 'Écarté'], pending: ['warn', 'En attente'], secondary: ['', 'Secondaire'], na: ['', '–'], complete: ['ok', 'Complet'], partial: ['warn', 'Incomplet'], absent: ['danger', 'Absent'] };
     const badge = k => J.badge(B[k][1], B[k][0]);
     const cols = [{ label: 'Titre', sort: 'name' }, { label: 'Place · type', sort: 'mic' }, 'FinanceDatabase', 'Yahoo', 'Mon catalogue', 'Motif', { label: 'Dernier cours', sort: 'price_time' }, { label: 'Quotidien', sort: 'closes' }, '15 min', 'Mise à jour / problème'];
-    page.innerHTML = `${runBar()}<div class="card" style="padding:0"><div class="row" style="padding:14px 18px;gap:10px;flex-wrap:wrap"><input id="tq" type="search" placeholder="Nom, symbole ou ISIN" value="${J.esc(tf.q)}" style="flex:1;min-width:180px">
+    page.innerHTML = `${runBar()}<div class="card" data-style="padding:0"><div class="row" data-style="padding:14px 18px;gap:10px;flex-wrap:wrap"><input id="tq" type="search" placeholder="Nom, symbole ou ISIN" value="${J.esc(tf.q)}" data-style="flex:1;min-width:180px">
         <select id="tk">${opt(tf.kind, [['', 'Actions et ETF'], ['equity', 'Actions'], ['etf', 'ETF']])}</select>
         <select id="tm"><option value="">Toutes les places</option>${r.places.map(m => `<option ${tf.mic === m ? 'selected' : ''}>${J.esc(m)}</option>`).join('')}</select>
         <select id="tfdb">${opt(tf.fdb, [['', 'Filtre FinanceDatabase : tous'], ['kept', 'Conservés'], ['removed', 'Écartés']])}</select>
         <select id="ty">${opt(tf.yahoo, [['', 'Filtre Yahoo : tous'], ['kept', 'Retenus'], ['removed', 'Écartés'], ['pending', 'En attente'], ['secondary', 'Cotations secondaires']])}</select>
         <select id="tfin">${opt(tf.final, [['', 'Catalogue : tous'], ['1', 'Dans mon catalogue'], ['0', 'Hors catalogue']])}</select>
         <select id="td">${opt(tf.daily, [['', 'Historique quotidien : tous'], ['complete', 'Complet'], ['partial', 'Incomplet'], ['absent', 'Absent']])}</select></div>
-      ${r.raw_total ? '' : '<div class="notice" style="margin:0 18px 12px">Aucun titre connu : importez et filtrez FinanceDatabase (page FinanceDatabase).</div>'}
+      ${r.raw_total ? '' : '<div class="notice" data-style="margin:0 18px 12px">Aucun titre connu : importez et filtrez FinanceDatabase (page FinanceDatabase).</div>'}
       <div class="table-wrap"><table>${J.table.head(cols, { key: tf.sort, dir: tf.dir })}<tbody>
       ${r.rows.map(x => `<tr ${x.in_final && x.lid ? `data-id="${x.lid}"` : ''} class="pointer"><td><b>${J.esc(x.name)}</b><div class="small muted">${J.esc(x.symbol)} · ${J.esc(x.isin || '')} · ${J.esc(x.country || '')}${x.category ? ' · ' + J.esc(x.category) : ''}</div></td>
         <td>${J.esc(x.mic)}<div class="small muted">${x.kind === 'etf' ? 'ETF' : 'Action'}</div></td><td>${badge(x.fdb_state)}</td><td>${badge(x.y_state)}</td>
@@ -246,7 +246,7 @@
         <td class="num small">${x.price != null ? J.num(x.price, 2) + ' ' + J.esc(x.pcur || '') + `<div class="muted">${x.price_time ? J.dateTime(x.price_time) : ''}</div>` : '–'}</td>
         <td>${x.in_final ? badge(x.d_state) + `<div class="small muted">${x.closes_count != null ? x.closes_count + ' séances' : ''}</div>` : '–'}</td><td>${x.in_final ? (x.intraday_state === 'na' ? '<span class="small muted">non géré</span>' : badge(x.intraday_state)) : '–'}</td>
         <td class="small">${x.issue ? `<span class="warn">${J.esc(x.issue)}</span>` : (x.quote_at ? 'Infos Yahoo ' + J.ago(x.quote_at) : '–')}</td></tr>`).join('') || '<tr><td colspan="10" class="empty">Aucun titre.</td></tr>'}</tbody></table></div>
-      <div class="row between" style="padding:12px 18px"><span class="muted small">${nf(r.total)} titres sur ${nf(r.raw_total)} connus</span><span class="row gap-s"><button class="btn sm" id="tp" ${r.page <= 1 ? 'disabled' : ''}>←</button><span class="small">Page ${r.page} / ${r.pages}</span><button class="btn sm" id="tn" ${r.page >= r.pages ? 'disabled' : ''}>→</button></span></div></div>`;
+      <div class="row between" data-style="padding:12px 18px"><span class="muted small">${nf(r.total)} titres sur ${nf(r.raw_total)} connus</span><span class="row gap-s"><button class="btn sm" id="tp" ${r.page <= 1 ? 'disabled' : ''}>←</button><span class="small">Page ${r.page} / ${r.pages}</span><button class="btn sm" id="tn" ${r.page >= r.pages ? 'disabled' : ''}>→</button></span></div></div>`;
     const go = () => { tf.q = J.$('#tq').value.trim(); tf.kind = J.$('#tk').value; tf.mic = J.$('#tm').value; tf.fdb = J.$('#tfdb').value; tf.yahoo = J.$('#ty').value; tf.final = J.$('#tfin').value; tf.daily = J.$('#td').value; tf.page = 1; titres(); };
     let t; J.$('#tq').oninput = () => { clearTimeout(t); t = setTimeout(go, 400); }; ['tk', 'tm', 'tfdb', 'ty', 'tfin', 'td'].forEach(i => J.$('#' + i).onchange = go);
     J.$('#tp').onclick = () => { tf.page--; titres(); }; J.$('#tn').onclick = () => { tf.page++; titres(); };
@@ -277,17 +277,17 @@
     page.innerHTML = `${runBar()}
       <div class="card"><h2>Le cron fonctionne-t-il ?</h2>
         <div class="grid cols-4"><div class="kpi"><span class="l">Cron installé et observé</span><span class="v"><span class="badge ${yes ? 'ok' : 'danger'}">${yes ? 'Oui' : 'Non'}</span></span><span class="small muted">${J.esc(c.label)}</span></div>
-          <div class="kpi"><span class="l">Dernier passage réel</span><span class="v" style="font-size:18px">${c.last_at ? J.dateTime(c.last_at) : 'jamais'}</span><span class="small muted">${c.last_at ? J.esc(c.last_done || 'rien à faire') + ' · durée ' + dur(c.last_duration_s) : ''}</span></div>
-          <div class="kpi"><span class="l">Prochain passage attendu</span><span class="v" style="font-size:18px">${c.next_at ? J.dateTime(c.next_at) : '–'}</span><span class="small muted">réglé : toutes les <input id="cr-int" type="number" min="1" max="60" value="${c.expected_minutes}" style="width:56px"> min<br>${c.measured_minutes ? 'observé : toutes les ' + c.measured_minutes + ' min (médiane des ' + c.passes_seen + ' derniers passages)' : 'fréquence réelle : mesure en cours (' + c.passes_seen + ' passage' + (c.passes_seen > 1 ? 's' : '') + ' vu' + (c.passes_seen > 1 ? 's' : '') + ')'}</span></div>
-          <div class="kpi"><span class="l">Clé cron sur le site</span><span class="v" style="font-size:18px">${site.cron_key_present ? 'Présente' : 'Absente'}</span><span class="small muted">adresse : ${J.esc(site.cron_path)}</span></div></div>
-        ${s.diagnosis.length ? `<div class="notice mt-3"><b>Diagnostic</b><ul style="margin:6px 0 0 18px">${s.diagnosis.map(d => `<li class="small">${J.esc(d)}</li>`).join('')}</ul></div>` : '<p class="small muted mt-3">Aucun problème détectable.</p>'}
+          <div class="kpi"><span class="l">Dernier passage réel</span><span class="v" data-style="font-size:18px">${c.last_at ? J.dateTime(c.last_at) : 'jamais'}</span><span class="small muted">${c.last_at ? J.esc(c.last_done || 'rien à faire') + ' · durée ' + dur(c.last_duration_s) : ''}</span></div>
+          <div class="kpi"><span class="l">Prochain passage attendu</span><span class="v" data-style="font-size:18px">${c.next_at ? J.dateTime(c.next_at) : '–'}</span><span class="small muted">réglé : toutes les <input id="cr-int" type="number" min="1" max="60" value="${c.expected_minutes}" data-style="width:56px"> min<br>${c.measured_minutes ? 'observé : toutes les ' + c.measured_minutes + ' min (médiane des ' + c.passes_seen + ' derniers passages)' : 'fréquence réelle : mesure en cours (' + c.passes_seen + ' passage' + (c.passes_seen > 1 ? 's' : '') + ' vu' + (c.passes_seen > 1 ? 's' : '') + ')'}</span></div>
+          <div class="kpi"><span class="l">Clé cron sur le site</span><span class="v" data-style="font-size:18px">${site.cron_key_present ? 'Présente' : 'Absente'}</span><span class="small muted">adresse : ${J.esc(site.cron_path)}</span></div></div>
+        ${s.diagnosis.length ? `<div class="notice mt-3"><b>Diagnostic</b><ul data-style="margin:6px 0 0 18px">${s.diagnosis.map(d => `<li class="small">${J.esc(d)}</li>`).join('')}</ul></div>` : '<p class="small muted mt-3">Aucun problème détectable.</p>'}
         ${!site.cron_key_present ? '<div class="notice err mt-3">Le site n’a pas de clé cron : l’adresse du cron répondra « clé absente ».</div>' : ''}
-        <div class="row gap-s" style="margin-top:12px;flex-wrap:wrap"><button class="btn" id="cr-test">Tester le déclenchement</button><button class="btn" id="cr-run">Lancer une collecte maintenant</button><button class="btn" id="cr-maint">Lancer l’entretien maintenant</button><button class="btn" id="cr-etf">Relancer les ETF seuls</button><span class="small muted">Le test lance un passage comme le ferait le cron, sans le compter comme passage du cron. La collecte lance « Importer / mettre à jour les historiques ».</span></div>
+        <div class="row gap-s" data-style="margin-top:12px;flex-wrap:wrap"><button class="btn" id="cr-test">Tester le déclenchement</button><button class="btn" id="cr-run">Lancer une collecte maintenant</button><button class="btn" id="cr-maint">Lancer l’entretien maintenant</button><button class="btn" id="cr-etf">Relancer les ETF seuls</button><span class="small muted">Le test lance un passage comme le ferait le cron, sans le compter comme passage du cron. La collecte lance « Importer / mettre à jour les historiques ».</span></div>
         ${c.last_test ? `<p class="small muted mt-2">Dernier test manuel : ${J.dateTime(c.last_test.at)} · ${J.esc(c.last_test.done || '')}</p>` : ''}</div>
       <div class="card mt-4"><div class="row between"><h2 class="m-0">Ce que fait le cron</h2><button class="btn primary" id="cr-save">Enregistrer</button></div>
         <p class="small muted">Uniquement l’entretien des historiques et cotations du catalogue final (et des titres détenus). Il n’importe jamais FinanceDatabase, ne filtre jamais, ne change jamais le catalogue. Après la collecte quotidienne, les indicateurs de l’Explorer sont recalculés sans nouvelle sélection.</p>
         <div class="grid cols-2">${s.tasks.map(t => { const k = st(t); return `<div class="card m-0"><div class="row between"><b>${J.esc(t.label)}</b><label class="small row gap-s"><input type="checkbox" data-t="${t.id}" data-f="enabled" ${t.enabled ? 'checked' : ''}> active</label></div>
-          <p class="small muted mt-1 mb-1">${J.esc(t.help)}</p>${Object.entries(t.params).map(([key, p]) => `<div class="small">${J.esc(p.label)} <input type="number" aria-label="${J.esc(p.label)}" data-t="${t.id}" data-f="${key}" min="${p.min}" max="${p.max}" value="${p.value}" style="width:64px"></div>`).join('')}
+          <p class="small muted mt-1 mb-1">${J.esc(t.help)}</p>${Object.entries(t.params).map(([key, p]) => `<div class="small">${J.esc(p.label)} <input type="number" aria-label="${J.esc(p.label)}" data-t="${t.id}" data-f="${key}" min="${p.min}" max="${p.max}" value="${p.value}" data-style="width:64px"></div>`).join('')}
           <p class="mt-2 mb-1"><span class="badge ${TSTATE[t.state][0]}">${TSTATE[t.state][1]}</span> <span class="small muted">${J.esc(t.state_detail)}</span></p>
           <div class="small">Dernière collecte : ${t.last ? J.dateTime(t.last.started_at) + ' · ' + dur(t.last.duration_s) + ' (moyenne ' + dur(t.avg_duration_s) + ')' : 'jamais'}<br>Prochaine : ${t.next ? J.dateTime(t.next) + ' UTC' : '–'}</div>
           ${k ? `<div class="table-wrap"><table><tbody><tr><td>Titres traités</td><td class="num">${nf(k.titles)}</td></tr><tr><td>Déjà à jour / complets</td><td class="num">${nf(k.up_to_date)}</td></tr><tr><td>Données ajoutées</td><td class="num">${nf(k.added)}</td></tr><tr><td>Déjà présentes</td><td class="num">${nf(k.present)}</td></tr><tr><td>Sans réponse ou en erreur</td><td class="num ${k.errors ? 'warn' : ''}">${nf(k.errors)}</td></tr></tbody></table></div><div class="small muted">Dernier passage : ${J.dateTime(k.at)}</div>` : '<p class="small muted">Aucun chiffre : pas encore de collecte.</p>'}
@@ -296,8 +296,8 @@
       ${catchupCard(s.catchup, c)}
       <div class="card mt-4"><h2>Erreurs du cron <span class="small muted">· 7 derniers jours</span></h2>
         ${s.errors.length ? s.errors.map(l => `<div class="reason ${l.level === 'error' ? 'fail' : 'missing'} mb-2"><span class="mark">${l.level === 'error' ? '✗' : '!'}</span><span class="small"><b>${J.esc(l.source === 'passage du cron' ? 'Passage du cron · ' + l.job_type : jobName(l.job_type))}</b> · ${J.dateTime(l.at)}<br>${J.esc(l.message)} ${l.job_id ? `<a href="#" data-job="${l.job_id}">Détail</a>` : ''}</span></div>`).join('') : '<span class="muted">Aucune erreur enregistrée sur 7 jours (traitements, passages, appels).</span>'}
-        ${site.log_errors && site.log_errors.length ? `<h3 class="mt-4 mb-2">Journal brut du cron (logs/cron.log) — lignes d’erreur</h3><pre class="small" style="white-space:pre-wrap;margin:0;max-height:200px;overflow:auto">${J.esc(site.log_errors.join('\n'))}</pre>` : '<p class="small muted mt-3">Journal brut du cron : aucune ligne d’erreur.</p>'}
-        ${site.rejected && site.rejected.length ? `<h3 class="mt-4 mb-2">Appels du cron refusés (mauvaise clé, clé absente…)</h3><pre class="small" style="white-space:pre-wrap;margin:0;max-height:160px;overflow:auto">${J.esc(site.rejected.join('\n'))}</pre>` : '<p class="small muted mt-2">Aucun appel refusé.</p>'}</div>`;
+        ${site.log_errors && site.log_errors.length ? `<h3 class="mt-4 mb-2">Journal brut du cron (logs/cron.log) — lignes d’erreur</h3><pre class="small" data-style="white-space:pre-wrap;margin:0;max-height:200px;overflow:auto">${J.esc(site.log_errors.join('\n'))}</pre>` : '<p class="small muted mt-3">Journal brut du cron : aucune ligne d’erreur.</p>'}
+        ${site.rejected && site.rejected.length ? `<h3 class="mt-4 mb-2">Appels du cron refusés (mauvaise clé, clé absente…)</h3><pre class="small" data-style="white-space:pre-wrap;margin:0;max-height:160px;overflow:auto">${J.esc(site.rejected.join('\n'))}</pre>` : '<p class="small muted mt-2">Aucun appel refusé.</p>'}</div>`;
     bindJobLinks(); poll();
     J.$('#cr-save').onclick = async () => {
       const cfg = { cron_interval_minutes: +J.$('#cr-int').value };
@@ -315,11 +315,11 @@
   async function logs() {
     const r = await J.api('admin/jobs', { params: Object.fromEntries(Object.entries(lf).filter(([, v]) => v !== '')) });
     const opt = (cur, list) => list.map(([v, l]) => `<option value="${v}" ${cur === v ? 'selected' : ''}>${l}</option>`).join('');
-    page.innerHTML = `<div class="card" style="padding:0"><div class="row" style="padding:14px 18px;gap:10px;flex-wrap:wrap"><select id="lf-t"><option value="">Tous les types</option>${opt(lf.type, [['fdb_import', 'Import FinanceDatabase'], ['fdb_filter', 'Filtrage FinanceDatabase'], ['yahoo_info', 'Import des informations Yahoo'], ['yahoo_filter', 'Filtrage Yahoo'], ['history', 'Mise à jour des historiques'], ['maintenance', 'Entretien après collecte'], ['intraday', 'Barres 15 min'], ['daily', 'Clôtures quotidiennes']])}</select>
+    page.innerHTML = `<div class="card" data-style="padding:0"><div class="row" data-style="padding:14px 18px;gap:10px;flex-wrap:wrap"><select id="lf-t"><option value="">Tous les types</option>${opt(lf.type, [['fdb_import', 'Import FinanceDatabase'], ['fdb_filter', 'Filtrage FinanceDatabase'], ['yahoo_info', 'Import des informations Yahoo'], ['yahoo_filter', 'Filtrage Yahoo'], ['history', 'Mise à jour des historiques'], ['maintenance', 'Entretien après collecte'], ['intraday', 'Barres 15 min'], ['daily', 'Clôtures quotidiennes']])}</select>
       <select id="lf-s"><option value="">Tous statuts</option>${opt(lf.status, Object.entries(STATE).map(([k, v]) => [k, v[1]]))}</select><select id="lf-g"><option value="">Manuel et auto</option>${opt(lf.trigger, [['admin', 'Manuel'], ['cron', 'Automatique']])}</select><input id="lf-d" type="date" value="${J.esc(lf.since)}"></div>
       <div class="table-wrap"><table>${J.table.head(["#", "Traitement", "Départ", "Durée", "Origine", "Statut", ["OK", 'num'], ["Erreurs", 'num'], "Résumé"])}<tbody>
       ${r.jobs.map(j => `<tr data-job="${j.id}" class="pointer"><td>${j.id}</td><td>${J.esc(jobName(j.job_type))}</td><td>${J.dateTime(j.started_at)}</td><td>${dur(j.duration_s)}</td><td>${j.trigger_by === 'admin' ? 'Manuel' : 'Auto'}</td><td><span class="badge ${STATE[j.status][0]}">${STATE[j.status][1]}</span></td><td class="num">${j.items_ok ?? '–'}</td><td class="num">${j.items_error}</td><td class="small muted">${J.esc(j.summary || '')}</td></tr>`).join('') || '<tr><td colspan="9" class="empty">Aucun traitement.</td></tr>'}</tbody></table></div>
-      <div class="row between" style="padding:12px 18px"><span class="muted small">${nf(r.total)} traitements</span><span class="row gap-s"><button class="btn sm" id="lp" ${r.page <= 1 ? 'disabled' : ''}>←</button><span class="small">Page ${r.page} / ${r.pages}</span><button class="btn sm" id="ln" ${r.page >= r.pages ? 'disabled' : ''}>→</button></span></div></div>`;
+      <div class="row between" data-style="padding:12px 18px"><span class="muted small">${nf(r.total)} traitements</span><span class="row gap-s"><button class="btn sm" id="lp" ${r.page <= 1 ? 'disabled' : ''}>←</button><span class="small">Page ${r.page} / ${r.pages}</span><button class="btn sm" id="ln" ${r.page >= r.pages ? 'disabled' : ''}>→</button></span></div></div>`;
     const go = () => { lf.type = J.$('#lf-t').value; lf.status = J.$('#lf-s').value; lf.trigger = J.$('#lf-g').value; lf.since = J.$('#lf-d').value; lf.page = 1; logs(); };
     ['lf-t', 'lf-s', 'lf-g', 'lf-d'].forEach(i => J.$('#' + i).onchange = go);
     J.$('#lp').onclick = () => { lf.page--; logs(); }; J.$('#ln').onclick = () => { lf.page++; logs(); };
@@ -349,13 +349,13 @@
     const s = (await J.api('admin/system')).settings;
     page.innerHTML = `<div class="notice">Les seuils du catalogue et du préfiltre Yahoo se règlent désormais dans <a href="#fdb">FinanceDatabase</a> et <a href="#yahoo">Yahoo Finance</a>.</div>
       <div class="grid cols-2 mt-4"><div class="card"><h2>Historique 15 minutes</h2>${J.field('Séances conservées (5 à 60)', `<input id="ret" type="number" min="5" max="60" value="${s.intraday_retention_sessions ?? 20}">`)}<button class="btn primary mt-3" id="sv-ret">Enregistrer</button></div>
-      <div class="card"><h2>Inscriptions</h2><p class="muted small">Un mot d’invitation permet aux personnes qui le connaissent de créer un compte. Vide = inscriptions fermées. ${s.invite_code ? `Mot actuel (masqué) : <b class="mono" id="inv-now" style="user-select:all">${J.esc(s.invite_code)}</b>` : 'Aucun mot défini : les inscriptions sont fermées.'}</p>${J.field('Nouveau mot d’invitation', '<input id="inv" autocomplete="off">')}<button class="btn primary mt-3" id="sv-inv">Enregistrer</button></div></div>
+      <div class="card"><h2>Inscriptions</h2><p class="muted small">Un mot d’invitation permet aux personnes qui le connaissent de créer un compte. Vide = inscriptions fermées. ${s.invite_code ? `Mot actuel (masqué) : <b class="mono" id="inv-now" data-style="user-select:all">${J.esc(s.invite_code)}</b>` : 'Aucun mot défini : les inscriptions sont fermées.'}</p>${J.field('Nouveau mot d’invitation', '<input id="inv" autocomplete="off">')}<button class="btn primary mt-3" id="sv-inv">Enregistrer</button></div></div>
       <div class="card mt-4"><h2>Base de données</h2><div id="tb"><span class="spinner"></span></div></div>`;
     const save = async (name, value) => { await J.post('admin/settings', { name, value }); J.toast('Réglage enregistré'); };
     J.$('#sv-ret').onclick = () => save('intraday_retention_sessions', J.$('#ret').value).catch(e => J.toast(e.message));
     J.$('#sv-inv').onclick = () => save('invite_code', J.$('#inv').value).then(render).catch(e => J.toast(e.message));
     const sys = await J.api('admin/system');
-    J.$('#tb').innerHTML = `<p class="small muted">${J.num(sys.total_mb, 0)} Mo utilisés (plafond hébergeur : 3 072 Mo)</p><div class="table-wrap" style="max-height:260px;overflow:auto"><table><tbody>${sys.tables.map(t => `<tr><td>${J.esc(t.name)}</td><td class="num">${J.num(+t.rows, 0)} lignes</td><td class="num">${J.num(+t.mb, 1)} Mo</td></tr>`).join('')}</tbody></table></div>`;
+    J.$('#tb').innerHTML = `<p class="small muted">${J.num(sys.total_mb, 0)} Mo utilisés (plafond hébergeur : 3 072 Mo)</p><div class="table-wrap" data-style="max-height:260px;overflow:auto"><table><tbody>${sys.tables.map(t => `<tr><td>${J.esc(t.name)}</td><td class="num">${J.num(+t.rows, 0)} lignes</td><td class="num">${J.num(+t.mb, 1)} Mo</td></tr>`).join('')}</tbody></table></div>`;
   }
   render();
 })();

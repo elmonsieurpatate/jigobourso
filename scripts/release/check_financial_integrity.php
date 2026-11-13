@@ -1,7 +1,7 @@
 <?php
 // CLI only, SELECT only. Reports issues without changing or disclosing transaction amounts.
 if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }
-require __DIR__ . '/../app/lib/db.php';
+require __DIR__ . '/../../app/lib/db.php';
 $db = db();
 $db->exec('SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ');
 $db->exec('START TRANSACTION READ ONLY');

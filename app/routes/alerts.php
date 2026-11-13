@@ -102,7 +102,8 @@ return [
         $sum = ($prev && $prev['strategy_key'] !== $key ? 'Changement vers « ' . $r['strategy_label'] . ' »' : ($prev ? 'Mise à jour de « ' . $r['strategy_label'] . ' »' : 'Surveillance « ' . $r['strategy_label'] .
             ' » activée')) . ' : ' . $r['added'] . ' ajoutée(s), ' . $r['updated'] . ' mise(s) à jour, ' . $r['kept'] . ' conservée(s), ' . $r['personal_kept'] . ' règle(s) personnelle(s) intacte(s).';
         q('INSERT INTO position_watch_log(portfolio_id, listing_id, from_key, to_key, summary, at) VALUES (?,?,?,?,?,?)', [$p['id'], $lid, $prev['strategy_key'] ?? null, $key, $sum, now_utc()]);
-        q('INSERT INTO position_watch(portfolio_id, listing_id, strategy_key, model_version, updated_at) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE strategy_key = VALUES(strategy_key), model_version = VALUES(model_version), updated_at = VALUES(updated_at)',
+        q('INSERT INTO position_watch(portfolio_id, listing_id, strategy_key, model_version, updated_at) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE strategy_key ' .
+            '= VALUES(strategy_key), model_version = VALUES(model_version), updated_at = VALUES(updated_at)',
             [$p['id'], $lid, $key, $r['model_version'] ?? null, now_utc()]);
         return $r;
     },

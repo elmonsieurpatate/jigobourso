@@ -155,7 +155,7 @@
     const perso = st.mode === 'perso', pct = st.unit === 'pct', vis = out.series.filter(s => !st.hidden.has(s.id));
     const msg = out.empty || (!out.series.length ? (perso ? 'Aucune position détenue sur cette période : votre historique personnel commence à votre première opération.' : 'Aucun cours disponible pour ces titres sur cette période.') : (!vis.length ? 'Toutes les courbes sont masquées : cliquez sur une pastille pour en réafficher.' : (!vis.some(s => s.values.some(isNum)) ? 'Aucune valeur disponible sur cette période pour les courbes affichées.' : '')));
     J.$('#' + st.id + '-cur').innerHTML = `<b>${perName(st.per)}</b> · ${pct ? '%' : '€'} · ${perso ? 'Mon investissement' : 'Historique des cours'}`;
-    if (msg && !vis.some(s => s.values.some(isNum))) { plot._financial && plot._financial.destroy(); plot.innerHTML = `<div class="px-empty" style="min-height:${h}px">${esc(msg)}</div>`; }
+    if (msg && !vis.some(s => s.values.some(isNum))) { plot._financial && plot._financial.destroy(); plot.innerHTML = `<div class="px-empty" data-style="min-height:${h}px">${esc(msg)}</div>`; }
     else {
       if (!plot._financial) plot.innerHTML = '';
       const fmt = pct ? (v => pc(v, 2)) : (perso ? (v => sg(v)) : (v => eur(v, 2)));
@@ -163,7 +163,7 @@
         onRange: r => { st.view = r; }, onReset: () => { st.view = null; }, onSelect: id => { st.focus = id && id !== st.focus ? id : null; drawBox(st, o); }, onTransaction: id => C.helpers.history(id) });
     }
     const last = s => { for (let i = s.values.length - 1; i >= 0; i--) if (isNum(s.values[i])) return s.values[i]; return null; };
-    J.$('#' + st.id + '-leg').innerHTML = out.series.map(s => `<button type="button" class="badge outline px-chip ${st.hidden.has(s.id) ? 'off' : ''}" data-sid="${esc(s.id)}" aria-pressed="${!st.hidden.has(s.id)}"><i style="background:${s.color}"></i>${esc(s.label)} <b class="${cl(last(s))}">${isNum(last(s)) ? (pct ? pc(last(s)) : (perso ? sg(last(s)) : eur(last(s)))) : 'n/d'}</b></button>`).join('');
+    J.$('#' + st.id + '-leg').innerHTML = out.series.map(s => `<button type="button" class="badge outline px-chip ${st.hidden.has(s.id) ? 'off' : ''}" data-sid="${esc(s.id)}" aria-pressed="${!st.hidden.has(s.id)}"><i data-style="background:${s.color}"></i>${esc(s.label)} <b class="${cl(last(s))}">${isNum(last(s)) ? (pct ? pc(last(s)) : (perso ? sg(last(s)) : eur(last(s)))) : 'n/d'}</b></button>`).join('');
     J.$$('#' + st.id + '-leg [data-sid]').forEach(b => b.onclick = () => { st.hidden.has(b.dataset.sid) ? st.hidden.delete(b.dataset.sid) : st.hidden.add(b.dataset.sid); drawBox(st, o); });
     const real = out.times.length ? [out.times[0], out.times[out.times.length - 1]] : null, fd = x => out.intraday ? J.dateTime(String(x).replace(' ', 'T')) : J.date(String(x).slice(0, 10)), pts = Math.max(0, ...out.series.map(s => s.values.filter(isNum).length));
     const full = out.series.length && out.series.every(s => s.values.filter(isNum).length >= out.times.length * 0.98) && !out.meta.notes.length;

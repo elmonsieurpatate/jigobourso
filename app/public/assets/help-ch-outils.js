@@ -31,7 +31,7 @@
   L.push({
     id: 'glossaire', group: 'outils', title: 'Glossaire', icon: I('book-open'), color: '#64748b', keywords: 'glossaire définition mot lexique vocabulaire',
     lead: 'Tous les mots, en une phrase.',
-    beginner: () => `<dl class="help-dl" style="display:grid;grid-template-columns:minmax(0,210px) minmax(0,1fr);gap:8px 16px">${G.map(([t, d]) => `<dt style="font-weight:700">${t}</dt><dd class="m-0">${d}</dd>`).join('')}</dl>`, expert: null
+    beginner: () => `<dl class="help-dl" data-style="display:grid;grid-template-columns:minmax(0,210px) minmax(0,1fr);gap:8px 16px">${G.map(([t, d]) => `<dt data-style="font-weight:700">${t}</dt><dd class="m-0">${d}</dd>`).join('')}</dl>`, expert: null
   });
 
   L.push({

@@ -1,6 +1,7 @@
 // Parcours de bout en bout dans un vrai navigateur : connexion, Explorer, fiche, portefeuilles, bilan, administration.
-// Usage : BASE=http://127.0.0.1:8090 USER=… PASS=… SHOTS=dossier node tests/e2e/smoke.mjs
-import { chromium } from '/home/jigo/test-chartmill/node_modules/playwright-core/index.mjs';
+// Usage : BASE=http://127.0.0.1:8090 USER=… PASS=… SHOTS=dossier node tests/e2e/smoke.cjs
+const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright-core');
+(async () => {
 const BASE = process.env.BASE || 'http://127.0.0.1:8090', SHOTS = process.env.SHOTS || '/tmp';
 const results = []; const check = (name, ok, info = '') => { results.push([name, ok, info]); console.log((ok ? 'OK   ' : 'ÉCHEC'), name, info); };
 const browser = await chromium.launch(); const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } }); const page = await ctx.newPage();
@@ -43,3 +44,4 @@ try {
 } catch (e) { check('parcours', false, String(e.stack).split('\n').slice(0, 4).join(' | ')); await shot('erreur'); }
 const bad = errors.filter(e => !/favicon/.test(e)); check('aucune erreur console', bad.length === 0, bad.slice(0, 3).join(' / '));
 await browser.close(); process.exit(results.every(r => r[1]) ? 0 : 1);
+})().catch(e => { console.error(e); process.exit(1); });

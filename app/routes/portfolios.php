@@ -101,7 +101,8 @@ return [
             $v[$k] = round((float)$x, 2);
         }
         if (abs(array_sum($v) - 100) > 0.01) throw new ApiError('Les trois parts doivent faire 100 %', 422);
-        q('INSERT INTO portfolio_targets(portfolio_id, us_pct, eu_pct, emerging_pct, updated_at) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE us_pct = VALUES(us_pct), eu_pct = VALUES(eu_pct), emerging_pct = VALUES(emerging_pct), updated_at = VALUES(updated_at)',
+        q('INSERT INTO portfolio_targets(portfolio_id, us_pct, eu_pct, emerging_pct, updated_at) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE us_pct = ' .
+            'VALUES(us_pct), eu_pct = VALUES(eu_pct), emerging_pct = VALUES(emerging_pct), updated_at = VALUES(updated_at)',
           [$p['id'], $v['us'], $v['eu'], $v['emerging'], now_utc()]);
         return ['target' => $v];
     },
@@ -120,7 +121,9 @@ return [
         $off = array_key_exists('alerts_off', $b) ? (!empty($b['alerts_off']) ? 1 : 0) : (int)(q('SELECT alerts_off FROM lot_settings WHERE transaction_id = ?', [$t['id']])->fetch()['alerts_off'] ?? 0);
         $reset = !array_key_exists('alerts_off', $b) || !$off;   // champ absent et tous les réglages vides = retour aux réglages par défaut (chemin de retour pour une ancienne case cochée)
         if ($strategy === null && $days === null && $drop === null && $reset) q('DELETE FROM lot_settings WHERE transaction_id = ?', [$t['id']]);
-        else q('INSERT INTO lot_settings(transaction_id, strategy, alert_days, alert_drop_pct, alerts_off, updated_at) VALUES (?,?,?,?,?,?) ON DUPLICATE KEY UPDATE strategy = VALUES(strategy), alert_days = VALUES(alert_days), alert_drop_pct = VALUES(alert_drop_pct), alerts_off = VALUES(alerts_off), updated_at = VALUES(updated_at)',
+        else q('INSERT INTO lot_settings(transaction_id, strategy, alert_days, alert_drop_pct, alerts_off, updated_at) VALUES (?,?,?,?,?,?) ON DUPLICATE KEY UPDATE ' .
+            'strategy = VALUES(strategy), alert_days = VALUES(alert_days), alert_drop_pct = VALUES(alert_drop_pct), alerts_off = VALUES(alerts_off), updated_at = ' .
+            'VALUES(updated_at)',
                [$t['id'], $strategy, $days === null ? null : (int)$days, $drop === null ? null : round((float)$drop, 2), $off, now_utc()]);
         return ['ok' => true];
     },

@@ -1,5 +1,5 @@
 /* Suivi des positions (spécification exécutable) : section repliable sous le tableau, une ligne par position, jauge, états, configuration par règle,
-   cohérence ligne/détail, sections repliables, thèmes, mobile 320→1440 sans débord. Base : tests/e2e/plan_suivi_seed.py. Serveur : php8.3 -S 127.0.0.1:18096 -t app/public. */
+   cohérence ligne/détail, sections repliables, thèmes, mobile 320→1440 sans débord. Base : tests/seeds/plan_suivi_seed.py. Serveur : php8.3 -S 127.0.0.1:18096 -t app/public. */
 const assert = require('node:assert/strict'); const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const BASE = process.env.BASE || 'http://127.0.0.1:18096', SHOTS = process.env.SHOTS || '';
 const text = s => s.replace(/\s+/g, ' ').trim();

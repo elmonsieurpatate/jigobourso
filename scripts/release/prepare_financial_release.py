@@ -2,7 +2,7 @@
 import time
 from engine.shared.db import connect
 from engine.jobs import tasks
-from scripts.verify_financial_release import run as verify
+from scripts.release.verify_financial_release import run as verify
 
 
 def refresh_metrics():

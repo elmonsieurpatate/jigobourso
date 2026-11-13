@@ -113,7 +113,10 @@ function secondary_read(): array {
     $definitions=secondary_decode($values[SECONDARY_DEFINITIONS]);$defaults=secondary_decode($values[SECONDARY_DEFAULTS]);
     $report=secondary_catalogue_report();$catalogue=$report['values'];
     foreach($definitions['filters'] as &$f) if(!$f['editable'])$f['values']=$catalogue[$f['id']]??[];unset($f);
-    return ['schema'=>2,'source'=>'settings','source_label'=>'Réglages persistants de l’administration','definitions'=>$definitions,'defaults'=>$defaults,'proposed'=>secondary_proposed(),'metadata_mapping'=>secondary_metadata_config(),'catalogue_mapping'=>$report['assignments'],'migration_notices'=>$defaults['metadata_migration']['notices']??[],'catalogue_scope'=>'Groupes fixes ; affectations et effectifs issus du catalogue stocké. Aucun calcul de classement.','filtering_connected'=>false];
+    return ['schema'=>2,'source'=>'settings','source_label'=>'Réglages persistants de l’administration',
+        'definitions'=>$definitions,'defaults'=>$defaults,'proposed'=>secondary_proposed(),'metadata_mapping'=>
+        secondary_metadata_config(),'catalogue_mapping'=>$report['assignments'],'migration_notices'=>
+        $defaults['metadata_migration']['notices']??[],'catalogue_scope'=>'Groupes fixes ; affectations et effectifs issus du catalogue stocké. Aucun calcul de classement.','filtering_connected'=>false];
 }
 function secondary_bound($v): bool { return $v===null || ((is_int($v)||is_float($v))&&is_finite((float)$v)); }
 function secondary_validate_measure(array $m,array $categories): void {
@@ -128,11 +131,14 @@ function secondary_validate_measure(array $m,array $categories): void {
         if(!is_string($c['description']??null)||mb_strlen($c['description'])>180||!preg_match('/^#[a-f0-9]{6}$/i',$c['color']??''))throw new ApiError('Description ou couleur invalide.',422);
         foreach(['active','unknown','minIncluded','maxIncluded'] as $key)if(!is_bool($c[$key]??null))throw new ApiError('États de catégorie booléens attendus.',422);
         if(!array_key_exists('min',$c)||!array_key_exists('max',$c)||!secondary_bound($c['min'])||!secondary_bound($c['max'])||!is_array($c['values']??null)||!array_is_list($c['values']))throw new ApiError('Bornes numériques invalides.',422);
-        if($c['unknown']){if(++$unknown>1||!$m['supportsUnknown']||$c['min']!==null||$c['max']!==null||$c['values']!==[]||$c['minIncluded']||$c['maxIncluded'])throw new ApiError('Une seule inconnue, sans borne ni valeur, est autorisée.',422);continue;}
+        if($c['unknown']){if(++$unknown>1||!$m['supportsUnknown']||$c['min']!==null||$c['max']!==null||
+            $c['values']!==[]||$c['minIncluded']||$c['maxIncluded'])throw new ApiError('Une seule inconnue, sans borne ni valeur, est autorisée.',422);continue;}
         if($m['kind']==='enum'){
-            $allowed=array_column($m['domain'],'value');if(!$c['values']||count(array_filter($c['values'],'is_string'))!==count($c['values'])||count(array_unique($c['values']))!==count($c['values'])||array_diff($c['values'],$allowed)||$c['min']!==null||$c['max']!==null)throw new ApiError('Valeurs d’état invalides.',422);
+            $allowed=array_column($m['domain'],'value');if(!$c['values']||count(array_filter($c['values'],
+                'is_string'))!==count($c['values'])||count(array_unique($c['values']))!==count($c['values'])||array_diff($c['values'],$allowed)||$c['min']!==null||$c['max']!==null)throw new ApiError('Valeurs d’état invalides.',422);
         }else{
-            if($c['values']!==[]||($c['min']===null&&$c['minIncluded'])||($c['max']===null&&$c['maxIncluded'])||($c['min']!==null&&$c['max']!==null&&($c['min']>$c['max']||($c['min']==$c['max']&&!($c['minIncluded']&&$c['maxIncluded'])))))throw new ApiError('Intervalle vide, inversé ou incohérent.',422);
+            if($c['values']!==[]||($c['min']===null&&$c['minIncluded'])||($c['max']===null&&$c['maxIncluded'])||
+                ($c['min']!==null&&$c['max']!==null&&($c['min']>$c['max']||($c['min']==$c['max']&&!($c['minIncluded']&&$c['maxIncluded'])))))throw new ApiError('Intervalle vide, inversé ou incohérent.',422);
         }
         $active[]=$c;
     }
@@ -173,7 +179,8 @@ function secondary_write(array $request): array {
             // Ordre d'affichage des filtres dans l'Explorer : permutation exacte des filtres existants, rien d'autre n'est modifié.
             if(($request['revision']??null)!==$d['revision'])throw new ApiError('Les filtres ont changé dans une autre session. Rechargez avant d’enregistrer.',409);
             $order=$request['order']??null;$current=array_column($d['filters'],'id');
-            if(!is_array($order)||$order!==array_values($order)||count($order)!==count($current)||count(array_filter($order,'is_string'))!==count($order)||array_diff($order,$current)||count(array_unique($order))!==count($order))throw new ApiError('Ordre des filtres invalide.',422);
+            if(!is_array($order)||$order!==array_values($order)||count($order)!==count($current)||count(array_filter($order,
+                'is_string'))!==count($order)||array_diff($order,$current)||count(array_unique($order))!==count($order))throw new ApiError('Ordre des filtres invalide.',422);
             $byId=[];foreach($d['filters'] as $f)$byId[$f['id']]=$f;
             $next=array_map(fn($i)=>$byId[$i],$order);
             if($next!==$d['filters']){$d['filters']=$next;$d['revision']++;q('UPDATE settings SET value_json=?,updated_at=? WHERE name=?',[secondary_json($d),now_utc(),SECONDARY_DEFINITIONS]);}
@@ -199,7 +206,9 @@ function secondary_write(array $request): array {
             if(!is_array($selection)||!in_array($selection['mode']??null,['all','custom'],true)||!is_array($selection['selected']??null)||!array_is_list($selection['selected']))throw new ApiError('Sélection par défaut invalide.',422);
             if($stored['editable']){$m=null;foreach($stored['measures'] as $item)if($item['id']===$measure)$m=$item;if(!$m)throw new ApiError('Mesure inconnue.',422);$allowed=secondary_ids($m);}
             else{if($measure!=='values')throw new ApiError('Valeurs catalogue attendues.',422);$allowed=array_column(secondary_catalogue()[$id],'id');}
-            if(count(array_filter($selection['selected'],'is_string'))!==count($selection['selected'])||count(array_unique($selection['selected']))!==count($selection['selected'])||array_diff($selection['selected'],$allowed)||($selection['mode']==='all'&&$selection['selected']!==[]))throw new ApiError('Catégorie ou valeur par défaut inconnue.',422);
+            if(count(array_filter($selection['selected'],'is_string'))!==count($selection['selected'])||
+                count(array_unique($selection['selected']))!==count($selection['selected'])||array_diff($selection['selected'],
+                $allowed)||($selection['mode']==='all'&&$selection['selected']!==[]))throw new ApiError('Catégorie ou valeur par défaut inconnue.',422);
             $s['filters'][$id][$measure]=$selection;$changedS=true;
         }elseif($action==='restore'){
             $d['filters'][$index]=$canonical;$changedD=true;$s['filters'][$id]=[];

@@ -25,7 +25,8 @@ return [
         $levels = []; foreach (q('SELECT listing_id, stop_px, target_px FROM position_levels WHERE portfolio_id = ?', [$p['id']])->fetchAll() as $l) $levels[(int)$l['listing_id']] = $l;
         $cfg = []; try { foreach (q('SELECT listing_id, rule_key, enabled, custom_value FROM position_plan_rules WHERE portfolio_id = ?', [$p['id']])->fetchAll() as $c) $cfg[(int)$c['listing_id']][$c['rule_key']] = ['enabled' => (bool)$c['enabled'],
             'custom' => $c['custom_value'] !== null ? (float)$c['custom_value'] : null]; } catch (Throwable $e) { $cfg = []; }
-        $origin = []; foreach (q("SELECT t.id, o.strategy_key FROM portfolio_transactions t LEFT JOIN lot_origin o ON o.transaction_id = t.id WHERE t.portfolio_id = ? AND t.side = 'buy'", [$p['id']])->fetchAll() as $o) $origin[(int)$o['id']] = $o['strategy_key'];
+        $origin = []; foreach (q("SELECT t.id, o.strategy_key FROM portfolio_transactions t LEFT JOIN lot_origin o ON o.transaction_id = t.id WHERE t.portfolio_id = ? AND t.side = " .
+            "'buy'", [$p['id']])->fetchAll() as $o) $origin[(int)$o['id']] = $o['strategy_key'];
         // Date d'ouverture = achat le plus ancien encore détenu (FIFO) ; origines = stratégies d'origine des achats encore détenus (information historique, jamais modifiée ici).
         $openDate = []; $origins = [];
         foreach (open_lots(q('SELECT * FROM portfolio_transactions WHERE portfolio_id = ?', [$p['id']])->fetchAll()) as $l) {
@@ -96,7 +97,8 @@ return [
         $en = $enabled ?? (int)$row['enabled'];
         $cv = $rule === 'recul' ? ($mode === 'custom' ? $custom : ($mode === 'auto' ? null : ($row['custom_value'] !== null ? (float)$row['custom_value'] : null))) : null;
         if ($en === 1 && $cv === null) q('DELETE FROM position_plan_rules WHERE portfolio_id = ? AND listing_id = ? AND rule_key = ?', [$p['id'], $lid, $rule]);   // pas de ligne = automatique et actif
-        else q('INSERT INTO position_plan_rules(portfolio_id, listing_id, rule_key, enabled, custom_value, updated_at) VALUES (?,?,?,?,?,?) ON DUPLICATE KEY UPDATE enabled = VALUES(enabled), custom_value = VALUES(custom_value), updated_at = VALUES(updated_at)',
+        else q('INSERT INTO position_plan_rules(portfolio_id, listing_id, rule_key, enabled, custom_value, updated_at) VALUES (?,?,?,?,?,?) ON DUPLICATE KEY UPDATE ' .
+            'enabled = VALUES(enabled), custom_value = VALUES(custom_value), updated_at = VALUES(updated_at)',
             [$p['id'], $lid, $rule, $en, $cv, $now]);
         return ['ok' => true];
     },

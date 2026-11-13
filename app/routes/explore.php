@@ -11,7 +11,8 @@ return [
     'explorer/library' => function () { $u=require_user();return explorer_library_list((int)$u['id']); },
     'explorer/library/save' => function () { need_post();$u=require_user();return explorer_library_save((int)$u['id'],body()); },
     'explorer/library/delete' => function () { need_post();$u=require_user();q('DELETE FROM explorer_saved WHERE id=? AND user_id=?',[(int)(body()['id']??0),$u['id']]);return ['ok'=>true]; },
-    'explorer/detail' => function () { need_post();$u=require_user();$b=body();$view=clean_view($b['view']??[]);$view['owned_ids']=held_listing_ids((int)$u['id']);return engine_call('sheet',['listing_id'=>(int)($b['id']??0),'config'=>$b['config']??'regular','view'=>$view,'fetch_profile'=>false]);
+    'explorer/detail' => function () { need_post();$u=require_user();$b=body();$view=clean_view($b['view']??
+        []);$view['owned_ids']=held_listing_ids((int)$u['id']);return engine_call('sheet',['listing_id'=>(int)($b['id']??0),'config'=>$b['config']??'regular','view'=>$view,'fetch_profile'=>false]);
         },
     'classement-test/categories' => function () {
         require_user();
@@ -115,9 +116,12 @@ return [
         if (mb_strlen($term) < 2) return ['results' => []];
         $like = '%' . str_replace(['%', '_'], '', $term) . '%';
         $rows = q("SELECT l.id, l.symbol, l.mic, l.currency, l.status, l.excluded_reason, l.is_primary, i.name, i.isin, i.kind, p.price, p.currency AS price_currency
-                   FROM listings l JOIN instruments i ON i.id = l.instrument_id LEFT JOIN latest_prices p ON p.listing_id = l.id
-                   WHERE LOWER(l.symbol) LIKE ? OR LOWER(i.name) LIKE ? OR LOWER(i.isin) LIKE ?
-                   ORDER BY (LOWER(l.symbol) = ?) DESC, l.is_primary DESC, l.status = 'excluded', i.name LIMIT 20", [$like, $like, $like, $term])->fetchAll();
+   " .
+            "                FROM listings l JOIN instruments i ON i.id = l.instrument_id LEFT JOIN latest_prices p ON p.listing_id = l.id
+                   " .
+            "WHERE LOWER(l.symbol) LIKE ? OR LOWER(i.name) LIKE ? OR LOWER(i.isin) LIKE ?
+                   ORDER BY (LOWER(l.symbol) = ?) DESC, l.is_primary " .
+            "DESC, l.status = 'excluded', i.name LIMIT 20", [$like, $like, $like, $term])->fetchAll();
         return ['results' => $rows];
     },
 ];

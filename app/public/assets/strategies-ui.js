@@ -19,10 +19,10 @@
   const PALETTE = ['#2563eb', '#16a34a', '#f97316', '#9333ea', '#0891b2', '#e11d48', '#ca8a04', '#4f46e5', '#0d9488', '#db2777', '#65a30d', '#ea580c'];
   const hue = key => HUES[key] || PALETTE[[...String(key)].reduce((a, c) => a + c.charCodeAt(0), 0) % PALETTE.length];
   const isEmoji = key => typeof key === 'string' && key && !(window.STRATEGY_ICONS && STRATEGY_ICONS[key]) && /[^\x00-\x7f]/.test(key);
-  const glyph = key => (window.STRATEGY_ICONS && STRATEGY_ICONS[key]) ? `<svg class="sui-ic" viewBox="0 0 24 24" aria-hidden="true" style="color:${hue(key)}">${STRATEGY_ICONS[key]}</svg>` : isEmoji(key) ? `<span class="sui-emoji">${E(key)}</span>` : '';
+  const glyph = key => (window.STRATEGY_ICONS && STRATEGY_ICONS[key]) ? `<svg class="sui-ic" viewBox="0 0 24 24" aria-hidden="true" data-style="color:${hue(key)}">${STRATEGY_ICONS[key]}</svg>` : isEmoji(key) ? `<span class="sui-emoji">${E(key)}</span>` : '';
   const tint = key => (window.STRATEGY_ICONS && STRATEGY_ICONS[key]) ? `background:color-mix(in srgb, ${hue(key)} 16%, transparent)` : '';
   const icon = (id, kind) => glyph(META[id] && META[id].icon) || J.icon(kind === 'personal' ? 'user' : (ICON[id] || 'target'), 'sui-ic');
-  const ico = (id, kind) => `<span class="sui-ico" aria-hidden="true" style="${tint(META[id] && META[id].icon)}">${icon(id, kind)}</span>`;
+  const ico = (id, kind) => `<span class="sui-ico" aria-hidden="true" data-style="${tint(META[id] && META[id].icon)}">${icon(id, kind)}</span>`;
   const desc = (id, kind) => (META[id] && META[id].description) || SHORT[kind === 'personal' ? 'personal' : id] || '';
   const badge = st => J.badge(STATUS[st] || st, { adapted: 'info', personal: 'ok' }[st] || '', { sm: true });
   let pop = null;

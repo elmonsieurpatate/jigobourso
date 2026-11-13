@@ -27,7 +27,8 @@ function stage_account_link(array $u, string $purpose, string $email): array {
 function deliver_account_link(string $hash, string $raw, string $purpose, string $email): bool {
     // Fragments never travel in HTTP request URLs, proxy logs or Referer headers.
     $url=base_url().'/'.($purpose==='reset'?'reset.html':'verify-email.html').'#token='.$raw;
-    $message=($purpose==='reset'?'Vous avez demandé à réinitialiser votre mot de passe.':'Confirmez votre nouvelle adresse e-mail.')."\n\n".$url."\n\nCe lien expire dans 30 minutes et ne fonctionne qu’une fois. Si vous n’êtes pas à l’origine de cette demande, ignorez ce message.\nJigobourso";
+    $message=($purpose==='reset'?'Vous avez demandé à réinitialiser votre mot de passe.':'Confirmez votre nouvelle adresse e-mail.').
+        "\n\n".$url."\n\nCe lien expire dans 30 minutes et ne fonctionne qu’une fois. Si vous n’êtes pas à l’origine de cette demande, ignorez ce message.\nJigobourso";
     if (!send_account_mail($email,$purpose==='reset'?'Réinitialiser votre mot de passe Jigobourso':'Confirmer votre adresse Jigobourso',$message)) {
         q('UPDATE account_tokens SET used_at=? WHERE token_hash=?',[now_utc(),$hash]);
         return false;
@@ -92,7 +93,10 @@ function update_account(array $u,array $b): array {
 
 // Courrier de bienvenue envoyé à la création d'un compte. Ne lève jamais ; renvoie false si le message n'a pas pu partir.
 function send_welcome_mail(string $username, string $email): bool {
-    $body="Bonjour ".$username.",\n\nVotre compte Jigobourso est créé.\n\nPour vous connecter : ".base_url()."/login.html\nVotre identifiant : ".$username."\n\nPour bien démarrer, ouvrez le centre d'aide : il explique la bourse et Jigobourso pas à pas, sans rien supposer connu.\n".base_url()."/aide.html\n\nJigobourso aide à trier et comparer des titres ; il ne donne aucun conseil d'achat.\n\nSi vous n'êtes pas à l'origine de cette inscription, répondez à ce message ou prévenez l'administrateur.\nJigobourso";
+    $body="Bonjour ".$username.",\n\nVotre compte Jigobourso est créé.\n\nPour vous connecter : ".base_url().
+        "/login.html\nVotre identifiant : ".$username."\n\nPour bien démarrer, ouvrez le centre d'aide : il explique la bourse et Jigobourso pas à pas, sans rien supposer connu.\n".
+        base_url()."/aide.html\n\nJigobourso aide à trier et comparer des titres ; il ne donne aucun conseil d'achat.\n\nSi vous n'êtes pas à l'origine de cette " .
+        "inscription, répondez à ce message ou prévenez l'administrateur.\nJigobourso";
     try { return send_account_mail($email,'Bienvenue sur Jigobourso',$body); } catch (Throwable $e) { error_log('welcome_mail: transport failure'); return false; }
 }
 // Prévient les administrateurs (ayant une adresse) d'une nouvelle inscription. Ne lève jamais.

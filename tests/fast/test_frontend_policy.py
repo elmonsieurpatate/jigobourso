@@ -31,11 +31,10 @@ def test_dynamic_html_escapes_catalogue_codes():
         assert not re.search(r'\$\{(p\.mic|m)\}', js), name
 
 
-def test_csp_blocks_style_elements_and_only_allows_style_attributes_inline():
+def test_csp_has_no_unsafe_inline_at_all():
     csp = re.search(r'Content-Security-Policy "([^"]+)"', open(os.path.join(PUBLIC, '.htaccess'), encoding='utf-8').read()).group(1)
     assert re.search(r"style-src 'self'(;|$)", csp), "style-src doit être 'self' seul (pas de <style> ni de feuille injectée)"
-    assert "style-src-attr 'unsafe-inline'" in csp
-    assert not re.search(r"(?<!-attr )'unsafe-inline'", csp.replace("style-src-attr 'unsafe-inline'", ''))
+    assert 'unsafe-inline' not in csp and 'style-src-attr' not in csp
 
 
 def test_no_style_element_and_no_inline_handler_in_scripts():
@@ -47,16 +46,12 @@ def test_no_style_element_and_no_inline_handler_in_scripts():
         assert not re.search(r"""\son(click|change|input|submit|load|error|keydown)=["'\\]""", js), name + ' : gestionnaire en ligne dans un gabarit HTML'
 
 
-# Plafond : les attributs style="…" générés en JS ne peuvent que diminuer (valeurs de données : couleurs, largeurs, positions).
-STYLE_ATTR_CEILING = 137
-
-
-def test_inline_style_attributes_do_not_grow():
-    total = 0
-    for name in sorted(os.listdir(os.path.join(PUBLIC, 'assets'))):
-        if name.endswith('.js'):
-            total += open(os.path.join(PUBLIC, 'assets', name), encoding='utf-8').read().count('style="')
-    assert total <= STYLE_ATTR_CEILING, f'{total} style="…" en JS (plafond {STYLE_ATTR_CEILING}) : utiliser une classe, ou abaisser le plafond'
+def test_no_inline_style_attribute_in_scripts_or_pages():
+    # Les styles de données passent par data-style (appliqué en CSSOM par core.js) : un attribut style= serait bloqué par la CSP.
+    files = [os.path.join(PUBLIC, 'assets', n) for n in os.listdir(os.path.join(PUBLIC, 'assets')) if n.endswith('.js')]
+    files += [os.path.join(PUBLIC, n) for n in os.listdir(PUBLIC) if n.endswith('.html')]
+    for f in sorted(files):
+        assert not re.search(r'(?<![-\w])style\s*=\s*["\'\\]', open(f, encoding='utf-8').read()), os.path.basename(f) + ' : attribut style= (utiliser data-style)'
 
 
 # Interpolations nues d'un champ de texte libre : chacune a été relue, la sortie est du texte (J.confirm échappe, messages via textContent).

@@ -61,7 +61,7 @@ def test_php_actual_classification_and_js_local_migration_agree():
     # Exercise every shipped ISO alias plus all explicit edge cases in both implementations.
     alias_cases = [('country', key, None, group) for key, group in CONFIG['country_aliases'].items()]
     cases = [list(c[:3]) for c in CASES + alias_cases]
-    result = subprocess.run(['php', 'tests/e2e/secondary-metadata.php'], cwd=ROOT,
+    result = subprocess.run(['php', 'tests/php/secondary-metadata.php'], cwd=ROOT,
                             input=json.dumps(cases), text=True, capture_output=True, check=True)
     output = json.loads(result.stdout)
     assert [r['id'] for r in output] == [c[3] for c in CASES + alias_cases]

@@ -80,14 +80,14 @@
     const tier = {}; const last = []; labelled.forEach(x => { const xv = sc.at(x.value); let t = 0; while (last[t] !== undefined && xv - last[t] < GAP) t++; tier[x.id] = t; last[t] = xv; });
     const rows = Math.max(...Object.values(tier), 0) + 1;
     const mk = x => { const xv = sc.at(x.value), t = tier[x.id] || 0, nolab = false, sy = compact ? '<i class="ps-tk"></i>' : symOf(x);
-      return { sym: `<span class="ps-mk ${x.cls}" style="left:${xv.toFixed(2)}%" title="${esc(x.label)} ${eur(x.value)}">${sy}</span>`,
-        lab: nolab ? '' : `<span class="ps-lb ${x.cls}" style="left:${xv.toFixed(2)}%;top:${t * TIER}px"><b>${esc(name(x))}</b><strong>${eur(x.value)}</strong>${x.sub ? `<em class="${x.id === 'current' ? cl(pl.gain && pl.gain.pct) : x.id === 'high' || x.id === 'personal' ? 'down' : 'sug'}">${x.sub}</em>` : ''}</span>`,
+      return { sym: `<span class="ps-mk ${x.cls}" data-style="left:${xv.toFixed(2)}%" title="${esc(x.label)} ${eur(x.value)}">${sy}</span>`,
+        lab: nolab ? '' : `<span class="ps-lb ${x.cls}" data-style="left:${xv.toFixed(2)}%;top:${t * TIER}px"><b>${esc(name(x))}</b><strong>${eur(x.value)}</strong>${x.sub ? `<em class="${x.id === 'current' ? cl(pl.gain && pl.gain.pct) : x.id === 'high' || x.id === 'personal' ? 'down' : 'sug'}">${x.sub}</em>` : ''}</span>`,
         leg: `<li class="${x.cls}"><span>${sy}</span><b>${esc(name(x))}</b><strong>${eur(x.value)}</strong>${x.sub ? `<em>${x.sub}</em>` : ''}</li>` }; };
     const parts = sorted.map(mk);
     const note = sc.log ? '<small class="ps-scale">Échelle logarithmique (forte progression) : les distances sont proportionnelles aux variations en %.</small>' : '';
     return `<div class="ps-gauge${compact ? ' ps-compact' : ''}" role="img" aria-label="Jauge de prix : ${sorted.map(x => esc(x.label) + ' ' + eur(x.value)).join(', ')}">
-      <div class="ps-track" style="background:${grad}">${parts.map(p => p.sym).join('')}</div>
-      <div class="ps-labels" style="height:${rows * TIER}px">${parts.map(p => p.lab).join('')}</div>
+      <div class="ps-track" data-style="background:${grad}">${parts.map(p => p.sym).join('')}</div>
+      <div class="ps-labels" data-style="height:${rows * TIER}px">${parts.map(p => p.lab).join('')}</div>
       <ul class="ps-legend">${parts.map(p => p.leg).join('')}</ul>${note}</div>`;
   }
 

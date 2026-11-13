@@ -13,7 +13,7 @@ Aucun framework ; une seule dépendance Python d'exécution (PyMySQL).
 | `db/` | `schema.sql` (schéma unique) et `migrations/` |
 | `scripts/` | base locale, migrations, vérifications de version (voir `scripts/README.md`) |
 | `ops/` | déploiement et exploitation (`deploy.sh`, rapports, journaux) |
-| `tests/` | `fast/` (sans base), `integ/` (MariaDB jetable), `e2e/` (navigateur) |
+| `tests/` | `fast/` (sans base), `integ/` (MariaDB jetable), `php/` (services PHP), `seeds/` (données), `e2e/` (navigateur, Node) ; voir `tests/e2e/README.md` |
 | `docs/` | architecture, méthode, sécurité, déploiement, structure du front |
 
 ## Commandes
@@ -27,7 +27,7 @@ make dev-db  # base de développement vide (jigobourso_v2)
 ```
 
 Site local : `php -S 127.0.0.1:8090 -t app/public` avec `JIGO_DB_*` et `JIGO_PYTHON`.
-Parcours navigateur : `BASE=http://127.0.0.1:8090 USER_NAME=… PASS=… node tests/e2e/smoke.mjs`.
+Parcours navigateur : `BASE=http://127.0.0.1:8090 USER_NAME=… PASS=… node tests/e2e/smoke.cjs` (variable `PLAYWRIGHT_MODULE` = chemin de playwright-core).
 
 ## Configuration
 

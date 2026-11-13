@@ -54,10 +54,12 @@ function secondary_user_write_once(int $userId,array $request): array {
         $action=$request['action']??'save';
         if(!in_array($action,['save','defaults','restore','order'],true))throw new ApiError('Action inconnue.',422);
         $revision=$action==='defaults'?($request['defaults_revision']??null):($request['revision']??null);
-        if($revision!==$current['definitions']['revision']||($action==='restore'&&($request['defaults_revision']??null)!==$current['defaults']['revision']))throw new ApiError('Vos filtres ont changé dans une autre fenêtre. Rechargez avant d’enregistrer.',409);
+        if($revision!==$current['definitions']['revision']||($action==='restore'&&($request['defaults_revision']??
+            null)!==$current['defaults']['revision']))throw new ApiError('Vos filtres ont changé dans une autre fenêtre. Rechargez avant d’enregistrer.',409);
         if($action==='order'){
             $order=$request['order']??null;$ids=array_column($current['definitions']['filters'],'id');
-            if(!is_array($order)||!array_is_list($order)||count($order)!==count($ids)||count(array_filter($order,'is_string'))!==count($order)||count(array_unique($order))!==count($order)||array_diff($order,$ids))throw new ApiError('Ordre des filtres invalide.',422);
+            if(!is_array($order)||!array_is_list($order)||count($order)!==count($ids)||count(array_filter($order,
+                'is_string'))!==count($order)||count(array_unique($order))!==count($order)||array_diff($order,$ids))throw new ApiError('Ordre des filtres invalide.',422);
             $doc['order']=$order;
         }else{
             $id=$request['filter_id']??null;if(!is_string($id))throw new ApiError('Identifiant de filtre requis.',422);
@@ -73,13 +75,15 @@ function secondary_user_write_once(int $userId,array $request): array {
                 }
             }elseif($action==='defaults'){
                 $measure=$request['measure_id']??'values';$selection=$request['selection']??null;
-                if(!is_string($measure)||!is_array($selection)||!in_array($selection['mode']??null,['all','custom'],true)||!is_array($selection['selected']??null)||!array_is_list($selection['selected']))throw new ApiError('Sélection par défaut invalide.',422);
+                if(!is_string($measure)||!is_array($selection)||!in_array($selection['mode']??null,['all',
+                    'custom'],true)||!is_array($selection['selected']??null)||!array_is_list($selection['selected']))throw new ApiError('Sélection par défaut invalide.',422);
                 if($stored['editable']){
                     $found=null;foreach($stored['measures'] as $m)if($m['id']===$measure)$found=$m;
                     if(!$found)throw new ApiError('Mesure inconnue.',422);$allowed=secondary_ids($found);
                 }else{if($measure!=='values')throw new ApiError('Valeurs catalogue attendues.',422);$allowed=array_column($stored['values'],'id');}
                 $chosen=$selection['selected'];
-                if(count(array_filter($chosen,'is_string'))!==count($chosen)||count(array_unique($chosen))!==count($chosen)||array_diff($chosen,$allowed)||($selection['mode']==='all'&&$chosen!==[]))throw new ApiError('Catégorie ou valeur inconnue.',422);
+                if(count(array_filter($chosen,'is_string'))!==count($chosen)||count(array_unique($chosen))!==count($chosen)||
+                    array_diff($chosen,$allowed)||($selection['mode']==='all'&&$chosen!==[]))throw new ApiError('Catégorie ou valeur inconnue.',422);
                 $doc['defaults'][$id][$measure]=$selection;
             }elseif($action==='restore'){
                 unset($doc['overrides'][$id],$doc['defaults'][$id]);

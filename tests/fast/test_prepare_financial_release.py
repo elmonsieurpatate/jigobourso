@@ -1,5 +1,5 @@
 import pytest
-from scripts.prepare_financial_release import prepare
+from scripts.release.prepare_financial_release import prepare
 
 
 def test_consistent_cache_needs_no_refresh():

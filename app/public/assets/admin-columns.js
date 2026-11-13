@@ -54,7 +54,7 @@
   function preview() {
     const cols = draft.columns.filter(c => c.visible);
     const prim = draft.sort[0];
-    const w = c => c.width ? ` style="width:${c.width}px;min-width:${c.width}px"` : '';
+    const w = c => c.width ? ` data-style="width:${c.width}px;min-width:${c.width}px"` : '';
     return `<div class="ac-frame ${device}"><div class="ac-scroll"><table class="ac-table"><thead><tr>${J.table.headRow(cols.map(c => ({ label: E(meta(c.id).label) + (prim && prim.key === c.id ? (prim.dir === 'asc' ? ' ▲' : ' ▼') : ''), title: meta(c.id).hint || '', width: c.width })))}</tr></thead>
       <tbody>${SAMPLE.map(r => `<tr>${cols.map(c => `<td${w(c)}>${sample(c.id, r)}</td>`).join('')}</tr>`).join('')}</tbody></table></div></div>
       <p class="small muted mt-2">Valeurs d’exemple : seuls l’ordre, la visibilité et les largeurs sont réels. ${device === 'mobile' ? 'Cadre de 375 px ; le tableau défile horizontalement.' : ''}</p>`;

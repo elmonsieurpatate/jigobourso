@@ -24,9 +24,9 @@ done
 mariadb --no-defaults --socket="$secondary_run/db.sock" -uroot -e "CREATE DATABASE jigobourso_filters_it CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci; ALTER USER 'root'@'localhost' IDENTIFIED BY 'filters-local-only';"
 export JIGO_DB_SOCKET="$secondary_run/db.sock" JIGO_DB_HOST=127.0.0.1 JIGO_DB_NAME=jigobourso_filters_it JIGO_DB_USER=root JIGO_DB_PASSWORD=filters-local-only JIGO_TEST_DATABASE=1 JIGO_ENV_FILE=/dev/null JIGO_PYTHON=/no-financial-engine
 MYSQL_PWD=filters-local-only mariadb --no-defaults --socket="$secondary_run/db.sock" -uroot jigobourso_filters_it < db/schema.sql
-php tests/e2e/secondary-persistence.php seed
-php tests/e2e/secondary-persistence.php | tee "$secondary_run/php-results.txt"
-php tests/e2e/secondary-metadata-persistence.php | tee "$secondary_run/metadata-results.txt"
+php tests/php/secondary-persistence.php seed
+php tests/php/secondary-persistence.php | tee "$secondary_run/php-results.txt"
+php tests/php/secondary-metadata-persistence.php | tee "$secondary_run/metadata-results.txt"
 secondary_port=$(python3 - <<'PY'
 import socket
 with socket.socket() as server:

@@ -1,6 +1,6 @@
 <?php
 // Read-only release check: never initializes settings or changes catalogue rows.
-require_once __DIR__.'/../app/services/secondary_filters.php';
+require_once __DIR__.'/../../app/services/secondary_filters.php';
 $report=secondary_catalogue_report();
 $instruments=(int)q('SELECT COUNT(*) FROM instruments')->fetchColumn();
 $listings=(int)q('SELECT COUNT(*) FROM listings')->fetchColumn();

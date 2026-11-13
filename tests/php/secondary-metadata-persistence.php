@@ -44,7 +44,7 @@ $check(in_array('market:us',array_column($assign['market'],'id'),true)&&in_array
 $check((bool)array_filter($assign['sector'],fn($r)=>($r['kind']??null)==='etf'&&$r['raw']==='Equity'&&$r['id']==='sector:other'),'ETF large : pas de secteur action inventé');
 foreach($assign as $filter=>$rows){if($filter!=='asset')foreach($rows as $row)$check($row['id']!==null,'Aucune métadonnée abandonnée');}
 $beforeCheck=q('SELECT name,value_json,updated_at FROM settings ORDER BY name')->fetchAll();
-exec(escapeshellarg(PHP_BINARY).' '.escapeshellarg(__DIR__.'/../../scripts/check_secondary_catalogue.php'),$checkOutput,$checkCode);
+exec(escapeshellarg(PHP_BINARY).' '.escapeshellarg(__DIR__.'/../../scripts/release/check_secondary_catalogue.php'),$checkOutput,$checkCode);
 $check($checkCode===0&&str_contains(implode(' ',$checkOutput),'affectations exhaustives'),'Contrôle du catalogue réellement stocké');
 $check($beforeCheck===q('SELECT name,value_json,updated_at FROM settings ORDER BY name')->fetchAll(),'Contrôle du catalogue sans initialisation ni écriture settings');
 echo "PASS: migration ancienne->groupes, archives, idempotence, défauts et activation préservés, restauration ciblée, inconnus, ETF large, double cotation indépendante du pays.\n";

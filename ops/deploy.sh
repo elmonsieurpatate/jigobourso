@@ -179,8 +179,8 @@ gzip -t "$file"
 echo "Sauvegarde financière vérifiée : $(basename "$file")"
 REMOTE
 # Run the new SELECT-only checker against the old deployment to establish the baseline.
-remote_sh "cd $root && set -a && . ./private/env && set +a && php" < <(sed "s@__DIR__ . '/../app/lib/db.php'@getcwd() . '/app/lib/db.php'@" scripts/check_financial_integrity.php) > "$RUNNER_TEMP/financial-before.json"
-remote_sh "cd $root && set -a && . ./private/env && set +a && php" < scripts/verify_account_release.php > "$RUNNER_TEMP/account-before.json"
+remote_sh "cd $root && set -a && . ./private/env && set +a && php" < <(sed "s@__DIR__ . '/../../app/lib/db.php'@getcwd() . '/app/lib/db.php'@" scripts/release/check_financial_integrity.php) > "$RUNNER_TEMP/financial-before.json"
+remote_sh "cd $root && set -a && . ./private/env && set +a && php" < scripts/release/verify_account_release.php > "$RUNNER_TEMP/account-before.json"
 
 echo "== Version des pages : ?v=$version"
 # Une seule version pour tous les fichiers CSS/JS : le marqueur __BUILD__ des pages est remplacé par l'identifiant de ce déploiement.
@@ -257,7 +257,7 @@ else
 fi
 .venv/bin/python -c "import engine.cli" && echo "moteur importable"
 echo "== Contrôle d'intégrité financière"
-php scripts/check_financial_integrity.php > "$ROOT/logs/financial-integrity.json"
+php scripts/release/check_financial_integrity.php > "$ROOT/logs/financial-integrity.json"
 chmod 600 "$ROOT/logs/financial-integrity.json"
 
 find app scripts -name '*.php' -print0 | xargs -0 -n1 php -l > /dev/null && echo "PHP valide"
@@ -266,18 +266,18 @@ REMOTE
   if [ "$validation" = full ]; then
   phase="vérification des calculs financiers"
   echo "== Vérification des calculs financiers avec les calendriers de séance"
-  remote_sh "cd $root && set -a && . ./private/env && set +a && PYTHONPATH=$root .venv/bin/python scripts/prepare_financial_release.py"
+  remote_sh "cd $root && set -a && . ./private/env && set +a && PYTHONPATH=$root .venv/bin/python scripts/release/prepare_financial_release.py"
 
   phase="vérification ETF, comptes et intégrité financière"
   echo "== Vérification ETF"
-  remote_sh "cd $root && set -a && . ./private/env && set +a && PYTHONPATH=$root .venv/bin/python scripts/verify_etf_release.py" > "$RUNNER_TEMP/etf-report.json"
+  remote_sh "cd $root && set -a && . ./private/env && set +a && PYTHONPATH=$root .venv/bin/python scripts/release/verify_etf_release.py" > "$RUNNER_TEMP/etf-report.json"
   else
     echo "== Mode rapide : vérifications exhaustives des calculs et ETF non exécutées"
   fi
   phase="préservation des comptes et intégrité financière"
   echo "== Vérification des comptes et des transactions"
-  remote_sh "cd $root && set -a && . ./private/env && set +a && php scripts/check_financial_integrity.php" > "$RUNNER_TEMP/financial-after.json"
-  remote_sh "cd $root && set -a && . ./private/env && set +a && JIGO_ACCOUNT_POSTCHECK=1 php scripts/verify_account_release.php" > "$RUNNER_TEMP/account-after.json"
+  remote_sh "cd $root && set -a && . ./private/env && set +a && php scripts/release/check_financial_integrity.php" > "$RUNNER_TEMP/financial-after.json"
+  remote_sh "cd $root && set -a && . ./private/env && set +a && JIGO_ACCOUNT_POSTCHECK=1 php scripts/release/verify_account_release.php" > "$RUNNER_TEMP/account-after.json"
   python3 - <<'ACCOUNTVERIFY'
 import json,os
 from pathlib import Path
@@ -300,9 +300,9 @@ PYVERIFY
   phase="vérification publique"
   echo "== Vérification publique"
   public_check "$version"
-  if [ -f scripts/check_secondary_catalogue.php ]; then
+  if [ -f scripts/release/check_secondary_catalogue.php ]; then
     echo "== Vérification des métadonnées du classement test (lecture seule)"
-    remote_sh "cd $root && set -a && . ./private/env && set +a && php scripts/check_secondary_catalogue.php"
+    remote_sh "cd $root && set -a && . ./private/env && set +a && php scripts/release/check_secondary_catalogue.php"
   fi
   if [ -z "$sandbox" ]; then
     for page in login.html recover.html reset.html verify-email.html; do

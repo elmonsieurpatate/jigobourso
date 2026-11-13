@@ -1,11 +1,13 @@
-# tests/e2e
+# Organisation des tests
 
-Parcours de bout en bout (navigateur ou serveur PHP réel). Trois formes coexistent, par choix de l'outil le plus direct :
+Un dossier par technologie, un seul rôle chacun :
 
-| Forme | Rôle |
-|---|---|
-| `*.cjs` / `*.mjs` | scénarios navigateur (playwright-core) et tests Node de modèles purs (`explorer-model.cjs`) |
-| `*.php` | tests de services PHP contre une base jetable (filtres secondaires) |
-| `*_seed.py` | données synthétiques injectées avant un scénario |
+| Dossier | Technologie | Rôle |
+|---|---|---|
+| `tests/fast/`, `tests/integ/` | Python (pytest) | logique, moteur, API ; lancent aussi les tests PHP ci-dessous |
+| `tests/php/` | PHP | tests des services PHP contre une base jetable (appelés par pytest ou `scripts/test_secondary_filters.sh`) |
+| `tests/seeds/` | Python | données synthétiques injectées avant un scénario navigateur |
+| `tests/e2e/` (ici) | Node (`.cjs`, playwright-core) | parcours navigateur et tests de modèles JS purs |
 
-Point d'entrée : `make e2e` (= `scripts/e2e_browser.sh`) rejoue les trois parcours de la CI (`financial`, `strategies-ui`, `account-navigation`). Les autres scénarios se lancent à la main (`node tests/e2e/<nom>.cjs`, après `make db-reset` et le seed correspondant). Les tests de logique pure sont lancés par `make fast`.
+Point d'entrée des parcours navigateur de la CI : `make e2e` (= `scripts/e2e_browser.sh` : `financial`, `strategies-ui`, `account-navigation`).
+Les autres scénarios se lancent à la main (`node tests/e2e/<nom>.cjs`, après `make db-reset` et le seed correspondant) ; les tests de logique pure (`core.cjs`, `explorer-model.cjs`…) tournent dans `make fast`.

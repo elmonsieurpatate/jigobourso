@@ -80,7 +80,7 @@ Pré-requis : **accord explicite de l'utilisateur**. Durée totale prévue ≈ 4
 3. [ ] **Moteur** : copier `engine/` ; venv Python 3.9 avec `PyMySQL` seul ; variables `JIGO_DB_*` dans un fichier hors de la racine web (droits 600).
 4. [ ] **Données** : `python -m engine.cli catalogue --source <clone>` ; `python scripts/bootstrap_real.py` ; `python -m engine.cli nightly` ; `python -m engine.cli tick` ; `python -m engine.cli suivi-backfill --sessions 30`. Contrôle : ≈ 40 650 cotations, ≈ 9 400 sélectionnées, ≈ 4 M clôtures, jobs `completed`.
 5. [ ] **Vos comptes** : `python scripts/migrate_legacy.py <export>` (script archivé : `git show archive/v1-migration:scripts/migrate_legacy.py`) : contrôle « conforme à l'export », 7/7 transactions rattachées, mots de passe inchangés. Refuse si des comptes existent déjà.
-6. [ ] **Site en parallèle** : `app/` sur un sous-domaine de test (même base). Lancer `tests/e2e/smoke.mjs` contre lui ; ouvrir à la main Explorer, une fiche ETF, Portefeuilles, Suivi.
+6. [ ] **Site en parallèle** : `app/` sur un sous-domaine de test (même base). Lancer `tests/e2e/smoke.cjs` contre lui ; ouvrir à la main Explorer, une fiche ETF, Portefeuilles, Suivi.
 7. [ ] **Bascule** : pointer le domaine sur `app/public` ; remplacer les 3 anciens crons par un seul `python -m engine.cli tick` toutes les 15 min. **Point de non-retour doux** : l'ancien code et l'ancienne base restent en place.
 8. [ ] **Après bascule (J+0)** : le tick suivant se déroule (page Administration > Traitements) ; première nuit : nightly 02:00 UTC terminé, un instantané « vécu » dans Suivi.
 9. [ ] **Observation 2 semaines**, puis nettoyage des anciennes tables seulement après dump, vérification et accord explicite. Changer le mot de passe de test `jigo/jigo`.

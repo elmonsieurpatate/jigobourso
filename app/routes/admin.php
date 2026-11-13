@@ -53,9 +53,12 @@ return [
         require_admin();
         $jobs = q('SELECT id, job_type, trigger_by, status, started_at, finished_at, items_ok, items_error, summary FROM jobs ORDER BY id DESC LIMIT 40')->fetchAll();
         $logs = q("SELECT l.level, l.message, l.logged_at, j.job_type FROM job_logs l JOIN jobs j ON j.id = l.job_id ORDER BY l.id DESC LIMIT 40")->fetchAll();
-        $sizes = q("SELECT table_name AS name, table_rows AS `rows`, ROUND((data_length + index_length) / 1048576, 1) AS mb FROM information_schema.tables WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE' ORDER BY (data_length + index_length) DESC")->fetchAll();
-        $freshness = q("SELECT l.mic, COUNT(*) AS followed, MAX(s.last_close_date) AS last_close, SUM(s.quality = 'stale') AS stale, SUM(s.quality = 'insufficient') AS insufficient, SUM(s.quality = 'break') AS broken
-                        FROM v_collect_set c JOIN listings l ON l.id = c.listing_id LEFT JOIN series_state s ON s.listing_id = l.id GROUP BY l.mic ORDER BY l.mic")->fetchAll();
+        $sizes = q("SELECT table_name AS name, table_rows AS `rows`, ROUND((data_length + index_length) / 1048576, 1) AS mb FROM information_schema.tables WHERE " .
+            "table_schema = DATABASE() AND table_type = 'BASE TABLE' ORDER BY (data_length + index_length) DESC")->fetchAll();
+        $freshness = q("SELECT l.mic, COUNT(*) AS followed, MAX(s.last_close_date) AS last_close, SUM(s.quality = 'stale') AS stale, SUM(s.quality = 'insufficient') AS " .
+            "insufficient, SUM(s.quality = 'break') AS broken
+                        FROM v_collect_set c JOIN listings l ON l.id = c.listing_id LEFT JOIN " .
+            "series_state s ON s.listing_id = l.id GROUP BY l.mic ORDER BY l.mic")->fetchAll();
         $intraday = q('SELECT l.mic, MAX(p.price_time) AS last_price FROM latest_prices p JOIN listings l ON l.id = p.listing_id JOIN v_collect_set c ON c.listing_id = l.id GROUP BY l.mic')->fetchAll(PDO::FETCH_KEY_PAIR);
         foreach ($freshness as &$f) $f['last_price'] = $intraday[$f['mic']] ?? null;
         $gaps = q("SELECT state, COUNT(*) n FROM price_gaps GROUP BY state")->fetchAll(PDO::FETCH_KEY_PAIR);

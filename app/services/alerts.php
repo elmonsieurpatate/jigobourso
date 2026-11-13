@@ -62,7 +62,8 @@ function alert_import_legacy(array $u, int $pid): void {
     }
 }
 function alert_origin_for(int $uid, int $pid, int $lid): array {
-    return q("SELECT t.id AS transaction_id, o.strategy_key, o.status, o.set_by, t.trade_at FROM portfolio_transactions t LEFT JOIN lot_origin o ON o.transaction_id = t.id WHERE t.portfolio_id = ? AND t.listing_id = ? AND t.side = 'buy' ORDER BY t.trade_at",
+    return q("SELECT t.id AS transaction_id, o.strategy_key, o.status, o.set_by, t.trade_at FROM portfolio_transactions t LEFT JOIN lot_origin o ON " .
+        "o.transaction_id = t.id WHERE t.portfolio_id = ? AND t.listing_id = ? AND t.side = 'buy' ORDER BY t.trade_at",
         [$pid, $lid])->fetchAll();
 }
 /** Version du modèle d'alerte d'une stratégie : enregistre une nouvelle version publiée uniquement si les règles ont changé (empreinte différente). Jamais de modification d'une version publiée. */

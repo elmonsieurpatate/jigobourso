@@ -7,14 +7,16 @@ export PATH="$PWD/.venv/bin:$PATH" JIGO_TEST_DATABASE=1 JIGO_DB_HOST=127.0.0.1 J
 export JIGO_PYTHON="$(command -v python)" JIGO_ENGINE_ROOT="$PWD" PYTHONPATH="$PWD"
 : "${PLAYWRIGHT_MODULE:?chemin de playwright-core}" "${JIGO_CHROMIUM:?chemin de Chromium}"
 export JIGO_TEST_MAIL_DIR="${JIGO_TEST_MAIL_DIR:-$(mktemp -d)}"; chmod 700 "$JIGO_TEST_MAIL_DIR"
-python tests/e2e/account_seed.py > /dev/null
+python tests/seeds/account_seed.py > /dev/null
 php scripts/create_user.php review_user review-local-password --admin --email=review@example.test > /dev/null
 php scripts/create_user.php plain_user plain-local-password --email=plain@example.test > /dev/null
-python tests/e2e/etf_seed.py > /dev/null
-php -S 127.0.0.1:18089 -t app/public > /dev/null 2>&1 & pid=$!
+python tests/seeds/etf_seed.py > /dev/null
+PHP_CLI_SERVER_WORKERS=4 php -S 127.0.0.1:18089 -t app/public > /dev/null 2>&1 & pid=$!
+out=$(mktemp -d)
 trap 'kill $pid 2>/dev/null' EXIT
 for _ in $(seq 50); do curl -sf -o /dev/null http://127.0.0.1:18089/login.html && break; sleep .2; done
-node tests/e2e/financial.cjs > /dev/null
-timeout 240s node tests/e2e/strategies-ui.cjs > /dev/null      # avant account-navigation : celui-ci provoque des échecs de connexion volontaires
-timeout 180s node tests/e2e/account-navigation.cjs > /dev/null
+run() { local name=$1; shift; "$@" > "$out/$name.log" 2>&1 || { echo "ÉCHEC $name :"; tail -c 1500 "$out/$name.log"; exit 1; }; }
+run financial node tests/e2e/financial.cjs
+run strategies-ui timeout 240s node tests/e2e/strategies-ui.cjs      # avant account-navigation : celui-ci provoque des échecs de connexion volontaires
+run account-navigation timeout 180s node tests/e2e/account-navigation.cjs
 echo "e2e navigateur : OK"

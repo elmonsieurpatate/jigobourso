@@ -4,7 +4,7 @@ PY = $(CURDIR)/.venv/bin/python
 SQLROOT = mariadb -h127.0.0.1 -P33307 -uroot -plocal-test-only
 DBENV = JIGO_TEST_DATABASE=1 JIGO_DB_HOST=127.0.0.1 JIGO_DB_PORT=33307 JIGO_DB_NAME=jigobourso_it JIGO_DB_USER=root JIGO_DB_PASSWORD=local-test-only
 
-.PHONY: e2e fast integ db-reset dev-db lint lint-py lint-php check
+.PHONY: release-check e2e fast integ db-reset dev-db lint lint-py lint-php check
 # Le code exige PHP >= 8.1 (expression throw, array_is_list) ; le serveur est en 8.2.
 PHP ?= $(shell command -v php8.3 || command -v php8.2 || command -v php8.4 || echo php)
 fast:
@@ -23,6 +23,10 @@ db-reset:
 integ: db-reset
 	ln -sf $(PHP) $(CURDIR)/.venv/bin/php
 	PATH=$(CURDIR)/.venv/bin:$$PATH $(DBENV) $(PY) -m pytest tests/integ -q
+release-check:   ## contrôles de version en lecture seule (scripts/release/) sur la base jetable : intégrité financière et catalogue secondaire
+	$(DBENV) $(PHP) scripts/release/check_financial_integrity.php > /dev/null
+	$(DBENV) $(PHP) scripts/release/check_secondary_catalogue.php > /dev/null
+	@echo "release-check : OK"
 e2e: db-reset   ## parcours navigateur de la CI (PLAYWRIGHT_MODULE et JIGO_CHROMIUM requis)
 	scripts/e2e_browser.sh
 dev-db:   ## base de développement avec données réelles : schéma seulement (puis catalogue, scripts/bootstrap_real.py)

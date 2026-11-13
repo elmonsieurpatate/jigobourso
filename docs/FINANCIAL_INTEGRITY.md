@@ -10,7 +10,7 @@ Le taux `fx_to_eur` désigne les euros pour **une unité du prix enregistré**. 
 
 Les frais sont exprimés en euros : ajoutés au coût des achats, déduits du produit des ventes. Les calculs conservent leur précision ; la présentation arrondit. Le coût moyen restant est réévalué chronologiquement lors de toute modification ancienne.
 
-Une transaction ancienne sans taux confirmé reste inchangée. Les prix de revient et plus-values qui en dépendent sont explicitement indisponibles, avec un avertissement dans le portefeuille et le bilan. Le contrôle CLI ne modifie rien : `php scripts/check_financial_integrity.php`.
+Une transaction ancienne sans taux confirmé reste inchangée. Les prix de revient et plus-values qui en dépendent sont explicitement indisponibles, avec un avertissement dans le portefeuille et le bilan. Le contrôle CLI ne modifie rien : `php scripts/release/check_financial_integrity.php`.
 
 ## Livres et pence
 

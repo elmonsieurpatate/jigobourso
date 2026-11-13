@@ -239,7 +239,7 @@ def test_targeted_history_refresh_checks_ownership_and_cooldown_without_network(
 
 
 def test_normal_metric_refresh_preserves_transactions_and_prices(world):
-    from scripts.prepare_financial_release import refresh_metrics
+    from scripts.release.prepare_financial_release import refresh_metrics
     a,pf=account(world);add(a,pf)
     conn=connect()
     with conn.cursor() as q:

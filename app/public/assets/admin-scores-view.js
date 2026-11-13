@@ -73,7 +73,7 @@ window.AdminScoresView = ctx => {
     const cw = p.complex_weights, total = sum(cw);
     return `<h3 class="as-h">Score complexe (qualité globale) <span class="as-i" title="Somme pondérée de notes 0-100. Ces poids sont propres au profil ; les valeurs proposées sont celles du profil de référence « Croissance rapide ».">ⓘ</span></h3>
       <div class="as-total ${Math.abs(total - 100) <= 0.05 ? 'ok' : 'ko'}">Total : <b id="cw-total">${fmt(total, 1)} %</b></div>
-      ${COMPLEX.map(([k, n, d]) => `<div class="as-cw"><span title="${E(d)}">${n}</span><input type="number" class="as-num" data-a="cw" data-k="${k}" min="0" max="100" step="0.5" value="${cw[k] ?? 0}"><span class="as-bar-bg"><span class="as-bar-fg" id="cwb-${k}" style="width:${Math.min(100, cw[k] || 0)}%"></span></span><span class="as-pct" id="cwp-${k}">${fmt(cw[k], 0)} %</span></div>`).join('')}
+      ${COMPLEX.map(([k, n, d]) => `<div class="as-cw"><span title="${E(d)}">${n}</span><input type="number" class="as-num" data-a="cw" data-k="${k}" min="0" max="100" step="0.5" value="${cw[k] ?? 0}"><span class="as-bar-bg"><span class="as-bar-fg" id="cwb-${k}" data-style="width:${Math.min(100, cw[k] || 0)}%"></span></span><span class="as-pct" id="cwp-${k}">${fmt(cw[k], 0)} %</span></div>`).join('')}
       <div class="row gap-s mt-3"><button class="btn sm" data-a="cw-norm">Normaliser à 100</button><button class="btn sm" data-a="cw-ref">Valeurs de référence</button></div>
       ${tuningCard(p)}
       <h3 class="as-h mt-4">Ancrage récent (λ = ${fmt(ctx.draft.global.anchor, 2)})</h3>
@@ -133,7 +133,7 @@ window.AdminScoresView = ctx => {
 
   function dist(d) {
     const max = Math.max(1, ...d.histogram);
-    return `<div class="as-hist">${d.histogram.map((n, i) => `<span title="${i * 10}–${i * 10 + 10} : ${n} titres"><i style="height:${Math.round(100 * n / max)}%"></i><small>${i * 10}</small></span>`).join('')}</div>
+    return `<div class="as-hist">${d.histogram.map((n, i) => `<span title="${i * 10}–${i * 10 + 10} : ${n} titres"><i data-style="height:${Math.round(100 * n / max)}%"></i><small>${i * 10}</small></span>`).join('')}</div>
       <p class="as-hint">Médiane <b>${fmt(d.median, 1)}</b> · quartiles ${fmt(d.p25, 1)} – ${fmt(d.p75, 1)} · 90e centile ${fmt(d.p90, 1)} · maximum ${fmt(d.max, 1)}</p>`;
   }
 
@@ -172,7 +172,7 @@ window.AdminScoresView = ctx => {
         ${marks.map(k => `<line class="mk" x1="${X(k.i).toFixed(1)}" x2="${X(k.i).toFixed(1)}" y1="${m.t}" y2="${m.t + ih}"/><text class="t mkt" x="${(X(k.i) + 3).toFixed(1)}" y="${m.t + 10}">début ${E(k.lab.toLowerCase())}</text>`).join('')}
         ${xt.map((i, k) => `<text class="t" x="${X(i).toFixed(1)}" y="${H - 7}" text-anchor="${i === 0 ? 'start' : i === pts.length - 1 ? 'end' : 'middle'}">${J.dayShort(pts[i].d)}</text>`).join('')}
         <polyline points="${line}" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
-        <line id="as-cur" class="cur" x1="0" x2="0" y1="${m.t}" y2="${m.t + ih}"/ style="display:none"><circle id="as-dot" r="4.5" cx="0" cy="0"/  style="display:none">
+        <line id="as-cur" class="cur" x1="0" x2="0" y1="${m.t}" y2="${m.t + ih}"/ data-style="display:none"><circle id="as-dot" r="4.5" cx="0" cy="0"/  data-style="display:none">
         <rect id="as-hit" x="${m.l}" y="${m.t}" width="${iw}" height="${ih}" fill="transparent"/></svg>
       <p class="as-hint">Cours de clôture réels sur les ${n} dernières séances (du ${J.dayShort(pts[0].d)} au ${J.dayShort(pts[pts.length - 1].d)})${chg === null ? '' : ' · <b>' + (chg >= 0 ? '+' : '') + fmt(chg, 1) + ' %</b>'}. Survolez ou touchez le graphique pour lire le cours de chaque séance.</p></div>`;
   }
@@ -188,7 +188,7 @@ window.AdminScoresView = ctx => {
   const STATUS = { retained: ['Retenue', 'ok'], excluded: ['Exclue', 'no'], undetermined: ['Indéterminée', 'na'] };
   const statusBadge = st => { if (!st) return ''; const [t, k] = STATUS[st] || STATUS.undetermined; return `<i class="as-status ${k}" title="Statut de la stratégie : ${t.toLowerCase()}. Détail dans la fiche du titre.">${t}</i>`; };
   const verdictBar = (n) => `<div class="seg" role="radiogroup" aria-label="Statut de stratégie : titres affichés">${[['retained', 'Retenues'], ['excluded', 'Exclues'], ['all', 'Toutes']].map(([k, l]) => `<button data-a="rk-verdict" data-v="${k}" role="radio" aria-checked="${ctx.rkVerdict === k}" class="${ctx.rkVerdict === k ? 'on' : ''}">${l} <b>${J.num(n ? n[k] : 0, 0)}</b></button>`).join('')}</div>${n && n.undetermined ? `<span class="as-hint m-0">${J.num(n.undetermined, 0)} indéterminé${n.undetermined > 1 ? 's' : ''} (données manquantes), visible${n.undetermined > 1 ? 's' : ''} dans « Toutes ».</span>` : ''}${c0ctx()}`;
-  const c0ctx = () => ctx.rank && ctx.rank.listing && ctx.rank.listing.context === 'missing' ? '<span class="as-hint" style="margin:0;color:var(--warn)">Critères de cette stratégie introuvables : statuts indéterminés.</span>' : '';
+  const c0ctx = () => ctx.rank && ctx.rank.listing && ctx.rank.listing.context === 'missing' ? '<span class="as-hint" data-style="margin:0;color:var(--warn)">Critères de cette stratégie introuvables : statuts indéterminés.</span>' : '';
   function rowHtml(r, which, pick) {
     return `<div class="as-rk ${pick ? 'pick' : ''}" ${pick ? `data-a="sim-pick" data-id="${r.id}" tabindex="0" role="button"` : ''}><span class="as-rk-n">${r.rank ?? '—'}</span>
       <span class="as-rk-name"><b>${E(r.symbol)}</b> <span class="muted">${E(r.name)}</span> ${statusBadge(r.status)}</span>${spark(r.curve)}
@@ -205,14 +205,14 @@ window.AdminScoresView = ctx => {
           <div class="as-tile"><span>Données incomplètes</span><b>${J.num(x.reduced_history, 0)}</b><small>${J.num(x.unreliable, 0)} sous le seuil de fiabilité</small></div></div>
         ${dist(x.distribution)}
         ${rel ? `<p class="as-hint"><b>Effet de vos modifications :</b> ${J.num(rel.score_changed, 0)} notes changent ; rang médian déplacé de ${J.num(rel.median_shift, 0)} ; ${J.num(rel.moved_over_10, 0)} titres bougent de plus de 10 places ; dans le top ${rel.top} : ${rel.top_entered} entrée${rel.top_entered > 1 ? 's' : ''}, ${rel.top_left} sortie${rel.top_left > 1 ? 's' : ''}.</p>` : ''}</div>`; };
-    return `<div class="card"><div class="row between" style="flex-wrap:wrap;gap:8px"><h3 class="as-h m-0">Classement général sur la base actuelle</h3><button class="btn sm" data-a="conf-run">${ctx.confBusy ? 'Calcul…' : 'Recalculer'}</button></div>
-      <div class="row gap-s" style="flex-wrap:wrap;margin:8px 0"><span class="muted">Stratégie :</span> ${stratPicker()}<span class="as-hint m-0">${c ? granText(c.granularity) : ''}</span></div>
-      ${ctx.confStale ? '<p class="as-hint" style="color:var(--warn)">Réglages modifiés depuis ce calcul : cliquez sur « Recalculer ».</p>' : ''}
+    return `<div class="card"><div class="row between" data-style="flex-wrap:wrap;gap:8px"><h3 class="as-h m-0">Classement général sur la base actuelle</h3><button class="btn sm" data-a="conf-run">${ctx.confBusy ? 'Calcul…' : 'Recalculer'}</button></div>
+      <div class="row gap-s" data-style="flex-wrap:wrap;margin:8px 0"><span class="muted">Stratégie :</span> ${stratPicker()}<span class="as-hint m-0">${c ? granText(c.granularity) : ''}</span></div>
+      ${ctx.confStale ? '<p class="as-hint" data-style="color:var(--warn)">Réglages modifiés depuis ce calcul : cliquez sur « Recalculer ».</p>' : ''}
       ${ctx.confBusy && !c ? '<div class="empty"><span class="spinner"></span></div>' : !c ? `<p class="muted">${ctx.confFail ? 'Calcul impossible : voir le message ci-dessus.' : 'Calcul au premier affichage.'}</p>` : s.universe === 0 ? '<div class="notice warn mt-2">Aucun titre dans cette base : rien à noter. Aucune valeur d’exemple n’est affichée.</div>' : `
         <p class="as-hint">Stratégie « ${E(st ? st.label : '')} » : ${granText(c.granularity)}. Tous les titres évaluables sont notés et classés, du meilleur au moins bon. Le rang est le rang général : choisir une catégorie ne le change pas.</p>
-        <div class="row between" style="flex-wrap:wrap;gap:8px"><div class="seg"><button data-a="rk-which" data-v="simple" class="${ctx.rkWhich === 'simple' ? 'on' : ''}">Classé par score simple</button><button data-a="rk-which" data-v="complex" class="${ctx.rkWhich === 'complex' ? 'on' : ''}">Classé par score complexe</button></div>${verdictBar(c.listing.counts)}</div>
+        <div class="row between" data-style="flex-wrap:wrap;gap:8px"><div class="seg"><button data-a="rk-which" data-v="simple" class="${ctx.rkWhich === 'simple' ? 'on' : ''}">Classé par score simple</button><button data-a="rk-which" data-v="complex" class="${ctx.rkWhich === 'complex' ? 'on' : ''}">Classé par score complexe</button></div>${verdictBar(c.listing.counts)}</div>
         <div class="as-chips mt-2 mb-2"><button class="btn sm ${ctx.rkCat ? '' : 'primary'}" data-a="rk-cat" data-v="">Toutes <b>${J.num(c.listing.categories.reduce((a, x) => a + x.count, 0), 0)}</b></button>
-          ${c.listing.categories.map(k => `<button class="btn sm ${ctx.rkCat === k.id ? 'primary' : ''}" data-a="rk-cat" data-v="${E(k.id)}"><i class="as-dot" style="background:${E(k.color || '#999')}"></i> ${E(k.name)} <b>${J.num(k.count, 0)}</b></button>`).join('')}</div>
+          ${c.listing.categories.map(k => `<button class="btn sm ${ctx.rkCat === k.id ? 'primary' : ''}" data-a="rk-cat" data-v="${E(k.id)}"><i class="as-dot" data-style="background:${E(k.color || '#999')}"></i> ${E(k.name)} <b>${J.num(k.count, 0)}</b></button>`).join('')}</div>
         ${c.listing.rows.length ? rankTable(c.listing.rows) : '<p class="muted">Aucun titre dans cette catégorie.</p>'}
         <p class="as-hint">* note calculée sur des données incomplètes. Ce classement porte sur tous les titres notés ; la page Classement présente les mêmes titres, dans le même ordre, avec les mêmes notes et les mêmes rangs (rang commun « = » pour des notes strictement identiques). Seuls ses filtres secondaires peuvent masquer des lignes.</p>
         ${c.listing.rows.length < c.listing.total ? `<div class="mt-2"><button class="btn sm" data-a="rk-more" ${ctx.rkMore ? 'disabled' : ''}>${ctx.rkMore ? 'Chargement…' : `Afficher la suite (${c.listing.rows.length} sur ${J.num(c.listing.total, 0)})`}</button></div>` : `<p class="as-hint">${J.num(c.listing.total, 0)} titre${c.listing.total > 1 ? 's' : ''}.</p>`}

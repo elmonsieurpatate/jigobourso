@@ -1,7 +1,7 @@
 <?php
 // Adaptateur pur : pas de connexion DB, ni d’écriture.
-require __DIR__ . '/../../app/lib/http.php';
-require __DIR__ . '/../../app/services/classement_test_categories.php';
+require __DIR__.'/../../app/lib/http.php';
+require __DIR__.'/../../app/services/classement_test_categories.php';
 $check = function ($ok, $message) { if (!$ok) throw new RuntimeException($message); };
 $proposed = classement_test_categories(null);
 $check($proposed['source'] === 'proposed', 'Origine des valeurs proposées explicite');

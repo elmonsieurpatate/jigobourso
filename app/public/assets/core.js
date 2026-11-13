@@ -129,7 +129,7 @@ J.table = (() => {
   const arrow = (key, sort) => sort && sort.key === key ? (sort.dir === 'asc' ? ' ▲' : ' ▼') : '';
   const th = (c, sort) => { c = norm(c);
     const cls = [c.num ? 'num' : '', c.cls || ''].filter(Boolean).join(' ');
-    const attrs = `${cls ? ` class="${cls}"` : ''}${c.scope ? ` scope="${c.scope}"` : ''}${c.title ? ` title="${J.esc(c.title)}"` : ''}${c.width ? ` style="width:${c.width}px;min-width:${c.width}px"` : ''}`;
+    const attrs = `${cls ? ` class="${cls}"` : ''}${c.scope ? ` scope="${c.scope}"` : ''}${c.title ? ` title="${J.esc(c.title)}"` : ''}${c.width ? ` data-style="width:${c.width}px;min-width:${c.width}px"` : ''}`;
     if (!c.sort) return `<th${attrs}>${c.label}</th>`;
     const on = sort && sort.key === c.sort;
     return `<th${attrs} aria-sort="${on ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}"><button type="button" data-sort="${J.esc(c.sort)}">${c.label}${arrow(c.sort, sort)}</button></th>`; };
@@ -165,4 +165,23 @@ J.table = (() => {
     onSort(root, fn) { root.addEventListener('click', e => { const b = e.target.closest('[data-sort]'); if (b && root.contains(b)) fn(b.dataset.sort, b); }); },
   };
   return T;
+})();
+
+// Styles de données (couleurs, largeurs, positions calculées) : les gabarits écrivent data-style="…", appliqué ici par l'API CSSOM
+// (autorisée par la CSP, contrairement à l'attribut style). Le MutationObserver s'exécute avant le prochain rendu.
+(() => {
+  'use strict';
+  const probe = document.createElement ? document.createElement('span') : null;
+  // fusion sans écraser : une valeur déjà posée par le code (el.style.x = …, exécuté juste après un innerHTML) l'emporte sur le gabarit
+  const apply = (el, force) => {
+    const v = el.getAttribute('data-style'); if (v === null || !el.style || !probe) return;
+    probe.style.cssText = v;
+    for (let k = 0; k < probe.style.length; k++) { const prop = probe.style[k]; if (force || !el.style.getPropertyValue(prop)) el.style.setProperty(prop, probe.style.getPropertyValue(prop), probe.style.getPropertyPriority(prop)); }
+  };
+  const scan = root => { if (root.nodeType !== 1) return; if (root.hasAttribute('data-style')) apply(root, false); root.querySelectorAll('[data-style]').forEach(e => apply(e)); };
+  J.applyStyles = scan;
+  if (typeof MutationObserver === 'undefined' || !document.documentElement) return;      // tests Node sans DOM
+  new MutationObserver(list => { for (const m of list) { if (m.type === 'attributes') apply(m.target, true); else m.addedNodes.forEach(scan); } })
+    .observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-style'] });
+  scan(document.documentElement);
 })();

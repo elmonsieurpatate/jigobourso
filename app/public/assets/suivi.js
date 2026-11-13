@@ -37,7 +37,7 @@
     }).join('') || '<div class="empty">Rien à afficher pour ce choix.</div>';
   }
   page.innerHTML = `${warn}${rebuilt}
-    <div class="card"><div class="row" style="gap:12px;flex-wrap:wrap;margin-bottom:12px">
+    <div class="card"><div class="row" data-style="gap:12px;flex-wrap:wrap;margin-bottom:12px">
       <div id="presets" class="seg">${Object.entries(s.presets).map(([k, p]) => `<button data-p="${k}">${J.esc(p.label)}</button>`).join('')}</div>
       <div id="groups" class="seg">${Object.entries(GROUPS).map(([k, l]) => `<button data-g="${k}">${l}</button>`).join('')}</div></div>
       <div id="table"></div></div>

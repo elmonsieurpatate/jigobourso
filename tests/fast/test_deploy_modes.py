@@ -74,12 +74,12 @@ def test_production_job_gate(event, operation, mode, syntax, tests, main, cancel
 def isolated_deployment(tmp_path, mode, fail_public=False):
     """Copy minimal code, mock ALL transports, never execute a remote command."""
     project = tmp_path / 'project'
-    for folder in ('ops', 'scripts', 'db', 'app/public', 'app/routes', 'engine', 'docs'):
+    for folder in ('ops', 'scripts/release', 'db', 'app/public', 'app/routes', 'engine', 'docs'):
         (project / folder).mkdir(parents=True, exist_ok=True)
     shutil.copy(ROOT / 'ops/deploy.sh', project / 'ops/deploy.sh')
     shutil.copy(ROOT / 'scripts/migrate.py', project / 'scripts/migrate.py')
     for script in ('check_financial_integrity.php', 'verify_account_release.php'):
-        shutil.copy(ROOT / 'scripts' / script, project / 'scripts' / script)
+        shutil.copy(ROOT / 'scripts/release' / script, project / 'scripts/release' / script)
     (project / 'db/schema.sql').write_text('CREATE TABLE example (id INT);\n')
     (project / 'app/public/index.html').write_text('<script src="assets/app.js?v=__BUILD__"></script>')
     (project / 'app/routes/secondary_filters.php').write_text('<?php // fixture')

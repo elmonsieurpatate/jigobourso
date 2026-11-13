@@ -190,7 +190,8 @@ function portfolio_valuation(int $portfolioId, ?array $transactions = null, ?str
 function held_listing_ids(int $userId): array {
     // Quantité nette > 0, splits confirmés compris (même règle que la valorisation des portefeuilles).
     $rows = q("SELECT t.listing_id, t.side, t.quantity, t.unit_price, t.trade_at, t.id FROM portfolio_transactions t JOIN portfolios p ON p.id = t.portfolio_id
-               WHERE p.user_id = ? AND t.listing_id IS NOT NULL ORDER BY t.trade_at, t.id", [$userId])->fetchAll();
+     " .
+        "          WHERE p.user_id = ? AND t.listing_id IS NOT NULL ORDER BY t.trade_at, t.id", [$userId])->fetchAll();
     $events = split_events(array_map(function ($t) { return $t['listing_id']; }, $rows));
     $freeBuys = free_buy_dates($rows);
     $qty = []; $cursor = [];

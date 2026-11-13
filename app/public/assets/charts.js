@@ -55,9 +55,9 @@
       const cross = el('line', { y1: T, y2: T + PH, class: 'lc-cross', visibility: 'hidden' }), dots = vis.map(s => el('circle', { r: 4.5, fill: s.color, class: 'lc-dot', visibility: 'hidden' }));
       svg.append(cross, ...dots);
       const axis = document.createElement('div'); axis.className = 'lc-y';
-      axis.innerHTML = ticks(y0, y1, 3).map(v => `<span style="top:${(100 * Y(v) / H).toFixed(2)}%">${fmt(v)}</span>`).join('');
+      axis.innerHTML = ticks(y0, y1, 3).map(v => `<span data-style="top:${(100 * Y(v) / H).toFixed(2)}%">${fmt(v)}</span>`).join('');
       const xa = document.createElement('div'); xa.className = 'lc-x';
-      xa.innerHTML = (W < 520 ? [0, 1] : [0, .33, .66, 1]).map(f => Math.round(f * (n - 1))).map((i, k, a) => `<span style="left:${(100 * X(i) / W).toFixed(2)}%" class="${k === 0 ? 'first' : k === a.length - 1 ? 'last' : ''}">${dl(xs[i])}</span>`).join('');
+      xa.innerHTML = (W < 520 ? [0, 1] : [0, .33, .66, 1]).map(f => Math.round(f * (n - 1))).map((i, k, a) => `<span data-style="left:${(100 * X(i) / W).toFixed(2)}%" class="${k === 0 ? 'first' : k === a.length - 1 ? 'last' : ''}">${dl(xs[i])}</span>`).join('');
       const tip = document.createElement('div'); tip.className = 'lc-tip'; tip.hidden = true;
       const box = document.createElement('div'); box.className = 'lc-box'; box.style.height = H + 'px'; box.append(svg, axis, xa, tip); wrap.append(box);
       let pinned=false;
@@ -68,7 +68,7 @@
         vis.forEach((s, k) => { const v = s.values[i]; if (v === null || v === undefined) { dots[k].setAttribute('visibility', 'hidden'); return; } dots[k].setAttribute('cx', X(i)); dots[k].setAttribute('cy', Y(v)); dots[k].setAttribute('visibility', 'visible'); });
         const rows = vis.map(s => [s, s.values[i]]).filter(([, v]) => v !== null && v !== undefined).sort((a, b) => b[1] - a[1]).slice(0, 10);
         const mk = (opts.markers || []).filter(m => m.x.slice(0, 10) === String(xs[i]).slice(0, 10));
-        tip.innerHTML = `<div class="lc-tip-d">${dl(xs[i])}</div>${rows.map(([s, v]) => `<div class="lc-tip-r"><i style="background:${s.color}"></i><span>${J.esc(s.label)}</span><b>${s.format ? s.format(v) : fmt(v)}</b></div>`).join('')}${mk.map(m => `<div class="lc-tip-m ${m.kind}">${J.esc(m.label)}${m.detail ? ' · '+J.esc(m.detail) : ''}</div>`).join('')}`;
+        tip.innerHTML = `<div class="lc-tip-d">${dl(xs[i])}</div>${rows.map(([s, v]) => `<div class="lc-tip-r"><i data-style="background:${s.color}"></i><span>${J.esc(s.label)}</span><b>${s.format ? s.format(v) : fmt(v)}</b></div>`).join('')}${mk.map(m => `<div class="lc-tip-m ${m.kind}">${J.esc(m.label)}${m.detail ? ' · '+J.esc(m.detail) : ''}</div>`).join('')}`;
         tip.hidden = false; const bx = box.getBoundingClientRect(), left = X(i) * r.width / W;
         tip.style.left = Math.max(0,Math.min(bx.width-tip.offsetWidth,left > bx.width / 2 ? left-tip.offsetWidth-14 : left+14))+'px';
       };
@@ -86,7 +86,7 @@
     }
     if (series.length > 1 && opts.onToggle) {
       const lg = document.createElement('div'); lg.className = 'lc-legend';
-      lg.innerHTML = series.map(s => `<button type="button" class="lc-chip ${hidden.has(s.id) ? 'off' : ''} ${opts.focusLegend && opts.selected===s.id?'selected':''}" data-id="${J.esc(s.id)}" aria-pressed="${opts.focusLegend ? !opts.selected || opts.selected===s.id : !hidden.has(s.id)}"><i style="background:${s.color}"></i>${J.esc(s.label)}</button>`).join('');
+      lg.innerHTML = series.map(s => `<button type="button" class="lc-chip ${hidden.has(s.id) ? 'off' : ''} ${opts.focusLegend && opts.selected===s.id?'selected':''}" data-id="${J.esc(s.id)}" aria-pressed="${opts.focusLegend ? !opts.selected || opts.selected===s.id : !hidden.has(s.id)}"><i data-style="background:${s.color}"></i>${J.esc(s.label)}</button>`).join('');
       lg.querySelectorAll('button').forEach(b => b.onclick = () => opts.onToggle(b.dataset.id));
       host.append(lg);
     }

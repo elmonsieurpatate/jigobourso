@@ -26,18 +26,18 @@
     const paths = o.series.map((s, i) => { const c = s.color || PAL[i % PAL.length]; return `<polyline fill="none" stroke="${c}" stroke-width="${s.width || 2.4}" ${s.dash ? 'stroke-dasharray="' + s.dash + '"' : ''} stroke-linejoin="round" points="${s.values.map((v, t) => X(t * ((n) / (s.values.length - 1))).toFixed(1) + ',' + Y(v).toFixed(1)).join(' ')}"/>`; }).join('');
     let marks = '';
     (o.marks || []).forEach(m => { marks += `<circle cx="${X(m.x)}" cy="${Y(m.y)}" r="4.5" fill="${m.color || '#e11d48'}" stroke="#fff" stroke-width="1.5"/>${m.label ? `<text x="${X(m.x) + 7}" y="${Y(m.y) - 7}" class="hc-tag">${esc(m.label)}</text>` : ''}`; });
-    const legend = o.series.length > 1 || o.legend ? `<div class="hc-legend">${o.series.map((s, i) => `<span><i style="background:${s.color || PAL[i % PAL.length]}"></i>${esc(s.name || '')}</span>`).join('')}${o.line ? `<span><i class="dash"></i>${esc(o.line.legend || 'droite de tendance')}</span>` : ''}</div>` : '';
+    const legend = o.series.length > 1 || o.legend ? `<div class="hc-legend">${o.series.map((s, i) => `<span><i data-style="background:${s.color || PAL[i % PAL.length]}"></i>${esc(s.name || '')}</span>`).join('')}${o.line ? `<span><i class="dash"></i>${esc(o.line.legend || 'droite de tendance')}</span>` : ''}</div>` : '';
     return `<figure class="hc"><svg viewBox="0 0 ${w} ${h}" role="img" aria-label="${esc(o.alt || 'Graphique')}" class="hc-svg">${g}${hl}${res}${reg}${paths}${marks}</svg>${legend}</figure>`;
   }
   /** Barres horizontales. items: [{label, value, color, note}] */
   function bars(items, o = {}) {
     const max = o.max || Math.max(...items.map(i => i.value), 1), fmt = o.fmt || (v => f1(v, 0));
-    return `<div class="hc-bars">${items.map((it, i) => `<div class="hc-bar"><span class="hc-bl">${esc(it.label)}</span><span class="hc-bt"><i style="width:${Math.max(0, Math.min(100, 100 * it.value / max))}%;background:${it.color || PAL[i % PAL.length]}"></i></span><b>${fmt(it.value)}${it.note ? ' <small>' + esc(it.note) + '</small>' : ''}</b></div>`).join('')}</div>`;
+    return `<div class="hc-bars">${items.map((it, i) => `<div class="hc-bar"><span class="hc-bl">${esc(it.label)}</span><span class="hc-bt"><i data-style="width:${Math.max(0, Math.min(100, 100 * it.value / max))}%;background:${it.color || PAL[i % PAL.length]}"></i></span><b>${fmt(it.value)}${it.note ? ' <small>' + esc(it.note) + '</small>' : ''}</b></div>`).join('')}</div>`;
   }
   /** Barre empilée (parts d'un total de 100). parts: [{label, value, color}] */
   function stack(parts, o = {}) {
     const tot = parts.reduce((a, p) => a + p.value, 0) || 1;
-    return `<div class="hc-stack" role="img" aria-label="${esc(o.alt || 'Répartition')}">${parts.filter(p => p.value > 0).map(p => `<span style="flex:${p.value};background:${p.color}" title="${esc(p.label)} : ${f1(100 * p.value / tot, 0)} %">${p.value / tot >= 0.09 ? f1(100 * p.value / tot, 0) + '' : ''}</span>`).join('')}</div>`;
+    return `<div class="hc-stack" role="img" aria-label="${esc(o.alt || 'Répartition')}">${parts.filter(p => p.value > 0).map(p => `<span data-style="flex:${p.value};background:${p.color}" title="${esc(p.label)} : ${f1(100 * p.value / tot, 0)} %">${p.value / tot >= 0.09 ? f1(100 * p.value / tot, 0) + '' : ''}</span>`).join('')}</div>`;
   }
   /** Mini courbe sans axes. */
   function spark(values, color = '#2563eb', w = 120, h = 36) {
