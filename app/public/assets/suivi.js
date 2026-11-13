@@ -36,13 +36,10 @@
         ${rows.map(e => `<tr><td><a href="titre.html?id=${e.id}"><b>${J.esc(e.symbol)}</b></a> <span class="small muted">${J.esc(e.name)}</span></td><td class="small">${J.esc((s.presets[e.preset] || {}).label || e.preset)}</td><td class="num">${e.rank}</td>${[1, 3, 5].map(h => cell(e, h)).join('')}</tr>`).join('')}</tbody></table></div></details>`;
     }).join('') || '<div class="empty">Rien à afficher pour ce choix.</div>';
   }
-  page.innerHTML = `${warn}${rebuilt}
-    <div class="card"><div class="row" data-style="gap:12px;flex-wrap:wrap;margin-bottom:12px">
-      <div id="presets" class="seg">${Object.entries(s.presets).map(([k, p]) => `<button data-p="${k}">${J.esc(p.label)}</button>`).join('')}</div>
-      <div id="groups" class="seg">${Object.entries(GROUPS).map(([k, l]) => `<button data-g="${k}">${l}</button>`).join('')}</div></div>
-      <div id="table"></div></div>
-    <div class="card"><h2>Derniers classements</h2><div id="recent"></div></div>
-    <p class="small muted">${s.days} jour(s) enregistré(s) du ${J.date(s.first)} au ${J.date(s.last)}. Les ${'20'} premiers titres de chaque groupe sont conservés pour chaque stratégie. Un titre est évalué à partir de sa clôture du jour du classement ; un saut de cours non expliqué (split) invalide la mesure. Analyse descriptive du passé, sans conseil ni promesse de performance.</p>`;
+  J.$('#tracking-notices').innerHTML = warn + rebuilt;
+  J.$('#presets').innerHTML = Object.entries(s.presets).map(([k, p]) => `<button data-p="${k}">${J.esc(p.label)}</button>`).join('');
+  J.$('#groups').innerHTML = Object.entries(GROUPS).map(([k, l]) => `<button data-g="${k}">${l}</button>`).join('');
+  J.$('#tracking-summary').textContent = `${s.days} jour(s) enregistré(s) du ${J.date(s.first)} au ${J.date(s.last)}. Les 20 premiers titres de chaque groupe sont conservés pour chaque stratégie. Un titre est évalué à partir de sa clôture du jour du classement ; un saut de cours non expliqué (split) invalide la mesure. Analyse descriptive du passé, sans conseil ni promesse de performance.`;
   J.$('#presets').onclick = e => { const b = e.target.closest('button'); if (b) { preset = b.dataset.p; draw(); } };
   J.$('#groups').onclick = e => { const b = e.target.closest('button'); if (b) { group = b.dataset.g; draw(); } };
   draw();

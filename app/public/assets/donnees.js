@@ -5,8 +5,8 @@
   const kinds = { equity: 'Actions', etf: 'ETF' }, st = { selected: 'Sélectionnées', candidate: 'Candidates', excluded: 'Exclues' };
   const tot = o.places.reduce((a, x) => ({ followed: a.followed + x.followed, ok: a.ok + x.ok, incomplete: a.incomplete + x.incomplete, calendar_unknown: a.calendar_unknown + x.calendar_unknown, stale: a.stale + x.stale, insufficient: a.insufficient + x.insufficient, broken: a.broken + x.broken, full: a.full + x.full_year }), { followed: 0, ok: 0, incomplete: 0, calendar_unknown: 0, stale: 0, insufficient: 0, broken: 0, full: 0 });
   const pct = (a, b) => b ? J.num(100 * a / b, 1) + ' %' : '–';
-  page.innerHTML = `<div class="page-head"><div><h1>Données</h1><p>D’où viennent les informations affichées, quand elles ont été collectées pour la dernière fois et ce qu’elles couvrent. Rien n’est estimé : une donnée manquante est signalée comme telle.</p><p class="small muted mt-1">État consulté le ${J.dateTime(o.now_utc)} (heure locale de votre appareil) · ${J.num(tot.stale, 0)} titre${tot.stale === 1 ? '' : 's'} signalé${tot.stale === 1 ? '' : 's'} en retard selon sa place.</p></div></div>
-  <div class="grid cols-2" data-style="gap:14px">
+  J.$('#data-status').textContent = `État consulté le ${J.dateTime(o.now_utc)} (heure locale) · ${J.num(tot.stale, 0)} titre${tot.stale === 1 ? '' : 's'} en retard selon sa place.`;
+  page.innerHTML = `  <div class="grid cols-2" data-style="gap:14px">
    <div class="card"><div class="row between"><h2 class="m-0">Catalogue · ${J.esc(c.source)}</h2><span class="badge ok">Source d’identité</span></div>
      <p class="small muted mt-2 mb-3">Qui est quoi : nom, type (action ou ETF), pays, secteur, ISIN, places de cotation. FinanceDatabase fournit la liste des titres ; elle ne fournit aucun cours.</p>
      <table class="dense"><tbody><tr><td class="muted">Dernier chargement</td><td>${J.dateTime(c.loaded_at)}</td></tr><tr><td class="muted">Version de la source</td><td>${J.esc(c.commit || '–')}</td></tr>

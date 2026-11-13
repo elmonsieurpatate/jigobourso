@@ -18,7 +18,7 @@
     fold: (title, html, open) => `<details class="hd" ${open ? 'open' : ''}><summary>${title}</summary><div>${html}</div></details>`,
     steps: items => `<ol class="hs">${items.map((s, i) => `<li><span class="hs-n">${i + 1}</span><div><h4>${s[0]}</h4>${s[1]}</div></li>`).join('')}</ol>`,
     cards: items => `<div class="hcards">${items.map(c => `<div class="hcard" ${c.href ? `data-go="${E(c.href)}" tabindex="0" role="link"` : ''}><span class="hcard-i" data-style="background:${c.bg || 'var(--accent-soft)'}">${c.icon || ''}</span><b>${c.title}</b><p>${c.text}</p></div>`).join('')}</div>`,
-    table: (head, rows, cls = '') => `<div class="sui-scroll"><table class="sui-cmp ${cls}">${J.table.head(head)}<tbody>${rows.map(r => `<tr>${r.map((c, i) => i ? `<td>${c}</td>` : `<th scope="row">${c}</th>`).join('')}</tr>`).join('')}</tbody></table></div>`,
+    table: (head, rows, cls = '') => `<div class="h-table-scroll"><table class="h-table ${cls}">${J.table.head(head)}<tbody>${rows.map(r => `<tr>${r.map((c, i) => i ? `<td>${c}</td>` : `<th scope="row">${c}</th>`).join('')}</tr>`).join('')}</tbody></table></div>`,
     demo: (name, extra = '') => `<div class="hdemo" data-demo="${E(name)}" ${extra}></div>`,
     quiz: (id, qs) => `<section class="hq" data-quiz="${E(id)}"><h3>Testez-vous</h3>${qs.map((q, i) => `<div class="hq-q" data-i="${i}"><p><b>${i + 1}.</b> ${q.q}</p>${q.o.map((o, j) => `<button type="button" class="hq-o" data-j="${j}" data-ok="${j === q.a ? 1 : 0}">${o}</button>`).join('')}<div class="hq-r" hidden>${q.why}</div></div>`).join('')}<div class="hq-s small muted"></div></section>`,
     fmt: (v, d = 1) => HC.f1(v, d), pct: (v, d = 1) => HC.f1(v, d) + ' %'
@@ -57,8 +57,7 @@
     if (!opts.silent) J.post('auth/prefs', { help_last: c.id }).then(r => { me.prefs = r.prefs; }).catch(() => { });
     const pct = Math.round(100 * list.filter(x => seen.has(x.id)).length / list.length);
     $('#h-main').innerHTML = `<nav class="h-crumb" aria-label="Fil d’Ariane">${crumbs}</nav>
-      <header class="h-head"><span class="h-ico" data-style="background:color-mix(in srgb, ${c.color || '#2563eb'} 16%, transparent);color:${c.color || '#2563eb'}">${c.icon || ''}</span><div><h1>${E(c.title)}</h1>${c.lead ? `<p class="h-lead">${c.lead}</p>` : ''}</div></header>
-      ${hasExpert ? `<div class="h-levelbar">${level === 'expert' ? `Vous lisez la version <b>Expert</b> (formules, paramètres, limites). <button class="btn sm" data-level="beginner">Revenir au niveau Débutant</button>` : `Version <b>Débutant</b>. Envie d’aller plus loin ? <button class="btn sm" data-level="expert">Approfondir (Expert)</button>`}</div>` : ''}
+      <header class="h-head"><span class="h-ico" data-style="background:color-mix(in srgb, ${c.color || '#2563eb'} 16%, transparent);color:${c.color || '#2563eb'}">${c.icon || ''}</span><div><h2>${E(c.title)}</h2>${c.lead ? `<p class="h-lead">${c.lead}</p>` : ''}</div></header>
       <article class="h-body">${body}</article>
       ${c.quiz ? '' : ''}
       <footer class="h-nav">${prev ? `<a class="btn" href="#/${E(prev.id)}">← ${E(prev.title)}</a>` : '<span></span>'}<span class="h-prog" title="Progression"><i data-style="width:${pct}%"></i><small>${list.filter(x => seen.has(x.id)).length} / ${list.length} chapitres vus</small></span>${next ? `<a class="btn primary" href="#/${E(next.id)}">${E(next.title)} →</a>` : '<span></span>'}</footer>`;
@@ -68,7 +67,6 @@
   }
   function mount(c) {
     const el = $('#h-main');
-    $$('[data-level]', el).forEach(b => b.onclick = () => setLevel(b.dataset.level));
     $$('[data-go]', el).forEach(b => { const go2 = () => { location.hash = '#/' + b.dataset.go; }; b.onclick = go2; b.onkeydown = e => { if (e.key === 'Enter') go2(); }; });
     $$('[data-quiz]', el).forEach(q => { let good = 0, done = 0; const total = $$('.hq-q', q).length;
       $$('.hq-o', q).forEach(b => b.onclick = () => { const box = b.closest('.hq-q'); if (box.dataset.done) return; box.dataset.done = 1; done++; const ok = b.dataset.ok === '1'; if (ok) good++; b.classList.add(ok ? 'good' : 'bad'); $$('.hq-o', box).forEach(x => { if (x.dataset.ok === '1') x.classList.add('good'); x.disabled = true; }); const r = $('.hq-r', box); r.hidden = false; r.classList.toggle('bad', !ok); $('.hq-s', q).textContent = done === total ? `Résultat : ${good} / ${total}.${good === total ? ' Bravo !' : ' Relisez les explications ci-dessus puis réessayez.'}` : ''; }); });
@@ -79,15 +77,13 @@
   function closeDrawer() { root.classList.remove('toc-open'); }
 
   /* ───── amorçage ───── */
-  root.innerHTML = `<div class="h-top"><button class="btn sm h-burger" type="button" id="h-burger" aria-expanded="false" aria-controls="h-side">☰ Sommaire</button>
-    <div class="help-mode" role="group" aria-label="Niveau de détail"><button type="button" data-mode="beginner" aria-pressed="${level === 'beginner'}">Débutant</button><button type="button" data-mode="expert" aria-pressed="${level === 'expert'}">Expert</button></div></div>
-    <div class="h-layout"><aside class="h-side" id="h-side" aria-label="Sommaire de l’aide"><label class="h-search"><span class="sr-only">Rechercher dans l’aide</span><input id="h-q" type="search" placeholder="Rechercher : pente, ETF, lots…" autocomplete="off"></label><nav id="h-toc"></nav></aside><div class="h-read"><div id="h-main" class="h-main" tabindex="-1"><div class="empty"><span class="spinner"></span></div></div></div></div>`;
+  $$('[data-mode]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mode === level)));
   $$('[data-mode]').forEach(b => b.onclick = () => setLevel(b.dataset.mode));
   $('#h-burger').onclick = () => { const o = root.classList.toggle('toc-open'); $('#h-burger').setAttribute('aria-expanded', String(o)); };
   $('#h-q').oninput = e => { renderToc(e.target.value); const t = e.target.value.trim(); if (t) { const best = ranked(t)[0], hit = best && byId(best); if (hit && e.inputType !== 'deleteContentBackward' && t.length >= 3) { /* ouverture directe de la meilleure rubrique */ if (!current || current.id !== hit.id) { history.replaceState(null, '', '#/' + hit.id); open(hit.id, { silent: true }); } } } };
   $('#h-q').onkeydown = e => { if (e.key === 'Enter') { const best = ranked(e.target.value)[0]; if (best) go(best); } };
   try { facts = await J.api('help/facts'); } catch (e) { facts = null; }
-  try { meta = (await J.api('classement-test/strategies')).meta || {}; SUI.setMeta(meta); } catch (e) { meta = {}; }
+  try { meta = (await J.api('classement-test/strategies')).meta || {}; } catch (e) { meta = {}; }
   const route = () => { const h = decodeURIComponent(location.hash.replace(/^#\/?/, '')); const last = store.get('jigo_help_last') || (me.prefs || {}).help_last; open(h || last || 'bienvenue', { silent: !h }); };
   addEventListener('hashchange', route);
   renderToc(''); route();

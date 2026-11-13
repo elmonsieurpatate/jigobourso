@@ -5,7 +5,7 @@
 .sui-info{appearance:none;border:0;background:transparent;color:var(--accent);cursor:pointer;padding:2px;border-radius:999px;line-height:0}
 
 .sui-pop{position:fixed;z-index:60;max-width:min(360px,calc(100vw - 24px));background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:12px 14px;font-size:.88rem}
-.sui-pop h4{margin:0 0 6px;font-size:.95rem;display:flex;gap:8px;align-items:center}
+.sui-pop h4{margin:0 0 6px;display:flex;gap:8px;align-items:center;}
 .sui-pop p{margin:0 0 8px;max-width:60ch}
 .sui-pick{position:relative;display:inline-block;min-width:min(100%,320px)}
 .sui-pick-btn{display:flex;align-items:center;gap:8px;width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--text);font:inherit;cursor:pointer;text-align:left}
@@ -20,15 +20,15 @@
 .sui-banner b{font-weight:600}
 .sui-banner a{margin-left:auto}
 .sui-cmp{width:100%;border-collapse:collapse;font-size:.86rem}
-.sui-cmp th,.sui-cmp td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
-.sui-cmp th{font-size:.74rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.sui-cmp th,.sui-cmp td{text-align:left;vertical-align:top;}
+
 .sui-cmp .mod{background:var(--info-soft)}
 .sui-scroll{overflow-x:auto}
 /* aide */
 .help{display:grid;grid-template-columns:260px minmax(0,1fr);gap:20px;align-items:start}
 .help-mode{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
-.help-mode button{border:0;background:var(--surface);padding:6px 14px;font:inherit;cursor:pointer;color:var(--muted)}
-.help-mode button[aria-pressed=true]{background:var(--accent);color:var(--accent-ink)}
+.help-mode button{cursor:pointer;}
+
 @media (max-width:860px){.help{grid-template-columns:minmax(0,1fr)}.sui-banner a{margin-left:0}}
 .sui-native{position:absolute;left:0;top:0;max-width:1px;width:1px;height:1px;opacity:0;pointer-events:none;overflow:hidden}
 .sui-emoji{font-size:1.25rem;line-height:1}
@@ -42,4 +42,4 @@
 .sui-ico .sui-ic{stroke-width:2}.sui-ico .sui-emoji{font-size:1.35rem}.ms-ic .sui-emoji{font-size:1.3rem}
 
 /* Éditeur personnel de stratégies. */
-.ms-ic{cursor:pointer}input:checked+.ms-ic{border-color:var(--accent);background:var(--accent-soft);box-shadow:0 0 0 2px var(--accent)}input:focus-visible+.ms-ic{outline:2px solid var(--accent)}.ms-form textarea{width:100%;font:inherit}
+.ms-ic{cursor:pointer}input:checked+.ms-ic{border-color:var(--accent);background:var(--accent-soft);box-shadow:0 0 0 2px var(--accent)}input:focus-visible+.ms-ic{outline:2px solid var(--accent)}.ms-form textarea{width:100%;}

@@ -7,14 +7,14 @@
 .ac-handle { cursor: grab; touch-action: none; user-select: none; text-align: center; font-size: 1.25rem; line-height: 1; padding: 8px 0; color: var(--muted); } .ac-handle:active { cursor: grabbing; }
 .ac-pos { color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; font-size: .8rem; }
 .ac-vis { display: flex; gap: 8px; align-items: center; min-width: 0; flex-wrap: wrap; } .ac-name { font-weight: 600; }
- .ac-width input { width: 72px; } .ac-move { display: flex; gap: 4px; }
+ .ac-width input { width: 72px} .ac-move { display: flex; gap: 4px; }
 .ac-sortrow, .ac-filter { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 6px 0; } .ac-sortrow > span:first-child, .ac-filter > span:first-child { min-width: 120px; }
-.ac-sortrow select { max-width: 100%; }
+.ac-sortrow select { max-width: 100%}
 .ac-actions { position: sticky; bottom: 0; display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 8px; padding: 10px 0; background: var(--bg, var(--surface)); border-top: 1px solid var(--line); }
 .ac-actions > span { margin-right: auto; } .warn { color: var(--warn); }
 .ac-frame { border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: var(--surface); } .ac-frame.mobile { max-width: 375px; margin: 0 auto; }
 .ac-scroll { overflow-x: auto; } .ac-table { border-collapse: collapse; width: 100%; font-size: .82rem; }
-.ac-table th, .ac-table td { padding: 6px 9px; border-bottom: 1px solid var(--line); white-space: nowrap; text-align: left; } .ac-table th { background: var(--surface-2, rgba(127,127,127,.08)); font-size: .72rem; text-transform: uppercase; color: var(--muted); }
+.ac-table th, .ac-table td { white-space: nowrap; text-align: left} 
 .ac-badge { font-style: normal; font-size: .68rem; font-weight: 700; padding: 1px 6px; border-radius: 999px; border: 1px solid var(--line); }  
 @media (max-width: 980px) { .ac-grid { grid-template-columns: minmax(0, 1fr); } .ac-side { position: static; } }
-@media (max-width: 640px) { .ac-row { grid-template-columns: 34px 22px minmax(0, 1fr); } .ac-width, .ac-move { grid-column: 3; } .ac-handle { padding: 12px 0; } .ac-row .btn { min-width: 44px} .ac-actions .btn { flex: 1 1 100%} }
+@media (max-width: 640px) { .ac-row { grid-template-columns: 34px 22px minmax(0, 1fr); } .ac-width, .ac-move { grid-column: 3; } .ac-handle { padding: 12px 0; } .ac-row .btn { min-width: 44px;} .ac-actions .btn { flex: 1 1 100%;} }

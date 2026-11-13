@@ -72,7 +72,7 @@ R² = Sxy² / (Sxx · Syy)      (1 si Syy = 0)</div>
         body.innerHTML = `<div class="ctl" role="group" aria-label="Étapes">${stepsTxt.map((s, i) => `<button class="btn sm ${step === i + 1 ? 'primary' : ''}" data-step="${i + 1}">Étape ${i + 1}</button>`).join('')}</div>
           <div class="two">${titles.map(t => `<div><b data-style="color:${t[3]}">${t[0]}</b>${chart(t[0], t[1], t[2], t[3])}</div>`).join('')}</div>
           <h3 class="mt-2">${stepsTxt[step - 1][0]}</h3><p>${stepsTxt[step - 1][1]}</p>
-          <div class="sui-scroll"><table><thead><tr><th></th><th class="n">Aurore</th><th class="n">Brumel</th></tr></thead><tbody>
+          <div class="h-table-scroll"><table><thead><tr><th></th><th class="n">Aurore</th><th class="n">Brumel</th></tr></thead><tbody>
           ${row('Performance', 0, m => pc(m.perf))}${step >= 3 ? row('Pente (%/séance)', 0, m => f(m.slope, 3)) : ''}${step >= 4 ? row('Régularité R²', 0, m => f(m.r2, 2)) : ''}${step >= 5 ? row('Volatilité (%/séance)', 0, m => f(m.volatility, 2)) + row('Repli maximal', 0, m => f(m.drawdown, 1) + ' %') : ''}</tbody></table></div>
           <div class="ctl"><button class="btn" data-step="${Math.max(1, step - 1)}" ${step === 1 ? 'disabled' : ''}>← Étape précédente</button><button class="btn primary" data-step="${Math.min(5, step + 1)}" ${step === 5 ? 'disabled' : ''}>Étape suivante →</button></div>`;
         body.querySelectorAll('[data-step]').forEach(b => b.onclick = () => { step = +b.dataset.step; draw(); });

@@ -4,11 +4,11 @@
 .pf-home{display:flex;flex-direction:column;gap:14px;color:var(--text)}
 .pf-home .muted{color:var(--muted)}.pf-home .up{color:var(--up)}.pf-home .down{color:var(--down)}
 .pf-home svg{width:18px;height:18px;flex:none;vertical-align:-3px}.pf-home .fc-svg{width:100%;height:auto}
-.pf-home h1{font-size:1.25rem;margin:0}.pf-home h2{font-size:1rem;margin:0}.pf-home h3{font-size:.9rem;margin:16px 0 8px}
+.pf-home h1{margin:0}.pf-home h2{margin:0}.pf-home h3{margin:16px 0 8px}
 .px-head p{margin:2px 0 0;font-size:.82rem}
 .px-ha{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .px-zones{display:flex;gap:4px;border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none}.px-zones::-webkit-scrollbar{display:none}
-.px-zones button{flex:1 0 auto;border:0;border-bottom:3px solid transparent;background:none;color:var(--muted);font:600 .86rem system-ui;padding:10px 12px;cursor:pointer;white-space:nowrap}
+.px-zones button{flex:1 0 auto;cursor:pointer;white-space:nowrap}
 
 .px-ph{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
 
@@ -34,11 +34,10 @@ a.px-sum{cursor:pointer}a.px-sum:hover{border-color:var(--accent)}.px-sum>svg:la
 /* graphique */
 .px-top{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
 .px-tabs,.px-seg{display:flex;gap:2px;background:var(--surface-2,var(--bg));border:1px solid var(--line);border-radius:9px;padding:2px}
-.px-tabs button,.px-seg button{border:0;background:none;color:var(--muted);font:600 .8rem system-ui;padding:7px 12px;border-radius:7px;cursor:pointer;white-space:nowrap}
-.px-tabs button.on,.px-seg button.on{background:var(--accent);color:var(--on-solid)}
+.px-tabs button,.px-seg button{cursor:pointer;white-space:nowrap}
 .px-per{display:flex;gap:4px;overflow-x:auto;scrollbar-width:thin;padding:2px 0 6px;margin-bottom:2px;-webkit-overflow-scrolling:touch}
-.px-per button{flex:0 0 auto;border:1px solid var(--line);background:var(--surface);color:var(--text);border-radius:999px;padding:5px 11px;font:600 .76rem system-ui;cursor:pointer;min-height:30px}
-.px-per button.on{background:var(--accent-soft,var(--surface-2));border-color:var(--accent);color:var(--accent)}
+.px-per button{flex:0 0 auto;cursor:pointer}
+
 .px-cur{margin:0 0 4px;font-size:.8rem;color:var(--muted)}
 .px-plot{position:relative;width:100%;transition:opacity .15s}.px-plot.loading{opacity:.55}.px-plot .px-spin{position:absolute;top:calc(50% - 10px);left:calc(50% - 10px);z-index:6}
 .px-plot .fc-svg{user-select:none;-webkit-user-select:none}
@@ -51,8 +50,8 @@ a.px-sum{cursor:pointer}a.px-sum:hover{border-color:var(--accent)}.px-sum>svg:la
 /* tableaux compacts */
 .px-tw{overflow-x:auto}
 .px-t{width:100%;border-collapse:collapse;font-size:.84rem}
-.px-t th{text-align:left;font-size:.72rem;color:var(--muted);font-weight:600;padding:4px 8px;white-space:nowrap;border-bottom:1px solid var(--line)}.px-t th button{border:0;background:none;color:inherit;font:inherit;cursor:pointer;padding:4px 0}
-.px-t td{padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+.px-t th{text-align:left;white-space:nowrap}.px-t th button{border:0;background:none;color:inherit;font:inherit;cursor:pointer;padding:4px 0}
+.px-t td{vertical-align:middle}
 .px-t th.num button{text-align:right}
 .px-t tr[data-open],.px-t tr[data-tx]{cursor:pointer}.px-t tbody tr:hover{background:var(--surface-2,var(--bg))}.px-t tr.closed{opacity:.65}
 .px-t .c-title b{display:block}.px-t .ell{display:block;max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:.76rem}
@@ -65,7 +64,7 @@ body.px-lock{overflow:hidden}
 #px-drawer-root{position:fixed;inset:0;z-index:60}.px-back{position:absolute;inset:0;background:var(--overlay)}
 .px-drawer{position:absolute;top:0;right:0;bottom:0;width:min(760px,100%);background:var(--bg);border-left:1px solid var(--line);display:flex;flex-direction:column;box-shadow:-8px 0 30px rgba(0,0,0,.3)}
 .px-dh{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;padding:14px 16px;border-bottom:1px solid var(--line);background:var(--surface)}
-.px-dh h2{margin:0;font-size:1.1rem}.px-dh h2 span{font-weight:400;color:var(--muted);font-size:.88rem}.px-dh small{color:var(--muted)}
+.px-dh h2{margin:0}.px-dh h2 span{font-weight:400;color:var(--muted);font-size:.88rem}.px-dh small{color:var(--muted)}
 .px-db{overflow-y:auto;overscroll-behavior:contain;padding:4px 16px 24px;flex:1}
 .px-db section{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-top:12px}.px-db section h3{margin:0 0 8px}
 .px-kv2{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px 14px;margin:0}.px-kv2 dd{margin:2px 0 0;font-weight:600;font-size:.88rem}
@@ -77,17 +76,17 @@ body.px-lock{overflow:hidden}
  .px-kv{grid-template-columns:1fr 1fr}.px-evo{grid-template-columns:repeat(3,minmax(0,1fr))}.px-val strong{font-size:1.7rem}
  .px-t thead{display:none}.px-t,.px-t tbody,.px-t tr,.px-t td{display:block;width:100%}
  .px-t tr{border:1px solid var(--line);border-radius:10px;margin-bottom:8px;padding:8px 10px;display:grid;grid-template-columns:1fr 1fr;gap:4px 10px}
- .px-t td{border:0;padding:2px 0;display:flex;justify-content:space-between;gap:8px;text-align:right}.px-t td[data-l]::before{content:attr(data-l);color:var(--muted);font-size:.72rem;text-align:left}
+ .px-t td{border:0;display:flex;justify-content:space-between;gap:8px;text-align:right}.px-t td[data-l]::before{content:attr(data-l);color:var(--muted);font-size:.72rem;text-align:left}
  .px-t .c-title{grid-column:1/-1;text-align:left;display:block}.px-t .c-title::before{display:none}.px-t .c-act{grid-column:1/-1;justify-content:flex-start;display:flex;flex-wrap:wrap;gap:6px;text-align:left}.px-t .c-act  .px-t .c-w,.px-t .c-strat,.px-t .c-contrib{display:flex}.px-t .ell{max-width:60vw}
  .px-drawer{width:100%;border-left:0}.px-dh{flex-wrap:wrap}.px-evo small{display:none}
  .px-tw{overflow:visible}
 }
-@media(max-width:380px){.px-tabs button{padding:7px 8px;font-size:.74rem}.px-hh{grid-template-columns:1fr}}
+@media(max-width:380px){.px-hh{grid-template-columns:1fr}}
 /* détail : en-tête compact et onglets */
 .px-dh{align-items:center}.px-hk{margin-top:6px;grid-template-columns:repeat(3,auto);gap:4px 18px;justify-content:start}
 .px-dact{justify-content:flex-end}
 .px-tabs2{display:flex;border-bottom:1px solid var(--line);background:var(--surface);padding:0 8px}
-.px-tabs2 button{flex:1;border:0;border-bottom:3px solid transparent;background:none;color:var(--muted);font:700 .92rem system-ui;padding:12px 8px;cursor:pointer}
+.px-tabs2 button{flex:1;cursor:pointer}
 
 .px-db section[hidden]{display:none}.px-db>section{border:0;background:none;padding:8px 0}
 .px-origin{margin:8px 0 12px}.px-figseg{margin:4px 0 8px;display:inline-flex}
@@ -101,7 +100,7 @@ body.px-lock{overflow:hidden}
 
 /* ---- styles propres à la page Portefeuilles, sortis de base.css ---- */
 .fold-h{display:flex;align-items:center;gap:10px;padding:14px 18px;cursor:pointer;user-select:none}
-.fold-h h2{margin:0;font-size:1.02rem;display:flex;align-items:center;gap:8px}
+.fold-h h2{margin:0;display:flex;align-items:center;gap:8px}
 .fold-x{margin-left:auto;font-weight:600}
 .fold-b{padding:0 18px 16px}
 .folded .fold-b{display:none}
@@ -109,19 +108,19 @@ body.px-lock{overflow:hidden}
 .hide-s{display:none}
 /* Portefeuille V3 : quatre espaces, résultat personnel et diagnostic distincts. */
 .pf-toolbar{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:18px}
-.pf-toolbar h1{margin:0 0 8px;font-size:1.45rem}
+.pf-toolbar h1{margin:0 0 8px}
 .pf-toolbar select{max-width:300px}
 .pf-nav{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:0 0 18px;overflow-x:auto}
-.pf-nav button{flex:1;min-width:max-content;border:0;border-bottom:3px solid transparent;background:none;padding:12px 14px;color:var(--muted);font:inherit;font-size:.88rem;font-weight:600;cursor:pointer}
+.pf-nav button{flex:1;min-width:max-content;cursor:pointer}
 .pf-panel>*+*{margin-top:14px}
 .lot-detail summary{cursor:pointer;color:var(--accent);padding:6px 0}
 .lot-detail{padding:12px 0;border-bottom:1px solid var(--line)}
 .pf-nav button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .pf-toolbar{align-items:flex-start;gap:10px}
-.pf-toolbar h1{font-size:1.2rem}
+
 .pf-toolbar select{max-width:190px}
 .pf-nav{display:grid;grid-template-columns:1fr 1fr;gap:0}
-.pf-nav button{min-width:0;padding:10px 6px;font-size:.76rem}
+.pf-nav button{min-width:0}
 .pf-nav{grid-template-columns:1fr 1fr}
 .fc-plot{position:relative;width:100%;min-width:0;height:300px;overflow:hidden}
 .fc-markers{position:absolute;inset:0 0 32px;pointer-events:none;overflow:hidden}

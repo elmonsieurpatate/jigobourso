@@ -67,7 +67,7 @@
 /* ───────── Suivi des positions : une ligne par position (même jauge, mêmes conseils que le détail) ───────── */
 /* en-têtes repliables des sections « Positions » et « Suivi des positions » */
 .px-fold{background:none;border:0;font:inherit;text-align:left;cursor:pointer;display:inline-flex;align-items:center;gap:8px;font-size:1.1rem;font-weight:700;color:var(--text);border-radius:8px;padding:2px 4px;margin:-2px -4px}
-.px-fold h2{margin:0;font-size:inherit}
+.px-fold h2{margin:0;}
 .px-fold .chv{display:inline-flex;width:20px;height:20px;transition:transform .15s;color:var(--muted)}.px-fold .chv svg{width:20px;height:20px}
 .px-fold[aria-expanded="true"] .chv{transform:rotate(90deg)}
 .px-fold .hint{font-size:.74rem;font-weight:600;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:1px 8px}
@@ -80,7 +80,7 @@
 /* dialogue « Configurer » */
 dialog .ps-rule{border:1px solid var(--line);border-radius:12px;margin:12px 0 0;padding:8px 12px 10px}dialog .ps-rule legend{font-weight:700;padding:0 6px}
 
-dialog .ps-rule-val{display:flex;gap:6px 12px;align-items:center;flex-wrap:wrap;margin-top:4px}dialog .ps-rule-val input[data-val]{width:9em}
+dialog .ps-rule-val{display:flex;gap:6px 12px;align-items:center;flex-wrap:wrap;margin-top:4px}dialog .ps-rule-val input[data-val]{width:9em;}
 dialog .ps-rule .small{margin:6px 0 0}dialog [data-reset][hidden]{display:none}
 .ps-tag{display:inline-block;border-radius:999px;padding:2px 10px;font:700 .72rem system-ui;background:var(--info-soft);color:var(--info)}
 .px-chk[hidden]{display:none}

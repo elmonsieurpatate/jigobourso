@@ -65,15 +65,15 @@
     };
     const groups = {}; lv.rules.forEach(r => (groups[r.group] = groups[r.group] || []).push(r));
     const names = { ...lv.groups, liquidity: 'Prix, ancienneté du cours et liquidité' };
-    return Object.entries(groups).map(([g, rs]) => `<div class="mb-4"><h3 class="mb-2">${J.esc(names[g] || g)}</h3>${rs.map(row).join('')}</div>`).join('');
+    return Object.entries(groups).map(([g, rs]) => `<section class="admin-rule-group"><h3>${J.esc(names[g] || g)}</h3><div class="admin-rule-list">${rs.map(row).join('')}</div></section>`).join('');
   }
   function placePicker(r, places) {
     const sel = new Set(r.current.values);
-    return `<div data-style="margin:6px 0 0 26px"><div class="row gap-s" data-style="flex-wrap:wrap"><input id="pl-q" type="search" placeholder="Chercher une place (nom ou code)" data-style="width:240px"><span class="small muted" id="pl-n"></span>
-      <button class="btn sm" type="button" id="pl-all">Cocher les places affichées</button><button class="btn sm" type="button" id="pl-none">Décocher les places affichées</button><button class="btn sm" type="button" id="pl-def">Places par défaut</button></div>
-      <div id="pl-list" data-style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:2px 12px;max-height:240px;overflow:auto;margin-top:6px;border:1px solid var(--line,#ddd);border-radius:8px;padding:8px">
-      ${places.map(p => `<label class="small" data-search="${J.esc((p.mic + ' ' + p.name).toLowerCase())}"><input type="checkbox" data-mic="${J.esc(p.mic)}" data-def="${p.default ? 1 : 0}" ${sel.has(p.mic) ? 'checked' : ''}> <b>${J.esc(p.mic)}</b> ${J.esc(p.name)} <span class="muted">${nf(p.equity)} act. · ${nf(p.etf)} ETF${p.hours_known ? '' : ' · pas de barres 15 min'}</span></label>`).join('') || '<span class="muted small">Importez FinanceDatabase pour voir toutes les places disponibles.</span>'}</div>
-      <p class="small muted mt-1">Toutes les places présentes dans FinanceDatabase sont proposées. Les places sans horaires connus n’ont que les clôtures quotidiennes.</p></div>`;
+    return `<div class="admin-picker"><div class="admin-picker-toolbar"><input id="pl-q" type="search" placeholder="Rechercher une place ou un code" aria-label="Rechercher une place"><span class="small muted" id="pl-n"></span>
+      <div class="admin-picker-actions"><button class="btn sm" type="button" id="pl-all">Tout cocher</button><button class="btn sm" type="button" id="pl-none">Tout décocher</button><button class="btn sm" type="button" id="pl-def">Par défaut</button></div></div>
+      <div id="pl-list" class="admin-place-list">
+      ${places.map(p => `<label class="admin-place" data-search="${J.esc((p.mic + ' ' + p.name).toLowerCase())}"><input type="checkbox" data-mic="${J.esc(p.mic)}" data-def="${p.default ? 1 : 0}" ${sel.has(p.mic) ? 'checked' : ''}><span class="admin-place-copy"><span class="admin-place-name"><b>${J.esc(p.mic)}</b> ${J.esc(p.name)}</span><small>${nf(p.equity)} actions · ${nf(p.etf)} ETF${p.hours_known ? '' : ' · sans barres 15 min'}</small></span></label>`).join('') || '<span class="muted small">Importez FinanceDatabase pour voir toutes les places disponibles.</span>'}</div>
+      <p class="small muted mt-1">Les places sans horaires connus n’ont que les clôtures quotidiennes.</p></div>`;
   }
   function catPicker(r, cats) {
     const sel = new Set(r.current.values);
@@ -162,19 +162,24 @@
   async function fdb() {
     const s = await J.api('admin/fdb'), imp = s.import, lv = s.filters, f = s.funnel;
     const none = !imp.raw_rows;
-    page.innerHTML = `${runBar()}
-      <div class="card"><h2>A · Importer FinanceDatabase</h2><div class="grid cols-2"><div>
-        <p class="m-0">${imp.load ? `Dernier import : <b>${J.dateTime(imp.load.loaded_at)}</b><br><span class="small muted">Source ${J.esc(imp.source)} · version ${J.esc(imp.load.commit)} · ${nf(imp.load.rows_read)} lignes lues</span>` : '<b>Jamais importé.</b>'}</p>
-        <p class="small muted mt-2">Données brutes conservées en base : <b>${nf(imp.raw_rows)}</b> lignes${none && imp.load ? ' <span class="warn">(import fait avec l’ancienne version : relancez l’import pour pouvoir filtrer)</span>' : ''}. L’import ne filtre rien et ne supprime rien : vous pourrez changer les filtres sans retélécharger.</p></div>
-        <div><div class="small">${jobLine(imp.last)}</div><button class="btn primary mt-3" id="go-import">Importer FinanceDatabase</button></div></div></div>
-      <div class="card mt-4"><h2>B · Filtres FinanceDatabase</h2>
-        <p class="small muted">Valeurs actuelles = valeurs par défaut au départ. Tout est modifiable ; rien n’est appliqué avant de cliquer sur « Filtrer ». ${lv.pending ? '<b class="warn">Filtres modifiés depuis le dernier filtrage.</b>' : ''}</p>
-        ${filterForm(lv, { places: s.places, categories: s.categories })}
-        <details class="mb-3"><summary class="small muted pointer">Règles techniques toujours appliquées</summary>${lv.technical.map(t => `<p class="small mt-1 mb-1"><b>${J.esc(t.label)}</b> : ${J.esc(t.role)}</p>`).join('')}</details>
-        <div class="row gap-s"><button class="btn primary" id="go-filter" ${none ? 'disabled title="Importez d’abord FinanceDatabase"' : ''}>Filtrer</button><button class="btn" id="go-reset" ${lv.is_default ? 'disabled' : ''}>Valeurs par défaut</button></div></div>
-      <div class="card mt-4"><h2>C · Résultats du filtrage</h2>${none ? '<p class="muted">Aucun résultat : importez puis filtrez.</p>' : funnelBlock(f.steps, 'catalogue', f.run)}
-        ${none ? '' : '<p class="mt-3">Résultat transmis à Yahoo : <b>' + nf(f.steps[f.steps.length - 1].kept) + ' titres</b>. <a href="#yahoo">Étape suivante : Yahoo Finance →</a></p>'}</div>
-      <div id="explain" class="mt-4"></div>`;
+    const template = J.$('#admin-fdb-template');
+    page.replaceChildren(template.content.cloneNode(true));
+    J.$('#fdb-import-info').innerHTML = imp.load
+      ? `<div class="admin-import-metrics"><div><span>Dernier import</span><strong>${J.dateTime(imp.load.loaded_at)}</strong></div><div><span>Lignes conservées</span><strong>${nf(imp.raw_rows)}</strong></div></div><p class="small muted">Source ${J.esc(imp.source)} · version ${J.esc(imp.load.commit)} · ${nf(imp.load.rows_read)} lignes lues.</p>${none ? '<p class="notice warn">Cet import utilise l’ancienne version. Relancez-le pour activer le filtrage.</p>' : ''}`
+      : '<div class="admin-empty-state"><strong>Aucun import effectué</strong><p>Importez FinanceDatabase pour constituer le catalogue de départ.</p></div>';
+    J.$('#fdb-import-job').innerHTML = jobLine(imp.last);
+    J.$('#fdb-filter-status').innerHTML = lv.pending
+      ? '<span class="badge warn">Réglages en attente</span> Les filtres ont changé depuis le dernier traitement.'
+      : 'Valeurs actuelles enregistrées. Le catalogue ne change qu’après un nouveau filtrage.';
+    J.$('#fdb-filter-form').innerHTML = filterForm(lv, { places: s.places, categories: s.categories });
+    J.$('#fdb-technical-list').innerHTML = lv.technical.map(t => `<p class="small"><b>${J.esc(t.label)}</b> · ${J.esc(t.role)}</p>`).join('');
+    J.$('#go-filter').disabled = none;
+    if (none) J.$('#go-filter').title = 'Importez d’abord FinanceDatabase';
+    J.$('#go-reset').disabled = !!lv.is_default;
+    J.$('#fdb-results').innerHTML = none
+      ? '<div class="admin-empty-state"><strong>Pas encore de résultat</strong><p>Importez les données, puis lancez le filtrage.</p></div>'
+      : funnelBlock(f.steps, 'catalogue', f.run);
+    J.$('#fdb-next').innerHTML = none ? '' : `Résultat transmis à Yahoo : <b>${nf(f.steps[f.steps.length - 1].kept)} titres</b>. <a href="#yahoo">Continuer vers Yahoo Finance →</a>`;
     bindForm(); bindJobLinks(); poll();
     J.$('#go-import').onclick = () => run('fdb_import', 'Importer FinanceDatabase', 'Télécharge FinanceDatabase (quelques minutes) et remplace les données brutes stockées. Aucun filtre n’est appliqué, vos portefeuilles ne sont pas touchés.');
     J.$('#go-filter').onclick = () => saveThen('catalogue', 'fdb_filter');
