@@ -117,7 +117,9 @@
     const st = { q: '', kind: '', mic: '', page: 1 };
     host.innerHTML = '';
     async function load() {
-      const r = await J.api('admin/funnel/items', { params: { stage, step, ...Object.fromEntries(Object.entries(st).filter(([, v]) => v !== '')) } });
+      let r;
+      try { r = await J.api('admin/funnel/items', { params: { stage, step, ...Object.fromEntries(Object.entries(st).filter(([, v]) => v !== '')) } }); }
+      catch (e) { host.innerHTML = `<div class="notice err mt-4">${J.esc(e.message)}</div>`; return; }
       const cat = stage === 'catalogue';
       host.innerHTML = `<div class="card flush mt-4"><div class="row between card-bar"><h3 class="m-0">Titres · ${J.esc(label)}</h3><button class="btn sm" id="ip-close">Fermer</button></div>
         <div class="row card-bar card-bar-sub"><input id="ip-q" type="search" placeholder="Nom, symbole ou ISIN" value="${J.esc(st.q)}" data-style="flex:1;min-width:160px"><select id="ip-k"><option value="">Actions et ETF</option><option value="equity" ${st.kind === 'equity' ? 'selected' : ''}>Actions</option><option value="etf" ${st.kind === 'etf' ? 'selected' : ''}>ETF</option></select><input id="ip-m" placeholder="Place (ex. XETR)" value="${J.esc(st.mic)}" data-style="width:130px"></div>

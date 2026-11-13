@@ -233,7 +233,7 @@ Centraliser les composants n'impose pas un CSS monolithique.
 - [ ] Onglets et segments : états et navigation clavier.
 - [ ] Dialogues/panneaux : focus, fermeture et retour au déclencheur.
 - [ ] Messages, notifications, erreurs et chargements communs.
-- [ ] Menus et infobulles contenus dans le viewport.
+- [x] Menus et infobulles contenus dans le viewport. Preuve 2026-11-13 : parcours automatique des boutons non destructifs de 14 pages (bureau clair, 390 px sombre) : 0 menu/dialogue hors écran, 0 débordement.
 - [ ] Primitives graphiques partagées lorsque leur fonction est identique.
 
 Clôture : composants réels conformes à la direction retenue, variantes identifiées,
@@ -293,7 +293,7 @@ Adapter cette liste aux pages réellement actives du dépôt courant.
 - [ ] Options et badges lisibles au clavier et au toucher.
 - [ ] Modification d'une stratégie ou d'un filtre sans recherche automatique.
 - [x] Application explicite et chargement perceptible. Preuve 2026-11-13 : « Recherche en cours… », spinner, #ct-apply désactivé (bureau/mobile, clair/sombre).
-- [ ] États distincts : à jour, réglages modifiés, aucun résultat, erreur.
+- [ ] États distincts : à jour, réglages modifiés, aucun résultat, erreur. Partiel 2026-11-13 : « à jour », chargement, aucun résultat et erreur (500 simulé : message « Résultats non actualisés : … Réessayez », bouton réactivé) vus ; « réglages modifiés » à revoir.
 - [x] Tableau consultable sans élargir toute la page. Preuve 2026-11-13 : tableau défile dans .ct-table-wrap (1384 px dans 1010 px ; 966 dans 364 mobile), scrollWidth page = 390.
 - [ ] Règles ET/OU, colonnes, tris et modes toujours utilisables.
 
@@ -749,3 +749,8 @@ Pagination : `flex-wrap` + visuels dédoublés retirés (halo.css gouverne). Dé
 ### Lot CSS étape 3 — 2026-11-13
 
 Formatage Prettier (e2a2ed4), garde-fou anti-surcharge, 16 règles déplacées dans halo.css, 5 exceptions documentées, favicon, tableau Données défilant, titre.js protégé. Mesures : 19 pages × 4 largeurs × 2 thèmes, 0 débordement, 0 erreur. Restent : états dynamiques Mes stratégies, Portefeuilles, Administration, dialogues, erreur Explorateur ; galerie de référence ; relance complète des tests.
+
+
+### Recette dynamique (parcours automatique) — 2026-11-13
+
+Parcours des boutons non destructifs sur 14 pages (1280 clair, 390 sombre) : menus et dialogues s'ouvrent, restent dans l'écran, se ferment avec Échap, aucun débordement, aucune erreur JS. Erreur d'API simulée sur l'Explorateur : message clair, bouton réactivé. Correctif : admin.js affiche une erreur si « Voir les titres » échoue (avant : panneau vide). Non couvert : actions qui écrivent (créer, renommer, supprimer, transactions) vérifiées par les tests e2e/integ sur la base jetable, pas visuellement ; appareil réel ; contraste automatisé.
