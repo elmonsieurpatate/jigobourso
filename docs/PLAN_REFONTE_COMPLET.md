@@ -685,7 +685,9 @@ Reste : F08 (≈60 `data-style` de présentation fixe, surtout admin.js et donne
 
 Lot suivant (même jour) : présentation fixe des `data-style` migrée vers des classes de halo.css (admin.js, donnees.js, admin-scores-view.js, titre.js, aide.js, mes-strategies.js) ; restent seulement des valeurs calculées ou de la disposition.
 Tests sur l'état local non commité : `make fast` 656 réussis ; `make lint` OK ; `make e2e` OK (3 parcours) ; `make integ` 336 réussis. Re-mesure des styles calculés conforme sur les pages touchées. Recette manuelle locale validée par l'utilisateur.
-Reste : états dynamiques par page (menus, dialogues, erreur, chargement) pour cocher l'étape 2 ; F08 reste ouvert tant que les `data-style` calculés ne sont pas justifiés un à un ; commit non fait.
+Commits : `bd23c36` (migration des `data-style`), `4b8435a` (plan). Poussés sur `main` ; le job de déploiement automatique du workflow se déclenche au push (aucun déploiement manuel). Résultat du workflow : voir le prochain lot.
+Reste : états dynamiques par page (menus, dialogues, erreur, chargement) pour cocher l'étape 2 ; F08 reste ouvert tant que les `data-style` calculés ne sont pas justifiés un à un.
+Prochain sous-lot précis : recette des états dynamiques, page par page, en commençant par l'Explorateur (sélecteur de stratégie, filtres secondaires, menu des colonnes, états vide/erreur/chargement, mobile), puis Mes stratégies, Portefeuilles, Administration.
 
 ### État initial
 
