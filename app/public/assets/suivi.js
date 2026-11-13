@@ -33,7 +33,7 @@
       const rows = byDay[d], origin = rows.some(r => r.origin === 'rebuilt') ? ' · reconstitué' : '';
       const cell = (e, h) => e.returns[h] === undefined ? '<td class="num muted">–</td>' : `<td class="num ${J.cls(e.returns[h])}">${J.pct(e.returns[h], 1)}</td>`;
       return `<details><summary>${J.date(d)}${origin} · ${rows.length} titre(s)</summary><div class="table-wrap"><table>${J.table.head(["Titre", "Stratégie", ["Rang", 'num'], ["+1 séance", 'num'], ["+3", 'num'], ["+5", 'num']])}<tbody>
-        ${rows.map(e => `<tr><td><a href="titre.html?id=${e.id}"><b>${J.esc(e.symbol)}</b></a> <span class="small muted">${J.esc(e.name)}</span></td><td class="small">${J.esc(s.presets[e.preset].label)}</td><td class="num">${e.rank}</td>${[1, 3, 5].map(h => cell(e, h)).join('')}</tr>`).join('')}</tbody></table></div></details>`;
+        ${rows.map(e => `<tr><td><a href="titre.html?id=${e.id}"><b>${J.esc(e.symbol)}</b></a> <span class="small muted">${J.esc(e.name)}</span></td><td class="small">${J.esc((s.presets[e.preset] || {}).label || e.preset)}</td><td class="num">${e.rank}</td>${[1, 3, 5].map(h => cell(e, h)).join('')}</tr>`).join('')}</tbody></table></div></details>`;
     }).join('') || '<div class="empty">Rien à afficher pour ce choix.</div>';
   }
   page.innerHTML = `${warn}${rebuilt}
