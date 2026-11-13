@@ -157,12 +157,12 @@ label.field, .ac label { color: var(--muted); font-size: var(--label-size); font
 .small { font-size: var(--text-sm); }
 
 /* Boutons : .btn (+ .primary .danger .ghost .sm .icon) et les boutons d'action des composants métier. */
-:is(.btn, .as-win button, .ct-pagination button, .sr-pages button, .px-per button, .ct-group-actions button, .ct-multi-popup footer button, .help-mode button, .ct-ranking-controls summary, .ct-fold) {
+:is(.btn, .as-win button, .ct-pagination button, .sr-pages button, .px-per button, .ct-group-actions button, .ct-multi-popup footer button, .help-mode button, .ct-ranking-controls summary, .ct-columns summary, .ct-fold) {
   min-height: var(--control-h); padding: var(--btn-pad); border: 1px solid var(--line); border-radius: var(--control-radius);
   background: var(--surface); color: var(--text); font: 700 var(--btn-size)/1.45 var(--font); box-shadow: none; text-decoration: none;
   transition: background .15s, border-color .15s, color .15s, box-shadow .15s;
 }
-:is(.btn, .as-win button, .ct-pagination button, .sr-pages button, .px-per button, .ct-group-actions button, .ct-multi-popup footer button, .help-mode button, .ct-ranking-controls summary, .ct-fold):hover { background: var(--halo-hover); border-color: var(--accent); color: var(--text); text-decoration: none; }
+:is(.btn, .as-win button, .ct-pagination button, .sr-pages button, .px-per button, .ct-group-actions button, .ct-multi-popup footer button, .help-mode button, .ct-ranking-controls summary, .ct-columns summary, .ct-fold):hover { background: var(--halo-hover); border-color: var(--accent); color: var(--text); text-decoration: none; }
 :is(.as-win button.on, .px-per button.on, .help-mode button[aria-pressed=true], .ct-pagination button[aria-current=page], .sr-pages button[aria-current=page]) { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
 .btn.primary { background: linear-gradient(110deg, var(--accent), color-mix(in srgb, var(--accent) 78%, #87a5ee)); border-color: var(--accent); color: var(--accent-ink); box-shadow: 0 5px 20px color-mix(in srgb, var(--accent) 22%, transparent); }
 .btn.primary:hover { background: var(--accent); color: var(--accent-ink); filter: brightness(1.06); }
@@ -299,8 +299,7 @@ details, summary { color: inherit; }
 /* Hauteur tactile et corps de texte des champs sur petit écran (au moins 16 px : pas de zoom automatique sur iOS). */
 @media (max-width: 700px) {
   :is(input:not([type=checkbox], [type=radio], [type=range], [type=color], [type=file], [type=hidden]), select, textarea) { font-size: var(--control-size-mobile); }
-  .btn { min-height: 37px; }
-  .btn.sm { min-height: 32px; }
+  :root { --control-h: 40px; --control-h-sm: 32px; }
   .ct .ct-strategy .sui-pick-btn { height: auto; min-height: 66px; }
   .ct .ct-group-operator select { height: 32px; min-height: 32px; }
 }
@@ -360,8 +359,7 @@ details, summary { color: inherit; }
   .ct-strategy, .ct-ranking-head { padding: 12px; }
   .ct-filters { padding: 12px; }
   .ac-filter-selector, .ac-overview { padding: 13px; }
-  .btn { min-height: 37px; }
-  .btn.sm { min-height: 32px; }
+  :root { --control-h: 40px; --control-h-sm: 32px; }
 }
 
 .side .nv .lbl, .side .sv { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.3; }
