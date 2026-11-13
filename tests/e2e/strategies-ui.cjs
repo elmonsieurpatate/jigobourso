@@ -22,7 +22,7 @@ const api=(pg,route,body)=>pg.evaluate(async([r,b])=>{try{const j=b?await J.post
   for(const r of ['admin/scores','admin/table-layouts','admin/users']){const x=await api(U.pg,r);must(x.json===null,'Route admin ouverte à un compte ordinaire : '+r);}
   must((await api(A.pg,'admin/scores')).json!==null,'Admin refusé');
   // 3. sélecteur groupé : 7 intégrées Officielles, une entrée chacune
-  const opts=async pg=>{await pg.click('.sui-pick-btn');const o=await pg.$$eval('.sui-opt',x=>x.map(e=>({id:e.dataset.id,label:e.querySelector('.grow').textContent.trim(),badge:e.querySelector('.sui-badge').textContent.trim()})));const g=await pg.$$eval('.sui-grp',x=>x.map(e=>e.textContent.trim()));await pg.keyboard.press('Escape');return {o,g};};
+  const opts=async pg=>{await pg.click('.sui-pick-btn');const o=await pg.$$eval('.sui-opt',x=>x.map(e=>({id:e.dataset.id,label:e.querySelector('.grow').textContent.trim(),badge:e.querySelector('.badge').textContent.trim()})));const g=await pg.$$eval('.sui-grp',x=>x.map(e=>e.textContent.trim()));await pg.keyboard.press('Escape');return {o,g};};
   const u=await opts(U.pg);
   must(/^Stratégies intégrées \(7\)$/i.test(u.g[0]),'Groupe : '+u.g);must(u.o.filter(x=>x.badge.toLowerCase()==='officielle').length===7,'7 Officielles attendues : '+JSON.stringify(u.o));
   must(new Set(u.o.map(x=>x.label)).size===u.o.length,'Doublon de stratégie');
@@ -47,7 +47,7 @@ const api=(pg,route,body)=>pg.evaluate(async([r,b])=>{try{const j=b?await J.post
   await U.pg.goto(BASE+'mes-scores.html');await U.pg.waitForSelector('[data-a="tab"]');
   must(!(await U.pg.$$eval('[data-a="tab"]',b=>b.some(x=>/Suivi/.test(x.textContent)))),'Onglet de suivi visible côté utilisateur');
   await U.pg.goto(BASE+'mes-colonnes.html');await U.pg.waitForSelector('.ac-list');
-  await U.pg.goto(BASE+'mes-filtres.html');await U.pg.waitForSelector('#ac-filter-select option');must(!U.pg.url().endsWith('index.html'),'Mes filtres redirige encore vers l Explorer');must((await U.pg.$$('[data-category-id]')).length>0,'Options éditables absentes de Mes filtres');
+  await U.pg.goto(BASE+'mes-filtres.html');await U.pg.waitForSelector('#ac-filter-select option',{state:'attached'});must(!U.pg.url().endsWith('index.html'),'Mes filtres redirige encore vers l Explorer');must((await U.pg.$$('[data-category-id]')).length>0,'Options éditables absentes de Mes filtres');
   // 7. Aide : cours interactif (un chapitre à la fois), recherche, modes, 7 fiches, démo pente/régularité, simulateur, section admin
   await U.pg.goto(BASE+'aide.html');await U.pg.waitForSelector('.h-body');
   must((await U.pg.$$('.h-body')).length===1,'Un seul chapitre attendu à l’écran');must(/Bienvenue/.test(await U.pg.textContent('.h-head h1')),'Premier chapitre : Bienvenue');
@@ -80,7 +80,7 @@ const api=(pg,route,body)=>pg.evaluate(async([r,b])=>{try{const j=b?await J.post
   await A.pg.goto(BASE+'aide.html');await A.pg.waitForSelector('#h-toc a[data-id="admin"]');
   // mot d'invitation visible de l'administrateur seulement
   must((await api(A.pg,'admin/settings',{name:'invite_code',value:'motdetest'})).json,'Mot d’invitation non enregistré');
-  must((await api(A.pg,'admin/system')).json.settings.invite_code==='motdetest','Mot d’invitation non visible de l’administrateur');
+  must((await api(A.pg,'admin/system')).json.settings.invite_code==='m'+'•'.repeat(8),'Mot d’invitation : l’administrateur doit le voir masqué (première lettre et longueur), jamais en clair');
   must((await api(U.pg,'admin/system')).json===null,'admin/system ouvert à un compte ordinaire');
   // 8. mobile : pas de débordement horizontal
   const M=await login(browser,'plain_user','plain-local-password',390);
