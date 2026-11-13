@@ -52,7 +52,7 @@
 /* Classement : rang, nom, courbe{ display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
 .as-rk { display: grid; grid-template-columns: 38px minmax(0, 1fr) 100px auto; gap: 10px; align-items: center; padding: 7px 12px; border-bottom: 1px solid var(--line); font-size: .9rem; }
 .as-rk:last-child { border-bottom: 0; }
-.as-rk.pick { cursor: pointer; } .as-rk.pick:hover, .as-rk.pick:focus { background: var(--surface-2, rgba(127,127,127,.08)); outline: 0; }
+.as-rk.pick { cursor: pointer; } .as-rk.pick:hover, .as-rk.pick:focus-visible { background: var(--surface-2, rgba(127,127,127,.08)); } .as-rk.pick:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .as-rk-n { color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; }
 .as-rk-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .as-rk-sc { display: grid; grid-template-columns: auto auto; column-gap: 8px; align-items: baseline; justify-items: end; font-variant-numeric: tabular-nums; min-width: 120px; }

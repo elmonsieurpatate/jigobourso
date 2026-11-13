@@ -332,3 +332,12 @@ button, select, input, textarea { font: inherit; }
 button, summary, select, input[type=checkbox] { cursor: pointer; }
 button:disabled { cursor: not-allowed; }
 
+/* ───── Accessibilité : lien d'évitement et réduction des animations ───── */
+.skip-link { position: absolute; left: 8px; top: -48px; z-index: 1000; padding: 10px 16px; border-radius: 8px; background: var(--surface); color: var(--text); border: 2px solid var(--accent); font-weight: 700; text-decoration: none; }
+.skip-link:focus { top: 8px; }
+main:focus { outline: 0; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+  .spinner { animation: none; border-top-color: var(--accent); }
+}
+

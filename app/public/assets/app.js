@@ -107,6 +107,8 @@ J.init = async function (page, { admin = false } = {}) {
   if (!me.user) { location.href = 'login.html?next=' + encodeURIComponent(location.pathname.split('/').pop() + location.search); return null; }
   if (admin && !me.user.is_admin) { location.href = 'index.html'; return null; }
   J.user = me.user;
+  const main = document.querySelector('main');          // lien d'évitement : premier élément focalisable de la page
+  if (main && !document.querySelector('.skip-link')) { main.id = main.id || 'contenu'; main.tabIndex = -1; const skip = document.createElement('a'); skip.className = 'skip-link'; skip.href = '#' + main.id; skip.textContent = 'Aller au contenu'; document.body.prepend(skip); }
   const prefs = me.user.prefs || {};
   J.applyTheme(prefs.theme || J.store.text.get('jigo_theme') || 'auto');
   document.body.classList.toggle('advanced', prefs.mode === 'advanced');
