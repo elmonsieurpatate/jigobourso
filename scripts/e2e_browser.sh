@@ -11,7 +11,7 @@ python tests/seeds/account_seed.py > /dev/null
 php scripts/create_user.php review_user review-local-password --admin --email=review@example.test > /dev/null
 php scripts/create_user.php plain_user plain-local-password --email=plain@example.test > /dev/null
 python tests/seeds/etf_seed.py > /dev/null
-PHP_CLI_SERVER_WORKERS=4 php -S 127.0.0.1:18089 -t app/public > /dev/null 2>&1 & pid=$!
+php -S 127.0.0.1:18089 -t app/public > /dev/null 2>&1 & pid=$!
 out=$(mktemp -d)
 trap 'kill $pid 2>/dev/null' EXIT
 for _ in $(seq 50); do curl -sf -o /dev/null http://127.0.0.1:18089/login.html && break; sleep .2; done
