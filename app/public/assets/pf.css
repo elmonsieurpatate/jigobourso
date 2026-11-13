@@ -338,14 +338,6 @@ a.px-sum:hover {
   text-align: left;
   white-space: nowrap;
 }
-.px-t th button {
-  border: 0;
-  background: none;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-  padding: 4px 0;
-}
 .px-t td {
   vertical-align: middle;
 }
@@ -647,10 +639,6 @@ body.px-lock {
   margin: 4px 0 8px;
   display: inline-flex;
 }
-.px-fig td.px-na {
-  color: var(--muted);
-  font-size: 0.8rem;
-}
 .px-part {
   display: block;
   color: var(--warn);
@@ -911,14 +899,6 @@ body.px-lock {
   max-width: 94px;
   background: var(--surface);
   min-height: 24px;
-}
-.fc-tip button {
-  font: inherit;
-  background: none;
-  color: var(--accent);
-  border: 0;
-  cursor: pointer;
-  padding: 4px;
 }
 .fc-tip {
   top: 48px;

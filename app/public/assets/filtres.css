@@ -49,12 +49,7 @@
   color: var(--muted);
 }
 .ac .ac-search input {
-  height: 34px;
   width: 100%;
-  border: 0;
-  background: transparent;
-  font-size: 11px;
-  padding: 0;
   min-width: 0;
 }
 .ac-indicators {
@@ -192,11 +187,6 @@
 .ac-editor > header h3 {
   margin: 0;
 }
-.ac-editor > header > button {
-  border: 0;
-  background: none;
-  font-size: 21px;
-}
 .ac-edit-grid {
   display: grid;
   grid-template-columns: minmax(100px, 1.3fr) minmax(75px, 1fr) minmax(75px, 1fr) minmax(110px, 1.2fr) 65px;
@@ -209,8 +199,6 @@
   gap: 5px;
 }
 .ac .ac-editor input[type="color"] {
-  padding: 4px;
-  cursor: pointer;
   min-width: 45px;
 }
 .ac select {

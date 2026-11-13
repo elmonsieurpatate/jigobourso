@@ -840,6 +840,103 @@ tr:last-child td {
   color: var(--muted);
 }
 /* Tableaux transformés en cartes sur mobile : la disposition prime sur le remplissage commun. */
+/* Variantes issues des feuilles de pages (déplacées pour garder halo.css source unique) */
+.as-group td {
+  background: var(--surface-2);
+  font-weight: 700;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+tr[data-child-of] td {
+  background: color-mix(in srgb, var(--surface-2) 55%, transparent);
+}
+.card.fold {
+  padding: 0;
+}
+.ct-period button {
+  background: none;
+  border: 0;
+  color: var(--text);
+  padding: 13px 5px 6px;
+  font-weight: 650;
+}
+.ct-number input {
+  font-weight: 650;
+}
+.ct .ct-group-operator select {
+  height: 28px;
+  padding: 2px 4px;
+  background: var(--accent);
+  color: white;
+  font-size: 11px;
+  font-weight: 750;
+  border: 0;
+  border-radius: 6px;
+  background-image: none;
+}
+body .ct .ct-group-operator select {
+  background-image: none;
+  background-color: var(--accent);
+  color: var(--accent-ink);
+  padding: 2px 4px;
+}
+.ct .ct-category-search input {
+  height: 32px;
+  background: transparent;
+  border: 0;
+  font-size: 11px;
+  padding: 3px 0;
+  border-radius: 0;
+}
+.ct-ranking th button {
+  border: 0;
+  background: none;
+  color: inherit;
+  padding: 0;
+  font-weight: 650;
+  font-size: inherit;
+}
+.ct-period button {
+  padding: 9px 6px 2px;
+  font-size: 13px;
+}
+.ac .ac-search input {
+  height: 34px;
+  border: 0;
+  background: transparent;
+  font-size: 11px;
+  padding: 0;
+}
+.ac-editor > header > button {
+  border: 0;
+  background: none;
+  font-size: 21px;
+}
+.ac .ac-editor input[type="color"] {
+  padding: 4px;
+  cursor: pointer;
+}
+.px-t th button {
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  padding: 4px 0;
+}
+.px-fig td.px-na {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.fc-tip button {
+  font: inherit;
+  background: none;
+  color: var(--accent);
+  border: 0;
+  cursor: pointer;
+  padding: 4px;
+}
+
 @media (max-width: 700px) {
   .ac td {
     padding: 0;
@@ -1967,4 +2064,24 @@ main.wrap.auth-wrap {
   border: 0;
   padding: 0;
   margin: 0;
+}
+
+/* Contrôles du sélecteur de période, de la recherche de catégories et des curseurs sur petit écran */
+@media (max-width: 700px) {
+  .ct-period button {
+    font-size: 12px;
+    padding: 8px 6px 8px 10px;
+  }
+  .ct .ct-category-search input {
+    font-size: 16px;
+    min-height: 44px;
+    height: 44px;
+  }
+  .ct-control .ct-number input {
+    height: 34px;
+    font-size: 16px;
+  }
+  .ct-control .ct-slider-row > button {
+    height: 34px;
+  }
 }

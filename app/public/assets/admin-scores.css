@@ -282,13 +282,6 @@
     display: none;
   }
 }
-
-.as-group td {
-  background: var(--surface-2);
-  font-weight: 700;
-  font-size: 0.82rem;
-  color: var(--muted);
-}
 .as-legacy td {
   opacity: 0.8;
 }

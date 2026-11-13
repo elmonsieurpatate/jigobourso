@@ -41,6 +41,38 @@ for sheet in ASSETS.glob("*.css"):
     if re.search(r"#[0-9a-fA-F]{3,8}\b|\brgb\(", source):
         errors.append(f"{sheet.name}: couleur littérale hors halo.css")
 
+# Surcharges locales interdites : une feuille de page ne redéfinit pas l'apparence d'un composant commun
+# (titres, boutons, champs, cellules, badges, cartes, onglets). Elle ne garde que la mise en page.
+COMPONENT = r"(?:h[1-6]|button|input|select|textarea|th|td|\.btn|\.badge|\.card|\.tab|\.seg|\.chip|\.switch)"
+VISUAL = {
+    "font-size", "font-weight", "letter-spacing", "border-radius", "padding", "height", "min-height",
+    "background", "background-color", "border", "box-shadow", "line-height", "text-transform",
+}
+# Exceptions légitimes, avec leur raison (feuille, sélecteur normalisé).
+EXCEPTIONS = {
+    ("explorer.css", ".ct-ranking td.ct-cell-name"): "colonne figée : fond opaque et séparateur nécessaires au défilement horizontal",
+    ("explorer.css", ".ct-ranking th.ct-name-heading"): "colonne figée : fond opaque nécessaire au défilement horizontal",
+    ("filtres.css", ".ac td"): "tableau transformé en cartes sur mobile : bordures de ligne",
+    ("filtres.css", ".ac td:before"): "libellé de cellule en mode cartes sur mobile",
+    ("pf.css", ".px-t td"): "tableau transformé en cartes sur mobile : bordures de ligne",
+}
+for sheet in ASSETS.glob("*.css"):
+    if sheet == HALO:
+        continue
+    for m in re.finditer(r"([^{}@]+)\{([^{}]*)\}", sheet.read_text()):
+        props = {d.split(":")[0].strip() for d in m.group(2).split(";") if ":" in d}
+        bad = VISUAL & props
+        if not bad:
+            continue
+        for sel in (x.strip() for x in m.group(1).split(",")):
+            norm = " ".join(sel.split())
+            last = re.split(r"[\s>+~]+", norm)[-1]
+            base = re.sub(r":[\w-]+(\([^)]*\))?|\[[^\]]*\]", "", last)
+            if (re.fullmatch(COMPONENT + r"(\.[\w-]+)*", base) or re.fullmatch(r"(\.[\w-]+)?" + COMPONENT, base)) \
+                    and (sheet.name, norm) not in EXCEPTIONS:
+                errors.append(f"{sheet.name}: surcharge locale de composant commun « {norm} » ({', '.join(sorted(bad))}) : à déplacer dans halo.css")
+                break
+
 if errors:
     raise SystemExit("\n".join(errors))
 print(f"Halo CSS: {len(pages)} pages, jetons communs uniques, ordre des feuilles correct")

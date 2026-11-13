@@ -39,6 +39,7 @@
   else if (src.startsWith('pf:')) reqBody.portfolio = +src.slice(3);
   let s;
   try { s = await J.post('sheet', reqBody); } catch (e) { page.innerHTML = `<div class="notice err">${J.esc(e.message)}</div>`; return; }
+  if (!s || !s.symbol) { page.innerHTML = '<div class="notice err">Titre introuvable.</div>'; return; }
   document.title = s.name + ' — Jigobourso';
   const tvMarket = {XNAS:'NASDAQ',XNYS:'NYSE',ARCX:'AMEX',XETR:'XETR',XPAR:'EURONEXT',XLON:'LSE',XAMS:'EURONEXT',XMIL:'MIL'}[s.mic];
   const localSymbol=s.symbol.replace(/\.(DE|PA|AS|L|MI|SW|MU)$/,'');
