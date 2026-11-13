@@ -292,9 +292,9 @@ Adapter cette liste aux pages réellement actives du dépôt courant.
 - [x] Sélecteur de stratégie contenu sur petit écran. Preuve : menu à 25–365 px sur 390 px, clair et sombre (mesure + capture).
 - [ ] Options et badges lisibles au clavier et au toucher.
 - [ ] Modification d'une stratégie ou d'un filtre sans recherche automatique.
-- [ ] Application explicite et chargement perceptible.
+- [x] Application explicite et chargement perceptible. Preuve 2026-11-13 : « Recherche en cours… », spinner, #ct-apply désactivé (bureau/mobile, clair/sombre).
 - [ ] États distincts : à jour, réglages modifiés, aucun résultat, erreur.
-- [ ] Tableau consultable sans élargir toute la page.
+- [x] Tableau consultable sans élargir toute la page. Preuve 2026-11-13 : tableau défile dans .ct-table-wrap (1384 px dans 1010 px ; 966 dans 364 mobile), scrollWidth page = 390.
 - [ ] Règles ET/OU, colonnes, tris et modes toujours utilisables.
 
 ## Points particuliers financiers
@@ -740,3 +740,7 @@ sur bureau et mobile ; changement de niveau et sommaire mobile vérifiés.
 Les contenus réels des pages nécessitant une session authentifiée n'ont pas
 été rejoués dans ce lot. Cette note décrit le lot local antérieur au commit
 `024768e` ; elle ne décrit pas à elle seule l'état Git actuel.
+
+### Recette Explorateur (suite) — 2026-11-13
+
+Pagination : `flex-wrap` + visuels dédoublés retirés (halo.css gouverne). Débordement mobile corrigé (scrollWidth 390). Résultats 50 lignes, focus clavier visible sur les premiers arrêts. Non vérifié : état d'erreur, règles ET/OU, badges au tactile. Tests non relancés (fin de lot).
