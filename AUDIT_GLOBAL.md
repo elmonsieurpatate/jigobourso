@@ -158,25 +158,26 @@ Réalisé le 12/11/2026. Chargement vérifié sur une copie servie par PHP aprè
 - [x] `filtres-catalogue.js` (2 848 lignes de données) découpé : un fichier `filtres-catalogue-<id>.js` par filtre (13) + `-indicators`, contenu strictement identique à l'original (vérifié) ; test `admin-categories-model.cjs` adapté
 - [x] `explorer.js` (617 → 480 lignes) scindé en `explorer-model.js` (logique pure : profils, arbre de règles, sauvegarde locale, filtres, lignes, tri ; testé sous Node par `tests/e2e/explorer-model.cjs`) et `explorer-view.js` (gabarits HTML purs) ; `admin-scores.js` (547 → 338) scindé en `admin-scores-view.js` (gabarits et libellés, lisant l'état par des accesseurs). Vérifié par des instantanés DOM identiques avant/après sur la base locale réelle (24 pour l'explorateur : Expert, règles, filtres, tri, pages, colonnes, stratégie ; 49 pour les scores : admin et « Mes paramètres », configuration, profils, simulation, suivi). Bug trouvé au passage et corrigé : l'onglet Profils de « Mes paramètres de scores » plantait (`S.personal` absent).
 
-## Étape 8 : CSP, styles inline et accessibilité 🟠
+## Étape 8 : CSP, styles inline et accessibilité ✅
 
-- [ ] Remplacer les ≈ 270 `style="` générés en JS (`admin.js` 83, `titre.js` 37, `admin-scores.js` 29, `donnees.js` 15, `mes-strategies.js` 12) par des classes utilitaires ou `el.style`, puis retirer `'unsafe-inline'` de `style-src` (`.htaccess:12`)
-- [ ] Recenser et remplacer les `onclick=` / `onchange=` (≈ 50, décompte à vérifier) : bloqués par `script-src 'self'`
-- [ ] Auditer les `innerHTML` (XSS côté client, non couvert)
-- [ ] Focus visible partout : retirer `outline:0` (`help.css:16`, `admin-scores.css:58`), corriger `all:unset`
-- [ ] `aria-label` sur les boutons-icônes, `<label>` sur les `<input>` (`admin.js`, `donnees.js`, `titre.js`)
-- [ ] Revoir les polices de 9–10 px en `var(--muted)` (contraste)
-- [ ] Ajouter `prefers-reduced-motion`, lien « aller au contenu »
+- [x] CSP : `style-src 'self'` (plus de `'unsafe-inline'` pour balises et feuilles) ; `style-src-attr 'unsafe-inline'` reste nécessaire. **Non fait, volontairement** : convertir en classes les 137 attributs `style=` générés en JS (dont ≈ 39 portent des couleurs/largeurs calculées) ; un plafond (`STYLE_ATTR_CEILING`) interdit toute hausse. Réserve : Safari < 15.4 ignore `style-src-attr` et retombe sur `style-src`.
+- [x] `onclick=` / `onchange=` : aucun attribut inline existant (les gestionnaires sont assignés en JS, compatibles CSP) ; un test interdit d'en ajouter
+- [x] `innerHTML` audités : champs libres échappés via `J.esc`, liste des exceptions relues dans `REVIEWED_FREE_TEXT` (test `test_free_text_fields_are_escaped_in_templates`) ; un oubli d'échappement trouvé et corrigé (`suivi.js`)
+- [x] Focus visible rétabli (`help.css`, `admin-scores.css`)
+- [x] `aria-label` sur les champs numériques sans libellé (`admin.js`) ; les autres champs sont déjà dans des `<label>`
+- [x] Texte 10 px porté à 11 px ; contraste de `--muted` vérifié AA dans les deux thèmes
+- [x] `prefers-reduced-motion` et lien « Aller au contenu » (`app.js`, `base.css`)
 
-## Étape 9 : Finitions
+## Étape 9 : Finitions ✅ (avec réserves)
 
-- [ ] Harmoniser le style PHP : espaces, lignes > 250 car. (`lib/auth.php:17-50`, `routes/auth.php:48-60`, `admin.php`, `alerts.php`)
-- [ ] Borner la pagination `$page` (`admin.php:91`, `admin/catalogue`) ; lier `$size`/`OFFSET` en paramètres (`admin.php:93`)
-- [ ] Revoir `JSON_PARTIAL_OUTPUT_ON_ERROR` (masque les erreurs d'encodage) ; envoyer `send_welcome_mail` après `out_then` plutôt que de façon synchrone
-- [x] Fusionner les doublons `.card`/`th` résiduels, nettoyer le CSS mort détecté après les étapes 6–7
-- [ ] Unifier la stack de tests e2e (`.cjs`, `.php`, seeds Python : 3 technologies)
-- [ ] Mettre à jour README / docs d'architecture (sous-paquets analytics, `scripts/release/`, `scripts/oneshot/`, `ops/`)
-- [ ] Rejouer toute la suite de tests et une vérification de déploiement ; supprimer les shims restants
+- [~] Style PHP : seules les zones touchées sont harmonisées ; pas de reformatage de masse (risque sans gain fonctionnel)
+- [x] Pagination `admin/catalogue` : page bornée, `LIMIT`/`OFFSET` liés en paramètres (la partie Python l'était déjà)
+- [x] `JSON_PARTIAL_OUTPUT_ON_ERROR` retiré : UTF-8 invalide substitué, autre erreur journalisée et signalée
+- [~] `send_welcome_mail` reste synchrone : son résultat est renvoyé à l'utilisateur (`welcome_mail`), le différer changerait le contrat de l'API
+- [x] Doublons `.card`/`th` fusionnés, CSS mort nettoyé
+- [ ] Unification des tests e2e (`.cjs`, `.php`, seeds Python) : non faite, chantier distinct
+- [x] README court et docs d'architecture à jour (sous-paquets analytics, `ops/`, `scripts/oneshot/`)
+- [x] Suite complète rejouée : make check (656), make integ (336), navigateur financial + strategies-ui + account-navigation, tous verts ; aucun shim restant
 
 ---
 

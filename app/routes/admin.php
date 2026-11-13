@@ -76,10 +76,10 @@ return [
         foreach (['kind' => 'i.kind', 'mic' => 'l.mic', 'status' => 'l.status'] as $k => $col) if (($_GET[$k] ?? '') !== '') { $where[] = "$col = ?"; $args[] = (string)$_GET[$k]; }
         if (($_GET['primary'] ?? '') === '1') $where[] = 'l.is_primary = 1';
         $w = $where ? ' WHERE ' . implode(' AND ', $where) : '';
-        $page = max(1, (int)($_GET['page'] ?? 1)); $size = 50;
+        $size = 50; $page = min(100000, max(1, (int)($_GET['page'] ?? 1)));   // page bornée ; LIMIT/OFFSET liés en paramètres
         $total = (int)q("SELECT COUNT(*) FROM listings l JOIN instruments i ON i.id = l.instrument_id$w", $args)->fetchColumn();
         $rows = q("SELECT l.id, l.symbol, l.mic, l.currency, l.status, l.excluded_reason, l.is_primary, l.primary_reason, i.name, i.isin, i.kind, i.country, i.category, p.price, p.price_time, s.last_close_date, s.closes_count, s.quality
-                   FROM listings l JOIN instruments i ON i.id = l.instrument_id LEFT JOIN latest_prices p ON p.listing_id = l.id LEFT JOIN series_state s ON s.listing_id = l.id$w ORDER BY i.name, l.mic LIMIT $size OFFSET " . (($page - 1) * $size), $args)->fetchAll();
+                   FROM listings l JOIN instruments i ON i.id = l.instrument_id LEFT JOIN latest_prices p ON p.listing_id = l.id LEFT JOIN series_state s ON s.listing_id = l.id$w ORDER BY i.name, l.mic LIMIT ? OFFSET ?", array_merge($args, [$size, ($page - 1) * $size]))->fetchAll();
         $reasons = q("SELECT excluded_reason r, COUNT(*) n FROM listings WHERE status = 'excluded' GROUP BY excluded_reason ORDER BY n DESC LIMIT 25")->fetchAll();
         $mics = q('SELECT DISTINCT mic FROM listings ORDER BY mic')->fetchAll(PDO::FETCH_COLUMN);
         $load = q('SELECT source_commit, loaded_at, rows_read, rows_kept, rules_json FROM catalogue_loads ORDER BY id DESC LIMIT 1')->fetch();

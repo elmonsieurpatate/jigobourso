@@ -56,10 +56,11 @@ Le schéma initial (colonnes fixes 5 j / 21 j) ne pouvait **pas** les reproduire
 
 ```
 db/schema.sql            schéma unique
-engine/                  Python : catalogue/ market/ analytics/ jobs/ shared/ cli.py
+engine/                  Python : catalogue/ market/ analytics/ (admin, explorer, market_views, portfolio, scoring, series, shared) jobs/ shared/ cli.py
 app/                     PHP : public/ (HTML, assets/) routes/ services/ lib/
 tests/                   fast/ (sans base) integ/ (MariaDB jetable) fixtures/
 scripts/                 local_db.sh, migrate.py, vérifications de release, oneshot/ (voir scripts/README.md)
+ops/                     deploy.sh, report-status.sh, public-log.sh, runners de sandbox (déploiement et exploitation)
 docs/                    ARCHITECTURE.md, FONCTIONNALITES.md
 reference/               extraits de l'ancien code consultés pour la parité (non exécutés en production)
 ```

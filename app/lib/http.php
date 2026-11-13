@@ -5,7 +5,10 @@ class ApiError extends Exception {
     public function __construct(string $message, int $status = 400) { parent::__construct($message); $this->status = $status; }
 }
 function json_text($data): string {
-    return (string)json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PARTIAL_OUTPUT_ON_ERROR);
+    // UTF-8 invalide remplacé (jamais de sortie tronquée en silence) ; toute autre erreur d'encodage est signalée, pas masquée.
+    $json = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE);
+    if ($json === false) { error_log('json_text : ' . json_last_error_msg()); return '{"error":"Réponse illisible (erreur d\'encodage)"}'; }
+    return $json;
 }
 function json_headers(int $status): void {
     http_response_code($status);
