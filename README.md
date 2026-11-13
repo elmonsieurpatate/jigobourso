@@ -40,4 +40,4 @@ Une seule tâche cron hPanel, toutes les 5 minutes, appelle `api/cron` (en-tête
 
 ## Sécurité du front
 
-CSP stricte : `script-src 'self'`, `style-src 'self'` (aucune balise ni feuille inline ; seuls des attributs `style=` restent permis, leur nombre est plafonné par un test). Détails : `docs/SECURITE.md`, `docs/FRONTEND_STRUCTURE.md`.
+CSP stricte, sans `unsafe-inline` : `script-src 'self'`, `style-src 'self'`. Aucun attribut `style=` : les valeurs calculées (couleurs, largeurs) passent par `data-style`, appliqué en CSSOM par `core.js`. Détails : `docs/SECURITE.md`, `docs/FRONTEND_STRUCTURE.md`.

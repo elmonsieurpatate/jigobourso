@@ -1,7 +1,7 @@
 # AUDIT GLOBAL : plan directeur de nettoyage et de professionnalisation
 
 Date : 2026-11-12 · Branche d'origine : `chore/frontend-cleanup-20261112` (fusionnée dans `main`)
-**Avancement (13/11/2026)** : étapes 0 à 7 faites (0 à 3 déployées le 12/11 ; 4 à 7 poussées le 13/11, la scission d'`explorer.js` et `admin-scores.js` est commitée mais pas encore poussée). Cases restantes : retrait de `?k=` du cron (étape 1), alias cron `yahoo-history-cron` et regroupement des scripts de release (étape 3). Étapes 8 et 9 : à faire.
+**Avancement (13/11/2026)** : étapes 0 à 9 faites. Seules restent deux cases qui dépendent de la tâche cron hPanel de production (action manuelle) : retrait de `?k=` (étape 1.1) et alias `yahoo-history-cron` (étape 3.1).
 Audit en lecture seule, aucun code modifié. Sources : 3 sous-agents (Backend/DB, Moteur/scripts, Frontend).
 
 **Limites de l'audit** : les 37 modules `engine/analytics/` n'ont pas été lus en entier (doublons et N+1 à confirmer). `app/services/*` et `tests/` non lus par l'agent Backend. Les `innerHTML` du frontend restent à auditer. Aucun constat critique n'a été relevé nulle part : pas d'injection SQL avérée, pas de secret dans le code.
@@ -75,7 +75,7 @@ Réalisé : `need_post` exige Origin ou Referer, `body()` exige `application/jso
 - [x] Supprimer les imports inutilisés : `clean_window, find_breaks, usable_closes, window_metrics, technical_state` (`service.py`, `compute.py`, `strategy.py`, `tracking.py`) après vérification qu'aucun appelant ne fait `service.clean_window` ; `cli.py` (`run_job`), `market/intraday.py` (`json`), `watch.py` (`math`), `scripts/explain_current_ranking.py` (`importlib`, `math`, `sys`)
 - [x] Uniformiser l'import `__import__('engine.analytics.explorer.strategy_docs', ...)` dans `cli.py:54`
 - [x] Archiver les scripts de migration V1→V2 une fois la migration confirmée : `migrate_legacy.py`, `export_user_data.py`, `drop_legacy_tables.sh`, `bootstrap_real.py`, `engine/migration/legacy.py` → supprimés (tag `archive/v1-migration`) ; `drop_legacy_tables.sh` retiré après nettoyage de la base le 12/11/2026 (V1, `codex_*`, `saved_*`, `jb_*` supprimées : 1 536 → 477 Mo) ; `bootstrap_real.py` conservé (`make dev-db`)
-- [ ] Regrouper `verify_{etf,financial,momentum}_release.py`, `prepare_financial_release.py` et les `verify_*`/`check_*` PHP dans `scripts/release/` avec un point d'entrée Makefile
+- [x] Regrouper `verify_{etf,financial,momentum}_release.py`, `prepare_financial_release.py` et les `verify_*`/`check_*` PHP dans `scripts/release/` avec un point d'entrée Makefile (`make release-check`)
 - [x] `scripts/test_secondary_filters.sh` : migrer vers `tests/e2e` ou supprimer s'il double `tests/e2e/secondary-*`
 - [x] Déplacer ou documenter les `.php` de `scripts/` (`create_user`, `check_*`, `verify_*`) → `ops/`
 
@@ -160,24 +160,24 @@ Réalisé le 12/11/2026. Chargement vérifié sur une copie servie par PHP aprè
 
 ## Étape 8 : CSP, styles inline et accessibilité ✅
 
-- [x] CSP : `style-src 'self'` (plus de `'unsafe-inline'` pour balises et feuilles) ; `style-src-attr 'unsafe-inline'` reste nécessaire. **Non fait, volontairement** : convertir en classes les 137 attributs `style=` générés en JS (dont ≈ 39 portent des couleurs/largeurs calculées) ; un plafond (`STYLE_ATTR_CEILING`) interdit toute hausse. Réserve : Safari < 15.4 ignore `style-src-attr` et retombe sur `style-src`.
-- [x] `onclick=` / `onchange=` : aucun attribut inline existant (les gestionnaires sont assignés en JS, compatibles CSP) ; un test interdit d'en ajouter
-- [x] `innerHTML` audités : champs libres échappés via `J.esc`, liste des exceptions relues dans `REVIEWED_FREE_TEXT` (test `test_free_text_fields_are_escaped_in_templates`) ; un oubli d'échappement trouvé et corrigé (`suivi.js`)
+- [x] Plus aucun attribut `style=` : les gabarits JS écrivent `data-style`, appliqué par l'API CSSOM (`core.js`, autorisée par la CSP). CSP sans aucun `unsafe-inline` (`style-src 'self'`) ; un test interdit tout `style=` en JS ou en HTML
+- [x] `onclick=` / `onchange=` : aucun attribut inline (gestionnaires assignés en JS) ; un test interdit d'en ajouter
+- [x] `innerHTML` audités : champs libres échappés via `J.esc` (`REVIEWED_FREE_TEXT`, test `test_free_text_fields_are_escaped_in_templates`) ; un oubli corrigé (`suivi.js`)
 - [x] Focus visible rétabli (`help.css`, `admin-scores.css`)
-- [x] `aria-label` sur les champs numériques sans libellé (`admin.js`) ; les autres champs sont déjà dans des `<label>`
+- [x] `aria-label` sur les champs numériques sans libellé (`admin.js`) ; les autres champs sont dans des `<label>`
 - [x] Texte 10 px porté à 11 px ; contraste de `--muted` vérifié AA dans les deux thèmes
 - [x] `prefers-reduced-motion` et lien « Aller au contenu » (`app.js`, `base.css`)
 
 ## Étape 9 : Finitions ✅
 
-- [x] Style PHP : lignes > 250 car. coupées (tokenizer, syntaxe vérifiée) ; il en reste 22, des chaînes SQL/HTML sans point de coupe sûr
-- [x] Pagination `admin/catalogue` : page bornée, `LIMIT`/`OFFSET` liés en paramètres (la partie Python l'était déjà)
+- [x] Style PHP : plus aucune ligne > 250 caractères (coupes sur jetons, chaînes interpolées et commentaires vérifiés identiques)
+- [x] Pagination `admin/catalogue` : page bornée, `LIMIT`/`OFFSET` liés en paramètres
 - [x] `JSON_PARTIAL_OUTPUT_ON_ERROR` retiré : UTF-8 invalide substitué, autre erreur journalisée et signalée
-- [x] `send_welcome_mail` envoyé après la réponse (`out_then`) ; l'API renvoie `welcome_mail: 'queued'`, un échec d'envoi n'est plus montré à l'utilisateur (journalisé seulement)
+- [x] `send_welcome_mail` envoyé après la réponse (`out_then`) ; l'API renvoie `welcome_mail: 'queued'`
 - [x] Doublons `.card`/`th` fusionnés, CSS mort nettoyé
-- [~] Tests e2e : trois formes conservées (`.cjs`, `.php`, seeds Python), point d'entrée unique `make e2e` et `tests/e2e/README.md` ; pas de réécriture dans une seule techno
-- [x] README court et docs d'architecture à jour (sous-paquets analytics, `ops/`, `scripts/oneshot/`)
-- [x] Suite complète rejouée : make check (656), make integ (336), navigateur financial + strategies-ui + account-navigation, tous verts ; aucun shim restant
+- [x] Tests rangés par technologie : `tests/php/`, `tests/seeds/`, `tests/e2e/` (Node seul, `.mjs` convertis en `.cjs`), point d'entrée `make e2e` ; voir `tests/e2e/README.md`
+- [x] README court et docs d'architecture à jour
+- [x] Suite complète rejouée : `make check`, `make integ`, `make e2e`, `make release-check`, CSP vérifiée en navigateur (0 violation) ; aucun shim restant
 
 ---
 
