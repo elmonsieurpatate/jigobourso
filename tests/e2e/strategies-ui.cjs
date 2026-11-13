@@ -2,7 +2,12 @@
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
 const BASE='http://127.0.0.1:18089/',must=(c,m)=>{if(!c)throw new Error(m);};
 const login=async(browser,u,p,width=1280)=>{const ctx=await browser.newContext({viewport:{width,height:900}}),pg=await ctx.newPage(),errors=[];pg.setDefaultTimeout(30000);pg.on('pageerror',e=>errors.push(e.message));
-  await pg.goto(BASE+'login.html');await pg.fill('#u',u);await pg.fill('#p',p);await pg.click('#auth-form button.primary');await pg.waitForURL('**/index.html');return {ctx,pg,errors};};
+  await pg.goto(BASE+'login.html');await pg.fill('#u',u);await pg.fill('#p',p);
+  const [response]=await Promise.all([pg.waitForResponse(r=>new URL(r.url()).searchParams.get('r')==='auth/login'),pg.click('#auth-form button.primary')]);
+  if(!response.ok())throw new Error(`Connexion ${u} : HTTP ${response.status()} — ${await response.text()}`);
+  try{await pg.waitForURL('**/index.html',{timeout:10000});}
+  catch(e){throw new Error(`Connexion ${u} : HTTP ${response.status()}, page ${pg.url()}, message ${await pg.locator('#msg').textContent().catch(()=>'?')}`);}
+  return {ctx,pg,errors};};
 // appels API depuis la page (même client que l'interface : J.api / J.post)
 const api=(pg,route,body)=>pg.evaluate(async([r,b])=>{try{const j=b?await J.post(r,b):await J.api(r);return {status:200,json:j};}catch(e){return {status:e.status||0,json:null,message:e.message};}},[route,body]);
 (async()=>{
@@ -50,7 +55,7 @@ const api=(pg,route,body)=>pg.evaluate(async([r,b])=>{try{const j=b?await J.post
   await U.pg.goto(BASE+'mes-filtres.html');await U.pg.waitForSelector('#ac-filter-select option',{state:'attached'});must(!U.pg.url().endsWith('index.html'),'Mes filtres redirige encore vers l Explorer');must((await U.pg.$$('[data-category-id]')).length>0,'Options éditables absentes de Mes filtres');
   // 7. Aide : cours interactif (un chapitre à la fois), recherche, modes, 7 fiches, démo pente/régularité, simulateur, section admin
   await U.pg.goto(BASE+'aide.html');await U.pg.waitForSelector('.h-body');
-  must((await U.pg.$$('.h-body')).length===1,'Un seul chapitre attendu à l’écran');must(/Bienvenue/.test(await U.pg.textContent('.h-head h1')),'Premier chapitre : Bienvenue');
+  must((await U.pg.$$('.h-body')).length===1,'Un seul chapitre attendu à l’écran');must(/Bienvenue/.test(await U.pg.textContent('.h-head h2')),'Premier chapitre : Bienvenue');
   must(!(await U.pg.$('#h-toc a[data-id="admin"]')),'Chapitre admin visible pour un compte ordinaire');
   must((await U.pg.$$('#h-toc a[data-id^="strat-"]')).length===8,'7 fiches + comparaison attendues dans le sommaire');
   await U.pg.click('#h-toc a[data-id="pente-regularite"]');await U.pg.waitForSelector('[data-demo=pr] svg');
@@ -58,7 +63,7 @@ const api=(pg,route,body)=>pg.evaluate(async([r,b])=>{try{const j=b?await J.post
   for(let i=0;i<4;i++)await U.pg.click('[data-demo=pr] button:has-text("Étape suivante")');
   must(/R² 1[,.]00/.test(await U.pg.textContent('[data-demo=pr]')),'Étape 5 sans R² d’Aurore');
   must(/Performance/.test(await U.pg.textContent('[data-demo=pr] table'))&&/Régularité/.test(await U.pg.textContent('[data-demo=pr] table')),'Tableau de la démo incomplet');
-  await U.pg.click('.h-nav .btn.primary');await U.pg.waitForTimeout(300);must(!/Tendance, pente/.test(await U.pg.textContent('.h-head h1')),'Bouton Suivant sans effet');
+  await U.pg.click('.h-nav .btn.primary');await U.pg.waitForTimeout(300);must(!/Tendance, pente/.test(await U.pg.textContent('.h-head h2')),'Bouton Suivant sans effet');
   // chapitre scores : simulateur sans effet sur les vrais réglages
   const before=JSON.stringify((await api(U.pg,'my/scores')).json.strategies.map(x=>x.current));
   await U.pg.click('#h-toc a[data-id="scores"]');await U.pg.waitForSelector('[data-demo=sim] input[data-k]');
@@ -72,10 +77,10 @@ const api=(pg,route,body)=>pg.evaluate(async([r,b])=>{try{const j=b?await J.post
   await U.pg.click('[data-mode="expert"]');await U.pg.waitForSelector('.h-body table');must(/Pente min/.test(await U.pg.textContent('.h-body')),'Fiche Expert sans seuil de pente');
   await U.pg.waitForTimeout(500);await U.pg.reload();await U.pg.waitForSelector('.h-body');must(await U.pg.getAttribute('[data-mode="expert"]','aria-pressed')==='true','Mode Expert non mémorisé');
   // recherche : ouvre directement le bon chapitre
-  await U.pg.fill('#h-q','prix de revient');await U.pg.waitForTimeout(400);must(/Achats, ventes/.test(await U.pg.textContent('.h-head h1')),'Recherche : mauvais chapitre');
+  await U.pg.fill('#h-q','prix de revient');await U.pg.waitForTimeout(400);must(/Achats, ventes/.test(await U.pg.textContent('.h-head h2')),'Recherche : mauvais chapitre');
   await U.pg.fill('#h-q','');await U.pg.click('[data-mode="beginner"]');
   // dernier chapitre mémorisé à la réouverture sans ancre
-  await U.pg.goto(BASE+'aide.html#/glossaire');await U.pg.waitForSelector('.help-dl');await U.pg.goto(BASE+'aide.html');await U.pg.waitForSelector('.help-dl');must(/Glossaire/.test(await U.pg.textContent('.h-head h1')),'Dernier chapitre non mémorisé');
+  await U.pg.goto(BASE+'aide.html#/glossaire');await U.pg.waitForSelector('.help-dl');await U.pg.goto(BASE+'aide.html');await U.pg.waitForSelector('.help-dl');must(/Glossaire/.test(await U.pg.textContent('.h-head h2')),'Dernier chapitre non mémorisé');
   await U.pg.goto(BASE+'aide.html#/action-etf');await U.pg.waitForSelector('[data-quiz]');await U.pg.click('[data-quiz] .hq-o[data-ok="1"]');must(await U.pg.$('.hq-o.good'),'Quiz sans retour');
   await A.pg.goto(BASE+'aide.html');await A.pg.waitForSelector('#h-toc a[data-id="admin"]');
   // mot d'invitation visible de l'administrateur seulement
@@ -84,7 +89,7 @@ const api=(pg,route,body)=>pg.evaluate(async([r,b])=>{try{const j=b?await J.post
   must((await api(U.pg,'admin/system')).json===null,'admin/system ouvert à un compte ordinaire');
   // 8. mobile : pas de débordement horizontal
   const M=await login(browser,'plain_user','plain-local-password',390);
-  for(const f of ['aide.html','mes-strategies.html','mes-scores.html','index.html']){await M.pg.goto(BASE+f);await M.pg.waitForTimeout(1500);const over=await M.pg.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1?[...document.querySelectorAll('body *')].filter(e=>e.getBoundingClientRect().right>innerWidth+1&&!e.closest('.ct-table-wrap,.sui-scroll,table')).slice(0,6).map(e=>e.tagName+'.'+e.className+':'+Math.round(e.getBoundingClientRect().right)):null);must(!over,'Débordement horizontal mobile : '+f+' '+JSON.stringify(over));}
+  for(const f of ['aide.html','mes-strategies.html','mes-scores.html','index.html']){await M.pg.goto(BASE+f);await M.pg.waitForTimeout(1500);const over=await M.pg.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1?[...document.querySelectorAll('body *')].filter(e=>e.getBoundingClientRect().right>innerWidth+1&&!e.closest('.ct-table-wrap,.sui-scroll,.h-table-scroll,table')).slice(0,6).map(e=>e.tagName+'.'+e.className+':'+Math.round(e.getBoundingClientRect().right)):null);must(!over,'Débordement horizontal mobile : '+f+' '+JSON.stringify(over));}
   const errs=[...A.errors,...U.errors,...M.errors];must(!errs.length,'Erreurs JS : '+errs.join(' | '));
   console.log('OK');
  }catch(e){console.error('FAIL',e.message);process.exitCode=1;}
