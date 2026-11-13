@@ -43,3 +43,5 @@
 
 /* Éditeur personnel de stratégies. */
 .ms-ic{cursor:pointer}input:checked+.ms-ic{border-color:var(--accent);background:var(--accent-soft);box-shadow:0 0 0 2px var(--accent)}input:focus-visible+.ms-ic{outline:2px solid var(--accent)}.ms-form textarea{width:100%;}
+
+.ms-ic{display:inline-flex;width:38px;height:38px;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:10px}

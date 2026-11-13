@@ -36,7 +36,7 @@
     $('#h-toc').innerHTML = GROUPS.map(([gid, gl]) => {
       const cs = list.filter(c => c.group === gid && (!matches || matches.has(c.id))); if (!cs.length) return '';
       return `<div class="ht-g"><div class="ht-gl">${E(gl)}</div>${cs.map(c => `<a href="#/${E(c.id)}" class="ht-i ${c.parent ? 'sub' : ''} ${current && current.id === c.id ? 'on' : ''} ${seen.has(c.id) ? 'seen' : ''}" data-id="${E(c.id)}">${c.icon ? `<span class="ht-ic" data-style="color:${c.color || 'var(--accent)'}">${c.icon}</span>` : ''}<span>${E(c.title)}</span>${seen.has(c.id) ? '<i class="ht-ok" aria-label="vu">✓</i>' : ''}</a>`).join('')}</div>`;
-    }).join('') || '<p class="muted small" data-style="padding:8px">Aucun résultat. Essayez un autre mot.</p>';
+    }).join('') || '<p class="muted small p-2">Aucun résultat. Essayez un autre mot.</p>';
   }
   let index = null;
   function buildIndex() { if (index) return; const clean = h => String(h).replace(/<[^>]+>/g, ' ').toLowerCase(); index = chapters().map(c => ({ id: c.id, title: c.title.toLowerCase(), kw: (c.keywords || '').toLowerCase(), text: clean(safe(c, 'beginner') + ' ' + safe(c, 'expert')) })); }
