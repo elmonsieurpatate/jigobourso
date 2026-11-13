@@ -2,42 +2,25 @@
 (async () => {
   'use strict';
   const user = await J.init('explorer'); if (!user) return;
-  const $ = J.$, esc = J.esc;
-  const periods = [['day','Jour',1],['week','Semaine',5],['month','Mois',21],['quarter','Trimestre',63],['half','6 mois',126],['year','1 an',252],['two_year','2 ans',504]];
+  const $ = J.$, esc = J.esc, M = ExplorerModel, V = ExplorerView;
+  const { periods, metrics, builtinNames, SESS, cloneJSON, withDay, isPrimary, rule, group, number } = M;
   // Critères de RECHERCHE de chaque stratégie intégrée : lus dans le moteur (scores_admin.V4_STRATEGIES via ranking/criteria), jamais recopiés ici.
   // Ils filtrent l'affichage ; ils n'entrent ni dans les notes ni dans les rangs. Une stratégie sans critère (Momentum) a des seuils à 0 = aucun critère.
   let crit={};try{crit=(await J.api('ranking/criteria')).criteria||{};}catch(_){/* périodes actives seules si le moteur ne répond pas */}
-  const FALLBACK={fast:['week','month'],regular:['month','quarter'],calm:['month','quarter'],rebound:['week','month','half'],mom6:['quarter','half'],mom12:['half','year'],momrisk:['half','year']};
-  const profiles=Object.fromEntries(Object.keys(FALLBACK).map(id=>{
-    const src=(crit[id]&&crit[id].periods)||Object.fromEntries(FALLBACK[id].map(k=>[k,{}])),per={},extra=[];
-    for(const [k,t] of Object.entries(src)){
-      if(t.slope!==undefined||t.r2!==undefined||!Object.keys(t).length)per[k]=[t.slope||0,t.r2||0];
-      if(t.max_volatility!==undefined&&!extra.some(x=>x[0]==='volatility'))extra.push(['volatility','<=',t.max_volatility,'month']);
-      if(t.max_drawdown!==undefined&&!extra.some(x=>x[0]==='drawdown'))extra.push(['drawdown','<=',t.max_drawdown,'month']);
-      if(t.max_return!==undefined)extra.push(['return','<=',t.max_return,k]);
-      if(t.min_return!==undefined)extra.push(['return','>=',t.min_return,k]);
-    }
-    for(const k of Object.keys(src))if(!per[k])per[k]=[0,0];                                 // période active sans pente ni R² (ex. contexte du Rebond)
-    return [id,{per,extra}];
-  }));
+  const profiles=M.profilesFrom(crit);
   const secondary=window.ClassementTestSecondary;
   const categoryPayload=window.ClassementTestCategoryConfig || await J.api('explorer/secondary-filters');
   const categories=secondary.normalize(categoryPayload);
   let serverView=null;try{serverView=await J.api('classement-test/strategies');}catch(_){/* page utilisable, enregistrement serveur indisponible */}
   const filters=Object.fromEntries(Object.entries(categories).map(([k,c])=>[k,[c.label,c.options]]));
-  const metrics = { slope:['Pente (% / séance)','% / séance'], r2:['R² (régression)',''], volatility:['Volatilité quotidienne','%'], drawdown:['Recul maximal','%'], return:['Rendement observé','%'], volume:['Volume moyen','titres / séance'] };
   const key = 'jigo_classement_test_v1';
-  // Jour (1 séance) : facultatif et désactivé par défaut ; seule la variation 1J sert de critère (ni pente ni R² sur une séance). Les configurations enregistrées avant son ajout n'ont pas cette entrée.
-  const DAY_OFF={enabled:false,slope:0,r2:0,return:0},withDay=c=>{if(c&&c.periods){if(!c.periods.day)c.periods.day={...DAY_OFF};if(c.periods.day.return==null)c.periods.day.return=0;}return c;};
-  const fresh = id => { const pr=profiles[id],first=Object.values(pr.per)[0]; return { periods:Object.fromEntries(periods.map(([k]) => { const v=pr.per[k]; if(k==='day')return [k,{...DAY_OFF}]; return [k,{enabled:!!v,slope:v?v[0]:first[0],r2:v?v[1]:first[1]}]; })), extra:(pr.extra||[]).map(([metric,op,value,period])=>({metric,op,value,period:period||'month'})), join:'and' }; };
+  const fresh=id=>M.fresh(profiles,id);
   let state = { mode:'simple',strategy:'fast',selected:'week',profiles:Object.fromEntries(Object.keys(profiles).map(id=>[id,fresh(id)])),filters:secondary.all(categories) };
   // Seules les sauvegardes explicites de cette page sont relues. Les préférences Explorer restent séparées.
   try {
     const saved = J.store.get(key);
     if (saved && saved.profiles && typeof saved.profiles==='object') for (const id of Object.keys(profiles)) if (!saved.profiles[id]) saved.profiles[id]=fresh(id); else withDay(saved.profiles[id]);     // stratégies ajoutées depuis la sauvegarde
-    if (saved && ['simple','expert'].includes(saved.mode) && profiles[saved.strategy] && periods.some(([k])=>k===saved.selected) && Object.keys(profiles).every(id => {
-      const p=saved.profiles?.[id]; return p && ['and','or'].includes(p.join) && Array.isArray(p.extra) && p.extra.every(x=>metrics[x.metric] && ['>=','<='].includes(x.op) && Number.isFinite(x.value) && x.value>=0) && periods.every(([k])=>k==='day' || typeof p.periods?.[k]?.enabled==='boolean' && Number.isFinite(p.periods[k].slope) && p.periods[k].slope>=.01 && p.periods[k].slope<=2 && Number.isFinite(p.periods[k].r2) && p.periods[k].r2>=0 && p.periods[k].r2<=1);
-    }) && saved.filters && typeof saved.filters==='object') state=saved;
+    if (M.isValidSaved(saved,profiles)) state=saved;
   } catch (_) { /* Stockage absent ou ancien : valeurs de démonstration. */ }
   const adminSelections=secondary.defaults(categoryPayload,categories);
   const userKey=String(user.id??'offline');
@@ -65,13 +48,7 @@
     }
   }
   // Un choix enregistré garde ses identifiants ; seules les catégories apparues depuis suivent les défauts de l'administration.
-  const filtersFor=o=>Object.fromEntries(Object.entries(categories).map(([k,c])=>{
-    const own=o[k],all=c.options.map(x=>x.id);if(!own)return[k,adminSelections[k]];
-    const selected=new Set(own.selected.filter(id=>all.includes(id)));
-    if(own.selected.length&&!selected.size)return[k,[...adminSelections[k]]];
-    for(const id of adminSelections[k])if(!own.known.includes(id))selected.add(id);
-    return[k,[...selected]];
-  }));
+  const filtersFor=o=>M.filtersFor(o,categories,adminSelections);
   state.filters=filtersFor(overrides);
   state.secondaryOverridesByUser={...byUser,[userKey]:overrides};
   state.secondaryMetadataPreviousByUser=rawLocal.secondaryMetadataPreviousByUser||{};
@@ -84,12 +61,7 @@
   state.categorySignature=categorySignature;
   // Jeu fictif immuable. Le formulaire de stratégie n'entre jamais dans son calcul.
   // Colonnes : identifiants et libellés viennent du catalogue de l'administration (app/config/table_columns.json) ; ici, seulement la valeur de tri et le rendu de chaque identifiant.
-  const SESS={week:'5',month:'21',quarter:'63',half:'126',year:'252'},STATUS_ORDER={retained:0,undetermined:1,excluded:2};
-  const REG={rank:{val:r=>r[rankKey()],dir:'asc'},name:{val:r=>r.name,dir:'asc'},status:{val:r=>STATUS_ORDER[r.status]??1,dir:'asc'},market:{val:r=>r.mic,dir:'asc'},sector:{val:r=>r.category,dir:'asc'},kind:{val:r=>r.kind,dir:'asc'},
-    price:{val:r=>r.price},change:{val:r=>r.change},last_close:{val:r=>r.lastClose},slope:{val:r=>r.slope},r2:{val:r=>r.r2},volatility:{val:r=>r.volatility},turnover:{val:r=>r.turnover},avgVolume:{val:r=>r.avgVolume},drawdown:{val:r=>r.drawdown},perfMonth:{val:r=>r.perfMonth},
-    simple:{val:r=>r.posSimple==null?null:-r.posSimple},complex:{val:r=>r.posComplex==null?null:-r.posComplex},rank_simple:{val:r=>r.rankSimple,dir:'asc'},rank_complex:{val:r=>r.rankComplex,dir:'asc'},trend:{val:()=>null,nosort:true}};
-  for(const k of ['week','quarter','half'])REG['perf_'+k]={val:r=>(r.perf||{})[k]};
-  for(const k of ['week','quarter','half','year']){REG['slope_'+k]={val:r=>(r.periods[SESS[k]]||{}).slope};REG['r2_'+k]={val:r=>(r.periods[SESS[k]]||{}).r2};}
+  const REG=M.registry(()=>rankKey());
   const LEGACY_LABELS={rank:'Rang',name:'Titre',status:'Statut stratégie',market:'Place',sector:'Secteur',price:'Cours',change:'Var. 1J (%)',last_close:'Dernière clôture',slope:'Pente · mois',r2:'R² · mois',volatility:'Volatilité',turnover:'Liquidité',avgVolume:'Volume',drawdown:'Recul max.',perfMonth:'Perf. 1 mois',simple:'Score simple',complex:'Score complexe',trend:'Tendance'};
   const LEGACY_HINTS={change:'Variation du cours entre les deux dernières séances clôturées.'};
   const LEGACY_VISIBLE=()=>Object.keys(REG).map(id=>[id,(window.matchMedia('(max-width:700px)').matches?['rank','name','status','price','change','slope','simple','complex']:['rank','name','status','price','change','slope','r2','volatility','turnover','simple','complex','trend']).includes(id)]);
@@ -114,55 +86,12 @@
   const applyDefaultSort=()=>{if(tableState.userSorted)return;const c=configuredSorts();tableState.sorts=c.length?c:[{key:defaultSort,dir:'desc'}];};
   let activeFilter=null, filterQuery='';
   const config = () => state.profiles[state.strategy];
-  const isPrimary = r => r.metric === 'slope' || r.metric === 'r2' || (r.metric === 'return' && r.period === 'day');
-  const rule = (metric,period,value,op='>=') => ({kind:'rule',metric,period,value,op});
-  const group = (children=[],join='and') => ({kind:'group',join,children});
-  function validTree(n,depth=0) {
-    if(!n || depth>6) return false;
-    if(n.kind==='group') return ['and','or'].includes(n.join) && Array.isArray(n.children) && n.children.length<=50 && n.children.every(x=>validTree(x,depth+1));
-    return n.kind==='rule' && metrics[n.metric] && ['>=','<=','>','<','='].includes(n.op) && periods.some(([k])=>k===n.period) && Number.isFinite(n.value);
-  }
-  function tree() {
-    const c=config();
-    if(!c.tree || !validTree(c.tree) || c.tree.kind!=='group') {
-      c.tree=group(periods.filter(([k])=>c.periods[k].enabled).flatMap(([k])=>k==='day'?[rule('return','day',c.periods.day.return)]:['slope','r2'].map(m=>rule(m,k,c.periods[k][m]))));
-      if(c.extra.length) c.tree.children.push(group(c.extra.map(x=>rule(x.metric,x.period||'month',x.value,x.op)),c.join));
-    }
-    return c.tree;
-  }
-  function leaves(n=tree(),path=[],joins=[]) {
-    if(n.kind==='rule') return [{node:n,path,joins}];
-    return n.children.flatMap((x,i)=>leaves(x,[...path,i],[...joins,n.join]));
-  }
-  function at(path) { return path===''?tree():path.split('.').reduce((n,i)=>n.children[Number(i)],tree()); }
-  function project() {
-    const rules=leaves().map(x=>x.node);
-    periods.forEach(([k])=>{
-      const p=config().periods[k], own=rules.filter(r=>isPrimary(r)&&r.period===k);
-      p.enabled=own.length>0;
-      ['slope','r2','return'].forEach(m=>{const r=own.find(r=>r.metric===m&&r.op==='>=');if(r)p[m]=r.value;});
-    });
-  }
-  function simpleCompatible() {
-    const all=leaves().filter(x=>isPrimary(x.node));
-    return all.every(({node:r,joins})=>r.op==='>=' && joins.every(j=>j==='and') && (r.metric==='return'?r.value>=-20&&r.value<=20:r.value>=0 && r.value<=(r.metric==='slope'?2:1))) && periods.every(([k])=>{
-      const own=all.filter(x=>x.node.period===k);return !own.length || (k==='day'?own.length===1:own.length===2 && new Set(own.map(x=>x.node.metric)).size===2);
-    });
-  }
-  function setSimpleValue(metric,value) {
-    config().periods[state.selected][metric]=value;
-    leaves().filter(x=>x.node.metric===metric&&x.node.period===state.selected&&x.node.op==='>=').forEach(x=>x.node.value=value);
-  }
-  function activatePeriod(k,enabled) {
-    function remove(n) {if(n.kind==='group') {n.children=n.children.filter(x=>!(x.kind==='rule'&&isPrimary(x)&&x.period===k));n.children.forEach(remove);}}
-    remove(tree());
-    if(enabled) (k==='day'?['return']:['slope','r2']).forEach(m=>tree().children.push(rule(m,k,config().periods[k][m])));
-    project();
-  }
+  const tree=()=>M.ensureTree(config()),leaves=()=>M.leaves(tree()),at=path=>M.at(tree(),path);
+  const project=()=>M.project(config()),simpleCompatible=()=>M.simpleCompatible(config());
+  const setSimpleValue=(metric,value)=>M.setSimpleValue(config(),state.selected,metric,value),activatePeriod=(k,enabled)=>M.activatePeriod(config(),k,enabled);
 
   // ───── Stratégies enregistrées (MariaDB) : une configuration et des choix de filtres propres à chacune ─────
-  const builtinNames={fast:'Croissance rapide',regular:'Croissance régulière',calm:'Hausse calme',rebound:'Rebond',mom6:'Momentum 6 mois (expérimental)',mom12:'Momentum 12 mois (expérimental)',momrisk:'Momentum ajusté du risque (expérimental)'};
-  const names={...builtinNames},ovBy={},saved={},cloneJSON=x=>JSON.parse(JSON.stringify(x));
+  const names={...builtinNames},ovBy={},saved={};
   let customIds=[],rev=serverView?serverView.revision:0,busy=false,meta=cloneJSON(serverView?.meta||{});
   const metaOf=id=>({icon:'trending-up',description:'',enabled:true,...(meta[id]||{})});
   const serverOk=!!serverView;
@@ -223,25 +152,13 @@
   const fmt = n => J.num(n,2,3);
   let timer;
   function feedback(text) { $('#ct-feedback').textContent=text; clearTimeout(timer); timer=setTimeout(()=>$('#ct-feedback').textContent='',5500); }
-  function number(value,min,max,fallback) { if(String(value).trim()==='') return fallback; const n=Number(String(value).replace(',','.'));return Number.isFinite(n)?Math.max(min,Math.min(max,n)):fallback; }
-  function chart() {
-    const p=config().periods[state.selected];
-    if(state.selected==='day'){$('#ct-chart').innerHTML=`<svg viewBox="0 0 240 110" role="img" aria-label="Illustration : variation de la dernière séance clôturée d’au moins ${fmt(p.return)} pour cent"><path d="M10 95H230M10 95V10" fill="none" stroke="var(--line)"/><polyline points="60,70 180,${70-Math.max(-30,Math.min(30,p.return*4))}" fill="none" stroke="var(--accent)" stroke-width="2"/><circle cx="60" cy="70" r="3.5" fill="var(--accent)"/><circle cx="180" cy="${70-Math.max(-30,Math.min(30,p.return*4))}" r="3.5" fill="var(--accent)"/></svg>`;return;}
-    const slope=p.slope/2, spread=(1-p.r2)*28, jitter=[0,1,-.7,.8,-1,.4,-.6,.3,0];
-    const pts=jitter.map((j,i)=>[15+i*25,86-i*(2+slope*7)+j*spread]);
-    $('#ct-chart').innerHTML=`<svg viewBox="0 0 240 110" role="img" aria-label="Illustration : pente ${fmt(p.slope)} pour cent par séance, R² ${fmt(p.r2)}"><path d="M10 95H230M10 95V10" fill="none" stroke="var(--line)"/><path d="M15 86L215 ${86-8*(2+slope*7)}" stroke="var(--accent)" stroke-width="2" stroke-dasharray="4 4"/><polyline points="${pts.map(p=>p.join(',')).join(' ')}" fill="none" stroke="var(--accent)" stroke-width="2"/>${pts.map(([x,y])=>`<circle cx="${x}" cy="${y}" r="3.5" fill="var(--accent)"/>`).join('')}</svg>`;
-  }
+  function chart() { $('#ct-chart').innerHTML=V.chartSvg(config().periods[state.selected],state.selected); }
   function preview() {
     const active=periods.filter(([k])=>config().periods[k].enabled);
     $('#ct-active-summary').textContent=active.length?`${active.length} périodes actives · ${active.map(([,l])=>l).join(' + ')}`:'Aucune période active · configuration libre';
-    function text(n) {
-      if(n.kind==='rule') return `<span>${n.metric==='return'&&n.period==='day'?'Variation 1J':metrics[n.metric][0]} ${esc(n.op)} ${fmt(n.value)} ${metrics[n.metric][1]} <em>(${periods.find(([k])=>k===n.period)[1]})</em></span>`;
-      return `<div class="ct-preview-group"><b>${n.join==='and'?'TOUTES (ET)':'AU MOINS UNE (OU)'}</b>${n.children.map(x=>`<div>${text(x)}</div>`).join('')||'<span>Aucun critère</span>'}</div>`;
-    }
-    $('#ct-preview').innerHTML=text(tree());
+    $('#ct-preview').innerHTML=V.previewHtml(tree());
     updateSearchStatus();
-    const hasEmpty = n => n.kind==='group' && (!n.children.length || n.children.some(hasEmpty));
-    const valid=leaves().length>0 && !hasEmpty(tree()) && leaves().every(({node:r})=>Number.isFinite(r.value) && (r.metric!=='r2'||(r.value>=0&&r.value<=1)) && (!['volatility','drawdown','volume'].includes(r.metric)||r.value>=0));
+    const valid=M.isTreeValid(tree());
     const badge=$('.ct-valid');badge.textContent=valid?'✓ Filtre valide':'⚠ Filtre à compléter';badge.classList.toggle('invalid',!valid);
 
     const advanced=leaves().filter(x=>!isPrimary(x.node)).length, compatible=simpleCompatible();
@@ -249,41 +166,26 @@
     $('#ct-extra-note').textContent=compatible?`${advanced} critère(s) avancé(s) conservé(s). Consultez le mode Expert pour les modifier.`:'Règles avancées conservées : cette combinaison ne peut pas être représentée fidèlement par deux minimums. Modifiez-la en mode Expert ; les curseurs simples sont verrouillés.';
   }
   function renderSimple() {
-    $('#ct-periods').innerHTML=periods.map(([k,label,n])=>`<div class="ct-period ${config().periods[k].enabled?'active':''} ${state.selected===k?'selected':''}"><button type="button" data-period="${k}" aria-pressed="${state.selected===k}">${label}<small>≈ ${n} séance${n>1?'s':''}</small></button><label><input type="checkbox" data-enabled="${k}" ${config().periods[k].enabled?'checked':''}>Activée</label></div>`).join('');
+    $('#ct-periods').innerHTML=V.periodsHtml(config(),state.selected);
     const p=config().periods[state.selected];
-    $('#ct-sliders').innerHTML=(state.selected==='day'?[['return','Variation 1J minimale',-20,20,.1,'%','Variation du cours entre les deux dernières séances clôturées. Une seule séance : ni pente ni R². À 0 : le dernier jour doit être positif. Masque seulement des lignes : notes et rangs ne changent pas.']]:[['slope','Pente minimale',0,2,.001,'% / séance','Progression moyenne modélisée par séance. À 0 : aucun seuil. Masque seulement des lignes : notes et rangs ne changent pas.'],['r2','R² minimal',0,1,.001,'','Régularité : de 0 (dispersé) à 1 (aligné).']]).map(([id,label,min,max,step,unit,help])=>`<div class="ct-control"><label for="ct-range-${id}">${label} · ${periods.find(([k])=>k===state.selected)[1]}</label><div class="ct-slider-row"><button type="button" class="btn icon sm" data-step="${id}" data-delta="-${step}" aria-label="Diminuer ${label}">−</button><input id="ct-range-${id}" type="range" data-simple="${id}" min="${min}" max="${max}" step="${step}" value="${p[id]}" aria-label="${label}"><button type="button" class="btn icon sm" data-step="${id}" data-delta="${step}" aria-label="Augmenter ${label}">+</button><div class="ct-number"><input id="ct-value-${id}" type="number" data-simple="${id}" min="${min}" max="${max}" step="${step}" value="${p[id]}" aria-label="Valeur ${label}"><span>${unit}</span></div></div><p class="ct-control-help">${help}</p></div>`).join('');
+    $('#ct-sliders').innerHTML=V.slidersHtml(p,state.selected);
     const compatible=simpleCompatible();
     $('#ct-simple').querySelectorAll('input,button[data-step]').forEach(el=>el.disabled=!compatible);
     chart();preview();
   }
   function renderExpert() {
-    function draw(n,path=[],depth=0) {
-      const p=path.join('.');
-      if(n.kind==='rule') return `<div class="ct-builder-row" data-path="${p}">
-        <select data-rule-field="metric" aria-label="Indicateur ${p}">${Object.entries(metrics).map(([k,[l]])=>`<option value="${k}" ${n.metric===k?'selected':''}>${l}</option>`).join('')}</select>
-        <select data-rule-field="op" aria-label="Opérateur ${p}">${[['>=','≥'],['<=','≤'],['>','>'],['<','<'],['=','=']].map(([v,l])=>`<option value="${esc(v)}" ${n.op===v?'selected':''}>${esc(l)}</option>`).join('')}</select>
-        <input type="number" step="any" value="${Number(n.value.toFixed(3))}" data-rule-field="value" aria-label="Valeur ${p}">
-        <select data-rule-field="period" aria-label="Période ${p}">${periods.filter(([k])=>k!=='day'||n.metric==='return').map(([k,l,count])=>`<option value="${k}" ${n.period===k?'selected':''}>sur ${l.toLowerCase()} (≈ ${count} s.)</option>`).join('')}</select>
-        <button type="button" class="ct-rule-remove" data-remove-node="${p}" aria-label="Supprimer le critère ${p}">×</button>
-      </div>`;
-      return `<div class="ct-builder-group ${depth?'nested':''}" data-group-path="${p}"><div class="ct-group-operator"><select data-group-join="${p}" aria-label="Combinaison ${depth?'du groupe '+p:'principale'}"><option value="and" ${n.join==='and'?'selected':''}>ET</option><option value="or" ${n.join==='or'?'selected':''}>OU</option></select></div><div class="ct-group-content">${n.children.map((x,i)=>draw(x,[...path,i],depth+1)).join('')||'<p class="ct-no-rules">Aucun critère dans ce groupe.</p>'}<div class="ct-group-actions"><button type="button" data-add-node="${p}">＋ Ajouter un critère</button>${depth<4?`<button type="button" data-add-group="${p}">＋ Groupe ET / OU</button>`:''}${depth?`<button type="button" data-remove-node="${p}" class="ct-delete-group">Supprimer le groupe</button>`:''}</div></div></div>`;
-    }
-    $('#ct-rules').innerHTML=draw(tree());
+    $('#ct-rules').innerHTML=V.rulesHtml(tree());
     preview();
   }
   function renderFilters() {
     $('#ct-filter-source').textContent=(categoryPayload.source_label||'Catégories administrateur')+' · bornes en lecture seule'+(Object.keys(state.secondaryMetadataPreviousByUser[userKey]||{}).length?' · anciennes préférences regroupées : vérifiez vos sélections':'');
     const manage=document.createElement('a');manage.href='mes-filtres.html';manage.textContent='Configurer mes filtres';$('#ct-filter-source').append(' · ',manage);
     if(categoryPayload.schema===2)document.querySelector('.ct-filter-logic').textContent='Un filtre retient un titre si l’une de ses catégories est cochée ; les filtres se combinent. Les scores et les rangs ne changent jamais.';
-    const drawIndicator=([k,c])=>`<div class="ct-multi" data-indicator="${k}"><button type="button" class="ct-multi-trigger" data-open-filter="${k}" title="${esc(c.label)} · ${esc(c.unit)}" aria-expanded="${activeFilter===k}" aria-controls="ct-list-${k}"><span>${esc(c.label)}</span><b data-count="${k}">${state.filters[k].length} / ${c.options.length}</b><span aria-hidden="true">⌄</span></button><div class="ct-multi-popup" id="ct-list-${k}" ${activeFilter===k?'':'hidden'}><label class="ct-category-search"><span aria-hidden="true">⌕</span><input type="search" data-category-search="${k}" placeholder="Rechercher une catégorie…" aria-label="Rechercher une catégorie : ${esc(c.label)}" value="${activeFilter===k?esc(filterQuery):''}"></label><div class="ct-category-options" role="group" aria-label="Catégories : ${esc(c.label)}">${c.options.map(o=>`<label class="ct-category-option" data-search-text="${esc(J.fold(o.label))}"><input type="checkbox" data-filter="${k}" data-category="${o.id}" ${state.filters[k].includes(o.id)?'checked':''}><i style="background:${o.color}" aria-hidden="true"></i><span>${esc(o.label)}</span><small>${esc(o.range)}</small></label>`).join('')}</div><p class="ct-no-category" hidden>Aucune catégorie correspondante.</p><footer><span data-selected-count="${k}">${state.filters[k].length} / ${c.options.length} sélectionnées</span><button type="button" data-all-indicator="${k}">Tout sélectionner</button><button type="button" data-close-filter="${k}" aria-label="Fermer ${esc(c.label)}">Fermer</button></footer></div></div>`;
-    const primaryKeys=categoryPayload.schema===2?['volatility','liquidity','volume','positive','spikes','concentration']:['volatility','turnover_eur','avg_volume','drawdown','up_fraction','gain_share'];
-    const isPrimary=([k,c])=>categoryPayload.schema===2?c.group==='main':primaryKeys.includes(k);
-    const primary=Object.entries(categories).filter(isPrimary),other=Object.entries(categories).filter(e=>!isPrimary(e));
-    $('#ct-filters').innerHTML=Object.keys(categories).length?`<div class="ct-filter-main">${primary.map(drawIndicator).join('')}</div>${other.length?`<details class="ct-more-filters"><summary>Autres indicateurs (${other.length}) <span id="ct-more-count"></span></summary><div class="ct-filter-main">${other.map(drawIndicator).join('')}</div></details>`:''}`:'<p>Aucun filtre actif. Réactivez-les depuis « Mes filtres ».</p>';
+    $('#ct-filters').innerHTML=V.filtersHtml(categories,categoryPayload.schema,state.filters,activeFilter,filterQuery);
     filterSummary();
     if(activeFilter) searchCategories(activeFilter,filterQuery);
   }
-  function isPrimaryKey(k){const c=categories[k];return categoryPayload.schema===2?c?.group==='main':['volatility','turnover_eur','avg_volume','drawdown','up_fraction','gain_share'].includes(k);}
+  function isPrimaryKey(k){return V.isPrimaryFilter(categoryPayload.schema,k,categories[k]||{});}
   function filterSummary() {
     const changed=Object.keys(categories).filter(k=>state.filters[k].length!==categories[k].options.length);
     const more=$('#ct-more-count');if(more)more.textContent=changed.filter(k=>!isPrimaryKey(k)).length+' filtre(s) actif(s)';
@@ -320,21 +222,11 @@
   const score1=n=>J.num(n,1);
   // Catégories de l'administration : la couleur d'un chiffre est celle de la catégorie du filtre correspondant.
   const defs=(categoryPayload.definitions&&categoryPayload.definitions.filters)||[];
-  const measureOf=Object.create(null),filterOfMeasure=Object.create(null);
-  for(const f of defs)for(const m of f.measures||[]){measureOf[m.id]=m;filterOfMeasure[m.id]=f;}
-  const inside=(c,v)=>(c.min===null||v>c.min||(v===c.min&&c.minIncluded))&&(c.max===null||v<c.max||(v===c.max&&c.maxIncluded));
-  function categoryOf(measureId,value){
-    const m=measureOf[measureId];if(!m)return null;
-    const unknown=m.categories.find(c=>c.unknown)||null;
-    if(value===null||value===undefined||Number.isNaN(value))return unknown;
-    if(m.kind==='enum')return m.categories.find(c=>!c.unknown&&(c.values||[]).includes(String(value)))||unknown;
-    return m.categories.find(c=>!c.unknown&&inside(c,value))||unknown;
-  }
+  const {categoryOf,rowOptions}=M.categories(defs);
   const tinted=(measureId,value,text)=>{const c=categoryOf(measureId,value);return c&&c.color?`<span class="ct-cat" style="--cat:${esc(c.color)}" title="${esc(c.name)}">${text}</span>`:text;};
-  const hue=s=>{let h=0;for(const ch of s)h=(h*31+ch.charCodeAt(0))%360;return `hsl(${h} 45% 42%)`;};
   // La fiche s'ouvre dans une autre fenêtre : elle reçoit l'identifiant de la stratégie et, si les réglages ne sont pas enregistrés, un brouillon sous une clé de contexte (localStorage, même origine).
   // Brouillon introuvable côté fiche ⇒ elle l'indique et ne rend aucun verdict : jamais de remplacement silencieux par d'autres réglages.
-  const ctxKey=s=>{let h=0;for(const c of s)h=(h*31+c.charCodeAt(0))|0;return (h>>>0).toString(36);};
+  const ctxKey=M.ctxKey;
   function sheetHref(id){
     const context=applied||{strategy:state.strategy,config:specNow()};
     let q='titre.html?src=explorer&id='+encodeURIComponent(id)+'&ct='+encodeURIComponent(context.strategy);
@@ -345,28 +237,7 @@
     }
     return q;
   }
-  // Valeurs des mesures de filtres : reconstituées depuis les champs de la ligne (une valeur absente reste null, jamais 0).
-  function secondaryOf(r){
-    const x=r.extra||{},perf=r.perf||{};
-    return {volatility:r.volatility,turnover_eur:r.turnover_eur,avg_volume:r.avg_volume,up_fraction:x.up_fraction??null,gain_share:x.gain_share??null,drawdown:r.drawdown,
-      'perf-week':perf.week??null,'perf-month':perf.month??null,'perf-quarter':perf.quarter??null,quality:x.quality??null,freshness:null,coverage:x.coverage??null,
-      score_simple_v4:r.simple,score_complex_v4:r.complex};
-  }
-  function toRow(r){
-    return {id:r.id,rank:r.rank_complex,rankSimple:r.rank_simple,rankComplex:r.rank_complex,posSimple:r.pos_simple,posComplex:r.pos_complex,tieSimple:r.tie_simple||1,tieComplex:r.tie_complex||1,symbol:r.symbol,name:r.name,mic:r.mic,currency:r.currency,kind:r.kind,country:r.country,category:r.category,group:r.group,
-      price:r.price_eur,priceNative:r.price,change:r.change,slope:r.slope,r2:r.r2,volatility:r.volatility,drawdown:r.drawdown,turnover:r.turnover_eur,liquiditySource:r.liquidity_source,avgVolume:r.avg_volume,
-      perf:r.perf||{},perfMonth:r.perf&&r.perf.month!==undefined?r.perf.month:null,simple:r.simple,complex:r.complex,simpleStatus:r.simple_status,complexStatus:r.complex_status,score:r.complex,
-      isin:r.isin,points:r.curve||[],color:hue(r.symbol),secondary:secondaryOf(r),periods:r.periods||{},held:!!r.held,lastClose:r.last_close,quality:r.quality,status:r.status||'undetermined'};
-  }
-  // Une ligne appartient à une catégorie par mesure (filtres à seuils) ou par groupe (pays, secteur, place, type). Un filtre retient la ligne si l'une de ses catégories est cochée (OU) ; les filtres se combinent en ET.
-  function rowOptions(row,k){
-    row._o=row._o||{};
-    if(row._o[k])return row._o[k];
-    const f=defs.find(x=>x.id===k);let out=[];
-    if(f&&f.editable)out=(f.measures||[]).map(m=>{const c=categoryOf(m.id,row.secondary[m.id]);return c?m.id+'::'+c.id:null;}).filter(Boolean);
-    else if(f)out=[row.group&&row.group[k]||'unknown'];
-    return row._o[k]=out;
-  }
+  const toRow=M.toRow;
   function applySecondary(rows){
     const filters=applied?applied.filters:state.filters;
     if(categoryPayload.schema!==2)return secondary.apply(rows,filters,categories);
@@ -379,8 +250,7 @@
   // l'univers noté reste complet, un titre hors critères reste noté et classé (« Ignorer les critères » l'affiche). Un seuil à 0 est sans effet.
   // Statut de stratégie (retenue / exclue / indéterminée) : calculé par le serveur (moteur unique `criteria`, le même que l'administration et la fiche), jamais ici.
   // Il ne change ni note ni rang. Une donnée manquante donne « indéterminée », jamais « exclue » ; « Toutes » les montre toutes.
-  const STATUS={retained:['Retenue','ok'],excluded:['Exclue','no'],undetermined:['Indéterminée','na']};
-  const statusBadge=row=>{const [t,c]=STATUS[row.status]||STATUS.undetermined;return `<i class="ct-status ${c}" title="Statut de la stratégie : ${t.toLowerCase()}. Détail dans la fiche du titre.">${t}</i>`;};
+  const statusBadge=V.statusBadge;
   // base = titres notés (recherche texte comprise) ; scoped = base moins les filtres secondaires (c'est le périmètre des compteurs) ; rows = scoped selon Retenues / Exclues / Toutes.
   function visibleRows(){
     const needle=J.fold(tableState.query.trim());
@@ -391,14 +261,7 @@
     const rows=tableState.verdict==='all'?scoped:scoped.filter(r=>r.status===tableState.verdict);
     return {base,scoped,counts,rows};
   }
-  function spark(row){
-    if(row.curveLoading)return '<span class="ct-missing">Chargement…</span>';
-    if(!row.points.length)return '<span class="ct-missing">Indisponible</span>';
-    const lo=Math.min(...row.points),hi=Math.max(...row.points),span=hi-lo||1;
-    const pts=row.points.map((v,i)=>[4+i*96/Math.max(1,row.points.length-1),25-(v-lo)*21/span]);
-    const up=row.points[row.points.length-1]>=row.points[0];
-    return `<svg class="ct-mini-curve ${up?'positive':'negative'}" viewBox="0 0 104 30" role="img" aria-label="Clôtures des 21 dernières séances : ${up?'hausse':'baisse'}"><polyline points="${pts.map(p=>p.map(n=>n.toFixed(1)).join(',')).join(' ')}"/><circle cx="${pts.at(-1)[0]}" cy="${pts.at(-1)[1]}" r="2"/></svg>`;
-  }
+  const spark=V.spark;
   const sectorLabel=row=>{const f=defs.find(x=>x.id==='sector'),g=(categoryPayload.defaults&&null)||null;const v=f&&(f.values||[]).find(x=>x.id===(row.group&&row.group.sector));return v?v.label:null;};
   function rowCell(row,key){
     if(key==='rank')return rankCell(row);

@@ -30,6 +30,13 @@ def test_core_unit_tests_pass():
     assert 'core.js : OK' in res.stdout
 
 
+@pytest.mark.skipif(shutil.which('node') is None, reason='Node absent')
+def test_explorer_model_unit_tests_pass():
+    res = subprocess.run(['node', os.path.join(ROOT, 'tests', 'e2e', 'explorer-model.cjs')], capture_output=True, text=True, timeout=60)
+    assert res.returncode == 0, res.stdout + res.stderr
+    assert 'explorer-model.js : OK' in res.stdout
+
+
 def test_core_is_loaded_before_app_on_every_page():
     for page in glob.glob(os.path.join(PAGES, '*.html')):
         html = open(page, encoding='utf-8').read()
