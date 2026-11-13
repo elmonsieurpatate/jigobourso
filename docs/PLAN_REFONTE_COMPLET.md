@@ -314,9 +314,9 @@ remplacées ont été retirées ; les exceptions sont explicites.
 
 ## Contrôles
 
-- [ ] Formatage CSS contrôlé automatiquement.
-- [ ] Règles adaptées contre les surcharges locales interdites.
-- [ ] Exceptions légitimes documentées.
+- [x] Formatage CSS contrôlé automatiquement. Preuve 2026-11-13 : Prettier 3.3.3 (.prettierrc), `make css-format` / `make css-check`, commit e2a2ed4.
+- [x] Règles adaptées contre les surcharges locales interdites. Preuve 2026-11-13 : check_halo_css.py : refus de toute surcharge visuelle d'un composant commun hors halo.css (test : .btn{padding} refusé).
+- [x] Exceptions légitimes documentées. Preuve 2026-11-13 : 5 exceptions avec raison dans EXCEPTIONS de check_halo_css.py (colonnes figées, tableaux en cartes mobile).
 - [x] Styles calculés comparés pour un même composant dans plusieurs pages. Preuve : script de mesure, 56 combinaisons page/thème/largeur.
 - [ ] Références visuelles stables avec procédure de mise à jour.
 - [x] Conservation des !important réellement justifiés. Preuve : 2 restants ([hidden], réduction des animations).
@@ -325,14 +325,14 @@ remplacées ont été retirées ; les exceptions sont explicites.
 
 ## Recette
 
-- [ ] 375/390 px, largeur intermédiaire et 1280 px.
-- [ ] 320 px pour les parcours qui doivent le supporter.
+- [x] 375/390 px, largeur intermédiaire et 1280 px. Preuve 2026-11-13 : 390, 768 et 1280 mesurés sur 19 pages.
+- [x] 320 px pour les parcours qui doivent le supporter. Preuve 2026-11-13 : 320 mesuré sur 19 pages + fiche titre : aucun débordement.
 - [ ] Thèmes, affichage initial et absence de flash.
 - [ ] Clavier, ordre de tabulation, focus et retour des fenêtres.
 - [ ] Contrastes, texte agrandi et réduction des animations.
 - [ ] Vide, données absentes, erreur, chargement long et désactivation.
-- [ ] Absence de débordement ou d'action inaccessible.
-- [ ] Absence d'erreur JS, ressource manquante ou violation CSP.
+- [x] Absence de débordement ou d'action inaccessible. Preuve 2026-11-13 : 19 pages × 320/390/768/1280 × clair/sombre : aucun débordement après correction du tableau Données.
+- [x] Absence d'erreur JS, ressource manquante ou violation CSP. Preuve 2026-11-13 : mêmes 19 pages : 0 erreur après correction de titre.js et ajout de favicon.svg (404 /favicon.ico).
 - [ ] Distinguer émulation mobile et vérification sur appareil réel.
 
 ## Clôture
@@ -340,7 +340,7 @@ remplacées ont été retirées ; les exceptions sont explicites.
 - [ ] Documentation du design mise à jour.
 - [ ] Exceptions visuelles maintenues et justifiées.
 - [ ] Couverture comparée à la liste des pages et aux maquettes.
-- [ ] Versions des assets cohérentes avec la convention du dépôt.
+- [x] Versions des assets cohérentes avec la convention du dépôt. Preuve 2026-11-13 : 19 pages utilisent ?v=__BUILD__.
 - [ ] Bilan des styles supprimés, mutualisés et conservés.
 
 Le CSS n'est terminé que lorsque les étapes 1, 2 et 3 sont validées.
@@ -744,3 +744,8 @@ Les contenus réels des pages nécessitant une session authentifiée n'ont pas
 ### Recette Explorateur (suite) — 2026-11-13
 
 Pagination : `flex-wrap` + visuels dédoublés retirés (halo.css gouverne). Débordement mobile corrigé (scrollWidth 390). Résultats 50 lignes, focus clavier visible sur les premiers arrêts. Non vérifié : état d'erreur, règles ET/OU, badges au tactile. Tests non relancés (fin de lot).
+
+
+### Lot CSS étape 3 — 2026-11-13
+
+Formatage Prettier (e2a2ed4), garde-fou anti-surcharge, 16 règles déplacées dans halo.css, 5 exceptions documentées, favicon, tableau Données défilant, titre.js protégé. Mesures : 19 pages × 4 largeurs × 2 thèmes, 0 débordement, 0 erreur. Restent : états dynamiques Mes stratégies, Portefeuilles, Administration, dialogues, erreur Explorateur ; galerie de référence ; relance complète des tests.
