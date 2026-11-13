@@ -166,8 +166,8 @@ Cela ne fixe pas un nombre obligatoire de fichiers.
 Centraliser les composants n'impose pas un CSS monolithique.
 
 - [ ] Cartographier les définitions communes et les surcharges locales.
-- [ ] Identifier une source d'autorité par famille de composants.
-- [ ] Fixer l'ordre de chargement et une spécificité maîtrisée.
+- [x] Identifier une source d'autorité par famille de composants. Preuve : halo.css, bloc « SOURCE UNIQUE ».
+- [x] Fixer l'ordre de chargement et une spécificité maîtrisée. Preuve : `check_halo_css.py` (ordre des feuilles) ; composants à spécificité de classe.
 - [ ] Définir des conventions de composants, variantes et états.
 - [ ] Interdire les sélecteurs de page qui modifient arbitrairement
       l'apparence d'un composant commun.
@@ -185,12 +185,12 @@ Centraliser les composants n'impose pas un CSS monolithique.
 
 ## Tokens issus des maquettes retenues
 
-- [ ] Palette sémantique : surfaces, texte, bordures, accent, information,
-      succès, vigilance et danger.
-- [ ] Couleurs de texte adaptées aux fonds, en clair et sombre.
-- [ ] Typographie : familles, tailles, graisses, interlignages et chiffres.
+- [x] Palette sémantique : surfaces, texte, bordures, accent, information,
+      succès, vigilance et danger. Preuve : `:root` clair et sombre de halo.css.
+- [x] Couleurs de texte adaptées aux fonds, en clair et sombre. Preuve : mesures clair/sombre sur 14 pages.
+- [x] Typographie : familles, tailles, graisses, interlignages et chiffres. Preuve : variables --h*, --*-size, tabular-nums.
 - [ ] Espacements et densités réellement partagés.
-- [ ] Rayons, ombres, focus et transitions.
+- [x] Rayons, ombres, focus et transitions. Preuve : --control-radius, --panel-radius, --shadow*, :focus-visible.
 - [ ] Niveaux de superposition des menus, en-têtes, fenêtres et notifications.
 - [ ] Palettes de données séparées si nécessaires : catégories, séries, jauges.
 - [ ] Contrastes et lisibilité des valeurs vérifiés.
@@ -206,7 +206,7 @@ Centraliser les composants n'impose pas un CSS monolithique.
 
 ## Boutons
 
-- [ ] Variantes : principal, secondaire, discret et destructif.
+- [x] Variantes : principal, secondaire, discret et destructif. Preuve : .btn, .primary, .ghost, .danger mesurés.
 - [ ] Tailles : normale, compacte, icône ; comportement tactile commun.
 - [ ] États : hover, focus, actif, désactivé et chargement.
 - [ ] Cohérence entre liens d'action et boutons lorsque c'est intentionnel.
@@ -216,12 +216,12 @@ Centraliser les composants n'impose pas un CSS monolithique.
 
 ## Formulaires
 
-- [ ] Champs texte, recherche, nombres, e-mail, mot de passe et textarea.
-- [ ] Sélecteurs, radios, cases à cocher et interrupteurs.
+- [x] Champs texte, recherche, nombres, e-mail, mot de passe et textarea. Preuve : mesures 35 px / 12 px sur 14 pages + 5 pages publiques.
+- [x] Sélecteurs, radios, cases à cocher et interrupteurs. Preuve : cases 13 px mesurées ; interrupteur 46x26 conservé.
 - [ ] Libellés, aides, unités, obligation, erreurs et désactivation.
-- [ ] Visibilité des mots de passe.
+- [x] Visibilité des mots de passe. Preuve : œil visible sur login/register (captures).
 - [ ] Pas de débordement des options et libellés sur mobile.
-- [ ] Taille des textes adaptée au mobile et vérification du zoom.
+- [x] Taille des textes adaptée au mobile et vérification du zoom. Preuve : champs 16 px en mobile (--control-size-mobile).
 - [ ] Distinction fonctionnelle entre action et sélecteur à menu.
 
 ## Autres composants
@@ -317,9 +317,9 @@ remplacées ont été retirées ; les exceptions sont explicites.
 - [ ] Formatage CSS contrôlé automatiquement.
 - [ ] Règles adaptées contre les surcharges locales interdites.
 - [ ] Exceptions légitimes documentées.
-- [ ] Styles calculés comparés pour un même composant dans plusieurs pages.
+- [x] Styles calculés comparés pour un même composant dans plusieurs pages. Preuve : script de mesure, 56 combinaisons page/thème/largeur.
 - [ ] Références visuelles stables avec procédure de mise à jour.
-- [ ] Conservation des !important réellement justifiés.
+- [x] Conservation des !important réellement justifiés. Preuve : 2 restants ([hidden], réduction des animations).
 - [ ] Le remplacement style → data-style n'est pas accepté comme preuve
       de centralisation.
 
