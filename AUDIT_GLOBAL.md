@@ -1,7 +1,7 @@
 # AUDIT GLOBAL : plan directeur de nettoyage et de professionnalisation
 
 Date : 2026-11-12 · Branche d'origine : `chore/frontend-cleanup-20261112` (fusionnée dans `main`)
-**Avancement (13/11/2026)** : étapes 0 à 9 faites. Seules restent deux cases qui dépendent de la tâche cron hPanel de production (action manuelle) : retrait de `?k=` (étape 1.1) et alias `yahoo-history-cron` (étape 3.1).
+**Avancement (13/11/2026)** : étapes 0 à 9 faites. Plus aucune case ouverte (le cron de production utilise l'en-tête `X-Cron-Key`, `?k=` et l'alias `yahoo-history-cron` sont retirés).
 Audit en lecture seule, aucun code modifié. Sources : 3 sous-agents (Backend/DB, Moteur/scripts, Frontend).
 
 **Limites de l'audit** : les 37 modules `engine/analytics/` n'ont pas été lus en entier (doublons et N+1 à confirmer). `app/services/*` et `tests/` non lus par l'agent Backend. Les `innerHTML` du frontend restent à auditer. Aucun constat critique n'a été relevé nulle part : pas d'injection SQL avérée, pas de secret dans le code.
@@ -26,7 +26,7 @@ Réalisé : `ruff.toml` + `make lint` (ruff + `php8.3 -l`, serveur en PHP 8.2), 
 ### 1.1 Backend PHP
 - [x] `lib/http.php:44-50` `need_post` : refuser si `Origin` et `Referer` sont absents ; exiger `Content-Type: application/json` dans `body()` (🟠)
 - [x] `lib/auth.php:9` `client_ip()` : définir une liste de proxys de confiance ; documenter la confiance accordée à `X-Forwarded-Proto` (🟠)
-- [ ] `routes/cron.php:19-22` : retirer la clé via `?k=` (fuite dans les logs d'accès) au profit de l'en-tête, après migration du cron (🟠)
+- [x] `routes/cron.php:19-22` : retirer la clé via `?k=` (fuite dans les logs d'accès) au profit de l'en-tête, après migration du cron (🟠)
 - [x] `routes/admin.php` `admin/system` : masquer ou hacher le code d'invitation renvoyé (🟠)
 - [x] `lib/account.php:26,93,100` et `lib/mail.php` : externaliser le domaine codé en dur vers `JIGO_BASE_URL` (🟠)
 
@@ -44,7 +44,7 @@ Réalisé : `ruff.toml` + `make lint` (ruff + `php8.3 -l`, serveur en PHP 8.2), 
 - [x] Contrôler par `EXPLAIN` le JOIN `alert_events` sur `rule_id` (`routes/alerts.php:147`) (🟢)
 
 Réalisé : `need_post` exige Origin ou Referer, `body()` exige `application/json` (415) ; `client_ip()`/`https()` ne croient `X-Forwarded-*` que d'un proxy listé dans `JIGO_TRUSTED_PROXIES` ; code d'invitation masqué ; `base_url()` (`JIGO_BASE_URL`, défaut = production) ; `funnel.items` : table de colonnes par stage + `LIMIT/OFFSET` liés, listes blanches explicites ; heartbeat `jobs.updated_at` (stale sur le dernier battement) et `job_logs.detail` TEXT (migrations `20261112_*`) ; `utcnow()` remplacé (reste `etf.py`, dont un test fige l'horloge) ; connexions de `cli.py` toutes fermées ; FK `user_id` sur `alert_rules`/`alert_events` ; purge déjà assurée par `tasks.housekeeping` (test ajouté) ; `EXPLAIN` du JOIN : index `idx_event_user` + `PRIMARY`.
-**Reste ouvert** : retrait de `?k=` du cron. Le code accepte déjà `JIGO_CRON_QUERY_KEY=0` pour le refuser, mais la tâche hPanel de production l'utilise encore : migrer vers `X-Cron-Key`, puis activer ce réglage (et changer la clé).
+**Fait** : tâche hPanel migrée vers `X-Cron-Key` le 13/11/2026 (vérifié : appel avec en-tête accepté, tick lancé) ; `?k=` retiré du code.
 **À l'application en production** : la migration `alert_user_fk` échoue sans rien modifier s'il existe des lignes orphelines ; `read_timeout=900` conservé (requêtes longues volontaires).
 
 ## Étape 2 : Architecture backend : terminer le refactor routes → services 🔴
@@ -68,7 +68,7 @@ Réalisé : `need_post` exige Origin ou Referer, `body()` exige `application/jso
 - [x] Migrer les données `saved_searches` / `saved_presets` vers `explorer_saved`, puis supprimer `routes/explore.php:109-146`, `services/explorer_library.php` (couche legacy) et les deux anciennes tables
 - [x] Supprimer `alerts_mail_pending`, `ALERTS_EXECUTION_ENABLED`, `ALERT_LABELS` (si inutilisée ailleurs) dans `routes/alerts.php`
 - [x] Supprimer `secondary_setting` (`services/secondary_filters.php:87`)
-- [ ] Supprimer l'alias cron legacy `yahoo-history-cron`
+- [x] Supprimer l'alias cron legacy `yahoo-history-cron`
 - [x] Aligner le style de `schema.sql` (`CREATE TABLE IF NOT EXISTS` mixte) et le rendre cohérent avec `db/migrations/`
 
 ### 3.2 Moteur / scripts
@@ -84,7 +84,7 @@ Réalisé : `need_post` exige Origin ou Referer, `body()` exige `application/jso
 - [x] Remplacer `alertes.html` et `classement-test.html` (meta refresh) par des redirections 301 `.htaccess`, puis supprimer les pages
 
 Réalisé : routes `searches`, `search/*`, `presets/*`, `explorer/library/legacy`, `explorer_legacy_action` et tables `saved_*` retirées du code et de `schema.sql` (aucune référence active, `git grep`) ; copie des données par `scripts/oneshot/migrate_saved_to_explorer.py` (testé, idempotent) ; sauvegarde quotidienne : `saved_searches` remplacée par `explorer_saved` ; `alerts_mail_pending`, `ALERTS_EXECUTION_ENABLED`, `secondary_setting` supprimés (`ALERT_LABELS` conservée : 3 usages dans `routes/alerts.php`) ; `schema.sql` tout en `CREATE TABLE IF NOT EXISTS` ; F401/F841 nettoyés et réactivés dans `ruff.toml` ; `scripts/README.md` ; `alertes.html`/`classement-test.html` → 301, `multiselect.js` supprimé (le contrôle de déploiement vise désormais `mes-filtres.html`).
-**Reste ouvert** : (1) alias cron `yahoo-history-cron` : la tâche hPanel de production l'appelle encore (même chantier que `?k=` de l'Étape 1.1), à retirer après migration vers `api/cron` ; (2) regroupement des `verify_*`/`prepare_*` dans `scripts/release/` : `ops/deploy.sh` et `test_deploy_modes.py` les appellent par chemin, à faire avec le déploiement.
+**Fait** : alias `yahoo-history-cron` et `?k=` retirés après migration de la tâche hPanel (voir étape 1.1).
 **Déployé le 12/11/2026** (commit `209c06a`). `migrate_saved_to_explorer.py` lancé après le déploiement (le script n'arrive sur le serveur qu'avec lui) : 0 ligne à copier, les deux anciennes tables étaient vides en production. Base de production nettoyée le même jour : 41 tables obsolètes supprimées (34 `codex_*`, 4 `saved_searches`, `saved_presets`, `saved_strategies`), sauvegarde des 37 petites sur le serveur (`~/backup-tables-obsoletes-20261112.sql.gz`). Test navigateur `strategies-ui.cjs` corrigé (menu admin « Splits ») ; les déploiements en `[deploy quick]` ne lancent pas les tests navigateur. Restes de CSS `.ms-*` (app.css) sans usage : à retirer à l'Étape 6.
 
 ## Étape 4 : Découpage du moteur `engine/analytics/` (37 fichiers → 7 sous-paquets)

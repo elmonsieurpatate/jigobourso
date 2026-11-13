@@ -119,7 +119,7 @@ return [
         $file = cfg('JIGO_CRON_KEY_FILE', '');
         $s = engine_call('schedule-get', []);
         $dir = cfg('JIGO_LOG_DIR', engine_root() . '/logs');
-        $s['site'] = ['cron_key_present' => $file !== '' && is_file($file) && trim((string)file_get_contents($file)) !== '', 'cron_path' => 'api/cron?k=<clé>',
+        $s['site'] = ['cron_key_present' => $file !== '' && is_file($file) && trim((string)file_get_contents($file)) !== '', 'cron_path' => 'api/cron (en-tête X-Cron-Key)',
                       'rejected' => log_tail($dir . '/cron-rejets.log', 10, null), 'log_errors' => log_tail($dir . '/cron.log', 15, '/Traceback|Error|Exception|No such file|not found|denied|Permission|failed|cannot|Killed/i')];
         return $s;
     },
