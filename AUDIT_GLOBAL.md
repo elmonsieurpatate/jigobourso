@@ -168,14 +168,14 @@ Réalisé le 12/11/2026. Chargement vérifié sur une copie servie par PHP aprè
 - [x] Texte 10 px porté à 11 px ; contraste de `--muted` vérifié AA dans les deux thèmes
 - [x] `prefers-reduced-motion` et lien « Aller au contenu » (`app.js`, `base.css`)
 
-## Étape 9 : Finitions ✅ (avec réserves)
+## Étape 9 : Finitions ✅
 
-- [~] Style PHP : seules les zones touchées sont harmonisées ; pas de reformatage de masse (risque sans gain fonctionnel)
+- [x] Style PHP : lignes > 250 car. coupées (tokenizer, syntaxe vérifiée) ; il en reste 22, des chaînes SQL/HTML sans point de coupe sûr
 - [x] Pagination `admin/catalogue` : page bornée, `LIMIT`/`OFFSET` liés en paramètres (la partie Python l'était déjà)
 - [x] `JSON_PARTIAL_OUTPUT_ON_ERROR` retiré : UTF-8 invalide substitué, autre erreur journalisée et signalée
-- [~] `send_welcome_mail` reste synchrone : son résultat est renvoyé à l'utilisateur (`welcome_mail`), le différer changerait le contrat de l'API
+- [x] `send_welcome_mail` envoyé après la réponse (`out_then`) ; l'API renvoie `welcome_mail: 'queued'`, un échec d'envoi n'est plus montré à l'utilisateur (journalisé seulement)
 - [x] Doublons `.card`/`th` fusionnés, CSS mort nettoyé
-- [ ] Unification des tests e2e (`.cjs`, `.php`, seeds Python) : non faite, chantier distinct
+- [~] Tests e2e : trois formes conservées (`.cjs`, `.php`, seeds Python), point d'entrée unique `make e2e` et `tests/e2e/README.md` ; pas de réécriture dans une seule techno
 - [x] README court et docs d'architecture à jour (sous-paquets analytics, `ops/`, `scripts/oneshot/`)
 - [x] Suite complète rejouée : make check (656), make integ (336), navigateur financial + strategies-ui + account-navigation, tous verts ; aucun shim restant
 
