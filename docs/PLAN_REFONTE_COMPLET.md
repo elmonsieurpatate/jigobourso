@@ -289,7 +289,7 @@ Adapter cette liste aux pages réellement actives du dépôt courant.
 
 ## Points particuliers de l'Explorateur
 
-- [ ] Sélecteur de stratégie contenu sur petit écran.
+- [x] Sélecteur de stratégie contenu sur petit écran. Preuve : menu à 25–365 px sur 390 px, clair et sombre (mesure + capture).
 - [ ] Options et badges lisibles au clavier et au toucher.
 - [ ] Modification d'une stratégie ou d'un filtre sans recherche automatique.
 - [ ] Application explicite et chargement perceptible.
@@ -688,6 +688,12 @@ Tests sur l'état local non commité : `make fast` 656 réussis ; `make lint` OK
 Commits : `bd23c36` (migration des `data-style`), `4b8435a` (plan). Poussés sur `main` ; le job de déploiement automatique du workflow se déclenche au push (aucun déploiement manuel). Résultat du workflow : voir le prochain lot.
 Reste : états dynamiques par page (menus, dialogues, erreur, chargement) pour cocher l'étape 2 ; F08 reste ouvert tant que les `data-style` calculés ne sont pas justifiés un à un.
 Prochain sous-lot précis : recette des états dynamiques, page par page, en commençant par l'Explorateur (sélecteur de stratégie, filtres secondaires, menu des colonnes, états vide/erreur/chargement, mobile), puis Mes stratégies, Portefeuilles, Administration.
+
+### Recette Explorateur (partielle) — 2026-11-13
+Correction de méthode : mes passes « clair » sur les pages connectées étaient en réalité en sombre (le thème du compte l'emportait sur celui forcé). Script corrigé (`J.applyTheme` après chargement) ; passe complète refaite en vrai clair/sombre, 14 pages, 1280/390 px : conforme, plus détection du texte rogné.
+Correctifs : champs et boutons à 40 px sur mobile (texte des listes rogné à 35 px avec une police de 16 px) ; menu des colonnes borné en hauteur (défilement interne) et visuels déplacés dans halo.css.
+Vérifié sur l'Explorateur : menus stratégie, colonnes, filtres secondaires, recherche sans résultat, tri, clair/sombre, bureau/mobile, aucun débordement horizontal, aucune erreur JS.
+Non vérifié : tableau avec résultats (aucune recherche lancée), états erreur et chargement, clavier. Un 404 de ressource vu une fois, non reproduit.
 
 ### État initial
 
