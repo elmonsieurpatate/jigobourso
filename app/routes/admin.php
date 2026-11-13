@@ -12,7 +12,8 @@ require_once __DIR__ . '/../services/scores.php';
 return [
     'admin/splits' => function () {
         require_admin();
-        return engine_call('split-reviews', ['state' => (string)($_GET['state'] ?? 'pending'), 'q' => (string)($_GET['q'] ?? ''), 'page' => max(1,(int)($_GET['page'] ?? 1)), 'sort' => (string)($_GET['sort'] ?? 'magnitude_desc'), 'min_ratio' => (string)($_GET['min_ratio'] ?? '1')]);
+        return engine_call('split-reviews', ['state' => (string)($_GET['state'] ?? 'pending'), 'q' => (string)($_GET['q'] ?? ''), 'page' => max(1,(int)($_GET['page'] ?? 1)), 'sort' => (string)($_GET['sort'] ?? 'magnitude_desc'),
+            'min_ratio' => (string)($_GET['min_ratio'] ?? '1')]);
     },
     'admin/splits/scan' => function () { need_post(); require_admin(); return engine_call('split-review-scan', []); },
     'admin/splits/decide' => function () {
@@ -79,12 +80,14 @@ return [
         $size = 50; $page = min(100000, max(1, (int)($_GET['page'] ?? 1)));   // page bornée ; LIMIT/OFFSET liés en paramètres
         $total = (int)q("SELECT COUNT(*) FROM listings l JOIN instruments i ON i.id = l.instrument_id$w", $args)->fetchColumn();
         $rows = q("SELECT l.id, l.symbol, l.mic, l.currency, l.status, l.excluded_reason, l.is_primary, l.primary_reason, i.name, i.isin, i.kind, i.country, i.category, p.price, p.price_time, s.last_close_date, s.closes_count, s.quality
-                   FROM listings l JOIN instruments i ON i.id = l.instrument_id LEFT JOIN latest_prices p ON p.listing_id = l.id LEFT JOIN series_state s ON s.listing_id = l.id$w ORDER BY i.name, l.mic LIMIT ? OFFSET ?", array_merge($args, [$size, ($page - 1) * $size]))->fetchAll();
+                   FROM listings l JOIN instruments i ON i.id = l.instrument_id LEFT JOIN latest_prices p ON p.listing_id = l.id LEFT JOIN series_state s ON s.listing_id = l.id$w ORDER BY i.name, l.mic LIMIT ? OFFSET ?",
+            array_merge($args, [$size, ($page - 1) * $size]))->fetchAll();
         $reasons = q("SELECT excluded_reason r, COUNT(*) n FROM listings WHERE status = 'excluded' GROUP BY excluded_reason ORDER BY n DESC LIMIT 25")->fetchAll();
         $mics = q('SELECT DISTINCT mic FROM listings ORDER BY mic')->fetchAll(PDO::FETCH_COLUMN);
         $load = q('SELECT source_commit, loaded_at, rows_read, rows_kept, rules_json FROM catalogue_loads ORDER BY id DESC LIMIT 1')->fetch();
         return ['total' => $total, 'page' => $page, 'pages' => max(1, (int)ceil($total / $size)), 'rows' => $rows, 'exclusion_reasons' => $reasons, 'mics' => $mics,
-                'rules' => $load && $load['rules_json'] ? json_decode($load['rules_json'], true) : null, 'load' => $load ? ['commit' => substr($load['source_commit'], 0, 8), 'loaded_at' => $load['loaded_at'], 'rows_read' => (int)$load['rows_read'], 'rows_kept' => (int)$load['rows_kept']] : null];
+                'rules' => $load && $load['rules_json'] ? json_decode($load['rules_json'], true) : null, 'load' => $load ? ['commit' => substr($load['source_commit'], 0, 8), 'loaded_at' => $load['loaded_at'],
+                    'rows_read' => (int)$load['rows_read'], 'rows_kept' => (int)$load['rows_kept']] : null];
     },
     'admin/fdb' => function () { require_admin(); return engine_call('fdb-state', []); },
     'admin/yahoo' => function () { require_admin(); return engine_call('yahoo-state', []); },
@@ -160,7 +163,8 @@ return [
         need_post(); require_admin();
         $job = str_in(body(), 'job', 24);
         $labels = ['fdb_import' => 'Import FinanceDatabase', 'fdb_filter' => 'Filtrage FinanceDatabase', 'yahoo_info' => 'Import des informations Yahoo', 'yahoo_filter' => 'Filtrage Yahoo',
-                   'history' => 'Import / mise à jour des historiques', 'gaps' => 'Clôtures manquantes (tout le catalogue)', 'volumes' => 'Volumes quotidiens (tout le catalogue)', 'maintenance' => 'Entretien après collecte', 'metrics' => 'Indicateurs et classements', 'etf' => 'Similarité des ETF'];
+                   'history' => 'Import / mise à jour des historiques', 'gaps' => 'Clôtures manquantes (tout le catalogue)', 'volumes' => 'Volumes quotidiens (tout le catalogue)', 'maintenance' => 'Entretien après collecte',
+                       'metrics' => 'Indicateurs et classements', 'etf' => 'Similarité des ETF'];
         if (!isset($labels[$job])) throw new ApiError('Traitement inconnu');
         engine_call('job-check', ['name' => $job]);          // 422 avec un message clair si l'étape précédente manque ou si un traitement est en cours
         $log = cfg('JIGO_LOG_DIR', engine_root() . '/logs') . '/admin.log';

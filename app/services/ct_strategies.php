@@ -10,7 +10,8 @@
 require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/http.php';
 
-const CT_BUILTIN = ['fast' => 'Croissance rapide', 'regular' => 'Croissance régulière', 'calm' => 'Hausse calme', 'rebound' => 'Rebond', 'mom6' => 'Momentum 6 mois (expérimental)', 'mom12' => 'Momentum 12 mois (expérimental)', 'momrisk' => 'Momentum ajusté du risque (expérimental)'];
+const CT_BUILTIN = ['fast' => 'Croissance rapide', 'regular' => 'Croissance régulière', 'calm' => 'Hausse calme', 'rebound' => 'Rebond', 'mom6' => 'Momentum 6 mois (expérimental)', 'mom12' => 'Momentum 12 mois (expérimental)',
+    'momrisk' => 'Momentum ajusté du risque (expérimental)'];
 const CT_PERIODS = ['week', 'month', 'quarter', 'half', 'year', 'two_year'];   // granularités à pente et R²
 const CT_DAY = 'day';                                                           // Jour (1 séance) : facultatif, seule la variation 1J sert de critère
 const CT_METRICS = ['slope', 'r2', 'volatility', 'drawdown', 'return', 'volume'];
@@ -25,7 +26,17 @@ const CT_DEFAULT_META = [
     'mom12' => ['icon' => 'calendar-days', 'description' => 'Le momentum des 12 derniers mois, dernier mois exclu : on classe les titres qui ont le mieux monté sur l’année.'],
     'momrisk' => ['icon' => 'shield-check', 'description' => 'Le momentum 6 et 12 mois, corrigé du risque : la volatilité et la plus forte baisse pénalisent la note.'],
 ];
-const CT_ICONS = ['arrow-up', 'arrow-down', 'arrow-left', 'arrow-right', 'arrow-up-left', 'arrow-down-left', 'arrow-left-right', 'chevron-up', 'chevron-down', 'chevrons-up', 'chevrons-down', 'chevrons-up-down', 'arrow-big-up', 'arrow-big-down', 'arrow-big-up-dash', 'move-up', 'move-down', 'move-up-right', 'move-down-right', 'circle-arrow-up', 'circle-arrow-down', 'circle-arrow-up-right', 'circle-arrow-down-right', 'circle-chevron-up', 'circle-chevron-down', 'square-arrow-up-right', 'corner-right-up', 'corner-right-down', 'arrow-up-from-line', 'arrow-down-to-line', 'arrow-up-wide-narrow', 'arrow-down-wide-narrow', 'rotate-cw', 'rotate-ccw', 'trending-up-down', 'chart-no-axes-column-increasing', 'trending-up', 'trending-down', 'rocket', 'shield', 'shield-check', 'scale', 'target', 'zap', 'sprout', 'gem', 'hourglass', 'coins', 'landmark', 'search', 'refresh-cw', 'calendar-days', 'compass', 'trophy', 'waves', 'moon', 'sun', 'gauge', 'activity', 'chart-column', 'chart-line', 'chart-area', 'chart-pie', 'layers', 'filter', 'sliders-horizontal', 'list-checks', 'circle-check', 'flag', 'bookmark', 'star', 'award', 'crosshair', 'radar', 'telescope', 'microscope', 'flask-conical', 'cpu', 'settings', 'wrench', 'anchor', 'lock', 'key', 'eye', 'bell', 'clock', 'timer', 'arrow-up-right', 'arrow-down-right', 'arrow-up-down', 'repeat', 'undo-2', 'git-branch', 'network', 'briefcase', 'building-2', 'banknote', 'wallet', 'percent', 'euro', 'globe', 'factory', 'leaf', 'mountain', 'wind', 'droplets', 'thermometer', 'circle-dollar-sign', 'piggy-bank', 'calculator', 'ruler', 'scan-search', 'lightbulb', 'brain-circuit', 'atom', 'bolt', 'battery-charging', 'flame', 'snowflake', 'route', 'signpost', 'map-pin', 'badge-check', 'scroll-text', 'book-open', 'file-chart-line', 'chart-no-axes-combined', 'chart-candlestick', '🐂', '🐻', '🦬', '🐃', '🐅', '🦅', '🐺', '🦉', '🐢', '🐇', '🐘', '🦁', '🐋', '🦈', '🐜', '🐝', '💹', '📈', '📉', '📊', '💰', '💵', '💶', '💴', '💷', '💎', '🏦', '🏛️', '🪙', '💳', '🧾', '🧮', '🏆', '🥇', '🎯', '🚀', '🔥', '⚡', '🌱', '🌊', '⏳', '🛡️', '⚖️', '🔍', '🔭', '🧭', '🔔', '🌍', '🏭', '🏢', '🛢️', '🔌', '💻', '💊', '🏥', '🚗', '✈️', '🏠', '🌾'];      // clés du jeu d'icônes (strategy-icons.js)
+const CT_ICONS = ['arrow-up', 'arrow-down', 'arrow-left', 'arrow-right', 'arrow-up-left', 'arrow-down-left', 'arrow-left-right', 'chevron-up', 'chevron-down', 'chevrons-up', 'chevrons-down', 'chevrons-up-down',
+    'arrow-big-up', 'arrow-big-down', 'arrow-big-up-dash', 'move-up', 'move-down', 'move-up-right', 'move-down-right', 'circle-arrow-up', 'circle-arrow-down', 'circle-arrow-up-right', 'circle-arrow-down-right',
+    'circle-chevron-up', 'circle-chevron-down', 'square-arrow-up-right', 'corner-right-up', 'corner-right-down', 'arrow-up-from-line', 'arrow-down-to-line', 'arrow-up-wide-narrow', 'arrow-down-wide-narrow',
+    'rotate-cw', 'rotate-ccw', 'trending-up-down', 'chart-no-axes-column-increasing', 'trending-up', 'trending-down', 'rocket', 'shield', 'shield-check', 'scale', 'target', 'zap', 'sprout', 'gem', 'hourglass',
+    'coins', 'landmark', 'search', 'refresh-cw', 'calendar-days', 'compass', 'trophy', 'waves', 'moon', 'sun', 'gauge', 'activity', 'chart-column', 'chart-line', 'chart-area', 'chart-pie', 'layers', 'filter',
+    'sliders-horizontal', 'list-checks', 'circle-check', 'flag', 'bookmark', 'star', 'award', 'crosshair', 'radar', 'telescope', 'microscope', 'flask-conical', 'cpu', 'settings', 'wrench', 'anchor', 'lock',
+    'key', 'eye', 'bell', 'clock', 'timer', 'arrow-up-right', 'arrow-down-right', 'arrow-up-down', 'repeat', 'undo-2', 'git-branch', 'network', 'briefcase', 'building-2', 'banknote', 'wallet', 'percent',
+    'euro', 'globe', 'factory', 'leaf', 'mountain', 'wind', 'droplets', 'thermometer', 'circle-dollar-sign', 'piggy-bank', 'calculator', 'ruler', 'scan-search', 'lightbulb', 'brain-circuit', 'atom', 'bolt',
+    'battery-charging', 'flame', 'snowflake', 'route', 'signpost', 'map-pin', 'badge-check', 'scroll-text', 'book-open', 'file-chart-line', 'chart-no-axes-combined', 'chart-candlestick', '🐂', '🐻', '🦬',
+    '🐃', '🐅', '🦅', '🐺', '🦉', '🐢', '🐇', '🐘', '🦁', '🐋', '🦈', '🐜', '🐝', '💹', '📈', '📉', '📊', '💰', '💵', '💶', '💴', '💷', '💎', '🏦', '🏛️', '🪙', '💳', '🧾', '🧮', '🏆', '🥇', '🎯', '🚀', '🔥', '⚡', '🌱', '🌊', '⏳', '🛡️', '⚖️',
+    '🔍', '🔭', '🧭', '🔔', '🌍', '🏭', '🏢', '🛢️', '🔌', '💻', '💊', '🏥', '🚗', '✈️', '🏠', '🌾'];      // clés du jeu d'icônes (strategy-icons.js)
 
 function ct_key(int $uid): string { return 'ct_strategies:' . $uid; }
 function ct_json($v): string { return json_encode($v, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR); }
@@ -45,7 +56,8 @@ function ct_tree(array $n, int $depth, int &$count): array {
         if (!in_array($n['join'] ?? null, ['and', 'or'], true) || !is_array($n['children'] ?? null) || !array_is_list($n['children']) || count($n['children']) > 50) throw new ApiError('Groupe de règles invalide.', 422);
         return ['kind' => 'group', 'join' => $n['join'], 'children' => array_map(fn($c) => is_array($c) ? ct_tree($c, $depth + 1, $count) : throw new ApiError('Règle invalide.', 422), $n['children'])];
     }
-    if (($n['kind'] ?? null) !== 'rule' || !in_array($n['metric'] ?? null, CT_METRICS, true) || !in_array($n['period'] ?? null, [...CT_PERIODS, CT_DAY], true) || !in_array($n['op'] ?? null, ['>=', '<=', '>', '<', '='], true)) throw new ApiError('Règle invalide.', 422);
+    if (($n['kind'] ?? null) !== 'rule' || !in_array($n['metric'] ?? null, CT_METRICS, true) || !in_array($n['period'] ?? null, [...CT_PERIODS, CT_DAY], true) || !in_array($n['op'] ?? null, ['>=', '<=',
+        '>', '<', '='], true)) throw new ApiError('Règle invalide.', 422);
     return ['kind' => 'rule', 'metric' => $n['metric'], 'period' => $n['period'], 'op' => $n['op'], 'value' => ct_num($n['value'] ?? null, -1e12, 1e12, 'Valeur de règle')];
 }
 /** Reconstruit une configuration propre : aucun champ inconnu n'est conservé. */

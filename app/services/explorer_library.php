@@ -6,7 +6,8 @@ require_once __DIR__ . '/../lib/engine.php';
 function clean_view($in): array {
     $view = [];
     if (!is_array($in)) return $view;
-    foreach (['currency', 'min_aum', 'max_aum', 'kind', 'geo_region', 'market', 'country', 'category', 'budget', 'min_price', 'max_price', 'min_score', 'max_volatility', 'max_drawdown', 'min_volume', 'max_fee', 'cap', 'regularity', 'risk', 'liquidity', 'pea', 'owned_only', 'open_now', 'fresh_only', 'sort', 'dir'] as $k)
+    foreach (['currency', 'min_aum', 'max_aum', 'kind', 'geo_region', 'market', 'country', 'category', 'budget', 'min_price', 'max_price', 'min_score', 'max_volatility', 'max_drawdown', 'min_volume', 'max_fee',
+        'cap', 'regularity', 'risk', 'liquidity', 'pea', 'owned_only', 'open_now', 'fresh_only', 'sort', 'dir'] as $k)
         if (isset($in[$k]) && is_scalar($in[$k]) && $in[$k] !== '' && $in[$k] !== false) $view[$k] = $in[$k];
     if (isset($view['kind']) && !in_array($view['kind'], ['all', 'equity', 'etf', 'large_etf'], true)) unset($view['kind']);
     if (isset($view['geo_region']) && !in_array($view['geo_region'], ['us', 'eu', 'emerging'], true)) unset($view['geo_region']);
@@ -21,7 +22,8 @@ function clean_view($in): array {
 /** Sauvegardes typées (stratégie, univers, recherche) de l'utilisateur. */
 function explorer_library_list(int $uid): array {
     $items = q('SELECT id,kind,name,payload,active,updated_at FROM explorer_saved WHERE user_id=? ORDER BY kind,name',[$uid])->fetchAll();
-    foreach ($items as &$item) { $item['id']=(string)$item['id'];$item['payload']=json_decode($item['payload'],true);if (isset($item['payload']['config']) && is_array($item['payload']['config'])) $item['payload']['config']=explorer_config_shape($item['payload']['config']);if (($item['payload']['universe']??null)===[])$item['payload']['universe']=new stdClass();$item['active']=(bool)$item['active']; } unset($item);
+    foreach ($items as &$item) { $item['id']=(string)$item['id'];$item['payload']=json_decode($item['payload'],true);if (isset($item['payload']['config']) && is_array($item['payload']['config'])) $item['payload']['config']=explorer_config_shape($item['payload']['config']);if (($item['payload']['universe']??null)===[])$item['payload']['universe']=new stdClass();$item['active']=(bool)$item['active'];
+        } unset($item);
     return ['items'=>$items];
 }
 function explorer_library_save(int $uid,array $b): array {

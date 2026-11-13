@@ -15,7 +15,7 @@
       const r = await J.post('auth/register', v);
       let logged = true; try { await J.post('auth/login', { username: v.username, password: v.password, remember: false }); } catch (_) { logged = false; }
       $('#box').innerHTML = `<h1>Bienvenue, ${E(v.username)} !</h1><div class="notice" role="status"><b>Votre compte est créé.</b></div>
-        <p>${r.welcome_mail ? `Un e-mail de bienvenue vient d’être envoyé à <b>${E(v.email)}</b> (pensez à regarder les courriers indésirables).` : `Nous n’avons pas pu envoyer l’e-mail de bienvenue à <b>${E(v.email)}</b>. Votre compte fonctionne normalement ; vérifiez l’adresse dans « Mon compte ».`}</p>
+        <p>Un e-mail de bienvenue part vers <b>${E(v.email)}</b> (pensez à regarder les courriers indésirables). Votre compte fonctionne dès maintenant ; si rien n’arrive, vérifiez l’adresse dans « Mon compte ».</p>
         <p>Pour bien démarrer, lisez le centre d’aide : il explique la bourse et Jigobourso pas à pas.</p>
         <p>${logged ? '<a class="btn primary" href="aide.html#/bienvenue">Découvrir l’aide</a> <a class="btn" href="index.html">Aller à l’Explorer</a>' : '<a class="btn primary" href="login.html">Me connecter</a>'}</p>`;
       if (logged) setTimeout(() => { location.href = 'aide.html#/bienvenue'; }, 6000);

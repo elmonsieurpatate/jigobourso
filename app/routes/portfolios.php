@@ -22,7 +22,8 @@ return [
         $p = own_portfolio((int)($_GET['id'] ?? 0), $u);
         $v = portfolio_valuation((int)$p['id']);
         $levels = [];
-        foreach (q('SELECT listing_id, stop_px, target_px FROM position_levels WHERE portfolio_id = ?', [$p['id']])->fetchAll() as $l) $levels[(int)$l['listing_id']] = ['stop' => $l['stop_px'] !== null ? (float)$l['stop_px'] : null, 'target' => $l['target_px'] !== null ? (float)$l['target_px'] : null];
+        foreach (q('SELECT listing_id, stop_px, target_px FROM position_levels WHERE portfolio_id = ?', [$p['id']])->fetchAll() as $l) $levels[(int)$l['listing_id']] = ['stop' => $l['stop_px'] !== null ? (float)$l['stop_px'] : null,
+            'target' => $l['target_px'] !== null ? (float)$l['target_px'] : null];
         foreach ($v['positions'] as &$pos) $pos['levels'] = $pos['listing_id'] ? ($levels[$pos['listing_id']] ?? null) : null;
         unset($pos);
         $tx = q('SELECT id, listing_id, symbol, name, isin, side, quantity, unit_price, currency, fx_to_eur, fees, trade_at, note FROM portfolio_transactions WHERE portfolio_id = ? ORDER BY trade_at DESC, id DESC', [$p['id']])->fetchAll();
@@ -36,7 +37,8 @@ return [
         $req = ['portfolio_strategy' => $pfCfg ? ['name' => $pfCfg['name'] ?? null, 'config' => $pfCfg] : null, 'lots' => [], 'positions' => $v['positions']];
         foreach ($lots as $l) {
             $t = $l['tx']; $s = $settings[(int)$t['id']] ?? [];
-            $req['lots'][] = ['tx_id' => (int)$t['id'], 'listing_id' => $t['listing_id'] ? (int)$t['listing_id'] : null, 'trade_date' => substr($t['trade_at'], 0, 10), 'remaining' => $l['remaining'], 'remaining_cost' => $l['remaining_cost'], 'manual_split' => $l['manual_split'],
+            $req['lots'][] = ['tx_id' => (int)$t['id'], 'listing_id' => $t['listing_id'] ? (int)$t['listing_id'] : null, 'trade_date' => substr($t['trade_at'], 0, 10), 'remaining' => $l['remaining'], 'remaining_cost' => $l['remaining_cost'],
+                'manual_split' => $l['manual_split'],
                 'strategy' => $s['strategy'] ?? null, 'alert_days' => isset($s['alert_days']) ? (int)$s['alert_days'] : null,
                 'alert_drop_pct' => isset($s['alert_drop_pct']) ? (float)$s['alert_drop_pct'] : null, 'alerts_off' => !empty($s['alerts_off'])];
         }
@@ -82,7 +84,8 @@ return [
         }
         if ($v['stop'] !== null && $v['target'] !== null && $v['stop'] >= $v['target']) throw new ApiError('Le filet de sécurité doit être inférieur à l’objectif', 422);
         if ($v['stop'] === null && $v['target'] === null) q('DELETE FROM position_levels WHERE portfolio_id = ? AND listing_id = ?', [$p['id'], $lid]);
-        else q('INSERT INTO position_levels(portfolio_id, listing_id, stop_px, target_px, updated_at) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE stop_px = VALUES(stop_px), target_px = VALUES(target_px), updated_at = VALUES(updated_at)', [$p['id'], $lid, $v['stop'], $v['target'], now_utc()]);
+        else q('INSERT INTO position_levels(portfolio_id, listing_id, stop_px, target_px, updated_at) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE stop_px = VALUES(stop_px), target_px = VALUES(target_px), updated_at = VALUES(updated_at)',
+            [$p['id'], $lid, $v['stop'], $v['target'], now_utc()]);
         return ['ok' => true];
     },
     'portfolio/target' => function () {
@@ -224,7 +227,8 @@ return [
             try {
                 $all = alert_strategies($u); $key = $b['strategy'];
                 if (isset($all[$key])) {
-                    q('INSERT INTO lot_origin(transaction_id, strategy_key, status, snapshot, set_by, created_at) VALUES (?,?,?,?,?,?)', [$res['id'], $key, $all[$key]['status'], json_encode($all[$key]['config'], JSON_UNESCAPED_UNICODE), 'purchase', now_utc()]);
+                    q('INSERT INTO lot_origin(transaction_id, strategy_key, status, snapshot, set_by, created_at) VALUES (?,?,?,?,?,?)', [$res['id'], $key, $all[$key]['status'], json_encode($all[$key]['config'],
+                        JSON_UNESCAPED_UNICODE), 'purchase', now_utc()]);
                     if ($listing) {
                         $res['alerts'] = alert_apply_template($u, (int)$p['id'], (int)$listing['id'], $key, 'add');
                         q('INSERT IGNORE INTO position_watch(portfolio_id, listing_id, strategy_key, updated_at) VALUES (?,?,?,?)', [$p['id'], $listing['id'], $key, now_utc()]);

@@ -11,7 +11,8 @@ return [
     'explorer/library' => function () { $u=require_user();return explorer_library_list((int)$u['id']); },
     'explorer/library/save' => function () { need_post();$u=require_user();return explorer_library_save((int)$u['id'],body()); },
     'explorer/library/delete' => function () { need_post();$u=require_user();q('DELETE FROM explorer_saved WHERE id=? AND user_id=?',[(int)(body()['id']??0),$u['id']]);return ['ok'=>true]; },
-    'explorer/detail' => function () { need_post();$u=require_user();$b=body();$view=clean_view($b['view']??[]);$view['owned_ids']=held_listing_ids((int)$u['id']);return engine_call('sheet',['listing_id'=>(int)($b['id']??0),'config'=>$b['config']??'regular','view'=>$view,'fetch_profile'=>false]); },
+    'explorer/detail' => function () { need_post();$u=require_user();$b=body();$view=clean_view($b['view']??[]);$view['owned_ids']=held_listing_ids((int)$u['id']);return engine_call('sheet',['listing_id'=>(int)($b['id']??0),'config'=>$b['config']??'regular','view'=>$view,'fetch_profile'=>false]);
+        },
     'classement-test/categories' => function () {
         require_user();
         // Compatibility URL; the shared settings service is now the sole live source.
@@ -66,7 +67,8 @@ return [
     'bars15' => function () {                   // barres de 15 min stockées des 7 derniers jours (vue « 1 semaine » d'un graphique)
         require_user();
         $id = (int)($_GET['id'] ?? 0);
-        $rows = q('SELECT slot_start, close_px FROM intraday_prices WHERE listing_id = ? AND slot_start >= (SELECT DATE_SUB(DATE(MAX(slot_start)), INTERVAL 7 DAY) FROM intraday_prices WHERE listing_id = ?) ORDER BY slot_start', [$id, $id])->fetchAll();
+        $rows = q('SELECT slot_start, close_px FROM intraday_prices WHERE listing_id = ? AND slot_start >= (SELECT DATE_SUB(DATE(MAX(slot_start)), INTERVAL 7 DAY) FROM intraday_prices WHERE listing_id = ?) ORDER BY slot_start',
+            [$id, $id])->fetchAll();
         return ['bars' => array_map(function ($r) { return [str_replace(' ', 'T', $r['slot_start']), (float)$r['close_px']]; }, $rows)];
     },
     'intraday' => function () {
@@ -95,13 +97,15 @@ return [
             if ($label === null) { $ct['id'] = $ctId; }
             elseif (!empty($ctIn['draft_lost'])) { $ct = ['id' => $ctId, 'state' => 'draft_lost', 'spec' => null, 'label' => $label, 'user_id' => (int)$u['id']]; }
             elseif (is_array($ctIn['draft'] ?? null)) { $ct = ['id' => $ctId, 'state' => 'draft', 'spec' => $ctIn['draft'], 'label' => $label, 'user_id' => (int)$u['id']]; }
-            else { $sv = ct_saved((int)$u['id'], $ctId); $ct = ['id' => $ctId, 'state' => ($sv && is_array($sv['config'])) ? 'saved' : (isset(CT_BUILTIN[$ctId]) ? 'default' : 'missing'), 'spec' => $sv['config'] ?? null, 'label' => $label, 'user_id' => (int)$u['id']]; }
+            else { $sv = ct_saved((int)$u['id'], $ctId); $ct = ['id' => $ctId, 'state' => ($sv && is_array($sv['config'])) ? 'saved' : (isset(CT_BUILTIN[$ctId]) ? 'default' : 'missing'), 'spec' => $sv['config'] ?? null,
+                'label' => $label, 'user_id' => (int)$u['id']]; }
         }
         $sheet = engine_call('sheet', ['listing_id' => $id, 'ct' => $ct, 'config' => $cfg ?: 'regular', 'view' => $view, 'source' => $cfg ? $source : 'Croissance régulière (réglage par défaut)', 'fetch_profile' => true]);
         $sheet['holdings'] = [];
         foreach (q('SELECT p.id, p.name FROM portfolios p WHERE p.user_id = ? ORDER BY p.is_default DESC, p.name', [$u['id']])->fetchAll() as $p) {
             $v = portfolio_valuation((int)$p['id']);
-            foreach ($v['positions'] as $pos) if ($pos['listing_id'] === $id) $sheet['holdings'][] = ['portfolio_id' => (int)$p['id'], 'portfolio' => $p['name'], 'qty' => $pos['qty'], 'avg_cost' => $pos['avg_cost'], 'value' => $pos['value'], 'unrealized' => $pos['unrealized'], 'unrealized_pct' => $pos['unrealized_pct']];
+            foreach ($v['positions'] as $pos) if ($pos['listing_id'] === $id) $sheet['holdings'][] = ['portfolio_id' => (int)$p['id'], 'portfolio' => $p['name'], 'qty' => $pos['qty'], 'avg_cost' => $pos['avg_cost'],
+                'value' => $pos['value'], 'unrealized' => $pos['unrealized'], 'unrealized_pct' => $pos['unrealized_pct']];
         }
         return $sheet;
     },

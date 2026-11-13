@@ -31,8 +31,11 @@ return [
         if (q('SELECT 1 FROM users WHERE email = ?', [$email])->fetch()) throw new ApiError('Cette adresse e-mail est déjà utilisée', 409);
         $username = str_in($b, 'username', 30);
         $id = create_user($username, password_input($b, 'password'), $email, false);
-        $sent = send_welcome_mail($username, $email);              // courrier de bienvenue : le résultat est affiché honnêtement à l'utilisateur
-        out_then(['user_id' => $id, 'welcome_mail' => $sent], function () use ($username, $email) { notify_admins_new_account($username, $email); });
+        // Réponse immédiate, puis envoi des courriers (bienvenue + alerte aux administrateurs) : le transport SMTP ne retarde plus l'inscription.
+        out_then(['user_id' => $id, 'welcome_mail' => 'queued'], function () use ($username, $email) {
+            send_welcome_mail($username, $email);
+            notify_admins_new_account($username, $email);
+        });
         return [];
     },
     'auth/password' => function () {

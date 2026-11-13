@@ -151,7 +151,7 @@ def test_registration_sends_welcome_mail_and_notifies_admins(world):
  anon=Client(world)
  assert anon.call('auth/register',{'username':'dave','password':'dave-secret-12345','code':'bienvenue1'})[0]==422      # e-mail obligatoire
  s,d=anon.call('auth/register',{'username':'dave','email':'dave@example.test','password':'dave-secret-12345','code':'bienvenue1'})
- assert s==200 and d['welcome_mail'] is True and d['user_id']
+ assert s==200 and d['welcome_mail']=='queued' and d['user_id']
  for _ in range(30):
   if len(list(MAILDIR.glob('*.json')))>=2:break
   time.sleep(.1)

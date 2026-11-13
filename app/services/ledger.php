@@ -178,7 +178,8 @@ function portfolio_valuation(int $portfolioId, ?array $transactions = null, ?str
     $computable = !$uncertain || count($pos) > count($uncertain);          // rien de calculable seulement si TOUS les titres sont incomplets
     $unrealized = $valueCertain - $costCertain;
     return ['integrity' => ['ok' => !$issues, 'issues' => $issues], 'positions' => $open, 'closed' => $closed,
-            'totals' => ['value' => $unpriced ? null : $value, 'cost' => $computable ? $costCertain : null, 'unrealized' => $computable && !$unpriced ? $unrealized : null, 'unrealized_pct' => $computable && !$unpriced && $costCertain > 0 ? 100 * $unrealized / $costCertain : null,
+            'totals' => ['value' => $unpriced ? null : $value, 'cost' => $computable ? $costCertain : null, 'unrealized' => $computable && !$unpriced ? $unrealized : null, 'unrealized_pct' => $computable &&
+                !$unpriced && $costCertain > 0 ? 100 * $unrealized / $costCertain : null,
                          'realized' => $computable ? $realizedTotal : null, 'fees' => $feesTotal, 'invested_total' => $computable ? $investedTotal : null, 'proceeds_total' => $computable ? $proceedsTotal : null,
                          'total_gain' => $computable && !$unpriced ? $unrealized + $realizedTotal : null, 'unpriced' => $unpriced,
                          'partial' => (bool)$uncertain, 'excluded' => $excluded],
