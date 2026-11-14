@@ -31,7 +31,7 @@ jobs:
       - name: Syntaxe PHP, Python, JavaScript et migrations additives
         run: |
           set -euo pipefail
-          find app scripts -name '*.php' -print0 | xargs -0 -n1 php -l > /dev/null
+          scripts/lint_php.sh
           python3 scripts/migrate.py --check
           python3 -m compileall -q engine scripts
           for file in app/public/assets/*.js; do node --check "$file"; done

@@ -13,7 +13,7 @@ lint: lint-py lint-php   ## linters : ruff (Python) + php -l (syntaxe PHP)
 lint-py:
 	$(CURDIR)/.venv/bin/ruff check .
 lint-php:
-	@git ls-files '*.php' | while read f; do $(PHP) -l "$$f" | grep -v '^No syntax errors' && exit 1; done; echo "php -l : OK ($(PHP))"
+	@PHP=$(PHP) scripts/lint_php.sh
 css-format:   ## formate les feuilles CSS (Prettier 3.3.3, config .prettierrc)
 	npx --yes prettier@3.3.3 --write 'app/public/assets/*.css'
 js-format:   ## formate les scripts JS (Prettier 3.3.3, config .prettierrc)

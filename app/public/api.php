@@ -12,6 +12,6 @@ try {
 } catch (ApiError $e) {
     out(['error' => $e->getMessage()], $e->status);
 } catch (Throwable $e) {
-    error_log('api ' . ($_GET['r'] ?? '?') . ': ' . $e->getMessage() . ' @' . basename($e->getFile()) . ':' . $e->getLine());
-    out(['error' => 'Erreur interne'], 500);
+    error_log('api [' . request_id() . '] ' . ($_GET['r'] ?? '?') . ': ' . $e->getMessage() . ' @' . basename($e->getFile()) . ':' . $e->getLine());
+    out(['error' => 'Erreur interne', 'ref' => request_id()], 500);
 }

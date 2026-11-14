@@ -36,7 +36,7 @@ jobs:
         run: |
           set -euo pipefail
           python -m pip install -r requirements.txt pytest
-          find app scripts -name '*.php' -print0 | xargs -0 -n1 php -l > /dev/null
+          scripts/lint_php.sh
           python scripts/migrate.py --check
           python -m compileall -q engine scripts
           for file in app/public/assets/*.js tests/e2e/*.cjs; do node --check "$file"; done

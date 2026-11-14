@@ -245,3 +245,16 @@ def test_week_bars_of_15_minutes(world):
                         [('2026-10-01 09:00:00', 1), ('2026-10-20 09:00:00', 2), ('2026-10-27 09:00:00', 3), ('2026-10-27 09:15:00', 4)])
     conn.commit(); conn.close()
     assert a.call('bars15', params='&id=1')[1]['bars'] == [['2026-10-20T09:00:00', 2.0], ['2026-10-27T09:00:00', 3.0], ['2026-10-27T09:15:00', 4.0]]
+
+
+def test_status_semantics_validation_rights_unknown_route(server):
+    """Contrat docs/API_CONTRACT.md : 404 route inconnue, 405 mauvaise méthode, 403 origine, 401/400 jamais 200 ; erreurs en {error}."""
+    c = Client(server)
+    st, d = c.call('nexiste/pas')
+    assert st == 404 and 'error' in d
+    st, d = c.call('auth/logout')                      # GET sur une route d'écriture
+    assert st == 405 and 'error' in d
+    st, d = c.call('auth/logout', body={}, origin='')  # écriture sans Origin ni Referer
+    assert st == 403 and 'error' in d
+    st, d = c.call('auth/logout', body={}, origin='http://autre.example')
+    assert st == 403 and 'error' in d

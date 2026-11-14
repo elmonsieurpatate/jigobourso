@@ -42,3 +42,14 @@ def test_hung_engine_is_stopped_after_the_timeout(tmp_path):
 def test_request_error_is_reported_as_422(tmp_path):
     r = run(tmp_path, "cat >/dev/null; echo '{\"error\": \"Stratégie invalide\"}'; exit 2")
     assert r == {'status': 422, 'message': 'Stratégie invalide'}
+
+
+@pytest.mark.parametrize('script', [
+    "cat >/dev/null; echo 'boom' >&2; exit 1",           # le moteur plante
+    "cat >/dev/null; printf '{\"a\": 1'",                # JSON tronqué
+    "cat >/dev/null",                                    # aucune sortie
+    "cat >/dev/null; echo '\"texte\"'",                  # JSON valide mais pas un objet
+])
+def test_engine_failures_become_503_never_a_success(tmp_path, script):
+    r = run(tmp_path, script)
+    assert r.get('status') == 503 and 'ok' not in r

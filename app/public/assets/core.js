@@ -33,7 +33,8 @@ J.api = async function (route, { method = "GET", body = null, params = {}, signa
     else signal.addEventListener("abort", () => ctl.abort(), { once: true });
   }
   let res,
-    data = null;
+    data = null,
+    unreadable = false;
   try {
     res = await fetch("api.php?" + qs, {
       method,
@@ -46,7 +47,7 @@ J.api = async function (route, { method = "GET", body = null, params = {}, signa
       data = await res.json();
     } catch (e) {
       if (e && e.name === "AbortError") throw e;
-      /* réponse non JSON */
+      unreadable = true; /* réponse non JSON : tranchée plus bas selon le statut */
     }
   } catch (e) {
     if (e && e.name === "AbortError" && timedOut)
@@ -60,6 +61,8 @@ J.api = async function (route, { method = "GET", body = null, params = {}, signa
     throw new Error("auth");
   }
   if (!res.ok) throw new Error((data && data.error) || "Erreur " + res.status);
+  // Succès HTTP mais corps illisible (JSON tronqué, page d'erreur HTML d'un proxy) : jamais un null silencieux.
+  if (unreadable) throw new Error("Réponse illisible du serveur (statut " + res.status + "). Réessayez.");
   return data;
 };
 /* Garde « la dernière demande gagne » : const g = J.latest(); … const t = g.next(); const r = await J.api(…); if (!g.isCurrent(t)) return;

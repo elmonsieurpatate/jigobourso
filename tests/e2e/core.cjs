@@ -86,5 +86,10 @@ const hang = (url, o) => new Promise((_, rej) => o.signal.addEventListener('abor
   await assert.rejects(J.api('x'), /Valeur invalide/);
   ctx.fetch = async () => ({ ok: true, status: 200, json: async () => ({ a: 1 }) });
   eq(await J.api('x'), { a: 1 });
+  // F04 : succès HTTP mais corps illisible = erreur, jamais null ; erreur HTTP sans JSON = message par statut
+  ctx.fetch = async () => ({ ok: true, status: 200, json: async () => { throw new SyntaxError('Unexpected end of JSON'); } });
+  await assert.rejects(J.api('x'), /Réponse illisible/);
+  ctx.fetch = async () => ({ ok: false, status: 502, json: async () => { throw new SyntaxError('<html>'); } });
+  await assert.rejects(J.api('x'), /Erreur 502/);
   console.log('core.js : OK');
 })().catch(e => { console.error(e); process.exit(1); });

@@ -91,7 +91,7 @@ pas présenté comme réalisé.
 - [x] Étape 2 — Migration et harmonisation de toutes les pages. Clôturée 2026-11-14 : lint, css-check, visual, fast (656), e2e, integ (336) verts ; voir journal.
 - [x] Étape 3 — Validation et verrouillage du résultat CSS. Clôturée 2026-11-14 : lint, css-check, visual, fast (656), e2e, integ (336) verts ; voir journal.
 - [x] Étape 4 — Lisibilité et architecture JavaScript. Clôturée 2026-11-14 : lint, js-check, css-check, visual, fast (656), e2e, integ (336) verts ; voir journal.
-- [ ] Étape 5 — Fiabilité des échanges et des contrôles.
+- [x] Étape 5 — Fiabilité des échanges et des contrôles.
 - [ ] Étape 6 — Cohérence financière : splits, unités et intégrité.
 - [ ] Étape 7 — Architecture et cas d'usage PHP.
 - [ ] Étape 8 — Architecture et dépendances Python.
@@ -394,17 +394,17 @@ anciens chemins retirés et parcours préservés.
 
 Constats : F03, F04, F05, F15, F17.
 
-- [ ] Reproduire l'échec masqué du contrôle lint-php.
-- [ ] Corriger sa propagation d'erreur sans affaiblir la CI.
-- [ ] Encoder la réponse avant son statut, ou lever une erreur correctement traitée.
-- [ ] Vérifier qu'une erreur JSON n'est pas renvoyée en HTTP 200.
-- [ ] Faire échouer explicitement le client API sur un JSON invalide.
-- [ ] Définir et vérifier les contrats minimaux des réponses.
-- [ ] Distinguer validation, absence de droits, conflit et panne interne.
-- [ ] Borner les corps JSON selon les besoins et refuser explicitement
+- [x] Reproduire l'échec masqué du contrôle lint-php.
+- [x] Corriger sa propagation d'erreur sans affaiblir la CI.
+- [x] Encoder la réponse avant son statut, ou lever une erreur correctement traitée.
+- [x] Vérifier qu'une erreur JSON n'est pas renvoyée en HTTP 200.
+- [x] Faire échouer explicitement le client API sur un JSON invalide.
+- [x] Définir et vérifier les contrats minimaux des réponses.
+- [x] Distinguer validation, absence de droits, conflit et panne interne.
+- [x] Borner les corps JSON selon les besoins et refuser explicitement
       les requêtes trop volumineuses.
-- [ ] Journaliser les détails utiles sans exposer de secrets.
-- [ ] Tester panne moteur, réponse tronquée et encodage impossible.
+- [x] Journaliser les détails utiles sans exposer de secrets.
+- [x] Tester panne moteur, réponse tronquée et encodage impossible.
 
 Clôture : plus de faux succès ni de null inexpliqué ; les garde-fous échouent
 réellement en présence d'une erreur.
@@ -593,9 +593,9 @@ Pour chaque résolution, indiquer commit et test/preuve.
 
 - [ ] F01 — Lecture des splits masquée. Étape 6. Preuve :
 - [ ] F02 — Correction manuelle ambiguë. Étape 6. Preuve :
-- [ ] F03 — Erreur JSON en HTTP 200. Étape 5. Preuve :
-- [ ] F04 — Réponse API invalide acceptée. Étape 5. Preuve :
-- [ ] F05 — Échec lint PHP masqué. Étape 5. Preuve :
+- [ ] F03 — Erreur JSON en HTTP 200. Étape 5. Preuve : 2026-11-14 : json_text encode avant le statut, donnée inencodable = 500 + ref ; tests/fast/test_http_contract.py.
+- [ ] F04 — Réponse API invalide acceptée. Étape 5. Preuve : 2026-11-14 : J.api lève « Réponse illisible » sur 2xx non JSON ; tests/e2e/core.cjs.
+- [ ] F05 — Échec lint PHP masqué. Étape 5. Preuve : 2026-11-14 : scripts/lint_php.sh (code 1 sur erreur, 2 sans php/fichier) utilisé par make et la CI ; reproduit avant, tests/fast/test_lint_php.py.
 - [ ] F06 — Contrôle financier ignorant les splits. Étape 6. Preuve :
 - [ ] F07 — Composants surchargés par les pages. Étapes 1–3. Preuve partielle (reste ouvert : états dynamiques, recette étape 3) : 2026-11-13, règles de page retirées (components/base/explorer/filtres/pf/help/splits/strategies-ui/admin-*.css) ; styles calculés conformes à la référence Halo sur 14 pages connecté, clair/sombre, 1280/390 px ; limites ci-dessous.
 - [ ] F08 — Présentation fixe dans data-style. Étapes 1–3. Preuve :
@@ -605,9 +605,9 @@ Pour chaque résolution, indiquer commit et test/preuve.
 - [ ] F12 — Unités monétaires divergentes. Étape 6. Preuve :
 - [ ] F13 — Activation/restauration de release. Étape 11. Preuve :
 - [ ] F14 — Dépendances non complètement validées. Étape 11. Preuve :
-- [ ] F15 — Garde-fous insuffisants. Étapes 3, 5, 11. Preuve :
+- [ ] F15 — Garde-fous insuffisants. Étapes 3, 5, 11. Preuve partielle (reste étape 11) : 2026-11-14 : garde lint PHP, contrats HTTP et moteur testés (étape 5).
 - [ ] F16 — Sources condensées/formatage. Étapes 1, 4, 7, 8. Preuve :
-- [ ] F17 — Taille des corps JSON. Étape 5. Preuve :
+- [ ] F17 — Taille des corps JSON. Étape 5. Preuve : 2026-11-14 : BODY_MAX 2 Mio, 413 avant lecture ; test_http_contract.py.
 - [ ] F18 — Classification des changements/cache. Étape 11. Preuve :
 - [x] F19 — Fusion implicite des styles calculés. Étape 4. Preuve : 2026-11-14 : règle de fusion/remplacement définie et documentée (FRONTEND_STRUCTURE.md).
 
@@ -776,3 +776,12 @@ Contrastes du thème clair relevés (jetons --muted, --accent, --ok, --warn, --d
 ### Clôture de l'étape 4 — 2026-11-14
 
 Formatage JS (Prettier, commit 4613946, `make js-format` / `make js-check`). Cycle de vie : `SUI.picker` ne cumule plus d'écouteurs (mesure : ancien code 4 → 10 écouteurs `click` après 6 rendus, nouveau 3 → 4), `SUI.openInfo` et le détail de `pf-home.js` retirent tous leurs écouteurs (AbortController). Réseau : `J.api` a un délai (120 s) et un `signal` (`J.isAbort`), `J.latest` ignore les réponses périmées (administration), la liste de titres de l'entonnoir affiche l'erreur. Découpes : `admin.js` (978 lignes) en `admin-common/-sources/-titres/-cron/-users` + coquille de 56 lignes ; `pf-home.js` → `pf-detail.js` ; `explorer-storage.js` (persistance de l'Explorateur). Docs : `docs/FRONTEND_STRUCTURE.md` (contrats du noyau, échappement, globals, ordre des scripts, frontières par page). Tests ajoutés : `core.cjs` (J.latest, J.api : délai, annulation, erreur), `strategies-ui.cjs` (écouteurs actifs après plusieurs rendus). Deux tests de texte source rendus insensibles au style de guillemets (Prettier) : `test_execution_architecture.py`, `test_scores_admin.py`. Vérifié en navigateur sur données réelles : 9 onglets d'administration, entonnoir, détail d'un portefeuille (3 onglets, Échap), Explorateur (colonnes, fiche titre). Non fait : F16 (reste ouverte : étapes 7 et 8 pour PHP/Python). Appareil réel non testé.
+
+## Journal — étape 5 (2026-11-14)
+
+- F05 reproduit (erreur de syntaxe injectée, `make lint-php` sortait 0), corrigé par `scripts/lint_php.sh` ; Makefile et deux workflows l'utilisent (ops/deploy.sh garde `find | xargs php -l`, déjà strict).
+- F03 : `json_text($data, &$status)` encode avant `json_headers`; échec = 500 `{error, ref}`. En-tête `X-Request-Id`, `ref` repris dans le journal `api [ref] …`.
+- F17 : `BODY_MAX` 2 Mio, 413 par `Content-Length` puis par lecture bornée.
+- F04 : `J.api` lève sur 2xx illisible.
+- Contrat et statuts : `docs/API_CONTRACT.md`. Tests : moteur 503 (plantage, JSON tronqué, vide, non objet), statuts réels en intégration.
+- Passe finale : lint, js-check, css-check, visual, fast 669, e2e, integ 337 — tous verts. Non poussé.
