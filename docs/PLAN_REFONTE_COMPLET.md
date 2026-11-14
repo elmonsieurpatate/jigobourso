@@ -548,10 +548,10 @@ Constats : F13, F14, F15, F18.
 - [x] Vérifier toutes les dépendances avant de déclarer le venv conforme. (scripts/check_env.py : versions + imports + moteur ; exécuté sur un venv neuf, rc=0 ; test_environment.py)
 - [ ] Définir des versions reproductibles compatibles avec l'hébergement. (partiel : bornes hautes testées, sous-dépendances non figées, voir DELIVERY.md)
 - [x] Documenter et tester le démarrage local depuis un environnement neuf. (README « Démarrage depuis zéro » ; venv neuf créé et vérifié 2026-11-14 ; base locale non rejouée depuis zéro)
-- [ ] Exécuter les contrôles de qualité retenus en CI, pas seulement la syntaxe.
+- [x] Exécuter les contrôles de qualité retenus en CI, pas seulement la syntaxe. (ruff, prettier, Halo en « Contrôles courts » ; CI verte sur b781231)
 - [x] Conserver intégration et navigateur dans un environnement jetable. (base jetable seule, JIGO_TEST_DATABASE=1, CI et make)
 - [x] Distinguer validation complète et déploiement rapide. (test_deploy_modes.py ; docs/DELIVERY.md)
-- [ ] Ne jamais présenter un test sauté comme réussi.
+- [x] Ne jamais présenter un test sauté comme réussi. (la CI échoue si un test est sauté ; a détecté un test sauté en CI, corrigé par une référence figée ; verte sur b781231)
 - [ ] Préparer une release cohérente avant activation, ou une maintenance maîtrisée. (ouvert : transfert rsync non atomique, voir DELIVERY.md)
 - [ ] Éviter les mélanges de versions pendant le transfert.
 - [x] Garantir la cohérence HTML, JS, CSS et versions des assets. (test_asset_versions.py ; échec du déploiement si marqueur restant)
@@ -605,7 +605,7 @@ Pour chaque résolution, indiquer commit et test/preuve.
 - [x] F12 — Unités monétaires divergentes. Étape 6. Preuve : 2026-11-14 : engine/shared/units.py + app/lib/units.php, ZAc/ILA corrigés dans l'historique et la saisie ; parité PHP/Python testée.
 - [ ] F13 — Activation/restauration de release. Étape 11. Preuve partielle (reste : transfert atomique, cible isolée) : 2026-11-14 : restauration code + dépendances testée, empreinte moteur unique testée.
 - [ ] F14 — Dépendances non complètement validées. Étape 11. Preuve partielle (reste : sous-dépendances non figées) : 2026-11-14 : check_env.py sur venv neuf, bornes testées, contrôle en CI.
-- [ ] F15 — Garde-fous insuffisants. Étapes 3, 5, 11. Preuve partielle (reste étape 11) : 2026-11-14 : garde lint PHP, contrats HTTP et moteur testés (étape 5).
+- [x] F15 — Garde-fous insuffisants. Étapes 3, 5, 11. Preuve : 2026-11-14 : qualité et tests sautés bloquants en CI (b781231 verte) ; 2026-11-14 : garde lint PHP, contrats HTTP et moteur testés (étape 5).
 - [ ] F16 — Sources condensées/formatage. Étapes 1, 4, 7, 8. Preuve :
 - [x] F17 — Taille des corps JSON. Étape 5. Preuve : 2026-11-14 : BODY_MAX 2 Mio, 413 avant lecture ; test_http_contract.py.
 - [x] F18 — Classification des changements/cache. Étape 11. Preuve : 2026-11-14 : scripts/release/engine_hash.sh (source unique), exclusions testées, docs/DELIVERY.md.
