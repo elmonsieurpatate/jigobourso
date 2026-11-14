@@ -20,14 +20,43 @@ function json_text($data, int &$status = 200): string {
     }
     return $json;
 }
+// Durées de la requête, renvoyées dans l'en-tête Server-Timing (lisible dans l'onglet Réseau des outils du navigateur) et journalisées au-delà de SLOW_MS :
+// `app` = total PHP ; `slot` = attente d'un emplacement moteur ; `engine` = processus Python entier ; `decode` = lecture de sa réponse.
+const SLOW_MS = 3000;
+function request_timing(?string $name = null, float $seconds = 0.0): array {
+    static $t = [];
+    if ($name !== null) $t[$name] = ($t[$name] ?? 0.0) + $seconds;
+    return $t;
+}
+function server_timing(): string {
+    $total = microtime(true) - (float)($_SERVER['REQUEST_TIME_FLOAT'] ?? microtime(true));
+    $parts = ['app;dur=' . round($total * 1000)];
+    foreach (request_timing() as $name => $s) $parts[] = $name . ';dur=' . round($s * 1000);
+    return implode(', ', $parts);
+}
 function json_headers(int $status): void {
     http_response_code($status);
     header('Content-Type: application/json; charset=utf-8');
     header('Cache-Control: no-store');
     header('X-Request-Id: ' . request_id());
+    header('Server-Timing: ' . server_timing());
+}
+// Réponses volumineuses (classement : ~10 Mo de JSON pour 9 600 titres, mesure du 14/11) : compressées en gzip quand le client l'accepte.
+// Le JSON se compresse à environ un dixième ; en dessous du seuil, le gain ne vaut pas le coût. Jamais deux fois : on ne touche pas à une réponse déjà encodée.
+const GZIP_MIN_BYTES = 65536;
+function json_payload(string $json): string {
+    if (strlen($json) < GZIP_MIN_BYTES || !function_exists('gzencode') || stripos((string)($_SERVER['HTTP_ACCEPT_ENCODING'] ?? ''), 'gzip') === false) return $json;
+    foreach (headers_list() as $h) if (stripos($h, 'Content-Encoding:') === 0) return $json;
+    $t = microtime(true);
+    $zipped = gzencode($json, 4);
+    if ($zipped === false) return $json;
+    request_timing('gzip', microtime(true) - $t);
+    header('Content-Encoding: gzip');
+    header('Vary: Accept-Encoding');
+    return $zipped;
 }
 function out($data, int $status = 200): void {
-    $json = json_text($data, $status);
+    $json = json_payload(json_text($data, $status));
     json_headers($status);
     echo $json;
     exit;
@@ -39,7 +68,7 @@ function out_then($data, callable $after, int $status = 200): void {
     $finish = function_exists('fastcgi_finish_request') ? 'fastcgi_finish_request' : (function_exists('litespeed_finish_request') ? 'litespeed_finish_request' : null);
     $run = function () use ($after) { try { $after(); } catch (Throwable $e) { error_log('after-response: ' . $e->getMessage() . ' @' . basename($e->getFile()) . ':' . $e->getLine()); } };
     if (!$finish) { $run(); out($data, $status); }
-    $json = json_text($data, $status);
+    $json = json_payload(json_text($data, $status));
     json_headers($status);
     header('Content-Length: ' . strlen($json));
     echo $json;

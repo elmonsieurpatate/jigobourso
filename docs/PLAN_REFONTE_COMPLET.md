@@ -96,7 +96,7 @@ pas présenté comme réalisé.
 - [x] Étape 7 — Architecture et cas d'usage PHP. Clôturée 2026-11-14 : lint, js-check, css-check, visual, fast (691), e2e, integ (346) verts ; voir journal.
 - [ ] Étape 8 — Architecture et dépendances Python. Quasi close 2026-11-14 : cycles supprimés, couches verrouillées ; reste le découpage des fonctions longues ; voir journal.
 - [x] Étape 9 — Données, migrations et accès SQL. Clôturée 2026-11-14 : lint, js-check, css-check, visual, fast (692), e2e, integ (349) verts ; docs/DATA_CONTRACT.md.
-- [ ] Étape 10 — Performance et observabilité.
+- [x] Étape 10 — Performance et observabilité. Clôturée 2026-11-14 : lint, js-check, css-check, visual, fast (697), e2e, integ (350) verts ; docs/PERFORMANCE.md (données synthétiques, limites indiquées).
 - [ ] Étape 11 — Installation, CI, livraison et restauration.
 - [ ] Étape 12 — Nettoyage final, documentation et recette.
 
@@ -522,19 +522,19 @@ Clôture : schéma, migrations, accès et tests décrivent le même contrat.
 
 # Étape 10 — Performance et observabilité
 
-- [ ] Définir des scénarios représentatifs : recherche, fiche, portefeuille,
+- [x] Définir des scénarios représentatifs : recherche, fiche, portefeuille,
       gros tableau, scores et traitements de fond.
-- [ ] Mesurer sur un volume réaliste.
-- [ ] Séparer attente de slot, démarrage Python, SQL, calcul/cache,
+- [x] Mesurer sur un volume réaliste.
+- [x] Séparer attente de slot, démarrage Python, SQL, calcul/cache,
       sérialisation, transfert et rendu.
-- [ ] Mesurer cache froid/chaud, mémoire et concurrence.
-- [ ] Mesurer JSON transmis et coût du filtrage/tri client.
-- [ ] Vérifier les assets chargés et leurs consommateurs.
-- [ ] Ne pas ajouter cache, pagination serveur, worker ou bundler
+- [x] Mesurer cache froid/chaud, mémoire et concurrence.
+- [x] Mesurer JSON transmis et coût du filtrage/tri client.
+- [x] Vérifier les assets chargés et leurs consommateurs.
+- [x] Ne pas ajouter cache, pagination serveur, worker ou bundler
       sans problème mesuré.
-- [ ] Rendre les lenteurs et erreurs diagnostiquables.
-- [ ] Préserver concurrence, heartbeat, verrouillage et reprise.
-- [ ] Tester pannes fournisseur, données absentes et limitations de débit
+- [x] Rendre les lenteurs et erreurs diagnostiquables.
+- [x] Préserver concurrence, heartbeat, verrouillage et reprise.
+- [x] Tester pannes fournisseur, données absentes et limitations de débit
       sans correction financière implicite.
 
 Clôture : améliorations chiffrées, causes de timeout mesurées plutôt que supposées.
@@ -808,3 +808,10 @@ Formatage JS (Prettier, commit 4613946, `make js-format` / `make js-check`). Cyc
 - N+1 : mesurés (`test_query_counts.py`), aucun par transaction.
 - `suivi` : réglages de plan illisibles signalés (`plan_rules_unavailable`) au lieu d'être masqués.
 - Aucune migration de schéma ajoutée.
+
+## Journal — étape 10 (2026-11-14)
+
+- Banc : `scripts/perf_probe.py` (9 600 titres × 400 séances, base jetable séparée) et `scripts/perf_browser.cjs`. Résultats et limites : docs/PERFORMANCE.md.
+- Problème mesuré : classement = 10,1 Mo de JSON. Correction : gzip des réponses > 64 Ko (÷ 8,8, 94 ms CPU). Pas de pagination, cache, worker ni bundler (non justifiés).
+- Observabilité : en-tête `Server-Timing` (app, slot, engine, decode, gzip), journal des requêtes > 3 s avec identifiant.
+- Garde-fous : tests d'assets (références, orphelins, doublons, plafond 450 Ko), comptage des requêtes SQL.

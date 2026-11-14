@@ -57,7 +57,9 @@ function engine_call(string $command, array $request) {
     $request=explorer_config_shape($request);
     if (isset($request['config']) && is_array($request['config'])) $request['config']=explorer_config_shape($request['config']);
     $env = engine_env(['JIGO_DB_HOST', 'JIGO_DB_PORT', 'JIGO_DB_SOCKET', 'JIGO_DB_NAME', 'JIGO_DB_USER', 'JIGO_DB_PASSWORD']);
+    $t0 = microtime(true);
     $slot = engine_acquire();
+    $t1 = microtime(true);
     $errFile = tempnam(sys_get_temp_dir(), 'jigo-eng-');
     try {
         $proc = proc_open([python_bin(), '-m', 'engine.cli', $command], [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['file', $errFile, 'w']], $pipes, engine_root(), $env + ['PYTHONPATH' => engine_root()]);
@@ -86,7 +88,9 @@ function engine_call(string $command, array $request) {
         @unlink($errFile);
         engine_release($slot);
     }
+    $t2 = microtime(true);
     $data = json_decode($stdout, true);
+    request_timing('slot', $t1 - $t0); request_timing('engine', $t2 - $t1); request_timing('decode', microtime(true) - $t2);   // attente d'emplacement, moteur Python (démarrage, SQL, calcul), décodage
     if ($code === 2 && is_array($data) && isset($data['error'])) throw new ApiError($data['error'], 422);
     if ($code !== 0 || !is_array($data)) {
         error_log('engine ' . $command . ' code ' . $code . ': ' . $stderr);

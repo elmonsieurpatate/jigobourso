@@ -75,6 +75,8 @@ def test_body_over_the_limit_is_413(server):
 def test_small_json_body_is_read_and_response_carries_request_id(server):
     status, d, headers = post(server, b'{"a":1}')
     assert status == 200 and d == {'body': {'a': 1}} and len(headers['X-Request-Id']) == 8
+    import re
+    assert re.fullmatch(r'app;dur=\d+', headers['Server-Timing'])             # durée totale, lisible dans l'onglet Réseau
 
 
 def test_non_json_content_type_is_415_and_bad_json_is_400(server):
@@ -85,3 +87,25 @@ def test_non_json_content_type_is_415_and_bad_json_is_400(server):
 def test_request_id_is_stable_within_a_request(tmp_path):
     r = cgi(tmp_path, "echo request_id() === request_id() ? 'same' : 'diff', strlen(request_id());")
     assert r.stdout == 'same8'
+
+
+def raw_post(url, data, accept=None):
+    import urllib.request
+    headers = {'Content-Type': 'application/json'}
+    if accept:
+        headers['Accept-Encoding'] = accept
+    with urllib.request.urlopen(urllib.request.Request(url, data=data, method='POST', headers=headers), timeout=20) as r:
+        return r.read(), r.headers
+
+
+def test_large_json_is_gzipped_only_when_accepted_and_worthwhile(server):
+    import gzip
+    big = json.dumps({'a': 'x' * 200000}).encode()
+    body, headers = raw_post(server, big, 'gzip, deflate')
+    assert headers['Content-Encoding'] == 'gzip' and 'Accept-Encoding' in headers['Vary']
+    assert len(body) < 5000 and json.loads(gzip.decompress(body))['body']['a'] == 'x' * 200000
+    assert 'gzip' in headers['Server-Timing']                                   # coût de compression attribuable
+    body, headers = raw_post(server, big)                                       # client sans gzip : réponse brute
+    assert headers.get('Content-Encoding') is None and len(body) > 200000
+    body, headers = raw_post(server, b'{"a":1}', 'gzip')                         # petite réponse : pas de compression
+    assert headers.get('Content-Encoding') is None and json.loads(body) == {'body': {'a': 1}}

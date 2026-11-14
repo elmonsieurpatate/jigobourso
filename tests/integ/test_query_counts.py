@@ -52,3 +52,14 @@ def test_portfolio_list_grows_linearly_and_detail_is_bounded(world):
         add(a, ids[0], qty=1)
     cost(a, 'portfolio', f'&id={ids[0]}')
     assert abs(cost(a, 'portfolio', f'&id={ids[0]}') - detail) <= 3
+
+
+def test_engine_route_reports_its_timing_breakdown(world):
+    """Une lenteur doit être attribuable : attente d'emplacement, moteur Python, décodage, total (en-tête Server-Timing)."""
+    import re
+    import urllib.request
+    a = login(world, 'alice', 'alice-secret-1234')
+    req = urllib.request.Request(f'{world}/api.php?r=strategy/presets')
+    resp = a.opener.open(req, timeout=60)
+    timing = resp.headers['Server-Timing']
+    assert re.fullmatch(r'app;dur=\d+, slot;dur=\d+, engine;dur=\d+, decode;dur=\d+', timing), timing
