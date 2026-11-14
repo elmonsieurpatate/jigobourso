@@ -100,13 +100,6 @@ def measured_interval(recent):
     return round(gaps[mid] if len(gaps) % 2 else (gaps[mid - 1] + gaps[mid]) / 2, 1)
 
 
-def record_error(conn, now, where, exc):
-    """Erreur d'un passage du cron survenue hors d'un traitement (base, planification, import) : conservée pour l'administration (50 dernières)."""
-    errs = settings.get(conn, 'cron_errors', [])
-    errs.insert(0, {'at': now.replace(tzinfo=None, microsecond=0).isoformat(sep=' '), 'where': where, 'message': f'{type(exc).__name__}: {exc}'[:300]})
-    settings.put(conn, 'cron_errors', errs[:50])
-
-
 def cron_errors(conn, naive, days=7, limit=40):
     """Tout ce qui a mal tourné pour le cron sur `days` jours : avertissements et erreurs des traitements automatiques, traitements en échec / en pause /
     interrompus, erreurs du passage lui-même. Liste vide = aucune erreur enregistrée (et non « inconnu »)."""

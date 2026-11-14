@@ -1,6 +1,6 @@
 import json
 import pathlib
-from engine.market.etf_profile import parse_profile
+from engine.analytics.market_views.etf import parse_profile
 
 FIXTURE = pathlib.Path(__file__).resolve().parents[1] / 'fixtures' / 'yahoo' / 'quote_summary_iwda.json'
 

@@ -4,6 +4,7 @@ import math
 import pytest
 from engine.analytics.explorer import strategy as S
 from engine.analytics.explorer import explorer_config as C
+from engine.analytics.explorer import legacy_upgrade as LU
 from engine.analytics.scoring import configurable_score as R
 from engine.analytics.series.measures import window_metrics
 from engine.analytics.explorer.explorer_metrics import path_metrics
@@ -15,7 +16,7 @@ def setup_config():
 
 
 def test_upgrade_preserves_all_historical_thresholds_and_original():
-    old=S.preset('fast');before=copy.deepcopy(old);c=C.upgrade(old)
+    old=S.preset('fast');before=copy.deepcopy(old);c=LU.upgrade(old)
     assert old==before and c['version']==4
     for a,b in zip(old['periods'],c['periods']):
         assert all(b[k]==v for k,v in a.items())
@@ -102,7 +103,7 @@ def test_validation_inverted_bounds_and_unknown_metric():
 
 @pytest.mark.parametrize('name',S.PRESETS)
 def test_migrated_builtin_rank_is_numerically_unchanged(name):
-    old=S.preset(name);new=C.upgrade(old)
+    old=S.preset(name);new=LU.upgrade(old)
     def rows():
         return [dict(key=i,symbol=str(i),group='equity',status='retained',reasons=[],technical={},momentum={'6m':i*2,'12m':i*3} if name=='momentum_risk' else i*2,
                      measures={n:dict(slope=i*.1,perf=i*2,r2=.6+i*.05,volatility=4-i*.4,drawdown=10-i) for n in (1,5,21,63,126,252)}) for i in (1,2,3)]
@@ -113,7 +114,7 @@ def test_migrated_builtin_rank_is_numerically_unchanged(name):
 
 
 def test_deselecting_momentum_period_stops_its_missing_data_gate_and_score():
-    c=C.upgrade(S.preset('momentum'));c['periods'][4]['enabled']=False
+    c=LU.upgrade(S.preset('momentum'));c['periods'][4]['enabled']=False
     v=S.judge(c,{},{},{},momentum=None);assert v['status']=='retained'
     v.update(key=1,symbol='S',group='equity')
     assert S.rank(c,[v])[0]['score'] is None
@@ -138,13 +139,13 @@ def test_malformed_sections_are_validation_errors(field,value):
 def test_string_false_is_never_a_boolean_and_null_weight_is_not_numeric():
     c=C.empty();c['technical']['above_ma50']='false'
     with pytest.raises(ValueError):C.validate(c)
-    c=C.upgrade(S.preset('regular'));c['ranking']['weights']['month']=None
+    c=LU.upgrade(S.preset('regular'));c['ranking']['weights']['month']=None
     with pytest.raises(ValueError):C.validate(c)
 
 
 @pytest.mark.parametrize('name',S.PRESETS)
 def test_editable_presets_use_generic_components_and_keep_legacy_scores(name):
-    old=C.upgrade(S.preset(name));new=C.editable(S.preset(name));assert new['ranking']['mode']=='weighted'
+    old=LU.upgrade(S.preset(name));new=LU.editable(S.preset(name));assert new['ranking']['mode']=='weighted'
     def rows():
         return [dict(key=i,symbol=str(i),group='equity',status='retained',reasons=[],technical={},momentum={'6m':i*2,'12m':i*3} if name=='momentum_risk' else {'6m':i*2,'12m':i*3},measures={n:dict(slope=i*.1,perf=i*2,r2=.6+i*.05,volatility=4-i*.4,drawdown=10-i) for n in (1,5,21,63,126,252)}) for i in (1,2,3)]
     legacy=rows()
@@ -156,5 +157,5 @@ def test_editable_presets_use_generic_components_and_keep_legacy_scores(name):
 
 def test_php_legacy_empty_weight_array_is_normalized_by_original_validator():
     c=S.preset('fast');c['ranking']['weights']=[]
-    assert C.upgrade(c)['ranking']['weights']['month']==1
+    assert LU.upgrade(c)['ranking']['weights']['month']==1
     assert c['ranking']['weights']==[]

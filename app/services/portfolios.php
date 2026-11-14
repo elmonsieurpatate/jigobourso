@@ -1,0 +1,288 @@
+<?php
+// Cas d'usage des portefeuilles : aucune dépendance à la requête HTTP (ni $_GET, ni body(), ni en-têtes). Les routes (routes/portfolios.php)
+// authentifient, contrôlent la méthode, puis appellent ces fonctions avec l'utilisateur et les paramètres (corps JSON ou $_GET). Testables sans serveur.
+require_once __DIR__ . '/../lib/db.php';
+require_once __DIR__ . '/../lib/http.php';
+require_once __DIR__ . '/../lib/engine.php';
+require_once __DIR__ . '/ledger.php';
+require_once __DIR__ . '/transactions.php';
+require_once __DIR__ . '/alerts.php';
+require_once __DIR__ . '/portfolio_access.php';
+
+const LOT_STRATEGIES = ['regular', 'fast', 'recovery', 'low_volatility', 'momentum', 'momentum12', 'momentum_risk', 'prudent'];   // engine/analytics/portfolio/alerts.py STRATEGIES (parité testée : tests/fast/test_alerts.py)
+
+function pf_list(array $u, array $b = []) {
+    $rows = q('SELECT id, name, is_default, strategy_config IS NOT NULL AS has_strategy, created_at FROM portfolios WHERE user_id = ? ORDER BY is_default DESC, name', [$u['id']])->fetchAll();
+    foreach ($rows as &$r) { $r['is_default'] = (bool)$r['is_default']; $r['totals'] = portfolio_valuation((int)$r['id'])['totals']; }
+    return ['portfolios' => $rows];
+}
+
+function pf_detail(array $u, array $b = []) {
+    $p = own_portfolio((int)($b['id'] ?? 0), $u);
+    $v = portfolio_valuation((int)$p['id']);
+    $levels = [];
+    foreach (q('SELECT listing_id, stop_px, target_px FROM position_levels WHERE portfolio_id = ?', [$p['id']])->fetchAll() as $l) $levels[(int)$l['listing_id']] = ['stop' => $l['stop_px'] !== null ? (float)$l['stop_px'] : null,
+        'target' => $l['target_px'] !== null ? (float)$l['target_px'] : null];
+    foreach ($v['positions'] as &$pos) $pos['levels'] = $pos['listing_id'] ? ($levels[$pos['listing_id']] ?? null) : null;
+    unset($pos);
+    $tx = q('SELECT id, listing_id, symbol, name, isin, side, quantity, unit_price, currency, fx_to_eur, fees, trade_at, note FROM portfolio_transactions WHERE portfolio_id = ? ORDER BY trade_at DESC, id DESC', [$p['id']])->fetchAll();
+    $v['etf_analysis'] = engine_call('etf-portfolio', ['positions' => array_map(function ($x) { return array_intersect_key($x, array_flip(['listing_id', 'kind', 'symbol', 'value'])); }, $v['positions'])]);
+    $t = q('SELECT us_pct, eu_pct, emerging_pct FROM portfolio_targets WHERE portfolio_id = ?', [$p['id']])->fetch();
+    $target = $t ? ['us' => (float)$t['us_pct'], 'eu' => (float)$t['eu_pct'], 'emerging' => (float)$t['emerging_pct']] : null;
+    $lots = open_lots(q('SELECT * FROM portfolio_transactions WHERE portfolio_id = ?', [$p['id']])->fetchAll());
+    $settings = [];
+    foreach (q('SELECT s.* FROM lot_settings s JOIN portfolio_transactions t ON t.id = s.transaction_id WHERE t.portfolio_id = ?', [$p['id']])->fetchAll() as $r) $settings[(int)$r['transaction_id']] = $r;
+    $pfCfg = $p['strategy_config'] ? json_decode($p['strategy_config'], true) : null;
+    $req = ['portfolio_strategy' => $pfCfg ? ['name' => $pfCfg['name'] ?? null, 'config' => $pfCfg] : null, 'lots' => [], 'positions' => $v['positions']];
+    foreach ($lots as $l) {
+        $t = $l['tx']; $s = $settings[(int)$t['id']] ?? [];
+        $req['lots'][] = ['tx_id' => (int)$t['id'], 'listing_id' => $t['listing_id'] ? (int)$t['listing_id'] : null, 'trade_date' => substr($t['trade_at'], 0, 10), 'remaining' => $l['remaining'], 'remaining_cost' => $l['remaining_cost'],
+            'manual_split' => $l['manual_split'],
+            'strategy' => $s['strategy'] ?? null, 'alert_days' => isset($s['alert_days']) ? (int)$s['alert_days'] : null,
+            'alert_drop_pct' => isset($s['alert_drop_pct']) ? (float)$s['alert_drop_pct'] : null, 'alerts_off' => !empty($s['alerts_off'])];
+    }
+    $alerts = $req['lots'] ? engine_call('lot-alerts', $req) : ['lots' => [], 'strategies' => null];
+    $v['lots'] = array_map(function ($l) use ($alerts, $settings) {
+        $t = $l['tx']; $s = $settings[(int)$t['id']] ?? null;
+        return ['tx_id' => (int)$t['id'], 'listing_id' => $t['listing_id'] ? (int)$t['listing_id'] : null, 'symbol' => $t['symbol'], 'name' => $t['name'], 'trade_at' => $t['trade_at'],
+                'quantity' => (float)$t['quantity'], 'remaining' => $l['remaining'], 'unit_price' => (float)$t['unit_price'], 'currency' => $t['currency'],
+                'settings' => $s ? ['strategy' => $s['strategy'], 'alert_days' => $s['alert_days'] !== null ? (int)$s['alert_days'] : null,
+                                    'alert_drop_pct' => $s['alert_drop_pct'] !== null ? (float)$s['alert_drop_pct'] : null, 'alerts_off' => (bool)$s['alerts_off']] : null,
+                'alert' => $alerts['lots'][(string)$t['id']] ?? null];
+    }, $lots);
+    $v['insights'] = $alerts['positions'] ?? (object)[];
+    $v['lot_strategies'] = $alerts['strategies'] ?? null;
+    $v['curves'] = $alerts['curves'] ?? (object)[];
+    $v['allocation'] = engine_call('allocation', ['target' => $target, 'positions' => array_map(function ($x) { return array_intersect_key($x, array_flip(['listing_id', 'kind', 'value'])); }, $v['positions'])]);
+    return $v + ['portfolio' => ['id' => (int)$p['id'], 'name' => $p['name'], 'is_default' => (bool)$p['is_default'], 'strategy' => $p['strategy_config'] ? json_decode($p['strategy_config'], true) : null], 'transactions_list' => $tx];
+}
+
+function pf_history_refresh(array $u, array $b = []) {
+    $p=own_portfolio((int)($b['id'] ?? 0),$u); $lid=(int)($b['listing_id'] ?? 0);
+    $held=portfolio_valuation((int)$p['id'])['positions'];
+    if (!$lid || !array_filter($held, fn($x) => $x['listing_id'] === $lid)) throw new ApiError('Titre non détenu dans ce portefeuille',404);
+    return engine_call('portfolio-refresh',['listing_id'=>$lid]);
+}
+
+function pf_history(array $u, array $b = []) {
+    $p = own_portfolio((int)($b['id'] ?? 0), $u);
+    $tx = q('SELECT id, listing_id, symbol, name, side, quantity, unit_price, currency, fx_to_eur, fees, trade_at FROM portfolio_transactions WHERE portfolio_id = ? ORDER BY trade_at, id', [$p['id']])->fetchAll();
+    return engine_call('portfolio-history', ['transactions' => $tx]);
+}
+
+function pf_set_levels(array $u, array $b = []) {
+    $p = own_portfolio((int)($b['portfolio_id'] ?? 0), $u);
+    $lid = (int)($b['listing_id'] ?? 0);
+    if (!q('SELECT 1 FROM portfolio_transactions WHERE portfolio_id = ? AND listing_id = ?', [$p['id'], $lid])->fetch()) throw new ApiError('Ce titre n’est pas dans ce portefeuille', 404);
+    $v = [];
+    foreach (['stop', 'target'] as $k) {
+        $x = $b[$k] ?? null;
+        if ($x === null || $x === '') { $v[$k] = null; continue; }
+        if (!is_numeric($x) || $x <= 0 || $x > 1e9) throw new ApiError('Prix invalide');
+        $v[$k] = (float)$x;
+    }
+    if ($v['stop'] !== null && $v['target'] !== null && $v['stop'] >= $v['target']) throw new ApiError('Le filet de sécurité doit être inférieur à l’objectif', 422);
+    if ($v['stop'] === null && $v['target'] === null) q('DELETE FROM position_levels WHERE portfolio_id = ? AND listing_id = ?', [$p['id'], $lid]);
+    else q('INSERT INTO position_levels(portfolio_id, listing_id, stop_px, target_px, updated_at) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE stop_px = VALUES(stop_px), target_px = VALUES(target_px), updated_at = VALUES(updated_at)',
+        [$p['id'], $lid, $v['stop'], $v['target'], now_utc()]);
+    return ['ok' => true];
+}
+
+function pf_set_target(array $u, array $b = []) {
+    $p = own_portfolio((int)($b['id'] ?? 0), $u);
+    if (empty($b['target'])) { q('DELETE FROM portfolio_targets WHERE portfolio_id = ?', [$p['id']]); return ['target' => null]; }
+    $t = $b['target'];
+    if (!is_array($t)) throw new ApiError('Répartition invalide', 422);
+    $v = [];
+    foreach (['us', 'eu', 'emerging'] as $k) {
+        $x = $t[$k] ?? null;
+        if (!is_numeric($x) || $x < 0 || $x > 100) throw new ApiError('Chaque part doit être comprise entre 0 et 100 %', 422);
+        $v[$k] = round((float)$x, 2);
+    }
+    if (abs(array_sum($v) - 100) > 0.01) throw new ApiError('Les trois parts doivent faire 100 %', 422);
+    q('INSERT INTO portfolio_targets(portfolio_id, us_pct, eu_pct, emerging_pct, updated_at) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE us_pct = ' .
+        'VALUES(us_pct), eu_pct = VALUES(eu_pct), emerging_pct = VALUES(emerging_pct), updated_at = VALUES(updated_at)',
+      [$p['id'], $v['us'], $v['eu'], $v['emerging'], now_utc()]);
+    return ['target' => $v];
+}
+
+function pf_lot_settings(array $u, array $b = []) {
+    $t = q("SELECT t.id FROM portfolio_transactions t JOIN portfolios p ON p.id = t.portfolio_id WHERE t.id = ? AND p.user_id = ? AND t.side = 'buy'", [(int)($b['tx_id'] ?? 0), $u['id']])->fetch();
+    if (!$t) throw new ApiError('Achat introuvable', 404);
+    $strategy = $b['strategy'] ?? null;
+    if ($strategy === '' ) $strategy = null;
+    if ($strategy !== null && !in_array($strategy, LOT_STRATEGIES, true)) throw new ApiError('Stratégie inconnue', 422);
+    $days = $b['alert_days'] ?? null; $drop = $b['alert_drop_pct'] ?? null;
+    if ($days === '') $days = null; if ($drop === '') $drop = null;
+    if ($days !== null && (!is_numeric($days) || (int)$days < 1 || (int)$days > 3650)) throw new ApiError('Durée invalide (1 à 3 650 jours)', 422);
+    if ($drop !== null && (!is_numeric($drop) || $drop <= 0 || $drop >= 100)) throw new ApiError('Seuil de chute invalide (entre 0 et 100 %)', 422);
+    // Réglage « désactiver les alertes de cet achat » retiré de l'interface : sa valeur déjà stockée est conservée telle quelle si le champ n'est pas envoyé.
+    $off = array_key_exists('alerts_off', $b) ? (!empty($b['alerts_off']) ? 1 : 0) : (int)(q('SELECT alerts_off FROM lot_settings WHERE transaction_id = ?', [$t['id']])->fetch()['alerts_off'] ?? 0);
+    $reset = !array_key_exists('alerts_off', $b) || !$off;   // champ absent et tous les réglages vides = retour aux réglages par défaut (chemin de retour pour une ancienne case cochée)
+    if ($strategy === null && $days === null && $drop === null && $reset) q('DELETE FROM lot_settings WHERE transaction_id = ?', [$t['id']]);
+    else q('INSERT INTO lot_settings(transaction_id, strategy, alert_days, alert_drop_pct, alerts_off, updated_at) VALUES (?,?,?,?,?,?) ON DUPLICATE KEY UPDATE ' .
+        'strategy = VALUES(strategy), alert_days = VALUES(alert_days), alert_drop_pct = VALUES(alert_drop_pct), alerts_off = VALUES(alerts_off), updated_at = ' .
+        'VALUES(updated_at)',
+           [$t['id'], $strategy, $days === null ? null : (int)$days, $drop === null ? null : round((float)$drop, 2), $off, now_utc()]);
+    return ['ok' => true];
+}
+
+function pf_create(array $u, array $b = []) {
+    $name = str_in($b, 'name', 100);
+    if (q('SELECT 1 FROM portfolios WHERE user_id = ? AND name = ?', [$u['id'], $name])->fetch()) throw new ApiError('Ce nom existe déjà', 409);
+    $first = !q('SELECT 1 FROM portfolios WHERE user_id = ?', [$u['id']])->fetch();
+    q('INSERT INTO portfolios(user_id, name, is_default, created_at, updated_at) VALUES (?,?,?,?,?)', [$u['id'], $name, $first ? 1 : 0, now_utc(), now_utc()]);
+    return ['id' => (int)db()->lastInsertId()];
+}
+
+function pf_rename(array $u, array $b = []) {
+    $p = own_portfolio((int)($b['id'] ?? 0), $u);
+    $name = str_in($b, 'name', 100);
+    if (q('SELECT 1 FROM portfolios WHERE user_id = ? AND name = ? AND id <> ?', [$u['id'], $name, $p['id']])->fetch()) throw new ApiError('Ce nom existe déjà', 409);
+    q('UPDATE portfolios SET name = ?, updated_at = ? WHERE id = ?', [$name, now_utc(), $p['id']]);
+    return ['ok' => true];
+}
+
+function pf_make_default(array $u, array $b = []) {
+    $p = own_portfolio((int)($b['id'] ?? 0), $u);
+    tx(function () use ($u, $p) {
+        q('UPDATE portfolios SET is_default = 0 WHERE user_id = ?', [$u['id']]);
+        q('UPDATE portfolios SET is_default = 1 WHERE id = ?', [$p['id']]);
+    });
+    return ['ok' => true];
+}
+
+function pf_delete(array $u, array $b = []) {
+    $p = own_portfolio((int)($b['id'] ?? 0), $u);
+    $n = (int)q('SELECT COUNT(*) FROM portfolio_transactions WHERE portfolio_id = ?', [$p['id']])->fetchColumn();
+    if ($n > 0 && ($b['confirm'] ?? '') !== $p['name']) throw new ApiError("Ce portefeuille contient $n transactions : tapez son nom pour confirmer la suppression", 422);
+    q('DELETE FROM portfolios WHERE id = ?', [$p['id']]);
+    if ($p['is_default']) q('UPDATE portfolios SET is_default = 1 WHERE user_id = ? ORDER BY id LIMIT 1', [$u['id']]);
+    return ['ok' => true];
+}
+
+function pf_set_strategy(array $u, array $b = []) {
+    $p = own_portfolio((int)($b['id'] ?? 0), $u);
+    $cfg = null;
+    if (!empty($b['config'])) $cfg = engine_call('validate-config', $b['config']);
+    q('UPDATE portfolios SET strategy_config = ?, updated_at = ? WHERE id = ?', [$cfg ? json_encode($cfg) : null, now_utc(), $p['id']]);
+    return ['config' => $cfg];
+}
+
+function tx_preview(array $u, array $b = []) {
+    $p = own_portfolio((int)($b['portfolio_id'] ?? 0), $u);
+    list($side, $qty, $price, $fees, $fx, $when) = tx_fields($b);
+    $rows = q('SELECT * FROM portfolio_transactions WHERE portfolio_id = ? ORDER BY trade_at,id', [$p['id']])->fetchAll();
+    $old = null;
+    if (!empty($b['id'])) {
+        foreach ($rows as $r) if ((int)$r['id'] === (int)$b['id']) $old = $r;
+        if (!$old) throw new ApiError('Transaction introuvable', 404);
+        $rows = array_values(array_filter($rows, fn($r) => (int)$r['id'] !== (int)$old['id']));
+    }
+    $lid = $old['listing_id'] ?? ($b['listing_id'] ?? null);
+    $symbol = $old['symbol'] ?? strtoupper(str_in($b, 'symbol', 32, false));
+    $currency = price_unit($b['currency'] ?? ($old['currency'] ?? null));
+    $fx = tx_carry_fx($old, $when, $currency, $fx);
+    $fx = historical_fx($currency, $when, $fx);
+    $candidate = ['id' => $old['id'] ?? PHP_INT_MAX, 'listing_id' => $lid, 'symbol' => $symbol,
+        'name' => $old['name'] ?? $symbol, 'isin' => $old['isin'] ?? null, 'side' => $side,
+        'quantity' => $qty, 'unit_price' => $price, 'currency' => $currency, 'fx_to_eur' => $fx,
+        'fees' => $fees, 'trade_at' => $when];
+    $all = array_merge($rows, [$candidate]);
+    validate_transaction_history($all); // Includes later transactions and confirmed splits.
+    $before = array_values(array_filter($rows, fn($r) => [$r['trade_at'], (int)$r['id']] < [$when, (int)$candidate['id']]));
+    $valuation = portfolio_valuation((int)$p['id'], array_merge($before, [$candidate]), substr($when,0,10));
+    $sale = null;
+    foreach ($valuation['sales'] as $s) if ($s['tx_id'] === (int)$candidate['id']) $sale = $s;
+    if ($side === 'sell' && !$sale) throw new ApiError('Coût historique incomplet : aperçu de vente indisponible',422);
+    return ['before_qty' => $sale ? $sale['quantity'] + array_sum(array_map(fn($r) => transaction_key($r) === transaction_key($candidate) ? $r['qty'] : 0, array_merge($valuation['positions'], $valuation['closed']))) : null,
+        'remaining_qty' => $sale ? array_sum(array_map(fn($r) => transaction_key($r) === transaction_key($candidate) ? $r['qty'] : 0, array_merge($valuation['positions'], $valuation['closed']))) : null,
+        'proceeds' => $sale['proceeds'] ?? null, 'cost' => $sale['cost'] ?? null, 'gain' => $sale['gain'] ?? null,
+        'gain_pct' => $sale['gain_pct'] ?? null, 'fx_to_eur' => $fx];
+}
+
+function tx_add(array $u, array $b = []) {
+    $p = own_portfolio((int)($b['portfolio_id'] ?? 0), $u);
+    list($side, $qty, $price, $fees, $fx, $when) = tx_fields($b);
+    $listing = null;
+    if (!empty($b['listing_id'])) {
+        $listing = q('SELECT l.id, l.symbol, l.currency, i.name, i.isin FROM listings l JOIN instruments i ON i.id = l.instrument_id WHERE l.id = ?', [(int)$b['listing_id']])->fetch();
+        if (!$listing) throw new ApiError('Titre introuvable', 404);
+    }
+    $symbol = $listing ? $listing['symbol'] : strtoupper(str_in($b, 'symbol', 32));
+    $currency = price_unit($b['currency'] ?? ($listing['currency'] ?? null));
+    if ($listing && empty($b['currency'])) {
+        $quote = q('SELECT currency FROM latest_prices WHERE listing_id = ?', [$listing['id']])->fetch();
+        $currency = price_unit($quote['currency'] ?? $currency);
+    }
+    $fx = historical_fx($currency, $when, $fx);
+    $res = write_transaction((int)$u['id'], (int)$p['id'], function ($rows) use ($p, $listing, $symbol, $b, $side, $qty, $price, $currency, $fx, $fees, $when) {
+    q('INSERT INTO portfolio_transactions(portfolio_id, listing_id, symbol, name, isin, side, quantity, unit_price, currency, fx_to_eur, fees, trade_at, note, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+      [$p['id'], $listing ? $listing['id'] : null, $symbol, $listing ? $listing['name'] : (str_in($b, 'name', 120, false) ?: null), $listing ? $listing['isin'] : null, $side, $qty, $price,
+       $currency, $fx, $fees, $when, str_in($b, 'note', 500, false) ?: null, now_utc()]);
+    return ['id' => (int)db()->lastInsertId()];
+    });
+    // Stratégie d'origine de l'achat : enregistrée telle que choisie (jamais devinée), avec un instantané de ses paramètres ; alertes de la stratégie préconfigurées.
+    if ($side === 'buy' && !empty($b['strategy']) && is_string($b['strategy'])) {
+        try {
+            $all = alert_strategies($u); $key = $b['strategy'];
+            if (isset($all[$key])) {
+                q('INSERT INTO lot_origin(transaction_id, strategy_key, status, snapshot, set_by, created_at) VALUES (?,?,?,?,?,?)', [$res['id'], $key, $all[$key]['status'], json_encode($all[$key]['config'],
+                    JSON_UNESCAPED_UNICODE), 'purchase', now_utc()]);
+                if ($listing) {
+                    $res['alerts'] = alert_apply_template($u, (int)$p['id'], (int)$listing['id'], $key, 'add');
+                    q('INSERT IGNORE INTO position_watch(portfolio_id, listing_id, strategy_key, updated_at) VALUES (?,?,?,?)', [$p['id'], $listing['id'], $key, now_utc()]);
+                }
+            }
+        } catch (Throwable $e) { error_log('tx/add strategy: ' . $e->getMessage()); $res['alerts_error'] = true; }   // l'achat reste enregistré même si la préconfiguration échoue
+    }
+    return $res;
+}
+
+function tx_delete(array $u, array $b = []) {
+    $t = own_transaction((int)($b['id'] ?? 0), $u);
+    return write_transaction((int)$u['id'], (int)$t['portfolio_id'], function ($rows) use ($t) {
+        if (!array_filter($rows, function ($r) use ($t) { return $r['id'] == $t['id']; })) throw new ApiError('Transaction introuvable', 404);
+        q('DELETE FROM portfolio_transactions WHERE id = ?', [$t['id']]);
+        return ['ok' => true];
+    });
+}
+
+function tx_update(array $u, array $b = []) {
+    $t = own_transaction((int)($b['id'] ?? 0), $u);
+    return write_transaction((int)$u['id'], (int)$t['portfolio_id'], function ($rows) use ($b, $t) {
+        $found = array_values(array_filter($rows, function ($r) use ($t) { return $r['id'] == $t['id']; }));
+        if (!$found) throw new ApiError('Transaction introuvable', 404);
+        $old = $found[0];
+        list($side, $qty, $price, $fees, $fx, $when) = tx_fields($b);
+        $currency = price_unit($b['currency'] ?? $old['currency']);
+        $fx = tx_carry_fx($old, $when, $currency, $fx);
+        $fx = historical_fx($currency, $when, $fx);
+        q('UPDATE portfolio_transactions SET side = ?, quantity = ?, unit_price = ?, currency = ?, fees = ?, fx_to_eur = ?, trade_at = ?, note = ? WHERE id = ?',
+          [$side, $qty, $price, $currency, $fees, $fx, $when, str_in($b, 'note', 500, false) ?: null, $old['id']]);
+        return ['ok' => true];
+    });
+}
+
+function pf_bilan(array $u, array $b = []) {
+    $list = q('SELECT id, name, is_default FROM portfolios WHERE user_id = ? ORDER BY is_default DESC, name', [$u['id']])->fetchAll();
+    $all = ['value' => 0.0, 'cost' => 0.0, 'unrealized' => 0.0, 'realized' => 0.0, 'fees' => 0.0, 'invested_total' => 0.0, 'unpriced' => 0];
+    $years = []; $rows = []; $issues = []; $excluded = [];
+    foreach ($list as $p) {
+        $v = portfolio_valuation((int)$p['id']);
+        $issues = array_merge($issues, $v['integrity']['issues']);
+        $rows[] = ['id' => (int)$p['id'], 'name' => $p['name'], 'totals' => $v['totals'], 'positions' => count($v['positions'])];
+        // Les résultats calculables de chaque portefeuille comptent toujours ; seules les positions incomplètes en sont exclues (et signalées).
+        foreach (['value', 'fees', 'unpriced'] as $k) $all[$k] += $v['totals'][$k];
+        foreach (['cost', 'unrealized', 'realized', 'invested_total'] as $k) $all[$k] += $v['totals'][$k] ?? 0.0;
+        foreach ($v['realized_by_year'] as $y => $g) $years[$y] = ($years[$y] ?? 0.0) + $g;
+        foreach ($v['totals']['excluded'] as $name) $excluded[] = $p['name'] . ' · ' . $name;
+    }
+    ksort($years);
+    if ($all['unpriced']) { $all['value'] = null; $all['unrealized'] = null; }
+    $all['total_gain'] = $all['unrealized'] === null ? null : $all['unrealized'] + $all['realized'];
+    $all['unrealized_pct'] = $all['unrealized'] !== null && $all['cost'] > 0 ? 100 * $all['unrealized'] / $all['cost'] : null;
+    $all['partial'] = (bool)$excluded;
+    $all['excluded'] = $excluded;
+    return ['integrity' => ['ok' => !$issues, 'issues' => $issues], 'portfolios' => $rows, 'totals' => $all, 'realized_by_year' => $years];
+}

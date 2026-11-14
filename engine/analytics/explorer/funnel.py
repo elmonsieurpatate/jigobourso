@@ -10,7 +10,8 @@ import datetime
 
 from engine.catalogue import rules as crules
 from engine.market import prefilter
-from engine.market.collect import latest_rates, to_eur_factor
+from engine.market.collect import latest_rates
+from engine.shared.units import to_eur_factor
 from engine.shared import settings
 
 PAGE = 50

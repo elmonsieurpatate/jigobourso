@@ -4,12 +4,12 @@ import copy
 
 import pytest
 
-from engine.analytics.explorer import explorer_config as C
+from engine.analytics.explorer import legacy_upgrade as LU
 from engine.analytics.scoring import score_service as S
 from engine.analytics.scoring import scores as SC
 from engine.analytics.admin import scores_admin as A
-from engine.analytics.admin import scores_profiles
-from engine.analytics.admin import scores_specs
+from engine.analytics.scoring import scores_profiles
+from engine.analytics.scoring import scores_specs
 from engine.shared import settings
 
 
@@ -102,7 +102,7 @@ def test_save_roundtrip_and_overlay(memory):
     g = row(A.state(None))
     assert g['customised'] and g['current']['weights'] == {'week': 20, 'month': 30, 'quarter': 50} and g['current']['periods']['week']['min_slope'] == 0.2
     assert A.state(None)['global']['kappa'] == 0.5
-    cfg = S.apply_admin(None, scores_specs.growth_v4())
+    cfg = scores_profiles.apply_admin(None, scores_specs.growth_v4())
     params = S.params_for(cfg, 'equity')
     assert [x['id'] for x in params['periods']] == ['week', 'month', 'quarter'] and params['kappa'] == 0.5 and params['threshold'] == 0.8
     assert SC.resolve_weights(params['periods'], params['kappa'])['quarter'] == pytest.approx(0.5)
@@ -141,7 +141,7 @@ def test_strategy_own_global_value_wins(memory):
     A.save(None, {'global': {'kappa': 0.5}})
     c = scores_specs.growth_v4()
     c['scoring']['kappa'] = 0.3
-    assert S.apply_admin(None, c)['scoring']['kappa'] == 0.3
+    assert scores_profiles.apply_admin(None, c)['scoring']['kappa'] == 0.3
 
 
 def test_conformity_thresholds_never_change_scores_cache_key(memory):
@@ -151,25 +151,25 @@ def test_conformity_thresholds_never_change_scores_cache_key(memory):
     p['periods']['month']['min_r2'] = 0.9
     p['periods']['month']['min_return'] = 25
     A.save(None, {'profile': p})
-    assert S._key(S.apply_admin(None, scores_specs.growth_v4()), 1) == base
+    assert S._key(scores_profiles.apply_admin(None, scores_specs.growth_v4()), 1) == base
     p['periods']['quarter']['enabled'] = True                                           # une granularité de plus : les notes changent
     A.save(None, {'profile': p})
-    assert S._key(S.apply_admin(None, scores_specs.growth_v4()), 1) != base
+    assert S._key(scores_profiles.apply_admin(None, scores_specs.growth_v4()), 1) != base
 
 
 def test_complex_weights_per_profile_change_the_key_but_not_conformity(memory):
     p = profile()
     p['complex_weights'] = dict(SC.COMPLEX_WEIGHTS, dynamics=30, liquidity=20)
     A.save(None, {'profile': p})
-    cfg = S.apply_admin(None, scores_specs.growth_v4())
+    cfg = scores_profiles.apply_admin(None, scores_specs.growth_v4())
     assert cfg['liquidity'] == scores_specs.growth_v4()['liquidity'] and cfg['scoring']['complex_weights']['liquidity'] == 20
 
 
 def test_historic_strategies_are_untouched_by_profiles(memory):
     A.save(None, {'profile': profile()})
     from engine.analytics.explorer import strategy
-    cfg = C.editable(strategy.preset('regular'))
-    assert S.apply_admin(None, cfg) == S.apply_global(None, cfg)
+    cfg = LU.editable(strategy.preset('regular'))
+    assert scores_profiles.apply_admin(None, cfg) == S.apply_global(None, cfg)
 
 
 def test_preview_returns_percentages():
@@ -203,7 +203,7 @@ def test_advanced_criteria_and_day_filter_roundtrip_and_never_change_scores(memo
     A.save(None, {'profile': p})
     cur = row(A.state(None))['current']
     assert cur['periods']['month']['max_drawdown'] == 20.0 and cur['day_filter']['enabled'] and cur['liquidity']['min_turnover_eur_us'] == 5e6
-    cfg = S.apply_admin(None, scores_specs.growth_v4())
+    cfg = scores_profiles.apply_admin(None, scores_specs.growth_v4())
     day = next(x for x in cfg['periods'] if x['id'] == 'day')
     assert day['enabled'] and day['min_return'] == 0.0
     assert S._key(cfg, 1) == key                                                  # ni Jour à 0 % ni les critères avancés ne changent les notes
@@ -217,7 +217,7 @@ def test_last_day_filter_can_be_disabled_again(memory):
     assert scores_profiles.stored_profiles(None)['growth_v4']['periods']['day']['enabled'] and scores_profiles.stored_profiles(None)['growth_v4']['day_filter']['enabled']
     p['periods']['day'].update(enabled=False, min_return=None)
     A.save(None, {'profile': p})
-    cfg = S.apply_admin(None, scores_profiles.base_config('growth_v4'))
+    cfg = scores_profiles.apply_admin(None, scores_profiles.base_config('growth_v4'))
     day = next(x for x in cfg['periods'] if x['id'] == 'day')
     assert not day['enabled'] and day['min_return'] is None
 
@@ -240,13 +240,13 @@ def test_technical_settings_are_separate_from_thresholds(memory):
     p['periods']['month']['require_history'] = False
     p['filters'] = {'enabled': True}
     A.save(None, {'profile': p})
-    cfg = S.apply_admin(None, scores_specs.growth_v4())
+    cfg = scores_profiles.apply_admin(None, scores_specs.growth_v4())
     assert cfg['selection']['require_fresh'] is False
     assert S.params_for(cfg, 'equity')['required'] == ['week']                    # la période obligatoire est un réglage technique, pas un seuil de croissance
 
 
 def test_filters_are_off_by_default_and_remove_no_title_from_the_ranking():
-    cfg = S.apply_admin(None, scores_specs.growth_v4())
+    cfg = scores_profiles.apply_admin(None, scores_specs.growth_v4())
     for pid in ('week', 'month'):
         x = next(p for p in cfg['periods'] if p['id'] == pid)
         assert x['enabled'] and not x['require_history'] and all(x[f] is None for f in scores_specs.THRESHOLDS)       # notées, jamais filtrées
@@ -260,28 +260,28 @@ def test_enabling_filters_applies_thresholds_but_never_changes_scores():
     p = profile()
     p['filters'] = {'enabled': True}
     A.save(None, {'profile': p})
-    cfg = S.apply_admin(None, scores_specs.growth_v4())
+    cfg = scores_profiles.apply_admin(None, scores_specs.growth_v4())
     wk = next(x for x in cfg['periods'] if x['id'] == 'week')
     assert wk['min_slope'] == scores_specs.SLOPE['very_strong'] and wk['require_history']
-    assert S._key(cfg, 1) == S._key(S.apply_admin(None, scores_specs.growth_v4()), 1)
+    assert S._key(cfg, 1) == S._key(scores_profiles.apply_admin(None, scores_specs.growth_v4()), 1)
     assert S._key(cfg, 1) == S._key(scores_profiles.neutral(scores_specs.growth_v4()), 1)          # même notation avec ou sans filtres
 
 
 def test_anchor_is_a_common_setting_validated_persisted_and_part_of_the_cache_key(memory):
-    base = S._key(S.apply_admin(None, scores_specs.growth_v4()), 1)
+    base = S._key(scores_profiles.apply_admin(None, scores_specs.growth_v4()), 1)
     p = profile()
     A.save(None, {'global': {'kappa': 0.7, 'threshold': 0.75, 'anchor': 0.0}, 'profile': p})
-    assert A.state(None)['global']['anchor'] == 0.0 and S.params_for(S.apply_admin(None, scores_specs.growth_v4()), 'equity')['anchor'] == 0.0
-    assert S._key(S.apply_admin(None, scores_specs.growth_v4()), 1) != base                    # l'ancrage change les notes complexes : il change la clé
+    assert A.state(None)['global']['anchor'] == 0.0 and S.params_for(scores_profiles.apply_admin(None, scores_specs.growth_v4()), 'equity')['anchor'] == 0.0
+    assert S._key(scores_profiles.apply_admin(None, scores_specs.growth_v4()), 1) != base                    # l'ancrage change les notes complexes : il change la clé
     for bad in (-0.1, 1.5):
         with pytest.raises(ValueError):
             A.save(None, {'global': {'kappa': 0.7, 'threshold': 0.75, 'anchor': bad}})
     A.save(None, {'reset': 'global'})
-    assert A.state(None)['global']['anchor'] == 0.5 and S._key(S.apply_admin(None, scores_specs.growth_v4()), 1) == base
+    assert A.state(None)['global']['anchor'] == 0.5 and S._key(scores_profiles.apply_admin(None, scores_specs.growth_v4()), 1) == base
 
 
 def test_strategies_current_profile_always_carries_sessions():
-    from engine.analytics.admin import scores_profiles
+    from engine.analytics.scoring import scores_profiles
     cur = scores_profiles.clean_profile(scores_profiles.profile_of(scores_profiles.base_config('growth_v4')))
     assert 'sessions' not in cur['periods']['week']                    # clean_profile ne le garde pas : strategies() doit le rajouter
 

@@ -44,3 +44,11 @@ def mark_applied(conn, level, config):
     applied = get(conn, 'rules_applied', {})
     applied[level] = {'hash': digest(config), 'at': datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None, microsecond=0).isoformat(sep=' ')}
     put(conn, 'rules_applied', applied)
+
+
+def record_cron_error(conn, now, where, exc):
+    """Erreur d'un passage du cron survenue hors d'un traitement (base, planification, import) : conservée pour l'administration (50 dernières).
+    Ici, et non dans jobs/schedule, pour que le rattrapage (market/catchup) l'enregistre sans dépendre de la planification."""
+    errs = get(conn, 'cron_errors', [])
+    errs.insert(0, {'at': now.replace(tzinfo=None, microsecond=0).isoformat(sep=' '), 'where': where, 'message': f'{type(exc).__name__}: {exc}'[:300]})
+    put(conn, 'cron_errors', errs[:50])

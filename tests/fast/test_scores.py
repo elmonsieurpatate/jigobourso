@@ -5,6 +5,7 @@ from engine.analytics.scoring import scores as SC
 from engine.analytics.scoring import score_inputs as SI
 from engine.analytics.series import liquidity as LQ
 from engine.analytics.explorer import explorer_config as C
+from engine.analytics.explorer import legacy_upgrade as LU
 from engine.analytics.explorer import strategy as S
 from engine.analytics.scoring import score_service as SS
 
@@ -333,7 +334,7 @@ def test_scoring_block_validation():
 
 def test_every_existing_configuration_gets_default_scoring_without_changing_its_filters():
     old = S.preset('fast')
-    up = C.upgrade(old)
+    up = LU.upgrade(old)
     assert up['scoring'] == {'kappa': 0.7, 'weights': {}, 'complex_weights': {}, 'threshold': 0.75, 'anchor': 0.5, 'sat_a': 17.0, 'accel_ref': 0.4, 'vol_mode': 'absolute', 'momentum_horizon': '6m'}
     assert up['ranking']['mode'] == 'performance'                  # le classement historique est conservé tel quel
 

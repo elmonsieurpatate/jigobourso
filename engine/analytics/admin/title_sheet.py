@@ -6,13 +6,14 @@ from collections import defaultdict
 from engine.catalogue.rules import MARKETS, is_leveraged_name
 from engine.shared import settings as settings_mod
 from engine.market import hours
-from engine.market.collect import latest_rates, to_eur_factor
+from engine.market.collect import latest_rates
+from engine.shared.units import to_eur_factor
 from engine.market.calendar import window_calendars, session_dates
 from ..series import signals
 from ..explorer import strategy
 from ..explorer import explorer_config
 from ..series.series import analyze_series, prepare_series, data_corrections
-from .universe_verdicts import expanded_parts, extended_metrics, judge_universe
+from ..explorer.universe_verdicts import expanded_parts, extended_metrics, judge_universe
 from .service import STATUS_LABELS, request_config, reference_window, scoped_entries
 from ..market_views.market_facts import analyst_view, expected_close, last_collection, pea_status, size_class
 
@@ -251,6 +252,7 @@ PROFILE_MAX_AGE_DAYS = 30
 def _etf_profile(conn, listing_id, symbol, allow_fetch):
     """Fiche pédagogique en cache ; rafraîchie à la demande (au plus tous les 30 jours, une tentative par jour en cas d'échec)."""
     from engine.market import etf_profile
+    from ..market_views import etf
     from engine.market.yahoo import YahooClient
     now = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None, microsecond=0)
     with conn.cursor() as cur:
@@ -259,7 +261,7 @@ def _etf_profile(conn, listing_id, symbol, allow_fetch):
     fresh_days = PROFILE_MAX_AGE_DAYS if row and row['state'] == 'ok' else 1
     if allow_fetch and (not row or row['version'] != etf_profile.VERSION or (now - row['fetched_at']).days >= fresh_days):
         try:
-            data, state = etf_profile.fetch_profile(YahooClient().transport, symbol), 'ok'
+            data, state = etf.fetch_profile(YahooClient().transport, symbol), 'ok'
             if data is None:
                 state = 'unavailable'
         except Exception:
@@ -285,7 +287,7 @@ def _scores_v4(conn, lid, ct=None):
     """Scores V4 du titre (simple, complexe, rangs généraux, contributions) avec la stratégie V4 du contexte (celle du Classement dont la fiche est ouverte) ; None si le titre n'est pas noté. Lecture seule.
     Mêmes scores et mêmes rangs que le Classement : retenu ou exclu, la note et le rang ne changent pas."""
     from ..scoring import scores
-    from . import scores_specs
+    from ..scoring import scores_specs
     from . import scores_ranking
     ct = ct or {}
     name = 'growth_v4'

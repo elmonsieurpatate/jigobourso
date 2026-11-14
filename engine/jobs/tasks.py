@@ -450,7 +450,7 @@ def tick(conn, client, now=None, trigger='cron'):
             return fn()
         except Exception as e:                                                   # noqa: BLE001
             conn.rollback()
-            schedule.record_error(conn, now, where, e)
+            settings.record_cron_error(conn, now, where, e)
 
     # 1. collectes normales, toujours prioritaires
     for mic in sorted({r['mic'] for r in collect.collection_set(conn)}):

@@ -1,7 +1,7 @@
 """SELECT-only snapshot for the requested week/month configuration, no ranking changes."""
 import json
 from engine.shared.db import connect
-from engine.analytics.admin import universe_verdicts
+from engine.analytics.explorer import universe_verdicts
 from engine.analytics.explorer import strategy
 c=connect()
 with c.cursor() as cur:

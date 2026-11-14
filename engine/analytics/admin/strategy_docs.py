@@ -2,11 +2,11 @@
 Le centre d'aide et les fiches de « Mes stratégies » les affichent tels quels : si une valeur change dans le moteur, la documentation change avec elle."""
 from ..scoring import ranking_table
 from ..scoring import scores as SC
-from ..admin import scores_admin as A
-from ..admin import scores_specs
-from ..admin import scores_profiles
-from . import strategy as LEGACY
-from . import explorer_config as C
+from . import scores_admin as A
+from ..scoring import scores_specs
+from ..scoring import scores_profiles
+from ..explorer import strategy as LEGACY
+from ..explorer import explorer_config as C
 from ..scoring import score_service
 
 

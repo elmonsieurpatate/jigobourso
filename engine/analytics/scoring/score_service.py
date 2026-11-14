@@ -11,14 +11,16 @@ import json
 from collections import defaultdict
 
 from ..explorer import explorer_config as C
+from ..explorer import legacy_upgrade
 from . import scores as SC
+from .score_cache import packed, unpacked
 
 CACHE_FORMAT = 1
 FIELDS = ('id', 'simple', 'simple_status', 'simple_coverage', 'complex', 'complex_status', 'complex_coverage', 'why')
 
 
 def v4(config):
-    return config if config.get('version') == 4 else C.upgrade(config)
+    return config if config.get('version') == 4 else legacy_upgrade.upgrade(config)
 
 
 def is_scores_mode(config):
@@ -92,7 +94,6 @@ def _key(config, version):
 
 def score_book(conn, config, data_version):
     """Scores légers de tout l'univers, mis en cache selon les seuls paramètres de score et la version des données."""
-    from ..admin.universe_verdicts import packed, unpacked
     key = _key(config, data_version)
     with conn.cursor() as cur:
         cur.execute('SELECT data_version, payload FROM result_cache WHERE cache_key=%s', (key,))
@@ -183,16 +184,3 @@ def apply_global(conn, config):
         if sc.get(field) == base[field]:
             sc[field] = admin[field]
     return dict(config, scoring=sc)
-
-
-def apply_admin(conn, config):
-    """Configuration d'une stratégie avec les réglages d'administration : profil de la stratégie (si V4 et enregistré), puis réglages communs."""
-    if config.get('version') != 4:
-        return config
-    if config.get('ranking', {}).get('mode') == C.SCORES_MODE:
-        from ..admin import scores_specs
-        from ..admin import scores_profiles
-        if scores_specs.known(config.get('name')):
-            prof = scores_profiles.stored_profiles(conn).get(config['name'])
-            config = scores_profiles.apply_profile(config, scores_profiles.clean_profile(prof)) if prof else scores_profiles.neutral(config)
-    return apply_global(conn, config)

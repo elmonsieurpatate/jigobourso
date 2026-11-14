@@ -41,12 +41,12 @@ function secondary_metadata_selection(string $filter,array $selection): array {
     return ['mode'=>'custom','selected'=>$selected];
 }
 /** Called under both settings row locks, exactly once per document version. */
-function secondary_metadata_migrate(array &$definitions,array &$defaults): void {
-    $canonical=secondary_proposed();
+function secondary_metadata_migrate(array &$definitions,array &$defaults,array $canonical): void {   // $canonical = secondary_proposed() fourni par l'appelant : ce module ne dépend pas des filtres
     if(($definitions['metadata_version']??0)<2){
         $previous=[];
         foreach($definitions['filters'] as &$f)if(!$f['editable']){
-            $new=secondary_find($canonical,$f['id']);$previous[$f['id']]=$f;
+            $new=null;foreach($canonical['filters'] as $c)if($c['id']===$f['id'])$new=$c;
+            if($new===null)throw new RuntimeException('Filtre canonique inconnu : '.$f['id']);$previous[$f['id']]=$f;
             // These four definitions are read-only; activation remains a user setting.
             $enabled=$f['enabled'];$f=$new;$f['enabled']=$enabled;
         }unset($f);

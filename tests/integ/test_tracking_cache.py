@@ -4,7 +4,7 @@ import pytest
 from engine.shared.db import connect
 from engine.analytics.series import compute
 from engine.analytics.admin import service
-from engine.analytics.admin import universe_verdicts
+from engine.analytics.explorer import universe_verdicts
 from engine.analytics.admin import title_sheet
 from engine.analytics.explorer import strategy
 from engine.analytics.portfolio import tracking

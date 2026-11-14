@@ -6,14 +6,15 @@ Une donnée absente reste None (jamais 0). Les groupes pays / secteur / place / 
 import json
 import os
 
-from engine.market.collect import latest_rates, to_eur_factor
+from engine.market.collect import latest_rates
+from engine.shared.units import to_eur_factor
 
 from . import criteria as CR
-from ..admin import scores_specs
-from ..admin import scores_profiles
-from ..admin import scores_ranking
+from . import scores_specs
+from . import scores_profiles
+from .ranking_support import ordered, series
 from . import score_service
-from ..admin import universe_verdicts
+from ..explorer import universe_verdicts
 
 CONFIG = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))), 'app', 'config', 'secondary_metadata_groups.json')
 ACCENTS = str.maketrans({'é': 'e', 'è': 'e', 'ê': 'e', 'ë': 'e', 'à': 'a', 'â': 'a', 'ä': 'a', 'á': 'a', 'ã': 'a', 'å': 'a', 'î': 'i', 'ï': 'i', 'í': 'i', 'ì': 'i', 'ô': 'o', 'ö': 'o', 'ó': 'o',
@@ -146,11 +147,11 @@ def table(conn, request):
     name, cfg, book = _base(conn, request)
     norm = norm_of(request)
     ids = evaluable(book)
-    simple, rank_s, pos_s = scores_ranking.ordered(book, 'simple')            # même fonction que l'administration des scores : même ordre, mêmes rangs
-    complex_, rank_c, pos_c = scores_ranking.ordered(book, 'complex')
+    simple, rank_s, pos_s = ordered(book, 'simple')            # même fonction que l'administration des scores : même ordre, mêmes rangs
+    complex_, rank_c, pos_c = ordered(book, 'complex')
     tie_s, tie_c = _ties(rank_s), _ties(rank_c)
     data = _fetch(conn, ids) if ids else {}
-    curves = scores_ranking.series(conn, ids, REFERENCE) if ids and request.get('include_curves', True) is not False else {}
+    curves = series(conn, ids, REFERENCE) if ids and request.get('include_curves', True) is not False else {}
     rates = latest_rates(conn)
     groups = _config()
     rows = []
@@ -198,4 +199,4 @@ def curves(conn, request):
     ids = request.get('ids')
     if not isinstance(ids, list) or len(ids) > 100 or any(type(i) is not int or i <= 0 for i in ids):
         raise ValueError('Une page de 100 identifiants de titres maximum est requise')
-    return {'curves': scores_ranking.series(conn, list(dict.fromkeys(ids)), REFERENCE) if ids else {}}
+    return {'curves': series(conn, list(dict.fromkeys(ids)), REFERENCE) if ids else {}}

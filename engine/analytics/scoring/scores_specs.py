@@ -1,6 +1,6 @@
 """Catalogue des stratégies de score : références officielles (V4 et historiques), stratégies personnalisées chargées de la base, utilisateur courant."""
 from ..explorer import explorer_config as C
-from ..scoring import scores as SC
+from . import scores as SC
 from ..explorer import strategy as LEGACY
 
 

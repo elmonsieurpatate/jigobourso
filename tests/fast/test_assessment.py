@@ -3,6 +3,7 @@ import pathlib
 
 from engine.analytics.admin import service
 from engine.analytics.series import signals
+from engine.analytics.shared.numbers import downsample
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 
@@ -123,6 +124,6 @@ def test_existing_assessment_is_preserved_in_the_full_sheet():
 
 def test_downsample_keeps_first_and_last_values_and_the_shape():
     values = list(range(253))
-    out = service.downsample(values, 66)
+    out = downsample(values, 66)
     assert len(out) == 66 and out[0] == 0 and out[-1] == 252 and out == sorted(out)
-    assert service.downsample([1, 2, 3], 66) == [1, 2, 3]
+    assert downsample([1, 2, 3], 66) == [1, 2, 3]

@@ -9,7 +9,6 @@ import hashlib
 from zoneinfo import ZoneInfo
 
 from . import hours
-from .collect import slot_of
 
 SESSIONS = 2
 COOLDOWN_MINUTES = 10        # pas de nouvel appel Yahoo pour un même titre avant ce délai
@@ -102,7 +101,7 @@ def store_chart(conn, listing_id, bars, now):
     cutoff = now.astimezone(datetime.timezone.utc).replace(tzinfo=None)
     slots = {}
     for ts, o, h, l, c, v in bars:
-        slots[slot_of(ts)] = (o, h, l, c, v)          # plusieurs barres dans un créneau : la dernière gagne
+        slots[hours.slot_of(ts)] = (o, h, l, c, v)          # plusieurs barres dans un créneau : la dernière gagne
     rows = [(listing_id, s, c, 1 if s + datetime.timedelta(minutes=hours.SLOT_MINUTES) <= cutoff else 0, o, h, l, v) for s, (o, h, l, c, v) in sorted(slots.items())]
     with conn.cursor() as cur:
         cur.executemany("""INSERT INTO intraday_prices(listing_id,slot_start,close_px,is_final,open_px,high_px,low_px,volume) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)

@@ -104,7 +104,7 @@ def _series(conn, ids):
 
 def _ranks(conn, name, config):
     """{listing_id: rang} des titres retenus par la stratégie (verdicts en cache, comme l'Explorer)."""
-    from ..admin import universe_verdicts
+    from ..explorer import universe_verdicts
     cfg = strategy.validate(config) if config else strategy.validate(strategy.preset(name))
     return {e['id']: e['rank'] for e in universe_verdicts.cached_verdicts(conn, cfg) if e['status'] == 'retained' and e.get('rank') is not None}
 
@@ -144,7 +144,7 @@ def lot_alerts(conn, request, today=None):
 
 def curves(lots, series, points=90):
     """Courbe de chaque titre détenu depuis son plus ancien achat encore détenu (série corrigée des splits, au plus `points` valeurs) et dates de ses achats."""
-    from ..admin.service import downsample
+    from ..shared.numbers import downsample
     out = {}
     for lid in sorted({int(l['listing_id']) for l in lots}):
         buys = sorted(l['trade_date'] for l in lots if int(l['listing_id']) == lid)

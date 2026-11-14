@@ -4,8 +4,8 @@ import os
 import pytest
 
 from engine.analytics.admin import scores_admin as A
-from engine.analytics.admin import scores_specs
-from engine.analytics.explorer import strategy_docs
+from engine.analytics.scoring import scores_specs
+from engine.analytics.admin import strategy_docs
 from engine.shared.db import connect
 from tests.dbutil import reset_data
 

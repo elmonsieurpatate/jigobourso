@@ -1,7 +1,8 @@
 """Faits de marché communs : éligibilité PEA, dernière collecte, dernière clôture attendue, classes de capitalisation, lecture des recommandations d'analystes."""
 from engine.market import hours
 from engine.shared.units import is_subunit
-from engine.market.collect import effective_expected_close, to_eur_factor
+from engine.market.collect import effective_expected_close
+from engine.shared.units import to_eur_factor
 
 
 # PEA : actions d'une société dont le siège est dans l'UE ou l'EEE (Islande, Liechtenstein et Norvège compris ; pas le Royaume-Uni ni la Suisse),

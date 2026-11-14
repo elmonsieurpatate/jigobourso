@@ -50,26 +50,6 @@ def period_slope(slope,sessions):
     return 100*math.expm1(sessions*math.log1p(slope/100))
 
 
-def upgrade(config):
-    c=copy.deepcopy(config)
-    if c.get('version')==4:return validate(c)
-    if c.get('version')!=3:raise ValueError('Version de stratégie inconnue : conversion explicite nécessaire')
-    from .strategy import validate as validate_legacy
-    c=validate_legacy(c)
-    c.pop('_upgrade',None)
-    c['version']=4;c['slope_unit']='percent_per_session'
-    for p in c['periods']:
-        # V3 required coverage on every selected period, even without thresholds.
-        p['require_history']=bool(p['enabled'])
-        for field in BOUNDS:p.setdefault(field,None)
-    c['ranking']['weights']={p['id']:c['ranking'].get('weights',{}).get(p['id'],1 if p['enabled'] else 0) for p in c['periods']}
-    c['selection']={'combine':'all','missing':'unknown','require_fresh':True}
-    c['liquidity']={'min_quoted_volume':None}
-    c['asset_rules']={}
-    c['presentation']={'configuration':'period'}
-    return validate(c)
-
-
 def empty():
     return validate({'version':4,'name':'custom','slope_unit':'percent_per_session',
       'periods':[dict(id=p,sessions=n,enabled=False,require_history=False,**{f:None for f in BOUNDS}) for p,n in SESSIONS.items()],
@@ -207,20 +187,3 @@ def needs_extended(c):
         ec=effective(c,kind)
         if any(p['enabled'] and any(p.get(f) is not None for f,m,_ in CRITERIA if m in EXTRA) for p in ec['periods']):return True
     return any(p.get('enabled',True) and p.get('weight',0)!=0 and p['metric'] in EXTRA and any(x['id']==p['period'] and x['enabled'] for kind in ('equity','etf') for x in effective(c,kind)['periods']) for p in c['ranking'].get('components',[]))
-
-
-def editable(raw):
-    """Expose legacy formulas as generic components without changing their math."""
-    c=upgrade(raw);c.pop('_editable',None);r=c['ranking'];mode=r['mode']
-    if mode in ('weighted',SCORES_MODE):return c
-    if mode=='momentum_risk':
-        specs=[('momentum6','half',.35,'higher',True),('momentum12','year',.45,'higher',True),('volatility','year',.10,'lower',False),('drawdown','year',.10,'lower',False)]
-    elif mode in ('momentum','momentum12'):
-        specs=[('momentum12' if mode=='momentum12' else 'momentum6','year' if mode=='momentum12' else 'half',1,'higher',True)]
-    else:
-        metric={'trend':'slope','performance':'perf','regularity':'r2','stability':'volatility'}[mode]
-        specs=[(metric,p['id'],r['weights'].get(p['id'],0),'lower' if mode=='stability' else 'higher',False) for p in c['periods'] if p['sessions']>=3 or metric not in ('r2','volatility','er')]
-    c['ranking']={'mode':'weighted','missing':'renormalize','aggregation':'mean','grouping':'asset_kind','components':[
-        dict(id='legacy-'+period+'-'+metric,metric=metric,period=period,weight=weight,direction=direction,required=required,kind='all',enabled=True,normalization='percentile',transform='identity',min=0,max=100,exponent=1)
-        for metric,period,weight,direction,required in specs]}
-    return validate(c)

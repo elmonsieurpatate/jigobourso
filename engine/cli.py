@@ -27,7 +27,7 @@ def _close_all():
 def _admin_commands():
     from engine.analytics.admin import adminsvc
     from engine.analytics.explorer import funnel
-    from engine.analytics.explorer import strategy_docs
+    from engine.analytics.admin import strategy_docs
     from engine.jobs import schedule, tasks
     from engine.shared import settings
     from engine.analytics.admin import scores_admin
@@ -88,7 +88,7 @@ def serve(cmd):
     """Commandes appelées par PHP : JSON en entrée, JSON en sortie, code 2 + {"error"} en cas de demande invalide."""
     import decimal
     import datetime as dt
-    from engine.analytics.admin import scores_specs
+    from engine.analytics.scoring import scores_specs
     from engine.analytics.admin import service
     from engine.analytics.admin import title_sheet
     from engine.analytics.explorer import strategy
@@ -149,8 +149,8 @@ def serve(cmd):
         elif cmd in ADMIN:
             result = ADMIN[cmd](connect(), request)
         elif cmd == 'validate-config':
-            from .analytics.explorer import explorer_config as C
-            result = C.editable(request) if request.get('_editable') else C.upgrade(request) if request.get('_upgrade') else strategy.validate(request)
+            from .analytics.explorer import legacy_upgrade
+            result = legacy_upgrade.editable(request) if request.get('_editable') else legacy_upgrade.upgrade(request) if request.get('_upgrade') else strategy.validate(request)
         else:
             conn = connect()
             result = service.explore(conn, request) if cmd == 'explore' else title_sheet.instrument_sheet(conn, request)
@@ -211,9 +211,9 @@ def _main(argv=None):
                 print(json.dumps([(k, m, j) for k, m, j in tasks.tick(conn, YahooClient(), now, args.trigger)]))
             except Exception as e:                                          # noqa: BLE001 : visible dans l'administration, puis remonte vers logs/cron.log
                 if args.trigger == 'cron':
-                    from engine.jobs import schedule
+                    from engine.shared import settings
                     conn.rollback()
-                    schedule.record_error(conn, now, 'passage', e)
+                    settings.record_cron_error(conn, now, 'passage', e)
                 raise
         elif args.cmd == 'job':
             print(tasks.run_manual(conn, YahooClient(), args.name, now, args.trigger))

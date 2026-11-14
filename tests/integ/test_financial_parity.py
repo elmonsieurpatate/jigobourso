@@ -108,3 +108,29 @@ def test_detected_price_jump_is_never_applied_as_a_split(world):
     conn.commit(); conn.close()
     assert portfolio(a, pf)['positions'][0]['qty'] == pytest.approx(10)      # simple saut de cours détecté : aucune quantité modifiée
     assert sell(a, pf, 11, '2026-07-01')[0] == 422
+
+
+def test_portfolio_use_cases_run_without_http(world):
+    """Étape 7 : les cas d'usage de app/services/portfolios.php s'appellent sans requête HTTP, avec l'utilisateur et un tableau de paramètres."""
+    code = ("require " + json.dumps(ROOT + '/app/services/portfolios.php') + ";"
+            "$u = q('SELECT * FROM users ORDER BY id LIMIT 1')->fetch();"
+            "$id = pf_create($u, ['name' => 'Sans HTTP'])['id'];"
+            "pf_rename($u, ['id' => $id, 'name' => 'Renommé']);"
+            "try { pf_rename($u, ['id' => 999999, 'name' => 'x']); } catch (ApiError $e) { $err = $e->status; }"
+            "try { tx_delete($u, ['id' => 999999]); } catch (ApiError $e) { $err2 = $e->status; }"
+            "$names = array_column(pf_list($u, [])['portfolios'], 'name');"
+            "pf_delete($u, ['id' => $id]);"
+            "echo json_encode(['renamed' => in_array('Renommé', $names), 'foreign' => $err, 'tx404' => $err2]);")
+    out = subprocess.run(['php', '-r', code], capture_output=True, text=True, timeout=60)
+    assert out.returncode == 0, out.stderr
+    assert json.loads(out.stdout) == {'renamed': True, 'foreign': 404, 'tx404': 404}
+
+
+def test_before_and_after_delivery_scripts_give_the_same_fingerprint(world):
+    a, pf = account(world); add(a, pf, qty=3, date='2026-05-01')
+    def run(script):
+        out = subprocess.run(['php', os.path.join(ROOT, 'scripts/release', script)], capture_output=True, text=True, timeout=60)
+        assert out.returncode == 0, out.stderr
+        return json.loads(out.stdout)
+    before, after = run('financial_fingerprint.php'), run('check_financial_integrity.php')
+    assert {k: before[k] for k in ('fingerprint', 'portfolios', 'transactions')} == {k: after[k] for k in ('fingerprint', 'portfolios', 'transactions')}

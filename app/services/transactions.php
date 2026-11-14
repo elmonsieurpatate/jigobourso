@@ -30,6 +30,12 @@ function historical_fx(?string $unit, string $when, ?float $explicit): float {
         throw new ApiError('Taux historique indisponible à cette date : renseignez le taux vers l’euro (pour une unité du prix)', 422);
     return (float)$r['to_eur'] / $divisor;
 }
+// Date et unité inchangées : le taux historique déjà enregistré est conservé quand le client laisse le champ vide (aperçu et modification partagent cette règle).
+function tx_carry_fx(?array $old, string $when, ?string $currency, ?float $fx): ?float {
+    if ($fx === null && $old && substr($when, 0, 10) === substr($old['trade_at'], 0, 10) && $currency === price_unit($old['currency']))
+        return $old['fx_to_eur'] === null ? null : (float)$old['fx_to_eur'];
+    return $fx;
+}
 function transaction_key(array $t): string {
     return !empty($t['listing_id']) ? 'L' . $t['listing_id'] : 'S' . strtoupper($t['symbol']);
 }

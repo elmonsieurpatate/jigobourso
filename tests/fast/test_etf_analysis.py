@@ -5,7 +5,7 @@ import random
 import pytest
 from engine.analytics.market_views import etf
 from engine.analytics.series import signals
-from engine.market.etf_profile import parse_profile
+from engine.analytics.market_views.etf import parse_profile
 
 START = dt.date(2025, 10, 6)           # un lundi
 

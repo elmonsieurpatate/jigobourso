@@ -10,6 +10,7 @@ import datetime as dt
 import re
 import json
 import math
+from engine.market import etf_profile
 from engine.shared.units import split_unit
 from collections import defaultdict
 
@@ -399,7 +400,6 @@ def warm_profiles(conn, client, now, limit=WARM_LIMIT, budget_s=WARM_BUDGET_S):
     2) ceux du haut du dernier classement, 3) le reste des ETF sélectionnés, jamais encore demandés. Un profil récent (30 jours, dernière version du lecteur) n'est jamais redemandé ;
     un profil indisponible est réessayé après un jour pour les deux premiers groupes, après 30 jours pour le reste. Arrêt au premier 429 ou à la fin du temps imparti : la suite reprend au passage suivant."""
     import time
-    from engine.market import etf_profile
     from engine.market.yahoo import RateLimited
     with conn.cursor() as c:
         c.execute("""SELECT l.id,l.symbol FROM listings l JOIN instruments i ON i.id=l.instrument_id
@@ -433,7 +433,7 @@ def warm_profiles(conn, client, now, limit=WARM_LIMIT, budget_s=WARM_BUDGET_S):
         if time.monotonic() - started > budget_s:
             break
         try:
-            data, state = etf_profile.fetch_profile(client.transport, r['symbol']), 'ok'
+            data, state = fetch_profile(client.transport, r['symbol']), 'ok'
             if data is None:
                 state = 'unavailable'
         except RateLimited:
@@ -556,7 +556,7 @@ def compare(conn, lid, limit=4):
         info = {r['id']: r for r in c.fetchall()}
         c.execute('SELECT currency,to_eur FROM fx_rates f WHERE rate_date=(SELECT MAX(rate_date) FROM fx_rates WHERE currency=f.currency)')
         rates = {r['currency']: float(r['to_eur']) for r in c.fetchall()}
-    from engine.market.collect import to_eur_factor
+    from engine.shared.units import to_eur_factor
 
     def row(i, p, sim_info=None):
         d, r = (p or {}).get('profile') or {}, info.get(i) or {}
@@ -618,3 +618,19 @@ def portfolio(conn, positions):
             'sectors': [{'name': k, 'value_eur': v, 'percent': 100 * v / total if complete else None} for k, v in sorted(amounts.items(), key=lambda kv: -kv[1])],
             'families': family_rows, 'etf_count': len(items), 'etf_without_composition': no_profile, 'signals': sig,
             'similar_pairs': sorted(pairs, key=lambda x: -x['coefficient']), 'unavailable_pairs': unavailable}
+
+
+def parse_profile(payload):
+    """Fiche stable pour l'interface (extraction du fournisseur puis normalisation et région), ou None si Yahoo ne décrit pas un fonds."""
+    from .geography import etf_region
+    out = etf_profile.parse_raw_profile(payload)
+    if out is None:
+        return None
+    out = profile_data(out)
+    out['geography_region'] = etf_region(out.get('category'))
+    return out if any(out[k] for k in ('holdings', 'sectors', 'expense_ratio', 'family', 'total_assets', 'category')) else None
+
+
+def fetch_profile(transport, symbol):
+    """Interroge Yahoo ; None si aucune donnée de fonds."""
+    return parse_profile(etf_profile.fetch_payload(transport, symbol))

@@ -2,9 +2,9 @@
 import copy
 from engine.shared import settings
 from ..explorer import explorer_config as C
-from ..scoring import score_service
-from ..scoring import scores as SC
-from .scores_specs import DAY_THRESHOLDS, LIQUIDITY, PROFILES, SCORING_PERIODS, THRESHOLDS, TOLERANCE, USER, spec, user_key
+from . import score_service
+from . import scores as SC
+from .scores_specs import DAY_THRESHOLDS, LIQUIDITY, PROFILES, SCORING_PERIODS, THRESHOLDS, TOLERANCE, USER, known, spec, user_key
 
 PERIOD_LABELS = {'day': 'Jour', 'week': 'Semaine', 'month': 'Mois', 'quarter': 'Trimestre', 'half': 'Semestre', 'year': 'Année'}
 
@@ -195,3 +195,14 @@ def auto_weights(kappa, period_ids):
         return {}
     w = SC.resolve_weights([{'id': p, 'sessions': C.SESSIONS[p]} for p in ids], k)
     return {p: 100 * w[p] for p in ids}
+
+
+def apply_admin(conn, config):
+    """Configuration d'une stratégie avec les réglages d'administration : profil de la stratégie (si V4 et enregistré), puis réglages communs."""
+    if config.get('version') != 4:
+        return config
+    if config.get('ranking', {}).get('mode') == C.SCORES_MODE:
+        if known(config.get('name')):
+            prof = stored_profiles(conn).get(config['name'])
+            config = apply_profile(config, clean_profile(prof)) if prof else neutral(config)
+    return score_service.apply_global(conn, config)

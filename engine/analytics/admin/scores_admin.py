@@ -5,8 +5,8 @@ from ..scoring import criteria as _CR
 from ..explorer import explorer_config as C
 from ..scoring import score_service
 from ..scoring import scores as SC
-from .scores_specs import CT_BUILTIN, DYNAMIC, PROFILES, SCORING_PERIODS, USER, V4_STRATEGIES, known, refresh, user_key
-from .scores_profiles import PERIOD_LABELS, apply_profile, auto_weights, base_config, build_config, clean_profile, design, formula, global_profiles, profile_of, stored_profiles, tuning_of, user_profiles
+from ..scoring.scores_specs import CT_BUILTIN, DYNAMIC, PROFILES, SCORING_PERIODS, USER, V4_STRATEGIES, known, refresh, user_key
+from ..scoring.scores_profiles import PERIOD_LABELS, apply_profile, auto_weights, base_config, build_config, clean_profile, design, formula, global_profiles, profile_of, stored_profiles, tuning_of, user_profiles
 
 def strategies(conn):
     refresh(conn)
@@ -255,7 +255,7 @@ def coverage(conn):
 
 def monitor(conn):
     """Suivi : titres notés, couverture, fraîcheur des données, origine de la liquidité, dernières erreurs de calcul."""
-    from . import universe_verdicts
+    from ..explorer import universe_verdicts
     cfg = build_config(conn, 'growth_v4')
     book = score_service.score_book(conn, cfg, universe_verdicts.data_version(conn))
     counts = {'simple': {'ok': 0, 'partiel': 0, 'inconnu': 0}, 'complex': {'ok': 0, 'partiel': 0, 'inconnu': 0}}

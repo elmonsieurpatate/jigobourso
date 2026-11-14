@@ -146,7 +146,7 @@ def enrich(conn, request, series, alerts, today):
         if currencies:
             cur.execute('SELECT currency,rate_date,to_eur FROM fx_rates WHERE currency IN (%s) ORDER BY rate_date' % ','.join(['%s'] * len(currencies)), currencies)
             for r in cur.fetchall(): fx.setdefault(r['currency'], {})[str(r['rate_date'])] = float(r['to_eur'])
-    from engine.market.collect import to_eur_factor
+    from engine.shared.units import to_eur_factor
     from ..series.history import _Carry
     result = {}
     for p in positions:

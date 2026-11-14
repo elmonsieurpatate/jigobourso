@@ -110,7 +110,7 @@ def refresh_fx(conn, client, now):
 
 
 # Devises cotées dans une sous-unité : code Yahoo (sensible à la casse quand il l'est) -> (devise principale, diviseur).
-from engine.shared.units import SUBUNITS, to_eur_factor  # noqa: E402,F401  (réexport : appelants existants)
+from engine.shared.units import to_eur_factor  # noqa: E402
 
 
 FX_HISTORY_DAYS = 300        # profondeur d'historique de change visée (les transactions plus anciennes exigent un taux saisi à la main)
@@ -629,9 +629,6 @@ def intraday_plan(conn, rows, now, previous=True):
 
 
 # ───────── barres de 15 minutes ─────────
-def slot_of(ts):
-    t = datetime.datetime.fromtimestamp(ts, datetime.timezone.utc).replace(tzinfo=None)
-    return t.replace(minute=t.minute - t.minute % hours.SLOT_MINUTES, second=0, microsecond=0)
 
 
 def collect_intraday(conn, client, rows, now, range_='1d', progress=None, failed=None, deadline=None, unfetched=None):
@@ -663,7 +660,7 @@ def collect_intraday(conn, client, rows, now, range_='1d', progress=None, failed
             lid = by_symbol[symbol]['listing_id']
             slots = {}
             for ts, close in series['bars']:
-                slots[slot_of(ts)] = close           # dernier prix du créneau
+                slots[hours.slot_of(ts)] = close           # dernier prix du créneau
             for slot, close in slots.items():
                 bars.append((lid, slot, close, 1 if slot + datetime.timedelta(minutes=hours.SLOT_MINUTES) <= cutoff else 0))
             if slots:

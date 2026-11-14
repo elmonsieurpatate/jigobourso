@@ -93,8 +93,8 @@ pas présenté comme réalisé.
 - [x] Étape 4 — Lisibilité et architecture JavaScript. Clôturée 2026-11-14 : lint, js-check, css-check, visual, fast (656), e2e, integ (336) verts ; voir journal.
 - [x] Étape 5 — Fiabilité des échanges et des contrôles.
 - [x] Étape 6 — Cohérence financière : splits, unités et intégrité.
-- [ ] Étape 7 — Architecture et cas d'usage PHP.
-- [ ] Étape 8 — Architecture et dépendances Python.
+- [x] Étape 7 — Architecture et cas d'usage PHP. Clôturée 2026-11-14 : lint, js-check, css-check, visual, fast (691), e2e, integ (346) verts ; voir journal.
+- [ ] Étape 8 — Architecture et dépendances Python. Quasi close 2026-11-14 : cycles supprimés, couches verrouillées ; reste le découpage des fonctions longues ; voir journal.
 - [ ] Étape 9 — Données, migrations et accès SQL.
 - [ ] Étape 10 — Performance et observabilité.
 - [ ] Étape 11 — Installation, CI, livraison et restauration.
@@ -457,18 +457,18 @@ entre les différents chemins métier.
 
 Constat : F10.
 
-- [ ] Formatage PHP distinct des changements fonctionnels.
-- [ ] Rôles clairs : HTTP/autorisation, cas d'usage, métier, accès aux données.
-- [ ] Extraire les opérations encore composées dans les routes de portefeuille.
-- [ ] Mutualiser la préparation entre prévisualisation et écriture
+- [x] Formatage PHP distinct des changements fonctionnels.
+- [x] Rôles clairs : HTTP/autorisation, cas d'usage, métier, accès aux données.
+- [x] Extraire les opérations encore composées dans les routes de portefeuille.
+- [x] Mutualiser la préparation entre prévisualisation et écriture
       lorsque leur contrat est identique.
-- [ ] Regrouper les accès SQL réellement partagés.
-- [ ] Définir les frontières transactionnelles et l'ordre des verrous.
-- [ ] Préserver les contrôles de propriétaire sur tous les chemins d'appel.
-- [ ] Rendre les dépendances explicites sans ordre accidentel de require.
-- [ ] Vérifier les interfaces et collisions des fonctions globales.
-- [ ] Clarifier le contrat PHP/Python : types, objets/listes vides, erreurs, délais.
-- [ ] Retirer les fonctions et chemins remplacés.
+- [x] Regrouper les accès SQL réellement partagés.
+- [x] Définir les frontières transactionnelles et l'ordre des verrous.
+- [x] Préserver les contrôles de propriétaire sur tous les chemins d'appel.
+- [x] Rendre les dépendances explicites sans ordre accidentel de require.
+- [x] Vérifier les interfaces et collisions des fonctions globales.
+- [x] Clarifier le contrat PHP/Python : types, objets/listes vides, erreurs, délais.
+- [x] Retirer les fonctions et chemins remplacés.
 
 Clôture : routes compréhensibles par responsabilité, cas d'usage testables
 sans requête HTTP, permissions toujours vérifiées par les tests HTTP.
@@ -479,23 +479,23 @@ sans requête HTTP, permissions toujours vérifiées par les tests HTTP.
 
 Constat : F11.
 
-- [ ] Formatage et contrôles compatibles avec la version supportée.
-- [ ] Directions explicites entre calculs purs, cas d'usage, stockage/cache
+- [x] Formatage et contrôles compatibles avec la version supportée.
+- [x] Directions explicites entre calculs purs, cas d'usage, stockage/cache
       et fournisseurs.
-- [ ] Sortir les spécifications et profils généraux du paquet admin.
-- [ ] Sortir la sérialisation du cache des responsabilités d'administration.
-- [ ] Examiner les cycles en incluant les imports différés.
-- [ ] Résoudre classement/scoring ↔ administration.
-- [ ] Résoudre fournisseur ETF ↔ présentation/normalisation.
-- [ ] Clarifier collecte ↔ intraday.
-- [ ] Clarifier planification ↔ rattrapage.
-- [ ] Clarifier configuration des stratégies ↔ calcul des scores.
-- [ ] Extraire les fonctions longues selon leurs responsabilités.
-- [ ] Garder les calculs purs indépendants de la base, du réseau et de l'admin.
-- [ ] Mutualiser les règles communes sans confondre des sémantiques différentes.
-- [ ] Mettre à jour imports, CLI, tâches, scripts et tests.
-- [ ] Retirer les anciens chemins et les shims devenus inutiles.
-- [ ] Contrôler automatiquement les dépendances interdites et nouveaux cycles.
+- [x] Sortir les spécifications et profils généraux du paquet admin.
+- [x] Sortir la sérialisation du cache des responsabilités d'administration.
+- [x] Examiner les cycles en incluant les imports différés.
+- [x] Résoudre classement/scoring ↔ administration.
+- [x] Résoudre fournisseur ETF ↔ présentation/normalisation.
+- [x] Clarifier collecte ↔ intraday.
+- [x] Clarifier planification ↔ rattrapage.
+- [x] Clarifier configuration des stratégies ↔ calcul des scores.
+- [ ] Extraire les fonctions longues selon leurs responsabilités. (Reste : history.build 136 lignes, admin.explore 127 ; plafond de 140 lignes verrouillé par test.)
+- [x] Garder les calculs purs indépendants de la base, du réseau et de l'admin.
+- [x] Mutualiser les règles communes sans confondre des sémantiques différentes.
+- [x] Mettre à jour imports, CLI, tâches, scripts et tests.
+- [x] Retirer les anciens chemins et les shims devenus inutiles.
+- [x] Contrôler automatiquement les dépendances interdites et nouveaux cycles.
 
 Clôture : dépendances orientées, calculs préservés et absence
 d'implémentations parallèles abandonnées.
@@ -600,8 +600,8 @@ Pour chaque résolution, indiquer commit et test/preuve.
 - [ ] F07 — Composants surchargés par les pages. Étapes 1–3. Preuve partielle (reste ouvert : états dynamiques, recette étape 3) : 2026-11-13, règles de page retirées (components/base/explorer/filtres/pf/help/splits/strategies-ui/admin-*.css) ; styles calculés conformes à la référence Halo sur 14 pages connecté, clair/sombre, 1280/390 px ; limites ci-dessous.
 - [ ] F08 — Présentation fixe dans data-style. Étapes 1–3. Preuve :
 - [x] F09 — Écouteurs accumulés. Étape 4. Preuve : 2026-11-14 : picker, openInfo, détail pf-home ; écouteurs retirés par AbortController.
-- [ ] F10 — Routes/services PHP incomplets. Étape 7. Preuve :
-- [ ] F11 — Dépendances Python mal orientées. Étape 8. Preuve :
+- [ ] F10 — Routes/services PHP incomplets. Étape 7. Preuve : 2026-11-14 : services/portfolios.php (17 cas d'usage sans HTTP), routes minces, own_transaction/tx_carry_fx, tests/fast/test_php_structure.py, docs/ARCHITECTURE_PHP.md.
+- [x] F11 — Dépendances Python mal orientées. Étape 8. Preuve : 2026-11-14 : 6 cycles (imports différés compris) supprimés, 0 restant ; tests/fast/test_python_dependencies.py ; docs/ARCHITECTURE_PYTHON.md.
 - [ ] F12 — Unités monétaires divergentes. Étape 6. Preuve : 2026-11-14 : engine/shared/units.py + app/lib/units.php, ZAc/ILA corrigés dans l'historique et la saisie ; parité PHP/Python testée.
 - [ ] F13 — Activation/restauration de release. Étape 11. Preuve :
 - [ ] F14 — Dépendances non complètement validées. Étape 11. Preuve :
@@ -792,3 +792,10 @@ Formatage JS (Prettier, commit 4613946, `make js-format` / `make js-check`). Cyc
 - Splits : lecture illisible = 503 ; règle de quantité unique `oversold_transactions` ; contrôle de release enrichi (ventes à découvert avec splits, achats à prix zéro, split sans événement moteur), lecture seule.
 - Documentation : section « Étape 6 » de FINANCIAL_INTEGRITY.md (décision sur les corrections manuelles, table des unités).
 - Passe finale : lint, js-check, css-check, visual, fast 682, e2e, integ 344 verts.
+
+## Journal — étapes 7 et 8 (2026-11-14)
+
+- Livraison étape 6 : le job hostinger a échoué une fois (empreinte « avant » exécutée avec le contrôle complet, dépendant du code applicatif absent de l'ancienne version) ; corrigé par `scripts/release/financial_fingerprint.php` (commit 62ae084), CI et déploiement verts. Garde : test_deploy_modes.
+- Étape 7 : routes de portefeuille → `app/services/portfolios.php` ; cycle PHP `secondary_metadata` ↔ `secondary_filters` supprimé ; tests de structure (fonctions uniques, require explicites, couches). Aucun formateur PHP dans le projet : formatage non touché (décision documentée).
+- Étape 8 : modules déplacés (scores_specs, scores_profiles → scoring ; universe_verdicts → explorer ; strategy_docs → admin ; conversion V3 → explorer/legacy_upgrade), nouveaux modules score_cache, ranking_support, shared/units ; réexports retirés ; `ops/deploy.sh` mis à jour (chemin de universe_verdicts, exclusion du hash moteur). Le premier déploiement recalculera donc les données dérivées (chemins du moteur changés).
+- Reste à l'étape 8 : fonctions longues.

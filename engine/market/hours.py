@@ -129,3 +129,9 @@ def price_is_stale(mic, stamp, now, expected=None, checked=None):
     if checked is not None:
         latest = max(stamp, checked if checked.tzinfo else checked.replace(tzinfo=timezone.utc))
     return (now - latest).total_seconds() > 30 * 60
+
+
+def slot_of(ts):
+    """Début (UTC naïf) du créneau de SLOT_MINUTES minutes qui contient l'horodatage Unix `ts`."""
+    t = datetime.fromtimestamp(ts, timezone.utc).replace(tzinfo=None)
+    return t.replace(minute=t.minute - t.minute % SLOT_MINUTES, second=0, microsecond=0)

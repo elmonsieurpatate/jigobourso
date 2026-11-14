@@ -9,7 +9,7 @@ import datetime
 import statistics
 from collections import defaultdict
 
-from ..admin import universe_verdicts
+from ..explorer import universe_verdicts
 from ..explorer import strategy
 from ..market_views.repository import recommendable_candidates
 from ..series.series import prepare_series

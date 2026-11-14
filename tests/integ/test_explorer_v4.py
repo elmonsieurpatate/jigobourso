@@ -7,6 +7,7 @@ from engine.analytics.admin import service
 from engine.analytics.admin import title_sheet
 from engine.analytics.explorer import strategy
 from engine.analytics.explorer import explorer_config as C
+from engine.analytics.explorer import legacy_upgrade as LU
 from tests.integ.test_api import server, world, login, Client  # noqa: F401  (fixtures)
 from tests.integ.test_tracking_cache import seed, NOW
 
@@ -57,7 +58,7 @@ def test_quoted_prices_do_not_change_last_day_closing_return(monkeypatch):
 
 
 def test_library_typed_saves_auth_and_validation(world):
-    a=login(world,'alice','alice-secret-1234');b=login(world,'bob','bob-secret-12345');cfg=C.upgrade(strategy.preset('fast'))
+    a=login(world,'alice','alice-secret-1234');b=login(world,'bob','bob-secret-12345');cfg=LU.upgrade(strategy.preset('fast'))
     assert Client(world).call('explorer/library')[0]==401
     status,res=a.call('explorer/library/save',{'kind':'strategy','name':'Ma stratégie','payload':{'config':cfg,'universe':{'q':'SHOULD_NOT_LEAK'}}})
     assert status==200,res

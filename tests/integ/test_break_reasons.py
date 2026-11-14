@@ -7,7 +7,7 @@ import pytest
 
 from engine.analytics.series import compute
 from engine.analytics.admin import service
-from engine.analytics.admin import universe_verdicts
+from engine.analytics.explorer import universe_verdicts
 from engine.analytics.explorer import strategy
 from engine.shared.db import connect
 from tests.dbutil import reset_data

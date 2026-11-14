@@ -5,7 +5,8 @@ from engine.shared.db import connect
 from engine.analytics.series.series import analyze_series
 from engine.market import hours
 from engine.market.calendar import session_dates, window_calendars
-from engine.market.collect import effective_expected_close, to_eur_factor
+from engine.market.collect import effective_expected_close
+from engine.shared.units import to_eur_factor
 
 
 def require_calculation(ok, symbol, window, field):

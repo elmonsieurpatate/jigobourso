@@ -1,4 +1,5 @@
-"""Fiche pédagogique d'un ETF : éditeur, frais, principales lignes, répartition par secteur (Yahoo quoteSummary)."""
+"""Fournisseur de la fiche d'un ETF (Yahoo quoteSummary) : lecture et extraction brute uniquement.
+La normalisation et la présentation (profile_data, région géographique) sont dans analytics/market_views/etf.py : ce module ne dépend d'aucune analyse."""
 import json
 import urllib.parse
 
@@ -13,8 +14,8 @@ def _raw(v):
     return v.get('raw') if isinstance(v, dict) else v
 
 
-def parse_profile(payload):
-    """Renvoie un dict stable pour l'interface, ou None si Yahoo ne décrit pas ce produit comme un fonds."""
+def parse_raw_profile(payload):
+    """Renvoie les champs extraits (non normalisés), ou None si Yahoo ne décrit pas ce produit comme un fonds."""
     try:
         r = payload['quoteSummary']['result'][0]
     except (KeyError, IndexError, TypeError):
@@ -40,15 +41,11 @@ def parse_profile(payload):
            'top10_weight': round(sum(h['weight'] for h in holdings), 1) if len(holdings) == 10 and all(h['weight'] is not None for h in holdings) else None,
            'stock_position': None if _raw(top.get('stockPosition')) is None else round(_raw(top['stockPosition']) * 100, 1),
            'bond_position': None if _raw(top.get('bondPosition')) is None else round(_raw(top['bondPosition']) * 100, 1)}
-    from engine.analytics.market_views.etf import profile_data
-    out = profile_data(out)
-    from engine.analytics.market_views.geography import etf_region
-    out['geography_region'] = etf_region(out.get('category'))
-    return out if any(out[k] for k in ('holdings', 'sectors', 'expense_ratio', 'family', 'total_assets', 'category')) else None
+    return out
 
 
-def fetch_profile(transport, symbol):
-    """Interroge Yahoo (crumb inclus par le transport) ; None si aucune donnée de fonds."""
+def fetch_payload(transport, symbol):
+    """Interroge Yahoo (crumb inclus par le transport) ; renvoie la réponse JSON décodée."""
     params = {'modules': MODULES}
     text = transport.get('/v10/finance/quoteSummary/' + urllib.parse.quote(symbol), params)
-    return parse_profile(json.loads(text))
+    return json.loads(text)

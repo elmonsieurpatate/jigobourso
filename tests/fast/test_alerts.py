@@ -20,7 +20,7 @@ def test_defaults_follow_the_exit_rule_study():
 
 
 def test_strategies_match_the_php_whitelist():
-    php = open(os.path.join(os.path.dirname(__file__), '..', '..', 'app', 'routes', 'portfolios.php'), encoding='utf-8').read()
+    php = open(os.path.join(os.path.dirname(__file__), '..', '..', 'app', 'services', 'portfolios.php'), encoding='utf-8').read()
     listed = re.search(r"const LOT_STRATEGIES = \[([^\]]*)\]", php).group(1)
     assert tuple(re.findall(r"'([a-z_0-9]+)'", listed)) == al.STRATEGIES == tuple(strategy.PRESETS) + ('prudent',)
 

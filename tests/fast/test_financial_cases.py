@@ -3,7 +3,7 @@ import datetime as dt
 import pytest
 from engine.analytics.series.series import analyze_series
 from engine.market import hours
-from engine.market.collect import to_eur_factor
+from engine.shared.units import to_eur_factor
 
 @pytest.mark.parametrize('unit,factor',[('GBP',1.2),('GBp',.012),('GBX',.012),('EUR',1)])
 def test_price_units(unit,factor):

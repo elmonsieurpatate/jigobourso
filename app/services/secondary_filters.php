@@ -49,7 +49,7 @@ function secondary_initialize_once(): void {
             if(!$f['editable']&&!array_key_exists('values',$defaults['filters'][$id])) $defaults['filters'][$id]['values']=secondary_all();
             unset($stored);
         }
-        secondary_metadata_migrate($definitions,$defaults);
+        secondary_metadata_migrate($definitions,$defaults,secondary_proposed());
         // Legacy category activation becomes an explicit selection, never a hidden category.
         if(($defaults['category_selection_version']??0)<1){
             $previous=[];

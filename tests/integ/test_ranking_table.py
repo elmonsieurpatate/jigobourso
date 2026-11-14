@@ -97,7 +97,7 @@ def _extra_titles(conn):
 
 
 def test_classement_and_scores_admin_rank_the_same_titles_in_the_same_order_with_the_same_notes_and_ranks():
-    from engine.analytics.admin import scores_specs
+    from engine.analytics.scoring import scores_specs
     from engine.analytics.admin import scores_ranking
     conn = connect()
     reset_data(conn)

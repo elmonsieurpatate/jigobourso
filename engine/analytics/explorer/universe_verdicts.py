@@ -2,15 +2,14 @@
 import datetime
 import hashlib
 import json
-import zlib
-import base64
 from collections import defaultdict
 from engine.market import hours
 from engine.market.calendar import window_calendars, session_dates
-from ..explorer import strategy
-from ..explorer import explorer_config
-from ..explorer import explorer_metrics
+from . import strategy
+from . import explorer_config
+from . import explorer_metrics
 from ..series import liquidity
+from ..scoring.score_cache import packed, unpacked
 from ..series.series import analyze_series
 from ..market_views.market_facts import expected_close
 
@@ -169,16 +168,6 @@ def data_version(conn):
         j = cur.fetchone()['j']
     clock = hashlib.sha1(','.join(hours.expected_last_close(m, hours.utcnow()) for m in sorted(hours.HOURS)).encode()).hexdigest()[:12]
     return f"{clock}.{CACHE_FORMAT}.{strategy.VERSION}|{a['t']}|{a['n']}|{j}"
-
-
-def packed(payload):
-    text=json.dumps(payload,separators=(',',':'))
-    return json.dumps({'compressed':base64.b64encode(zlib.compress(text.encode())).decode()})
-
-
-def unpacked(payload):
-    data=json.loads(payload)
-    return json.loads(zlib.decompress(base64.b64decode(data['compressed']))) if isinstance(data,dict) and 'compressed' in data else data
 
 
 def compact_parts(v):

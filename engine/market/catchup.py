@@ -167,8 +167,7 @@ def plan_intraday(conn, now):
             t = _plan_mic(conn, led, mic, aware, now, horizon, _rows(conn, mic))
         except Exception as e:                                             # noqa: BLE001
             conn.rollback()
-            from engine.jobs import schedule                                # import tardif : schedule importe ce module
-            schedule.record_error(conn, aware, f'rattrapage:{mic}', e)
+            settings.record_cron_error(conn, aware, f'rattrapage:{mic}', e)
             continue
         if t:
             tasks.append(t)

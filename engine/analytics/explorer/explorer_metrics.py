@@ -10,7 +10,7 @@ from bisect import bisect_right
 from collections import defaultdict
 from ..series.series import prepare_series
 from engine.market.calendar import window_calendars
-from engine.market.collect import to_eur_factor
+from engine.shared.units import to_eur_factor
 
 
 def path_metrics(prices,volumes=None,turnovers=None):

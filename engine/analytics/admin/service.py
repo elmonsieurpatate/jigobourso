@@ -8,16 +8,18 @@ from collections import Counter, defaultdict
 from engine.catalogue.rules import MARKETS
 from engine.shared import settings as settings_mod
 from engine.market import hours
-from engine.market.collect import latest_rates, to_eur_factor
+from engine.market.collect import latest_rates
+from engine.shared.units import to_eur_factor
 from engine.market.calendar import window_calendars
 from ..series import signals
 from ..explorer import strategy
 from ..explorer import explorer_config
-from ..scoring import score_service
+from ..scoring import score_service, scores_profiles
 from ..market_views import geography
 from ..series.series import prepare_series
 from ..market_views.market_facts import analyst_view, expected_close, last_collection, pea_status, size_key
-from .universe_verdicts import cached_verdicts, compact_parts, data_version, expanded_parts, judge_universe
+from ..shared.numbers import downsample
+from ..explorer.universe_verdicts import cached_verdicts, compact_parts, data_version, expanded_parts, judge_universe
 
 STATUS_LABELS = {'retained': 'Retenu', 'rejected': 'Écarté', 'unknown': 'Non évaluable', 'excluded': 'Exclu'}
 
@@ -241,7 +243,7 @@ def score_view(entry, detail):
 
 
 def explore(conn, request):
-    config = score_service.apply_admin(conn, request_config(request))
+    config = scores_profiles.apply_admin(conn, request_config(request))
     view = request.get('view') or {}
     export = bool(view.get('export'))
     page, size = max(1, int(view.get('page', 1))), min(100, max(1, int(view.get('page_size', 24))))
@@ -433,14 +435,6 @@ def _search_excluded(conn, query, kind, market):
              'price_source': r['price_source'], 'status': 'excluded' if r['status'] == 'excluded' else 'unknown',
              'status_label': 'Exclu' if r['status'] == 'excluded' else 'En attente d’analyse', 'excluded_reason': r['excluded_reason'], 'score': None, 'rank': None,
              'quality': None, 'measures': {}, 'reasons': []} for r in rows]
-
-
-def downsample(values, points):
-    """Au plus `points` valeurs réparties régulièrement, première et dernière comprises (la forme de la courbe est conservée)."""
-    if len(values) <= points:
-        return list(values)
-    last = len(values) - 1
-    return [values[round(i * last / (points - 1))] for i in range(points)]
 
 
 def _attach_curves(conn, rows, sessions=63, points=66):

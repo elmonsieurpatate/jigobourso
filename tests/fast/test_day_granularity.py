@@ -12,8 +12,8 @@ from engine.analytics.explorer import explorer_config as C
 from engine.analytics.scoring import score_service as S
 from engine.analytics.scoring import scores as SC
 from engine.analytics.admin import scores_admin as A
-from engine.analytics.admin import scores_profiles
-from engine.analytics.admin import scores_specs
+from engine.analytics.scoring import scores_profiles
+from engine.analytics.scoring import scores_specs
 from engine.analytics.series.measures import dated_technical_state
 from engine.market import hours
 from engine.market.calendar import session_dates

@@ -1,5 +1,6 @@
 """Calcul nocturne : mesures par fenêtre (strategy_metrics) et état de série (series_state) pour chaque cotation suivie."""
 import datetime
+from engine.shared import units
 import json
 
 from .loader import load_splits
@@ -82,7 +83,7 @@ def compute_all(conn, now, batch=400):
                          score_rows=score_rows, previous_windows=prev_by_mic.get(mics[lid]))
             q = quotes.get(lid) or {}
             cur_code = q.get('currency') or listing_currency.get(lid)
-            factor = collect.to_eur_factor(cur_code, rates)
+            factor = units.to_eur_factor(cur_code, rates)
             last20 = [(c, v) for _d, c, v in volumes.get(lid, [])][-liq.WINDOW:]
             info = liq.liquidity(last20, float(q['price']) if q.get('price') is not None else None, q.get('avg_volume_3m'), factor)
             liquidity_rows.append((lid, None if info['turnover_eur'] is None else round(info['turnover_eur'], 2), info['days'] if info['source'] == 'daily' else None, info['source'], stamp))

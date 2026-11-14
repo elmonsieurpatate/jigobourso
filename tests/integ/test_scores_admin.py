@@ -7,7 +7,7 @@ import pytest
 from engine.analytics.series import compute
 from engine.analytics.admin import scores_admin as A
 from engine.analytics.admin import scores_ranking
-from engine.analytics.admin import scores_profiles
+from engine.analytics.scoring import scores_profiles
 from engine.shared.db import connect
 from tests.dbutil import reset_data
 
@@ -69,7 +69,7 @@ def test_simulation_monitor_and_profiles_use_real_data_and_stay_independent_of_c
 
 
 def test_general_ranking_rates_every_evaluable_title_and_filters_remove_none():
-    from engine.analytics.admin import universe_verdicts
+    from engine.analytics.explorer import universe_verdicts
     conn = connect()
     reset_data(conn)
     seed(conn)
@@ -114,7 +114,7 @@ def test_per_strategy_normalisations_persist_change_only_their_strategy_and_the_
     conn = connect()
     reset_data(conn)
     seed(conn)
-    from engine.analytics.admin import universe_verdicts
+    from engine.analytics.explorer import universe_verdicts
     ver = universe_verdicts.data_version(conn)
     before = {n: {e['id']: (e['simple'], e['complex']) for e in S.score_book(conn, scores_profiles.build_config(conn, n), ver).values()} for n in ('growth_v4', 'rebound')}
     key_before = S._key(scores_profiles.build_config(conn, 'rebound'), ver)
@@ -138,7 +138,7 @@ def test_per_strategy_normalisations_persist_change_only_their_strategy_and_the_
 
 def test_stored_profile_without_new_fields_is_still_valid_and_momentum_strategies_use_series_state():
     from engine.analytics.scoring import score_service as S
-    from engine.analytics.admin import universe_verdicts
+    from engine.analytics.explorer import universe_verdicts
     conn = connect()
     reset_data(conn)
     seed(conn)
