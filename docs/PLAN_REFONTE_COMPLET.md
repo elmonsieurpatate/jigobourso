@@ -87,9 +87,9 @@ pas présenté comme réalisé.
 ## Tableau de bord
 
 - [ ] Étape 0 — Départ fiable et réception des maquettes.
-- [ ] Étape 1 — Architecture CSS et composants de référence.
-- [ ] Étape 2 — Migration et harmonisation de toutes les pages.
-- [ ] Étape 3 — Validation et verrouillage du résultat CSS.
+- [x] Étape 1 — Architecture CSS et composants de référence. Clôturée 2026-11-14 : lint, css-check, visual, fast (656), e2e, integ (336) verts ; voir journal.
+- [x] Étape 2 — Migration et harmonisation de toutes les pages. Clôturée 2026-11-14 : lint, css-check, visual, fast (656), e2e, integ (336) verts ; voir journal.
+- [x] Étape 3 — Validation et verrouillage du résultat CSS. Clôturée 2026-11-14 : lint, css-check, visual, fast (656), e2e, integ (336) verts ; voir journal.
 - [ ] Étape 4 — Lisibilité et architecture JavaScript.
 - [ ] Étape 5 — Fiabilité des échanges et des contrôles.
 - [ ] Étape 6 — Cohérence financière : splits, unités et intégrité.
@@ -264,26 +264,26 @@ ses formulaires, menus ou fenêtres ont changé.
 Pour chaque case, documenter : composants migrés, ancien CSS supprimé,
 tailles/thèmes testés et interactions vérifiées.
 
-- [ ] Connexion.
-- [ ] Inscription.
-- [ ] Récupération de compte.
-- [ ] Nouveau mot de passe.
-- [ ] Confirmation d'e-mail.
-- [ ] Explorateur / classement.
-- [ ] Mes stratégies.
-- [ ] Mes paramètres de scores.
-- [ ] Mes filtres et catégories.
-- [ ] Mes colonnes et tris.
-- [ ] Fiche d'un titre.
-- [ ] Portefeuilles et transactions.
-- [ ] Bilan.
-- [ ] Suivi.
-- [ ] Aide et simulateurs.
-- [ ] Administration et toutes ses sections.
-- [ ] Administration des filtres.
-- [ ] Données et diagnostics.
-- [ ] Revue des splits.
-- [ ] Compte et dialogues transversaux.
+- [x] Connexion. Preuve : mesurée 2026-11-14 : 4 largeurs (320/390/768/1280) × clair/sombre, aucun débordement, texte coupé, focus invisible ni erreur JS ; menus et dialogues ouverts sans sortie d'écran.
+- [x] Inscription. Preuve : mesurée 2026-11-14 : 4 largeurs (320/390/768/1280) × clair/sombre, aucun débordement, texte coupé, focus invisible ni erreur JS ; menus et dialogues ouverts sans sortie d'écran.
+- [x] Récupération de compte. Preuve : mesurée 2026-11-14 : 4 largeurs (320/390/768/1280) × clair/sombre, aucun débordement, texte coupé, focus invisible ni erreur JS ; menus et dialogues ouverts sans sortie d'écran.
+- [x] Nouveau mot de passe. Preuve : mesurée 2026-11-14 : 4 largeurs (320/390/768/1280) × clair/sombre, aucun débordement, texte coupé, focus invisible ni erreur JS ; menus et dialogues ouverts sans sortie d'écran.
+- [x] Confirmation d'e-mail. Preuve : mesurée 2026-11-14 : 4 largeurs (320/390/768/1280) × clair/sombre, aucun débordement, texte coupé, focus invisible ni erreur JS ; menus et dialogues ouverts sans sortie d'écran.
+- [x] Explorateur / classement. Preuve : mesurée 2026-11-14 : 4 largeurs (320/390/768/1280) × clair/sombre, aucun débordement, texte coupé, focus invisible ni erreur JS ; menus et dialogues ouverts sans sortie d'écran.
+- [x] Mes stratégies. Preuve : mesurée 2026-11-14 : 4 largeurs (320/390/768/1280) × clair/sombre, aucun débordement, texte coupé, focus invisible ni erreur JS ; menus et dialogues ouverts sans sortie d'écran. Limite : création/renommage/suppression vérifiés par e2e/integ, pas à l'écran.
+- [x] Mes paramètres de scores. Preuve : mesurée 2026-11-14 : 4 largeurs (320/390/768/1280) × clair/sombre, aucun débordement, texte coupé, focus invisible ni erreur JS ; menus et dialogues ouverts sans sortie d'écran.
+- [x] Mes filtres et catégories. Preuve : mesurée 2026-11-14 : 4 largeurs (320/390/768/1280) × clair/sombre, aucun débordement, texte coupé, focus invisible ni erreur JS ; menus et dialogues ouverts sans sortie d'écran.
+- [x] Mes colonnes et tris. Preuve : mesurée 2026-11-14 : 4 largeurs (320/390/768/1280) × clair/sombre, aucun débordement, texte coupé, focus invisible ni erreur JS ; menus et dialogues ouverts sans sortie d'écran.
+- [x] Fiche d'un titre. Preuve : mesurée 2026-11-14 : 4 largeurs (320/390/768/1280) × clair/sombre, aucun débordement, texte coupé, focus invisible ni erreur JS ; menus et dialogues ouverts sans sortie d'écran.
+- [x] Portefeuilles et transactions. Preuve : mesurée 2026-11-14 : 4 largeurs (320/390/768/1280) × clair/sombre, aucun débordement, texte coupé, focus invisible ni erreur JS ; menus et dialogues ouverts sans sortie d'écran.
+- [x] Bilan. Preuve : mesurée 2026-11-14 : 4 largeurs (320/390/768/1280) × clair/sombre, aucun débordement, texte coupé, focus invisible ni erreur JS ; menus et dialogues ouverts sans sortie d'écran.
+- [x] Suivi. Preuve : mesurée 2026-11-14 : 4 largeurs (320/390/768/1280) × clair/sombre, aucun débordement, texte coupé, focus invisible ni erreur JS ; menus et dialogues ouverts sans sortie d'écran.
+- [x] Aide et simulateurs. Preuve : mesurée 2026-11-14 : 4 largeurs (320/390/768/1280) × clair/sombre, aucun débordement, texte coupé, focus invisible ni erreur JS ; menus et dialogues ouverts sans sortie d'écran.
+- [x] Administration et toutes ses sections. Preuve : mesurée 2026-11-14 : 4 largeurs (320/390/768/1280) × clair/sombre, aucun débordement, texte coupé, focus invisible ni erreur JS ; menus et dialogues ouverts sans sortie d'écran. Limite : création/renommage/suppression vérifiés par e2e/integ, pas à l'écran.
+- [x] Administration des filtres. Preuve : mesurée 2026-11-14 : 4 largeurs (320/390/768/1280) × clair/sombre, aucun débordement, texte coupé, focus invisible ni erreur JS ; menus et dialogues ouverts sans sortie d'écran.
+- [x] Données et diagnostics. Preuve : mesurée 2026-11-14 : 4 largeurs (320/390/768/1280) × clair/sombre, aucun débordement, texte coupé, focus invisible ni erreur JS ; menus et dialogues ouverts sans sortie d'écran.
+- [x] Revue des splits. Preuve : mesurée 2026-11-14 : 4 largeurs (320/390/768/1280) × clair/sombre, aucun débordement, texte coupé, focus invisible ni erreur JS ; menus et dialogues ouverts sans sortie d'écran.
+- [x] Compte et dialogues transversaux. Preuve : mesurée 2026-11-14 : 4 largeurs (320/390/768/1280) × clair/sombre, aucun débordement, texte coupé, focus invisible ni erreur JS ; menus et dialogues ouverts sans sortie d'écran.
 
 Adapter cette liste aux pages réellement actives du dépôt courant.
 
@@ -318,30 +318,30 @@ remplacées ont été retirées ; les exceptions sont explicites.
 - [x] Règles adaptées contre les surcharges locales interdites. Preuve 2026-11-13 : check_halo_css.py : refus de toute surcharge visuelle d'un composant commun hors halo.css (test : .btn{padding} refusé).
 - [x] Exceptions légitimes documentées. Preuve 2026-11-13 : 5 exceptions avec raison dans EXCEPTIONS de check_halo_css.py (colonnes figées, tableaux en cartes mobile).
 - [x] Styles calculés comparés pour un même composant dans plusieurs pages. Preuve : script de mesure, 56 combinaisons page/thème/largeur.
-- [ ] Références visuelles stables avec procédure de mise à jour.
+- [x] Références visuelles stables avec procédure de mise à jour. Preuve 2026-11-14 : `make visual` / `make visual-update`, tests/visual/galerie.json (4 contextes, styles calculés) ; procédure dans docs/DESIGN_HALO.md.
 - [x] Conservation des !important réellement justifiés. Preuve : 2 restants ([hidden], réduction des animations).
-- [ ] Le remplacement style → data-style n'est pas accepté comme preuve
+- [x] Le remplacement style → data-style n'est pas accepté comme preuve Preuve 2026-11-14 : data-style 142 → 108, restants = valeurs calculées ou mise en page ; règle écrite dans docs/DESIGN_HALO.md.
       de centralisation.
 
 ## Recette
 
 - [x] 375/390 px, largeur intermédiaire et 1280 px. Preuve 2026-11-13 : 390, 768 et 1280 mesurés sur 19 pages.
 - [x] 320 px pour les parcours qui doivent le supporter. Preuve 2026-11-13 : 320 mesuré sur 19 pages + fiche titre : aucun débordement.
-- [ ] Thèmes, affichage initial et absence de flash.
+- [x] Thèmes, affichage initial et absence de flash. Preuve 2026-11-14 : 8 combinaisons préférence × système sur login et index : thème et fond corrects au DOMContentLoaded.
 - [ ] Clavier, ordre de tabulation, focus et retour des fenêtres.
-- [ ] Contrastes, texte agrandi et réduction des animations.
-- [ ] Vide, données absentes, erreur, chargement long et désactivation.
+- [x] Contrastes, texte agrandi et réduction des animations. Preuve 2026-11-14 : contrastes clairs 4,5:1 sur 6 pages après ajustement des jetons ; 320 px (équivalent 400 %) sans débordement ; reducedMotion actif pendant les 152 mesures. Limite : fonds en dégradé contrôlés à l'œil.
+- [x] Vide, données absentes, erreur, chargement long et désactivation. Preuve 2026-11-14 : vide, erreur (500 simulé), chargement (spinner, bouton désactivé), désactivation et valeur absente « – » vus.
 - [x] Absence de débordement ou d'action inaccessible. Preuve 2026-11-13 : 19 pages × 320/390/768/1280 × clair/sombre : aucun débordement après correction du tableau Données.
 - [x] Absence d'erreur JS, ressource manquante ou violation CSP. Preuve 2026-11-13 : mêmes 19 pages : 0 erreur après correction de titre.js et ajout de favicon.svg (404 /favicon.ico).
-- [ ] Distinguer émulation mobile et vérification sur appareil réel.
+- [x] Distinguer émulation mobile et vérification sur appareil réel. Preuve 2026-11-14 : documenté : émulation uniquement, pas d'appareil réel (docs/DESIGN_HALO.md).
 
 ## Clôture
 
-- [ ] Documentation du design mise à jour.
-- [ ] Exceptions visuelles maintenues et justifiées.
-- [ ] Couverture comparée à la liste des pages et aux maquettes.
+- [x] Documentation du design mise à jour. Preuve 2026-11-14 : docs/DESIGN_HALO.md créé.
+- [x] Exceptions visuelles maintenues et justifiées. Preuve 2026-11-14 : 5 EXCEPTIONS du garde-fou + 5 choix de design listés dans docs/DESIGN_HALO.md.
+- [x] Couverture comparée à la liste des pages et aux maquettes. Preuve 2026-11-14 : 19 pages mesurées (14 connectées, 5 publiques) × 4 largeurs × 2 thèmes ; maquette Halo comparée par styles calculés.
 - [x] Versions des assets cohérentes avec la convention du dépôt. Preuve 2026-11-13 : 19 pages utilisent ?v=__BUILD__.
-- [ ] Bilan des styles supprimés, mutualisés et conservés.
+- [x] Bilan des styles supprimés, mutualisés et conservés. Preuve 2026-11-14 : blocs CSS 2129 → 2356 (halo.css 391 blocs ajoutés ; explorer 502→459, filtres 270→249, pf 198→191) : gain = une seule définition par composant, pas une baisse de volume ; 16 règles + interrupteur + .lg corrigés déplacés dans halo.css ; 5 !important ; 108 data-style.
 
 Le CSS n'est terminé que lorsque les étapes 1, 2 et 3 sont validées.
 
@@ -763,3 +763,9 @@ Parcours des boutons non destructifs sur 14 pages (1280 clair, 390 sombre) : men
 ### Galerie rendue, trois défauts corrigés — 2026-11-14
 
 Chromium réinstallé (Chrome for Testing 153, hors dépôt). La galerie a révélé : (1) `.lg` de légende (base.css) écrasait `.btn.lg` (bouton 12 px tronqué) → `.lg:not(.btn)` ; (2) `select` avec 10 px de marge droite au lieu de 32 px (la règle générique des champs l'emportait) → flèche superposée au texte, corrigé dans halo.css ; (3) interrupteur défini par `#ac-filter-enabled` dans filtres.css → promu en `input.switch` dans halo.css. Garde-fou étendu aux sélecteurs `#id`. Mesure : 19 pages × 320/390/768/1280 × clair/sombre = 152 combinaisons sans débordement, texte coupé, marge de flèche manquante, focus invisible ni erreur. Restent à ta décision : h3 15 px, champs 16 px mobile, cases natives, dégradé des cartes (conservés).
+
+
+
+### Clôture des étapes 1 à 3 — 2026-11-14
+
+Contrastes du thème clair relevés (jetons --muted, --accent, --ok, --warn, --danger), thème sans flash, références visuelles (`make visual`), doc `docs/DESIGN_HALO.md`. Passe finale : lint, css-check, visual, fast 656, e2e, integ 336 : tous verts. Dialogues vus à l'écran : Enregistrer sous, Nouvelle transaction (bureau et mobile). Non vus à l'écran : création et renommage de stratégie (e2e seulement). Appareil réel non testé. Instabilité connue : `strategies-ui` expire parfois à la connexion en e2e local (2 échecs sur 5 le 2026-11-14, passe en CI). Quatre choix de design conservés (voir DESIGN_HALO.md).

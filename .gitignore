@@ -14,3 +14,4 @@ cron.key
 node_modules/
 audit-results/
 rsync-deploy.log
+tests/visual/out/
