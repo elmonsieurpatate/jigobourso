@@ -100,10 +100,10 @@ def test_pure_calculation_modules_use_neither_database_nor_network_nor_admin():
 
 
 def test_no_function_grows_beyond_the_current_ceiling():
-    """Plafond de longueur des fonctions (lignes) : les plus longues existent encore (history.build, admin.explore…), aucune nouvelle ne doit les dépasser."""
+    """Plafond de longueur des fonctions (lignes) : les plus longues font environ 100 lignes (strategy.rank, history.build, etf.build) ; aucune fonction ne doit dépasser 105."""
     longest = []
     for name, path in MODS.items():
         for node in ast.walk(ast.parse(open(path, encoding='utf-8').read())):
             if isinstance(node, ast.FunctionDef):
                 longest.append((node.end_lineno - node.lineno + 1, name, node.name))
-    assert max(longest)[0] <= 140, sorted(longest, reverse=True)[:3]
+    assert max(longest)[0] <= 105, sorted(longest, reverse=True)[:3]

@@ -94,7 +94,7 @@ pas présenté comme réalisé.
 - [x] Étape 5 — Fiabilité des échanges et des contrôles.
 - [x] Étape 6 — Cohérence financière : splits, unités et intégrité.
 - [x] Étape 7 — Architecture et cas d'usage PHP. Clôturée 2026-11-14 : lint, js-check, css-check, visual, fast (691), e2e, integ (346) verts ; voir journal.
-- [ ] Étape 8 — Architecture et dépendances Python. Quasi close 2026-11-14 : cycles supprimés, couches verrouillées ; reste le découpage des fonctions longues ; voir journal.
+- [x] Étape 8 — Architecture et dépendances Python. Clôturée 2026-11-14 : cycles supprimés, couches verrouillées, fonctions longues découpées ; voir journal.
 - [x] Étape 9 — Données, migrations et accès SQL. Clôturée 2026-11-14 : lint, js-check, css-check, visual, fast (692), e2e, integ (349) verts ; docs/DATA_CONTRACT.md.
 - [x] Étape 10 — Performance et observabilité. Clôturée 2026-11-14 : lint, js-check, css-check, visual, fast (697), e2e, integ (350) verts ; docs/PERFORMANCE.md (données synthétiques, limites indiquées).
 - [ ] Étape 11 — Installation, CI, livraison et restauration.
@@ -490,7 +490,7 @@ Constat : F11.
 - [x] Clarifier collecte ↔ intraday.
 - [x] Clarifier planification ↔ rattrapage.
 - [x] Clarifier configuration des stratégies ↔ calcul des scores.
-- [ ] Extraire les fonctions longues selon leurs responsabilités. (Reste : history.build 136 lignes, admin.explore 127 ; plafond de 140 lignes verrouillé par test.)
+- [x] Extraire les fonctions longues selon leurs responsabilités. (2026-11-14 : history.build 136 → 99 lignes, admin.explore 127 → 79 ; aucune fonction du moteur au-delà de 101 lignes, plafond de 105 verrouillé par test ; code mort retiré : collected_rows, score_categories.select, exclusion_reason.)
 - [x] Garder les calculs purs indépendants de la base, du réseau et de l'admin.
 - [x] Mutualiser les règles communes sans confondre des sémantiques différentes.
 - [x] Mettre à jour imports, CLI, tâches, scripts et tests.
@@ -567,19 +567,19 @@ Clôture : installation, activation et restauration reproductibles et cohérente
 
 # Étape 12 — Recette finale et suppression des anciennes couches
 
-- [ ] Vérifier les parcours de bout en bout sur une base locale représentative.
-- [ ] Rejouer les suites rapides, intégration, navigateur et release pertinentes.
-- [ ] Refaire la recette visuelle après les derniers changements de code.
-- [ ] Vérifier les cas financiers et permissions multi-utilisateurs.
-- [ ] Supprimer les anciennes fonctions, règles, classes et fichiers remplacés.
-- [ ] Vérifier références dynamiques, imports et compatibilités avant suppression.
-- [ ] Retirer les adaptateurs transitoires devenus inutiles.
-- [ ] Documenter les exceptions restantes et leur raison.
-- [ ] Mettre à jour README, architecture, design, conventions et commandes.
-- [ ] Indiquer les limites de couverture : navigateurs, appareils, données,
+- [x] Vérifier les parcours de bout en bout sur une base locale représentative. (e2e sur base jetable synthétique, 2026-11-14)
+- [x] Rejouer les suites rapides, intégration, navigateur et release pertinentes. (fast 706, integ 350, e2e, release-check, visual ; voir docs/RECETTE_FINALE.md)
+- [ ] Refaire la recette visuelle après les derniers changements de code. (galerie automatisée OK ; recette manuelle des pages réelles non refaite)
+- [x] Vérifier les cas financiers et permissions multi-utilisateurs. (test_financial_parity, test_account, account-navigation)
+- [x] Supprimer les anciennes fonctions, règles, classes et fichiers remplacés. (collected_rows, select, exclusion_reason retirés ; reste documenté)
+- [x] Vérifier références dynamiques, imports et compatibilités avant suppression. (recherche sur engine, app, scripts, ops, tests ; tests verts)
+- [x] Retirer les adaptateurs transitoires devenus inutiles. (exclusion_reason retiré ; legacy_upgrade conservé (configurations V3 en base))
+- [x] Documenter les exceptions restantes et leur raison. (docs/RECETTE_FINALE.md)
+- [ ] Mettre à jour README, architecture, design, conventions et commandes. (README et docs de livraison faits ; documents de design non relus)
+- [x] Indiquer les limites de couverture : navigateurs, appareils, données, (docs/RECETTE_FINALE.md)
       volumes et hébergement non testés.
 - [ ] Revoir chaque case cochée et sa preuve.
-- [ ] Fournir une synthèse : conservé, remplacé, supprimé, vérifié, différé.
+- [x] Fournir une synthèse : conservé, remplacé, supprimé, vérifié, différé. (docs/RECETTE_FINALE.md)
 
 Terminé signifie : une architecture comprise et vérifiée, des composants
 réellement partagés, et une seule implémentation maintenue des règles communes.

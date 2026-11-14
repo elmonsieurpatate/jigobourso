@@ -61,13 +61,8 @@ class _Carry:
         return self.last
 
 
-def build(transactions, bars, splits, unit, fx, meta, today=None, bars15=None):
-    """Calcul pur (testable sans base). transactions : lignes du registre (trade_at, side, quantity, unit_price, fx_to_eur, fees, listing_id, symbol, name, currency)."""
-    today = (today or datetime.date.today()).isoformat()
-    txs = sorted(transactions, key=lambda t: (str(t['trade_at']), int(t.get('id') or 0)))
-    if not txs:
-        return {'dates': [], 'value': [], 'net_in': [], 'gain': [], 'purchases': [], 'unpriced': [], 'lines': [], 'trades': [], 'notes': [], 'intraday': {'t': [], 'value': []}, 'performance': performance.linked([],[],[])}
-    notes = []
+def _split_adjusted_series(txs, bars, splits):
+    """Par titre détenu : clôtures ajustées des splits [(jour, cours)] et splits appliqués."""
     series, applied = {}, {}
     for lid in {int(t['listing_id']) for t in txs if t.get('listing_id')}:
         b = bars.get(lid, [])
@@ -75,11 +70,11 @@ def build(transactions, bars, splits, unit, fx, meta, today=None, bars15=None):
         dates, closes, _, _ = prepare_series(b, ev)
         series[lid] = list(zip(dates, closes))
         applied[lid] = applied_splits(b, ev)
-    first = str(txs[0]['trade_at'])[:10]
-    calendar = sorted({d for lid in series for d, _ in series[lid] if first <= d <= today} | {str(t['trade_at'])[:10] for t in txs})
-    if calendar and calendar[-1] < today and series:
-        calendar.append(today)
-    # Dernier point : le dernier cours connu (cotation du jour) quand il est plus récent que la dernière clôture, comme la valeur affichée en haut de page.
+    return series, applied
+
+
+def _append_live_quotes(series, meta, today):
+    """Ajoute le dernier cours connu (cotation du jour) quand il est plus récent que la clôture ; renvoie {titre : jour du cours}."""
     quote_observed = {}
     for lid in series:
         m = meta.get(lid) or {}
@@ -88,6 +83,53 @@ def build(transactions, bars, splits, unit, fx, meta, today=None, bars15=None):
         if live and day_live and (not series[lid] or day_live >= series[lid][-1][0]) and day_live <= today:
             series[lid].append((today, live))
             quote_observed[lid] = day_live
+    return quote_observed
+
+
+def _value_day(day, today, lines, holdings, closes, rates, unit, to_eur, quote_observed):
+    """Valorise chaque ligne au jour donné (ajoute un point à ses séries) ; renvoie (total EUR, lignes sans valeur, cours ou change périmé ?)."""
+    total, unpriced = 0.0, 0
+    stale_today = False
+    for key, line in lines.items():
+        q = holdings.get(key, 0.0)
+        v = 0.0
+        if q > 1e-12:
+            c = closes[key].at(day) if isinstance(key, int) and key in closes else None
+            f = to_eur(key, day) if c is not None else None
+            v = q * c * f if c is not None and f is not None else None
+            observed = closes[key].last_day if isinstance(key,int) and key in closes else None
+            if observed == today and key in quote_observed: observed = quote_observed[key]
+            if observed and (datetime.date.fromisoformat(day)-datetime.date.fromisoformat(observed)).days>7:
+                stale_today = True
+            currency = (unit.get(key) or 'EUR')
+            base = split_unit(currency)[0]
+            if base != 'EUR' and base in rates and rates[base].last_day and (datetime.date.fromisoformat(day)-datetime.date.fromisoformat(rates[base].last_day)).days>7:
+                stale_today = True
+        line['quantities'].append(q)
+        line['values'].append(None if v is None else round(v, 2))
+        line['purchases'].append(round(line['_purchases'], 2))
+        line['net_in'].append(round(line['_in'], 2))
+        if v is None:
+            unpriced += 1
+        else:
+            total += v
+    return total, unpriced, stale_today
+
+
+def build(transactions, bars, splits, unit, fx, meta, today=None, bars15=None):
+    """Calcul pur (testable sans base). transactions : lignes du registre (trade_at, side, quantity, unit_price, fx_to_eur, fees, listing_id, symbol, name, currency)."""
+    today = (today or datetime.date.today()).isoformat()
+    txs = sorted(transactions, key=lambda t: (str(t['trade_at']), int(t.get('id') or 0)))
+    if not txs:
+        return {'dates': [], 'value': [], 'net_in': [], 'gain': [], 'purchases': [], 'unpriced': [], 'lines': [], 'trades': [], 'notes': [], 'intraday': {'t': [], 'value': []}, 'performance': performance.linked([],[],[])}
+    notes = []
+    series, applied = _split_adjusted_series(txs, bars, splits)
+    first = str(txs[0]['trade_at'])[:10]
+    calendar = sorted({d for lid in series for d, _ in series[lid] if first <= d <= today} | {str(t['trade_at'])[:10] for t in txs})
+    if calendar and calendar[-1] < today and series:
+        calendar.append(today)
+    # Dernier point : le dernier cours connu (cotation du jour) quand il est plus récent que la dernière clôture, comme la valeur affichée en haut de page.
+    quote_observed = _append_live_quotes(series, meta, today)
     closes = {lid: _Carry(series[lid]) for lid in series}
     rates = {c: _Carry(v) for c, v in fx.items()}
 
@@ -140,31 +182,7 @@ def build(transactions, bars, splits, unit, fx, meta, today=None, bars15=None):
             trades.append({'id': t.get('id'), 'key': str(key), 'date': str(t['trade_at'])[:10], 'trade_at': str(t['trade_at']), 'side': t['side'], 'symbol': t['symbol'],
                            'quantity': qty, 'unit_price': price, 'currency': t.get('currency'), 'fees_eur': fees, 'fx_to_eur': rate,
                            'first_buy': t['side'] == 'buy' and not any(x.get('key') == str(key) and x['side'] == 'buy' for x in trades)})
-        total, unpriced = 0.0, 0
-        stale_today = False
-        for key, line in lines.items():
-            q = holdings.get(key, 0.0)
-            v = 0.0
-            if q > 1e-12:
-                c = closes[key].at(day) if isinstance(key, int) and key in closes else None
-                f = to_eur(key, day) if c is not None else None
-                v = q * c * f if c is not None and f is not None else None
-                observed = closes[key].last_day if isinstance(key,int) and key in closes else None
-                if observed == today and key in quote_observed: observed = quote_observed[key]
-                if observed and (datetime.date.fromisoformat(day)-datetime.date.fromisoformat(observed)).days>7:
-                    stale_today = True
-                currency = (unit.get(key) or 'EUR')
-                base = split_unit(currency)[0]
-                if base != 'EUR' and base in rates and rates[base].last_day and (datetime.date.fromisoformat(day)-datetime.date.fromisoformat(rates[base].last_day)).days>7:
-                    stale_today = True
-            line['quantities'].append(q)
-            line['values'].append(None if v is None else round(v, 2))
-            line['purchases'].append(round(line['_purchases'], 2))
-            line['net_in'].append(round(line['_in'], 2))
-            if v is None:
-                unpriced += 1
-            else:
-                total += v
+        total, unpriced, stale_today = _value_day(day, today, lines, holdings, closes, rates, unit, to_eur, quote_observed)
         # titres apparus après le début : leurs valeurs antérieures valent 0
         for line in lines.values():
             if len(line['values']) < len(out['dates']) + 1:

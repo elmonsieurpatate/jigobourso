@@ -242,6 +242,72 @@ def score_view(entry, detail):
     return dict(out, simple=detail['simple'], complex=detail['complex'], weights=detail['weights'], periods=detail['periods'], missing=detail['missing'], liquidity=detail['liquidity'])
 
 
+def _ordered(rows, aux, config, status, sort, desc):
+    """Classe les lignes selon le tri demandé ; renvoie (lignes, tri par proximité ?)."""
+    proximity_order = status == 'rejected' and (sort == 'proximity' or sort == 'rank' and not score_service.is_scores_mode(config))
+    if proximity_order:
+        rows = sorted(rows,key=lambda e: (*(e.get('proximity') or [999,999,float('inf')]), e['symbol']))
+    elif sort in SORT_KEYS:
+        key = SORT_KEYS[sort]
+        have = [e for e in rows if key(e, aux.get(e['id'], {})) is not None]
+        none = [e for e in rows if key(e, aux.get(e['id'], {})) is None]
+        have.sort(key=lambda e: (key(e, aux.get(e['id'], {})), e['symbol']), reverse=desc)
+        rows = have + none
+    else:   # rang : retenus par rang, puis écartés, puis non évaluables ; actions avant ETF
+        order = {'retained': 0, 'rejected': 1, 'unknown': 2}
+        rows.sort(key=lambda e: (order[e['status']], e['group'] == 'etf', e['rank'] or 10 ** 9, e['symbol']), reverse=desc)
+    return rows, proximity_order
+
+
+def _etf_page_context(conn, rows, page_rows, excluded_hits):
+    """Concentration des dix premiers ETF de la vue, nature des fonds et groupes de la page : (concentration, natures, groupe par id, détail de groupe par id)."""
+    from ..market_views import etf
+    etf_top = [e['id'] for e in rows if e.get('group') == 'etf'][:10]          # dix premiers ETF de la vue, avant pagination, dans l'ordre déjà déterminé
+    etf_concentration = etf.concentration(conn, etf_top)
+    page_etf = [e['id'] for e in page_rows if e not in excluded_hits and e.get('group') == 'etf']
+    fund_natures = {}
+    if page_etf:
+        with conn.cursor() as cur:
+            cur.execute("SELECT listing_id,data_json FROM etf_profiles WHERE state='ok' AND listing_id IN (%s)" % ','.join(['%s'] * len(page_etf)), page_etf)
+            for profile in cur.fetchall():
+                data = etf.decode(profile['data_json'])
+                fund_natures[profile['listing_id']] = next((str(data.get(k)).strip() for k in ('category', 'family', 'legal_type') if data.get(k)), None)
+    cache = etf.load(conn, set(page_etf) | set(etf_top))
+    pgroups = etf.page_groups(cache, page_etf) if len(page_etf) > 1 else []          # toute la page, depuis les liens précalculés : aucune corrélation recalculée ici
+    group_of, group_info = {}, {}
+    for g in pgroups:
+        group_of[g['leader']] = g['id']
+        group_info[g['leader']] = {'leader': True, 'size': len(g['members']) + 1, 'index': g['index']}
+        for r in g['rows']:
+            group_of[r['id']] = g['id']
+            group_info[r['id']] = {'leader': False, 'why': r['why'], 'diff': r['diff'], 'coefficient': r['coefficient']}
+    banner = []                                          # le bandeau reprend la même méthode (lien direct avec le chef, même couverture), appliquée aux dix premiers ETF de la vue
+    for g in etf.page_groups(cache, etf_top):
+        m = [g['leader']] + g['members']
+        if len(m) >= 3:
+            banner.append({'id': g['id'], 'size': len(m), 'members': m, 'symbols': [cache[i]['meta']['symbol'] for i in m], 'label': g['index'], 'min_coefficient': g['min_coefficient'],
+                           'unstable': False, 'basis': 'Corrélation des rendements hebdomadaires en EUR >= %s (52 semaines), lien direct avec le chef du groupe' % etf.NEAR_IDENTICAL})
+    etf_concentration['groups'] = banner
+    return etf_concentration, fund_natures, group_of, group_info
+
+
+def _facets(entries, base):
+    """Motifs d'écart de la vue et facettes (marchés, pays, catégories) de tout l'univers."""
+    reasons = defaultdict(int)
+    for e in base:
+        if e['status'] != 'retained':
+            for f in e['fails']:
+                reasons[f] += 1
+    markets, countries, categories = defaultdict(int), defaultdict(int), defaultdict(int)
+    for e in entries:
+        markets[e['mic']] += 1
+        if e['country']:
+            countries[e['country']] += 1
+        if e['category']:
+            categories[e['category']] += 1
+    return reasons, markets, countries, categories
+
+
 def explore(conn, request):
     config = scores_profiles.apply_admin(conn, request_config(request))
     view = request.get('view') or {}
@@ -282,18 +348,7 @@ def explore(conn, request):
     rows, level_counts = level_filtered_rows(rows, aux, ref, prefilter_cfg, wanted, query, set(view.get('owned_ids') or []) if view.get('owned_only') else set())
     level_masked = sum(level_counts['regularity'].values()) - len(rows)
     sort, desc = view.get('sort', 'rank'), view.get('dir') == 'desc'
-    proximity_order = status == 'rejected' and (sort == 'proximity' or sort == 'rank' and not score_service.is_scores_mode(config))
-    if proximity_order:
-        rows = sorted(rows,key=lambda e: (*(e.get('proximity') or [999,999,float('inf')]), e['symbol']))
-    elif sort in SORT_KEYS:
-        key = SORT_KEYS[sort]
-        have = [e for e in rows if key(e, aux.get(e['id'], {})) is not None]
-        none = [e for e in rows if key(e, aux.get(e['id'], {})) is None]
-        have.sort(key=lambda e: (key(e, aux.get(e['id'], {})), e['symbol']), reverse=desc)
-        rows = have + none
-    else:   # rang : retenus par rang, puis écartés, puis non évaluables ; actions avant ETF
-        order = {'retained': 0, 'rejected': 1, 'unknown': 2}
-        rows.sort(key=lambda e: (order[e['status']], e['group'] == 'etf', e['rank'] or 10 ** 9, e['symbol']), reverse=desc)
+    rows, proximity_order = _ordered(rows, aux, config, status, sort, desc)
     total = len(rows) + len(excluded_hits)
     if export:
         size, page = EXPORT_LIMIT, 1
@@ -302,33 +357,7 @@ def explore(conn, request):
     detail = {v['key']: v for v in judge_universe(conn, config, wanted)} if wanted else {}
     score_detail = score_service.details(conn, config, wanted)
     out = []
-    from ..market_views import etf
-    etf_top = [e['id'] for e in rows if e.get('group') == 'etf'][:10]          # dix premiers ETF de la vue, avant pagination, dans l'ordre déjà déterminé
-    etf_concentration = etf.concentration(conn, etf_top)
-    page_etf = [e['id'] for e in page_rows if e not in excluded_hits and e.get('group') == 'etf']
-    fund_natures = {}
-    if page_etf:
-        with conn.cursor() as cur:
-            cur.execute("SELECT listing_id,data_json FROM etf_profiles WHERE state='ok' AND listing_id IN (%s)" % ','.join(['%s'] * len(page_etf)), page_etf)
-            for profile in cur.fetchall():
-                data = etf.decode(profile['data_json'])
-                fund_natures[profile['listing_id']] = next((str(data.get(k)).strip() for k in ('category', 'family', 'legal_type') if data.get(k)), None)
-    cache = etf.load(conn, set(page_etf) | set(etf_top))
-    pgroups = etf.page_groups(cache, page_etf) if len(page_etf) > 1 else []          # toute la page, depuis les liens précalculés : aucune corrélation recalculée ici
-    group_of, group_info = {}, {}
-    for g in pgroups:
-        group_of[g['leader']] = g['id']
-        group_info[g['leader']] = {'leader': True, 'size': len(g['members']) + 1, 'index': g['index']}
-        for r in g['rows']:
-            group_of[r['id']] = g['id']
-            group_info[r['id']] = {'leader': False, 'why': r['why'], 'diff': r['diff'], 'coefficient': r['coefficient']}
-    banner = []                                          # le bandeau reprend la même méthode (lien direct avec le chef, même couverture), appliquée aux dix premiers ETF de la vue
-    for g in etf.page_groups(cache, etf_top):
-        m = [g['leader']] + g['members']
-        if len(m) >= 3:
-            banner.append({'id': g['id'], 'size': len(m), 'members': m, 'symbols': [cache[i]['meta']['symbol'] for i in m], 'label': g['index'], 'min_coefficient': g['min_coefficient'],
-                           'unstable': False, 'basis': 'Corrélation des rendements hebdomadaires en EUR >= %s (52 semaines), lien direct avec le chef du groupe' % etf.NEAR_IDENTICAL})
-    etf_concentration['groups'] = banner
+    etf_concentration, fund_natures, group_of, group_info = _etf_page_context(conn, rows, page_rows, excluded_hits)
     for position, e in enumerate(page_rows, (page - 1) * size + 1):
         if e in excluded_hits:
             out.append(e)
@@ -353,18 +382,7 @@ def explore(conn, request):
                 _attach_analysis_curves(conn,subset,n)
                 for r in subset:r['curve_sessions']=n;r['curve_label']=signals.period_label(n)
         else:_attach_curves(conn, out, ref)
-    reasons = defaultdict(int)
-    for e in base:
-        if e['status'] != 'retained':
-            for f in e['fails']:
-                reasons[f] += 1
-    markets, countries, categories = defaultdict(int), defaultdict(int), defaultdict(int)
-    for e in entries:
-        markets[e['mic']] += 1
-        if e['country']:
-            countries[e['country']] += 1
-        if e['category']:
-            categories[e['category']] += 1
+    reasons, markets, countries, categories = _facets(entries, base)
     return {'scoring': score_service.summary(config, entries), 'etf_concentration': etf_concentration, 'config': config, 'total': total, 'page': page, 'pages': max(1, -(-total // size)), 'rows': out, 'ref_sessions': ref, 'curve_label': signals.period_label(ref), 'ordering': 'proximity' if proximity_order else sort if sort in SORT_KEYS else 'rank',
             'universe': len(entries), 'examined': len(base), 'tradable': {'on': bool(view.get('tradable', True)), 'masked': masked}, 'level_filters': {'masked': level_masked, 'counts': level_counts},
             'counts': {g: dict(c) for g, c in counts.items()}, 'scope_counts': scope_counts, 'populations': {g: sum(c.values()) for g, c in counts.items()},
