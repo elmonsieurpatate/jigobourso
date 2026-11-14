@@ -6,6 +6,8 @@ Référence visuelle : `design-demos/terminal-ultraviolet.html`, variante Halo (
 
 `app/public/assets/halo.css` est la **seule** source des jetons et des composants communs. Les feuilles de page (`explorer.css`, `pf.css`, `filtres.css`, `help.css`, `admin-*.css`, `plan-suivi.css`, `splits.css`, `strategies-ui.css`) ne gardent que la mise en page (grille, position, largeurs, défilement) et les valeurs réellement calculées. `halo.css` est toujours chargée en dernier.
 
+`base.css` fournit le reset, la structure de l'application et les utilitaires. Les couleurs transparentes des ombres et des graphiques restent des cas particuliers. `scripts/check_halo_css.py` ne remplace pas la comparaison visuelle des pages et des états dynamiques.
+
 ## Modifier une valeur commune
 
 | Pour changer… | Variable dans `halo.css` (`:root`, puis bloc sombre) |
