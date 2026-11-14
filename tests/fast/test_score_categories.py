@@ -1,5 +1,4 @@
 """Filtres « Score simple V4 » et « Score complexe V4 » : définitions proposées, rangement des notes, sélection sans effet sur notes ni rangs."""
-import copy
 import json
 import pathlib
 
@@ -56,22 +55,6 @@ def test_zero_hundred_partial_and_unavailable_scores(which):
     assert partial['simple']['status'] == 'partiel' and partial['simple']['score'] is not None
     assert SCAT.assign(partial['simple']['score'], c) != ids['Inconnu']            # un score partiel reste une note, rangée par sa valeur
     assert SCAT.assign(partial['complex']['score'], c) != ids['Inconnu']
-
-
-def test_selection_keeps_notes_ranks_and_calculation_untouched(which):
-    c = cats(which)
-    names = {x['id']: x['name'] for x in c}
-    values = [0.0, 0.5, 3.0, 8.0, 20.0, 40.0, 61.0, 100.0, None, 12.5]
-    entries = [{'id': i, 'score_' + which: v, 'rank': i + 1, 'score': v} for i, v in enumerate(values)]
-    before = copy.deepcopy(entries)
-    kept = SCAT.select(entries, which, [x['id'] for x in c if x['name'] in ('Élevé', 'Très élevé')], c)
-    assert entries == before                                                       # rien n'est modifié ni supprimé
-    assert all(names[SCAT.assign(e['score_' + which], c)] in ('Élevé', 'Très élevé') for e in kept) and kept and len(kept) < len(entries)
-    assert all(e is entries[e['id']] and e['rank'] == e['id'] + 1 for e in kept)   # mêmes lignes, mêmes rangs globaux
-    only_unknown = SCAT.select(entries, which, [x['id'] for x in c if x['unknown']], c)
-    assert [e['id'] for e in only_unknown] == [8]
-    assert SCAT.select(entries, which, [x['id'] for x in c], c) == entries         # tout inclus : aucune ligne masquée
-    assert SCAT.select(entries, which, None, c) == entries
 
 
 def test_existing_thirteen_filters_are_unchanged():

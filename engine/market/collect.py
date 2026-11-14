@@ -27,15 +27,6 @@ def setting(conn, name, default):
     return json.loads(row['value_json']) if row else default
 
 
-def collected_rows(conn):
-    """(clôtures quotidiennes, barres de 15 minutes) déjà en base pour le jeu de collecte."""
-    with conn.cursor() as cur:
-        cur.execute('SELECT COUNT(*) n FROM daily_prices d JOIN v_collect_set c ON c.listing_id=d.listing_id')
-        daily = cur.fetchone()['n']
-        cur.execute('SELECT COUNT(*) n FROM intraday_prices d JOIN v_collect_set c ON c.listing_id=d.listing_id')
-        return daily, cur.fetchone()['n']
-
-
 def collection_set(conn, mic=None):
     sql = 'SELECT c.listing_id, c.mic, c.symbol, c.held FROM v_collect_set c'
     with conn.cursor() as cur:

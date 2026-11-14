@@ -162,11 +162,6 @@ def evaluate(kind, row, config=None):
     return None, None
 
 
-def exclusion_reason(kind, row, config=None):
-    """Motif d'exclusion (texte court) ou None (compatibilité : même signature qu'avant)."""
-    return evaluate(kind, row, config)[1]
-
-
 def rule_text(rid, config):
     """Description lisible de la règle avec sa valeur actuelle (affichée dans l'entonnoir)."""
     c = config[rid]

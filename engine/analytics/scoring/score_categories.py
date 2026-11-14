@@ -33,12 +33,3 @@ def measure(definitions, which):
     return [], False
 
 
-def select(entries, which, selected, categories):
-    """Lignes dont la catégorie du score `which` est dans `selected` (None/absent = tout inclure). Ordre, notes et rangs des lignes inchangés."""
-    if selected is None or not categories:
-        return list(entries)
-    key = 'score_' + which
-    chosen = set(selected)
-    return [e for e in entries if assign(e.get(key), categories) in chosen]
-
-

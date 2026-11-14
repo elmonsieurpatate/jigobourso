@@ -1,4 +1,4 @@
-from engine.catalogue.rules import exclusion_reason
+from engine.catalogue.rules import evaluate
 from engine.catalogue.primary import choose_primary
 
 
@@ -9,15 +9,15 @@ def row(**kw):
 
 
 def test_exclusions():
-    assert exclusion_reason('equity', row()) is None
-    assert exclusion_reason('equity', row(mic='XTKS')) == 'place non retenue'
-    assert exclusion_reason('equity', row(delisted='True')) == 'titre radié'
-    assert exclusion_reason('equity', row(name='Foo Acquisition Corp II')) == 'société vide (SPAC)'
-    assert exclusion_reason('equity', row(name='Foo Corp Warrants')) is not None
-    assert exclusion_reason('equity', row(symbol='FOO-WT', name='Foo Corp')) is not None
-    assert exclusion_reason('etf', row(name='Leverage Shares 3x Tesla')) == 'ETF à effet de levier ou inverse'
-    assert exclusion_reason('etf', row(name='iShares Core MSCI World')) is None
-    assert exclusion_reason('equity', row(name='Unity Software')) is None      # « unit » ne doit pas matcher « Unity »
+    assert evaluate('equity', row())[1] is None
+    assert evaluate('equity', row(mic='XTKS'))[1] == 'place non retenue'
+    assert evaluate('equity', row(delisted='True'))[1] == 'titre radié'
+    assert evaluate('equity', row(name='Foo Acquisition Corp II'))[1] == 'société vide (SPAC)'
+    assert evaluate('equity', row(name='Foo Corp Warrants'))[1] is not None
+    assert evaluate('equity', row(symbol='FOO-WT', name='Foo Corp'))[1] is not None
+    assert evaluate('etf', row(name='Leverage Shares 3x Tesla'))[1] == 'ETF à effet de levier ou inverse'
+    assert evaluate('etf', row(name='iShares Core MSCI World'))[1] is None
+    assert evaluate('equity', row(name='Unity Software'))[1] is None      # « unit » ne doit pas matcher « Unity »
 
 
 def test_sap_goes_to_xetra():
