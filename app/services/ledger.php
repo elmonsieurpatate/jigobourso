@@ -1,5 +1,7 @@
 <?php
 require_once __DIR__ . '/../lib/db.php';
+require_once __DIR__ . '/../lib/units.php';
+require_once __DIR__ . '/../lib/http.php';
 
 // Valorisation d'un portefeuille à partir du registre de transactions (méthode du prix de revient moyen pondéré, en euros).
 // Achat : le coût (prix × quantité × change + frais) s'ajoute au stock. Vente : le coût moyen de la quantité vendue sort du stock,
@@ -12,11 +14,10 @@ function fx_rates(): array {
     return $out;
 }
 function eur_factor(?string $currency, array $rates): ?float {
-    if (!$currency) return null;
-    if ($currency === 'GBp' || strtoupper($currency) === 'GBX') return isset($rates['GBP']) ? $rates['GBP'] / 100 : null;
-    if ($currency === 'ZAc' || strtoupper($currency) === 'ZAC') return isset($rates['ZAR']) ? $rates['ZAR'] / 100 : null;        // cents du rand (Johannesburg)
-    if (strtoupper($currency) === 'ILA') return isset($rates['ILS']) ? $rates['ILS'] / 100 : null;                              // agorot (Tel-Aviv)
-    return $rates[strtoupper($currency)] ?? null;
+    [$base, $divisor] = unit_split($currency);
+    if ($base === '') return null;
+    if ($base === 'EUR') return 1.0;
+    return isset($rates[$base]) && $rates[$base] ? $rates[$base] / $divisor : null;
 }
 
 // Splits et regroupements confirmés par le fournisseur (market/splits.py : l'historique de cours a été ajusté par Yahoo) : le registre en tient compte
@@ -32,7 +33,10 @@ function split_events(array $listingIds): array {
             $out[(int)$s['listing_id']][] = ['date' => (string)$s['event_date'], 'ratio' => (float)$s['ratio']];
         return $out;
     } catch (Throwable $e) {
-        return [];                                     // table absente tant que la migration n'est pas passée
+        // Lecture impossible ≠ aucun split : une liste vide ferait valider ou valoriser des quantités fausses sans le dire.
+        // Indisponibilité explicite (503) ; une table absente (migration non passée) en fait partie.
+        error_log('split_events [' . request_id() . '] : ' . $e->getMessage());
+        throw new ApiError('Événements de split illisibles : calcul des quantités indisponible, réessayez plus tard', 503);
     }
 }
 function free_buy_dates(array $rows): array {

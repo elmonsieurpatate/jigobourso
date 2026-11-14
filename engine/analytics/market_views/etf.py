@@ -10,6 +10,7 @@ import datetime as dt
 import re
 import json
 import math
+from engine.shared.units import split_unit
 from collections import defaultdict
 
 from ..series.series import prepare_series
@@ -71,8 +72,8 @@ def returns_eur(bars, splits, currency, fx, start, end=None):
     """Rendements hebdomadaires en EUR, clés = date de FIN (le rendement couvre les sept jours qui précèdent). Pas de remplissage : les deux dates doivent avoir une clôture
     et aucune rupture de cours ne doit se trouver entre elles. Change à la date de chaque clôture (dernier taux antérieur, 7 jours maximum), jamais le taux actuel."""
     dates, closes, _, breaks = prepare_series(bars, splits)
-    cur = {'GBp': 'GBP', 'GBX': 'GBP', 'ZAc': 'ZAR', 'ZAC': 'ZAR', 'ILA': 'ILS'}.get(currency, currency)
-    scale = .01 if currency in ('GBp', 'GBX', 'ZAc', 'ZAC', 'ILA') else 1.0
+    cur, divisor = split_unit(currency)
+    scale = 1.0 / divisor
     rates = fx.get(cur, {})
 
     def rate(day):

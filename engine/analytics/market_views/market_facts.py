@@ -1,5 +1,6 @@
 """Faits de marché communs : éligibilité PEA, dernière collecte, dernière clôture attendue, classes de capitalisation, lecture des recommandations d'analystes."""
 from engine.market import hours
+from engine.shared.units import is_subunit
 from engine.market.collect import effective_expected_close, to_eur_factor
 
 
@@ -69,7 +70,7 @@ _SIZE_CLASSES = ((300e6, 'micro-capitalisation'), (2e9, 'petite capitalisation')
 
 def size_class(market_cap, currency, rates):
     """Catégorie de taille d'une action, en euros ; inconnue si la devise n'est pas une devise ordinaire (par exemple les pence)."""
-    if not market_cap or currency in (None, 'GBp', 'ZAc', 'ILA'):
+    if not market_cap or currency is None or is_subunit(currency):
         return None
     f = to_eur_factor(currency, rates)
     if not f:
@@ -80,7 +81,7 @@ def size_class(market_cap, currency, rates):
 
 def size_key(market_cap, currency, rates):
     """Clé de taille (micro, small, mid, large, mega) en euros ; None si inconnue (ETF, devise non ordinaire, capitalisation absente)."""
-    if not market_cap or currency in (None, 'GBp', 'ZAc', 'ILA'):
+    if not market_cap or currency is None or is_subunit(currency):
         return None
     f = to_eur_factor(currency, rates)
     if not f:

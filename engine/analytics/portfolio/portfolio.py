@@ -5,6 +5,7 @@ current cohort from its latest acquisition; individual historical peaks are neve
 Accounting PMP results remain exclusively in ledger.php.
 """
 import datetime as dt
+from engine.shared.units import split_unit
 
 from engine.market import hours
 from ..series import signals
@@ -141,7 +142,7 @@ def enrich(conn, request, series, alerts, today):
         if ids:
             cur.execute('SELECT listing_id,sessions,slope,perf,volatility,drawdown FROM strategy_metrics WHERE listing_id IN (%s) AND sessions IN (5,21,63,126,252)' % ','.join(['%s'] * len(ids)), ids)
             for r in cur.fetchall(): metrics.setdefault(r['listing_id'], {})[r['sessions']] = {k: finite(r[k]) for k in ('slope', 'perf', 'volatility', 'drawdown')}
-        currencies = sorted({{'GBp': 'GBP', 'GBX': 'GBP', 'ZAc': 'ZAR', 'ZAC': 'ZAR', 'ILA': 'ILS'}.get(p.get('price_currency'), p.get('price_currency')) for p in positions if p.get('price_currency') and p['price_currency'] != 'EUR'})
+        currencies = sorted({split_unit(p.get('price_currency'))[0] for p in positions if p.get('price_currency') and p['price_currency'] != 'EUR'})
         if currencies:
             cur.execute('SELECT currency,rate_date,to_eur FROM fx_rates WHERE currency IN (%s) ORDER BY rate_date' % ','.join(['%s'] * len(currencies)), currencies)
             for r in cur.fetchall(): fx.setdefault(r['currency'], {})[str(r['rate_date'])] = float(r['to_eur'])

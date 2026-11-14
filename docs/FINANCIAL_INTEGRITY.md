@@ -35,3 +35,28 @@ Les exclus sont paginés comme de véritables éléments, sans réinitialiser le
 ## Livraison et conservation
 
 La CI exécute les tests, les syntaxes PHP/JS et une navigation Chrome sur base jetable à 375, 390 et 1 280 px. Avant déploiement : sauvegarde des tables financières hors racine web et empreinte des transactions. Après transfert : recalcul des seules tables dérivées depuis les historiques déjà présents, comparaison des mesures de BOX/BBSI/VOO/UBU5 avec les séries réelles, contrôle de l'empreinte et des effectifs des portefeuilles/transactions, puis contrôle HTTP public. Aucune collecte massive et aucune réécriture des transactions historiques.
+
+## Étape 6 — splits, unités, parité (2026-11-14)
+
+**Lecture des splits.** `split_events` (ledger.php) lit `split_log` (statut `confirmed` seulement : un simple saut de cours « detected » ou « real_move » ne modifie jamais une quantité). Lecture impossible (base, table absente) = `ApiError` 503 « Événements de split illisibles », jamais une liste vide : valorisation et validation d'écriture échouent explicitement plutôt que de calculer des quantités sans split. Aucun titre demandé = liste vide légitime.
+
+**Règle de quantité unique.** `oversold_transactions()` (transactions.php) est la seule règle « quantité détenue à la date, splits confirmés compris ». La validation des écritures et le contrôle de release (`check_financial_integrity.php`) l'appellent toutes deux : plus de faux diagnostic de vente à découvert après un split valide. Le ratio d'un événement est compté dès le jour du split inclus ; plusieurs splits et regroupements se composent.
+
+**Corrections manuelles (décision).** Un achat à prix zéro daté à partir du jour d'un split vaut correction manuelle de l'utilisateur : le split n'est plus appliqué automatiquement pour ce titre, il n'est jamais corrigé deux fois. Le lien est donc implicite (date et prix zéro), sans migration ni réparation automatique ; l'ambiguïté (don d'actions, ou correction d'un regroupement, un achat ne pouvant pas retirer de parts) est traitée par le recensement : le contrôle de release liste chaque achat à prix zéro (`zero_price_buy_manual_split_or_gift`) pour confirmation par l'utilisateur, sans rien modifier. Les transactions d'origine ne sont jamais réécrites.
+
+**Parité PHP / Python.** Le registre PHP lit `split_log`, le moteur lit `corporate_events` ; les deux sont écrits ensemble à la confirmation (`market/splits.py`, `split_review.py`). Le contrôle de release signale tout split confirmé sans événement correspondant (`confirmed_split_without_corporate_event`).
+
+**Unités de prix.** Source unique côté Python `engine/shared/units.py`, miroir PHP `app/lib/units.php` ; parité testée (`tests/fast/test_units_parity.py`).
+
+| Unité | Devise du taux | Diviseur | Facteur vers l'euro |
+|---|---|---|---|
+| EUR | EUR | 1 | 1 |
+| GBP (livre) | GBP | 1 | taux GBP |
+| GBp, GBX (pence) | GBP | 100 | taux GBP / 100 |
+| ZAc, ZAC (cents du rand) | ZAR | 100 | taux ZAR / 100 |
+| ILA (agorot) | ILS | 100 | taux ILS / 100 |
+| autre code ISO | lui-même | 1 | son taux |
+
+Casse : `GBp` (pence) et `GBP` (livre) sont distincts ; les autres codes sont insensibles à la casse. Unité ou taux inconnu : facteur indisponible (`None`/`null`), jamais 1 par défaut. Avant l'étape 6, l'historique des portefeuilles et la saisie historique ne divisaient que les pence : ZAc et ILA étaient 100 fois trop grands.
+
+Les taux historiques enregistrés avec les transactions ne sont jamais recalculés. Aucune migration de données n'est nécessaire à l'étape 6.

@@ -36,7 +36,7 @@ db-reset:
 # Les tests lancent `python` et `php` nus : on les force vers le venv et vers PHP >= 8.1 (le `php` du PATH peut être en 7.4).
 integ: db-reset
 	ln -sf $(PHP) $(CURDIR)/.venv/bin/php
-	PATH=$(CURDIR)/.venv/bin:$$PATH $(DBENV) $(PY) -m pytest tests/integ -q
+	PATH=$(CURDIR)/.venv/bin:$$PATH $(DBENV) $(PY) -m pytest $(or $(INTEG_ARGS),tests/integ) -q
 release-check:   ## contrôles de version en lecture seule (scripts/release/) sur la base jetable : intégrité financière et catalogue secondaire
 	$(DBENV) $(PHP) scripts/release/check_financial_integrity.php > /dev/null
 	$(DBENV) $(PHP) scripts/release/check_secondary_catalogue.php > /dev/null

@@ -1,17 +1,18 @@
 """Indicative 15-minute changes, only for unchanged holdings and observed prices."""
 import datetime as dt
 from bisect import bisect_right
+from engine.shared.units import split_unit
 
 
 def euro_rate(currency, day, fx):
     currency=currency or ''
     if currency.upper()=='EUR':return 1.0
-    base='GBP' if currency.upper() in ('GBP','GBX') else currency.upper()
+    base,divisor=split_unit(currency)
     pairs=fx.get(base,[]);i=bisect_right([str(d) for d,_ in pairs],day)-1
     if i<0:return None
     date,rate=pairs[i]
     if not 0<rate or (dt.date.fromisoformat(day)-dt.date.fromisoformat(str(date))).days>7:return None
-    return rate/(100 if currency in ('GBp','GBX') else 1)
+    return rate/divisor
 
 
 def build(holdings,bars,units,fx,transactions,splits=None,meta=None):

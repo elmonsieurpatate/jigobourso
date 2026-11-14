@@ -92,7 +92,7 @@ pas présenté comme réalisé.
 - [x] Étape 3 — Validation et verrouillage du résultat CSS. Clôturée 2026-11-14 : lint, css-check, visual, fast (656), e2e, integ (336) verts ; voir journal.
 - [x] Étape 4 — Lisibilité et architecture JavaScript. Clôturée 2026-11-14 : lint, js-check, css-check, visual, fast (656), e2e, integ (336) verts ; voir journal.
 - [x] Étape 5 — Fiabilité des échanges et des contrôles.
-- [ ] Étape 6 — Cohérence financière : splits, unités et intégrité.
+- [x] Étape 6 — Cohérence financière : splits, unités et intégrité.
 - [ ] Étape 7 — Architecture et cas d'usage PHP.
 - [ ] Étape 8 — Architecture et dépendances Python.
 - [ ] Étape 9 — Données, migrations et accès SQL.
@@ -420,32 +420,32 @@ La refonte CSS n'autorise aucune modification des données financières.
 
 ## Splits et corrections
 
-- [ ] Distinguer absence de split et échec de lecture.
-- [ ] Corriger le catch trop large transformant l'erreur en liste vide.
-- [ ] Définir une indisponibilité explicite lorsque les événements sont illisibles.
-- [ ] Recenser les corrections historiques et achats au prix zéro.
-- [ ] Définir un lien explicite entre correction manuelle et événement.
-- [ ] Tester plusieurs splits, regroupements, opérations le même jour
+- [x] Distinguer absence de split et échec de lecture.
+- [x] Corriger le catch trop large transformant l'erreur en liste vide.
+- [x] Définir une indisponibilité explicite lorsque les événements sont illisibles.
+- [x] Recenser les corrections historiques et achats au prix zéro.
+- [x] Définir un lien explicite entre correction manuelle et événement.
+- [x] Tester plusieurs splits, regroupements, opérations le même jour
       et corrections ultérieures.
-- [ ] Aligner validation, valorisation, lots, historique et contrôle de release.
-- [ ] Ne pas appliquer automatiquement un split sur un simple saut de cours.
+- [x] Aligner validation, valorisation, lots, historique et contrôle de release.
+- [x] Ne pas appliquer automatiquement un split sur un simple saut de cours.
 
 ## Unités et change
 
-- [ ] Définir unités, devises de référence et multiplicateurs.
-- [ ] Couvrir EUR, GBP, GBp/GBX, ZAc/ZAC, ILA et les autres unités supportées.
-- [ ] Aligner les règles PHP et Python.
-- [ ] Préserver les taux historiques enregistrés.
-- [ ] Tester frais, ventes partielles, fractions, précision et données absentes.
+- [x] Définir unités, devises de référence et multiplicateurs.
+- [x] Couvrir EUR, GBP, GBp/GBX, ZAc/ZAC, ILA et les autres unités supportées.
+- [x] Aligner les règles PHP et Python.
+- [x] Préserver les taux historiques enregistrés.
+- [x] Tester frais, ventes partielles, fractions, précision et données absentes.
 
 ## Intégrité
 
-- [ ] Corriger le faux diagnostic de vente à découvert après un split valide.
-- [ ] Partager les règles de quantités/événements ou tester leur parité.
-- [ ] Comparer les résultats avant/après sur des cas de référence.
-- [ ] Conserver transactions originales et piste d'audit.
-- [ ] Ne pas effectuer de réparation automatique des données.
-- [ ] Si une migration est nécessaire, définir séparément simulation, sauvegarde,
+- [x] Corriger le faux diagnostic de vente à découvert après un split valide.
+- [x] Partager les règles de quantités/événements ou tester leur parité.
+- [x] Comparer les résultats avant/après sur des cas de référence.
+- [x] Conserver transactions originales et piste d'audit.
+- [x] Ne pas effectuer de réparation automatique des données.
+- [x] Si une migration est nécessaire, définir séparément simulation, sauvegarde,
       validation et retour arrière.
 
 Clôture : règles explicites, cas limites couverts et résultats compatibles
@@ -591,18 +591,18 @@ Aucun objectif artificiel de nombre de fichiers ou de lignes supprimées.
 
 Pour chaque résolution, indiquer commit et test/preuve.
 
-- [ ] F01 — Lecture des splits masquée. Étape 6. Preuve :
-- [ ] F02 — Correction manuelle ambiguë. Étape 6. Preuve :
+- [ ] F01 — Lecture des splits masquée. Étape 6. Preuve : 2026-11-14 : split_events lève 503 explicite au lieu de []; test_units_parity.py + tests/integ/test_financial_parity.py (table renommée = 503).
+- [ ] F02 — Correction manuelle ambiguë. Étape 6. Preuve : 2026-11-14 : règle documentée (FINANCIAL_INTEGRITY.md), recensement des achats à prix zéro par le contrôle de release, aucune réécriture ; décision : lien implicite conservé, sans migration.
 - [ ] F03 — Erreur JSON en HTTP 200. Étape 5. Preuve : 2026-11-14 : json_text encode avant le statut, donnée inencodable = 500 + ref ; tests/fast/test_http_contract.py.
 - [ ] F04 — Réponse API invalide acceptée. Étape 5. Preuve : 2026-11-14 : J.api lève « Réponse illisible » sur 2xx non JSON ; tests/e2e/core.cjs.
 - [ ] F05 — Échec lint PHP masqué. Étape 5. Preuve : 2026-11-14 : scripts/lint_php.sh (code 1 sur erreur, 2 sans php/fichier) utilisé par make et la CI ; reproduit avant, tests/fast/test_lint_php.py.
-- [ ] F06 — Contrôle financier ignorant les splits. Étape 6. Preuve :
+- [ ] F06 — Contrôle financier ignorant les splits. Étape 6. Preuve : 2026-11-14 : check_financial_integrity.php et validation partagent oversold_transactions ; parité split_log/corporate_events contrôlée ; test_financial_parity.py.
 - [ ] F07 — Composants surchargés par les pages. Étapes 1–3. Preuve partielle (reste ouvert : états dynamiques, recette étape 3) : 2026-11-13, règles de page retirées (components/base/explorer/filtres/pf/help/splits/strategies-ui/admin-*.css) ; styles calculés conformes à la référence Halo sur 14 pages connecté, clair/sombre, 1280/390 px ; limites ci-dessous.
 - [ ] F08 — Présentation fixe dans data-style. Étapes 1–3. Preuve :
 - [x] F09 — Écouteurs accumulés. Étape 4. Preuve : 2026-11-14 : picker, openInfo, détail pf-home ; écouteurs retirés par AbortController.
 - [ ] F10 — Routes/services PHP incomplets. Étape 7. Preuve :
 - [ ] F11 — Dépendances Python mal orientées. Étape 8. Preuve :
-- [ ] F12 — Unités monétaires divergentes. Étape 6. Preuve :
+- [ ] F12 — Unités monétaires divergentes. Étape 6. Preuve : 2026-11-14 : engine/shared/units.py + app/lib/units.php, ZAc/ILA corrigés dans l'historique et la saisie ; parité PHP/Python testée.
 - [ ] F13 — Activation/restauration de release. Étape 11. Preuve :
 - [ ] F14 — Dépendances non complètement validées. Étape 11. Preuve :
 - [ ] F15 — Garde-fous insuffisants. Étapes 3, 5, 11. Preuve partielle (reste étape 11) : 2026-11-14 : garde lint PHP, contrats HTTP et moteur testés (étape 5).
@@ -785,3 +785,10 @@ Formatage JS (Prettier, commit 4613946, `make js-format` / `make js-check`). Cyc
 - F04 : `J.api` lève sur 2xx illisible.
 - Contrat et statuts : `docs/API_CONTRACT.md`. Tests : moteur 503 (plantage, JSON tronqué, vide, non objet), statuts réels en intégration.
 - Passe finale : lint, js-check, css-check, visual, fast 669, e2e, integ 337 — tous verts. Non poussé.
+
+## Journal — étape 6 (2026-11-14)
+
+- Unités : table unique Python (`engine/shared/units.py`) et miroir PHP (`app/lib/units.php`) ; 7 doublons de règles Python remplacés ; ZAc/ILA n'étaient pas divisés par 100 dans l'historique des portefeuilles (`session.py`, `history.py`) ni dans la saisie historique PHP (`historical_fx`).
+- Splits : lecture illisible = 503 ; règle de quantité unique `oversold_transactions` ; contrôle de release enrichi (ventes à découvert avec splits, achats à prix zéro, split sans événement moteur), lecture seule.
+- Documentation : section « Étape 6 » de FINANCIAL_INTEGRITY.md (décision sur les corrections manuelles, table des unités).
+- Passe finale : lint, js-check, css-check, visual, fast 682, e2e, integ 344 verts.

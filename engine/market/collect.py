@@ -110,7 +110,7 @@ def refresh_fx(conn, client, now):
 
 
 # Devises cotées dans une sous-unité : code Yahoo (sensible à la casse quand il l'est) -> (devise principale, diviseur).
-SUBUNITS = {'GBp': ('GBP', 100), 'GBX': ('GBP', 100), 'ZAc': ('ZAR', 100), 'ZAC': ('ZAR', 100), 'ILA': ('ILS', 100)}
+from engine.shared.units import SUBUNITS, to_eur_factor  # noqa: E402,F401  (réexport : appelants existants)
 
 
 FX_HISTORY_DAYS = 300        # profondeur d'historique de change visée (les transactions plus anciennes exigent un taux saisi à la main)
@@ -146,19 +146,6 @@ def backfill_fx(conn, client, now):
                         ('fx_backfill_tried', json.dumps(tried), naive_utc(now)))
         conn.commit()
     return added
-
-
-def to_eur_factor(currency, rates):
-    """Facteur de conversion vers l'euro ; 'GBp' (pence), 'ZAc' (cents du rand) et 'ILA' (agorot) sont des sous-unités ; None si inconnu."""
-    if not currency:
-        return None
-    sub = SUBUNITS.get(currency) or SUBUNITS.get(currency.upper())
-    if sub:
-        r = rates.get(sub[0])
-        return r / sub[1] if r else None
-    if currency.upper() == 'EUR':
-        return 1.0
-    return rates.get(currency.upper())
 
 
 def latest_rates(conn):

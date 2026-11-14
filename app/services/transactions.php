@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/ledger.php';
 require_once __DIR__ . '/../lib/http.php';
+require_once __DIR__ . '/../lib/units.php';
 
 // A price is expressed in a unit, not just a currency. GBX is the canonical pence code.
 function price_unit($unit): ?string {
@@ -21,22 +22,24 @@ function historical_fx(?string $unit, string $when, ?float $explicit): float {
     }
     if ($unit === 'EUR') return 1.0;
     if (!$unit) throw new ApiError('Devise manquante : précisez la devise et le change historique', 422);
-    $base = $unit === 'GBX' ? 'GBP' : $unit;
+    [$base, $divisor] = unit_split($unit);
     $date = substr($when, 0, 10);
     $r = q('SELECT rate_date, to_eur FROM fx_rates WHERE currency = ? AND rate_date <= ? ORDER BY rate_date DESC LIMIT 1', [$base, $date])->fetch();
     // A weekend can use the preceding rate, but never a future rate or a remote historical guess.
     if (!$r || (strtotime($date) - strtotime($r['rate_date'])) > 7 * 86400 || (float)$r['to_eur'] <= 0)
         throw new ApiError('Taux historique indisponible à cette date : renseignez le taux vers l’euro (pour une unité du prix)', 422);
-    return (float)$r['to_eur'] / ($unit === 'GBX' ? 100 : 1);
+    return (float)$r['to_eur'] / $divisor;
 }
 function transaction_key(array $t): string {
     return !empty($t['listing_id']) ? 'L' . $t['listing_id'] : 'S' . strtoupper($t['symbol']);
 }
-function validate_transaction_history(array $rows): void {
+// Règle unique de quantité détenue (splits confirmés compris) : renvoie les ventes qui dépassent le stock à leur date.
+// Utilisée par la validation des écritures ET par le contrôle de release (scripts/release/check_financial_integrity.php).
+function oversold_transactions(array $rows): array {
     usort($rows, function ($a, $b) { return [$a['trade_at'], (int)$a['id']] <=> [$b['trade_at'], (int)$b['id']]; });
     $events = split_events(array_map(function ($t) { return $t['listing_id'] ?? null; }, $rows));      // les quantités suivent les splits confirmés, comme la valorisation
     $freeBuys = free_buy_dates($rows);
-    $held = []; $cursor = [];
+    $held = []; $cursor = []; $bad = [];
     foreach ($rows as $t) {
         $k = transaction_key($t); $qty = (float)$t['quantity'];
         $have = $held[$k] ?? 0.0;
@@ -46,10 +49,14 @@ function validate_transaction_history(array $rows): void {
             $have *= pending_split_ratio($events[$lid], $freeBuys[$lid] ?? [], $c, substr($t['trade_at'], 0, 10));
             $cursor[$k] = $c;
         }
-        if ($t['side'] === 'sell' && $qty > $have + 1e-9)
-            throw new ApiError('Vente supérieure à la quantité détenue à la date du ' . $t['trade_at'] . ' (' . $t['symbol'] . ')', 422);
+        if ($t['side'] === 'sell' && $qty > $have + 1e-9) $bad[] = $t;
         $held[$k] = $have + ($t['side'] === 'buy' ? $qty : -$qty);
     }
+    return $bad;
+}
+function validate_transaction_history(array $rows): void {
+    $bad = oversold_transactions($rows);
+    if ($bad) throw new ApiError('Vente supérieure à la quantité détenue à la date du ' . $bad[0]['trade_at'] . ' (' . $bad[0]['symbol'] . ')', 422);
 }
 // All writers take the same portfolio row lock before reading the ledger: concurrent writes serialize.
 function write_transaction(int $userId, int $portfolioId, callable $change): array {

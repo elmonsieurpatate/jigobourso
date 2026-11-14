@@ -8,6 +8,7 @@ Les splits : clôtures et quantités sont exprimées dans les unités d'aujourd'
 """
 import datetime
 import math
+from engine.shared.units import split_unit
 
 from .series import prepare_series
 from ..shared.numbers import finite
@@ -36,7 +37,7 @@ def _load(conn, ids, start):
         cur.execute(f'SELECT l.id, COALESCE(p.currency, l.currency) cur, l.symbol, i.name, p.price, p.price_time FROM listings l JOIN instruments i ON i.id=l.instrument_id LEFT JOIN latest_prices p ON p.listing_id=l.id WHERE l.id IN ({marks})', list(ids))
         meta = {r['id']: r for r in cur.fetchall()}
         unit = {k: v['cur'] for k, v in meta.items()}
-        curs = sorted({('GBP' if (c or '').upper() in ('GBP', 'GBX') else (c or '').upper()) for c in unit.values()} - {'EUR', ''})
+        curs = sorted({split_unit(c)[0] for c in unit.values()} - {'EUR', ''})
         fx = {}
         if curs:
             cur.execute(f"SELECT currency, rate_date, to_eur FROM fx_rates WHERE currency IN ({','.join(['%s'] * len(curs))}) AND rate_date >= %s ORDER BY currency, rate_date",
@@ -94,9 +95,9 @@ def build(transactions, bars, splits, unit, fx, meta, today=None, bars15=None):
         u = (unit.get(lid) or 'EUR')
         if u.upper() == 'EUR':
             return 1.0
-        base = 'GBP' if u.upper() in ('GBP', 'GBX') else u.upper()
+        base, divisor = split_unit(u)
         r = rates[base].at(day) if base in rates else None
-        return None if r is None else r / (100 if u in ('GBp', 'GBX') else 1)
+        return None if r is None else r / divisor
 
     holdings, net_in, purchases, k = {}, 0.0, 0.0, 0
     lines = {}
@@ -153,7 +154,7 @@ def build(transactions, bars, splits, unit, fx, meta, today=None, bars15=None):
                 if observed and (datetime.date.fromisoformat(day)-datetime.date.fromisoformat(observed)).days>7:
                     stale_today = True
                 currency = (unit.get(key) or 'EUR')
-                base = 'GBP' if currency.upper() in ('GBP','GBX') else currency.upper()
+                base = split_unit(currency)[0]
                 if base != 'EUR' and base in rates and rates[base].last_day and (datetime.date.fromisoformat(day)-datetime.date.fromisoformat(rates[base].last_day)).days>7:
                     stale_today = True
             line['quantities'].append(q)

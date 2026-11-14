@@ -4,6 +4,7 @@ A missing session makes path statistics unavailable. Split-adjusted prices are u
 for returns; raw historical prices and dated FX for traded euro amounts.
 """
 import math
+from engine.shared.units import split_unit
 import datetime
 from bisect import bisect_right
 from collections import defaultdict
@@ -47,7 +48,7 @@ def load(conn,universe,windows,expected_close):
             for r in q.fetchall():splits[r['listing_id']].append((str(r['event_date']),float(r['ratio']) if r['ratio'] is not None else None))
             for lid in part:
                 u=meta[lid];dates,prices,_,breaks=prepare_series(bars[lid],splits[lid]);observations=dict(zip(dates,prices))
-                currency=u.get('price_currency') or u.get('currency');base='GBP' if currency in ('GBp','GBX') else currency
+                currency=u.get('price_currency') or u.get('currency');base=split_unit(currency)[0]
                 for n,ds in calendars[u['mic']].items():
                     if not ds or any(ds[0]<dates[b]<=ds[-1] for b in breaks):continue
                     vs=[volume.get((lid,d)) for d in ds[1:]];amounts=[]
