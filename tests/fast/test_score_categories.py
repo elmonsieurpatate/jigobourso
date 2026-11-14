@@ -58,10 +58,7 @@ def test_zero_hundred_partial_and_unavailable_scores(which):
 
 
 def test_existing_thirteen_filters_are_unchanged():
-    import subprocess
-    old = subprocess.run(['git', 'show', 'c8abdda:app/config/explorer_secondary_filters.json'], capture_output=True, text=True, cwd=CONFIG.parents[2])
-    if old.returncode != 0:
-        pytest.skip('référence c8abdda absente')
-    before = json.loads(old.stdout)['filters']
+    """Référence figée dans tests/fixtures (extraite du commit c8abdda) : plus de dépendance à l'historique git, absent d'un clone superficiel (CI)."""
+    before = json.loads((CONFIG.parents[2] / 'tests/fixtures/explorer_filters_13.json').read_text(encoding='utf-8'))
     now = [f for f in DEFS['filters'] if f['id'] not in ('score_simple', 'score_complex')]
     assert now == before and len(now) == 13
