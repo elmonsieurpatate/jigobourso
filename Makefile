@@ -4,7 +4,7 @@ PY = $(CURDIR)/.venv/bin/python
 SQLROOT = mariadb -h127.0.0.1 -P33307 -uroot -plocal-test-only
 DBENV = JIGO_TEST_DATABASE=1 JIGO_DB_HOST=127.0.0.1 JIGO_DB_PORT=33307 JIGO_DB_NAME=jigobourso_it JIGO_DB_USER=root JIGO_DB_PASSWORD=local-test-only
 
-.PHONY: visual visual-update css-format css-check release-check e2e fast integ db-reset dev-db lint lint-py lint-php check
+.PHONY: js-format js-check visual visual-update css-format css-check release-check e2e fast integ db-reset dev-db lint lint-py lint-php check
 # Le code exige PHP >= 8.1 (expression throw, array_is_list) ; le serveur est en 8.2.
 PHP ?= $(shell command -v php8.3 || command -v php8.2 || command -v php8.4 || echo php)
 fast:
@@ -16,6 +16,11 @@ lint-php:
 	@git ls-files '*.php' | while read f; do $(PHP) -l "$$f" | grep -v '^No syntax errors' && exit 1; done; echo "php -l : OK ($(PHP))"
 css-format:   ## formate les feuilles CSS (Prettier 3.3.3, config .prettierrc)
 	npx --yes prettier@3.3.3 --write 'app/public/assets/*.css'
+js-format:   ## formate les scripts JS (Prettier 3.3.3, config .prettierrc)
+	npx --yes prettier@3.3.3 --write 'app/public/assets/*.js'
+js-check:   ## vérifie le formatage et la syntaxe des scripts JS
+	npx --yes prettier@3.3.3 --check 'app/public/assets/*.js'
+	@for f in app/public/assets/*.js; do node --check $$f || exit 1; done; echo 'JS : syntaxe OK'
 css-check:   ## vérifie formatage + garde-fous Halo
 	npx --yes prettier@3.3.3 --check 'app/public/assets/*.css'
 	python3 scripts/check_halo_css.py

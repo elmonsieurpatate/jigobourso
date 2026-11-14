@@ -1,224 +1,657 @@
 /* Jigobourso v2 — coque de l'application : navigation, graphiques SVG, dialogues, thème, compte. Le noyau (J.$, J.esc, J.api, formats, J.store, J.dom) est dans core.js. */
-'use strict';
+"use strict";
 
 /* ───── statuts et explications ───── */
-J.statusBadge = (status, label) => J.badge(label || status, { retained: 'ok', rejected: 'danger', unknown: 'warn', excluded: 'danger' }[status] || '');
-J.PERIODS = { day: 'Dernier jour', week: 'Dernière semaine', month: 'Dernier mois', quarter: 'Trois mois', half: 'Six mois', year: 'Un an' };
-J.CRITERIA = {
-  min_slope: ['pente', '% / séance', 'slope'], min_r2: ['régularité (R²)', '', 'r2'], min_er: ['efficacité (ER)', '', 'er'], min_return: ['performance', '%', 'perf'],
-  max_return: ['performance maximale', '%', 'perf'], max_volatility: ['volatilité', '% / séance', 'volatility'], max_drawdown: ['repli maximal', '%', 'drawdown'],
+J.statusBadge = (status, label) =>
+  J.badge(label || status, { retained: "ok", rejected: "danger", unknown: "warn", excluded: "danger" }[status] || "");
+J.PERIODS = {
+  day: "Dernier jour",
+  week: "Dernière semaine",
+  month: "Dernier mois",
+  quarter: "Trois mois",
+  half: "Six mois",
+  year: "Un an",
 };
-J.TECH = { above_ma50: 'Cours au-dessus de la moyenne 50 jours', ma50_rising: 'Moyenne 50 jours en hausse', max_daily_change: 'Variation du jour', max_gap_ma20: 'Écart à la moyenne 20 jours' };
+J.CRITERIA = {
+  min_slope: ["pente", "% / séance", "slope"],
+  min_r2: ["régularité (R²)", "", "r2"],
+  min_er: ["efficacité (ER)", "", "er"],
+  min_return: ["performance", "%", "perf"],
+  max_return: ["performance maximale", "%", "perf"],
+  max_volatility: ["volatilité", "% / séance", "volatility"],
+  max_drawdown: ["repli maximal", "%", "drawdown"],
+};
+J.TECH = {
+  above_ma50: "Cours au-dessus de la moyenne 50 jours",
+  ma50_rising: "Moyenne 50 jours en hausse",
+  max_daily_change: "Variation du jour",
+  max_gap_ma20: "Écart à la moyenne 20 jours",
+};
 J.explain = function (r) {
   const per = J.PERIODS[r.period] || r.period;
-  const ok = r.result === 'pass' ? 'pass' : r.result === 'fail' ? 'fail' : 'missing';
+  const ok = r.result === "pass" ? "pass" : r.result === "fail" ? "fail" : "missing";
   let text;
-  if (r.criterion === 'freshness') text = `Données non à jour : dernière clôture ${J.date(r.value)} (attendue ${J.date(r.threshold)}).`;
-  else if (r.criterion === 'coverage') text = `${per} : historique incomplet, ${J.num(r.value, 0)} clôtures disponibles sur ${J.num(r.threshold, 0)} séances attendues. Les indicateurs de chemin (volatilité, repli, ER) ne sont pas reconstruits à travers les séances absentes.`;
-  else if (r.criterion === 'data') {
-    const why = { history: 'historique trop court', break: 'saut de cours inhabituel dans la période (variation de plus de ×1,6 ou de moins de ÷1,6 en une séance) : mesure suspendue par prudence, l’origine du saut (split non ajusté, erreur de données ou vrai mouvement) n’étant pas établie', invalid: 'données inexploitables', coverage: 'historique insuffisant ou incomplet', calendar: 'calendrier de séances indisponible pour cette place', momentum: 'momentum non calculable (historique trop court ou clôture manquante à l’une des deux dates)' }[r.metric] || 'donnée absente';
-    text = `${r.period ? per : 'Momentum'} : ${why}${['history', 'coverage', 'invalid'].includes(r.metric) || !r.metric ? ` (${r.threshold} clôtures nécessaires).` : '.'}`;
-  }
-  else if (r.period === 'technical') text = `${J.TECH[r.criterion] || r.criterion} : ${r.result === 'missing' ? 'non évaluable' : r.result === 'pass' ? 'respecté' : 'non respecté'}.`;
+  if (r.criterion === "freshness")
+    text = `Données non à jour : dernière clôture ${J.date(r.value)} (attendue ${J.date(r.threshold)}).`;
+  else if (r.criterion === "coverage")
+    text = `${per} : historique incomplet, ${J.num(r.value, 0)} clôtures disponibles sur ${J.num(r.threshold, 0)} séances attendues. Les indicateurs de chemin (volatilité, repli, ER) ne sont pas reconstruits à travers les séances absentes.`;
+  else if (r.criterion === "data") {
+    const why =
+      {
+        history: "historique trop court",
+        break:
+          "saut de cours inhabituel dans la période (variation de plus de ×1,6 ou de moins de ÷1,6 en une séance) : mesure suspendue par prudence, l’origine du saut (split non ajusté, erreur de données ou vrai mouvement) n’étant pas établie",
+        invalid: "données inexploitables",
+        coverage: "historique insuffisant ou incomplet",
+        calendar: "calendrier de séances indisponible pour cette place",
+        momentum: "momentum non calculable (historique trop court ou clôture manquante à l’une des deux dates)",
+      }[r.metric] || "donnée absente";
+    text = `${r.period ? per : "Momentum"} : ${why}${["history", "coverage", "invalid"].includes(r.metric) || !r.metric ? ` (${r.threshold} clôtures nécessaires).` : "."}`;
+  } else if (r.period === "technical")
+    text = `${J.TECH[r.criterion] || r.criterion} : ${r.result === "missing" ? "non évaluable" : r.result === "pass" ? "respecté" : "non respecté"}.`;
   else {
-    const [label, unit] = J.CRITERIA[r.criterion] || [r.criterion, ''];
-    const min = r.criterion.startsWith('min');
-    const d = r.metric === 'r2' || r.metric === 'er' ? 2 : 3;
-    text = `${per} : ${label} ${J.num(r.value, d)}${unit && unit !== '' ? ' ' + unit : ''} — ${min ? 'minimum' : 'maximum'} ${J.num(r.threshold, d)}.`;
+    const [label, unit] = J.CRITERIA[r.criterion] || [r.criterion, ""];
+    const min = r.criterion.startsWith("min");
+    const d = r.metric === "r2" || r.metric === "er" ? 2 : 3;
+    text = `${per} : ${label} ${J.num(r.value, d)}${unit && unit !== "" ? " " + unit : ""} — ${min ? "minimum" : "maximum"} ${J.num(r.threshold, d)}.`;
   }
-  return `<div class="reason ${ok}"><span class="mark">${ok === 'pass' ? '✓' : ok === 'fail' ? '✗' : '?'}</span><span>${J.esc(text)}</span></div>`;
+  return `<div class="reason ${ok}"><span class="mark">${ok === "pass" ? "✓" : ok === "fail" ? "✗" : "?"}</span><span>${J.esc(text)}</span></div>`;
 };
 
 /* ───── graphiques SVG ───── */
 J.spark = function (values, w = 120, h = 34) {
   if (!values || values.length < 2) return '<span class="muted small">–</span>';
-  const min = Math.min(...values), max = Math.max(...values), span = max - min || 1;
-  const pts = values.map((v, i) => [i * (w / (values.length - 1)), h - 3 - (v - min) / span * (h - 6)]);
-  const d = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join('');
+  const min = Math.min(...values),
+    max = Math.max(...values),
+    span = max - min || 1;
+  const pts = values.map((v, i) => [i * (w / (values.length - 1)), h - 3 - ((v - min) / span) * (h - 6)]);
+  const d = pts.map((p, i) => (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1)).join("");
   const up = values[values.length - 1] >= values[0];
-  return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" data-style="color:var(--${up ? 'up' : 'down'})"><path class="area" d="${d}L${w} ${h}L0 ${h}Z"/><path d="${d}" stroke="currentColor"/></svg>`;
+  return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" data-style="color:var(--${up ? "up" : "down"})"><path class="area" d="${d}L${w} ${h}L0 ${h}Z"/><path d="${d}" stroke="currentColor"/></svg>`;
 };
-J.lineChart = function (el, series, { ma = [], unit = '', time = false } = {}) {
+J.lineChart = function (el, series, { ma = [], unit = "", time = false } = {}) {
   /* series : [[x, y]] avec x = libellé de date ; ma : [[x, y]] moyenne mobile */
-  const W = 900, H = 260, L = 8, R = 56, T = 12, B = 24;
-  if (!series || series.length < 2) { el.innerHTML = '<div class="empty">Pas assez de données pour tracer la courbe.</div>'; return; }
-  const ys = series.map(p => p[1]).concat(ma.map(p => p[1]));
-  let min = Math.min(...ys), max = Math.max(...ys); const pad = (max - min) * .06 || 1; min -= pad; max += pad;
-  const X = i => L + i * (W - L - R) / (series.length - 1), Y = v => T + (max - v) / (max - min) * (H - T - B);
-  const path = series.map((p, i) => (i ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(p[1]).toFixed(1)).join('');
-  let grid = '';
-  for (let k = 0; k <= 4; k++) { const v = min + (max - min) * k / 4, y = Y(v); grid += `<line class="grid" x1="${L}" x2="${W - R}" y1="${y}" y2="${y}"/><text x="${W - R + 6}" y="${y + 4}">${J.num(v, v > 100 ? 0 : 2)}</text>`; }
-  let xl = '';
-  for (let k = 0; k <= 4; k++) { const i = Math.round(k * (series.length - 1) / 4); xl += `<text x="${X(i)}" y="${H - 6}" text-anchor="${k === 0 ? 'start' : k === 4 ? 'end' : 'middle'}">${J.esc(time ? String(series[i][0]).slice(11, 16) : J.date(series[i][0]))}</text>`; }
+  const W = 900,
+    H = 260,
+    L = 8,
+    R = 56,
+    T = 12,
+    B = 24;
+  if (!series || series.length < 2) {
+    el.innerHTML = '<div class="empty">Pas assez de données pour tracer la courbe.</div>';
+    return;
+  }
+  const ys = series.map((p) => p[1]).concat(ma.map((p) => p[1]));
+  let min = Math.min(...ys),
+    max = Math.max(...ys);
+  const pad = (max - min) * 0.06 || 1;
+  min -= pad;
+  max += pad;
+  const X = (i) => L + (i * (W - L - R)) / (series.length - 1),
+    Y = (v) => T + ((max - v) / (max - min)) * (H - T - B);
+  const path = series.map((p, i) => (i ? "L" : "M") + X(i).toFixed(1) + " " + Y(p[1]).toFixed(1)).join("");
+  let grid = "";
+  for (let k = 0; k <= 4; k++) {
+    const v = min + ((max - min) * k) / 4,
+      y = Y(v);
+    grid += `<line class="grid" x1="${L}" x2="${W - R}" y1="${y}" y2="${y}"/><text x="${W - R + 6}" y="${y + 4}">${J.num(v, v > 100 ? 0 : 2)}</text>`;
+  }
+  let xl = "";
+  for (let k = 0; k <= 4; k++) {
+    const i = Math.round((k * (series.length - 1)) / 4);
+    xl += `<text x="${X(i)}" y="${H - 6}" text-anchor="${k === 0 ? "start" : k === 4 ? "end" : "middle"}">${J.esc(time ? String(series[i][0]).slice(11, 16) : J.date(series[i][0]))}</text>`;
+  }
   const off = series.length - ma.length;
-  const maPath = ma.length > 1 ? ma.map((p, i) => (i ? 'L' : 'M') + X(i + off).toFixed(1) + ' ' + Y(p[1]).toFixed(1)).join('') : '';
-  el.innerHTML = `<svg class="chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Évolution du cours">${grid}${xl}<path class="area" d="${path}L${X(series.length - 1)} ${H - B}L${L} ${H - B}Z"/>${maPath ? `<path class="ma" d="${maPath}"/>` : ''}<path class="line" d="${path}"/><g id="hover"></g><rect x="${L}" y="${T}" width="${W - L - R}" height="${H - T - B}" fill="transparent" id="hit"/></svg><div class="small muted" id="readout" data-style="min-height:1.4em"></div>`;
-  const svg = el.querySelector('svg'), hit = el.querySelector('#hit'), ro = el.querySelector('#readout'), hv = el.querySelector('#hover');
-  hit.addEventListener('mousemove', e => {
-    const r = svg.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * W, i = Math.max(0, Math.min(series.length - 1, Math.round((x - L) / ((W - L - R) / (series.length - 1)))));
+  const maPath =
+    ma.length > 1 ? ma.map((p, i) => (i ? "L" : "M") + X(i + off).toFixed(1) + " " + Y(p[1]).toFixed(1)).join("") : "";
+  el.innerHTML = `<svg class="chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Évolution du cours">${grid}${xl}<path class="area" d="${path}L${X(series.length - 1)} ${H - B}L${L} ${H - B}Z"/>${maPath ? `<path class="ma" d="${maPath}"/>` : ""}<path class="line" d="${path}"/><g id="hover"></g><rect x="${L}" y="${T}" width="${W - L - R}" height="${H - T - B}" fill="transparent" id="hit"/></svg><div class="small muted" id="readout" data-style="min-height:1.4em"></div>`;
+  const svg = el.querySelector("svg"),
+    hit = el.querySelector("#hit"),
+    ro = el.querySelector("#readout"),
+    hv = el.querySelector("#hover");
+  hit.addEventListener("mousemove", (e) => {
+    const r = svg.getBoundingClientRect(),
+      x = ((e.clientX - r.left) / r.width) * W,
+      i = Math.max(0, Math.min(series.length - 1, Math.round((x - L) / ((W - L - R) / (series.length - 1)))));
     hv.innerHTML = `<circle cx="${X(i)}" cy="${Y(series[i][1])}" r="4" fill="var(--accent)"/>`;
-    ro.textContent = (time ? J.dateTime(series[i][0]) : J.date(series[i][0])) + ' — ' + J.num(series[i][1], 2) + (unit ? ' ' + unit : '');
+    ro.textContent =
+      (time ? J.dateTime(series[i][0]) : J.date(series[i][0])) +
+      " — " +
+      J.num(series[i][1], 2) +
+      (unit ? " " + unit : "");
   });
-  hit.addEventListener('mouseleave', () => { hv.innerHTML = ''; ro.textContent = ''; });
+  hit.addEventListener("mouseleave", () => {
+    hv.innerHTML = "";
+    ro.textContent = "";
+  });
 };
-J.barChart = function (el, data, { unit = '€' } = {}) {
-  if (!data.length) { el.innerHTML = '<div class="empty">Aucune vente enregistrée.</div>'; return; }
-  const W = 600, H = 200, B = 26, max = Math.max(...data.map(d => Math.abs(d[1])), 1), bw = Math.min(70, (W - 20) / data.length - 12), mid = (H - B) / 2;
-  el.innerHTML = `<svg class="chart" viewBox="0 0 ${W} ${H}" data-style="height:200px"><line class="grid" x1="0" x2="${W}" y1="${mid}" y2="${mid}"/>${data.map((d, i) => { const x = 20 + i * ((W - 20) / data.length), h = Math.abs(d[1]) / max * (mid - 18); return `<rect x="${x}" y="${d[1] >= 0 ? mid - h : mid}" width="${bw}" height="${Math.max(h, 1)}" rx="5" fill="var(--${d[1] >= 0 ? 'up' : 'down'})"/><text x="${x + bw / 2}" y="${H - 8}" text-anchor="middle">${J.esc(d[0])}</text><text x="${x + bw / 2}" y="${d[1] >= 0 ? mid - h - 4 : mid + h + 12}" text-anchor="middle">${J.num(d[1], 0)} ${unit}</text>`; }).join('')}</svg>`;
+J.barChart = function (el, data, { unit = "€" } = {}) {
+  if (!data.length) {
+    el.innerHTML = '<div class="empty">Aucune vente enregistrée.</div>';
+    return;
+  }
+  const W = 600,
+    H = 200,
+    B = 26,
+    max = Math.max(...data.map((d) => Math.abs(d[1])), 1),
+    bw = Math.min(70, (W - 20) / data.length - 12),
+    mid = (H - B) / 2;
+  el.innerHTML = `<svg class="chart" viewBox="0 0 ${W} ${H}" data-style="height:200px"><line class="grid" x1="0" x2="${W}" y1="${mid}" y2="${mid}"/>${data
+    .map((d, i) => {
+      const x = 20 + i * ((W - 20) / data.length),
+        h = (Math.abs(d[1]) / max) * (mid - 18);
+      return `<rect x="${x}" y="${d[1] >= 0 ? mid - h : mid}" width="${bw}" height="${Math.max(h, 1)}" rx="5" fill="var(--${d[1] >= 0 ? "up" : "down"})"/><text x="${x + bw / 2}" y="${H - 8}" text-anchor="middle">${J.esc(d[0])}</text><text x="${x + bw / 2}" y="${d[1] >= 0 ? mid - h - 4 : mid + h + 12}" text-anchor="middle">${J.num(d[1], 0)} ${unit}</text>`;
+    })
+    .join("")}</svg>`;
 };
 
 /* ───── dialogues, messages ───── */
-J.toast = function (msg) { const t = J.dom.h('div.toast', { role: 'status', 'aria-live': 'polite', text: msg }); document.body.appendChild(t); setTimeout(() => t.remove(), 3200); };
+J.toast = function (msg) {
+  const t = J.dom.h("div.toast", { role: "status", "aria-live": "polite", text: msg });
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3200);
+};
 /* Protection des gains (version du 3 novembre) : meilleur gain observé, gain actuel, gain rendu, barre « part du gain conservée », statut coloré. */
-J.INSIGHT = { normal: ['ok', 'Normal'], watch: ['warn', 'À surveiller'], act: ['danger', 'À examiner'], unknown: ['', 'Données insuffisantes'] };
-J.insightBadge = i => { const c = J.INSIGHT[(i && i.status) || 'unknown'] || J.INSIGHT.unknown; return J.badge((i && i.label) || c[1], c[0]); };
-J.keptShare = g => { const used = Math.max(0, g.peak_gain_pct); return Math.max(0, Math.min(100, used > 0 ? 100 * Math.max(0, g.gain_pct) / used : 0)); };
+J.INSIGHT = {
+  normal: ["ok", "Normal"],
+  watch: ["warn", "À surveiller"],
+  act: ["danger", "À examiner"],
+  unknown: ["", "Données insuffisantes"],
+};
+J.insightBadge = (i) => {
+  const c = J.INSIGHT[(i && i.status) || "unknown"] || J.INSIGHT.unknown;
+  return J.badge((i && i.label) || c[1], c[0]);
+};
+J.keptShare = (g) => {
+  const used = Math.max(0, g.peak_gain_pct);
+  return Math.max(0, Math.min(100, used > 0 ? (100 * Math.max(0, g.gain_pct)) / used : 0));
+};
 J.gainProtection = (g, px, compact) => {
-  if (!g || !g.available) return `<p class="small muted">${J.esc((g && g.reason) || 'Sommet depuis l’achat indisponible.')}</p>`;
-  const kept = J.keptShare(g), money = px || ((v, c) => J.money(v, c || 'EUR'));
+  if (!g || !g.available)
+    return `<p class="small muted">${J.esc((g && g.reason) || "Sommet depuis l’achat indisponible.")}</p>`;
+  const kept = J.keptShare(g),
+    money = px || ((v, c) => J.money(v, c || "EUR"));
   return `<div class="protection"><div class="protection-values"><span>Meilleur gain observé <b>${J.pct(g.peak_gain_pct, 1)}</b></span><span>Actuel <b class="${J.cls(g.gain_pct)}">${J.pct(g.gain_pct, 1)}</b></span><span>Gain rendu <b>${J.num(g.given_back_pp, 1)} points</b></span></div><div class="protection-track" role="img" aria-label="${J.num(kept, 0)} % du gain positif observé conservé"><i data-style="width:${kept.toFixed(2)}%"></i></div>${compact ? `<p class="small muted">Suivi depuis le ${J.date(g.start)} · sommet ${money(g.high, g.currency)} · recul −${J.num(g.drop_pct, 2)} %.</p>` : `<p class="small muted">Recul du cours : −${J.num(g.drop_pct, 2)} % depuis le sommet observé ${money(g.high, g.currency)}. Référence : ${J.date(g.start)} ; dernière valeur du ${J.date(g.value_date)} ; sommet du gain le ${J.date(g.peak_date)}.</p>`}</div>`;
 };
 /* Barre de risque d'un achat (moteur : engine/analytics/portfolio/risk.py). Un repère, jamais un ordre : rien n'est vendu automatiquement. */
-J.RISK = { ok: ['ok', 'Tendance intacte'], watch: ['watch', 'À surveiller'], act: ['act', 'Vente à envisager'], na: ['na', 'Non évaluée'] };
-J.riskWorst = list => { const order = ['na', 'ok', 'watch', 'act']; return (list || []).filter(r => r && r.level).sort((a, b) => order.indexOf(b.level) - order.indexOf(a.level))[0] || null; };
-J.riskBar = (r, opt = {}) => {
-  if (!r || !r.level) return '';
-  const [cls, label] = J.RISK[r.level] || J.RISK.na, pct = r.level === 'na' ? 0 : Math.max(8, Math.round(100 * (r.score || 0) / (r.max || 6)));
-  const why = (r.level === 'na' ? [r.message] : (r.signals || []).map(x => x.label + ' : ' + x.message)).concat(r.info ? [r.info] : []).filter(Boolean).join('\n');
-  return `<span class="rbar ${cls}${opt.compact ? ' compact' : ''}" role="img" aria-label="Risque : ${J.esc(label)}${r.level === 'na' ? '' : ', ' + (r.score || 0) + ' sur ' + (r.max || 6)}" title="${J.esc(why)}"><span class="rbar-track"><i data-style="width:${pct}%"></i></span><b>${J.esc(label)}</b></span>`;
+J.RISK = {
+  ok: ["ok", "Tendance intacte"],
+  watch: ["watch", "À surveiller"],
+  act: ["act", "Vente à envisager"],
+  na: ["na", "Non évaluée"],
 };
-J.riskDetail = r => !r || !r.level ? '' : r.level === 'na' ? `<p class="small muted">${J.esc(r.message || 'Non évaluée.')}</p>` :
-  `<ul class="rbar-why">${(r.signals || []).map(x => `<li class="p${x.points}"><b>${J.esc(x.label)}</b> ${J.esc(x.message)}</li>`).join('')}${r.info ? `<li class="info">${J.esc(r.info)}</li>` : ''}</ul>`;
+J.riskWorst = (list) => {
+  const order = ["na", "ok", "watch", "act"];
+  return (
+    (list || []).filter((r) => r && r.level).sort((a, b) => order.indexOf(b.level) - order.indexOf(a.level))[0] || null
+  );
+};
+J.riskBar = (r, opt = {}) => {
+  if (!r || !r.level) return "";
+  const [cls, label] = J.RISK[r.level] || J.RISK.na,
+    pct = r.level === "na" ? 0 : Math.max(8, Math.round((100 * (r.score || 0)) / (r.max || 6)));
+  const why = (r.level === "na" ? [r.message] : (r.signals || []).map((x) => x.label + " : " + x.message))
+    .concat(r.info ? [r.info] : [])
+    .filter(Boolean)
+    .join("\n");
+  return `<span class="rbar ${cls}${opt.compact ? " compact" : ""}" role="img" aria-label="Risque : ${J.esc(label)}${r.level === "na" ? "" : ", " + (r.score || 0) + " sur " + (r.max || 6)}" title="${J.esc(why)}"><span class="rbar-track"><i data-style="width:${pct}%"></i></span><b>${J.esc(label)}</b></span>`;
+};
+J.riskDetail = (r) =>
+  !r || !r.level
+    ? ""
+    : r.level === "na"
+      ? `<p class="small muted">${J.esc(r.message || "Non évaluée.")}</p>`
+      : `<ul class="rbar-why">${(r.signals || []).map((x) => `<li class="p${x.points}"><b>${J.esc(x.label)}</b> ${J.esc(x.message)}</li>`).join("")}${r.info ? `<li class="info">${J.esc(r.info)}</li>` : ""}</ul>`;
 
 J.dialog = function ({ title, body, actions = [], onopen }) {
-  const d = J.dom.h('dialog');
+  const d = J.dom.h("dialog");
   d.innerHTML = `<form method="dialog"><div class="head"><h2 class="m-0">${J.esc(title)}</h2><button class="btn sm" value="x" aria-label="Fermer">✕</button></div><div class="body">${body}</div><div class="foot"></div></form>`;
-  const foot = d.querySelector('.foot');
-  actions.forEach(a => { const b = J.dom.h('button.btn', { type: 'button', class: a.cls, text: a.label, on: { click: async () => { try { b.disabled = true; const keep = await a.run(d); if (!keep) d.close(); } catch (e) { J.formError(d, e.message); } finally { b.disabled = false; } } } }); foot.appendChild(b); });
-  document.body.appendChild(d); d.addEventListener('close', () => d.remove()); d.showModal(); if (onopen) onopen(d); return d;
+  const foot = d.querySelector(".foot");
+  actions.forEach((a) => {
+    const b = J.dom.h("button.btn", {
+      type: "button",
+      class: a.cls,
+      text: a.label,
+      on: {
+        click: async () => {
+          try {
+            b.disabled = true;
+            const keep = await a.run(d);
+            if (!keep) d.close();
+          } catch (e) {
+            J.formError(d, e.message);
+          } finally {
+            b.disabled = false;
+          }
+        },
+      },
+    });
+    foot.appendChild(b);
+  });
+  document.body.appendChild(d);
+  d.addEventListener("close", () => d.remove());
+  d.showModal();
+  if (onopen) onopen(d);
+  return d;
 };
-J.formError = (d, msg) => { let e = d.querySelector('.notice.err'); if (!e) { e = J.dom.h('div.notice.err'); d.querySelector('.body').appendChild(e); } e.textContent = msg; };
-J.confirm = (title, text, okLabel = 'Confirmer') => new Promise(res => { let done = false; const d = J.dialog({ title, body: `<p>${J.esc(text)}</p>`, actions: [{ label: 'Annuler', run: () => { } }, { label: okLabel, cls: 'primary', run: () => { done = true; } }] }); d.addEventListener('close', () => res(done)); });
+J.formError = (d, msg) => {
+  let e = d.querySelector(".notice.err");
+  if (!e) {
+    e = J.dom.h("div.notice.err");
+    d.querySelector(".body").appendChild(e);
+  }
+  e.textContent = msg;
+};
+J.confirm = (title, text, okLabel = "Confirmer") =>
+  new Promise((res) => {
+    let done = false;
+    const d = J.dialog({
+      title,
+      body: `<p>${J.esc(text)}</p>`,
+      actions: [
+        { label: "Annuler", run: () => {} },
+        {
+          label: okLabel,
+          cls: "primary",
+          run: () => {
+            done = true;
+          },
+        },
+      ],
+    });
+    d.addEventListener("close", () => res(done));
+  });
 J.field = (label, input) => `<label class="field">${J.esc(label)}${input}</label>`;
 
 /* ───── page : en-tête commun ───── */
 J.init = async function (page, { admin = false } = {}) {
-  const me = await J.api('auth/me');
-  if (!me.user) { location.href = 'login.html?next=' + encodeURIComponent(location.pathname.split('/').pop() + location.search); return null; }
-  if (admin && !me.user.is_admin) { location.href = 'index.html'; return null; }
+  const me = await J.api("auth/me");
+  if (!me.user) {
+    location.href = "login.html?next=" + encodeURIComponent(location.pathname.split("/").pop() + location.search);
+    return null;
+  }
+  if (admin && !me.user.is_admin) {
+    location.href = "index.html";
+    return null;
+  }
   J.user = me.user;
-  const main = document.querySelector('main');          // lien d'évitement : premier élément focalisable de la page
-  if (main && !document.querySelector('.skip-link')) { main.id = main.id || 'contenu'; main.tabIndex = -1; const skip = document.createElement('a'); skip.className = 'skip-link'; skip.href = '#' + main.id; skip.textContent = 'Aller au contenu'; document.body.prepend(skip); }
+  const main = document.querySelector("main"); // lien d'évitement : premier élément focalisable de la page
+  if (main && !document.querySelector(".skip-link")) {
+    main.id = main.id || "contenu";
+    main.tabIndex = -1;
+    const skip = document.createElement("a");
+    skip.className = "skip-link";
+    skip.href = "#" + main.id;
+    skip.textContent = "Aller au contenu";
+    document.body.prepend(skip);
+  }
   const prefs = me.user.prefs || {};
-  J.applyTheme(prefs.theme || J.store.text.get('jigo_theme') || 'auto');
-  document.body.classList.toggle('advanced', prefs.mode === 'advanced');
+  J.applyTheme(prefs.theme || J.store.text.get("jigo_theme") || "auto");
+  document.body.classList.toggle("advanced", prefs.mode === "advanced");
   J.buildShell(page, me.user);
   return me.user;
 };
 
 /* ───── coquille : barre latérale repliable à sous-menus, en-tête, tiroir mobile ───── */
 J.ICONS = {
-  compass: '<circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/>', bell: '<path d="M6 17h12l-1.5-2V10a4.5 4.5 0 0 0-9 0v5z"/><path d="M10 20h4"/>', wallet: '<path d="M3 7a2 2 0 0 1 2-2h13v4"/><path d="M3 7v10a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1H5a2 2 0 0 1-2-1"/><circle cx="16" cy="13.5" r="1"/>',
-  chart: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>', pulse: '<path d="M3 12h4l3-8 4 16 3-8h4"/>', db: '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/>',
-  shield: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/>', menu: '<path d="M4 6h16M4 12h16M4 18h16"/>', search: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>',
-  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>', moon: '<path d="M21 13a8 8 0 1 1-10-10 7 7 0 0 0 10 10z"/>',
-  panel: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/>', chev: '<path d="M9 6l6 6-6 6"/>',
-  help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 1-1 1.7M12 17h.01"/>', info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5h.01"/>',
-  book: '<path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 21V5M9 7h6"/>', sliders: '<path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/>',
-  cols: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M15 4v16"/>', funnel: '<path d="M3 5h18l-7 8v6l-4-2v-4z"/>', target: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>',
-  rocket: '<path d="M5 15c-1 1-1.5 4-1.5 4s3-.5 4-1.5M14 4c3 0 6 3 6 6-3 5-6 7-9 7l-4-4c0-3 2-6 7-9z"/><circle cx="14.5" cy="9.5" r="1.4"/>', trend: '<path d="M3 17l6-6 4 4 8-9M15 6h6v6"/>',
-  leaf: '<path d="M5 19c0-9 5-14 15-14 0 10-5 15-14 15M5 19l8-8"/>', rebound: '<path d="M4 6v6h6M4 12c1.5-4 5-6 9-6 4 0 7 3 7 7s-3 7-7 7"/>', gauge: '<path d="M4 17a8 8 0 1 1 16 0M12 17l4-5"/>',
-  clock6: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>', shieldcheck: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
-  user: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>', check: '<path d="M5 12l5 5 9-10"/>', undo: '<path d="M9 14L4 9l5-5M4 9h11a5 5 0 0 1 0 10h-3"/>', compare: '<path d="M7 4v16M17 4v16M3 8l4-4 4 4M13 16l4 4 4-4"/>',
+  compass: '<circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/>',
+  bell: '<path d="M6 17h12l-1.5-2V10a4.5 4.5 0 0 0-9 0v5z"/><path d="M10 20h4"/>',
+  wallet:
+    '<path d="M3 7a2 2 0 0 1 2-2h13v4"/><path d="M3 7v10a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1H5a2 2 0 0 1-2-1"/><circle cx="16" cy="13.5" r="1"/>',
+  chart: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+  pulse: '<path d="M3 12h4l3-8 4 16 3-8h4"/>',
+  db: '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/>',
+  shield: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/>',
+  menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
+  search: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  moon: '<path d="M21 13a8 8 0 1 1-10-10 7 7 0 0 0 10 10z"/>',
+  panel: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/>',
+  chev: '<path d="M9 6l6 6-6 6"/>',
+  help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 1-1 1.7M12 17h.01"/>',
+  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5h.01"/>',
+  book: '<path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 21V5M9 7h6"/>',
+  sliders: '<path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/>',
+  cols: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M15 4v16"/>',
+  funnel: '<path d="M3 5h18l-7 8v6l-4-2v-4z"/>',
+  target: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>',
+  rocket:
+    '<path d="M5 15c-1 1-1.5 4-1.5 4s3-.5 4-1.5M14 4c3 0 6 3 6 6-3 5-6 7-9 7l-4-4c0-3 2-6 7-9z"/><circle cx="14.5" cy="9.5" r="1.4"/>',
+  trend: '<path d="M3 17l6-6 4 4 8-9M15 6h6v6"/>',
+  leaf: '<path d="M5 19c0-9 5-14 15-14 0 10-5 15-14 15M5 19l8-8"/>',
+  rebound: '<path d="M4 6v6h6M4 12c1.5-4 5-6 9-6 4 0 7 3 7 7s-3 7-7 7"/>',
+  gauge: '<path d="M4 17a8 8 0 1 1 16 0M12 17l4-5"/>',
+  clock6: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+  shieldcheck: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
+  user: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>',
+  check: '<path d="M5 12l5 5 9-10"/>',
+  undo: '<path d="M9 14L4 9l5-5M4 9h11a5 5 0 0 1 0 10h-3"/>',
+  compare: '<path d="M7 4v16M17 4v16M3 8l4-4 4 4M13 16l4 4 4-4"/>',
 };
-J.icon = (n, cls = 'ic') => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">${J.ICONS[n] || (window.STRATEGY_ICONS || {})[n] || ''}</svg>`;
+J.icon = (n, cls = "ic") =>
+  `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">${J.ICONS[n] || (window.STRATEGY_ICONS || {})[n] || ""}</svg>`;
 J.NAV = (admin) => [
-  { id: 'aide', label: 'Aide', icon: 'help', file: ['aide.html'], href: 'aide.html' },
-  { sec: 'Marchés' },
-  { id: 'explorer', label: 'Explorer', icon: 'compass', file: ['index.html', 'titre.html', 'mes-filtres.html', 'mes-strategies.html', 'mes-scores.html', 'mes-colonnes.html'], children: [
-    { label: 'Recherche et résultats', href: 'index.html', icon: 'search', on: () => true },
-    { label: 'Mes stratégies', href: 'mes-strategies.html', icon: 'target', on: (q, h) => h !== '#criteres' },
-    { label: 'Mes critères de recherche', href: 'mes-strategies.html#criteres', icon: 'sliders', on: (q, h) => h === '#criteres' },
-    { label: 'Mes paramètres de scores', href: 'mes-scores.html', icon: 'gauge', on: () => true },
-    { label: 'Mes colonnes et tris', href: 'mes-colonnes.html', icon: 'cols', on: () => true },
-    { label: 'Mes filtres et catégories', href: 'mes-filtres.html', icon: 'funnel', on: () => true }] },
-  { sec: 'Mon patrimoine' },
-  { id: 'portefeuilles', label: 'Portefeuilles', icon: 'wallet', file: ['portefeuilles.html'], dynamic: 'portfolios', children: [{ label: 'Vue d’ensemble', href: 'portefeuilles.html', on: q => !q.has('id') }] },
-  { id: 'bilan', label: 'Bilans', icon: 'chart', file: ['bilan.html'], children: [{ label: 'Bilan global', href: 'bilan.html', on: () => true }] },
-  { sec: 'Méthode' },
-  { id: 'suivi', label: 'Suivi des classements', icon: 'pulse', file: ['suivi.html'], href: 'suivi.html' },
-  ...(admin ? [{ sec: 'Administration technique' }, { id: 'admin', label: 'Administration', icon: 'shield', file: ['admin.html', 'admin-filtres.html', 'donnees.html', 'splits.html'], children: [
-    { label: 'FinanceDatabase', href: 'admin.html#fdb', on: (q, h) => !h || h === '#fdb' }, { label: 'Yahoo Finance', href: 'admin.html#yahoo', on: (q, h) => h === '#yahoo' },
-    { label: 'Actions / ETF', href: 'admin.html#titres', on: (q, h) => h === '#titres' }, { label: 'Cron', href: 'admin.html#cron', on: (q, h) => h === '#cron' }, { label: 'Journaux', href: 'admin.html#logs', on: (q, h) => h === '#logs' },
-    { label: 'Splits', href: 'splits.html', on: () => true }, { label: 'Données', href: 'donnees.html', on: () => true }, { label: 'Utilisateurs', href: 'admin.html#users', on: (q, h) => h === '#users' }, { label: 'Réglages', href: 'admin.html#settings', on: (q, h) => h === '#settings' },
-    ] }] : [])
+  { id: "aide", label: "Aide", icon: "help", file: ["aide.html"], href: "aide.html" },
+  { sec: "Marchés" },
+  {
+    id: "explorer",
+    label: "Explorer",
+    icon: "compass",
+    file: [
+      "index.html",
+      "titre.html",
+      "mes-filtres.html",
+      "mes-strategies.html",
+      "mes-scores.html",
+      "mes-colonnes.html",
+    ],
+    children: [
+      { label: "Recherche et résultats", href: "index.html", icon: "search", on: () => true },
+      { label: "Mes stratégies", href: "mes-strategies.html", icon: "target", on: (q, h) => h !== "#criteres" },
+      {
+        label: "Mes critères de recherche",
+        href: "mes-strategies.html#criteres",
+        icon: "sliders",
+        on: (q, h) => h === "#criteres",
+      },
+      { label: "Mes paramètres de scores", href: "mes-scores.html", icon: "gauge", on: () => true },
+      { label: "Mes colonnes et tris", href: "mes-colonnes.html", icon: "cols", on: () => true },
+      { label: "Mes filtres et catégories", href: "mes-filtres.html", icon: "funnel", on: () => true },
+    ],
+  },
+  { sec: "Mon patrimoine" },
+  {
+    id: "portefeuilles",
+    label: "Portefeuilles",
+    icon: "wallet",
+    file: ["portefeuilles.html"],
+    dynamic: "portfolios",
+    children: [{ label: "Vue d’ensemble", href: "portefeuilles.html", on: (q) => !q.has("id") }],
+  },
+  {
+    id: "bilan",
+    label: "Bilans",
+    icon: "chart",
+    file: ["bilan.html"],
+    children: [{ label: "Bilan global", href: "bilan.html", on: () => true }],
+  },
+  { sec: "Méthode" },
+  { id: "suivi", label: "Suivi des classements", icon: "pulse", file: ["suivi.html"], href: "suivi.html" },
+  ...(admin
+    ? [
+        { sec: "Administration technique" },
+        {
+          id: "admin",
+          label: "Administration",
+          icon: "shield",
+          file: ["admin.html", "admin-filtres.html", "donnees.html", "splits.html"],
+          children: [
+            { label: "FinanceDatabase", href: "admin.html#fdb", on: (q, h) => !h || h === "#fdb" },
+            { label: "Yahoo Finance", href: "admin.html#yahoo", on: (q, h) => h === "#yahoo" },
+            { label: "Actions / ETF", href: "admin.html#titres", on: (q, h) => h === "#titres" },
+            { label: "Cron", href: "admin.html#cron", on: (q, h) => h === "#cron" },
+            { label: "Journaux", href: "admin.html#logs", on: (q, h) => h === "#logs" },
+            { label: "Splits", href: "splits.html", on: () => true },
+            { label: "Données", href: "donnees.html", on: () => true },
+            { label: "Utilisateurs", href: "admin.html#users", on: (q, h) => h === "#users" },
+            { label: "Réglages", href: "admin.html#settings", on: (q, h) => h === "#settings" },
+          ],
+        },
+      ]
+    : []),
 ];
 J.buildShell = function (page, user) {
-  const file = location.pathname.split('/').pop() || 'index.html', store = J.store.text;
-  const nav = J.NAV(user.is_admin), narrow = () => matchMedia('(max-width: 960px)').matches;
-  const isOn = c => { const href = c.href.split('#')[0].split('?')[0]; return href === file && c.on(new URLSearchParams(location.search), location.hash); };
-  let opened; try { opened = JSON.parse(store.get('jigo_nav_open') || '{}'); } catch (e) { opened = {}; }
-  const html = nav.map(n => {
-    if (n.sec) return `<div class="sec">${J.esc(n.sec)}</div>`;
-    const here = n.file.includes(file);
-    if (!n.children) return `<a class="nv ${here ? 'on' : ''}" href="${n.href}" title="${J.esc(n.label)}">${J.icon(n.icon)}<span class="lbl">${J.esc(n.label)}</span></a>`;
-    const open = here || opened[n.id];
-    return `<div class="grp ${open ? 'open' : ''} ${here ? 'cur' : ''}" data-id="${n.id}"><button class="nv" type="button" aria-expanded="${!!open}" title="${J.esc(n.label)}">${J.icon(n.icon)}<span class="lbl">${J.esc(n.label)}</span>${J.icon('chev', 'chev')}</button>
-      <div class="sub" data-sub="${n.id}">${n.children.map(c => c.head ? `<div class="sh">${J.esc(c.head)}</div>` : `<a class="sv ${here && isOn(c) ? 'on' : ''}" href="${c.href}">${J.esc(c.label)}</a>`).join('')}</div></div>`;
-  }).join('');
-  const initial = (user.username || '?').slice(0, 1);
-  document.body.classList.add('has-shell');
-  if (store.get('jigo_side') === 'collapsed' && !narrow()) document.body.classList.add('side-collapsed');
-  document.body.insertAdjacentHTML('afterbegin', `<aside class="side" id="side" aria-label="Navigation principale">
+  const file = location.pathname.split("/").pop() || "index.html",
+    store = J.store.text;
+  const nav = J.NAV(user.is_admin),
+    narrow = () => matchMedia("(max-width: 960px)").matches;
+  const isOn = (c) => {
+    const href = c.href.split("#")[0].split("?")[0];
+    return href === file && c.on(new URLSearchParams(location.search), location.hash);
+  };
+  let opened;
+  try {
+    opened = JSON.parse(store.get("jigo_nav_open") || "{}");
+  } catch (e) {
+    opened = {};
+  }
+  const html = nav
+    .map((n) => {
+      if (n.sec) return `<div class="sec">${J.esc(n.sec)}</div>`;
+      const here = n.file.includes(file);
+      if (!n.children)
+        return `<a class="nv ${here ? "on" : ""}" href="${n.href}" title="${J.esc(n.label)}">${J.icon(n.icon)}<span class="lbl">${J.esc(n.label)}</span></a>`;
+      const open = here || opened[n.id];
+      return `<div class="grp ${open ? "open" : ""} ${here ? "cur" : ""}" data-id="${n.id}"><button class="nv" type="button" aria-expanded="${!!open}" title="${J.esc(n.label)}">${J.icon(n.icon)}<span class="lbl">${J.esc(n.label)}</span>${J.icon("chev", "chev")}</button>
+      <div class="sub" data-sub="${n.id}">${n.children.map((c) => (c.head ? `<div class="sh">${J.esc(c.head)}</div>` : `<a class="sv ${here && isOn(c) ? "on" : ""}" href="${c.href}">${J.esc(c.label)}</a>`)).join("")}</div></div>`;
+    })
+    .join("");
+  const initial = (user.username || "?").slice(0, 1);
+  document.body.classList.add("has-shell");
+  if (store.get("jigo_side") === "collapsed" && !narrow()) document.body.classList.add("side-collapsed");
+  document.body.insertAdjacentHTML(
+    "afterbegin",
+    `<aside class="side" id="side" aria-label="Navigation principale">
     <a class="brand" href="index.html"><svg viewBox="0 0 28 28" aria-hidden="true"><rect width="28" height="28" rx="8" fill="#12a77b"/><path d="M5 20l6-7 4 4 8-10" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="23" cy="7" r="2.2" fill="#e8b73c"/></svg><span>Jigobourso<small>Analyse des marchés</small></span></a>
     <nav class="side-scroll" id="nav">${html}</nav>
-    <div class="side-foot"><button class="who" id="user-btn" type="button" title="Mon compte"><span class="avatar">${J.esc(initial)}</span><span><b>${J.esc(user.username)}</b><span>${user.is_admin ? 'Administrateur' : 'Utilisateur'}</span></span></button>
-      <button class="nv" id="collapse-btn" type="button" title="Réduire le menu">${J.icon('panel')}<span class="lbl">Réduire le menu</span></button></div></aside><div class="side-scrim" id="scrim"></div>
-    <header class="hdr"><button class="btn icon" id="menu-btn" type="button" aria-label="Afficher ou masquer le menu" aria-controls="side" aria-expanded="true">${J.icon('menu', '')}</button><div class="crumbs" id="crumbs"></div><span class="grow"></span>
-      <form id="quick-form" class="quick" role="search">${J.icon('search', '')}<input id="quick" type="search" placeholder="Rechercher un titre, un ISIN…" aria-label="Rechercher un titre"></form>
-      <button class="btn icon" id="theme-btn" type="button" aria-label="Changer de thème" title="Thème clair / sombre"></button></header>`);
-  const body = document.body, side = J.$('#side'), btn = J.$('#menu-btn');
-  const sync = () => { const open = narrow() ? body.classList.contains('side-open') : !body.classList.contains('side-collapsed'); btn.setAttribute('aria-expanded', open); J.$('#collapse-btn .lbl').textContent = 'Réduire le menu'; };
-  const toggle = () => { if (narrow()) body.classList.toggle('side-open'); else { body.classList.toggle('side-collapsed'); store.set('jigo_side', body.classList.contains('side-collapsed') ? 'collapsed' : 'open'); closeFly(); } sync(); };
-  btn.onclick = toggle; J.$('#collapse-btn').onclick = () => { if (narrow()) body.classList.remove('side-open'); else toggle(); sync(); };
-  J.$('#scrim').onclick = () => { body.classList.remove('side-open'); sync(); };
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') { body.classList.remove('side-open'); closeFly(); sync(); } });
-  matchMedia('(max-width: 960px)').addEventListener('change', () => { body.classList.remove('side-open'); sync(); });
+    <div class="side-foot"><button class="who" id="user-btn" type="button" title="Mon compte"><span class="avatar">${J.esc(initial)}</span><span><b>${J.esc(user.username)}</b><span>${user.is_admin ? "Administrateur" : "Utilisateur"}</span></span></button>
+      <button class="nv" id="collapse-btn" type="button" title="Réduire le menu">${J.icon("panel")}<span class="lbl">Réduire le menu</span></button></div></aside><div class="side-scrim" id="scrim"></div>
+    <header class="hdr"><button class="btn icon" id="menu-btn" type="button" aria-label="Afficher ou masquer le menu" aria-controls="side" aria-expanded="true">${J.icon("menu", "")}</button><div class="crumbs" id="crumbs"></div><span class="grow"></span>
+      <form id="quick-form" class="quick" role="search">${J.icon("search", "")}<input id="quick" type="search" placeholder="Rechercher un titre, un ISIN…" aria-label="Rechercher un titre"></form>
+      <button class="btn icon" id="theme-btn" type="button" aria-label="Changer de thème" title="Thème clair / sombre"></button></header>`,
+  );
+  const body = document.body,
+    side = J.$("#side"),
+    btn = J.$("#menu-btn");
+  const sync = () => {
+    const open = narrow() ? body.classList.contains("side-open") : !body.classList.contains("side-collapsed");
+    btn.setAttribute("aria-expanded", open);
+    J.$("#collapse-btn .lbl").textContent = "Réduire le menu";
+  };
+  const toggle = () => {
+    if (narrow()) body.classList.toggle("side-open");
+    else {
+      body.classList.toggle("side-collapsed");
+      store.set("jigo_side", body.classList.contains("side-collapsed") ? "collapsed" : "open");
+      closeFly();
+    }
+    sync();
+  };
+  btn.onclick = toggle;
+  J.$("#collapse-btn").onclick = () => {
+    if (narrow()) body.classList.remove("side-open");
+    else toggle();
+    sync();
+  };
+  J.$("#scrim").onclick = () => {
+    body.classList.remove("side-open");
+    sync();
+  };
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      body.classList.remove("side-open");
+      closeFly();
+      sync();
+    }
+  });
+  matchMedia("(max-width: 960px)").addEventListener("change", () => {
+    body.classList.remove("side-open");
+    sync();
+  });
   /* groupes dépliables */
-  J.$$('.grp > .nv', side).forEach(b => b.onclick = () => { const g = b.parentElement; if (body.classList.contains('side-collapsed') && !narrow()) { location.href = nav.find(n => n.id === g.dataset.id).children.find(c => c.href).href; return; } g.classList.toggle('open'); b.setAttribute('aria-expanded', g.classList.contains('open')); opened[g.dataset.id] = g.classList.contains('open'); store.set('jigo_nav_open', JSON.stringify(opened)); });
-  J.$$('#nav a', side).forEach(a => a.addEventListener('click', () => { if (narrow()) body.classList.remove('side-open'); }));
+  J.$$(".grp > .nv", side).forEach(
+    (b) =>
+      (b.onclick = () => {
+        const g = b.parentElement;
+        if (body.classList.contains("side-collapsed") && !narrow()) {
+          location.href = nav.find((n) => n.id === g.dataset.id).children.find((c) => c.href).href;
+          return;
+        }
+        g.classList.toggle("open");
+        b.setAttribute("aria-expanded", g.classList.contains("open"));
+        opened[g.dataset.id] = g.classList.contains("open");
+        store.set("jigo_nav_open", JSON.stringify(opened));
+      }),
+  );
+  J.$$("#nav a", side).forEach((a) =>
+    a.addEventListener("click", () => {
+      if (narrow()) body.classList.remove("side-open");
+    }),
+  );
   /* menu volant quand la barre est réduite */
-  let fly = null; const closeFly = () => { if (fly) { fly.remove(); fly = null; } };
-  J.$$('.grp', side).forEach(g => { const n = nav.find(x => x.id === g.dataset.id); g.addEventListener('mouseenter', () => { if (!body.classList.contains('side-collapsed') || narrow()) return; closeFly(); const r = g.getBoundingClientRect(); fly = document.createElement('div'); fly.className = 'fly'; fly.style.left = (r.right + 6) + 'px'; fly.style.top = r.top + 'px';
-    fly.innerHTML = `<div class="ttl">${J.esc(n.label)}</div>` + J.$$('.sv', g).map(a => `<a class="sv ${a.classList.contains('on') ? 'on' : ''}" href="${a.getAttribute('href')}">${a.textContent}</a>`).join(''); fly.addEventListener('mouseleave', closeFly); document.body.appendChild(fly); });
-    g.addEventListener('mouseleave', e => { if (!fly || !fly.contains(e.relatedTarget)) setTimeout(() => { if (fly && !fly.matches(':hover') && !g.matches(':hover')) closeFly(); }, 120); }); });
+  let fly = null;
+  const closeFly = () => {
+    if (fly) {
+      fly.remove();
+      fly = null;
+    }
+  };
+  J.$$(".grp", side).forEach((g) => {
+    const n = nav.find((x) => x.id === g.dataset.id);
+    g.addEventListener("mouseenter", () => {
+      if (!body.classList.contains("side-collapsed") || narrow()) return;
+      closeFly();
+      const r = g.getBoundingClientRect();
+      fly = document.createElement("div");
+      fly.className = "fly";
+      fly.style.left = r.right + 6 + "px";
+      fly.style.top = r.top + "px";
+      fly.innerHTML =
+        `<div class="ttl">${J.esc(n.label)}</div>` +
+        J.$$(".sv", g)
+          .map(
+            (a) =>
+              `<a class="sv ${a.classList.contains("on") ? "on" : ""}" href="${a.getAttribute("href")}">${a.textContent}</a>`,
+          )
+          .join("");
+      fly.addEventListener("mouseleave", closeFly);
+      document.body.appendChild(fly);
+    });
+    g.addEventListener("mouseleave", (e) => {
+      if (!fly || !fly.contains(e.relatedTarget))
+        setTimeout(() => {
+          if (fly && !fly.matches(":hover") && !g.matches(":hover")) closeFly();
+        }, 120);
+    });
+  });
   /* portefeuilles : un sous-menu par portefeuille */
-  if (J.$('[data-sub="portefeuilles"]')) J.api('portfolios').then(r => { const sub = J.$('[data-sub="portefeuilles"]'), cur = new URLSearchParams(location.search).get('id'); r.portfolios.forEach(p => sub.insertAdjacentHTML('beforeend', `<a class="sv ${file === 'portefeuilles.html' && (cur == p.id || (!cur && false)) ? 'on' : ''}" href="portefeuilles.html?id=${p.id}">${J.esc(p.name)}${p.is_default ? ' ★' : ''}</a>`)); }).catch(() => { });
+  if (J.$('[data-sub="portefeuilles"]'))
+    J.api("portfolios")
+      .then((r) => {
+        const sub = J.$('[data-sub="portefeuilles"]'),
+          cur = new URLSearchParams(location.search).get("id");
+        r.portfolios.forEach((p) =>
+          sub.insertAdjacentHTML(
+            "beforeend",
+            `<a class="sv ${file === "portefeuilles.html" && (cur == p.id || (!cur && false)) ? "on" : ""}" href="portefeuilles.html?id=${p.id}">${J.esc(p.name)}${p.is_default ? " ★" : ""}</a>`,
+          ),
+        );
+      })
+      .catch(() => {});
   /* en-tête : fil d'Ariane, recherche, thème */
-  const active = nav.find(n => n.file && n.file.includes(file)), child = active && active.children ? active.children.find(c => c.href && isOn(c)) : null;
-  J.$('#crumbs').innerHTML = active ? `<span>${J.esc(active.label)}</span>` + (file === 'titre.html' ? '<i>›</i><b>Fiche</b>' : child ? `<i>›</i><b>${J.esc(child.label)}</b>` : '') : '';
-  J.$('#quick-form').onsubmit = e => { e.preventDefault(); const v = J.$('#quick').value.trim(); if (v) location.href = 'index.html?q=' + encodeURIComponent(v); };
-  const themeIcon = () => { J.$('#theme-btn').innerHTML = J.icon(document.documentElement.dataset.theme === 'dark' ? 'sun' : 'moon', ''); };
-  J.$('#theme-btn').onclick = async () => { const t = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'; J.applyTheme(t); themeIcon(); try { J.user.prefs = (await J.post('auth/prefs', { theme: t })).prefs; } catch (e) { } };
-  themeIcon(); J.$('#user-btn').onclick = J.accountDialog; sync();
-  window.addEventListener('hashchange', () => { J.$$('.sv', side).forEach(a => { const h = a.getAttribute('href'); if (h.includes('#') && h.split('#')[0] === file) a.classList.toggle('on', ('#' + h.split('#')[1]) === location.hash || (!location.hash && h.endsWith('#data'))); }); });
+  const active = nav.find((n) => n.file && n.file.includes(file)),
+    child = active && active.children ? active.children.find((c) => c.href && isOn(c)) : null;
+  J.$("#crumbs").innerHTML = active
+    ? `<span>${J.esc(active.label)}</span>` +
+      (file === "titre.html" ? "<i>›</i><b>Fiche</b>" : child ? `<i>›</i><b>${J.esc(child.label)}</b>` : "")
+    : "";
+  J.$("#quick-form").onsubmit = (e) => {
+    e.preventDefault();
+    const v = J.$("#quick").value.trim();
+    if (v) location.href = "index.html?q=" + encodeURIComponent(v);
+  };
+  const themeIcon = () => {
+    J.$("#theme-btn").innerHTML = J.icon(document.documentElement.dataset.theme === "dark" ? "sun" : "moon", "");
+  };
+  J.$("#theme-btn").onclick = async () => {
+    const t = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+    J.applyTheme(t);
+    themeIcon();
+    try {
+      J.user.prefs = (await J.post("auth/prefs", { theme: t })).prefs;
+    } catch (e) {}
+  };
+  themeIcon();
+  J.$("#user-btn").onclick = J.accountDialog;
+  sync();
+  window.addEventListener("hashchange", () => {
+    J.$$(".sv", side).forEach((a) => {
+      const h = a.getAttribute("href");
+      if (h.includes("#") && h.split("#")[0] === file)
+        a.classList.toggle("on", "#" + h.split("#")[1] === location.hash || (!location.hash && h.endsWith("#data")));
+    });
+  });
 };
-J.applyTheme = t => { const dark = t === 'dark' || (t === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches); document.documentElement.dataset.theme = dark ? 'dark' : 'light'; J.store.text.set('jigo_theme', t); };
+J.applyTheme = (t) => {
+  const dark = t === "dark" || (t === "auto" && matchMedia("(prefers-color-scheme: dark)").matches);
+  document.documentElement.dataset.theme = dark ? "dark" : "light";
+  J.store.text.set("jigo_theme", t);
+};
 J.accountDialog = function () {
   const prefs = J.user.prefs || {};
   J.dialog({
-    title: 'Mon compte', body: `<div class="row between"><span>Affichage</span><span class="seg" id="mode"><button type="button" data-v="simple">Simple</button><button type="button" data-v="advanced">Avancé</button></span></div>
+    title: "Mon compte",
+    body: `<div class="row between"><span>Affichage</span><span class="seg" id="mode"><button type="button" data-v="simple">Simple</button><button type="button" data-v="advanced">Avancé</button></span></div>
     <div class="row between"><span>Thème</span><span class="seg" id="theme"><button type="button" data-v="auto">Auto</button><button type="button" data-v="light">Clair</button><button type="button" data-v="dark">Sombre</button></span></div>
-    <hr data-style="border:0;border-top:1px solid var(--line);width:100%"><h3>Mes coordonnées</h3>${J.field('Pseudo', `<input id="account-name" autocomplete="username" value="${J.esc(J.user.username)}" maxlength="30">`)}${J.field('E-mail', `<input id="account-email" type="email" autocomplete="email" value="${J.esc(J.user.email || '')}" maxlength="190">`)}<p class="account-note">Une nouvelle adresse doit être confirmée par e-mail. L’adresse actuelle reste utilisable jusque-là.</p><h3>Confirmer mes modifications</h3>${J.field('Mot de passe actuel', '<input type="password" id="pw0" autocomplete="current-password">')}${J.field('Nouveau (10 caractères minimum)', '<input type="password" id="pw1" autocomplete="new-password">')}`,
-    actions: [{ label: 'Se déconnecter', cls: 'danger', run: async () => { await J.post('auth/logout'); location.href = 'login.html'; return true; }, },
-    { label: 'Enregistrer mes coordonnées', run: async d => { const r = await J.post('auth/account', { username: J.$('#account-name', d).value, email: J.$('#account-email', d).value, current: J.$('#pw0', d).value }); J.toast(r.message); J.user = (await J.api('auth/me')).user; const label=J.$('#user-btn b'); if(label)label.textContent=J.user.username; } },
-    { label: 'Changer le mot de passe', run: async d => { await J.post('auth/password', { current: J.$('#pw0', d).value, new: J.$('#pw1', d).value }); J.toast('Mot de passe modifié'); } }],
-    onopen: d => {
-      for (const [id, key, cur] of [['mode', 'mode', prefs.mode || 'simple'], ['theme', 'theme', prefs.theme || J.store.text.get('jigo_theme') || 'auto']]) {
-        const seg = J.$('#' + id, d); J.$$('button', seg).forEach(b => { b.classList.toggle('on', b.dataset.v === cur); b.onclick = async () => { J.$$('button', seg).forEach(x => x.classList.toggle('on', x === b)); J.user.prefs = (await J.post('auth/prefs', { [key]: b.dataset.v })).prefs; if (key === 'theme') J.applyTheme(b.dataset.v); else { document.body.classList.toggle('advanced', b.dataset.v === 'advanced'); window.dispatchEvent(new Event('jigo-mode')); } }; });
+    <hr data-style="border:0;border-top:1px solid var(--line);width:100%"><h3>Mes coordonnées</h3>${J.field("Pseudo", `<input id="account-name" autocomplete="username" value="${J.esc(J.user.username)}" maxlength="30">`)}${J.field("E-mail", `<input id="account-email" type="email" autocomplete="email" value="${J.esc(J.user.email || "")}" maxlength="190">`)}<p class="account-note">Une nouvelle adresse doit être confirmée par e-mail. L’adresse actuelle reste utilisable jusque-là.</p><h3>Confirmer mes modifications</h3>${J.field("Mot de passe actuel", '<input type="password" id="pw0" autocomplete="current-password">')}${J.field("Nouveau (10 caractères minimum)", '<input type="password" id="pw1" autocomplete="new-password">')}`,
+    actions: [
+      {
+        label: "Se déconnecter",
+        cls: "danger",
+        run: async () => {
+          await J.post("auth/logout");
+          location.href = "login.html";
+          return true;
+        },
+      },
+      {
+        label: "Enregistrer mes coordonnées",
+        run: async (d) => {
+          const r = await J.post("auth/account", {
+            username: J.$("#account-name", d).value,
+            email: J.$("#account-email", d).value,
+            current: J.$("#pw0", d).value,
+          });
+          J.toast(r.message);
+          J.user = (await J.api("auth/me")).user;
+          const label = J.$("#user-btn b");
+          if (label) label.textContent = J.user.username;
+        },
+      },
+      {
+        label: "Changer le mot de passe",
+        run: async (d) => {
+          await J.post("auth/password", { current: J.$("#pw0", d).value, new: J.$("#pw1", d).value });
+          J.toast("Mot de passe modifié");
+        },
+      },
+    ],
+    onopen: (d) => {
+      for (const [id, key, cur] of [
+        ["mode", "mode", prefs.mode || "simple"],
+        ["theme", "theme", prefs.theme || J.store.text.get("jigo_theme") || "auto"],
+      ]) {
+        const seg = J.$("#" + id, d);
+        J.$$("button", seg).forEach((b) => {
+          b.classList.toggle("on", b.dataset.v === cur);
+          b.onclick = async () => {
+            J.$$("button", seg).forEach((x) => x.classList.toggle("on", x === b));
+            J.user.prefs = (await J.post("auth/prefs", { [key]: b.dataset.v })).prefs;
+            if (key === "theme") J.applyTheme(b.dataset.v);
+            else {
+              document.body.classList.toggle("advanced", b.dataset.v === "advanced");
+              window.dispatchEvent(new Event("jigo-mode"));
+            }
+          };
+        });
       }
     },
   });
 };
 
-if (!document.querySelector('script[src*="passwords.js"]')) { const p=document.createElement('script'); p.src='assets/passwords.js'+new URL(document.currentScript.src).search; document.head.appendChild(p); }
+if (!document.querySelector('script[src*="passwords.js"]')) {
+  const p = document.createElement("script");
+  p.src = "assets/passwords.js" + new URL(document.currentScript.src).search;
+  document.head.appendChild(p);
+}
