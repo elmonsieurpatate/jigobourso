@@ -95,7 +95,7 @@ pas présenté comme réalisé.
 - [x] Étape 6 — Cohérence financière : splits, unités et intégrité.
 - [x] Étape 7 — Architecture et cas d'usage PHP. Clôturée 2026-11-14 : lint, js-check, css-check, visual, fast (691), e2e, integ (346) verts ; voir journal.
 - [ ] Étape 8 — Architecture et dépendances Python. Quasi close 2026-11-14 : cycles supprimés, couches verrouillées ; reste le découpage des fonctions longues ; voir journal.
-- [ ] Étape 9 — Données, migrations et accès SQL.
+- [x] Étape 9 — Données, migrations et accès SQL. Clôturée 2026-11-14 : lint, js-check, css-check, visual, fast (692), e2e, integ (349) verts ; docs/DATA_CONTRACT.md.
 - [ ] Étape 10 — Performance et observabilité.
 - [ ] Étape 11 — Installation, CI, livraison et restauration.
 - [ ] Étape 12 — Nettoyage final, documentation et recette.
@@ -504,17 +504,17 @@ d'implémentations parallèles abandonnées.
 
 # Étape 9 — Données, migrations et SQL
 
-- [ ] Vérifier clés étrangères, index et contraintes utiles.
-- [ ] Vérifier les identifiants SQL dynamiques et leurs listes blanches.
-- [ ] Rechercher et mesurer les N+1 avant correction.
-- [ ] Distinguer base neuve et base ancienne migrée.
-- [ ] Vérifier idempotence et reprise après DDL partiellement appliqué.
-- [ ] Documenter l'état de migration requis.
-- [ ] Éviter les comportements financiers silencieusement dégradés.
-- [ ] Vérifier isolation, concurrence, révisions et conflits.
-- [ ] Vérifier conservation/purge des sessions, tentatives, logs et caches.
-- [ ] Expliciter types numériques et arrondis aux frontières.
-- [ ] Ne changer le schéma que pour un besoin démontré.
+- [x] Vérifier clés étrangères, index et contraintes utiles.
+- [x] Vérifier les identifiants SQL dynamiques et leurs listes blanches.
+- [x] Rechercher et mesurer les N+1 avant correction.
+- [x] Distinguer base neuve et base ancienne migrée.
+- [x] Vérifier idempotence et reprise après DDL partiellement appliqué.
+- [x] Documenter l'état de migration requis.
+- [x] Éviter les comportements financiers silencieusement dégradés.
+- [x] Vérifier isolation, concurrence, révisions et conflits.
+- [x] Vérifier conservation/purge des sessions, tentatives, logs et caches.
+- [x] Expliciter types numériques et arrondis aux frontières.
+- [x] Ne changer le schéma que pour un besoin démontré.
 
 Clôture : schéma, migrations, accès et tests décrivent le même contrat.
 
@@ -799,3 +799,12 @@ Formatage JS (Prettier, commit 4613946, `make js-format` / `make js-check`). Cyc
 - Étape 7 : routes de portefeuille → `app/services/portfolios.php` ; cycle PHP `secondary_metadata` ↔ `secondary_filters` supprimé ; tests de structure (fonctions uniques, require explicites, couches). Aucun formateur PHP dans le projet : formatage non touché (décision documentée).
 - Étape 8 : modules déplacés (scores_specs, scores_profiles → scoring ; universe_verdicts → explorer ; strategy_docs → admin ; conversion V3 → explorer/legacy_upgrade), nouveaux modules score_cache, ranking_support, shared/units ; réexports retirés ; `ops/deploy.sh` mis à jour (chemin de universe_verdicts, exclusion du hash moteur). Le premier déploiement recalculera donc les données dérivées (chemins du moteur changés).
 - Reste à l'étape 8 : fonctions longues.
+
+## Journal — étape 9 (2026-11-14)
+
+- Audit : 48 tables InnoDB, 33 clés étrangères, aucune FK sans index ; seule `account_attempts` n'a pas de clé primaire (journal purgé quotidiennement, schéma inchangé faute de besoin démontré).
+- Migrations : reprise après DDL partiel (erreurs « existe déjà » tolérées et journalisées, autres erreurs bloquantes) ; rejeu des vraies migrations sur schéma neuf testé.
+- SQL dynamique : liste blanche ajoutée à `_count` ; autres interpolations vérifiées (constantes).
+- N+1 : mesurés (`test_query_counts.py`), aucun par transaction.
+- `suivi` : réglages de plan illisibles signalés (`plan_rules_unavailable`) au lieu d'être masqués.
+- Aucune migration de schéma ajoutée.

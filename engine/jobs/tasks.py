@@ -175,7 +175,12 @@ def yahoo_filter(conn, log, now=None):
 
 
 # ───────── historiques : même code pour le bouton de l'administration et pour le cron ─────────
+HISTORY_TABLES = ('daily_prices', 'intraday_prices')         # liste blanche : le nom de table est interpolé dans le SQL
+
+
 def _count(conn, table, ids):
+    if table not in HISTORY_TABLES:
+        raise ValueError('table non autorisée')
     n = 0
     with conn.cursor() as cur:
         for i in range(0, len(ids), 2000):

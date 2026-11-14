@@ -48,8 +48,23 @@ def pending(conn, directory=DIR):
     return [f for f in files(directory) if f not in done]
 
 
-def apply(conn, directory=DIR):
-    """Applique les migrations en attente. Tout est vérifié AVANT la première exécution. Renvoie la liste appliquée."""
+# Erreurs MariaDB « l'objet existe déjà » : le DDL n'est pas transactionnel, une migration interrompue en cours de route a pu appliquer ses premières instructions.
+# À la reprise, une instruction dont l'effet est déjà là est ignorée (journalisée) au lieu de bloquer définitivement la livraison.
+ALREADY_APPLIED = {1050: 'table existante', 1060: 'colonne existante', 1061: 'index existant', 1826: 'clé étrangère existante'}
+
+
+def _already_applied(error):
+    code = error.args[0] if error.args else 0
+    if code in ALREADY_APPLIED:
+        return ALREADY_APPLIED[code]
+    if code == 1005 and 'errno: 121' in str(error):                              # nom de contrainte déjà utilisé (ancienne forme de 1826)
+        return 'clé étrangère existante'
+    return None
+
+
+def apply(conn, directory=DIR, log=print):
+    """Applique les migrations en attente. Tout est vérifié AVANT la première exécution. Renvoie la liste appliquée.
+    Reprise : une instruction déjà appliquée par une exécution interrompue est ignorée, toute autre erreur arrête sans enregistrer la migration."""
     todo = pending(conn, directory)
     texts = {}
     for f in todo:
@@ -59,7 +74,13 @@ def apply(conn, directory=DIR):
     for f in todo:
         with conn.cursor() as cur:
             for st in statements(texts[f]):
-                cur.execute(st)
+                try:
+                    cur.execute(st)
+                except Exception as e:                                           # noqa: BLE001 : seules les erreurs « déjà appliqué » sont tolérées
+                    why = _already_applied(e)
+                    if not why:
+                        raise
+                    log(f'{f} : instruction déjà appliquée ({why}), ignorée : {st[:70]!r}')
             cur.execute('INSERT INTO schema_migrations(name, applied_at) VALUES (%s,%s)', (f, datetime.datetime.utcnow().replace(microsecond=0)))
         conn.commit()
     return todo

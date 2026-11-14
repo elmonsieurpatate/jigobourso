@@ -23,8 +23,8 @@ return [
         $custom = track_custom_names((int)$u['id']);
         $watch = []; foreach (q('SELECT listing_id, strategy_key FROM position_watch WHERE portfolio_id = ?', [$p['id']])->fetchAll() as $w) $watch[(int)$w['listing_id']] = $w['strategy_key'];
         $levels = []; foreach (q('SELECT listing_id, stop_px, target_px FROM position_levels WHERE portfolio_id = ?', [$p['id']])->fetchAll() as $l) $levels[(int)$l['listing_id']] = $l;
-        $cfg = []; try { foreach (q('SELECT listing_id, rule_key, enabled, custom_value FROM position_plan_rules WHERE portfolio_id = ?', [$p['id']])->fetchAll() as $c) $cfg[(int)$c['listing_id']][$c['rule_key']] = ['enabled' => (bool)$c['enabled'],
-            'custom' => $c['custom_value'] !== null ? (float)$c['custom_value'] : null]; } catch (Throwable $e) { $cfg = []; }
+        $cfg = []; $planRulesError = false; try { foreach (q('SELECT listing_id, rule_key, enabled, custom_value FROM position_plan_rules WHERE portfolio_id = ?', [$p['id']])->fetchAll() as $c) $cfg[(int)$c['listing_id']][$c['rule_key']] = ['enabled' => (bool)$c['enabled'],
+            'custom' => $c['custom_value'] !== null ? (float)$c['custom_value'] : null]; } catch (Throwable $e) { error_log('suivi plan_rules [' . request_id() . '] : ' . $e->getMessage()); $cfg = []; $planRulesError = true; }   // réglages de plan illisibles : valeurs par défaut, signalé au client
         $origin = []; foreach (q("SELECT t.id, o.strategy_key FROM portfolio_transactions t LEFT JOIN lot_origin o ON o.transaction_id = t.id WHERE t.portfolio_id = ? AND t.side = " .
             "'buy'", [$p['id']])->fetchAll() as $o) $origin[(int)$o['id']] = $o['strategy_key'];
         // Date d'ouverture = achat le plus ancien encore détenu (FIFO) ; origines = stratégies d'origine des achats encore détenus (information historique, jamais modifiée ici).
@@ -61,7 +61,7 @@ return [
         }
         $opts = []; foreach (TRACK_LABEL as $k => $l) $opts[] = ['key' => $k, 'label' => $l, 'custom' => false];
         foreach ($custom as $k => $l) $opts[] = ['key' => $k, 'label' => $l, 'custom' => true];
-        return ['portfolio' => ['id' => (int)$p['id'], 'name' => $p['name']], 'positions' => (object)$out, 'strategies' => $opts, 'model' => 1];
+        return ['portfolio' => ['id' => (int)$p['id'], 'name' => $p['name']], 'positions' => (object)$out, 'strategies' => $opts, 'model' => 1] + ($planRulesError ? ['plan_rules_unavailable' => true] : []);
     },
     // Réglage d'UNE règle d'UNE position : mode automatique (valeur calculée par le moteur) ou personnalisé, activation. Ne touche jamais aux autres règles.
     //   stop : valeur = filet de protection personnel (devise de cotation, position_levels.stop_px) ; auto = repasse au calcul automatique
