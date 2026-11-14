@@ -591,23 +591,23 @@ Aucun objectif artificiel de nombre de fichiers ou de lignes supprimées.
 
 Pour chaque résolution, indiquer commit et test/preuve.
 
-- [ ] F01 — Lecture des splits masquée. Étape 6. Preuve : 2026-11-14 : split_events lève 503 explicite au lieu de []; test_units_parity.py + tests/integ/test_financial_parity.py (table renommée = 503).
-- [ ] F02 — Correction manuelle ambiguë. Étape 6. Preuve : 2026-11-14 : règle documentée (FINANCIAL_INTEGRITY.md), recensement des achats à prix zéro par le contrôle de release, aucune réécriture ; décision : lien implicite conservé, sans migration.
-- [ ] F03 — Erreur JSON en HTTP 200. Étape 5. Preuve : 2026-11-14 : json_text encode avant le statut, donnée inencodable = 500 + ref ; tests/fast/test_http_contract.py.
-- [ ] F04 — Réponse API invalide acceptée. Étape 5. Preuve : 2026-11-14 : J.api lève « Réponse illisible » sur 2xx non JSON ; tests/e2e/core.cjs.
-- [ ] F05 — Échec lint PHP masqué. Étape 5. Preuve : 2026-11-14 : scripts/lint_php.sh (code 1 sur erreur, 2 sans php/fichier) utilisé par make et la CI ; reproduit avant, tests/fast/test_lint_php.py.
-- [ ] F06 — Contrôle financier ignorant les splits. Étape 6. Preuve : 2026-11-14 : check_financial_integrity.php et validation partagent oversold_transactions ; parité split_log/corporate_events contrôlée ; test_financial_parity.py.
+- [x] F01 — Lecture des splits masquée. Étape 6. Preuve : 2026-11-14 : split_events lève 503 explicite au lieu de []; test_units_parity.py + tests/integ/test_financial_parity.py (table renommée = 503).
+- [x] F02 — Correction manuelle ambiguë. Étape 6. Preuve : 2026-11-14 : règle documentée (FINANCIAL_INTEGRITY.md), recensement des achats à prix zéro par le contrôle de release, aucune réécriture ; décision : lien implicite conservé, sans migration.
+- [x] F03 — Erreur JSON en HTTP 200. Étape 5. Preuve : 2026-11-14 : json_text encode avant le statut, donnée inencodable = 500 + ref ; tests/fast/test_http_contract.py.
+- [x] F04 — Réponse API invalide acceptée. Étape 5. Preuve : 2026-11-14 : J.api lève « Réponse illisible » sur 2xx non JSON ; tests/e2e/core.cjs.
+- [x] F05 — Échec lint PHP masqué. Étape 5. Preuve : 2026-11-14 : scripts/lint_php.sh (code 1 sur erreur, 2 sans php/fichier) utilisé par make et la CI ; reproduit avant, tests/fast/test_lint_php.py.
+- [x] F06 — Contrôle financier ignorant les splits. Étape 6. Preuve : 2026-11-14 : check_financial_integrity.php et validation partagent oversold_transactions ; parité split_log/corporate_events contrôlée ; test_financial_parity.py.
 - [ ] F07 — Composants surchargés par les pages. Étapes 1–3. Preuve partielle (reste ouvert : états dynamiques, recette étape 3) : 2026-11-13, règles de page retirées (components/base/explorer/filtres/pf/help/splits/strategies-ui/admin-*.css) ; styles calculés conformes à la référence Halo sur 14 pages connecté, clair/sombre, 1280/390 px ; limites ci-dessous.
 - [ ] F08 — Présentation fixe dans data-style. Étapes 1–3. Preuve :
 - [x] F09 — Écouteurs accumulés. Étape 4. Preuve : 2026-11-14 : picker, openInfo, détail pf-home ; écouteurs retirés par AbortController.
-- [ ] F10 — Routes/services PHP incomplets. Étape 7. Preuve : 2026-11-14 : services/portfolios.php (17 cas d'usage sans HTTP), routes minces, own_transaction/tx_carry_fx, tests/fast/test_php_structure.py, docs/ARCHITECTURE_PHP.md.
+- [x] F10 — Routes/services PHP incomplets. Étape 7. Preuve : 2026-11-14 : services/portfolios.php (17 cas d'usage sans HTTP), routes minces, own_transaction/tx_carry_fx, tests/fast/test_php_structure.py, docs/ARCHITECTURE_PHP.md.
 - [x] F11 — Dépendances Python mal orientées. Étape 8. Preuve : 2026-11-14 : 6 cycles (imports différés compris) supprimés, 0 restant ; tests/fast/test_python_dependencies.py ; docs/ARCHITECTURE_PYTHON.md.
-- [ ] F12 — Unités monétaires divergentes. Étape 6. Preuve : 2026-11-14 : engine/shared/units.py + app/lib/units.php, ZAc/ILA corrigés dans l'historique et la saisie ; parité PHP/Python testée.
+- [x] F12 — Unités monétaires divergentes. Étape 6. Preuve : 2026-11-14 : engine/shared/units.py + app/lib/units.php, ZAc/ILA corrigés dans l'historique et la saisie ; parité PHP/Python testée.
 - [ ] F13 — Activation/restauration de release. Étape 11. Preuve :
 - [ ] F14 — Dépendances non complètement validées. Étape 11. Preuve :
 - [ ] F15 — Garde-fous insuffisants. Étapes 3, 5, 11. Preuve partielle (reste étape 11) : 2026-11-14 : garde lint PHP, contrats HTTP et moteur testés (étape 5).
 - [ ] F16 — Sources condensées/formatage. Étapes 1, 4, 7, 8. Preuve :
-- [ ] F17 — Taille des corps JSON. Étape 5. Preuve : 2026-11-14 : BODY_MAX 2 Mio, 413 avant lecture ; test_http_contract.py.
+- [x] F17 — Taille des corps JSON. Étape 5. Preuve : 2026-11-14 : BODY_MAX 2 Mio, 413 avant lecture ; test_http_contract.py.
 - [ ] F18 — Classification des changements/cache. Étape 11. Preuve :
 - [x] F19 — Fusion implicite des styles calculés. Étape 4. Preuve : 2026-11-14 : règle de fusion/remplacement définie et documentée (FRONTEND_STRUCTURE.md).
 
