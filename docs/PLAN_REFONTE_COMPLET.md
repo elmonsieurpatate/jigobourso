@@ -90,7 +90,7 @@ pas présenté comme réalisé.
 - [x] Étape 1 — Architecture CSS et composants de référence. Clôturée 2026-11-14 : lint, css-check, visual, fast (656), e2e, integ (336) verts ; voir journal.
 - [x] Étape 2 — Migration et harmonisation de toutes les pages. Clôturée 2026-11-14 : lint, css-check, visual, fast (656), e2e, integ (336) verts ; voir journal.
 - [x] Étape 3 — Validation et verrouillage du résultat CSS. Clôturée 2026-11-14 : lint, css-check, visual, fast (656), e2e, integ (336) verts ; voir journal.
-- [ ] Étape 4 — Lisibilité et architecture JavaScript.
+- [x] Étape 4 — Lisibilité et architecture JavaScript. Clôturée 2026-11-14 : lint, js-check, css-check, visual, fast (656), e2e, integ (336) verts ; voir journal.
 - [ ] Étape 5 — Fiabilité des échanges et des contrôles.
 - [ ] Étape 6 — Cohérence financière : splits, unités et intégrité.
 - [ ] Étape 7 — Architecture et cas d'usage PHP.
@@ -353,12 +353,12 @@ Constats : F09, F16, F19.
 
 ## Sources et contrats
 
-- [ ] Formatage automatique JS dans un commit séparé.
-- [ ] Interfaces publiques du noyau et des composants documentées.
-- [ ] Source unique pour API, formats, échappement et stockage.
-- [ ] Contrat clair entre texte à échapper et HTML volontairement produit.
-- [ ] Dépendances et globals publics identifiés.
-- [ ] Dépendances accidentelles à l'ordre des scripts éliminées.
+- [x] Formatage automatique JS dans un commit séparé. Preuve 2026-11-14 : Prettier 3.3.3, `make js-format` / `make js-check`, commit 4613946.
+- [x] Interfaces publiques du noyau et des composants documentées. Preuve 2026-11-14 : docs/FRONTEND_STRUCTURE.md « Contrats du noyau » (J.api, J.latest, J.store, échappement, globals).
+- [x] Source unique pour API, formats, échappement et stockage. Preuve 2026-11-14 : J.api/J.post, J.num…, J.esc, J.store dans core.js ; règle vérifiée par tests/fast/test_js_core.py.
+- [x] Contrat clair entre texte à échapper et HTML volontairement produit. Preuve 2026-11-14 : section « Échappement » de docs/FRONTEND_STRUCTURE.md (liste des entrées HTML voulues).
+- [x] Dépendances et globals publics identifiés. Preuve 2026-11-14 : liste des globals publics et des drapeaux internes dans docs/FRONTEND_STRUCTURE.md.
+- [x] Dépendances accidentelles à l'ordre des scripts éliminées. Preuve 2026-11-14 : ordre documenté ; core.js avant app.js vérifié par test_js_core.py ; scripts de données ne dépendent que de window/J. Pas de nouvelle dépendance introduite.
 
 ## Séparation des fonctionnalités
 
@@ -367,22 +367,22 @@ Modèle : logique testable sans navigateur.
 Vue : rendu sans réseau caché.
 Contrôleur : événements, API et orchestration.
 
-- [ ] Explorer : frontières modèle, rendu, état et persistance terminées.
-- [ ] Stratégies : montage, mise à jour et destruction des composants.
-- [ ] Portefeuilles : calculs de présentation, état, requêtes et templates séparés.
-- [ ] Administration : fonctionnalités et vues clairement délimitées.
-- [ ] Filtres, colonnes et scores : composants partagés sans fusionner
+- [x] Explorer : frontières modèle, rendu, état et persistance terminées. Preuve 2026-11-14 : explorer-model/-filters (modèle), explorer-view (rendu), explorer.js (état), explorer-storage.js (persistance : seul à connaître les clés ; plus aucun J.store dans explorer.js) ; vérifié en navigateur : clé de visibilité écrite, fiche titre reçoit le contexte.
+- [x] Stratégies : montage, mise à jour et destruction des composants. Preuve 2026-11-14 : SUI.picker (AbortController par sélecteur, retourne { destroy }) et SUI.openInfo (closePop retire tous les écouteurs).
+- [x] Portefeuilles : calculs de présentation, état, requêtes et templates séparés. Preuve 2026-11-14 : pf-math.js (calculs), pf-home.js (état, vue d'ensemble), pf-detail.js (détail, 3 onglets) via window.PFHomeX ; vérifié en navigateur (vue d'ensemble, détail, onglets, Échap, fermeture) identique à l'ancien code.
+- [x] Administration : fonctionnalités et vues clairement délimitées. Preuve 2026-11-14 : admin.js (978 lignes) scindé en admin-common/-sources/-titres/-cron/-users + coquille admin.js (56 lignes) ; 9 onglets vérifiés en navigateur, entonnoir, recherche, fiche de traitement, navigation par hash.
+- [x] Filtres, colonnes et scores : composants partagés sans fusionner Preuve 2026-11-14 : table-layout.js partagé par explorer.js et admin-scores.js ; règles métier non fusionnées.
       des règles métier différentes.
-- [ ] Graphiques : mutualisation des primitives réellement communes.
+- [x] Graphiques : mutualisation des primitives réellement communes. Preuve 2026-11-14 : J.svg/J.ticks/J.priceDec/J.chartBox dans core.js utilisés par charts.js et intraday.js ; financial-chart.js (canvas) sans duplication.
 
 ## Cycle de vie
 
-- [ ] Corriger les écouteurs accumulés par le sélecteur.
-- [ ] Nettoyer les écouteurs des fenêtres fermées par clic, Échap ou remplacement.
-- [ ] Encadrer observateurs, minuteries et abonnements.
-- [ ] Éviter qu'une réponse ancienne écrase une demande plus récente.
-- [ ] Gérer chargement, erreurs et annulations sans action bloquée.
-- [ ] Définir la fusion/remplacement des styles calculés, ou retirer le pont global
+- [x] Corriger les écouteurs accumulés par le sélecteur. Preuve 2026-11-14 : picker : un seul écouteur de clic extérieur par hôte ; mesure navigateur : ancien code 4→10 écouteurs après 6 rendus, nouveau 3→4 (un par hôte distinct).
+- [x] Nettoyer les écouteurs des fenêtres fermées par clic, Échap ou remplacement. Preuve 2026-11-14 : openInfo (AbortController, fermeture par Échap/clic/remplacement) et openDetail de pf-home (detailAc).
+- [x] Encadrer observateurs, minuteries et abonnements. Preuve 2026-11-14 : inventaire : 3 MutationObserver/1 ResizeObserver globaux, 0 setInterval ; resize d'admin-scores gardé par drapeau, pointeurs d'admin-columns retirés au pointerup/cancel.
+- [x] Éviter qu'une réponse ancienne écrase une demande plus récente. Preuve 2026-11-14 : J.latest dans admin.js (items de l'entonnoir, titres, explication) ; Classement : loading + comparaison applied.
+- [x] Gérer chargement, erreurs et annulations sans action bloquée. Preuve 2026-11-14 : J.api : timeout 120 s, signal/annulation (J.isAbort) ; liste de titres de l'entonnoir affiche l'erreur ; tests/e2e/core.cjs.
+- [x] Définir la fusion/remplacement des styles calculés, ou retirer le pont global Preuve 2026-11-14 : règle écrite dans docs/FRONTEND_STRUCTURE.md et core.js ; pont conservé (108 data-style calculés).
       devenu inutile.
 
 Clôture : modèles testables sans DOM, composants remontables sans accumulation,
@@ -599,7 +599,7 @@ Pour chaque résolution, indiquer commit et test/preuve.
 - [ ] F06 — Contrôle financier ignorant les splits. Étape 6. Preuve :
 - [ ] F07 — Composants surchargés par les pages. Étapes 1–3. Preuve partielle (reste ouvert : états dynamiques, recette étape 3) : 2026-11-13, règles de page retirées (components/base/explorer/filtres/pf/help/splits/strategies-ui/admin-*.css) ; styles calculés conformes à la référence Halo sur 14 pages connecté, clair/sombre, 1280/390 px ; limites ci-dessous.
 - [ ] F08 — Présentation fixe dans data-style. Étapes 1–3. Preuve :
-- [ ] F09 — Écouteurs accumulés. Étape 4. Preuve :
+- [x] F09 — Écouteurs accumulés. Étape 4. Preuve : 2026-11-14 : picker, openInfo, détail pf-home ; écouteurs retirés par AbortController.
 - [ ] F10 — Routes/services PHP incomplets. Étape 7. Preuve :
 - [ ] F11 — Dépendances Python mal orientées. Étape 8. Preuve :
 - [ ] F12 — Unités monétaires divergentes. Étape 6. Preuve :
@@ -609,7 +609,7 @@ Pour chaque résolution, indiquer commit et test/preuve.
 - [ ] F16 — Sources condensées/formatage. Étapes 1, 4, 7, 8. Preuve :
 - [ ] F17 — Taille des corps JSON. Étape 5. Preuve :
 - [ ] F18 — Classification des changements/cache. Étape 11. Preuve :
-- [ ] F19 — Fusion implicite des styles calculés. Étape 4. Preuve :
+- [x] F19 — Fusion implicite des styles calculés. Étape 4. Preuve : 2026-11-14 : règle de fusion/remplacement définie et documentée (FRONTEND_STRUCTURE.md).
 
 Un constat peut être résolu par correction, par preuve qu'il n'existe plus
 dans la version courante, ou par décision métier explicite.
@@ -769,3 +769,10 @@ Chromium réinstallé (Chrome for Testing 153, hors dépôt). La galerie a rév�
 ### Clôture des étapes 1 à 3 — 2026-11-14
 
 Contrastes du thème clair relevés (jetons --muted, --accent, --ok, --warn, --danger), thème sans flash, références visuelles (`make visual`), doc `docs/DESIGN_HALO.md`. Passe finale : lint, css-check, visual, fast 656, e2e, integ 336 : tous verts. Dialogues vus à l'écran : Enregistrer sous, Nouvelle transaction (bureau et mobile). Non vus à l'écran : création et renommage de stratégie (e2e seulement). Appareil réel non testé. Instabilité connue : `strategies-ui` expire parfois à la connexion en e2e local (2 échecs sur 5 le 2026-11-14, passe en CI). Quatre choix de design conservés (voir DESIGN_HALO.md).
+
+
+
+
+### Clôture de l'étape 4 — 2026-11-14
+
+Formatage JS (Prettier, commit 4613946, `make js-format` / `make js-check`). Cycle de vie : `SUI.picker` ne cumule plus d'écouteurs (mesure : ancien code 4 → 10 écouteurs `click` après 6 rendus, nouveau 3 → 4), `SUI.openInfo` et le détail de `pf-home.js` retirent tous leurs écouteurs (AbortController). Réseau : `J.api` a un délai (120 s) et un `signal` (`J.isAbort`), `J.latest` ignore les réponses périmées (administration), la liste de titres de l'entonnoir affiche l'erreur. Découpes : `admin.js` (978 lignes) en `admin-common/-sources/-titres/-cron/-users` + coquille de 56 lignes ; `pf-home.js` → `pf-detail.js` ; `explorer-storage.js` (persistance de l'Explorateur). Docs : `docs/FRONTEND_STRUCTURE.md` (contrats du noyau, échappement, globals, ordre des scripts, frontières par page). Tests ajoutés : `core.cjs` (J.latest, J.api : délai, annulation, erreur), `strategies-ui.cjs` (écouteurs actifs après plusieurs rendus). Deux tests de texte source rendus insensibles au style de guillemets (Prettier) : `test_execution_architecture.py`, `test_scores_admin.py`. Vérifié en navigateur sur données réelles : 9 onglets d'administration, entonnoir, détail d'un portefeuille (3 onglets, Échap), Explorateur (colonnes, fiche titre). Non fait : F16 (reste ouverte : étapes 7 et 8 pour PHP/Python). Appareil réel non testé.

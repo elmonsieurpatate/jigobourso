@@ -1,4 +1,5 @@
 """Architecture d'exécution : connexion rétablie, réglage des threads, maintenance en étapes indépendantes, déploiement sans recalcul."""
+import re
 import os
 import pathlib
 import subprocess
@@ -179,7 +180,7 @@ def test_deploy_recalculates_only_when_engine_or_schema_changed():
 
 def test_manual_gap_fill_is_a_registered_job_on_the_whole_catalogue(monkeypatch):
     assert 'gaps' in tasks.JOBS and 'gaps' in tasks.MANUAL_LABELS and 'gaps' not in tasks.COMPUTE
-    assert "'gaps' =>" in (ROOT / 'app/routes/admin.php').read_text() and "'gaps'" in (ROOT / 'app/public/assets/admin.js').read_text()
+    assert "'gaps' =>" in (ROOT / 'app/routes/admin.php').read_text() and re.search(r"['\"]gaps['\"]", (ROOT / 'app/public/assets/admin-common.js').read_text())
     seen = {}
     monkeypatch.setattr(tasks.collect, 'collection_set', lambda conn: [{'listing_id': 1}, {'listing_id': 2}])
     monkeypatch.setattr(tasks.collect, 'fill_gaps_batch', lambda *a, **k: seen.update(k) or {'added': 3, 'examined': 2, 'candidates': 2, 'remaining': 0, 'rate_limited': False})

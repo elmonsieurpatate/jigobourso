@@ -12,19 +12,48 @@ J.$ = (sel, root = document) => root.querySelector(sel);
 J.$$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
 /* ───── API ───── */
-J.api = async function (route, { method = "GET", body = null, params = {} } = {}) {
+/* Contrat J.api(route, { method, body, params, signal, timeout }) :
+   - renvoie le JSON décodé ; lève une Error dont le message est celui du serveur (data.error) ou « Erreur <statut> » ;
+   - 401 hors login.html : redirection vers la connexion puis Error("auth") ;
+   - timeout (ms, 120 000 par défaut, 0 = sans limite) : lève Error « Délai dépassé… » (aucune action ne reste bloquée) ;
+   - signal : un AbortSignal du code appelant ; l'annulation lève une erreur reconnue par J.isAbort(e) et ne doit pas s'afficher. */
+J.isAbort = (e) => !!e && e.name === "AbortError";
+J.api = async function (route, { method = "GET", body = null, params = {}, signal = null, timeout = 120000 } = {}) {
   const qs = new URLSearchParams({ r: route, ...params });
-  const res = await fetch("api.php?" + qs, {
-    method,
-    credentials: "same-origin",
-    headers: body ? { "Content-Type": "application/json" } : {},
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  let data = null;
+  const ctl = new AbortController();
+  let timedOut = false;
+  const timer = timeout
+    ? setTimeout(() => {
+        timedOut = true;
+        ctl.abort();
+      }, timeout)
+    : null;
+  if (signal) {
+    if (signal.aborted) ctl.abort();
+    else signal.addEventListener("abort", () => ctl.abort(), { once: true });
+  }
+  let res,
+    data = null;
   try {
-    data = await res.json();
+    res = await fetch("api.php?" + qs, {
+      method,
+      credentials: "same-origin",
+      headers: body ? { "Content-Type": "application/json" } : {},
+      body: body ? JSON.stringify(body) : undefined,
+      signal: ctl.signal,
+    });
+    try {
+      data = await res.json();
+    } catch (e) {
+      if (e && e.name === "AbortError") throw e;
+      /* réponse non JSON */
+    }
   } catch (e) {
-    /* réponse non JSON */
+    if (e && e.name === "AbortError" && timedOut)
+      throw new Error("Délai dépassé : le serveur n’a pas répondu à temps.");
+    throw e;
+  } finally {
+    if (timer) clearTimeout(timer);
   }
   if (res.status === 401 && !location.pathname.endsWith("login.html")) {
     location.href = "login.html?next=" + encodeURIComponent(location.pathname.split("/").pop() + location.search);
@@ -32,6 +61,12 @@ J.api = async function (route, { method = "GET", body = null, params = {} } = {}
   }
   if (!res.ok) throw new Error((data && data.error) || "Erreur " + res.status);
   return data;
+};
+/* Garde « la dernière demande gagne » : const g = J.latest(); … const t = g.next(); const r = await J.api(…); if (!g.isCurrent(t)) return;
+   Une réponse arrivée après une demande plus récente (frappe rapide, changement de filtre) est ignorée au lieu d'écraser l'affichage. */
+J.latest = () => {
+  let n = 0;
+  return { next: () => ++n, isCurrent: (t) => t === n, cancel: () => void ++n };
 };
 J.post = (route, body) => J.api(route, { method: "POST", body: body || {} });
 

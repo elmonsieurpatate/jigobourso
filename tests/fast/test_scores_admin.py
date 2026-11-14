@@ -1,4 +1,5 @@
 """Administration des scores : un moteur commun, des profils de stratégie validés, des réglages communs superposés sans jamais toucher à la conformité."""
+import re
 import copy
 
 import pytest
@@ -299,7 +300,7 @@ def test_classement_proposes_every_v4_strategy():
     for ct_id, name in scores_specs.CT_BUILTIN.items():
         label = scores_specs.V4_STRATEGIES[name]['label']
         assert f"'{ct_id}' => '{label}'" in php
-        assert f"{ct_id}:'{label}'" in js
+        assert re.search(rf"\b{ct_id}\s*:\s*['\"]{re.escape(label)}['\"]", js)   # insensible au style de guillemets (Prettier)
         engine = {p['id']: p for p in scores_specs.V4_STRATEGIES[name]['build']()['periods'] if p['enabled']}
         assert set(crit[ct_id]['periods']) == set(engine), ct_id                              # mêmes périodes actives
         for k, p in engine.items():

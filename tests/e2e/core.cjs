@@ -69,4 +69,22 @@ assert.ok(J.tabs([['t1', 'Un', 3], ['t2', 'Deux']], 't1').includes('aria-selecte
 assert.strictEqual(J.dayNumeric('2026-11-05'), '05/11/2026');  assert.strictEqual(J.dayShort('2026-11-05'), '5 nov.');  assert.strictEqual(J.dayNumeric(null), '–');
 assert.strictEqual(J.fold('ÉCOLE'), 'école');  assert.strictEqual(J.tz('Europe/Paris').time(Date.UTC(2026, 0, 1, 11, 5)), '12:05');
 eq(J.ticks(0, 10, 5), [0, 2, 4, 6, 8, 10]);  eq([J.priceDec(0.5), J.priceDec(5), J.priceDec(50)], [4, 3, 2]);
-console.log('core.js : OK');
+// cycle de vie : garde « dernière demande gagnante »
+{ const g = J.latest(); const a = g.next(), b = g.next();
+  assert.ok(!g.isCurrent(a) && g.isCurrent(b), 'une demande plus récente invalide la précédente');
+  g.cancel(); assert.ok(!g.isCurrent(b), 'cancel invalide la demande en cours'); }
+// J.api : annulation reconnue, délai dépassé sans action bloquée, erreur serveur lisible
+assert.ok(J.isAbort({ name: 'AbortError' }) && !J.isAbort(new Error('x')) && !J.isAbort(null));
+ctx.AbortController = AbortController; ctx.setTimeout = setTimeout; ctx.clearTimeout = clearTimeout; ctx.location = { pathname: '/index.html', search: '' };
+const hang = (url, o) => new Promise((_, rej) => o.signal.addEventListener('abort', () => rej(Object.assign(new Error('abort'), { name: 'AbortError' }))));
+(async () => {
+  ctx.fetch = hang;
+  await assert.rejects(J.api('x', { timeout: 20 }), /Délai dépassé/);
+  const ctl = new AbortController(); const pend = J.api('x', { signal: ctl.signal, timeout: 0 }); ctl.abort();
+  await pend.then(() => assert.fail('doit être annulée'), e => assert.ok(J.isAbort(e), 'annulation du code appelant reconnue'));
+  ctx.fetch = async () => ({ ok: false, status: 422, json: async () => ({ error: 'Valeur invalide' }) });
+  await assert.rejects(J.api('x'), /Valeur invalide/);
+  ctx.fetch = async () => ({ ok: true, status: 200, json: async () => ({ a: 1 }) });
+  eq(await J.api('x'), { a: 1 });
+  console.log('core.js : OK');
+})().catch(e => { console.error(e); process.exit(1); });

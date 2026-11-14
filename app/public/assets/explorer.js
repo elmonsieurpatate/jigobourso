@@ -27,7 +27,7 @@
     /* page utilisable, enregistrement serveur indisponible */
   }
   const filters = Object.fromEntries(Object.entries(categories).map(([k, c]) => [k, [c.label, c.options]]));
-  const key = "jigo_classement_test_v1";
+  const Store = window.ExplorerStore;
   const fresh = (id) => M.fresh(profiles, id);
   let state = {
     mode: "simple",
@@ -38,7 +38,7 @@
   };
   // Seules les sauvegardes explicites de cette page sont relues. Les préférences Explorer restent séparées.
   try {
-    const saved = J.store.get(key);
+    const saved = Store.readSaved();
     if (saved && saved.profiles && typeof saved.profiles === "object")
       for (const id of Object.keys(profiles))
         if (!saved.profiles[id]) saved.profiles[id] = fresh(id);
@@ -51,7 +51,7 @@
   const userKey = String(user.id ?? "offline");
   let rawLocal = {};
   try {
-    rawLocal = J.store.get(key, {}) || {};
+    rawLocal = Store.readLocal();
   } catch (_) {}
   const byUser = rawLocal.secondaryOverridesByUser || {};
   let overrides = Object.fromEntries(
@@ -67,7 +67,7 @@
     };
     rawLocal.secondaryOverridesByUser = { ...byUser, [userKey]: overrides };
     try {
-      J.store.set(key, rawLocal);
+      Store.write(rawLocal);
     } catch (_) {
       /* Current session still uses the migrated preferences. */
     }
@@ -166,10 +166,9 @@
   const labelOf = (id) => (catalogOf().find((c) => c.id === id) || {}).label || LEGACY_LABELS[id] || id;
   const hintOf = (id) => (catalogOf().find((c) => c.id === id) || {}).hint || LEGACY_HINTS[id] || "";
   // Préférences personnelles de visibilité (sélecteur « Colonnes ») : valables tant que l'administrateur n'a pas modifié cette configuration.
-  const visKey = "jigo_ct_vis_v5";
   const personal = () => {
     try {
-      const v = J.store.get(visKey);
+      const v = Store.readVisibility();
       return v && v.rev === layout.revision && v.dev === TableLayout.device() ? v.vis : {};
     } catch (_) {
       return {};
@@ -256,7 +255,7 @@
     saved[id] = { p: cloneJSON(state.profiles[id]), o: cloneJSON(ovBy[id]) };
   }
   try {
-    const l = J.store.get(key, {}) || {};
+    const l = Store.readLocal();
     if (["simple", "expert"].includes(l.mode)) state.mode = l.mode;
   } catch (_) {
     /* préférences d'affichage facultatives */
@@ -577,7 +576,7 @@
       const json = JSON.stringify({ id: context.strategy, spec: context.config }),
         k = ctxKey(json);
       try {
-        J.store.text.set("jigo_ct_ctx:" + k, json);
+        Store.handoff(k, json);
       } catch (_) {
         /* la fiche signalera un contexte introuvable */
       }
@@ -953,7 +952,7 @@
     if (el.dataset.column !== undefined) {
       vis[el.dataset.column] = el.checked;
       try {
-        J.store.set(visKey, { rev: layout.revision, dev: TableLayout.device(), vis });
+        Store.writeVisibility({ rev: layout.revision, dev: TableLayout.device(), vis });
       } catch (_) {
         /* préférence facultative */
       }
@@ -985,7 +984,7 @@
     $("#ct-filter-panel").scrollIntoView({ behavior: "smooth", block: "start" });
   };
   $("#ct-tab-queries").onclick = () => {
-    const has = J.store.has(key);
+    const has = Store.has();
     J.dialog({
       title: "Requêtes locales de test",
       body: `<p>${has ? "Un état de recherche est enregistré sur cet appareil." : "Aucune recherche enregistrée sur cet appareil."}</p><p>Chaque stratégie, avec ses règles et ses choix de filtres, est enregistrée dans votre compte avec « Enregistrer la stratégie ».</p>`,
@@ -1072,7 +1071,7 @@
       takeView(await post({ action: "save", id, ...currentPayload() }));
       markSaved(id);
       try {
-        J.store.set(key, { mode: state.mode });
+        Store.write({ mode: state.mode });
       } catch (_) {
         /* préférences d'affichage seulement */
       }

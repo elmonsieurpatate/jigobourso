@@ -87,6 +87,16 @@ const api=(pg,route,body)=>pg.evaluate(async([r,b])=>{try{const j=b?await J.post
   must((await api(A.pg,'admin/settings',{name:'invite_code',value:'motdetest'})).json,'Mot d’invitation non enregistré');
   must((await api(A.pg,'admin/system')).json.settings.invite_code==='m'+'•'.repeat(8),'Mot d’invitation : l’administrateur doit le voir masqué (première lettre et longueur), jamais en clair');
   must((await api(U.pg,'admin/system')).json===null,'admin/system ouvert à un compte ordinaire');
+  // 8bis. cycle de vie : redessiner un même sélecteur ne cumule pas d'écouteurs « clic extérieur » sur document
+  await A.pg.context().addInitScript(()=>{const live=new Set(),add=document.addEventListener.bind(document);
+    document.addEventListener=(t,f,o)=>{if(t==='click'){const rec={},sig=o&&o.signal;live.add(rec);if(sig)sig.addEventListener('abort',()=>live.delete(rec));}return add(t,f,o);};
+    window.__liveClicks=()=>live.size;});
+  await A.pg.goto(BASE+'index.html');await A.pg.waitForSelector('.sui-pick-btn');
+  await A.pg.evaluate(()=>{const w=document.createElement('div');w.innerHTML='<select id="zz-picker"></select>';document.body.appendChild(w);
+    window.__redraw=n=>{const L=[{id:'a',label:'A',kind:'builtin',status:'official'},{id:'b',label:'B',kind:'builtin',status:'official'}];for(let i=0;i<n;i++)SUI.picker(w.querySelector('select'),L,i%2?'a':'b');};});
+  await A.pg.evaluate(()=>window.__redraw(2));const live1=await A.pg.evaluate(()=>window.__liveClicks());
+  await A.pg.evaluate(()=>window.__redraw(6));const live2=await A.pg.evaluate(()=>window.__liveClicks());
+  must(live2===live1,'Écouteurs « clic » cumulés sur document : '+live1+' puis '+live2);
   // 8. mobile : pas de débordement horizontal
   const M=await login(browser,'plain_user','plain-local-password',390);
   for(const f of ['aide.html','mes-strategies.html','mes-scores.html','index.html']){await M.pg.goto(BASE+f);await M.pg.waitForTimeout(1500);const over=await M.pg.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1?[...document.querySelectorAll('body *')].filter(e=>e.getBoundingClientRect().right>innerWidth+1&&!e.closest('.ct-table-wrap,.sui-scroll,.h-table-scroll,table')).slice(0,6).map(e=>e.tagName+'.'+e.className+':'+Math.round(e.getBoundingClientRect().right)):null);must(!over,'Débordement horizontal mobile : '+f+' '+JSON.stringify(over));}

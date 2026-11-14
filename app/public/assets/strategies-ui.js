@@ -114,16 +114,17 @@
     `<span class="sui-ico" aria-hidden="true" data-style="${tint(META[id] && META[id].icon)}">${icon(id, kind)}</span>`;
   const desc = (id, kind) => (META[id] && META[id].description) || SHORT[kind === "personal" ? "personal" : id] || "";
   const badge = (st) => J.badge(STATUS[st] || st, { adapted: "info", personal: "ok" }[st] || "", { sm: true });
-  let pop = null;
+  let pop = null,
+    popAc = null; // AbortController : retire d'un coup tous les écouteurs de la fenêtre ouverte
   function closePop() {
+    if (popAc) {
+      popAc.abort();
+      popAc = null;
+    }
     if (pop) {
       pop.remove();
       pop = null;
-      document.removeEventListener("keydown", onKey, true);
     }
-  }
-  function onKey(e) {
-    if (e.key === "Escape") closePop();
   }
   /** Fenêtre d'information : ouverte au clic ou au clavier (pas seulement au survol), fermée par Échap ou clic extérieur. */
   function openInfo(btn, s) {
@@ -139,17 +140,19 @@
       w = pop.offsetWidth;
     pop.style.left = Math.max(12, Math.min(innerWidth - w - 12, r.left)) + "px";
     pop.style.top = Math.min(innerHeight - pop.offsetHeight - 12, r.bottom + 6) + "px";
-    document.addEventListener("keydown", onKey, true);
-    setTimeout(
-      () =>
-        document.addEventListener("click", function f(e) {
-          if (pop && !pop.contains(e.target) && e.target !== btn) {
-            closePop();
-            document.removeEventListener("click", f);
-          }
-        }),
-      0,
-    );
+    const ac = (popAc = new AbortController());
+    document.addEventListener("keydown", (e) => e.key === "Escape" && closePop(), { capture: true, signal: ac.signal });
+    // le clic qui ouvre la fenêtre ne doit pas la fermer : écouteur posé au tour suivant, sauf fermeture entre-temps
+    setTimeout(() => {
+      if (ac.signal.aborted) return;
+      document.addEventListener(
+        "click",
+        (e) => {
+          if (pop && !pop.contains(e.target) && e.target !== btn) closePop();
+        },
+        { signal: ac.signal },
+      );
+    }, 0);
   }
   const infoButton = (s) =>
     `<button type="button" class="sui-info" data-sui-info="${E(s.id)}" aria-label="Informations sur ${E(s.label)}" aria-haspopup="dialog">${J.icon("info", "sui-ic")}</button>`;
@@ -214,9 +217,18 @@
         opts[Math.max(0, i - 1)].focus();
       }
     };
-    document.addEventListener("click", (e) => {
-      if (!host.contains(e.target)) set(false);
-    });
+    // un seul écouteur de clic extérieur par sélecteur : l'appel suivant (nouveau rendu) remplace le précédent
+    if (host._ac) host._ac.abort();
+    const ac = (host._ac = new AbortController());
+    document.addEventListener(
+      "click",
+      (e) => {
+        if (!host.isConnected) ac.abort();
+        else if (!host.contains(e.target)) set(false);
+      },
+      { signal: ac.signal },
+    );
+    return { destroy: () => ac.abort() };
   }
   /** Bandeau compact : état des critères de recherche et du calcul des scores de la stratégie choisie. */
   function banner(s) {
