@@ -754,3 +754,7 @@ Formatage Prettier (e2a2ed4), garde-fou anti-surcharge, 16 règles déplacées d
 ### Recette dynamique (parcours automatique) — 2026-11-13
 
 Parcours des boutons non destructifs sur 14 pages (1280 clair, 390 sombre) : menus et dialogues s'ouvrent, restent dans l'écran, se ferment avec Échap, aucun débordement, aucune erreur JS. Erreur d'API simulée sur l'Explorateur : message clair, bouton réactivé. Correctif : admin.js affiche une erreur si « Voir les titres » échoue (avant : panneau vide). Non couvert : actions qui écrivent (créer, renommer, supprimer, transactions) vérifiées par les tests e2e/integ sur la base jetable, pas visuellement ; appareil réel ; contraste automatisé.
+
+### Galerie de référence et blocage de vérification — 2026-11-14
+
+`design/galerie.html` créée (titres, boutons et états, champs, cases, onglets, segments, badges, messages, indicateurs, textes longs, valeurs absentes) avec les feuilles réelles base.css et halo.css ; hors `app/public` car le test `test_core_is_loaded_before_app_on_every_page` impose core.js/app.js sur toute page déployée. NON rendue ni mesurée : après redémarrage de la machine, Chromium (/tmp) et le serveur local 8090 ont disparu et le CDN Playwright est inaccessible. Cases « galerie » non cochées. Restent : rendre la galerie (clair/sombre, 390/1280), revoir « réglages modifiés » dans l'Explorateur, valider les 4 choix de design (h3 15 px, champs 16 px mobile, cases natives, dégradé des cartes) — conservés tels quels en attendant.
