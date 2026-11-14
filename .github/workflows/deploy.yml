@@ -35,6 +35,13 @@ jobs:
           python3 scripts/migrate.py --check
           python3 -m compileall -q engine scripts
           for file in app/public/assets/*.js; do node --check "$file"; done
+      - name: Qualité du code (ruff, formatage JS/CSS, règles Halo)
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet ruff==0.17.4
+          python3 -m ruff check .
+          npx --yes prettier@3.3.3 --check 'app/public/assets/*.js' 'app/public/assets/*.css'
+          python3 scripts/check_halo_css.py
   tests:
     name: Tests complets
     needs: syntax
@@ -62,11 +69,15 @@ jobs:
         with:
           python-version: "3.9"
       - name: Dépendances
-        run: python -m pip install -r requirements.txt pytest
+        run: |
+          python -m pip install -r requirements.txt pytest
+          python scripts/check_env.py
       - name: Tests rapides
         run: |
           set -euo pipefail
-          python -m pytest tests/fast -q --tb=no | tee "$RUNNER_TEMP/jigobourso-deploy.log"
+          python -m pytest tests/fast -q --tb=no -rs | tee "$RUNNER_TEMP/jigobourso-deploy.log"
+          # un test sauté n'est pas un test réussi : la CI échoue s'il en reste un
+          if grep -E '^SKIPPED|[0-9]+ skipped' "$RUNNER_TEMP/jigobourso-deploy.log"; then echo "::error::tests rapides sautés"; exit 1; fi
       - name: Tests d'intégration (base jetable du runner)
         env:
           JIGO_TEST_DATABASE: "1"
@@ -78,7 +89,8 @@ jobs:
         run: |
           set -euo pipefail
           MYSQL_PWD=local-test-only mysql -h127.0.0.1 -uroot jigobourso_it < db/schema.sql
-          timeout 240s python -m pytest tests/integ -q --tb=no | tee -a "$RUNNER_TEMP/jigobourso-deploy.log"
+          timeout 240s python -m pytest tests/integ -q --tb=no -rs | tee -a "$RUNNER_TEMP/integ.log" "$RUNNER_TEMP/jigobourso-deploy.log"
+          if grep -E '^SKIPPED|[0-9]+ skipped' "$RUNNER_TEMP/integ.log"; then echo "::error::tests d'intégration sautés (base jetable non configurée ?)"; exit 1; fi
       - name: Browser financial smoke (isolated synthetic database)
         env: {JIGO_TEST_DATABASE: '1', JIGO_DB_HOST: 127.0.0.1, JIGO_DB_PORT: '3306', JIGO_DB_NAME: jigobourso_it, JIGO_DB_USER: root, JIGO_DB_PASSWORD: local-test-only}
         run: |

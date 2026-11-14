@@ -545,21 +545,21 @@ Clôture : améliorations chiffrées, causes de timeout mesurées plutôt que su
 
 Constats : F13, F14, F15, F18.
 
-- [ ] Vérifier toutes les dépendances avant de déclarer le venv conforme.
-- [ ] Définir des versions reproductibles compatibles avec l'hébergement.
-- [ ] Documenter et tester le démarrage local depuis un environnement neuf.
+- [x] Vérifier toutes les dépendances avant de déclarer le venv conforme. (scripts/check_env.py : versions + imports + moteur ; exécuté sur un venv neuf, rc=0 ; test_environment.py)
+- [ ] Définir des versions reproductibles compatibles avec l'hébergement. (partiel : bornes hautes testées, sous-dépendances non figées, voir DELIVERY.md)
+- [x] Documenter et tester le démarrage local depuis un environnement neuf. (README « Démarrage depuis zéro » ; venv neuf créé et vérifié 2026-11-14 ; base locale non rejouée depuis zéro)
 - [ ] Exécuter les contrôles de qualité retenus en CI, pas seulement la syntaxe.
-- [ ] Conserver intégration et navigateur dans un environnement jetable.
-- [ ] Distinguer validation complète et déploiement rapide.
+- [x] Conserver intégration et navigateur dans un environnement jetable. (base jetable seule, JIGO_TEST_DATABASE=1, CI et make)
+- [x] Distinguer validation complète et déploiement rapide. (test_deploy_modes.py ; docs/DELIVERY.md)
 - [ ] Ne jamais présenter un test sauté comme réussi.
-- [ ] Préparer une release cohérente avant activation, ou une maintenance maîtrisée.
+- [ ] Préparer une release cohérente avant activation, ou une maintenance maîtrisée. (ouvert : transfert rsync non atomique, voir DELIVERY.md)
 - [ ] Éviter les mélanges de versions pendant le transfert.
-- [ ] Garantir la cohérence HTML, JS, CSS et versions des assets.
-- [ ] Restaurer code ET dépendances compatibles.
-- [ ] Définir invalidation de cache, recalcul des verdicts et recalcul des mesures.
-- [ ] Tester ces décisions, notamment les exclusions du hash moteur.
-- [ ] Vérifier sauvegardes et conservation des données.
-- [ ] Tester la procédure sur une cible isolée avant toute livraison autorisée.
+- [x] Garantir la cohérence HTML, JS, CSS et versions des assets. (test_asset_versions.py ; échec du déploiement si marqueur restant)
+- [x] Restaurer code ET dépendances compatibles. (restore_code remet le venv sauvegardé ; testé avec faux serveur, pas sur l'hébergement réel)
+- [x] Définir invalidation de cache, recalcul des verdicts et recalcul des mesures. (scripts/release/engine_hash.sh, docs/DELIVERY.md)
+- [x] Tester ces décisions, notamment les exclusions du hash moteur. (test_environment.py, test_execution_architecture.py)
+- [x] Vérifier sauvegardes et conservation des données. (dumps vérifiés gzip -t, empreintes financière et comptes avant/après ; deploy.sh)
+- [ ] Tester la procédure sur une cible isolée avant toute livraison autorisée. (ouvert : secret serveur sandbox absent, non vérifiable seul)
 
 Clôture : installation, activation et restauration reproductibles et cohérentes.
 
@@ -603,12 +603,12 @@ Pour chaque résolution, indiquer commit et test/preuve.
 - [x] F10 — Routes/services PHP incomplets. Étape 7. Preuve : 2026-11-14 : services/portfolios.php (17 cas d'usage sans HTTP), routes minces, own_transaction/tx_carry_fx, tests/fast/test_php_structure.py, docs/ARCHITECTURE_PHP.md.
 - [x] F11 — Dépendances Python mal orientées. Étape 8. Preuve : 2026-11-14 : 6 cycles (imports différés compris) supprimés, 0 restant ; tests/fast/test_python_dependencies.py ; docs/ARCHITECTURE_PYTHON.md.
 - [x] F12 — Unités monétaires divergentes. Étape 6. Preuve : 2026-11-14 : engine/shared/units.py + app/lib/units.php, ZAc/ILA corrigés dans l'historique et la saisie ; parité PHP/Python testée.
-- [ ] F13 — Activation/restauration de release. Étape 11. Preuve :
-- [ ] F14 — Dépendances non complètement validées. Étape 11. Preuve :
+- [ ] F13 — Activation/restauration de release. Étape 11. Preuve partielle (reste : transfert atomique, cible isolée) : 2026-11-14 : restauration code + dépendances testée, empreinte moteur unique testée.
+- [ ] F14 — Dépendances non complètement validées. Étape 11. Preuve partielle (reste : sous-dépendances non figées) : 2026-11-14 : check_env.py sur venv neuf, bornes testées, contrôle en CI.
 - [ ] F15 — Garde-fous insuffisants. Étapes 3, 5, 11. Preuve partielle (reste étape 11) : 2026-11-14 : garde lint PHP, contrats HTTP et moteur testés (étape 5).
 - [ ] F16 — Sources condensées/formatage. Étapes 1, 4, 7, 8. Preuve :
 - [x] F17 — Taille des corps JSON. Étape 5. Preuve : 2026-11-14 : BODY_MAX 2 Mio, 413 avant lecture ; test_http_contract.py.
-- [ ] F18 — Classification des changements/cache. Étape 11. Preuve :
+- [x] F18 — Classification des changements/cache. Étape 11. Preuve : 2026-11-14 : scripts/release/engine_hash.sh (source unique), exclusions testées, docs/DELIVERY.md.
 - [x] F19 — Fusion implicite des styles calculés. Étape 4. Preuve : 2026-11-14 : règle de fusion/remplacement définie et documentée (FRONTEND_STRUCTURE.md).
 
 Un constat peut être résolu par correction, par preuve qu'il n'existe plus
@@ -815,3 +815,12 @@ Formatage JS (Prettier, commit 4613946, `make js-format` / `make js-check`). Cyc
 - Problème mesuré : classement = 10,1 Mo de JSON. Correction : gzip des réponses > 64 Ko (÷ 8,8, 94 ms CPU). Pas de pagination, cache, worker ni bundler (non justifiés).
 - Observabilité : en-tête `Server-Timing` (app, slot, engine, decode, gzip), journal des requêtes > 3 s avec identifiant.
 - Garde-fous : tests d'assets (références, orphelins, doublons, plafond 450 Ko), comptage des requêtes SQL.
+
+## Journal — étape 11 (2026-11-14)
+
+- `scripts/release/engine_hash.sh` : empreinte du moteur définie une seule fois (avant/après transfert) ; testée (exclusions inactives, code et schéma actifs, exclusions existantes).
+- `ops/deploy.sh` : la restauration remet aussi le venv sauvegardé si `requirements.txt` restauré ne correspond plus à `.requirements.sha`.
+- `scripts/check_env.py` + README « Démarrage depuis zéro » ; venv neuf installé depuis `requirements.txt` : conforme.
+- CI : ruff, prettier, règles Halo dans les contrôles courts ; `check_env.py` après installation ; échec si un test est sauté (rapides et intégration).
+- `docs/DELIVERY.md` : chaîne de validation, restauration, recalcul, sauvegardes, limites.
+- Ouvert : transfert non atomique ; sous-dépendances non figées ; essai isolé Hostinger (secret serveur absent) ; restauration des dépendances non testée sur l'hébergement réel.

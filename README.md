@@ -16,6 +16,18 @@ Aucun framework ; une seule dépendance Python d'exécution (PyMySQL).
 | `tests/` | `fast/` (sans base), `integ/` (MariaDB jetable), `php/` (services PHP), `seeds/` (données), `e2e/` (navigateur, Node) ; voir `tests/e2e/README.md` |
 | `docs/` | architecture, méthode, sécurité, déploiement, structure du front |
 
+## Démarrage depuis zéro
+
+```
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt pytest ruff==0.17.4
+.venv/bin/python scripts/check_env.py   # 0 = dépendances conformes à requirements.txt, moteur importable
+make dev-db                             # MariaDB locale (docker) + base jigobourso_v2 vide
+make check                              # lint + tests rapides
+```
+
+Prérequis : Python 3.9+ (le serveur est en 3.9 ; développement testé en 3.12), PHP ≥ 8.1, MariaDB 10.11, Node (formatage et navigateur).
+Livraison, restauration et reprise : `docs/DELIVERY.md`.
+
 ## Commandes
 
 ```

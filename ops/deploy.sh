@@ -66,7 +66,22 @@ trap 'rm -rf "$tmp"' EXIT
 tar xzf "$BACKUPS/$FILE" -C "$tmp"
 cd "$tmp/jigobourso-v2"
 rsync -rlt --delete --exclude=__pycache__ app engine db docs scripts README.md requirements.txt "$ROOT/"
-"$ROOT/.venv/bin/python" -c "import sys; sys.path.insert(0, '$ROOT'); import engine.cli" && echo "moteur importable après restauration"
+# Code ET dépendances : si les dépendances installées ne correspondent plus au requirements.txt restauré, on remet le venv sauvegardé avant la mise à jour.
+want=$(sha256sum "$ROOT/requirements.txt" | cut -d' ' -f1)
+if [ -f "$ROOT/.requirements.sha" ] && [ "$want" != "$(cat "$ROOT/.requirements.sha")" ]; then
+  pkg=$(ls -1t "$BACKUPS"/site-packages-*.tgz 2>/dev/null | head -1 || true)
+  if [ -n "$pkg" ]; then
+    site=$("$ROOT/.venv/bin/python" -c "import sysconfig; print(sysconfig.get_paths()['purelib'])")
+    tar tzf "$pkg" > /dev/null
+    find "$site" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+    tar xzf "$pkg" -C "$site"
+    printf '%s\n' "$want" > "$ROOT/.requirements.sha"
+    echo "dépendances Python restaurées depuis $(basename "$pkg")"
+  else
+    echo "dépendances différentes mais aucune sauvegarde du venv : vérification manuelle requise" >&2
+  fi
+fi
+"$ROOT/.venv/bin/python" -c "import sys; sys.path.insert(0, '$ROOT'); import engine.cli, pymysql, numpy, pandas, exchange_calendars" && echo "moteur et dépendances importables après restauration"
 printf 'restored_from=%s\ndate=%s\n' "$FILE" "$(date -u +%FT%TZ)" > "$ROOT/.deployed"
 echo "code restauré depuis $FILE"
 REMOTE
@@ -204,7 +219,7 @@ REMOTE
 )
 echo "sauvegarde : $backup"
 # Le recalcul n'est demandé que si le code qui produit les données dérivées (engine/, db/) change. service.py (et les modules qui en sont issus : universe_verdicts, title_sheet, market_facts) et signals.py ne font qu'afficher (lecture seule) : les exclure évite un recalcul pour une retouche d'affichage.
-engine_before=$(remote_sh "cd $root && find engine db -type f ! -name '*.pyc' ! -path engine/analytics/admin/service.py ! -path engine/analytics/explorer/universe_verdicts.py ! -path engine/analytics/admin/title_sheet.py ! -path engine/analytics/market_views/market_facts.py ! -path engine/analytics/series/signals.py | LC_ALL=C sort | xargs sha256sum | sha256sum | cut -c1-16" 2>/dev/null || true)
+engine_before=$(remote_sh "bash -s $root" < scripts/release/engine_hash.sh 2>/dev/null || true)
 
 set +e
 (
@@ -327,7 +342,7 @@ fi
 
 remote_sh "ROOT=$root SHA=$sha VERSION=$version BEFORE=$engine_before bash -s" <<'REMOTE'
 cd "$ROOT"
-hash=$(find engine db -type f ! -name '*.pyc' ! -path engine/analytics/admin/service.py ! -path engine/analytics/explorer/universe_verdicts.py ! -path engine/analytics/admin/title_sheet.py ! -path engine/analytics/market_views/market_facts.py ! -path engine/analytics/series/signals.py | LC_ALL=C sort | xargs sha256sum | sha256sum | cut -c1-16)
+hash=$(bash scripts/release/engine_hash.sh "$ROOT")
 printf 'commit=%s\nversion=%s\ndate=%s\nengine_hash=%s\n' "$SHA" "$VERSION" "$(date -u +%FT%TZ)" "$hash" > .deployed
 if [ "$hash" = "$BEFORE" ]; then
   echo "moteur et schéma inchangés : aucun recalcul"
