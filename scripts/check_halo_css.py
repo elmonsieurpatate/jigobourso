@@ -68,7 +68,7 @@ for sheet in ASSETS.glob("*.css"):
             norm = " ".join(sel.split())
             last = re.split(r"[\s>+~]+", norm)[-1]
             base = re.sub(r":[\w-]+(\([^)]*\))?|\[[^\]]*\]", "", last)
-            if (re.fullmatch(COMPONENT + r"(\.[\w-]+)*", base) or re.fullmatch(r"(\.[\w-]+)?" + COMPONENT, base)) \
+            if (re.fullmatch(COMPONENT + r"([.#][\w-]+)*", base) or re.fullmatch(r"(\.[\w-]+)?" + COMPONENT, base)) \
                     and (sheet.name, norm) not in EXCEPTIONS:
                 errors.append(f"{sheet.name}: surcharge locale de composant commun « {norm} » ({', '.join(sorted(bad))}) : à déplacer dans halo.css")
                 break

@@ -198,10 +198,10 @@ Centraliser les composants n'impose pas un CSS monolithique.
 
 ## Galerie de référence
 
-- [ ] Créer une galerie ou un parcours de référence utilisant les composants réels.
-- [ ] Présenter variantes et états.
-- [ ] Inclure textes longs, gros montants, valeurs absentes et icônes.
-- [ ] Utiliser les mêmes sources CSS que l'application.
+- [x] Créer une galerie ou un parcours de référence utilisant les composants réels. Preuve 2026-11-14 : design/galerie.html rendue (1280/390, clair/sombre) avec les feuilles réelles ; elle a révélé 3 défauts corrigés.
+- [x] Présenter variantes et états. Preuve 2026-11-14 : boutons (variantes, tailles, désactivé, chargement), champs, cases, interrupteur, onglets, segments, badges, messages, vide/chargement.
+- [x] Inclure textes longs, gros montants, valeurs absentes et icônes. Preuve 2026-11-14 : libellé long, 1 234 567,89 €, valeur absente « – », icônes.
+- [x] Utiliser les mêmes sources CSS que l'application. Preuve 2026-11-14 : liens vers app/public/assets/base.css et halo.css.
 - [ ] Identifier les références visuelles retenues.
 
 ## Boutons
@@ -291,9 +291,9 @@ Adapter cette liste aux pages réellement actives du dépôt courant.
 
 - [x] Sélecteur de stratégie contenu sur petit écran. Preuve : menu à 25–365 px sur 390 px, clair et sombre (mesure + capture).
 - [ ] Options et badges lisibles au clavier et au toucher.
-- [ ] Modification d'une stratégie ou d'un filtre sans recherche automatique.
+- [x] Modification d'une stratégie ou d'un filtre sans recherche automatique. Preuve 2026-11-14 : modification d'un réglage Expert, 0 requête ranking.
 - [x] Application explicite et chargement perceptible. Preuve 2026-11-13 : « Recherche en cours… », spinner, #ct-apply désactivé (bureau/mobile, clair/sombre).
-- [ ] États distincts : à jour, réglages modifiés, aucun résultat, erreur. Partiel 2026-11-13 : « à jour », chargement, aucun résultat et erreur (500 simulé : message « Résultats non actualisés : … Réessayez », bouton réactivé) vus ; « réglages modifiés » à revoir.
+- [x] États distincts : à jour, réglages modifiés, aucun résultat, erreur. Preuve 2026-11-14 : à jour, chargement, aucun résultat, erreur (500 simulé) et réglage modifié (invitation « Cliquez sur Appliquer les réglages », 0 requête ranking) vus.
 - [x] Tableau consultable sans élargir toute la page. Preuve 2026-11-13 : tableau défile dans .ct-table-wrap (1384 px dans 1010 px ; 966 dans 364 mobile), scrollWidth page = 390.
 - [ ] Règles ET/OU, colonnes, tris et modes toujours utilisables.
 
@@ -758,3 +758,8 @@ Parcours des boutons non destructifs sur 14 pages (1280 clair, 390 sombre) : men
 ### Galerie de référence et blocage de vérification — 2026-11-14
 
 `design/galerie.html` créée (titres, boutons et états, champs, cases, onglets, segments, badges, messages, indicateurs, textes longs, valeurs absentes) avec les feuilles réelles base.css et halo.css ; hors `app/public` car le test `test_core_is_loaded_before_app_on_every_page` impose core.js/app.js sur toute page déployée. NON rendue ni mesurée : après redémarrage de la machine, Chromium (/tmp) et le serveur local 8090 ont disparu et le CDN Playwright est inaccessible. Cases « galerie » non cochées. Restent : rendre la galerie (clair/sombre, 390/1280), revoir « réglages modifiés » dans l'Explorateur, valider les 4 choix de design (h3 15 px, champs 16 px mobile, cases natives, dégradé des cartes) — conservés tels quels en attendant.
+
+
+### Galerie rendue, trois défauts corrigés — 2026-11-14
+
+Chromium réinstallé (Chrome for Testing 153, hors dépôt). La galerie a révélé : (1) `.lg` de légende (base.css) écrasait `.btn.lg` (bouton 12 px tronqué) → `.lg:not(.btn)` ; (2) `select` avec 10 px de marge droite au lieu de 32 px (la règle générique des champs l'emportait) → flèche superposée au texte, corrigé dans halo.css ; (3) interrupteur défini par `#ac-filter-enabled` dans filtres.css → promu en `input.switch` dans halo.css. Garde-fou étendu aux sélecteurs `#id`. Mesure : 19 pages × 320/390/768/1280 × clair/sombre = 152 combinaisons sans débordement, texte coupé, marge de flèche manquante, focus invisible ni erreur. Restent à ta décision : h3 15 px, champs 16 px mobile, cases natives, dégradé des cartes (conservés).
