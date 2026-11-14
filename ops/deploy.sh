@@ -179,7 +179,7 @@ gzip -t "$file"
 echo "Sauvegarde financière vérifiée : $(basename "$file")"
 REMOTE
 # Run the new SELECT-only checker against the old deployment to establish the baseline.
-remote_sh "cd $root && set -a && . ./private/env && set +a && php" < <(sed "s@__DIR__ . '/../../app/lib/db.php'@getcwd() . '/app/lib/db.php'@" scripts/release/check_financial_integrity.php) > "$RUNNER_TEMP/financial-before.json"
+remote_sh "cd $root && set -a && . ./private/env && set +a && php" < <(sed "s@__DIR__ . '/../../app/lib/db.php'@getcwd() . '/app/lib/db.php'@" scripts/release/financial_fingerprint.php) > "$RUNNER_TEMP/financial-before.json"
 remote_sh "cd $root && set -a && . ./private/env && set +a && php" < scripts/release/verify_account_release.php > "$RUNNER_TEMP/account-before.json"
 
 echo "== Version des pages : ?v=$version"

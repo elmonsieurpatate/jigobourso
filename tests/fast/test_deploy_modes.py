@@ -78,7 +78,7 @@ def isolated_deployment(tmp_path, mode, fail_public=False):
         (project / folder).mkdir(parents=True, exist_ok=True)
     shutil.copy(ROOT / 'ops/deploy.sh', project / 'ops/deploy.sh')
     shutil.copy(ROOT / 'scripts/migrate.py', project / 'scripts/migrate.py')
-    for script in ('check_financial_integrity.php', 'verify_account_release.php'):
+    for script in ('check_financial_integrity.php', 'financial_fingerprint.php', 'verify_account_release.php'):
         shutil.copy(ROOT / 'scripts/release' / script, project / 'scripts/release' / script)
     (project / 'db/schema.sql').write_text('CREATE TABLE example (id INT);\n')
     (project / 'app/public/index.html').write_text('<script src="assets/app.js?v=__BUILD__"></script>')
@@ -161,3 +161,14 @@ def test_explicit_push_marker_selects_quick_and_keeps_main_gate():
     assert expression_value(job_condition('hostinger'), {**context, 'github.ref': 'refs/heads/feature/test'}) is False
     assert expression_value(job_condition('hostinger'), {**context, 'needs.syntax.result': 'failure'}) is False
     assert expression_value(job_condition('hostinger'), {**context, 'needs.tests.result': 'failure'}) is False
+
+
+def test_before_delivery_fingerprint_script_depends_only_on_db_php():
+    """La livraison envoie ce script au serveur par l'entrée standard alors que le code applicatif y est encore l'ancienne version :
+    il ne doit charger que db.php (régression du 14/11 : le contrôle complet exigeait des fonctions absentes de l'ancien code)."""
+    import re
+    script = (ROOT / 'scripts/release/financial_fingerprint.php').read_text()
+    assert re.findall(r"require(?:_once)?\s+([^;]+);", script) == ["__DIR__ . '/../../app/lib/db.php'"]
+    deploy = (ROOT / 'ops/deploy.sh').read_text()
+    before = [line for line in deploy.splitlines() if 'financial-before.json' in line and 'remote_sh' in line]
+    assert before and 'financial_fingerprint.php' in before[0] and 'check_financial_integrity.php' not in before[0]
