@@ -172,3 +172,11 @@ def test_before_delivery_fingerprint_script_depends_only_on_db_php():
     deploy = (ROOT / 'ops/deploy.sh').read_text()
     before = [line for line in deploy.splitlines() if 'financial-before.json' in line and 'remote_sh' in line]
     assert before and 'financial_fingerprint.php' in before[0] and 'check_financial_integrity.php' not in before[0]
+
+
+def test_pre_transfer_diagnostic_tolerates_the_previous_module_layout():
+    """Le diagnostic des classements s'exécute sur le code déjà en place (avant le transfert) : il doit importer l'ancien comme le nouvel emplacement
+    d'un module déplacé (régression du 14/11, universe_verdicts)."""
+    deploy = (ROOT / 'ops/deploy.sh').read_text()
+    block = deploy[deploy.index('Contrôle des classements'):deploy.index('Mode rapide : diagnostic exhaustif')]
+    assert 'except ImportError' in block and 'from engine.analytics.admin import universe_verdicts' in block

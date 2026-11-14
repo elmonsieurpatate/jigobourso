@@ -98,7 +98,10 @@ export MYSQL_PWD="$JIGO_DB_PASSWORD" PYTHONPATH="$ROOT"
 .venv/bin/python - <<'PY'
 from engine.shared.db import connect
 from engine.analytics.admin import service
-from engine.analytics.explorer import universe_verdicts
+try:                                                       # ce contrôle s'exécute sur la version EN PLACE (avant transfert) : ancien ou nouvel emplacement
+    from engine.analytics.explorer import universe_verdicts
+except ImportError:
+    from engine.analytics.admin import universe_verdicts
 from engine.analytics.explorer import strategy
 
 conn = connect()
