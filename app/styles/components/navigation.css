@@ -1,0 +1,188 @@
+/* Navigation latérale, tiroirs et fil d’Ariane. */
+.side {
+  color: var(--side-ink);
+  background: radial-gradient(120% 60% at 0% 0%, var(--side-bg-2), var(--side-bg) 60%);
+  border-right: 1px solid var(--side-line);
+}
+.side .brand {
+  color: var(--on-dark);
+  font-weight: 800;
+  font-size: var(--fs-16);
+  letter-spacing: -0.02em;
+  text-decoration: none;
+}
+.side .brand small {
+  font-size: var(--fs-10);
+  font-weight: 600;
+  color: var(--side-ink);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.side-scroll {
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+.side .sec {
+  font-size: var(--fs-10);
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--side-muted);
+}
+.side .nv {
+  border: 0;
+  border-radius: var(--radius-12);
+  background: none;
+  color: var(--side-ink);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: none;
+}
+.side .nv:hover {
+  background: var(--side-hover-overlay);
+  color: var(--on-dark);
+  text-decoration: none;
+}
+.side .nv svg.ic {
+  fill: none;
+  stroke: currentColor;
+}
+.side .nv .chev {
+  fill: none;
+  stroke: currentColor;
+}
+.side .nv.on,
+.side .grp.cur > .nv {
+  color: var(--on-dark);
+  background: var(--side-active-overlay);
+}
+.side .nv.on::before,
+.side .grp.cur > .nv::before {
+  border-radius: 0 var(--radius-4) var(--radius-4) 0;
+  background: var(--side-active);
+}
+.side .nv.on svg.ic,
+.side .grp.cur > .nv svg.ic {
+  color: var(--side-active-ink);
+}
+.side .sub {
+  border-left: 1px solid var(--side-line);
+}
+.side .sh {
+  font-size: var(--fs-10);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--side-ink);
+}
+.side .sv {
+  border-radius: var(--radius-8);
+  color: var(--side-ink);
+  font-size: var(--fs-13);
+  font-weight: 500;
+  text-decoration: none;
+}
+.side .sv::before {
+  border-radius: 50%;
+  background: currentColor;
+}
+.side .sv:hover {
+  background: var(--side-sub-overlay);
+  color: var(--on-dark);
+  text-decoration: none;
+}
+.side .sv.on {
+  color: var(--on-dark);
+  background: var(--side-sub-hover-overlay);
+  font-weight: 700;
+}
+.side .sv.on::before {
+  background: var(--side-active);
+}
+.side .sv .cnt {
+  font-size: var(--fs-10);
+  color: var(--side-muted);
+}
+.side-foot {
+  border-top: 1px solid var(--side-line);
+}
+.side-foot .who {
+  border-radius: var(--radius-12);
+  border: 0;
+  background: none;
+  color: var(--on-dark);
+  font: inherit;
+}
+.side-foot .who:hover {
+  background: var(--side-hover-overlay);
+}
+.avatar {
+  border-radius: var(--radius-12);
+  background: linear-gradient(135deg, var(--avatar-1), var(--avatar-2));
+  color: var(--on-dark);
+  font-weight: 800;
+  text-transform: uppercase;
+}
+.side-foot .who b {
+  line-height: var(--lh-tight);
+}
+.side-foot .who span {
+  font-size: var(--fs-10);
+  color: var(--side-ink);
+}
+body.side-collapsed .side .sec {
+  background: var(--side-line);
+  font-size: 0;
+}
+.fly {
+  border-radius: var(--radius-12);
+  background: var(--side-bg-2);
+  border: 1px solid var(--side-line);
+  box-shadow: 0 12px 40px var(--shadow-menu-color);
+}
+.fly .ttl {
+  font-weight: 800;
+  color: var(--on-dark);
+}
+.fly .sv {
+  color: var(--side-ink);
+}
+.fly .sv:hover {
+  color: var(--on-dark);
+}
+.hdr {
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(10px);
+}
+.crumbs {
+  font-size: var(--fs-13);
+}
+.crumbs b {
+  font-weight: 700;
+}
+.crumbs i {
+  font-style: normal;
+}
+.hdr .quick input {
+  padding-left: var(--sp-40);
+}
+.hdr .quick svg {
+  fill: none;
+  stroke: var(--muted);
+}
+@media (max-width: 900px) {
+  .side,
+  body.side-collapsed .side {
+    box-shadow: none;
+  }
+  body.side-open .side {
+    box-shadow: 0 0 60px var(--shadow-drawer-color);
+  }
+  body.side-open .side-scrim {
+    background: var(--dialog-backdrop-color);
+    backdrop-filter: blur(2px);
+  }
+  body.side-collapsed .side .sec {
+    background: none;
+    font-size: var(--fs-10);
+  }
+}

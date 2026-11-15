@@ -55,7 +55,58 @@
         "source": "theme/tokens.css"
       },
       {
-        "source": "components/foundation.css"
+        "source": "components/text-states.css"
+      },
+      {
+        "source": "components/busy.css"
+      },
+      {
+        "source": "components/strategy-controls.css"
+      },
+      {
+        "source": "components/search-results.css"
+      },
+      {
+        "source": "components/chart-primitives.css"
+      },
+      {
+        "source": "components/help-text.css"
+      },
+      {
+        "source": "components/metrics.css"
+      },
+      {
+        "source": "components/market-charts.css"
+      },
+      {
+        "source": "components/navigation.css"
+      },
+      {
+        "source": "components/account-fields.css"
+      },
+      {
+        "source": "components/signals.css"
+      },
+      {
+        "source": "components/filter-controls.css"
+      },
+      {
+        "source": "components/chart-levels.css"
+      },
+      {
+        "source": "components/portfolio-values.css"
+      },
+      {
+        "source": "components/performance-chart.css"
+      },
+      {
+        "source": "components/data-states.css"
+      },
+      {
+        "source": "components/risk-bars.css"
+      },
+      {
+        "source": "components/accessibility.css"
       },
       {
         "source": "features/admin-columns.css",

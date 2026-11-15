@@ -1,0 +1,56 @@
+/* Barres de risque et de protection des gains. */
+.rbar {
+  font-size: var(--fs-12);
+}
+.rbar-track {
+  border-radius: var(--radius-4);
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.rbar-track i {
+  border-radius: var(--radius-4);
+  background: var(--up);
+}
+.rbar.watch .rbar-track i {
+  background: var(--warn);
+}
+.rbar.act .rbar-track i {
+  background: var(--down);
+}
+.rbar b {
+  font-weight: 650;
+  color: var(--up);
+}
+.rbar.watch b {
+  color: var(--warn);
+}
+.rbar.act b {
+  color: var(--down);
+}
+.rbar.na b {
+  color: var(--muted);
+  font-weight: 500;
+}
+.rbar.compact {
+  font-size: var(--fs-11);
+}
+.rbar-why {
+  font-size: var(--fs-12);
+  color: var(--muted);
+}
+.rbar-why b {
+  color: var(--text);
+}
+.rbar-why li.p2 b {
+  color: var(--down);
+}
+.rbar-why li.p1 b {
+  color: var(--warn);
+}
+.protection-values {
+  font-size: var(--fs-11);
+}
+.protection-track {
+  background: var(--warn-soft, var(--line));
+  border-radius: var(--radius-8);
+}

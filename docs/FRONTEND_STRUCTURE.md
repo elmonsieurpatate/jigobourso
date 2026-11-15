@@ -105,3 +105,10 @@ contrôleur garde sélection, chargements et événements. Les demandes d’aper
 par le cache asynchrone commun à états pending/ready/error, avec reprise explicite.
 Cela ne transforme pas les contrôleurs en fichiers vides : ils coordonnent encore
 les parcours et leur état, ce qui reste leur rôle.
+
+Les règles héritées de la feuille de base ne restent pas dans un bloc
+« foundation » indifférencié : navigation, graphiques de marché/performance,
+signaux, indicateurs, réglages de stratégie, filtres, états, risque et accessibilité
+ont chacun leur source dans components. Leur ordre explicite dans le manifeste
+conserve la cascade ; ce découpage supplémentaire ne change aucun octet des
+11 sorties compilées, vérifié par build_styles --check.

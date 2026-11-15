@@ -1,0 +1,11 @@
+/* Champs de mot de passe et messages de compte. */
+.pw-wrap input {
+  padding-right: 52px;
+}
+.pw-wrap .pw-eye {
+  background: var(--surface);
+}
+.account-note {
+  font-size: var(--fs-12);
+  color: var(--muted);
+}

@@ -1,0 +1,26 @@
+/* Niveaux, opérations et repères des graphiques. */
+.price-svg .markline {
+  stroke: var(--accent);
+}
+.price-svg .marklabel {
+  fill: var(--accent);
+  font-weight: 600;
+}
+.price-svg .levelline {
+  stroke: var(--chart-level);
+}
+.price-svg .levelline.high {
+  stroke: var(--muted);
+}
+.price-svg .levellabel {
+  fill: var(--chart-level);
+}
+.price-svg .levellabel.high {
+  fill: var(--muted);
+}
+.chart-tip i.dot {
+  border-radius: var(--radius-4);
+}
+.price-svg .markline.sell {
+  stroke: var(--down);
+}

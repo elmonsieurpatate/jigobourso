@@ -1,0 +1,38 @@
+/* Résultats et motifs de sélection. */
+.result {
+  border-bottom: 1px solid var(--line);
+  color: inherit;
+}
+.result:hover,
+.ht-i:hover {
+  background: var(--surface-2);
+  text-decoration: none;
+}
+.result .rank {
+  font-weight: 800;
+  color: var(--muted);
+  font-size: var(--fs-15);
+}
+.result .name {
+  font-weight: 700;
+}
+.result .meta {
+  color: var(--muted);
+  font-size: var(--fs-11);
+}
+.reason {
+  border-radius: var(--radius-12);
+  background: var(--surface-2);
+}
+.reason .mark {
+  font-weight: 800;
+}
+.reason.pass .mark {
+  color: var(--up);
+}
+.reason.fail .mark {
+  color: var(--down);
+}
+.reason.missing .mark {
+  color: var(--warn);
+}

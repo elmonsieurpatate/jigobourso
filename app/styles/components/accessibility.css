@@ -1,0 +1,23 @@
+/* Héritage typographique, lien d’évitement et réduction des animations. */
+button,
+select,
+input,
+textarea {
+  font: inherit;
+}
+.skip-link {
+  border-radius: var(--radius-8);
+  background: var(--surface);
+  color: var(--text);
+  border: 2px solid var(--accent);
+  font-weight: 700;
+  text-decoration: none;
+}
+main:focus {
+  outline: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    border-top-color: var(--accent);
+  }
+}

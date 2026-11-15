@@ -1,0 +1,14 @@
+/* Aide et valeurs de contribution du portefeuille. */
+details.help > summary {
+  color: var(--muted);
+  font-size: var(--fs-11);
+}
+.contrib .cv {
+  font-weight: 600;
+}
+.pos {
+  color: var(--up);
+}
+.neg {
+  color: var(--down);
+}

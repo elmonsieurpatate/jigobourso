@@ -1,0 +1,42 @@
+/* Liens, textes secondaires et états sémantiques. */
+a {
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+.small {
+  font-size: var(--fs-12);
+}
+.up {
+  color: var(--up);
+}
+.down {
+  color: var(--down);
+}
+.warn {
+  color: var(--warn);
+}
+.kpi .v {
+  font-size: var(--fs-20);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.kpi .l {
+  color: var(--muted);
+  font-size: var(--fs-11);
+  font-weight: 600;
+}
+.empty {
+  padding: var(--sp-40) var(--sp-16);
+  color: var(--muted);
+}
+#ct-masked-count.has-hidden,
+.ac-validation.error,
+.ps-ic.t-down,
+.ps-ic.ic-down,
+.ps-risk.r-vhigh {
+  background: var(--down-soft);
+  color: var(--down);
+}
