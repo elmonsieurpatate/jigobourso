@@ -138,7 +138,30 @@ else
   echo "== Mode rapide : diagnostic exhaustif des classements non exécuté"
 fi
 
-if [ "$operation" = diagnostic ]; then echo "Diagnostic terminé : rien modifié."; exit 0; fi
+if [ "$operation" = diagnostic ]; then
+  echo "== Conformité des dépendances (lecture seule)"
+  remote_sh "cd $root && .venv/bin/python -" <<'PYDEPS'
+import sys
+import importlib.metadata as md
+sys.path.insert(0, 'scripts')
+import check_env
+from pathlib import Path
+text = Path('requirements.txt').read_text()
+found = check_env.problems(text)
+for name, _ in check_env.parse(text):
+    errors = [e for e in found if e.startswith(name + ' ') or e.startswith(name + ' :')]
+    canonical = lambda s: s.lower().replace('-', '_')
+    copies = sum(canonical(d.metadata.get('Name', '')) == canonical(name) for d in md.distributions())
+    if copies > 1:
+        print('Erreur environnement :', name, ': métadonnées multiples')
+    for error in errors:
+        reason = 'version incompatible' if 'hors des bornes' in error else 'paquet absent' if 'non installé' in error else 'import impossible'
+        print('Erreur environnement :', name, ':', reason)
+if not found:
+    print('site OK : dépendances conformes')
+PYDEPS
+  echo "Diagnostic terminé : rien modifié."; exit 0
+fi
 
 if [ "$operation" = rollback ]; then
   file=${ROLLBACK_BACKUP:-$(remote_sh "ls -1t $backups/code-*.tgz | head -1 | xargs -n1 basename")}
