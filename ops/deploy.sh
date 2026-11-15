@@ -68,14 +68,16 @@ cd "$tmp/jigobourso-v2"
 rsync -rlt --delete-delay --delay-updates --exclude=__pycache__ app engine db docs scripts README.md requirements.txt "$ROOT/"
 # Code ET dépendances : si les dépendances installées ne correspondent plus au requirements.txt restauré, on remet le venv sauvegardé avant la mise à jour.
 want=$(sha256sum "$ROOT/requirements.txt" | cut -d' ' -f1)
-if [ -f "$ROOT/.requirements.sha" ] && [ "$want" != "$(cat "$ROOT/.requirements.sha")" ]; then
-  pkg=$(ls -1t "$BACKUPS"/site-packages-*.tgz 2>/dev/null | head -1 || true)
-  if [ -n "$pkg" ]; then
+marker="$ROOT/.deployment-venv-backup"
+if [ -f "$marker" ] || { [ -f "$ROOT/.requirements.sha" ] && [ "$want" != "$(cat "$ROOT/.requirements.sha")" ]; }; then
+  if [ -f "$marker" ]; then pkg="$BACKUPS/$(cat "$marker")"; else pkg=$(ls -1t "$BACKUPS"/site-packages-*.tgz 2>/dev/null | head -1 || true); fi
+  if [ -n "$pkg" ] && [ -f "$pkg" ]; then
     site=$("$ROOT/.venv/bin/python" -c "import sysconfig; print(sysconfig.get_paths()['purelib'])")
     tar tzf "$pkg" > /dev/null
     find "$site" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
     tar xzf "$pkg" -C "$site"
     printf '%s\n' "$want" > "$ROOT/.requirements.sha"
+    rm -f "$marker"
     echo "dépendances Python restaurées depuis $(basename "$pkg")"
   else
     echo "dépendances différentes mais aucune sauvegarde du venv : vérification manuelle requise" >&2
@@ -241,27 +243,7 @@ set +e
   remote_sh "ROOT=$root BACKUPS=$backups SHA=$sha VERSION=$version bash -s" <<'REMOTE'
 set -euo pipefail
 cd "$ROOT"
-want=$(sha256sum requirements.txt | cut -d' ' -f1)
-have=$(cat .requirements.sha 2>/dev/null || true)
-site=$(.venv/bin/python -c "import sysconfig; print(sysconfig.get_paths()['purelib'])")
-if [ "$have" = "$want" ]; then
-  echo "dépendances Python inchangées"
-elif [ -z "$have" ]; then
-  .venv/bin/python -c "import pymysql" || { echo "dépendances Python inutilisables" >&2; exit 1; }
-  printf '%s\n' "$want" > .requirements.sha; echo "dépendances Python existantes validées (première exécution)"
-else
-  tar czf "$BACKUPS/site-packages-$(date -u +%Y%m%d%H%M%S).tgz" -C "$site" . || { echo "sauvegarde du venv impossible : mise à jour refusée" >&2; exit 1; }
-  echo "sauvegarde du venv faite"
-  ls -1t "$BACKUPS"/site-packages-*.tgz | tail -n +4 | xargs -r rm -f
-  if .venv/bin/python -m pip --version > /dev/null 2>&1; then
-    .venv/bin/python -m pip install --quiet --upgrade -r requirements.txt
-  else
-    # le venv de production n'a pas pip (ensurepip indisponible) : le pip du système installe dans le venv
-    python3 -m pip install --quiet --upgrade --target "$site" -r requirements.txt
-  fi
-  .venv/bin/python -c "import pymysql" || { echo "dépendances Python inutilisables après mise à jour" >&2; exit 1; }
-  printf '%s\n' "$want" > .requirements.sha; echo "dépendances Python mises à jour"
-fi
+bash scripts/release/ensure_dependencies.sh "$ROOT" "$BACKUPS"
 set -a; . ./private/env; set +a
 export MYSQL_PWD="$JIGO_DB_PASSWORD" PYTHONPATH="$ROOT"
 dbconn=(-u"$JIGO_DB_USER"); if [ -n "${JIGO_DB_SOCKET:-}" ]; then dbconn+=(--protocol=socket --socket="$JIGO_DB_SOCKET"); else dbconn+=(-h"$JIGO_DB_HOST" -P"${JIGO_DB_PORT:-3306}"); fi   # JIGO_DB_SOCKET : essais isolés uniquement
@@ -355,6 +337,7 @@ fi
 remote_sh "ROOT=$root SHA=$sha VERSION=$version BEFORE=$engine_before bash -s" <<'REMOTE'
 cd "$ROOT"
 hash=$(bash scripts/release/engine_hash.sh "$ROOT")
+rm -f .deployment-venv-backup
 printf 'commit=%s\nversion=%s\ndate=%s\nengine_hash=%s\n' "$SHA" "$VERSION" "$(date -u +%FT%TZ)" "$hash" > .deployed
 if [ "$hash" = "$BEFORE" ]; then
   echo "moteur et schéma inchangés : aucun recalcul"

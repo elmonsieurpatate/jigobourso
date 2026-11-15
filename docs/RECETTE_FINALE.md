@@ -86,3 +86,10 @@ Correction du harnais : galerie servie en HTTP local, police chargée explicitem
 largeurs introductives contrôlées contre leur conteneur plutôt que figées en
 pixels ; forme native radio exclue, ses dimensions et les autres propriétés
 restent contrôlées. Aucun style applicatif modifié ni test métier désactivé.
+
+Le passage `43715205602` a ensuite validé tous les contrôles CI (Python 3.9,
+visuels et e2e), puis Hostinger a refusé la conformité des dépendances et restauré
+le code. L'installateur comparait seulement l'empreinte du manifeste : corrigé
+pour vérifier le venv réel avant de décider qu'aucune installation n'est requise.
+Sauvegarde et restauration du venv préservées même avec une empreinte identique ;
+14 tests d'environnement passent, dont 3 nouveaux cas de réparation/restauration.

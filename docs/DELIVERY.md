@@ -56,3 +56,14 @@ Résultats du 2026-11-15 (base de 3,8 M de prix, 20 transactions) :
 - `fail-deps` : code **et** dépendances restaurés (paquet ajouté retiré).
 
 Non couvert par la répétition : particularités de l'hébergement (PHP 8.2 réel, droits de fichiers, venv sans pip, SSH, `sendmail` réel — remplacé par un faux).
+
+## Réconciliation du venv à la livraison (15 novembre 2026)
+
+Une empreinte `requirements.txt` identique ne prouve pas que les paquets installés
+sont conformes. `scripts/release/ensure_dependencies.sh` vérifie aussi l'environnement
+réel ; une dérive suit le chemin normal de sauvegarde et d'installation, sans
+modifier les bornes du manifeste. La conformité est contrôlée avant de valider
+l'empreinte. Le marqueur `.deployment-venv-backup` conserve la sauvegarde exacte
+jusqu'à la réussite de toute la livraison : un échec tardif restaure aussi le venv
+quand le manifeste n'a pas changé. Trois tests sur serveur factice couvrent la
+réparation, l'absence d'installation inutile et la restauration après échec.

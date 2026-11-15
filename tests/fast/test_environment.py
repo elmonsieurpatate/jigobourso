@@ -165,3 +165,63 @@ def test_restore_signals_missing_dependency_backup_without_failing_the_code_rest
     root, backups, site = fake_server(tmp_path, 'nouvelle', 'autre-empreinte')
     result = run_restore(root, backups)
     assert result.returncode == 0 and 'vérification manuelle requise' in result.stderr and (site / 'paquet.txt').read_text() == 'nouvelle'
+
+
+def dependency_server(tmp_path, installed):
+    import hashlib
+
+    same = hashlib.sha256(b'numpy<2\n').hexdigest()
+    root, backups, site = fake_server(tmp_path, installed, same)
+    py = root / '.venv/bin/python'
+    py.write_text(
+        '#!/bin/bash\nset -e\n'
+        f'site={site}\n'
+        'if [ "$1" = "-c" ]; then echo "$site"; '
+        'elif [ "$1" = "scripts/check_env.py" ]; then grep -qx conforme "$site/paquet.txt"; '
+        'elif [ "$*" = "-m pip --version" ]; then exit 0; '
+        'elif [ "$1 $2 $3" = "-m pip install" ]; then '
+        'echo installation >> "$site/paquet.txt"; '
+        '[ "${FAIL_INSTALL:-0}" != 1 ] || exit 1; echo conforme > "$site/paquet.txt"; '
+        'else exit 2; fi\n'
+    )
+    return root, backups, site
+
+
+def ensure_dependencies(root, backups, fail=False):
+    return subprocess.run(
+        ['bash', str(ROOT / 'scripts/release/ensure_dependencies.sh'), str(root), str(backups)],
+        env={**os.environ, 'FAIL_INSTALL': '1' if fail else '0'},
+        capture_output=True,
+        text=True,
+    )
+
+
+def test_deploy_repairs_a_drifted_venv_even_with_an_unchanged_manifest(tmp_path):
+    root, backups, site = dependency_server(tmp_path, 'ancienne')
+    result = ensure_dependencies(root, backups)
+    assert result.returncode == 0, result.stderr
+    assert (site / 'paquet.txt').read_text().strip() == 'conforme'
+    assert (root / '.deployment-venv-backup').is_file()
+    assert len(list(backups.glob('site-packages-*.tgz'))) == 1
+    # Un échec plus tard doit restaurer le venv précédent, même empreinte égale.
+    assert run_restore(root, backups).returncode == 0
+    assert (site / 'paquet.txt').read_text() == 'ancienne'
+    assert not (root / '.deployment-venv-backup').exists()
+
+
+def test_deploy_keeps_an_already_conforming_venv(tmp_path):
+    root, backups, site = dependency_server(tmp_path, 'conforme\n')
+    result = ensure_dependencies(root, backups)
+    assert result.returncode == 0, result.stderr
+    assert not list(backups.glob('site-packages-*.tgz'))
+    assert not (root / '.deployment-venv-backup').exists()
+    assert (site / 'paquet.txt').read_text() == 'conforme\n'
+
+
+def test_failed_dependency_repair_can_restore_the_original_venv(tmp_path):
+    root, backups, site = dependency_server(tmp_path, 'ancienne')
+    result = ensure_dependencies(root, backups, fail=True)
+    assert result.returncode != 0
+    assert (root / '.deployment-venv-backup').is_file()
+    assert run_restore(root, backups).returncode == 0
+    assert (site / 'paquet.txt').read_text() == 'ancienne'
