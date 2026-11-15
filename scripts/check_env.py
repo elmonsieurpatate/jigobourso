@@ -3,6 +3,7 @@
 Usage : .venv/bin/python scripts/check_env.py   (code 0 = conforme, 1 = écart listé, 2 = fichier illisible)
 Sert à valider un venv neuf (README, « Démarrage depuis zéro ») et à contrôler la reproductibilité (tests/fast/test_environment.py).
 """
+
 import importlib
 import importlib.metadata as md
 import re
@@ -55,7 +56,7 @@ def problems(requirements_text):
         module = IMPORTS.get(name, name.replace('-', '_'))
         try:
             importlib.import_module(module)
-        except Exception as exc:                          # un paquet présent mais inutilisable (binaire incompatible) est un écart
+        except Exception as exc:  # un paquet présent mais inutilisable (binaire incompatible) est un écart
             found.append(f'{name} : import impossible ({exc})')
     return found
 

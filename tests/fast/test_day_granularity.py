@@ -1,4 +1,5 @@
 """Granularité Jour (1 séance) et « Var. 1J (%) » : dernière séance clôturée, critère de recherche, poids de score facultatif, compatibilité des profils enregistrés."""
+
 import copy
 import datetime
 import json
@@ -40,7 +41,7 @@ def DAY(ret):
     return dict(slope=ret, r2=None, perf=ret, volatility=None, drawdown=0.0, up_fraction=None, spike_share=None, accel=None, r2_prev=None)
 
 
-INPUTS = {5: M(1.1, .82, .7, .35, 2.4, 3.0, .6, .5), 21: M(.75, .9, .62, .28, 2.1, 6.0, .3, .7)}
+INPUTS = {5: M(1.1, 0.82, 0.7, 0.35, 2.4, 3.0, 0.6, 0.5), 21: M(0.75, 0.9, 0.62, 0.28, 2.1, 6.0, 0.3, 0.7)}
 LIQ = {'turnover_eur': 20e6, 'source': 'daily'}
 
 
@@ -54,15 +55,16 @@ WITH_DAY = P(('day', 1), ('week', 5), ('month', 21))
 
 # ───────────── Var. 1J : dernière séance clôturée ─────────────
 
+
 def test_var_1j_after_a_weekend_compares_friday_and_monday():
-    sessions = session_dates('XPAR', '2026-11-09', 2)                           # lundi
-    assert sessions == ['2026-11-06', '2026-11-09']                             # le week-end n'est pas une séance
+    sessions = session_dates('XPAR', '2026-11-09', 2)  # lundi
+    assert sessions == ['2026-11-06', '2026-11-09']  # le week-end n'est pas une séance
     st = dated_technical_state(sessions, {'2026-11-06': 100.0, '2026-11-09': 102.0})
     assert st['daily_change'] == pytest.approx(2.0)
 
 
 def test_var_1j_after_a_holiday_skips_the_closed_day():
-    sessions = session_dates('XPAR', '2026-12-28', 2)                           # lundi suivant Noël (25/12 férié, 26-27 week-end)
+    sessions = session_dates('XPAR', '2026-12-28', 2)  # lundi suivant Noël (25/12 férié, 26-27 week-end)
     assert '2026-12-25' not in sessions and sessions[-1] == '2026-12-28'
     obs = {sessions[0]: 50.0, sessions[1]: 49.0}
     assert dated_technical_state(sessions, obs)['daily_change'] == pytest.approx(-2.0)
@@ -70,14 +72,14 @@ def test_var_1j_after_a_holiday_skips_the_closed_day():
 
 def test_var_1j_never_invents_a_move_across_a_missing_close():
     sessions = session_dates('XPAR', '2026-11-09', 2)
-    assert dated_technical_state(sessions, {'2026-11-09': 102.0})['daily_change'] is None      # clôture de la veille absente : inconnue, pas 0
+    assert dated_technical_state(sessions, {'2026-11-09': 102.0})['daily_change'] is None  # clôture de la veille absente : inconnue, pas 0
 
 
 def test_an_open_session_is_not_a_closed_session():
     paris = ZoneInfo('Europe/Paris')
-    during = datetime.datetime(2026, 11, 9, 11, 0, tzinfo=paris)               # lundi, en séance
+    during = datetime.datetime(2026, 11, 9, 11, 0, tzinfo=paris)  # lundi, en séance
     assert not hours.is_settled('XPAR', datetime.date(2026, 11, 9), during)
-    assert hours.expected_last_close('XPAR', during) == '2026-11-06'            # la dernière séance clôturée est vendredi
+    assert hours.expected_last_close('XPAR', during) == '2026-11-06'  # la dernière séance clôturée est vendredi
     after = datetime.datetime(2026, 11, 9, 19, 0, tzinfo=paris)
     assert hours.is_settled('XPAR', datetime.date(2026, 11, 9), after) and hours.expected_last_close('XPAR', after) == '2026-11-09'
     weekend = datetime.datetime(2026, 11, 8, 12, 0, tzinfo=paris)
@@ -86,17 +88,19 @@ def test_an_open_session_is_not_a_closed_session():
 
 # ───────────── colonne ─────────────
 
+
 def test_column_catalog_renames_var_and_keeps_its_identifier_and_tooltip():
     with open(os.path.join(ROOT, 'app', 'config', 'table_columns.json'), encoding='utf-8') as f:
         cat = json.load(f)
     for page in ('explorer', 'scores'):
-        col = next(c for c in cat['pages'][page]['columns'] if c['id'] == 'change')              # même identifiant : visibilité, position, largeur et tri enregistrés restent valables
+        col = next(c for c in cat['pages'][page]['columns'] if c['id'] == 'change')  # même identifiant : visibilité, position, largeur et tri enregistrés restent valables
         assert col['label'] == 'Var. 1J (%)' and col['sortable']
         assert col['hint'] == 'Variation du cours entre les deux dernières séances clôturées.'
     assert not any('Var. %' in json.dumps(c, ensure_ascii=False) for p in cat['pages'].values() for c in p['columns'])
 
 
 # ───────────── scores ─────────────
+
 
 def _scores(periods, inputs, weights=None):
     r = SC.score_title(inputs, LIQ, periods, weights=weights, required=[])
@@ -106,7 +110,7 @@ def _scores(periods, inputs, weights=None):
 def test_day_at_zero_percent_leaves_every_score_untouched():
     base = _scores(WEEK_MONTH, INPUTS)
     for ret in (-6.0, 0.0, 3.5):
-        with_day = _scores(WITH_DAY, {**INPUTS, 1: DAY(ret)})                    # poids automatique : Jour = 0
+        with_day = _scores(WITH_DAY, {**INPUTS, 1: DAY(ret)})  # poids automatique : Jour = 0
         for kind in ('simple', 'complex'):
             assert with_day[kind]['score'] == base[kind]['score'] and with_day[kind]['status'] == base[kind]['status']
         assert with_day['weights']['day'] == 0.0 and with_day['weights']['week'] == base['weights']['week']
@@ -115,37 +119,37 @@ def test_day_at_zero_percent_leaves_every_score_untouched():
 
 
 def test_day_with_a_weight_scores_the_variation_only_and_invents_nothing():
-    w = {'day': .2, 'week': .3, 'month': .5}
+    w = {'day': 0.2, 'week': 0.3, 'month': 0.5}
     r = _scores(WITH_DAY, {**INPUTS, 1: DAY(1.0)}, w)
     day = r['periods']['day']
     assert day['r2'] is None and day['volatility'] is None and day['drawdown'] is None and day['up_days'] is None and day['concentration'] is None and day['acceleration'] is None
-    assert day['raw']['r2'] is None and day['raw']['drawdown'] is None                      # le repli 0 d'une séance n'est pas reporté
-    assert r['weights_effective']['day'] == pytest.approx(.2) and sum(r['weights_effective'].values()) == pytest.approx(1)
-    ref = _scores(WEEK_MONTH, INPUTS, {'week': .3, 'month': .5})                         # régularité : uniquement les périodes qui ont un R²
+    assert day['raw']['r2'] is None and day['raw']['drawdown'] is None  # le repli 0 d'une séance n'est pas reporté
+    assert r['weights_effective']['day'] == pytest.approx(0.2) and sum(r['weights_effective'].values()) == pytest.approx(1)
+    ref = _scores(WEEK_MONTH, INPUTS, {'week': 0.3, 'month': 0.5})  # régularité : uniquement les périodes qui ont un R²
     assert r['simple']['quality'] == pytest.approx(ref['simple']['quality'])
     assert r['simple']['status'] == 'ok' and r['simple']['coverage'] == pytest.approx(1) and r['complex']['status'] == 'ok' and r['complex']['coverage'] == pytest.approx(1)
 
 
 def test_day_weight_moves_the_score_in_the_direction_of_the_variation():
-    w = {'day': .2, 'week': .3, 'month': .5}
+    w = {'day': 0.2, 'week': 0.3, 'month': 0.5}
     up = _scores(WITH_DAY, {**INPUTS, 1: DAY(4.0)}, w)
     flat = _scores(WITH_DAY, {**INPUTS, 1: DAY(0.0)}, w)
     down = _scores(WITH_DAY, {**INPUTS, 1: DAY(-4.0)}, w)
     for kind in ('simple', 'complex'):
-        assert up[kind]['score'] > flat[kind]['score'] and flat[kind]['score'] == down[kind]['score']      # comme toute période : une variation négative vaut une dynamique nulle, jamais une note négative
+        assert up[kind]['score'] > flat[kind]['score'] and flat[kind]['score'] == down[kind]['score']  # comme toute période : une variation négative vaut une dynamique nulle, jamais une note négative
     assert 0 <= down['simple']['score'] and up['simple']['score'] <= 100 and up['complex']['score'] <= 100
 
 
 def test_day_never_drives_the_recent_anchor():
-    w = {'day': .2, 'week': .3, 'month': .5}
+    w = {'day': 0.2, 'week': 0.3, 'month': 0.5}
     ref = _scores(WEEK_MONTH, INPUTS)
     r = _scores(WITH_DAY, {**INPUTS, 1: DAY(-8.0)}, w)
-    assert r['complex']['anchor_gate'] == ref['complex']['anchor_gate']             # l'ancrage reste porté par la plus courte période à plus d'une séance
+    assert r['complex']['anchor_gate'] == ref['complex']['anchor_gate']  # l'ancrage reste porté par la plus courte période à plus d'une séance
 
 
 def test_missing_day_measure_falls_back_on_the_other_periods():
-    w = {'day': .2, 'week': .3, 'month': .5}
-    base = _scores(WEEK_MONTH, INPUTS, {'week': .3, 'month': .5})
+    w = {'day': 0.2, 'week': 0.3, 'month': 0.5}
+    base = _scores(WEEK_MONTH, INPUTS, {'week': 0.3, 'month': 0.5})
     r = _scores(WITH_DAY, {**INPUTS, 1: None}, w)
     assert r['simple']['score'] == pytest.approx(base['simple']['score']) and r['complex']['score'] == pytest.approx(base['complex']['score'])
     assert 'day' in r['missing']['optional_periods']
@@ -162,6 +166,7 @@ def test_automatic_weights_ignore_day_and_do_not_move_other_weights():
 
 
 # ───────────── profils et stratégies ─────────────
+
 
 def test_builtin_strategies_keep_day_disabled_and_at_zero_percent():
     for name in scores_specs.V4_STRATEGIES:
@@ -262,6 +267,7 @@ def test_day_alone_is_refused_in_automatic_mode_and_has_no_slope_or_r2_threshold
 
 # ───────────── critères de recherche ─────────────
 
+
 def _spec(**day):
     return {'periods': {'week': {'enabled': True, 'slope': 0.1, 'r2': 0.0}, 'day': dict({'enabled': True}, **day)}, 'extra': [], 'join': 'and'}
 
@@ -276,7 +282,7 @@ def test_day_criterion_uses_the_variation_and_is_off_by_default():
     prim = CR.normalize(_spec(**{'return': 0.0}))['primary']
     assert ('return', 'day', '>=', 0.0) in [(c['metric'], c['period'], c['op'], c['value']) for c in prim]
     assert CR.normalize(_spec(enabled=False, **{'return': 0.0}))['primary'] == CR.normalize({'periods': {'week': {'slope': 0.1, 'r2': 0}}, 'extra': [], 'join': 'and'})['primary']
-    assert all(c['period'] != 'day' for c in CR.normalize(_spec())['primary'])         # activée sans seuil : aucun critère
+    assert all(c['period'] != 'day' for c in CR.normalize(_spec())['primary'])  # activée sans seuil : aucun critère
 
 
 def test_day_criterion_retains_excludes_or_leaves_undetermined():
@@ -286,7 +292,7 @@ def test_day_criterion_retains_excludes_or_leaves_undetermined():
     assert ev['status'] == CR.EXCLUDED
     fail = next(c for c in ev['checks'] if c['result'] == 'fail')
     assert fail['period'] == 'day' and fail['label'] == 'Variation 1J' and fail['unit'] == '%' and fail['value'] == -0.4 and fail['period_label'] == 'Jour'
-    assert CR.evaluate(sp, {'m': {5: {'slope': 0.5, 'r2': 0.9}}})['status'] == CR.UNDETERMINED     # variation absente : jamais « exclue »
+    assert CR.evaluate(sp, {'m': {5: {'slope': 0.5, 'r2': 0.9}}})['status'] == CR.UNDETERMINED  # variation absente : jamais « exclue »
 
 
 def test_day_never_requires_a_slope_or_r2_on_one_session():
@@ -296,8 +302,11 @@ def test_day_never_requires_a_slope_or_r2_on_one_session():
 
 
 def test_day_rule_in_the_tree_counts_once_as_a_primary_criterion():
-    tree = {'kind': 'group', 'join': 'and', 'children': [{'kind': 'rule', 'metric': 'return', 'period': 'day', 'op': '>=', 'value': 1.0},
-                                                       {'kind': 'rule', 'metric': 'slope', 'period': 'week', 'op': '>=', 'value': 0.1}]}
+    tree = {
+        'kind': 'group',
+        'join': 'and',
+        'children': [{'kind': 'rule', 'metric': 'return', 'period': 'day', 'op': '>=', 'value': 1.0}, {'kind': 'rule', 'metric': 'slope', 'period': 'week', 'op': '>=', 'value': 0.1}],
+    }
     spec = dict(_spec(**{'return': 1.0}), tree=tree)
     n = CR.normalize(spec)
     assert [(c['metric'], c['period']) for c in n['primary']].count(('return', 'day')) == 1 and not n['extra']

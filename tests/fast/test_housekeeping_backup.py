@@ -1,4 +1,5 @@
 """Sauvegarde quotidienne des données utilisateur : outil de dump simulé, aucune base."""
+
 import datetime as dt
 import os
 import stat
@@ -28,14 +29,15 @@ def env(tmp_path, monkeypatch):
 
 def test_backup_is_private_complete_and_once_a_day(env):
     import gzip
+
     now = dt.datetime(2026, 10, 29, 3, 0)
     path = tasks.backup_user_data(now, str(env))
     assert path.endswith('userdata-20261029.sql.gz')
     assert stat.S_IMODE(os.stat(path).st_mode) == 0o600 and stat.S_IMODE(os.stat(env).st_mode) == 0o700
     text = gzip.open(path, 'rt').read()
     assert all(t in text for t in tasks.BACKUP_TABLES) and 'MYSQL_PWD_SEEN=yes' in text
-    assert 'secret' not in text                                   # le mot de passe passe par l'environnement, jamais par la ligne de commande
-    assert tasks.backup_user_data(now, str(env)) is None          # déjà faite aujourd'hui
+    assert 'secret' not in text  # le mot de passe passe par l'environnement, jamais par la ligne de commande
+    assert tasks.backup_user_data(now, str(env)) is None  # déjà faite aujourd'hui
     assert not list(env.glob('*.part'))
 
 

@@ -1,5 +1,6 @@
 """Ancien moteur d'alertes (« Surveillance ») : désactivé. Les règles restent stockées, intactes ; plus aucune évaluation, aucun événement, aucune notification,
 par aucun point d'entrée réel (tick planifié, CLI, API, e-mails du cron). Le Plan de suivi reste lisible. Exécuter avec PHP 8.3 (voir Makefile : integ)."""
+
 import json
 import os
 import re
@@ -44,7 +45,7 @@ def test_legacy_engine_run_all_is_a_noop_and_rules_stay_intact(world):
     for kw in ({}, {'force': True}, {'user_id': 1, 'force': True}):
         assert watch.run_all(conn, **kw) == {'disabled': True, 'rules': 0, 'triggered': 0}
     conn.commit()
-    assert snapshot(conn) == before                         # aucune règle modifiée (état, dernière évaluation), aucun événement créé
+    assert snapshot(conn) == before  # aucune règle modifiée (état, dernière évaluation), aucun événement créé
 
 
 def test_every_real_entry_point_is_closed(world):
@@ -66,7 +67,7 @@ def test_new_tracking_plan_still_works_and_old_rules_remain_readable(world):
     a, pf, rid, rid2, conn = scenario(world)
     st, state = a.call('tracking/state', params=f'&portfolio={pf}')
     assert st == 200 and state['positions'] and 'strategies' in state
-    st, old = a.call('alerts/state', params=f'&portfolio={pf}')              # lecture seule des anciennes règles : toujours possible (données conservées)
+    st, old = a.call('alerts/state', params=f'&portfolio={pf}')  # lecture seule des anciennes règles : toujours possible (données conservées)
     assert st == 200 and {r['id'] for r in old['rules']} >= {rid, rid2}
     assert a.call('tracking/state', params=f'&portfolio={pf}')[0] == 200
 

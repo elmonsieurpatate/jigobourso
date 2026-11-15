@@ -1,4 +1,5 @@
 """Point d'entrée du moteur : python -m engine.cli <commande>   (job | tick | metrics | …)."""
+
 import argparse
 import json
 import subprocess
@@ -20,7 +21,7 @@ def _close_all():
     while _opened:
         try:
             _opened.pop().close()
-        except Exception:      # noqa: BLE001 : connexion déjà fermée par le serveur ; rien à faire
+        except Exception:  # noqa: BLE001 : connexion déjà fermée par le serveur ; rien à faire
             pass
 
 
@@ -47,6 +48,7 @@ def _admin_commands():
     def check(conn, r):
         tasks.precheck(conn, r.get('name'))
         return {'ok': True}
+
     return {
         'fdb-state': lambda conn, r: adminsvc.fdb_state(conn),
         'yahoo-state': lambda conn, r: adminsvc.yahoo_state(conn),
@@ -100,47 +102,72 @@ def serve(cmd):
         if isinstance(o, (dt.datetime, dt.date)):
             return o.isoformat(sep=' ') if isinstance(o, dt.datetime) else o.isoformat()
         raise TypeError(type(o).__name__)
+
     ADMIN.update(_admin_commands())
     try:
         request = json.load(sys.stdin)
-        scores_specs.set_user((request.get('user_id') or (request.get('ct') or {}).get('user_id')) if isinstance(request, dict) else None)      # adaptations de scores propres à l'utilisateur de la requête
+        scores_specs.set_user(
+            (request.get('user_id') or (request.get('ct') or {}).get('user_id')) if isinstance(request, dict) else None
+        )  # adaptations de scores propres à l'utilisateur de la requête
         if cmd == 'presets':
             from .analytics.explorer import explorer_config as C
-            result = {'presets': {name: strategy.preset(name) for name in strategy.PRESETS}, 'labels': strategy.LABELS,
-                      'version':4,'empty':C.empty(),'metrics':sorted(C.METRICS),'bounds':C.BOUNDS,'slope_levels': strategy.SLOPE_LEVELS, 'r2_levels': strategy.R2_LEVELS, 'rank_modes': list(strategy.RANK_MODES), 'experimental': list(strategy.EXPERIMENTAL)}
+
+            result = {
+                'presets': {name: strategy.preset(name) for name in strategy.PRESETS},
+                'labels': strategy.LABELS,
+                'version': 4,
+                'empty': C.empty(),
+                'metrics': sorted(C.METRICS),
+                'bounds': C.BOUNDS,
+                'slope_levels': strategy.SLOPE_LEVELS,
+                'r2_levels': strategy.R2_LEVELS,
+                'rank_modes': list(strategy.RANK_MODES),
+                'experimental': list(strategy.EXPERIMENTAL),
+            }
         elif cmd == 'intraday':
             from engine.market import intraday
             from engine.market.yahoo import YahooClient
+
             result = intraday.view(connect(), int(request['listing_id']), client=YahooClient() if request.get('fetch', True) else None)
         elif cmd == 'etf-portfolio':
             from .analytics.market_views import etf
+
             result = etf.portfolio(connect(), request.get('positions', []))
         elif cmd == 'lot-alerts':
             from .analytics.portfolio import alerts
+
             result = alerts.lot_alerts(connect(), request)
         elif cmd == 'position-plan':
             from .analytics.portfolio import position_plan
+
             result = position_plan.run(connect(), request)
         elif cmd == 'portfolio-refresh':
             from .analytics.series import history_refresh
-            result=history_refresh.refresh(connect(),int(request['listing_id']))
+
+            result = history_refresh.refresh(connect(), int(request['listing_id']))
         elif cmd == 'watch-template':
             from .analytics.portfolio import watch
+
             result = {'rules': watch.template(request['name'], request.get('config'))}
         elif cmd == 'watch-run':
             from .analytics.portfolio import watch
+
             result = watch.run_all(connect(), user_id=int(request['user_id']), force=True)
         elif cmd == 'watch-eval':
             from .analytics.portfolio import watch
+
             result = watch.evaluate(connect(), request)
         elif cmd == 'portfolio-history':
             from .analytics.series import history
+
             result = history.portfolio_history(connect(), request)
         elif cmd == 'allocation':
             from .analytics.portfolio import allocation
+
             result = allocation.portfolio_allocation(connect(), request)
         elif cmd == 'overview':
             from .analytics.market_views import overview
+
             result = overview.data_overview(connect())
         elif cmd == 'filter-metadata-coverage':
             result = service.filter_metadata_coverage(connect())
@@ -150,16 +177,17 @@ def serve(cmd):
             result = ADMIN[cmd](connect(), request)
         elif cmd == 'validate-config':
             from .analytics.explorer import legacy_upgrade
+
             result = legacy_upgrade.editable(request) if request.get('_editable') else legacy_upgrade.upgrade(request) if request.get('_upgrade') else strategy.validate(request)
         else:
             conn = connect()
             result = service.explore(conn, request) if cmd == 'explore' else title_sheet.instrument_sheet(conn, request)
         print(json.dumps(result, default=plain, ensure_ascii=False, allow_nan=False))
         return 0
-    except ValueError as e:                                 # demande invalide : message écrit pour l'utilisateur
+    except ValueError as e:  # demande invalide : message écrit pour l'utilisateur
         print(json.dumps({'error': str(e)}, ensure_ascii=False))
         return 2
-    except (KeyError, TypeError) as e:                      # forme de requête inattendue : le détail va dans le journal, pas vers le client
+    except (KeyError, TypeError) as e:  # forme de requête inattendue : le détail va dans le journal, pas vers le client
         print(f'{type(e).__name__}: {e}', file=sys.stderr)
         print(json.dumps({'error': f'Champ manquant : {e.args[0]}' if isinstance(e, KeyError) and e.args and isinstance(e.args[0], str) else 'Requête invalide'}, ensure_ascii=False))
         return 2
@@ -186,17 +214,112 @@ def _main(argv=None):
     sub.add_parser('etf', help='recalculer la similarité des ETF (indépendant des mesures)')
     back = sub.add_parser('suivi-backfill', help='reconstituer les classements des dernières séances (origine « reconstitué »)')
     back.add_argument('--sessions', type=int, default=30)
-    for name in ('fdb-state', 'yahoo-state', 'titles', 'rules-save', 'rules-reset', 'funnel', 'funnel-items', 'funnel-explain', 'schedule-get', 'schedule-save', 'job-check', 'jobs-list', 'job-detail', 'scores-state', 'scores-save', 'scores-preview', 'scores-simulate', 'scores-monitor', 'scores-ranking', 'split-reviews', 'split-review-decide', 'split-review-scan', 'ranking-table', 'ranking-curves', 'ranking-verdicts', 'strategies-status', 'help-facts', 'scores-user-save', 'scores-user-state', 'ranking-criteria'):
+    for name in (
+        'fdb-state',
+        'yahoo-state',
+        'titles',
+        'rules-save',
+        'rules-reset',
+        'funnel',
+        'funnel-items',
+        'funnel-explain',
+        'schedule-get',
+        'schedule-save',
+        'job-check',
+        'jobs-list',
+        'job-detail',
+        'scores-state',
+        'scores-save',
+        'scores-preview',
+        'scores-simulate',
+        'scores-monitor',
+        'scores-ranking',
+        'split-reviews',
+        'split-review-decide',
+        'split-review-scan',
+        'ranking-table',
+        'ranking-curves',
+        'ranking-verdicts',
+        'strategies-status',
+        'help-facts',
+        'scores-user-save',
+        'scores-user-state',
+        'ranking-criteria',
+    ):
         sub.add_parser(name, help='administration (JSON sur stdin)')
-    for name, text in (('explore', 'Explorer : classement et recherche (JSON sur stdin)'), ('sheet', 'fiche d’un titre (JSON sur stdin)'),
-                       ('validate-config', 'valider une configuration de stratégie (JSON sur stdin)'),
-                       ('etf-portfolio', 'Expositions connues et similarité du portefeuille'), ('portfolio-refresh', 'collecte ciblée et limitée d’un titre détenu'), ('portfolio-history', 'évolution du portefeuille jour par jour (JSON sur stdin)'), ('watch-template', 'modèle de règles de surveillance d’une stratégie (JSON sur stdin)'), ('watch-eval', 'évaluation de règles d’alerte (JSON sur stdin)'), ('watch-run', 'évaluation et enregistrement des alertes d’un utilisateur (JSON sur stdin)'), ('lot-alerts', 'alertes de vente achat par achat (JSON sur stdin)'), ('position-plan', 'plan de suivi des positions : tendance, risque, protection indicative, conseil (JSON sur stdin)'), ('allocation', 'répartition du portefeuille par zone et écart à la cible (JSON sur stdin)'), ('presets', 'les stratégies de départ (dont l’expérimentale Momentum 6 mois)'), ('suivi', 'statistiques de la page Suivi'), ('overview', 'vue d’ensemble des données (sources, fraîcheur, couverture)'), ('intraday', 'deux dernières séances en barres de 15 minutes (JSON sur stdin)'), ('filter-metadata-coverage', 'couverture des métadonnées de filtre ETF')):
+    for name, text in (
+        ('explore', 'Explorer : classement et recherche (JSON sur stdin)'),
+        ('sheet', 'fiche d’un titre (JSON sur stdin)'),
+        ('validate-config', 'valider une configuration de stratégie (JSON sur stdin)'),
+        ('etf-portfolio', 'Expositions connues et similarité du portefeuille'),
+        ('portfolio-refresh', 'collecte ciblée et limitée d’un titre détenu'),
+        ('portfolio-history', 'évolution du portefeuille jour par jour (JSON sur stdin)'),
+        ('watch-template', 'modèle de règles de surveillance d’une stratégie (JSON sur stdin)'),
+        ('watch-eval', 'évaluation de règles d’alerte (JSON sur stdin)'),
+        ('watch-run', 'évaluation et enregistrement des alertes d’un utilisateur (JSON sur stdin)'),
+        ('lot-alerts', 'alertes de vente achat par achat (JSON sur stdin)'),
+        ('position-plan', 'plan de suivi des positions : tendance, risque, protection indicative, conseil (JSON sur stdin)'),
+        ('allocation', 'répartition du portefeuille par zone et écart à la cible (JSON sur stdin)'),
+        ('presets', 'les stratégies de départ (dont l’expérimentale Momentum 6 mois)'),
+        ('suivi', 'statistiques de la page Suivi'),
+        ('overview', 'vue d’ensemble des données (sources, fraîcheur, couverture)'),
+        ('intraday', 'deux dernières séances en barres de 15 minutes (JSON sur stdin)'),
+        ('filter-metadata-coverage', 'couverture des métadonnées de filtre ETF'),
+    ):
         sub.add_parser(name, help=text)
     args = ap.parse_args(argv)
-    if args.cmd in ('fdb-state', 'yahoo-state', 'titles', 'rules-save', 'rules-reset', 'funnel', 'funnel-items', 'funnel-explain', 'schedule-get', 'schedule-save', 'job-check', 'jobs-list', 'job-detail', 'scores-state', 'scores-save', 'scores-preview', 'scores-simulate', 'scores-monitor', 'scores-ranking', 'split-reviews', 'split-review-decide', 'split-review-scan', 'ranking-table', 'ranking-curves', 'ranking-verdicts', 'strategies-status', 'help-facts', 'scores-user-save', 'scores-user-state', 'ranking-criteria', 'explore', 'sheet', 'validate-config', 'presets', 'suivi', 'intraday', 'overview', 'etf-portfolio', 'allocation', 'lot-alerts', 'position-plan', 'portfolio-history', 'portfolio-refresh', 'watch-template', 'watch-eval', 'watch-run'):
+    if args.cmd in (
+        'fdb-state',
+        'yahoo-state',
+        'titles',
+        'rules-save',
+        'rules-reset',
+        'funnel',
+        'funnel-items',
+        'funnel-explain',
+        'schedule-get',
+        'schedule-save',
+        'job-check',
+        'jobs-list',
+        'job-detail',
+        'scores-state',
+        'scores-save',
+        'scores-preview',
+        'scores-simulate',
+        'scores-monitor',
+        'scores-ranking',
+        'split-reviews',
+        'split-review-decide',
+        'split-review-scan',
+        'ranking-table',
+        'ranking-curves',
+        'ranking-verdicts',
+        'strategies-status',
+        'help-facts',
+        'scores-user-save',
+        'scores-user-state',
+        'ranking-criteria',
+        'explore',
+        'sheet',
+        'validate-config',
+        'presets',
+        'suivi',
+        'intraday',
+        'overview',
+        'etf-portfolio',
+        'allocation',
+        'lot-alerts',
+        'position-plan',
+        'portfolio-history',
+        'portfolio-refresh',
+        'watch-template',
+        'watch-eval',
+        'watch-run',
+    ):
         return serve(args.cmd)
     if args.cmd == 'catalogue':
         from engine.catalogue.loader import load
+
         commit = subprocess.run(['git', '-C', args.source, 'rev-parse', 'HEAD'], capture_output=True, text=True).stdout.strip() or '0' * 40
         conn = connect()
         print(json.dumps(load(conn, args.source, commit), ensure_ascii=False))
@@ -204,14 +327,16 @@ def _main(argv=None):
         from engine.jobs import tasks
         from engine.market import hours
         from engine.market.yahoo import YahooClient
+
         conn = connect()
         now = hours.utcnow()
         if args.cmd == 'tick':
             try:
                 print(json.dumps([(k, m, j) for k, m, j in tasks.tick(conn, YahooClient(), now, args.trigger)]))
-            except Exception as e:                                          # noqa: BLE001 : visible dans l'administration, puis remonte vers logs/cron.log
+            except Exception as e:  # noqa: BLE001 : visible dans l'administration, puis remonte vers logs/cron.log
                 if args.trigger == 'cron':
                     from engine.shared import settings
+
                     conn.rollback()
                     settings.record_cron_error(conn, now, 'passage', e)
                 raise
@@ -219,12 +344,15 @@ def _main(argv=None):
             print(tasks.run_manual(conn, YahooClient(), args.name, now, args.trigger))
         elif args.cmd == 'suivi-backfill':
             from engine.analytics.portfolio import tracking
+
             print(tracking.backfill(conn, args.sessions, log=lambda m: print(m, file=sys.stderr)), tracking.update_outcomes(conn))
         elif args.cmd == 'metrics':
             from engine.analytics.series import compute
+
             print(compute.compute_all(conn, now))
         elif args.cmd == 'etf':
             from engine.analytics.market_views import etf
+
             print(etf.build(conn, now))
     return 0
 

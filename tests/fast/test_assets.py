@@ -1,4 +1,5 @@
 """Assets chargés : chaque fichier référencé existe, chaque fichier d'assets a au moins un consommateur (page HTML ou autre asset)."""
+
 import glob
 import os
 import re

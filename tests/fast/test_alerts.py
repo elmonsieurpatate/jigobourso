@@ -1,4 +1,5 @@
 """Alertes de vente achat par achat : réglages par stratégie, réglages personnels, mesures depuis l'achat, règles de sortie."""
+
 import datetime
 import os
 import re
@@ -49,23 +50,23 @@ def test_alerts_fire_on_duration_drop_momentum_ma50_and_rank():
     rec = al.evaluate({'trade_date': '2026-10-01'}, al.rules_for('recovery', None), {'drop_pct': 1.0}, {'close': 10, 'ma50': 12}, None, TODAY)
     assert kinds(rec) == ['ma50', 'rank'] and 'plus retenu' in rec[1]['message']
     fast = al.evaluate({'trade_date': '2026-10-01'}, al.rules_for('fast', None), {'drop_pct': 25.0}, None, False, TODAY)
-    assert [(x['kind'], x['action'], x['level']) for x in fast] == [('drop', 'alléger', 'act')]           # rang inconnu (False) : pas d'alerte de classement
+    assert [(x['kind'], x['action'], x['level']) for x in fast] == [('drop', 'alléger', 'act')]  # rang inconnu (False) : pas d'alerte de classement
 
 
 def test_curves_start_at_the_oldest_open_purchase():
     series = {7: (['2026-01-02', '2026-01-05', '2026-01-06', '2026-01-07'], [10.0, 11.0, 12.0, 13.0], None)}
     lots = [{'listing_id': 7, 'trade_date': '2026-01-04'}, {'listing_id': 7, 'trade_date': '2026-01-06'}]
     c = al.curves(lots, series)['7']
-    assert c['buys'] == ['2026-01-04', '2026-01-06'] and c['points'][0] == ['2026-01-02', 10.0]      # achat un dimanche : départ de la clôture précédente
+    assert c['buys'] == ['2026-01-04', '2026-01-06'] and c['points'][0] == ['2026-01-02', 10.0]  # achat un dimanche : départ de la clôture précédente
     assert al.curves([{'listing_id': 8, 'trade_date': '2026-01-04'}], {})['8']['points'] == []
 
 
 def test_momentum_alert_preserves_the_percentage_unit_from_series():
     from engine.analytics.series.series import momentum_6_1
+
     closes = [100.0] * 105 + [90.0] * 22
     momentum = momentum_6_1([str(i) for i in range(127)], closes, [])
     assert round(momentum, 6) == -10
-    out = al.evaluate({'trade_date': '2026-10-01'}, al.defaults('momentum'), None,
-                      {'momentum_6m': momentum}, False, TODAY)
+    out = al.evaluate({'trade_date': '2026-10-01'}, al.defaults('momentum'), None, {'momentum_6m': momentum}, False, TODAY)
     alert = next(a for a in out if a['kind'] == 'momentum')
     assert alert['value'] == -10 and '-10,0 %' in alert['message']

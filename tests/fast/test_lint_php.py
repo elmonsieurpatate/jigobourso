@@ -1,4 +1,5 @@
 """scripts/lint_php.sh : une erreur de syntaxe fait échouer le contrôle (F05), un contrôle vide aussi."""
+
 import os
 import shutil
 import subprocess

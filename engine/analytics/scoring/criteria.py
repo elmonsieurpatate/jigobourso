@@ -9,6 +9,7 @@ mais au moins une mesure nécessaire manque : jamais traité comme une exclusion
 Unités : pente en % PAR SÉANCE (100·(exp(pente de la régression du log) − 1)), identique dans les seuils et dans les mesures ; R² entre 0 et 1 ;
 performance, volatilité et repli en % ; volume en titres/jour.
 """
+
 import operator
 
 from ..shared.numbers import finite
@@ -19,7 +20,7 @@ PERIOD_LABELS = {'day': 'Jour', 'week': 'Semaine', 'month': 'Mois', 'quarter': '
 METRIC_LABELS = {'slope': 'Pente', 'r2': 'R²', 'volatility': 'Volatilité', 'drawdown': 'Repli maximal', 'return': 'Performance', 'volume': 'Volume moyen'}
 UNITS = {'slope': '% par séance', 'r2': '', 'volatility': '%', 'drawdown': '%', 'return': '%', 'volume': 'titres/jour'}
 OPS = {'>=': operator.ge, '<=': operator.le, '>': operator.gt, '<': operator.lt, '=': operator.eq}
-REFERENCE = 21                                           # volatilité et repli sont mesurés sur un mois
+REFERENCE = 21  # volatilité et repli sont mesurés sur un mois
 
 
 def default_spec(periods):
@@ -39,9 +40,9 @@ def normalize(spec):
     for k, v in periods.items():
         if k not in PERIODS or not isinstance(v, dict) or v.get('enabled') is False:
             continue
-        if k == 'day':                                       # Jour (1 séance) : seule la variation sert de critère ; ni pente ni R² sur une séance. Activée sans seuil : aucun critère.
+        if k == 'day':  # Jour (1 séance) : seule la variation sert de critère ; ni pente ni R² sur une séance. Activée sans seuil : aucun critère.
             val = finite(v.get('return'))
-            if v.get('enabled') is True and val is not None and not isinstance(spec.get('tree'), dict):      # avec un arbre de règles, la règle Jour de l'arbre fait foi
+            if v.get('enabled') is True and val is not None and not isinstance(spec.get('tree'), dict):  # avec un arbre de règles, la règle Jour de l'arbre fait foi
                 primary.append({'metric': 'return', 'period': 'day', 'op': '>=', 'value': val})
             continue
         for metric in ('slope', 'r2'):
@@ -50,7 +51,7 @@ def normalize(spec):
                 primary.append({'metric': metric, 'period': k, 'op': '>=', 'value': val})
     tree = spec.get('tree')
     leaves = _leaves(tree) if isinstance(tree, dict) else None
-    if leaves is not None:                                   # règles « variation 1J » de l'arbre : critères principaux (ET), comme pente et R², pas des seuils facultatifs
+    if leaves is not None:  # règles « variation 1J » de l'arbre : critères principaux (ET), comme pente et R², pas des seuils facultatifs
         for x in leaves:
             val = finite(x.get('value'))
             if x.get('metric') == 'return' and x.get('period') == 'day' and x.get('op') in OPS and val is not None:
@@ -82,7 +83,7 @@ def measure(metrics, metric, period):
     m = metrics.get('m') or {}
     if metric in ('slope', 'r2'):
         if period == 'day':
-            return None                                      # pente et R² n'existent pas sur une séance : jamais inventés
+            return None  # pente et R² n'existent pas sur une séance : jamais inventés
         return finite((m.get(PERIODS[period]) or {}).get(metric))
     if metric in ('volatility', 'drawdown'):
         return finite((m.get(REFERENCE) or {}).get(metric))
@@ -97,8 +98,18 @@ def _check(metrics, c):
     value = measure(metrics, c['metric'], c['period'])
     ok = None if value is None else bool(OPS[c['op']](value, c['value']))
     label = 'Variation 1J' if c['metric'] == 'return' and c['period'] == 'day' else METRIC_LABELS[c['metric']]
-    return {'metric': c['metric'], 'period': c['period'], 'period_label': PERIOD_LABELS[c['period']], 'op': c['op'], 'threshold': c['value'], 'value': value,
-            'unit': UNITS[c['metric']], 'label': label, 'result': 'unknown' if ok is None else 'pass' if ok else 'fail', 'optional': False}
+    return {
+        'metric': c['metric'],
+        'period': c['period'],
+        'period_label': PERIOD_LABELS[c['period']],
+        'op': c['op'],
+        'threshold': c['value'],
+        'value': value,
+        'unit': UNITS[c['metric']],
+        'label': label,
+        'result': 'unknown' if ok is None else 'pass' if ok else 'fail',
+        'optional': False,
+    }
 
 
 def evaluate(norm, metrics):
@@ -124,8 +135,7 @@ def evaluate(norm, metrics):
         status = UNDETERMINED
     else:
         status = RETAINED
-    return {'status': status, 'checks': checks + extra, 'active': len(checks) + len(extra), 'join': norm['join'] if extra else None,
-            'reason': None if status != UNDETERMINED else 'missing_data'}
+    return {'status': status, 'checks': checks + extra, 'active': len(checks) + len(extra), 'join': norm['join'] if extra else None, 'reason': None if status != UNDETERMINED else 'missing_data'}
 
 
 def counts(statuses):

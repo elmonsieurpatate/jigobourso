@@ -40,6 +40,7 @@ jobs:
           set -euo pipefail
           python3 -m pip install --quiet ruff==0.17.4
           python3 -m ruff check .
+          python3 -m ruff format --check engine tests scripts
           npx --yes prettier@3.3.3 --check 'app/public/assets/*.js' 'app/public/assets/*.css'
           python3 scripts/check_halo_css.py
   tests:

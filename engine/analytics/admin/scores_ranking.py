@@ -1,4 +1,5 @@
 """Classement et simulation des scores pour l'administration : livre de scores, aperçu, listes paginées, courbes et statuts."""
+
 from engine.shared import settings
 from ..scoring import criteria as _CR
 from ..explorer import explorer_config as C
@@ -9,20 +10,27 @@ from ..scoring.ranking_support import dated_series, ordered, series
 from ..scoring.scores_specs import CT_BUILTIN, SCORING_PERIODS, known, refresh
 from ..scoring.scores_profiles import TUNING_DEFAULTS, build_config
 
+
 def _titles(conn, ids):
     if not ids:
         return {}
     with conn.cursor() as cur:
-        cur.execute(f"""SELECT l.id, l.symbol, l.mic, i.name, i.kind, i.isin, s.daily_change FROM listings l JOIN instruments i ON i.id=l.instrument_id
-                        LEFT JOIN series_state s ON s.listing_id=l.id WHERE l.id IN ({','.join(['%s'] * len(ids))})""", list(ids))
+        cur.execute(
+            f"""SELECT l.id, l.symbol, l.mic, i.name, i.kind, i.isin, s.daily_change FROM listings l JOIN instruments i ON i.id=l.instrument_id
+                        LEFT JOIN series_state s ON s.listing_id=l.id WHERE l.id IN ({','.join(['%s'] * len(ids))})""",
+            list(ids),
+        )
         return {r['id']: r for r in cur.fetchall()}
 
 
 def _search(conn, q):
     like = '%' + q.replace('%', '').replace('_', '') + '%'
     with conn.cursor() as cur:
-        cur.execute("""SELECT l.id FROM listings l JOIN instruments i ON i.id=l.instrument_id JOIN v_recommendable r ON r.listing_id=l.id
-                       WHERE l.symbol LIKE %s OR i.name LIKE %s OR i.isin=%s ORDER BY (l.symbol=%s) DESC, i.name LIMIT 8""", (like, like, q.upper(), q.upper()))
+        cur.execute(
+            """SELECT l.id FROM listings l JOIN instruments i ON i.id=l.instrument_id JOIN v_recommendable r ON r.listing_id=l.id
+                       WHERE l.symbol LIKE %s OR i.name LIKE %s OR i.isin=%s ORDER BY (l.symbol=%s) DESC, i.name LIMIT 8""",
+            (like, like, q.upper(), q.upper()),
+        )
         return [r['id'] for r in cur.fetchall()]
 
 
@@ -30,6 +38,7 @@ def simulate(conn, request):
     """Décomposition des deux scores d'un titre réel avec la configuration enregistrée ou un brouillon. Aucune donnée n'est inventée : sans données, la réponse le dit."""
     refresh(conn)
     from ..explorer import universe_verdicts
+
     name = request.get('strategy')
     if not known(name):
         raise ValueError('Stratégie V4 inconnue')
@@ -59,11 +68,24 @@ def simulate(conn, request):
     if scored is None or info is None:
         return {'empty': False, 'not_found': True, 'candidates': candidates, 'suggestions': _suggestions(conn, book, sessions=gran), **meta}
     params = score_service.params_for(cfg, info['kind'])
-    return {'empty': False, 'title': dict(id=lid, symbol=info['symbol'], mic=info['mic'], name=info['name'], kind=info['kind'], isin=info['isin']),
-            'candidates': candidates, 'result': scored, 'periods': [dict(id=p['id'], sessions=p['sessions']) for p in params['periods']],
-            'kappa': params['kappa'], 'tuning': {k: params[k] for k in TUNING_DEFAULTS}, 'suggestions': _suggestions(conn, book, sessions=gran),
-            'curve': dated_series(conn, lid, max(CURVE_SESSIONS, _granularity(params))),
-            'windows': [dict(id=x, sessions=C.SESSIONS[x], active=any(q['id'] == x for q in params['periods'])) for x in SCORING_PERIODS if x != 'day' and C.SESSIONS[x] <= max(CURVE_SESSIONS, _granularity(params))], 'granularity': _granularity(params), 'ranks': _rank_of(book, lid)}
+    return {
+        'empty': False,
+        'title': dict(id=lid, symbol=info['symbol'], mic=info['mic'], name=info['name'], kind=info['kind'], isin=info['isin']),
+        'candidates': candidates,
+        'result': scored,
+        'periods': [dict(id=p['id'], sessions=p['sessions']) for p in params['periods']],
+        'kappa': params['kappa'],
+        'tuning': {k: params[k] for k in TUNING_DEFAULTS},
+        'suggestions': _suggestions(conn, book, sessions=gran),
+        'curve': dated_series(conn, lid, max(CURVE_SESSIONS, _granularity(params))),
+        'windows': [
+            dict(id=x, sessions=C.SESSIONS[x], active=any(q['id'] == x for q in params['periods']))
+            for x in SCORING_PERIODS
+            if x != 'day' and C.SESSIONS[x] <= max(CURVE_SESSIONS, _granularity(params))
+        ],
+        'granularity': _granularity(params),
+        'ranks': _rank_of(book, lid),
+    }
 
 
 def _rank_of(book, lid):
@@ -81,9 +103,20 @@ def _suggestions(conn, book, n=8, sessions=0):
     top = ordered(book, 'simple')[0][:n]
     info = _titles(conn, [e['id'] for e in top])
     curves = series(conn, [e['id'] for e in top], sessions)
-    return [dict(id=e['id'], symbol=info[e['id']]['symbol'], mic=info[e['id']]['mic'], name=info[e['id']]['name'], simple=e['simple'], complex=e['complex'],
-                 rank=ranks.get(e['id']), curve=curves.get(e['id'], []))
-            for e in top if e['id'] in info]
+    return [
+        dict(
+            id=e['id'],
+            symbol=info[e['id']]['symbol'],
+            mic=info[e['id']]['mic'],
+            name=info[e['id']]['name'],
+            simple=e['simple'],
+            complex=e['complex'],
+            rank=ranks.get(e['id']),
+            curve=curves.get(e['id'], []),
+        )
+        for e in top
+        if e['id'] in info
+    ]
 
 
 BUCKETS = 10
@@ -95,8 +128,10 @@ def _distribution(values):
     for v in values:
         hist[min(BUCKETS - 1, int(v // (100 / BUCKETS)))] += 1
     vals = sorted(values)
+
     def q(f):
         return None if not vals else round(vals[min(len(vals) - 1, int(f * len(vals)))], 2)
+
     return {'histogram': hist, 'min': q(0), 'p25': q(0.25), 'median': q(0.5), 'p75': q(0.75), 'p90': q(0.9), 'max': None if not vals else round(vals[-1], 2)}
 
 
@@ -111,8 +146,15 @@ def _book_summary(book, threshold, universe):
             statuses[e[key + '_status']] = statuses.get(e[key + '_status'], 0) + 1
             if e[key] is not None and (e[key + '_coverage'] or 0) < threshold - 1e-12:
                 unreliable += 1
-        out[key] = {'rated': len(rated), 'ranked': len(rated), 'unavailable': universe - len(rated), 'complete': statuses['ok'], 'reduced_history': statuses['partiel'],
-                    'unreliable': unreliable, 'distribution': _distribution(rated)}
+        out[key] = {
+            'rated': len(rated),
+            'ranked': len(rated),
+            'unavailable': universe - len(rated),
+            'complete': statuses['ok'],
+            'reduced_history': statuses['partiel'],
+            'unreliable': unreliable,
+            'distribution': _distribution(rated),
+        }
     reasons = {}
     for e in book.values():
         if e['simple'] is None or e['complex'] is None:
@@ -133,23 +175,33 @@ def _movement(saved, draft, key, top=20):
     both = [l for l in b if l in a]
     shifts = sorted(abs(a[l] - b[l]) for l in both)
     ta, tb = {l for l, r in a.items() if r <= top}, {l for l, r in b.items() if r <= top}
-    return {'compared': len(both), 'median_shift': shifts[len(shifts) // 2] if shifts else 0, 'moved_over_10': sum(1 for x in shifts if x > 10),
-            'top': top, 'top_kept': len(ta & tb), 'top_entered': len(tb - ta), 'top_left': len(ta - tb),
-            'score_changed': sum(1 for l in both if abs((saved[l][key] or 0) - (draft[l][key] or 0)) > 0.005)}
+    return {
+        'compared': len(both),
+        'median_shift': shifts[len(shifts) // 2] if shifts else 0,
+        'moved_over_10': sum(1 for x in shifts if x > 10),
+        'top': top,
+        'top_kept': len(ta & tb),
+        'top_entered': len(tb - ta),
+        'top_left': len(ta - tb),
+        'score_changed': sum(1 for l in both if abs((saved[l][key] or 0) - (draft[l][key] or 0)) > 0.005),
+    }
 
 
 def _top(conn, book, key, n=10):
     entries, ranks, _ = ordered(book, key)
     ranked = entries[:n]
     info = _titles(conn, [e['id'] for e in ranked])
-    return [dict(rank=ranks[e['id']], id=e['id'], symbol=info[e['id']]['symbol'], name=info[e['id']]['name'], score=e[key], other=e['complex' if key == 'simple' else 'simple'],
-                 status=e[key + '_status']) for e in ranked if e['id'] in info]
+    return [
+        dict(rank=ranks[e['id']], id=e['id'], symbol=info[e['id']]['symbol'], name=info[e['id']]['name'], score=e[key], other=e['complex' if key == 'simple' else 'simple'], status=e[key + '_status'])
+        for e in ranked
+        if e['id'] in info
+    ]
 
 
 PAGE = 25
 
 
-CURVE_SESSIONS = max(C.SESSIONS[p] for p in C.PERIODS if p in ('week', 'month', 'quarter'))   # la courbe de simulation couvre la plus longue granularité de notation
+CURVE_SESSIONS = max(C.SESSIONS[p] for p in C.PERIODS if p in ('week', 'month', 'quarter'))  # la courbe de simulation couvre la plus longue granularité de notation
 
 
 CATEGORY_FILE = 'app/config/explorer_secondary_filters.json'
@@ -159,6 +211,7 @@ def _definitions(conn):
     """Définitions des filtres de l'administration (réglages), sinon fichier livré avec l'application. Lecture seule."""
     import json
     import os
+
     d = settings.get(conn, score_categories.SETTING)
     if isinstance(d, dict) and d.get('filters'):
         return d
@@ -184,6 +237,7 @@ def _sorted(conn, entries, sort, key, rank_of, statuses):
     """Tri complet de la liste (pas seulement de la page) : jusqu'à trois critères, valeurs absentes toujours en dernier, repli stable sur l'ordre général du classement puis l'identifiant.
     Le rang affiché reste le rang général : il ne dépend pas de ce tri."""
     info = _titles(conn, [e['id'] for e in entries]) if any(s['key'] in ('name', 'kind', 'market', 'change') for s in sort) else {}
+
     def value(e, k):
         if k == 'rank':
             return rank_of.get(e['id'])
@@ -192,14 +246,15 @@ def _sorted(conn, entries, sort, key, rank_of, statuses):
         if k == 'status':
             return STATUS_ORDER.get((statuses or {}).get(e['id'], 'undetermined'))
         t = info.get(e['id']) or {}
-        if k == 'change':                                           # Var. 1J : variation entre les deux dernières séances clôturées
+        if k == 'change':  # Var. 1J : variation entre les deux dernières séances clôturées
             return None if t.get('daily_change') is None else float(t['daily_change'])
         v = {'name': t.get('name'), 'kind': t.get('kind'), 'market': t.get('mic')}[k]
         return None if v is None else str(v).casefold()
+
     base = {e['id']: i for i, e in enumerate(entries)}
     out = list(entries)
     out.sort(key=lambda e: base[e['id']])
-    for s in reversed(sort):                                        # tris successifs stables : le dernier critère est appliqué en premier
+    for s in reversed(sort):  # tris successifs stables : le dernier critère est appliqué en premier
         k, desc = s['key'], s['dir'] == 'desc'
         present = [e for e in out if value(e, k) is not None]
         absent = [e for e in out if value(e, k) is None]
@@ -222,15 +277,43 @@ def _listing(conn, book, which, category, offset, limit, cats, sessions, statuse
     chosen = [e for e in scoped if verdict == 'all' or statuses is None or statuses.get(e['id'], _CR.UNDETERMINED) == verdict]
     if sort:
         chosen = _sorted(conn, chosen, sort, key, rank_of, statuses)
-    page = chosen[offset:offset + limit]
+    page = chosen[offset : offset + limit]
     info = _titles(conn, [e['id'] for e in page])
     curves = series(conn, [e['id'] for e in page], sessions)
-    rows = [dict(rank=rank_of[e['id']], id=e['id'], symbol=info[e['id']]['symbol'], mic=info[e['id']]['mic'], name=info[e['id']]['name'], kind=info[e['id']]['kind'],
-                 status=(statuses or {}).get(e['id']), change=None if info[e['id']].get('daily_change') is None else round(float(info[e['id']]['daily_change']), 4), simple=e['simple'], complex=e['complex'], simple_status=e['simple_status'], complex_status=e['complex_status'],
-                 coverage=e[key + '_coverage'], curve=curves.get(e['id'], [])) for e in page if e['id'] in info]
-    return {'which': key, 'category': category or None, 'verdict': verdict, 'counts': scope_counts, 'total': len(chosen), 'offset': offset, 'rows': rows,
-            'categories': [dict(id=c['id'], name=c['name'], color=c.get('color'), min=c.get('min'), max=c.get('max'), minIncluded=c.get('minIncluded'), maxIncluded=c.get('maxIncluded'),
-                                count=counts.get(c['id'], 0)) for c in cats if not c.get('unknown')]}
+    rows = [
+        dict(
+            rank=rank_of[e['id']],
+            id=e['id'],
+            symbol=info[e['id']]['symbol'],
+            mic=info[e['id']]['mic'],
+            name=info[e['id']]['name'],
+            kind=info[e['id']]['kind'],
+            status=(statuses or {}).get(e['id']),
+            change=None if info[e['id']].get('daily_change') is None else round(float(info[e['id']]['daily_change']), 4),
+            simple=e['simple'],
+            complex=e['complex'],
+            simple_status=e['simple_status'],
+            complex_status=e['complex_status'],
+            coverage=e[key + '_coverage'],
+            curve=curves.get(e['id'], []),
+        )
+        for e in page
+        if e['id'] in info
+    ]
+    return {
+        'which': key,
+        'category': category or None,
+        'verdict': verdict,
+        'counts': scope_counts,
+        'total': len(chosen),
+        'offset': offset,
+        'rows': rows,
+        'categories': [
+            dict(id=c['id'], name=c['name'], color=c.get('color'), min=c.get('min'), max=c.get('max'), minIncluded=c.get('minIncluded'), maxIncluded=c.get('maxIncluded'), count=counts.get(c['id'], 0))
+            for c in cats
+            if not c.get('unknown')
+        ],
+    }
 
 
 def _ct_id(name):
@@ -245,6 +328,7 @@ def _ct_id(name):
 def _statuses(conn, book, name, request):
     """Statut de stratégie (critères de recherche) de chaque titre noté : même moteur que le Classement et la fiche. Ne touche ni scores ni rangs."""
     from ..scoring import ranking_table
+
     ct_id = _ct_id(name)
     spec = (request.get('ct_specs') or {}).get(ct_id) if ct_id else None
     norm = ranking_table.norm_of({'ct_id': ct_id, 'spec': spec})
@@ -259,6 +343,7 @@ def ranking(conn, request):
     Aucun filtre n'intervient : les seuils facultatifs ne retirent aucun titre de ce classement."""
     refresh(conn)
     from ..explorer import universe_verdicts
+
     name = request.get('strategy')
     if not known(name):
         raise ValueError('Stratégie V4 inconnue')
@@ -271,10 +356,16 @@ def ranking(conn, request):
         universe = int(cur.fetchone()['n'])
     params = score_service.params_for(cfg, 'equity')
     weights = SC.resolve_weights(params['periods'], params['kappa'])
-    out = {'strategy': name, 'engine_version': SC.VERSION, 'summary': _book_summary(book, params['threshold'], universe),
-           'weights': [dict(id=p['id'], sessions=p['sessions'], weight=weights[p['id']], custom='weight' in p) for p in params['periods']],
-           'kappa': params['kappa'], 'reliability_threshold': params['threshold'],
-           'top': {k: _top(conn, book, k) for k in ('simple', 'complex')}, 'compared': None}
+    out = {
+        'strategy': name,
+        'engine_version': SC.VERSION,
+        'summary': _book_summary(book, params['threshold'], universe),
+        'weights': [dict(id=p['id'], sessions=p['sessions'], weight=weights[p['id']], custom='weight' in p) for p in params['periods']],
+        'kappa': params['kappa'],
+        'reliability_threshold': params['threshold'],
+        'top': {k: _top(conn, book, k) for k in ('simple', 'complex')},
+        'compared': None,
+    }
     which = 'complex' if request.get('which') == 'complex' else 'simple'
     cats, _ = score_categories.measure(_definitions(conn), which)
     sessions = _granularity(params)

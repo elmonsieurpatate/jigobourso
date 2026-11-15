@@ -1,4 +1,5 @@
 """Revue administrative des opérations suspectes. Aucun accès réseau et aucune transaction de portefeuille réécrite."""
+
 import datetime
 import math
 from urllib.parse import urlparse
@@ -17,14 +18,12 @@ def state(conn, request):
     page = max(1, int(request.get('page') or 1))
     query = str(request.get('q') or '').strip()[:80]
     sort = request.get('sort') or 'magnitude_desc'
-    orders = {'magnitude_desc': MAGNITUDE + ' DESC,s.event_date DESC,s.listing_id',
-              'magnitude_asc': MAGNITUDE + ' ASC,s.event_date DESC,s.listing_id',
-              'recent': 's.event_date DESC,s.listing_id'}
+    orders = {'magnitude_desc': MAGNITUDE + ' DESC,s.event_date DESC,s.listing_id', 'magnitude_asc': MAGNITUDE + ' ASC,s.event_date DESC,s.listing_id', 'recent': 's.event_date DESC,s.listing_id'}
     if sort not in orders:
         raise ValueError('Tri inconnu')
     try:
         minimum = float(request.get('min_ratio') or 1)
-    except (ValueError,TypeError):
+    except (ValueError, TypeError):
         raise ValueError('Ratio minimum invalide') from None
     if not math.isfinite(minimum) or not 1 <= minimum <= 1000000000:
         raise ValueError('Ratio minimum invalide')
@@ -46,13 +45,23 @@ def state(conn, request):
         total = int(cur.fetchone()['n'])
         pages = max(1, math.ceil(total / 40))
         page = min(page, pages)
-        cur.execute('''SELECT s.listing_id,s.event_date,s.price_ratio,s.ratio AS proposed_ratio,s.status AS vendor_state,
+        cur.execute(
+            '''SELECT s.listing_id,s.event_date,s.price_ratio,s.ratio AS proposed_ratio,s.status AS vendor_state,
                       s.detected_at,s.checked_at,s.checks,l.symbol,l.mic,l.currency,i.name,i.isin,
                       r.ratio AS reviewed_ratio,r.source_url,r.note,r.actor_id,r.updated_at,COALESCE(r.revision,0) AS revision,
-                      ''' + STATE + ''' AS state,
+                      '''
+            + STATE
+            + ''' AS state,
                       (SELECT p.close_px FROM daily_prices p WHERE p.listing_id=s.listing_id AND p.price_date<s.event_date ORDER BY p.price_date DESC LIMIT 1) AS price_before,
                       (SELECT p.close_px FROM daily_prices p WHERE p.listing_id=s.listing_id AND p.price_date=s.event_date) AS price_after
-                      ''' + join + clause + ' ORDER BY ' + orders[sort] + ' LIMIT 40 OFFSET %s', args + [(page - 1) * 40])
+                      '''
+            + join
+            + clause
+            + ' ORDER BY '
+            + orders[sort]
+            + ' LIMIT 40 OFFSET %s',
+            args + [(page - 1) * 40],
+        )
         rows = cur.fetchall()
         ids = sorted({r['listing_id'] for r in rows})
         history = []
@@ -61,8 +70,16 @@ def state(conn, request):
             history = cur.fetchall()
     for row in rows:
         row['history'] = [h for h in history if h['listing_id'] == row['listing_id'] and h['event_date'] == row['event_date']][:5]
-    return {'rows': rows, 'counts': counts, 'total': total, 'page': page, 'pages': pages,
-            'sort': sort, 'min_ratio': minimum, 'recompute_pending': bool(settings.get(conn, 'split_metrics_pending', False))}
+    return {
+        'rows': rows,
+        'counts': counts,
+        'total': total,
+        'page': page,
+        'pages': pages,
+        'sort': sort,
+        'min_ratio': minimum,
+        'recompute_pending': bool(settings.get(conn, 'split_metrics_pending', False)),
+    }
 
 
 def scan(conn, request):
@@ -131,18 +148,28 @@ def decide(conn, request):
                 existing = cur.fetchall()
                 if any(abs(float(e['ratio'] or 0) - ratio) > 1e-7 for e in existing):
                     raise ValueError('Une autre opération existe déjà à cette date. Aucun changement effectué.')
-                cur.execute('INSERT INTO corporate_events(listing_id,event_date,kind,ratio) VALUES (%s,%s,%s,%s) ON DUPLICATE KEY UPDATE ratio=VALUES(ratio)',
-                            (lid, day, 'split' if ratio > 1 else 'reverse_split', ratio))
+                cur.execute(
+                    'INSERT INTO corporate_events(listing_id,event_date,kind,ratio) VALUES (%s,%s,%s,%s) ON DUPLICATE KEY UPDATE ratio=VALUES(ratio)',
+                    (lid, day, 'split' if ratio > 1 else 'reverse_split', ratio),
+                )
                 cur.execute("UPDATE split_log SET status='confirmed',ratio=%s,checked_at=UTC_TIMESTAMP(),recheck_after=NULL WHERE listing_id=%s AND event_date=%s", (ratio, lid, day))
                 # La demande est conservée dans la même transaction ; le cron reprend un lancement interrompu.
-                cur.execute("INSERT INTO settings(name,value_json,updated_at) VALUES ('split_metrics_pending','true',UTC_TIMESTAMP()) ON DUPLICATE KEY UPDATE value_json='true',updated_at=UTC_TIMESTAMP()")
+                cur.execute(
+                    "INSERT INTO settings(name,value_json,updated_at) VALUES ('split_metrics_pending','true',UTC_TIMESTAMP()) ON DUPLICATE KEY UPDATE value_json='true',updated_at=UTC_TIMESTAMP()"
+                )
             note = note or ('Refus manuel du split' if action == 'rejected' else 'Remis en attente')
             values = (lid, day, action, ratio, source or None, note, actor)
-            cur.execute('''INSERT INTO split_reviews(listing_id,event_date,decision,ratio,source_url,note,actor_id,revision,updated_at)
+            cur.execute(
+                '''INSERT INTO split_reviews(listing_id,event_date,decision,ratio,source_url,note,actor_id,revision,updated_at)
                            VALUES (%s,%s,%s,%s,%s,%s,%s,1,UTC_TIMESTAMP())
-                           ON DUPLICATE KEY UPDATE decision=VALUES(decision),ratio=VALUES(ratio),source_url=VALUES(source_url),note=VALUES(note),actor_id=VALUES(actor_id),revision=revision+1,updated_at=UTC_TIMESTAMP()''', values)
-            cur.execute('''INSERT INTO split_review_history(listing_id,event_date,decision,ratio,source_url,note,actor_id,created_at)
-                           VALUES (%s,%s,%s,%s,%s,%s,%s,UTC_TIMESTAMP())''', values)
+                           ON DUPLICATE KEY UPDATE decision=VALUES(decision),ratio=VALUES(ratio),source_url=VALUES(source_url),note=VALUES(note),actor_id=VALUES(actor_id),revision=revision+1,updated_at=UTC_TIMESTAMP()''',
+                values,
+            )
+            cur.execute(
+                '''INSERT INTO split_review_history(listing_id,event_date,decision,ratio,source_url,note,actor_id,created_at)
+                           VALUES (%s,%s,%s,%s,%s,%s,%s,UTC_TIMESTAMP())''',
+                values,
+            )
         conn.commit()
         return {'changed': True, 'decision': action, 'recompute_pending': action == 'applied'}
     except Exception:

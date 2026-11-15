@@ -15,6 +15,7 @@ Définitions (unités affichables) :
 Fenêtres courtes : 1 séance = performance seule ; 2 séances = pas de régression (R² et ER non définis) ;
 volatilité à partir de 3 séances.
 """
+
 import math
 
 MIN_SESSIONS, MAX_SESSIONS = 1, 252
@@ -27,8 +28,7 @@ def window_metrics(closes):
     n = len(closes) - 1
     logs = [math.log(c) for c in closes]
     steps = [logs[i + 1] - logs[i] for i in range(n)]
-    out = {'sessions': n, 'perf': 100 * math.expm1(logs[-1] - logs[0]),
-           'slope': None, 'slope_log': None, 'r2': None, 'volatility': None, 'drawdown': None, 'er': None}
+    out = {'sessions': n, 'perf': 100 * math.expm1(logs[-1] - logs[0]), 'slope': None, 'slope_log': None, 'r2': None, 'volatility': None, 'drawdown': None, 'er': None}
     peak, worst = closes[0], 0.0
     for c in closes:
         peak = max(peak, c)
@@ -73,20 +73,15 @@ def dated_window_metrics(session_dates, observations):
     expected = list(session_dates or ())
     if len(expected) < 2:
         return None, {'observations': 0, 'expected_closes': len(expected), 'coverage': 0.0}
-    points = [(i, float(observations[d])) for i, d in enumerate(expected)
-              if d in observations and observations[d] is not None
-              and float(observations[d]) > 0 and math.isfinite(float(observations[d]))]
+    points = [(i, float(observations[d])) for i, d in enumerate(expected) if d in observations and observations[d] is not None and float(observations[d]) > 0 and math.isfinite(float(observations[d]))]
     n_expected = len(expected) - 1
     coverage = len(points) / len(expected)
-    info = {'observations': len(points), 'expected_closes': len(expected), 'coverage': coverage,
-            'missing_sessions': len(expected) - len(points)}
+    info = {'observations': len(points), 'expected_closes': len(expected), 'coverage': coverage, 'missing_sessions': len(expected) - len(points)}
     full = len(points) == len(expected)
     if full:
-        return dict(window_metrics([v for _, v in points]), **{'coverage': 1.0, 'observations': len(points),
-                                                              'expected_closes': len(expected), 'missing_sessions': 0}), info
+        return dict(window_metrics([v for _, v in points]), **{'coverage': 1.0, 'observations': len(points), 'expected_closes': len(expected), 'missing_sessions': 0}), info
 
-    out = {'sessions': n_expected, 'perf': None, 'slope': None, 'slope_log': None, 'r2': None,
-           'volatility': None, 'drawdown': None, 'er': None}
+    out = {'sessions': n_expected, 'perf': None, 'slope': None, 'slope_log': None, 'r2': None, 'volatility': None, 'drawdown': None, 'er': None}
     minimum = max(3, math.ceil(0.80 * len(expected)))
     if len(points) < minimum:
         return out, info
@@ -127,20 +122,27 @@ def technical_state(closes):
     if not closes:
         return {'close': None, 'ma20': None, 'ma50': None, 'ma50_prev': None, 'daily_change': None, 'gap_to_ma20': None}
     ma20 = moving_average(closes, 20)
-    return {'close': closes[-1], 'ma20': ma20, 'ma50': moving_average(closes, 50),
-            'ma50_prev': moving_average(closes[:-5], 50) if len(closes) > 5 else None,
-            'ma200': moving_average(closes, 200), 'ma200_prev': moving_average(closes[:-5], 200) if len(closes) > 205 else None,
-            'daily_change': 100 * (closes[-1] / closes[-2] - 1) if len(closes) >= 2 else None,
-            'gap_to_ma20': 100 * (closes[-1] / ma20 - 1) if ma20 else None}
+    return {
+        'close': closes[-1],
+        'ma20': ma20,
+        'ma50': moving_average(closes, 50),
+        'ma50_prev': moving_average(closes[:-5], 50) if len(closes) > 5 else None,
+        'ma200': moving_average(closes, 200),
+        'ma200_prev': moving_average(closes[:-5], 200) if len(closes) > 205 else None,
+        'daily_change': 100 * (closes[-1] / closes[-2] - 1) if len(closes) >= 2 else None,
+        'gap_to_ma20': 100 * (closes[-1] / ma20 - 1) if ma20 else None,
+    }
 
 
 def dated_technical_state(expected_dates, observations):
     """Indicateurs de contexte calculés sur des séances calendaires sans sauter les trous."""
     dates = list(expected_dates or ())
+
     def values(days):
         if len(days) != len(set(days)) or not days or any(d not in observations for d in days):
             return None
         return [float(observations[d]) for d in days]
+
     close = observations.get(dates[-1]) if dates else None
     last20, last50 = values(dates[-20:]), values(dates[-50:])
     prev50 = values(dates[-55:-5]) if len(dates) >= 55 else None
@@ -153,6 +155,13 @@ def dated_technical_state(expected_dates, observations):
     ma200 = sum(last200) / 200 if last200 else None
     ma200_prev = sum(prev200) / 200 if prev200 else None
     daily = 100 * (last2[-1] / last2[0] - 1) if last2 else None
-    return {'close': float(close) if close is not None else None, 'ma20': ma20, 'ma50': ma50,
-            'ma50_prev': ma50_prev, 'ma200': ma200, 'ma200_prev': ma200_prev, 'daily_change': daily,
-            'gap_to_ma20': 100 * (float(close) / ma20 - 1) if close is not None and ma20 else None}
+    return {
+        'close': float(close) if close is not None else None,
+        'ma20': ma20,
+        'ma50': ma50,
+        'ma50_prev': ma50_prev,
+        'ma200': ma200,
+        'ma200_prev': ma200_prev,
+        'daily_change': daily,
+        'gap_to_ma20': 100 * (float(close) / ma20 - 1) if close is not None and ma20 else None,
+    }

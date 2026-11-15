@@ -1,4 +1,5 @@
 """Cohérence `db/schema.sql` ↔ `db/migrations/` : tout ce qu'une migration ajoute doit exister dans l'installation neuve."""
+
 import os
 import re
 import pytest
@@ -20,7 +21,7 @@ def tables(sql):
         while depth and i < len(sql):
             depth += {'(': 1, ')': -1}.get(sql[i], 0)
             i += 1
-        out[m.group(1).lower()] = sql[m.end():i - 1]
+        out[m.group(1).lower()] = sql[m.end() : i - 1]
     return out
 
 
@@ -32,8 +33,7 @@ def column_names(body):
 
 
 def index_names(body):
-    return {m.group(1).lower() for m in re.finditer(r'(?:UNIQUE\s+)?(?:KEY|INDEX)\s+`?(\w+)`?', body, re.I)} | \
-           {m.group(1).lower() for m in re.finditer(r'CONSTRAINT\s+`?(\w+)`?', body, re.I)}
+    return {m.group(1).lower() for m in re.finditer(r'(?:UNIQUE\s+)?(?:KEY|INDEX)\s+`?(\w+)`?', body, re.I)} | {m.group(1).lower() for m in re.finditer(r'CONSTRAINT\s+`?(\w+)`?', body, re.I)}
 
 
 def test_schema_declares_tables():

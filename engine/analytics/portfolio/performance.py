@@ -6,6 +6,7 @@ as such. No-flow intervals are exact for those valuations. Fees remain expenses.
 Cash/dividends are not recorded: purchases are contributions to the securities
 sleeve, net sale proceeds withdrawals. This is not a total-account cash return.
 """
+
 import datetime as dt
 import math
 
@@ -20,19 +21,23 @@ def linked(dates, values, trades, invalid=False):
         start = previous_day or dt.datetime.fromisoformat(day)
         flows, buys, sells = [], 0.0, 0.0
         while cursor < len(pending) and pending[cursor]['date'] <= day:
-            t = pending[cursor]; cursor += 1
+            t = pending[cursor]
+            cursor += 1
             gross = t['quantity'] * t['unit_price'] * t['fx_to_eur']
             if t['side'] == 'buy':
-                flow = gross + t['fees_eur']; buys += flow
+                flow = gross + t['fees_eur']
+                buys += flow
             else:
-                net = gross - t['fees_eur']; flow = -net; sells += net
-            when = dt.datetime.fromisoformat(t['trade_at'].replace('T',' '))
-            weight = min(1.0,max(0.0,(end-when).total_seconds()/max(1,(end-start).total_seconds())))
-            flows.append((flow,weight))
+                net = gross - t['fees_eur']
+                flow = -net
+                sells += net
+            when = dt.datetime.fromisoformat(t['trade_at'].replace('T', ' '))
+            weight = min(1.0, max(0.0, (end - when).total_seconds() / max(1, (end - start).total_seconds())))
+            flows.append((flow, weight))
         estimated.append(bool(flows))
         factor = None
         if not invalid and previous is not None and value is not None:
-            net_flow = sum(f for f,_ in flows)
+            net_flow = sum(f for f, _ in flows)
             gain = value - previous - net_flow
             if previous <= 1e-12 and buys > 0:
                 # New holding interval: capital first enters at the purchases,
@@ -42,7 +47,7 @@ def linked(dates, values, trades, invalid=False):
                 # Full liquidation has a known final value (net proceeds).
                 denominator = previous
             else:
-                denominator = previous + sum(f*w for f,w in flows)
+                denominator = previous + sum(f * w for f, w in flows)
             if denominator > 1e-12:
                 candidate = 1 + gain / denominator
                 if math.isfinite(candidate) and candidate >= 0:
@@ -58,5 +63,4 @@ def linked(dates, values, trades, invalid=False):
         notes.append('Performance estimée les jours d’achat/vente à partir des valorisations quotidiennes, frais compris.')
     if any(x is None for x in factors):
         notes.append('Performance hors mouvements indisponible sur les passages sans valorisation fiable ; aucune liaison artificielle entre ces passages.')
-    return {'method':'linked_daily_modified_dietz', 'factors':factors, 'index':index,
-            'estimated':estimated, 'notes':notes}
+    return {'method': 'linked_daily_modified_dietz', 'factors': factors, 'index': index, 'estimated': estimated, 'notes': notes}

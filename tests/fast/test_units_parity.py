@@ -1,4 +1,5 @@
 """F12 : unités de prix — mêmes facteurs vers l'euro en Python (engine/shared/units.py) et en PHP (eur_factor)."""
+
 import json
 import os
 import shutil
@@ -30,8 +31,10 @@ def test_pound_is_not_pence_and_subunit_detection():
 
 @pytest.mark.skipif(not shutil.which('php'), reason='php absent')
 def test_php_matches_python():
-    code = ("require " + json.dumps(ROOT + '/app/services/ledger.php') + "; $r = json_decode('" + json.dumps(RATES) + "', true); $out = [];"
-            "foreach (json_decode('" + json.dumps(UNITS) + "', true) as $u) $out[] = eur_factor($u, $r); echo json_encode($out);")
+    code = (
+        "require " + json.dumps(ROOT + '/app/services/ledger.php') + "; $r = json_decode('" + json.dumps(RATES) + "', true); $out = [];"
+        "foreach (json_decode('" + json.dumps(UNITS) + "', true) as $u) $out[] = eur_factor($u, $r); echo json_encode($out);"
+    )
     out = subprocess.run(['php', '-r', code], capture_output=True, text=True, timeout=30)
     assert out.returncode == 0, out.stderr
     assert json.loads(out.stdout) == [to_eur_factor(u, RATES) for u in UNITS]
@@ -40,12 +43,14 @@ def test_php_matches_python():
 @pytest.mark.skipif(not shutil.which('php'), reason='php absent')
 def test_unreadable_split_events_are_unavailable_not_empty():
     """F01 : base injoignable = 503 explicite, jamais une liste vide qui ferait calculer des quantités sans split."""
-    code = ("require " + json.dumps(ROOT + '/app/services/ledger.php') + ";"
-            "try { echo json_encode(['ok' => split_events([1, 2])]); } catch (ApiError $e) { echo json_encode(['status' => $e->status]); }"
-            " echo '|', json_encode(split_events([]));")
+    code = (
+        "require " + json.dumps(ROOT + '/app/services/ledger.php') + ";"
+        "try { echo json_encode(['ok' => split_events([1, 2])]); } catch (ApiError $e) { echo json_encode(['status' => $e->status]); }"
+        " echo '|', json_encode(split_events([]));"
+    )
     env = dict(os.environ, JIGO_DB_HOST='127.0.0.1', JIGO_DB_NAME='x', JIGO_DB_USER='x', JIGO_DB_PASSWORD='x', JIGO_DB_SOCKET='/nonexistent/mysql.sock')
     out = subprocess.run(['php', '-r', code], capture_output=True, text=True, timeout=30, env=env)
     assert out.returncode == 0, out.stderr
     unreadable, empty = out.stdout.split('|')
     assert json.loads(unreadable) == {'status': 503}
-    assert json.loads(empty) == []                      # aucun titre demandé : vide légitime, sans lecture
+    assert json.loads(empty) == []  # aucun titre demandé : vide légitime, sans lecture

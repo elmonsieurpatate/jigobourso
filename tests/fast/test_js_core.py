@@ -1,5 +1,6 @@
 """Noyau JS commun (core.js) : le test Node du noyau passe, et aucun script de page ne recrée de copie locale
 des sélecteurs, de l'échappement HTML, des formats de nombres ou de l'accès à localStorage."""
+
 import glob
 import os
 import re
@@ -59,7 +60,7 @@ def test_no_local_copy_of_core_helpers():
             for m in re.finditer(pat, js):
                 line = js.count('\n', 0, m.start()) + 1
                 if re.search(r'//.*localStorage|/\*.*localStorage', js.splitlines()[line - 1]):
-                    continue                      # simple mention dans un commentaire
+                    continue  # simple mention dans un commentaire
                 bad.append(f'{name}:{line} {why}')
     assert not bad, '\n'.join(bad)
 

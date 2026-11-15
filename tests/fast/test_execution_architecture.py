@@ -1,4 +1,5 @@
 """Architecture d'exécution : connexion rétablie, réglage des threads, maintenance en étapes indépendantes, déploiement sans recalcul."""
+
 import re
 import os
 import pathlib
@@ -17,6 +18,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 
 class Conn:
     """Connexion simulée : `alive` passe à False quand le serveur l'a fermée ; ping lève comme pymysql."""
+
     def __init__(self, alive=True):
         self.alive, self.reconnects, self.rollbacks = alive, 0, 0
 
@@ -41,17 +43,29 @@ def test_ensure_reconnects_only_a_closed_connection():
 
 
 def test_blas_is_limited_to_one_thread_before_numpy_loads():
-    out = subprocess.run([sys.executable, '-c', 'import os, engine; print(os.environ["OPENBLAS_NUM_THREADS"], "numpy" in __import__("sys").modules)'],
-                         cwd=ROOT, env={k: v for k, v in os.environ.items() if not k.endswith('_NUM_THREADS')}, capture_output=True, text=True, check=True).stdout.split()
+    out = subprocess.run(
+        [sys.executable, '-c', 'import os, engine; print(os.environ["OPENBLAS_NUM_THREADS"], "numpy" in __import__("sys").modules)'],
+        cwd=ROOT,
+        env={k: v for k, v in os.environ.items() if not k.endswith('_NUM_THREADS')},
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.split()
     assert out == ['1', 'False']
-    assert subprocess.run([sys.executable, '-c', 'import os, engine; print(os.environ["OPENBLAS_NUM_THREADS"])'], cwd=ROOT, env=dict(os.environ, OPENBLAS_NUM_THREADS='4'),
-                          capture_output=True, text=True, check=True).stdout.strip() == '4'          # un réglage explicite reste prioritaire
+    assert (
+        subprocess.run(
+            [sys.executable, '-c', 'import os, engine; print(os.environ["OPENBLAS_NUM_THREADS"])'], cwd=ROOT, env=dict(os.environ, OPENBLAS_NUM_THREADS='4'), capture_output=True, text=True, check=True
+        ).stdout.strip()
+        == '4'
+    )  # un réglage explicite reste prioritaire
 
 
 def test_database_socket_replaces_host_for_isolated_tests(monkeypatch):
     seen = {}
     monkeypatch.setattr(db.pymysql, 'connect', lambda **kw: seen.update(kw) or object())
-    monkeypatch.setenv('JIGO_DB_NAME', 'x'); monkeypatch.setenv('JIGO_DB_USER', 'u'); monkeypatch.setenv('JIGO_DB_PASSWORD', 'p')
+    monkeypatch.setenv('JIGO_DB_NAME', 'x')
+    monkeypatch.setenv('JIGO_DB_USER', 'u')
+    monkeypatch.setenv('JIGO_DB_PASSWORD', 'p')
     monkeypatch.delenv('JIGO_DB_HOST', raising=False)
     monkeypatch.setenv('JIGO_DB_SOCKET', '/tmp/x.sock')
     db.connect()
@@ -75,7 +89,9 @@ def plan(monkeypatch):
             if name in fail:
                 raise fail[name]
             return result
+
         return run
+
     monkeypatch.setattr(tasks, 'backup_user_data', step('backup', '/x/userdata.sql.gz'))
     monkeypatch.setattr(tasks.collect, 'collection_set', lambda *a, **k: [{'id': 1}])
     monkeypatch.setattr(tasks.collect, 'refresh_quotes', step('quotes', (1, 0)))
@@ -103,18 +119,35 @@ def plan(monkeypatch):
 def test_maintenance_runs_everything_and_the_backup_comes_first(plan):
     calls, fail, pending, logs, log = plan
     ok, errors, summary = tasks.maintenance(Conn(), object(), None, log)
-    assert calls[0] == 'backup' and calls == ['backup', 'quotes', 'fx', 'fx_history', 'gaps', 'volumes', 'detect', 'verify', 'recheck', 'compute', 'warm', 'etf', 'snapshot', 'outcomes', 'prune', 'housekeeping']
+    assert calls[0] == 'backup' and calls == [
+        'backup',
+        'quotes',
+        'fx',
+        'fx_history',
+        'gaps',
+        'volumes',
+        'detect',
+        'verify',
+        'recheck',
+        'compute',
+        'warm',
+        'etf',
+        'snapshot',
+        'outcomes',
+        'prune',
+        'housekeeping',
+    ]
     assert errors == 0 and pending['maintenance_pending'] is False and 'séries 9612' in summary and 'en échec' not in summary
 
 
 def test_an_etf_failure_blocks_nothing_else_and_rearms_the_maintenance(plan):
     calls, fail, pending, logs, log = plan
-    conn = Conn(alive=False)                                   # l'erreur 2006 : la connexion est fermée au moment de l'échec
+    conn = Conn(alive=False)  # l'erreur 2006 : la connexion est fermée au moment de l'échec
     fail['etf'] = pymysql.err.OperationalError(2006, 'MySQL server has gone away')
     ok, errors, summary = tasks.maintenance(conn, object(), None, log)
     assert calls[-4:] == ['snapshot', 'outcomes', 'prune', 'housekeeping'] and 'backup' in calls
-    assert errors == 1 and 'Similarité des ETF' in summary and pending['maintenance_pending'] is True      # nouvelle tentative prévue
-    assert conn.alive and conn.reconnects == 1 and conn.rollbacks >= 1                                        # connexion rétablie avant de continuer
+    assert errors == 1 and 'Similarité des ETF' in summary and pending['maintenance_pending'] is True  # nouvelle tentative prévue
+    assert conn.alive and conn.reconnects == 1 and conn.rollbacks >= 1  # connexion rétablie avant de continuer
     assert any(lvl == 'error' and 'Similarité des ETF' in msg for lvl, msg in logs)
 
 
@@ -129,7 +162,7 @@ def test_failed_indicators_skip_the_ranking_snapshot_but_not_the_rest(plan):
     calls, fail, pending, logs, log = plan
     fail['compute'] = RuntimeError('boom')
     ok, errors, summary = tasks.maintenance(Conn(), object(), None, log)
-    assert 'snapshot' not in calls and {'etf', 'outcomes', 'prune', 'housekeeping'} <= set(calls)             # jamais de photographie d'un classement périmé
+    assert 'snapshot' not in calls and {'etf', 'outcomes', 'prune', 'housekeeping'} <= set(calls)  # jamais de photographie d'un classement périmé
     assert any('ignoré' in msg for _, msg in logs) and errors == 1
 
 
@@ -143,10 +176,10 @@ def test_yahoo_rate_limit_is_a_warning_on_that_step_only(plan):
 
 def test_a_deployment_requests_the_recalculation_without_delay(monkeypatch):
     monkeypatch.setattr(tasks.settings, 'get', lambda conn, name, default=None: 'deploy')
-    monkeypatch.setattr(tasks, '_ran_within', lambda *a: True)                                               # la maintenance vient de tourner
+    monkeypatch.setattr(tasks, '_ran_within', lambda *a: True)  # la maintenance vient de tourner
     assert tasks._maintenance_due(None, None) is True
     monkeypatch.setattr(tasks.settings, 'get', lambda conn, name, default=None: True)
-    assert tasks._maintenance_due(None, None) is False                                                       # un échec attend 30 minutes
+    assert tasks._maintenance_due(None, None) is False  # un échec attend 30 minutes
 
 
 def test_deploy_script_no_longer_recalculates_or_waits():
@@ -161,7 +194,7 @@ def test_explicit_actions_start_now_and_deploy_starts_the_recalculation_detached
     admin = (ROOT / 'app/routes/admin.php').read_text()
     for job in ("'maintenance'", "'metrics'", "'etf'"):
         assert job in admin
-    assert admin.count("engine_spawn('job'") == 2                                  # lanceur unique, toujours détaché (actions explicites + décision de split) : aucune requête HTTP n'attend le calcul
+    assert admin.count("engine_spawn('job'") == 2  # lanceur unique, toujours détaché (actions explicites + décision de split) : aucune requête HTTP n'attend le calcul
     assert tasks.COMPUTE == ('maintenance', 'metrics', 'etf')
     assert set(tasks.COMPUTE) <= set(tasks.MANUAL_LABELS)
     deploy = (ROOT / 'ops/deploy.sh').read_text()
@@ -173,7 +206,7 @@ def test_deploy_recalculates_only_when_engine_or_schema_changed():
     assert 'engine_hash=' in deploy and 'aucun recalcul' in deploy
     script = (ROOT / 'scripts/release/engine_hash.sh').read_text()
     assert 'find engine db' in script and 'service.py' in script and 'signals.py' in script
-    assert 'find engine db' not in deploy and deploy.count('engine_hash.sh') == 2          # une seule définition de l'empreinte, avant et après le transfert
+    assert 'find engine db' not in deploy and deploy.count('engine_hash.sh') == 2  # une seule définition de l'empreinte, avant et après le transfert
     assert deploy.index("--name maintenance") > deploy.index('"$hash" = "$BEFORE"')
 
 
@@ -193,7 +226,7 @@ def test_maintenance_skips_the_volume_step_while_the_manual_catchup_runs(plan, m
     calls, fail, pending, logs, log = plan
     monkeypatch.setattr(tasks, '_volumes_job_running', lambda conn: True)
     ok, errors, summary = tasks.maintenance(Conn(), object(), None, log)
-    assert 'volumes' not in calls and 'compute' in calls and errors == 0       # pas de doublon d'appels Yahoo ; le reste continue
+    assert 'volumes' not in calls and 'compute' in calls and errors == 0  # pas de doublon d'appels Yahoo ; le reste continue
 
 
 def test_a_volume_failure_is_a_real_error_with_its_location_and_blocks_nothing(plan):
@@ -201,4 +234,4 @@ def test_a_volume_failure_is_a_real_error_with_its_location_and_blocks_nothing(p
     fail['volumes'] = RuntimeError('Yahoo illisible')
     ok, errors, summary = tasks.maintenance(Conn(), object(), None, log)
     assert errors == 1 and 'Volumes quotidiens' in summary and 'compute' in calls and pending['maintenance_pending'] is True
-    assert any(lvl == 'error' and 'Volumes quotidiens' in msg and 'RuntimeError' in msg and '.py:' in msg for lvl, msg in logs)   # erreur non masquée, avec fichier:ligne
+    assert any(lvl == 'error' and 'Volumes quotidiens' in msg and 'RuntimeError' in msg and '.py:' in msg for lvl, msg in logs)  # erreur non masquée, avec fichier:ligne

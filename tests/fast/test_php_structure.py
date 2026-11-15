@@ -1,4 +1,5 @@
 """Structure PHP : fonctions globales uniques, dépendances explicites (require_once) et couches respectées (F10)."""
+
 import os
 import re
 

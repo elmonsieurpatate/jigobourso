@@ -12,6 +12,7 @@ fast:
 lint: lint-py lint-php   ## linters : ruff (Python) + php -l (syntaxe PHP)
 lint-py:
 	$(CURDIR)/.venv/bin/ruff check .
+	$(CURDIR)/.venv/bin/ruff format --check engine tests scripts
 lint-php:
 	@PHP=$(PHP) scripts/lint_php.sh
 css-format:   ## formate les feuilles CSS (Prettier 3.3.3, config .prettierrc)

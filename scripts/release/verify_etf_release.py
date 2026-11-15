@@ -1,7 +1,9 @@
 """Rapport SELECT uniquement : couverture et exemples publics, aucune donnée utilisateur."""
+
 import json
 import os
 import sys
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from engine.shared.db import connect
 from engine.analytics.market_views import etf

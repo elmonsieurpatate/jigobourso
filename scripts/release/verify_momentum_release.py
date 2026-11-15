@@ -1,5 +1,6 @@
 """Contrôle en LECTURE SEULE des deux stratégies Momentum sur une base réelle (essai isolé ou production) : valeurs stockées, cohérence avec la formule des tests chronologiques, classements du moteur.
 Usage : PYTHONPATH=$PWD python scripts/release/verify_momentum_release.py   (variables JIGO_DB_*)   Code de sortie 0 = tout est cohérent."""
+
 import json
 import random
 import sys
@@ -30,11 +31,11 @@ def main():
     #  - « daté » : formule du calendrier de la place (cours à J−fenêtre et J−21 séances attendues, relevés dans la série) ; doit correspondre à 100 % aux valeurs stockées ;
     #  - « indices » : formule des tests chronologiques sur les clôtures disponibles (cours[-22] / cours[-1-fenêtre]) ; elle diffère légèrement si la série a des séances manquantes
     #    (trous au milieu de la fenêtre), cas où le calcul daté est le bon : indicatif seulement.
-    with conn.cursor() as cur:        # comme le calcul des indicateurs : la fenêtre se termine à la dernière séance de la PLACE (un titre en retard d'une séance garde la fenêtre de sa place)
+    with conn.cursor() as cur:  # comme le calcul des indicateurs : la fenêtre se termine à la dernière séance de la PLACE (un titre en retard d'une séance garde la fenêtre de sa place)
         cur.execute('SELECT l.mic, MAX(s.last_close_date) d FROM series_state s JOIN listings l ON l.id=s.listing_id GROUP BY l.mic')
         market_latest = {r['mic']: r['d'].isoformat() for r in cur.fetchall()}
     for column, window in (('momentum_6m', 126), ('momentum_12m', 252)):
-        assert column in ('momentum_6m', 'momentum_12m')      # identifiant SQL interpolé : liste blanche explicite
+        assert column in ('momentum_6m', 'momentum_12m')  # identifiant SQL interpolé : liste blanche explicite
         with conn.cursor() as cur:
             cur.execute(f'SELECT s.listing_id, s.{column} v, s.last_close_date d, l.mic FROM series_state s JOIN listings l ON l.id=s.listing_id WHERE s.{column} IS NOT NULL')
             stored = {r['listing_id']: (float(r['v']), r['d'].isoformat(), r['mic']) for r in cur.fetchall()}
@@ -63,7 +64,9 @@ def main():
                 index += 1
             elif shown < 3:
                 shown += 1
-                print(f'   écart {column} #{lid} {mic}: stocké {value:+.2f} · indices {by_index:+.2f} · séances présentes sur la fenêtre {sum(1 for d in dates if expected_sessions and expected_sessions[0] <= d <= expected_sessions[-1])}/{window + 1}')
+                print(
+                    f'   écart {column} #{lid} {mic}: stocké {value:+.2f} · indices {by_index:+.2f} · séances présentes sur la fenêtre {sum(1 for d in dates if expected_sessions and expected_sessions[0] <= d <= expected_sessions[-1])}/{window + 1}'
+                )
         print(f'{column} : {dated}/{total} identiques à la formule datée du calendrier ; {index}/{total} identiques à la formule des tests par indices')
         if total < MIN_SAMPLES or dated < total:
             problems.append(f'{column} : valeurs stockées différentes du calcul daté ({dated}/{total})')

@@ -8,6 +8,7 @@ Valeurs par défaut tirées de research/RESULTATS_SORTIES.md (test chronologique
   - Rebond : « le cours passe sous sa moyenne 50 jours » fait mieux qu'une durée fixe équivalente ;
   - la sortie du classement (Top 50) n'a montré aucun avantage : elle est signalée pour information seulement.
 """
+
 import datetime
 
 from ..shared.text import fr
@@ -23,16 +24,31 @@ DEFAULT_DAYS = 182
 DEFAULT_DROP = 20.0
 MOMENTUM = ('momentum', 'momentum12', 'momentum_risk')
 STRATEGIES = tuple(strategy.PRESETS) + ('prudent',)
-NAMES = {'regular': 'Croissance régulière', 'fast': 'Croissance rapide', 'recovery': 'Rebond', 'low_volatility': 'Hausse calme', 'momentum': 'Momentum 6 mois',
-         'momentum12': 'Momentum 12 mois', 'momentum_risk': 'Momentum ajusté au risque', 'prudent': 'Prudente (ETF par zone)', 'custom': 'Stratégie du portefeuille'}
+NAMES = {
+    'regular': 'Croissance régulière',
+    'fast': 'Croissance rapide',
+    'recovery': 'Rebond',
+    'low_volatility': 'Hausse calme',
+    'momentum': 'Momentum 6 mois',
+    'momentum12': 'Momentum 12 mois',
+    'momentum_risk': 'Momentum ajusté au risque',
+    'prudent': 'Prudente (ETF par zone)',
+    'custom': 'Stratégie du portefeuille',
+}
 
 
 def defaults(name):
     """Réglages par défaut d'une stratégie : durée (jours), chute depuis le plus haut (%), action conseillée sur chute, règle de sortie propre."""
     if name == 'prudent':
         return {'days': 365, 'drop': None, 'drop_action': None, 'days_action': 'rééquilibrer', 'exit': None, 'rank_exit': False}
-    out = {'days': DEFAULT_DAYS, 'drop': DEFAULT_DROP, 'drop_action': 'alléger' if name == 'fast' else 'surveiller', 'days_action': 'réexaminer',
-           'exit': 'momentum_negative' if name in MOMENTUM else 'below_ma50' if name == 'recovery' else None, 'rank_exit': True}
+    out = {
+        'days': DEFAULT_DAYS,
+        'drop': DEFAULT_DROP,
+        'drop_action': 'alléger' if name == 'fast' else 'surveiller',
+        'days_action': 'réexaminer',
+        'exit': 'momentum_negative' if name in MOMENTUM else 'below_ma50' if name == 'recovery' else None,
+        'rank_exit': True,
+    }
     return out
 
 
@@ -66,22 +82,62 @@ def evaluate(lot, rules, measures, state, rank, today):
     out = []
     held = (today - datetime.date.fromisoformat(lot['trade_date'])).days
     if rules.get('days') and held >= rules['days']:
-        out.append({'kind': 'duration', 'level': 'watch', 'action': rules['days_action'], 'value': held, 'threshold': rules['days'],
-                    'message': f"Détenu depuis {held} jours (repère : {rules['days']} jours)."})
+        out.append(
+            {
+                'kind': 'duration',
+                'level': 'watch',
+                'action': rules['days_action'],
+                'value': held,
+                'threshold': rules['days'],
+                'message': f"Détenu depuis {held} jours (repère : {rules['days']} jours).",
+            }
+        )
     if rules.get('drop') and measures and measures.get('drop_pct') is not None and measures['drop_pct'] >= rules['drop']:
-        out.append({'kind': 'drop', 'level': 'act' if rules['drop_action'] == 'alléger' else 'watch', 'action': rules['drop_action'], 'value': round(measures['drop_pct'], 1), 'threshold': rules['drop'],
-                    'message': f"Le cours a perdu {fr(measures['drop_pct'])} % depuis son plus haut depuis l'achat (seuil : {fr(rules['drop'], 0) if float(rules['drop']).is_integer() else fr(rules['drop'])} %)."})
+        out.append(
+            {
+                'kind': 'drop',
+                'level': 'act' if rules['drop_action'] == 'alléger' else 'watch',
+                'action': rules['drop_action'],
+                'value': round(measures['drop_pct'], 1),
+                'threshold': rules['drop'],
+                'message': f"Le cours a perdu {fr(measures['drop_pct'])} % depuis son plus haut depuis l'achat (seuil : {fr(rules['drop'], 0) if float(rules['drop']).is_integer() else fr(rules['drop'])} %).",
+            }
+        )
     st = state or {}
     if rules.get('exit') == 'momentum_negative' and st.get('momentum_6m') is not None and st['momentum_6m'] < 0:
-        out.append({'kind': 'momentum', 'level': 'act', 'action': 'vente à envisager', 'value': round(st['momentum_6m'], 1), 'threshold': 0,
-                    'message': f"Le momentum 6 mois du titre est devenu négatif ({fr(st['momentum_6m'])} %) : c'est la meilleure règle de sortie testée pour le Momentum."})
+        out.append(
+            {
+                'kind': 'momentum',
+                'level': 'act',
+                'action': 'vente à envisager',
+                'value': round(st['momentum_6m'], 1),
+                'threshold': 0,
+                'message': f"Le momentum 6 mois du titre est devenu négatif ({fr(st['momentum_6m'])} %) : c'est la meilleure règle de sortie testée pour le Momentum.",
+            }
+        )
     if rules.get('exit') == 'below_ma50' and st.get('close') and st.get('ma50') and st['close'] < st['ma50']:
-        out.append({'kind': 'ma50', 'level': 'act', 'action': 'vente à envisager', 'value': st['close'], 'threshold': st['ma50'],
-                    'message': 'Le cours est passé sous sa moyenne 50 jours : fin probable du rebond.'})
+        out.append(
+            {
+                'kind': 'ma50',
+                'level': 'act',
+                'action': 'vente à envisager',
+                'value': st['close'],
+                'threshold': st['ma50'],
+                'message': 'Le cours est passé sous sa moyenne 50 jours : fin probable du rebond.',
+            }
+        )
     if rules.get('rank_exit') and rank is not False and (rank is None or rank > RANK_LIMIT):
-        out.append({'kind': 'rank', 'level': 'info', 'action': 'information', 'value': rank, 'threshold': RANK_LIMIT,
-                    'message': ("N'est plus retenu par sa stratégie." if rank is None else f"N'est plus dans les {RANK_LIMIT} premiers de sa stratégie (rang {rank}).")
-                               + ' Pour information : sortir à ce signal n\'a pas montré d\'avantage.'})
+        out.append(
+            {
+                'kind': 'rank',
+                'level': 'info',
+                'action': 'information',
+                'value': rank,
+                'threshold': RANK_LIMIT,
+                'message': ("N'est plus retenu par sa stratégie." if rank is None else f"N'est plus dans les {RANK_LIMIT} premiers de sa stratégie (rang {rank}).")
+                + ' Pour information : sortir à ce signal n\'a pas montré d\'avantage.',
+            }
+        )
     return out
 
 
@@ -93,9 +149,17 @@ def _series(conn, ids):
     bars, splits = load_bars_and_splits(conn, ids)
     with conn.cursor() as cur:
         cur.execute(f'SELECT listing_id, close_px, ma50, ma200, momentum_6m, quality, last_close_date FROM series_state WHERE listing_id IN ({marks})', list(ids))
-        states = {r['listing_id']: {'close': None if r['close_px'] is None else float(r['close_px']), 'ma50': None if r['ma50'] is None else float(r['ma50']),
-                                    'quality': r['quality'], 'last_close_date': str(r['last_close_date']) if r['last_close_date'] else None, 'ma200': None if r['ma200'] is None else float(r['ma200']),
-                                    'momentum_6m': None if r['momentum_6m'] is None else float(r['momentum_6m'])} for r in cur.fetchall()}
+        states = {
+            r['listing_id']: {
+                'close': None if r['close_px'] is None else float(r['close_px']),
+                'ma50': None if r['ma50'] is None else float(r['ma50']),
+                'quality': r['quality'],
+                'last_close_date': str(r['last_close_date']) if r['last_close_date'] else None,
+                'ma200': None if r['ma200'] is None else float(r['ma200']),
+                'momentum_6m': None if r['momentum_6m'] is None else float(r['momentum_6m']),
+            }
+            for r in cur.fetchall()
+        }
     for lid in ids:
         dates, closes, _, _ = prepare_series(bars.get(lid, []), splits.get(lid, ()))
         out[lid] = (dates, closes, states.get(lid))
@@ -105,6 +169,7 @@ def _series(conn, ids):
 def _ranks(conn, name, config):
     """{listing_id: rang} des titres retenus par la stratégie (verdicts en cache, comme l'Explorer)."""
     from ..explorer import universe_verdicts
+
     cfg = strategy.validate(config) if config else strategy.validate(strategy.preset(name))
     return {e['id']: e['rank'] for e in universe_verdicts.cached_verdicts(conn, cfg) if e['status'] == 'retained' and e.get('rank') is not None}
 
@@ -128,16 +193,23 @@ def lot_alerts(conn, request, today=None):
             if name not in rank_cache:
                 try:
                     rank_cache[name] = _ranks(conn, name, pf.get('config') if name == 'custom' else None)
-                except Exception:                    # classement indisponible : l'alerte de classement est simplement omise
+                except Exception:  # classement indisponible : l'alerte de classement est simplement omise
                     rank_cache[name] = None
             rank = False if rank_cache[name] is None else rank_cache[name].get(int(lot['listing_id']))
         alerts = evaluate(lot, rules, m, state, rank, today)
-        out[str(lot['tx_id'])] = {'strategy': name, 'strategy_label': NAMES.get(name, name), 'own_strategy': own is not None,
-                                  'rules': {k: rules.get(k) for k in ('days', 'drop', 'drop_action', 'days_action', 'exit', 'off', 'personal')},
-                                  'measures': m, 'rank': rank if rank is not False else None, 'alerts': alerts,
-                                  'level': max((a['level'] for a in alerts), key=('info', 'watch', 'act').index, default=None),
-                                  'risk': None if rules.get('off') else risk_bar.assess(name, closes, (m or {}).get('drop_pct'), lot.get('alert_drop_pct'), (state or {}).get('ma50'))}
+        out[str(lot['tx_id'])] = {
+            'strategy': name,
+            'strategy_label': NAMES.get(name, name),
+            'own_strategy': own is not None,
+            'rules': {k: rules.get(k) for k in ('days', 'drop', 'drop_action', 'days_action', 'exit', 'off', 'personal')},
+            'measures': m,
+            'rank': rank if rank is not False else None,
+            'alerts': alerts,
+            'level': max((a['level'] for a in alerts), key=('info', 'watch', 'act').index, default=None),
+            'risk': None if rules.get('off') else risk_bar.assess(name, closes, (m or {}).get('drop_pct'), lot.get('alert_drop_pct'), (state or {}).get('ma50')),
+        }
     from .portfolio import enrich
+
     positions = enrich(conn, request, series, out, today)
     return {'positions': positions, 'lots': out, 'rank_limit': RANK_LIMIT, 'strategies': {k: NAMES[k] for k in STRATEGIES}, 'curves': curves(lots, series)}
 
@@ -145,13 +217,14 @@ def lot_alerts(conn, request, today=None):
 def curves(lots, series, points=90):
     """Courbe de chaque titre détenu depuis son plus ancien achat encore détenu (série corrigée des splits, au plus `points` valeurs) et dates de ses achats."""
     from ..shared.numbers import downsample
+
     out = {}
     for lid in sorted({int(l['listing_id']) for l in lots}):
         buys = sorted(l['trade_date'] for l in lots if int(l['listing_id']) == lid)
         dates, closes, _ = series.get(lid, ([], [], None))
         start = next((i for i, d in enumerate(dates) if d >= buys[0]), None)
         if start is not None and start > 0 and dates[start] > buys[0]:
-            start -= 1                                   # achat un jour sans cotation : on part de la dernière clôture connue avant
+            start -= 1  # achat un jour sans cotation : on part de la dernière clôture connue avant
         pts = [[d, c] for d, c in zip(dates[start:], closes[start:])] if start is not None else []
-        out[str(lid)] = {'points': downsample(pts, points), 'buys': buys, 'daily': [[d, round(c, 6)] for d, c in zip(dates[-400:], closes[-400:])]}   # série complète : graphique sans autre appel
+        out[str(lid)] = {'points': downsample(pts, points), 'buys': buys, 'daily': [[d, round(c, 6)] for d, c in zip(dates[-400:], closes[-400:])]}  # série complète : graphique sans autre appel
     return out

@@ -5,10 +5,11 @@ Deux sources, jamais mélangées ni confondues :
   estimated  volume moyen 3 mois (cotation Yahoo) × dernier cours : ESTIMATION, signalée partout tant que les volumes réels manquent
 Un volume absent n'est jamais compté comme zéro : une séance sans volume est ignorée, et sous le minimum de séances renseignées on retombe sur l'estimation.
 """
+
 import math
 
-WINDOW = 20            # séances de la moyenne
-MIN_DAYS = 15          # séances renseignées minimales pour parler de volumes réels
+WINDOW = 20  # séances de la moyenne
+MIN_DAYS = 15  # séances renseignées minimales pour parler de volumes réels
 MAX_PLAUSIBLE_VOLUME = 1e13
 
 
@@ -48,4 +49,4 @@ def liquidity(bars, price, avg_volume_3m, factor):
     return {'turnover_eur': est, 'days': days, 'source': 'estimated' if est is not None else None}
 
 
-US_MICS = frozenset({'XNAS', 'XNYS', 'XASE', 'ARCX', 'BATS'})      # seuil de liquidité V1 plus élevé sur les places américaines (5 M contre 2 M)
+US_MICS = frozenset({'XNAS', 'XNYS', 'XASE', 'ARCX', 'BATS'})  # seuil de liquidité V1 plus élevé sur les places américaines (5 M contre 2 M)

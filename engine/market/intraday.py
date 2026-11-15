@@ -4,6 +4,7 @@ Principes : aucune interpolation (un créneau sans donnée reste un trou signal�
 (les jours fériés et week-ends n'existent tout simplement pas) ; une barre est « définitive » quand son créneau est terminé.
 Les bougies complètes (ouverture, haut, bas, volume) sont lues chez Yahoo (API chart) à la consultation et conservées en base.
 """
+
 import datetime
 import hashlib
 from zoneinfo import ZoneInfo
@@ -11,8 +12,8 @@ from zoneinfo import ZoneInfo
 from . import hours
 
 SESSIONS = 2
-COOLDOWN_MINUTES = 10        # pas de nouvel appel Yahoo pour un même titre avant ce délai
-DELAY_FLAG_MINUTES = 20      # au-delà, une séance en cours est signalée comme différée
+COOLDOWN_MINUTES = 10  # pas de nouvel appel Yahoo pour un même titre avant ce délai
+DELAY_FLAG_MINUTES = 20  # au-delà, une séance en cours est signalée comme différée
 
 
 def _utc(dt):
@@ -73,25 +74,43 @@ def build_view(mic, bars, now, sessions=SESSIONS):
         vols = [b[5] for b in rows]
         full_volume = all(v is not None for v in vols)
         opening = first[1] if first[1] is not None else first[4]
-        out.append({
-            'date': day.isoformat(), 'weekday': day.strftime('%A'), 'tz_label': tz_label(tzname, day),
-            'open_utc': start.isoformat() + 'Z', 'close_utc': end.isoformat() + 'Z',
-            'expected': len(expected), 'count': len(rows), 'in_progress': in_progress,
-            'complete': not missing and not in_progress and len(rows) >= len(expected),
-            'missing': [s.isoformat() + 'Z' for s in missing], 'outside_regular': [b[0].isoformat() + 'Z' for b in outside],
-            'bars': [[b[0].isoformat() + 'Z', b[1], b[2], b[3], b[4], b[5], bool(b[6])] for b in rows],
-            'summary': {'open': opening, 'close': last[4], 'high': max(highs), 'low': min(lows),
-                        'change_pct': 100 * (last[4] / opening - 1) if opening else None,
-                        'volume': sum(v for v in vols if v is not None) if any(v is not None for v in vols) else None,
-                        'volume_complete': full_volume, 'ohlc_complete': all(b[1] is not None and b[2] is not None and b[3] is not None for b in rows)}})
+        out.append(
+            {
+                'date': day.isoformat(),
+                'weekday': day.strftime('%A'),
+                'tz_label': tz_label(tzname, day),
+                'open_utc': start.isoformat() + 'Z',
+                'close_utc': end.isoformat() + 'Z',
+                'expected': len(expected),
+                'count': len(rows),
+                'in_progress': in_progress,
+                'complete': not missing and not in_progress and len(rows) >= len(expected),
+                'missing': [s.isoformat() + 'Z' for s in missing],
+                'outside_regular': [b[0].isoformat() + 'Z' for b in outside],
+                'bars': [[b[0].isoformat() + 'Z', b[1], b[2], b[3], b[4], b[5], bool(b[6])] for b in rows],
+                'summary': {
+                    'open': opening,
+                    'close': last[4],
+                    'high': max(highs),
+                    'low': min(lows),
+                    'change_pct': 100 * (last[4] / opening - 1) if opening else None,
+                    'volume': sum(v for v in vols if v is not None) if any(v is not None for v in vols) else None,
+                    'volume_complete': full_volume,
+                    'ohlc_complete': all(b[1] is not None and b[2] is not None and b[3] is not None for b in rows),
+                },
+            }
+        )
     return out
 
 
 def _load(conn, listing_id, now, days=9):
     since = now.astimezone(datetime.timezone.utc).replace(tzinfo=None) - datetime.timedelta(days=days)
     with conn.cursor() as cur:
-        cur.execute("""SELECT slot_start, open_px, high_px, low_px, close_px, volume, is_final FROM intraday_prices
-                       WHERE listing_id=%s AND slot_start>=%s ORDER BY slot_start""", (listing_id, since))
+        cur.execute(
+            """SELECT slot_start, open_px, high_px, low_px, close_px, volume, is_final FROM intraday_prices
+                       WHERE listing_id=%s AND slot_start>=%s ORDER BY slot_start""",
+            (listing_id, since),
+        )
         f = lambda v: None if v is None else float(v)
         return [(r['slot_start'], f(r['open_px']), f(r['high_px']), f(r['low_px']), float(r['close_px']), r['volume'], r['is_final']) for r in cur.fetchall()]
 
@@ -101,12 +120,15 @@ def store_chart(conn, listing_id, bars, now):
     cutoff = now.astimezone(datetime.timezone.utc).replace(tzinfo=None)
     slots = {}
     for ts, o, h, l, c, v in bars:
-        slots[hours.slot_of(ts)] = (o, h, l, c, v)          # plusieurs barres dans un créneau : la dernière gagne
+        slots[hours.slot_of(ts)] = (o, h, l, c, v)  # plusieurs barres dans un créneau : la dernière gagne
     rows = [(listing_id, s, c, 1 if s + datetime.timedelta(minutes=hours.SLOT_MINUTES) <= cutoff else 0, o, h, l, v) for s, (o, h, l, c, v) in sorted(slots.items())]
     with conn.cursor() as cur:
-        cur.executemany("""INSERT INTO intraday_prices(listing_id,slot_start,close_px,is_final,open_px,high_px,low_px,volume) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+        cur.executemany(
+            """INSERT INTO intraday_prices(listing_id,slot_start,close_px,is_final,open_px,high_px,low_px,volume) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
                            ON DUPLICATE KEY UPDATE close_px=IF(is_final=1 AND VALUES(is_final)=0, close_px, VALUES(close_px)), is_final=GREATEST(is_final, VALUES(is_final)),
-                             open_px=VALUES(open_px), high_px=VALUES(high_px), low_px=VALUES(low_px), volume=VALUES(volume)""", rows)
+                             open_px=VALUES(open_px), high_px=VALUES(high_px), low_px=VALUES(low_px), volume=VALUES(volume)""",
+            rows,
+        )
     conn.commit()
     return len(rows)
 
@@ -124,8 +146,10 @@ def _recently_fetched(conn, listing_id, now):
 
 def _mark_fetched(conn, listing_id, now):
     with conn.cursor() as cur:
-        cur.execute("REPLACE INTO result_cache(cache_key, data_version, built_at, payload) VALUES (%s,'intraday-fetch',%s,'{}')",
-                    (_cooldown_key(listing_id), now.astimezone(datetime.timezone.utc).replace(tzinfo=None, microsecond=0)))
+        cur.execute(
+            "REPLACE INTO result_cache(cache_key, data_version, built_at, payload) VALUES (%s,'intraday-fetch',%s,'{}')",
+            (_cooldown_key(listing_id), now.astimezone(datetime.timezone.utc).replace(tzinfo=None, microsecond=0)),
+        )
     conn.commit()
 
 
@@ -139,8 +163,11 @@ def view(conn, listing_id, now=None, client=None, fetch=True):
     """Résultat complet pour la page : séances, source, fraîcheur, avertissements."""
     now = now or hours.utcnow()
     with conn.cursor() as cur:
-        cur.execute("""SELECT l.id, l.symbol, l.mic, l.currency, i.name, p.currency AS price_currency FROM listings l JOIN instruments i ON i.id=l.instrument_id
-                       LEFT JOIN latest_prices p ON p.listing_id=l.id WHERE l.id=%s""", (listing_id,))
+        cur.execute(
+            """SELECT l.id, l.symbol, l.mic, l.currency, i.name, p.currency AS price_currency FROM listings l JOIN instruments i ON i.id=l.instrument_id
+                       LEFT JOIN latest_prices p ON p.listing_id=l.id WHERE l.id=%s""",
+            (listing_id,),
+        )
         l = cur.fetchone()
     if not l:
         raise ValueError('Titre introuvable')
@@ -157,7 +184,7 @@ def view(conn, listing_id, now=None, client=None, fetch=True):
                 sessions = build_view(l['mic'], _load(conn, listing_id, now), now)
             else:
                 notes.append('Yahoo Finance n’a renvoyé aucune barre de 15 minutes pour ce titre.')
-        except Exception as e:      # réseau, limitation, symbole inconnu : on montre ce qui est stocké
+        except Exception as e:  # réseau, limitation, symbole inconnu : on montre ce qui est stocké
             notes.append('Yahoo Finance indisponible pour le moment (' + str(e)[:80] + ') : données stockées affichées.')
         _mark_fetched(conn, listing_id, now)
     now_naive = now.astimezone(datetime.timezone.utc).replace(tzinfo=None)
@@ -175,8 +202,19 @@ def view(conn, listing_id, now=None, client=None, fetch=True):
             notes.append(f"Séance du {s['date']} : {len(s['missing'])} créneau(x) de 15 min sans donnée (trou de source, journée écourtée ou suspension de cotation) ; ils ne sont pas inventés.")
         if not s['summary']['volume_complete']:
             notes.append(f"Séance du {s['date']} : volumes absents ou partiels.")
-    return {'supported': True, 'listing': {'id': l['id'], 'symbol': l['symbol'], 'name': l['name'], 'mic': l['mic'], 'market': hours.HOURS[l['mic']][0]},
-            'tz': hours.HOURS[l['mic']][0], 'currency': l['price_currency'] or l['currency'], 'interval_minutes': hours.SLOT_MINUTES,
-            'sessions': sessions, 'source': source, 'fetched_at': fetched_at, 'now_utc': now_naive.isoformat() + 'Z', 'market_open': hours.is_open(l['mic'], now),
-            'last_bar_utc': last_bar.isoformat() + 'Z' if last_bar else None, 'lag_minutes': lag, 'delayed': bool(live and lag is not None and lag > DELAY_FLAG_MINUTES),
-            'notes': list(dict.fromkeys(notes))}
+    return {
+        'supported': True,
+        'listing': {'id': l['id'], 'symbol': l['symbol'], 'name': l['name'], 'mic': l['mic'], 'market': hours.HOURS[l['mic']][0]},
+        'tz': hours.HOURS[l['mic']][0],
+        'currency': l['price_currency'] or l['currency'],
+        'interval_minutes': hours.SLOT_MINUTES,
+        'sessions': sessions,
+        'source': source,
+        'fetched_at': fetched_at,
+        'now_utc': now_naive.isoformat() + 'Z',
+        'market_open': hours.is_open(l['mic'], now),
+        'last_bar_utc': last_bar.isoformat() + 'Z' if last_bar else None,
+        'lag_minutes': lag,
+        'delayed': bool(live and lag is not None and lag > DELAY_FLAG_MINUTES),
+        'notes': list(dict.fromkeys(notes)),
+    }

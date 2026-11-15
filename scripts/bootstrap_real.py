@@ -1,6 +1,8 @@
 """Amorçage de la base LOCALE avec de vraies données Yahoo (lecture seule côté Yahoo) : Quote, préfiltre, clôtures 2 ans, mesures.
 Usage : JIGO_DB_*=… python scripts/bootstrap_real.py   (base jetable uniquement)"""
+
 import sys, time
+
 sys.path.insert(0, '.')
 from engine.shared.db import connect
 from engine.market import collect, hours

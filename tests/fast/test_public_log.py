@@ -1,4 +1,5 @@
 """ops/public-log.sh : le journal publié ne contient que titres d'étapes et verdicts, et le filtre n'échoue jamais (régression du 29/10 : aucun match = échec de la CI)."""
+
 import os
 import subprocess
 

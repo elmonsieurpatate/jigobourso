@@ -6,6 +6,7 @@
 Les splits : clôtures et quantités sont exprimées dans les unités d'aujourd'hui (comme les courbes des fiches). Un split déjà saisi à la main par un « achat gratuit »
 (prix 0) n'est pas compté deux fois : l'achat gratuit est ignoré et le split appliqué aux quantités. Lecture seule.
 """
+
 import datetime
 import math
 from engine.shared.units import split_unit
@@ -34,14 +35,19 @@ def _load(conn, ids, start):
         cur.execute(f"SELECT listing_id, event_date, ratio FROM corporate_events WHERE listing_id IN ({marks}) AND kind IN ('split','reverse_split')", list(ids))
         for r in cur.fetchall():
             splits.setdefault(r['listing_id'], []).append((r['event_date'].isoformat(), finite(r['ratio'])))
-        cur.execute(f'SELECT l.id, COALESCE(p.currency, l.currency) cur, l.symbol, i.name, p.price, p.price_time FROM listings l JOIN instruments i ON i.id=l.instrument_id LEFT JOIN latest_prices p ON p.listing_id=l.id WHERE l.id IN ({marks})', list(ids))
+        cur.execute(
+            f'SELECT l.id, COALESCE(p.currency, l.currency) cur, l.symbol, i.name, p.price, p.price_time FROM listings l JOIN instruments i ON i.id=l.instrument_id LEFT JOIN latest_prices p ON p.listing_id=l.id WHERE l.id IN ({marks})',
+            list(ids),
+        )
         meta = {r['id']: r for r in cur.fetchall()}
         unit = {k: v['cur'] for k, v in meta.items()}
         curs = sorted({split_unit(c)[0] for c in unit.values()} - {'EUR', ''})
         fx = {}
         if curs:
-            cur.execute(f"SELECT currency, rate_date, to_eur FROM fx_rates WHERE currency IN ({','.join(['%s'] * len(curs))}) AND rate_date >= %s ORDER BY currency, rate_date",
-                        curs + [min([start]+[datetime.date.fromisoformat(b[0][0]) for b in bars.values() if b]) - datetime.timedelta(days=15)])
+            cur.execute(
+                f"SELECT currency, rate_date, to_eur FROM fx_rates WHERE currency IN ({','.join(['%s'] * len(curs))}) AND rate_date >= %s ORDER BY currency, rate_date",
+                curs + [min([start] + [datetime.date.fromisoformat(b[0][0]) for b in bars.values() if b]) - datetime.timedelta(days=15)],
+            )
             for r in cur.fetchall():
                 fx.setdefault(r['currency'], []).append((r['rate_date'].isoformat(), float(r['to_eur'])))
     return bars, splits, unit, (fx, meta)
@@ -49,6 +55,7 @@ def _load(conn, ids, start):
 
 class _Carry:
     """Dernière valeur connue à une date (séries triées)."""
+
     def __init__(self, pairs):
         self.pairs, self.i, self.last = pairs, 0, None
         self.last_day = None
@@ -97,13 +104,14 @@ def _value_day(day, today, lines, holdings, closes, rates, unit, to_eur, quote_o
             c = closes[key].at(day) if isinstance(key, int) and key in closes else None
             f = to_eur(key, day) if c is not None else None
             v = q * c * f if c is not None and f is not None else None
-            observed = closes[key].last_day if isinstance(key,int) and key in closes else None
-            if observed == today and key in quote_observed: observed = quote_observed[key]
-            if observed and (datetime.date.fromisoformat(day)-datetime.date.fromisoformat(observed)).days>7:
+            observed = closes[key].last_day if isinstance(key, int) and key in closes else None
+            if observed == today and key in quote_observed:
+                observed = quote_observed[key]
+            if observed and (datetime.date.fromisoformat(day) - datetime.date.fromisoformat(observed)).days > 7:
                 stale_today = True
-            currency = (unit.get(key) or 'EUR')
+            currency = unit.get(key) or 'EUR'
             base = split_unit(currency)[0]
-            if base != 'EUR' and base in rates and rates[base].last_day and (datetime.date.fromisoformat(day)-datetime.date.fromisoformat(rates[base].last_day)).days>7:
+            if base != 'EUR' and base in rates and rates[base].last_day and (datetime.date.fromisoformat(day) - datetime.date.fromisoformat(rates[base].last_day)).days > 7:
                 stale_today = True
         line['quantities'].append(q)
         line['values'].append(None if v is None else round(v, 2))
@@ -121,7 +129,19 @@ def build(transactions, bars, splits, unit, fx, meta, today=None, bars15=None):
     today = (today or datetime.date.today()).isoformat()
     txs = sorted(transactions, key=lambda t: (str(t['trade_at']), int(t.get('id') or 0)))
     if not txs:
-        return {'dates': [], 'value': [], 'net_in': [], 'gain': [], 'purchases': [], 'unpriced': [], 'lines': [], 'trades': [], 'notes': [], 'intraday': {'t': [], 'value': []}, 'performance': performance.linked([],[],[])}
+        return {
+            'dates': [],
+            'value': [],
+            'net_in': [],
+            'gain': [],
+            'purchases': [],
+            'unpriced': [],
+            'lines': [],
+            'trades': [],
+            'notes': [],
+            'intraday': {'t': [], 'value': []},
+            'performance': performance.linked([], [], []),
+        }
     notes = []
     series, applied = _split_adjusted_series(txs, bars, splits)
     first = str(txs[0]['trade_at'])[:10]
@@ -134,7 +154,7 @@ def build(transactions, bars, splits, unit, fx, meta, today=None, bars15=None):
     rates = {c: _Carry(v) for c, v in fx.items()}
 
     def to_eur(lid, day):
-        u = (unit.get(lid) or 'EUR')
+        u = unit.get(lid) or 'EUR'
         if u.upper() == 'EUR':
             return 1.0
         base, divisor = split_unit(u)
@@ -150,7 +170,8 @@ def build(transactions, bars, splits, unit, fx, meta, today=None, bars15=None):
     invalid_performance = False
     for day in calendar:
         while k < len(txs) and str(txs[k]['trade_at'])[:10] <= day:
-            t = txs[k]; k += 1
+            t = txs[k]
+            k += 1
             qty, price, fees = finite(t['quantity']) or 0.0, finite(t['unit_price']) or 0.0, finite(t.get('fees')) or 0.0
             rate = finite(t.get('fx_to_eur')) or (1.0 if (t.get('currency') or '').upper() == 'EUR' else None)
             if rate is None:
@@ -162,7 +183,7 @@ def build(transactions, bars, splits, unit, fx, meta, today=None, bars15=None):
                 day0 = str(t['trade_at'])[:10]
                 if t['side'] == 'buy' and price == 0 and any(e <= day0 for e, _ in applied.get(key, [])):
                     trades.append({'date': day0, 'side': 'buy', 'symbol': t['symbol'], 'note': 'split saisi à la main'})
-                    continue                                     # « achat gratuit » d'un split : déjà compté par la conversion des quantités
+                    continue  # « achat gratuit » d'un split : déjà compté par la conversion des quantités
                 for e, r in applied.get(key, []):
                     if e > day0:
                         factor *= r
@@ -172,16 +193,43 @@ def build(transactions, bars, splits, unit, fx, meta, today=None, bars15=None):
                 net_in += gross + fees
                 purchases += gross + fees
             else:
-                if qty * factor > holdings.get(key,0.0) + 1e-9: invalid_performance = True
+                if qty * factor > holdings.get(key, 0.0) + 1e-9:
+                    invalid_performance = True
                 holdings[key] = max(0.0, holdings.get(key, 0.0) - qty * factor)
                 net_in -= gross - fees
-            lines.setdefault(key, {'key': str(key), 'symbol': t['symbol'], 'name': (meta.get(key) or {}).get('name') or t.get('name') or t['symbol'], 'values': [], 'net_in': [], 'purchases': [], 'quantities': [], '_in': 0.0, '_purchases': 0.0})
+            lines.setdefault(
+                key,
+                {
+                    'key': str(key),
+                    'symbol': t['symbol'],
+                    'name': (meta.get(key) or {}).get('name') or t.get('name') or t['symbol'],
+                    'values': [],
+                    'net_in': [],
+                    'purchases': [],
+                    'quantities': [],
+                    '_in': 0.0,
+                    '_purchases': 0.0,
+                },
+            )
             if t['side'] == 'buy':
                 lines[key]['_purchases'] += gross + fees
             lines[key]['_in'] += (gross + fees) if t['side'] == 'buy' else -(gross - fees)
-            trades.append({'id': t.get('id'), 'key': str(key), 'date': str(t['trade_at'])[:10], 'trade_at': str(t['trade_at']), 'side': t['side'], 'symbol': t['symbol'],
-                           'quantity': qty, 'unit_price': price, 'currency': t.get('currency'), 'fees_eur': fees, 'fx_to_eur': rate,
-                           'first_buy': t['side'] == 'buy' and not any(x.get('key') == str(key) and x['side'] == 'buy' for x in trades)})
+            trades.append(
+                {
+                    'id': t.get('id'),
+                    'key': str(key),
+                    'date': str(t['trade_at'])[:10],
+                    'trade_at': str(t['trade_at']),
+                    'side': t['side'],
+                    'symbol': t['symbol'],
+                    'quantity': qty,
+                    'unit_price': price,
+                    'currency': t.get('currency'),
+                    'fees_eur': fees,
+                    'fx_to_eur': rate,
+                    'first_buy': t['side'] == 'buy' and not any(x.get('key') == str(key) and x['side'] == 'buy' for x in trades),
+                }
+            )
         total, unpriced, stale_today = _value_day(day, today, lines, holdings, closes, rates, unit, to_eur, quote_observed)
         # titres apparus après le début : leurs valeurs antérieures valent 0
         for line in lines.values():
@@ -202,15 +250,17 @@ def build(transactions, bars, splits, unit, fx, meta, today=None, bars15=None):
     for line in lines.values():
         line.pop('_in', None)
         line.pop('_purchases', None)
-        line['gain'] = [None if v is None else round(v - i, 2) for v, i in zip(line['values'], line['net_in'])]      # gain ou perte cumulé du titre (latent + réalisé)
+        line['gain'] = [None if v is None else round(v - i, 2) for v, i in zip(line['values'], line['net_in'])]  # gain ou perte cumulé du titre (latent + réalisé)
     out['lines'] = sorted(lines.values(), key=lambda l: -max((v for v in l['values'] if v is not None), default=0))
     out['intraday'] = intraday_value(holdings, bars15 or {}, {k: (closes[k].last if k in closes else None) for k in holdings if isinstance(k, int)}, to_eur, today)
     out['market'] = market_history(holdings, bars, splits, unit, {k: {**{'symbol': l['symbol'], 'name': l['name']}, **meta.get(k, {})} for k, l in lines.items()}, today, bars15 or {}, fx)
-    out['session'] = session.build(holdings,bars15 or {},unit,fx,txs,applied,meta)
+    out['session'] = session.build(holdings, bars15 or {}, unit, fx, txs, applied, meta)
     out['trades'] = trades
-    out['performance'] = performance.linked(out['dates'],performance_values,trades,invalid=bool(notes) or invalid_performance)
-    if invalid_performance: out['performance']['notes'].append('Historique des quantités incohérent : performance hors mouvements indisponible.')
-    if stale_performance: out['performance']['notes'].append('Cours ou change de plus de sept jours : performance hors mouvements indisponible aux dates concernées.')
+    out['performance'] = performance.linked(out['dates'], performance_values, trades, invalid=bool(notes) or invalid_performance)
+    if invalid_performance:
+        out['performance']['notes'].append('Historique des quantités incohérent : performance hors mouvements indisponible.')
+    if stale_performance:
+        out['performance']['notes'].append('Cours ou change de plus de sept jours : performance hors mouvements indisponible aux dates concernées.')
     if any(out['unpriced']):
         notes.append('Valorisation indisponible aux dates sans cours ou change : aucune estimation au prix d’achat.')
     out['notes'] = notes
@@ -234,19 +284,36 @@ def market_history(holdings, bars, splits, unit, meta, today, bars15, fx=None):
         live = finite(m.get('price'))
         if live is not None and live > 0 and day and day <= today and (not observed or day >= max(observed)):
             observed[day] = live
-        info = {'key': str(lid), 'symbol': m.get('symbol') or str(lid).removeprefix('S'),
-                'name': m.get('name') or str(lid), 'currency': unit.get(lid),
-                'break_dates': [dates[i] for i in quality], 'last_date': max(observed) if observed else None}
+        info = {
+            'key': str(lid),
+            'symbol': m.get('symbol') or str(lid).removeprefix('S'),
+            'name': m.get('name') or str(lid),
+            'currency': unit.get(lid),
+            'break_dates': [dates[i] for i in quality],
+            'last_date': max(observed) if observed else None,
+        }
         lines.append(dict(info, observations=observed))
         intraday.append(dict(info, observations={t: c for t, c in bars15.get(lid, []) if t[:10] <= today}))
-    def session_rate(line,day):return session.euro_rate(line['currency'],day[:10],fx or {})
+
+    def session_rate(line, day):
+        return session.euro_rate(line['currency'], day[:10], fx or {})
+
     def aligned(items, session=False):
         dates = sorted({d for l in items for d in l['observations']})
         if session and dates:
             dates = [d for d in dates if d[:10] == dates[-1][:10]]
-        return {'dates': dates, 'lines': [{**{k: v for k, v in l.items() if k != 'observations'},
-                                         'prices_eur': [None if l['observations'].get(d) is None or session_rate(l,d) is None else l['observations'][d]*session_rate(l,d) for d in dates],
-                                         'prices': [l['observations'].get(d) for d in dates]} for l in items]}
+        return {
+            'dates': dates,
+            'lines': [
+                {
+                    **{k: v for k, v in l.items() if k != 'observations'},
+                    'prices_eur': [None if l['observations'].get(d) is None or session_rate(l, d) is None else l['observations'][d] * session_rate(l, d) for d in dates],
+                    'prices': [l['observations'].get(d) for d in dates],
+                }
+                for l in items
+            ],
+        }
+
     return dict(aligned(lines), intraday=aligned(intraday, True))
 
 
@@ -270,7 +337,8 @@ def intraday_value(holdings, bars15, last_close, to_eur, today):
                 unavailable = True
                 continue
             while idx[k] < len(series[k]) and series[k][idx[k]][0] <= s:
-                cur[k] = series[k][idx[k]][1]; idx[k] += 1
+                cur[k] = series[k][idx[k]][1]
+                idx[k] += 1
             f = to_eur(k, today)
             if cur[k] is None or f is None:
                 unavailable = True
@@ -291,7 +359,10 @@ def portfolio_history(conn, request):
     bars15 = {}
     if ids:
         with conn.cursor() as cur:
-            cur.execute(f"SELECT listing_id, slot_start, close_px FROM intraday_prices WHERE listing_id IN ({','.join(['%s'] * len(ids))}) AND slot_start >= (SELECT DATE_SUB(DATE(MAX(p.slot_start)), INTERVAL 7 DAY) FROM intraday_prices p WHERE p.listing_id=intraday_prices.listing_id) ORDER BY listing_id, slot_start", ids)
+            cur.execute(
+                f"SELECT listing_id, slot_start, close_px FROM intraday_prices WHERE listing_id IN ({','.join(['%s'] * len(ids))}) AND slot_start >= (SELECT DATE_SUB(DATE(MAX(p.slot_start)), INTERVAL 7 DAY) FROM intraday_prices p WHERE p.listing_id=intraday_prices.listing_id) ORDER BY listing_id, slot_start",
+                ids,
+            )
             for r in cur.fetchall():
                 bars15.setdefault(r['listing_id'], []).append((r['slot_start'].isoformat(), float(r['close_px'])))
     return build(txs, bars, splits, unit, fx, meta, bars15=bars15)

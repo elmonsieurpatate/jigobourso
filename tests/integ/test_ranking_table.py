@@ -1,4 +1,5 @@
 """Tableau du classement : toutes les lignes avec scores V4, rangs, valeurs des filtres et groupes ; rien n'est inventé."""
+
 import os
 
 import pytest
@@ -20,7 +21,7 @@ def test_table_has_scores_ranks_groups_and_unknowns_stay_none():
     seed(conn)
     with conn.cursor() as cur:
         cur.execute("UPDATE instruments SET category='Technology' WHERE id=1")
-        cur.execute("UPDATE latest_prices SET analyst_rating='1.6 - Buy' WHERE listing_id=1")      # texte de Yahoo, pas un nombre
+        cur.execute("UPDATE latest_prices SET analyst_rating='1.6 - Buy' WHERE listing_id=1")  # texte de Yahoo, pas un nombre
     conn.commit()
     t = R.table(conn, {})
     rows = {r['symbol']: r for r in t['rows']}
@@ -29,15 +30,16 @@ def test_table_has_scores_ranks_groups_and_unknowns_stay_none():
     assert up['analyst'] == '1.6 - Buy'
     assert up['simple'] is not None and up['rank_simple'] == 1 and up['rank_complex'] in (1, 2)
     assert up['group'] == {'country': 'country:europe', 'market': 'market:europe', 'sector': 'sector:technology', 'asset': 'asset:equity'}
-    assert rows['ZIG.DE']['group']['sector'] == 'unknown'                           # secteur non renseigné : inconnu, pas « autres »
+    assert rows['ZIG.DE']['group']['sector'] == 'unknown'  # secteur non renseigné : inconnu, pas « autres »
     assert up['price_eur'] == pytest.approx(250.0) and up['curve'] and set(up['perf']) == {'week', 'month', 'quarter', 'half'}
     assert up['avg_volume'] == 300000 and up['extra']['up_fraction'] is not None
     assert set(up['periods']) >= {'5', '21', '63'} and up['periods']['21']['slope'] is not None
-    assert 'freshness' not in up['extra'] and 'secondary' not in up                  # fraîcheur : non fournie, jamais zéro
+    assert 'freshness' not in up['extra'] and 'secondary' not in up  # fraîcheur : non fournie, jamais zéro
 
 
 def test_sheet_carries_the_same_v4_scores_as_the_ranking():
     from engine.analytics.admin import title_sheet
+
     conn = connect()
     reset_data(conn)
     seed(conn)
@@ -51,30 +53,52 @@ def test_sheet_carries_the_same_v4_scores_as_the_ranking():
 def test_personal_classement_strategies_get_their_own_score_profile_and_ranking():
     import json
     from engine.analytics.admin import scores_admin as A
+
     conn = connect()
     reset_data(conn)
     seed(conn)
-    doc = {'schema': 1, 'revision': 1, 'selected': 'cs-aaa', 'items': [
-        {'id': 'cs-aaa', 'name': 'Blou', 'builtin': False, 'filters': [], 'config': {'periods': {
-            'week': {'enabled': False, 'slope': .08, 'r2': .65}, 'month': {'enabled': True, 'slope': .08, 'r2': .65}, 'quarter': {'enabled': True, 'slope': .05, 'r2': .6},
-            'half': {'enabled': False, 'slope': .05, 'r2': .6}, 'year': {'enabled': False, 'slope': .05, 'r2': .6}, 'two_year': {'enabled': False, 'slope': .05, 'r2': .6}}, 'extra': [], 'join': 'and'}}]}
+    doc = {
+        'schema': 1,
+        'revision': 1,
+        'selected': 'cs-aaa',
+        'items': [
+            {
+                'id': 'cs-aaa',
+                'name': 'Blou',
+                'builtin': False,
+                'filters': [],
+                'config': {
+                    'periods': {
+                        'week': {'enabled': False, 'slope': 0.08, 'r2': 0.65},
+                        'month': {'enabled': True, 'slope': 0.08, 'r2': 0.65},
+                        'quarter': {'enabled': True, 'slope': 0.05, 'r2': 0.6},
+                        'half': {'enabled': False, 'slope': 0.05, 'r2': 0.6},
+                        'year': {'enabled': False, 'slope': 0.05, 'r2': 0.6},
+                        'two_year': {'enabled': False, 'slope': 0.05, 'r2': 0.6},
+                    },
+                    'extra': [],
+                    'join': 'and',
+                },
+            }
+        ],
+    }
     with conn.cursor() as cur:
         cur.execute("INSERT INTO settings(name,value_json,updated_at) VALUES ('ct_strategies:7',%s,NOW())", (json.dumps(doc),))
     conn.commit()
     names = [s['name'] for s in A.state(conn)['strategies'] if s['engine'] == 'v4']
-    assert 'ct:7:cs-aaa' in names and 'growth_regular' in names and 'calm_rise' in names and 'rebound' in names and 'growth_v4' in names        # « Blou » est dans l'interface des scores
+    assert 'ct:7:cs-aaa' in names and 'growth_regular' in names and 'calm_rise' in names and 'rebound' in names and 'growth_v4' in names  # « Blou » est dans l'interface des scores
     blou = [s for s in A.state(conn)['strategies'] if s['name'] == 'ct:7:cs-aaa'][0]
     assert blou['label'] == 'Blou' and [p for p, v in blou['current']['periods'].items() if v['enabled']] == ['month', 'quarter']
     # son propre profil : des poids complexes différents changent SES notes, pas celles des autres stratégies
     base_fast = {r['symbol']: r['complex'] for r in R.table(conn, {'ct_id': 'fast', 'user_id': 7})['rows']}
     prof = dict(blou['current'], name='ct:7:cs-aaa')
-    prof['complex_weights'] = dict(prof['complex_weights'], dynamics=10, liquidity=40)      # total inchangé (100 %)
+    prof['complex_weights'] = dict(prof['complex_weights'], dynamics=10, liquidity=40)  # total inchangé (100 %)
     A.save(conn, {'profile': prof})
     t = R.table(conn, {'ct_id': 'cs-aaa', 'user_id': 7})
     assert t['strategy'] == 'ct:7:cs-aaa' and t['label'] == 'Blou' and t['universe'] == 2
     assert {r['symbol']: r['complex'] for r in R.table(conn, {'ct_id': 'fast', 'user_id': 7})['rows']} == base_fast
-    assert R.table(conn, {'ct_id': 'cs-inconnu', 'user_id': 7})['strategy'] == 'growth_v4'                      # identifiant inconnu : stratégie commune
-    assert R.table(conn, {'ct_id': 'cs-aaa', 'user_id': 8})['strategy'] == 'growth_v4'                          # la stratégie d'un autre utilisateur n'est pas la sienne
+    assert R.table(conn, {'ct_id': 'cs-inconnu', 'user_id': 7})['strategy'] == 'growth_v4'  # identifiant inconnu : stratégie commune
+    assert R.table(conn, {'ct_id': 'cs-aaa', 'user_id': 8})['strategy'] == 'growth_v4'  # la stratégie d'un autre utilisateur n'est pas la sienne
 
 
 def _extra_titles(conn):
@@ -82,16 +106,26 @@ def _extra_titles(conn):
     import datetime
     import exchange_calendars as xc
     from engine.analytics.series import compute
+
     calendar = xc.get_calendar('XETR', start='2026-01-05', end='2027-01-31')
     days = [d.date() for d in calendar.sessions if d.date() >= datetime.date(2026, 1, 5)][:260]
     now = datetime.datetime(2026, 10, 28, 2, 10, tzinfo=datetime.timezone.utc)
     with conn.cursor() as cur:
-        cur.execute("INSERT INTO instruments(id,group_key,kind,name,country) VALUES (3,'sym:XETR:TWIN.DE','equity','Jumeau AG','Germany'),(4,'sym:XETR:DOWN.DE','equity','Baisse AG','Germany'),"
-                    "(5,'sym:XETR:DOWN2.DE','equity','Baisse bis AG','Germany')")
-        cur.execute("INSERT INTO listings(id,instrument_id,mic,symbol,currency,status,is_primary) VALUES (3,3,'XETR','TWIN.DE','EUR','selected',1),(4,4,'XETR','DOWN.DE','EUR','selected',1),(5,5,'XETR','DOWN2.DE','EUR','selected',1)")
-        cur.executemany('INSERT INTO daily_prices(listing_id,price_date,close_px) VALUES (%s,%s,%s)',
-                        [(3, d, round(100 * 1.004 ** i, 6)) for i, d in enumerate(days)] + [(n, d, round(100 * 0.998 ** i, 6)) for n in (4, 5) for i, d in enumerate(days)])
-        cur.executemany("INSERT INTO latest_prices(listing_id,price,price_time,source,currency,avg_volume_3m) VALUES (%s,%s,%s,'daily','EUR',%s)", [(3, 250.0, now, 300000), (4, 60.0, now, 1000), (5, 60.0, now, 1000)])
+        cur.execute(
+            "INSERT INTO instruments(id,group_key,kind,name,country) VALUES (3,'sym:XETR:TWIN.DE','equity','Jumeau AG','Germany'),(4,'sym:XETR:DOWN.DE','equity','Baisse AG','Germany'),"
+            "(5,'sym:XETR:DOWN2.DE','equity','Baisse bis AG','Germany')"
+        )
+        cur.execute(
+            "INSERT INTO listings(id,instrument_id,mic,symbol,currency,status,is_primary) VALUES (3,3,'XETR','TWIN.DE','EUR','selected',1),(4,4,'XETR','DOWN.DE','EUR','selected',1),(5,5,'XETR','DOWN2.DE','EUR','selected',1)"
+        )
+        cur.executemany(
+            'INSERT INTO daily_prices(listing_id,price_date,close_px) VALUES (%s,%s,%s)',
+            [(3, d, round(100 * 1.004**i, 6)) for i, d in enumerate(days)] + [(n, d, round(100 * 0.998**i, 6)) for n in (4, 5) for i, d in enumerate(days)],
+        )
+        cur.executemany(
+            "INSERT INTO latest_prices(listing_id,price,price_time,source,currency,avg_volume_3m) VALUES (%s,%s,%s,'daily','EUR',%s)",
+            [(3, 250.0, now, 300000), (4, 60.0, now, 1000), (5, 60.0, now, 1000)],
+        )
     conn.commit()
     compute.compute_all(conn, now)
 
@@ -99,6 +133,7 @@ def _extra_titles(conn):
 def test_classement_and_scores_admin_rank_the_same_titles_in_the_same_order_with_the_same_notes_and_ranks():
     from engine.analytics.scoring import scores_specs
     from engine.analytics.admin import scores_ranking
+
     conn = connect()
     reset_data(conn)
     seed(conn)
@@ -109,7 +144,7 @@ def test_classement_and_scores_admin_rank_the_same_titles_in_the_same_order_with
         for which in ('simple', 'complex'):
             admin = scores_ranking.ranking(conn, {'strategy': name, 'which': which, 'limit': 100})['listing']['rows']
             mine = sorted((r for r in t['rows'] if r[which] is not None), key=lambda r: r['pos_' + which])
-            assert [r['id'] for r in mine] == [r['id'] for r in admin], (name, which)                           # mêmes titres, même ordre
+            assert [r['id'] for r in mine] == [r['id'] for r in admin], (name, which)  # mêmes titres, même ordre
             assert [r[which] for r in mine] == [r[which] for r in admin] and [r['rank_' + which] for r in mine] == [r['rank'] for r in admin], (name, which)
             assert len(mine) == t['scored'][which]
         assert t['evaluated'] == len(t['rows']) and t['universe'] == 5 and t['default_sort'] in ('simple', 'complex')
@@ -123,13 +158,14 @@ def test_identical_raw_scores_share_a_rank_and_the_order_is_deterministic():
     t = R.table(conn, {'strategy': 'growth_v4'})
     rows = {r['symbol']: r for r in t['rows']}
     assert rows['UP.DE']['simple'] == rows['TWIN.DE']['simple'] and rows['UP.DE']['rank_simple'] == rows['TWIN.DE']['rank_simple'] == 1
-    assert rows['UP.DE']['tie_simple'] == 2 and rows['UP.DE']['pos_simple'] != rows['TWIN.DE']['pos_simple']       # même rang, ordre des lignes départagé
+    assert rows['UP.DE']['tie_simple'] == 2 and rows['UP.DE']['pos_simple'] != rows['TWIN.DE']['pos_simple']  # même rang, ordre des lignes départagé
     assert rows['DOWN.DE']['simple'] == rows['DOWN2.DE']['simple'] == 0 and rows['DOWN.DE']['rank_simple'] == rows['DOWN2.DE']['rank_simple']
-    assert rows['DOWN.DE']['simple'] is not None and rows['DOWN.DE']['complex'] is not None                         # aucun titre en baisse n'est exclu
-    assert R.table(conn, {'strategy': 'growth_v4'})['rows'] == t['rows']                                           # résultat reproductible
+    assert rows['DOWN.DE']['simple'] is not None and rows['DOWN.DE']['complex'] is not None  # aucun titre en baisse n'est exclu
+    assert R.table(conn, {'strategy': 'growth_v4'})['rows'] == t['rows']  # résultat reproductible
 
 
 # ───────────── statut de stratégie : moteur unique (Classement = Scores = fiche) ─────────────
+
 
 def _strict(period='month', slope=0.3, r2=0.0):
     return {'periods': {period: {'enabled': True, 'slope': slope, 'r2': r2}}, 'extra': [], 'join': 'and'}
@@ -143,15 +179,16 @@ def test_three_modes_counts_cover_every_evaluable_title_and_never_change_scores_
     loose = R.table(conn, {'ct_id': 'fast', 'user_id': 1, 'spec': _strict(slope=0.0)})
     strict = R.table(conn, {'ct_id': 'fast', 'user_id': 1, 'spec': _strict(slope=0.39)})
     assert loose['counts']['all'] == strict['counts']['all'] == len(loose['rows']) == loose['evaluated']
-    assert loose['counts']['retained'] == loose['evaluated']                                      # aucun critère actif : tout est retenu
+    assert loose['counts']['retained'] == loose['evaluated']  # aucun critère actif : tout est retenu
     assert strict['counts']['excluded'] > 0 and sum(strict['counts'][k] for k in ('retained', 'excluded', 'undetermined')) == strict['counts']['all']
     keep = lambda t: {r['id']: (r['simple'], r['complex'], r['rank_simple'], r['rank_complex'], r['pos_simple']) for r in t['rows']}
-    assert keep(loose) == keep(strict)                                                             # les critères ne changent ni score ni rang
+    assert keep(loose) == keep(strict)  # les critères ne changent ni score ni rang
     assert {r['id'] for r in strict['rows'] if r['status'] == 'retained'} < {r['id'] for r in loose['rows']}
 
 
 def test_live_verdicts_endpoint_equals_table_statuses_and_scores_admin_listing():
     from engine.analytics.admin import scores_ranking
+
     conn = connect()
     reset_data(conn)
     seed(conn)
@@ -164,13 +201,15 @@ def test_live_verdicts_endpoint_equals_table_statuses_and_scores_admin_listing()
         ids = []
         for which in ('simple', 'complex'):
             L = scores_ranking.ranking(conn, {'strategy': 'growth_v4', 'which': which, 'limit': 100, 'verdict': mode, 'ct_specs': {'fast': spec}})['listing']
-            assert L['counts'] == {**{k: sum(1 for r in t['rows'] if r['status'] == k and r[which] is not None) for k in ('retained', 'excluded', 'undetermined')},
-                                   'all': sum(1 for r in t['rows'] if r[which] is not None)}
+            assert L['counts'] == {
+                **{k: sum(1 for r in t['rows'] if r['status'] == k and r[which] is not None) for k in ('retained', 'excluded', 'undetermined')},
+                'all': sum(1 for r in t['rows'] if r[which] is not None),
+            }
             expected = [r for r in t['rows'] if r[which] is not None and (mode == 'all' or r['status'] == mode)]
             assert sorted(r['id'] for r in L['rows']) == sorted(r['id'] for r in expected), (mode, which)
             for r in L['rows']:
                 mine = next(x for x in t['rows'] if x['id'] == r['id'])
-                assert r['rank'] == mine['rank_' + which] and r['status'] == mine['status']       # même rang et même statut dans les deux pages
+                assert r['rank'] == mine['rank_' + which] and r['status'] == mine['status']  # même rang et même statut dans les deux pages
             ids.append(L['total'])
         assert all(n >= 0 for n in ids)
 
@@ -185,7 +224,7 @@ def test_insufficient_data_is_undetermined_never_excluded():
     conn.commit()
     t = R.table(conn, {'ct_id': 'fast', 'user_id': 1, 'spec': _strict(slope=0.01)})
     row = next(r for r in t['rows'] if r['id'] == 1)
-    assert row['status'] == 'undetermined' and row['simple'] is not None                        # noté, classé, mais statut indéterminé
+    assert row['status'] == 'undetermined' and row['simple'] is not None  # noté, classé, mais statut indéterminé
     assert t['counts']['undetermined'] >= 1
 
 
@@ -196,11 +235,12 @@ def test_missing_context_is_undetermined_and_builtin_defaults_come_from_the_cent
     t = R.table(conn, {'ct_id': 'cs-inconnu', 'user_id': 1})
     assert t['context'] == 'missing' and {r['status'] for r in t['rows']} == {'undetermined'}
     assert R.table(conn, {'ct_id': 'mom6', 'user_id': 1})['context'] == 'ok'
-    assert {r['status'] for r in R.table(conn, {'ct_id': 'mom6', 'user_id': 1})['rows']} == {'retained'}   # Momentum : aucun critère de recherche
+    assert {r['status'] for r in R.table(conn, {'ct_id': 'mom6', 'user_id': 1})['rows']} == {'retained'}  # Momentum : aucun critère de recherche
 
 
 def test_sheet_status_and_scores_equal_the_ranking_in_every_context():
     from engine.analytics.admin import title_sheet
+
     conn = connect()
     reset_data(conn)
     seed(conn)
@@ -216,45 +256,49 @@ def test_sheet_status_and_scores_equal_the_ranking_in_every_context():
     lost = title_sheet.instrument_sheet(conn, {'listing_id': 1, 'config': 'regular', 'ct': {'id': 'fast', 'state': 'draft_lost', 'spec': None, 'label': 'Croissance rapide', 'user_id': 1}})
     none = title_sheet.instrument_sheet(conn, {'listing_id': 1, 'config': 'regular'})
     for s in (lost, none):
-        assert s['v4']['status'] == 'undetermined' and s['v4']['context'] == 'missing'          # jamais « retenue » par défaut de transmission
+        assert s['v4']['status'] == 'undetermined' and s['v4']['context'] == 'missing'  # jamais « retenue » par défaut de transmission
     free = title_sheet.instrument_sheet(conn, {'listing_id': 1, 'config': 'regular', 'ct': {'id': 'mom6', 'state': 'default', 'spec': None, 'label': 'Momentum', 'user_id': 1}})
     assert free['v4']['status'] == 'retained' and free['v4']['criteria_free'] is True
 
 
 def test_sheet_measures_use_the_units_of_the_criteria():
     from engine.analytics.admin import title_sheet
+
     conn = connect()
     reset_data(conn)
     seed(conn)
     s = title_sheet.instrument_sheet(conn, {'listing_id': 1, 'config': 'regular'})
     m = s['measures']['21']
     t = next(r for r in R.table(conn, {})['rows'] if r['id'] == 1)
-    assert m['slope'] == pytest.approx(t['periods']['21']['slope'], abs=1e-3)                    # % par séance : même valeur que celle comparée aux seuils
-    assert m['slope_period'] > m['slope'] * 15                                                   # pente composée sur 21 séances : plus grande, jamais comparée au seuil par séance
+    assert m['slope'] == pytest.approx(t['periods']['21']['slope'], abs=1e-3)  # % par séance : même valeur que celle comparée aux seuils
+    assert m['slope_period'] > m['slope'] * 15  # pente composée sur 21 séances : plus grande, jamais comparée au seuil par séance
 
 
 def test_scores_listing_sort_covers_the_whole_list_and_never_changes_global_ranks():
     from engine.analytics.admin import scores_ranking
+
     conn = connect()
     reset_data(conn)
     seed(conn)
     _extra_titles(conn)
+
     def rows(sort, limit=100, offset=0, which='simple'):
         return scores_ranking.ranking(conn, {'strategy': 'growth_v4', 'which': which, 'limit': limit, 'offset': offset, 'sort': sort})['listing']['rows']
+
     default = rows([])
     rank = {r['id']: r['rank'] for r in default}
     asc, desc = rows([{'key': 'simple', 'dir': 'asc'}]), rows([{'key': 'simple', 'dir': 'desc'}])
     assert [r['id'] for r in desc] == [r['id'] for r in default] and sorted(r['id'] for r in asc) == sorted(rank)
-    assert [r['simple'] for r in asc] == sorted(r['simple'] for r in asc)                                           # numérique, jamais alphabétique
+    assert [r['simple'] for r in asc] == sorted(r['simple'] for r in asc)  # numérique, jamais alphabétique
     names = rows([{'key': 'name', 'dir': 'asc'}])
     assert [r['name'].casefold() for r in names] == sorted(r['name'].casefold() for r in names)
-    assert all(r['rank'] == rank[r['id']] for r in asc + names + rows([{'key': 'kind', 'dir': 'desc'}]))           # le rang global ne dépend pas du tri
+    assert all(r['rank'] == rank[r['id']] for r in asc + names + rows([{'key': 'kind', 'dir': 'desc'}]))  # le rang global ne dépend pas du tri
     pages = rows([{'key': 'name', 'dir': 'desc'}], limit=2, offset=0) + rows([{'key': 'name', 'dir': 'desc'}], limit=2, offset=2) + rows([{'key': 'name', 'dir': 'desc'}], limit=2, offset=4)
-    assert [r['id'] for r in pages] == [r['id'] for r in rows([{'key': 'name', 'dir': 'desc'}])][:len(pages)]       # tri complet, puis pagination
+    assert [r['id'] for r in pages] == [r['id'] for r in rows([{'key': 'name', 'dir': 'desc'}])][: len(pages)]  # tri complet, puis pagination
     multi = rows([{'key': 'kind', 'dir': 'asc'}, {'key': 'simple', 'dir': 'desc'}])
     assert [r['kind'] for r in multi] == sorted(r['kind'] for r in multi)
-    assert multi == rows([{'key': 'kind', 'dir': 'asc'}, {'key': 'simple', 'dir': 'desc'}])                          # déterministe
-    assert [r['id'] for r in rows([{'key': 'inconnue', 'dir': 'asc'}])] == [r['id'] for r in default]              # clé inconnue ignorée
+    assert multi == rows([{'key': 'kind', 'dir': 'asc'}, {'key': 'simple', 'dir': 'desc'}])  # déterministe
+    assert [r['id'] for r in rows([{'key': 'inconnue', 'dir': 'asc'}])] == [r['id'] for r in default]  # clé inconnue ignorée
 
 
 @pytest.mark.parametrize('basis', ['raw', 'adjusted', 'partial'])
@@ -262,6 +306,7 @@ def test_ranking_and_simulation_curves_use_the_same_split_basis_as_the_sheet(bas
     import datetime
     from engine.analytics.admin import scores_ranking
     from engine.analytics.series.series import prepare_series
+
     conn = connect()
     try:
         reset_data(conn)

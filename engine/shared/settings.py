@@ -1,4 +1,5 @@
 """Accès aux réglages persistants (table `settings`, JSON) et configuration des règles : lecture avec valeurs par défaut, écriture validée."""
+
 import datetime
 import hashlib
 import json
@@ -20,8 +21,10 @@ def saved_at(conn, name):
 
 def put(conn, name, value):
     with conn.cursor() as cur:
-        cur.execute('INSERT INTO settings(name, value_json, updated_at) VALUES (%s,%s,%s) ON DUPLICATE KEY UPDATE value_json=VALUES(value_json), updated_at=VALUES(updated_at)',
-                    (name, json.dumps(value, ensure_ascii=False), datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None, microsecond=0)))
+        cur.execute(
+            'INSERT INTO settings(name, value_json, updated_at) VALUES (%s,%s,%s) ON DUPLICATE KEY UPDATE value_json=VALUES(value_json), updated_at=VALUES(updated_at)',
+            (name, json.dumps(value, ensure_ascii=False), datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None, microsecond=0)),
+        )
     conn.commit()
 
 
@@ -31,11 +34,13 @@ def digest(config):
 
 def catalogue_rules(conn):
     from engine.catalogue import rules
+
     return rules.normalize(get(conn, 'catalogue_rules', {}))
 
 
 def prefilter_rules(conn):
     from engine.market import prefilter
+
     return prefilter.normalize(get(conn, 'prefilter', {}))
 
 

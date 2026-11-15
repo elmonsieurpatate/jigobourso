@@ -1,4 +1,5 @@
 """Le chargement léger garde les notes/statuts et ne lit pas les historiques invisibles."""
+
 from contextlib import contextmanager
 
 import pytest
@@ -22,13 +23,18 @@ def ranking(monkeypatch):
     book = {i: dict(id=i, simple=s, complex=s, simple_status='ok', complex_status='ok') for i, s in [(1, 80), (2, 60), (3, None)]}
     monkeypatch.setattr(R, '_base', lambda conn, req: ('growth_v4', {}, book))
     fetched, curves = [], []
+
     def fetch(conn, ids):
         fetched.append(ids)
-        return {i: {'symbol': str(i), 'name': str(i), 'mic': 'XPAR', 'kind': 'equity', 'currency': 'EUR',
-                    'price': 100, 'avg_volume_3m': 1000, 'm': {21: {'slope': 0.2 if i == 1 else 0.1, 'r2': 0.8}}} for i in ids}
+        return {
+            i: {'symbol': str(i), 'name': str(i), 'mic': 'XPAR', 'kind': 'equity', 'currency': 'EUR', 'price': 100, 'avg_volume_3m': 1000, 'm': {21: {'slope': 0.2 if i == 1 else 0.1, 'r2': 0.8}}}
+            for i in ids
+        }
+
     def series(conn, ids, sessions):
         curves.append(ids)
         return {i: [100, 101] for i in ids}
+
     monkeypatch.setattr(R, '_fetch', fetch)
     monkeypatch.setattr(R, 'series', series)
     monkeypatch.setattr(R, 'latest_rates', lambda conn: {})

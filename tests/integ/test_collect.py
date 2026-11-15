@@ -11,7 +11,7 @@ if not os.environ.get('JIGO_TEST_DATABASE'):
     pytest.skip('base jetable non configurée', allow_module_level=True)
 
 UTC = datetime.timezone.utc
-NOW = datetime.datetime(2026, 10, 27, 18, 0, tzinfo=UTC)       # mardi, Xetra fermée et clôture publiée
+NOW = datetime.datetime(2026, 10, 27, 18, 0, tzinfo=UTC)  # mardi, Xetra fermée et clôture publiée
 
 
 @pytest.fixture
@@ -68,7 +68,7 @@ def test_prefilter_excludes_dvdg_but_held_listing_is_still_collected(conn):
 
 def test_daily_skips_unsettled_session(conn):
     rows = [{'listing_id': 1, 'mic': 'XETR', 'symbol': 'LIQ.DE'}]
-    early = datetime.datetime(2026, 10, 27, 15, 0, tzinfo=UTC)        # 16h Berlin : séance du jour non publiée
+    early = datetime.datetime(2026, 10, 27, 15, 0, tzinfo=UTC)  # 16h Berlin : séance du jour non publiée
     client = FakeYahoo(daily={'LIQ.DE': ('Europe/Berlin', [(datetime.date(2026, 10, 26), 100.0), (datetime.date(2026, 10, 27), 101.0)])})
     collect.collect_daily(conn, client, rows, early)
     with conn.cursor() as cur:
@@ -83,9 +83,9 @@ def test_daily_skips_unsettled_session(conn):
 def test_intraday_final_never_overwritten_by_provisional_and_latest_follows(conn):
     rows = [{'listing_id': 1, 'mic': 'XETR', 'symbol': 'LIQ.DE'}]
     slot = datetime.datetime(2026, 10, 27, 9, 0)
-    now1 = datetime.datetime(2026, 10, 27, 9, 20, tzinfo=UTC)         # créneau 9h00 terminé
+    now1 = datetime.datetime(2026, 10, 27, 9, 20, tzinfo=UTC)  # créneau 9h00 terminé
     collect.collect_intraday(conn, FakeYahoo(intraday={'LIQ.DE': ('UTC', [(slot + datetime.timedelta(minutes=14), 100.0)])}), rows, now1)
-    now0 = datetime.datetime(2026, 10, 27, 9, 5, tzinfo=UTC)          # relecture « en retard » : créneau encore ouvert
+    now0 = datetime.datetime(2026, 10, 27, 9, 5, tzinfo=UTC)  # relecture « en retard » : créneau encore ouvert
     collect.collect_intraday(conn, FakeYahoo(intraday={'LIQ.DE': ('UTC', [(slot + datetime.timedelta(minutes=2), 77.0)])}), rows, now0)
     with conn.cursor() as cur:
         cur.execute('SELECT close_px,is_final FROM intraday_prices')
@@ -97,14 +97,15 @@ def test_intraday_final_never_overwritten_by_provisional_and_latest_follows(conn
 
 def test_gap_detection_ignores_holidays_and_repairs(conn):
     from engine.market import catchup
+
     with conn.cursor() as cur:
         cur.execute("UPDATE listings SET status='selected' WHERE id=1")
     conn.commit()
     rows = [{'listing_id': 1, 'mic': 'XETR', 'symbol': 'LIQ.DE'}]
-    day = datetime.date(2026, 10, 26)                                  # lundi
+    day = datetime.date(2026, 10, 26)  # lundi
     full = [(datetime.datetime(2026, 10, 26, 8, 0) + datetime.timedelta(minutes=15 * i), 100.0 + i) for i in range(34)]
     collect.collect_intraday(conn, FakeYahoo(intraday={'LIQ.DE': ('UTC', full[:10])}), rows, NOW, range_='5d')
-    assert day in collect.session_gaps(conn, 'XETR', NOW)               # séance incomplète : trou ; les autres jours (sans barre ni clôture) sont fériés, pas des trous
+    assert day in collect.session_gaps(conn, 'XETR', NOW)  # séance incomplète : trou ; les autres jours (sans barre ni clôture) sont fériés, pas des trous
     assert [t['sessions'] for t in catchup.plan_intraday(conn, NOW)] == [[day]]
     catchup.execute(conn, FakeYahoo(intraday={'LIQ.DE': ('UTC', full)}), catchup.plan_intraday(conn, NOW), NOW, lambda *a: None)
     with conn.cursor() as cur:
@@ -123,7 +124,7 @@ def test_stale_quote_is_excluded_only_when_the_filter_is_applied(conn):
     with conn.cursor() as cur:
         cur.execute("UPDATE latest_prices SET price_time=%s WHERE listing_id=1", (old,))
         cur.execute("SELECT status FROM listings WHERE id=1")
-        assert cur.fetchone()['status'] == 'candidate'                       # rien n'a changé tant que le filtre n'est pas relancé
+        assert cur.fetchone()['status'] == 'candidate'  # rien n'a changé tant que le filtre n'est pas relancé
     conn.commit()
     collect.apply_prefilter(conn, NOW)
     with conn.cursor() as cur:

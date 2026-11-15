@@ -1,4 +1,5 @@
 """Conversion numérique tolérante."""
+
 import math
 
 

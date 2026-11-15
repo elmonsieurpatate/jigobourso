@@ -1,4 +1,5 @@
 """Une seule version pour tous les fichiers CSS et JS des pages : le marqueur `__BUILD__`, remplacé au déploiement (ops/deploy.sh)."""
+
 import pathlib
 import re
 

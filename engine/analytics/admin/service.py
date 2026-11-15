@@ -2,6 +2,7 @@
 
 L'univers évalué est v_recommendable. La recherche explicite d'un titre (nom, symbole, ISIN) peut aussi renvoyer des titres exclus,
 toujours étiquetés « exclu » avec leur motif : ils ne reçoivent ni rang ni verdict de stratégie."""
+
 import datetime
 import json
 from collections import Counter, defaultdict
@@ -42,12 +43,35 @@ def _row(v, rates, conn=None):
     cur = u['price_currency'] or u['currency']
     factor = to_eur_factor(cur, rates)
     price = float(u['price']) if u['price'] is not None else None
-    return {'id': u['id'], 'symbol': u['symbol'], 'name': u['name'], 'isin': u['isin'], 'mic': u['mic'], 'market': MARKETS.get(u['mic'], u['mic']),
-            'kind': u['kind'], 'category': u['category'], 'country': u['country'], 'pea': pea_status(u['kind'], u['country'], u['mic']) == 'probable',
-            'currency': cur, 'price': price, 'price_eur': price * factor if price is not None and factor else None,
-            'price_time': u['price_time'].isoformat(sep=' ') if u['price_time'] else None, 'quote_at': u['quote_at'].isoformat(sep=' ') if u.get('quote_at') else None, 'price_source': u['price_source'],
-            'status': v['status'], 'status_label': STATUS_LABELS[v['status']], 'score': v['score'], 'rank': v['rank'], 'momentum': v.get('momentum'),
-            'quality': u['quality'], 'price_stale': hours.price_is_stale(u['mic'], u['price_time'], hours.utcnow(), expected_close(conn, u['mic']) if conn is not None else None, last_collection(conn, u['mic']) if conn is not None else None), 'measures': {str(n): dict(m,slope_period=explorer_config.period_slope(m.get('slope'),n)) if m else None for n, m in v['measures'].items()}, 'reasons': v['reasons']}
+    return {
+        'id': u['id'],
+        'symbol': u['symbol'],
+        'name': u['name'],
+        'isin': u['isin'],
+        'mic': u['mic'],
+        'market': MARKETS.get(u['mic'], u['mic']),
+        'kind': u['kind'],
+        'category': u['category'],
+        'country': u['country'],
+        'pea': pea_status(u['kind'], u['country'], u['mic']) == 'probable',
+        'currency': cur,
+        'price': price,
+        'price_eur': price * factor if price is not None and factor else None,
+        'price_time': u['price_time'].isoformat(sep=' ') if u['price_time'] else None,
+        'quote_at': u['quote_at'].isoformat(sep=' ') if u.get('quote_at') else None,
+        'price_source': u['price_source'],
+        'status': v['status'],
+        'status_label': STATUS_LABELS[v['status']],
+        'score': v['score'],
+        'rank': v['rank'],
+        'momentum': v.get('momentum'),
+        'quality': u['quality'],
+        'price_stale': hours.price_is_stale(
+            u['mic'], u['price_time'], hours.utcnow(), expected_close(conn, u['mic']) if conn is not None else None, last_collection(conn, u['mic']) if conn is not None else None
+        ),
+        'measures': {str(n): dict(m, slope_period=explorer_config.period_slope(m.get('slope'), n)) if m else None for n, m in v['measures'].items()},
+        'reasons': v['reasons'],
+    }
 
 
 def masked_by_tradability(entry, aux_row, prefilter_cfg, query=''):
@@ -57,7 +81,7 @@ def masked_by_tradability(entry, aux_row, prefilter_cfg, query=''):
     return level == 'bad' and not (query and query in (entry['symbol'].casefold(), (entry['isin'] or '').casefold()))
 
 
-LEVEL_FILTERS = ('regularity', 'risk', 'liquidity')          # clés de vue = clés des pastilles ; valeurs : ok, warn, bad, unknown
+LEVEL_FILTERS = ('regularity', 'risk', 'liquidity')  # clés de vue = clés des pastilles ; valeurs : ok, warn, bad, unknown
 
 
 def row_levels(entry, aux_row, ref, prefilter_cfg):
@@ -102,8 +126,18 @@ def _aux(conn, ref, rates):
             price = None if r['price'] is None else float(r['price'])
             f = to_eur_factor(r['cur'], rates)
             age = None if r['quote_at'] is None else max(0.0, (hours.utcnow().replace(tzinfo=None) - r['quote_at']).total_seconds() / 86400)
-            out[r['id']] = {'price': price, 'price_eur': price * f if price is not None and f else None, 'cap': size_key(r['market_cap'], r['cur'], rates), 'volume': r['volume'], 'volume_10d': r['volume_10d'], 'fee': None if r['fee'] is None else float(r['fee']), 'analyst': r['analyst'], 'quote_age_days': age,
-                            'last_close': r['last_close_date'], 'quality': 'stale' if r['last_close_date'] and str(r['last_close_date']) < expected_close(conn, r['mic']) else r['quality']}
+            out[r['id']] = {
+                'price': price,
+                'price_eur': price * f if price is not None and f else None,
+                'cap': size_key(r['market_cap'], r['cur'], rates),
+                'volume': r['volume'],
+                'volume_10d': r['volume_10d'],
+                'fee': None if r['fee'] is None else float(r['fee']),
+                'analyst': r['analyst'],
+                'quote_age_days': age,
+                'last_close': r['last_close_date'],
+                'quality': 'stale' if r['last_close_date'] and str(r['last_close_date']) < expected_close(conn, r['mic']) else r['quality'],
+            }
         cur.execute('SELECT listing_id, slope, r2, perf, volatility, drawdown FROM strategy_metrics WHERE sessions=%s', (ref,))
         for r in cur.fetchall():
             if r['listing_id'] in out:
@@ -113,14 +147,25 @@ def _aux(conn, ref, rates):
 
 def reference_window(config, stored=(1, 5, 21, 63, 126, 252)):
     """Fenêtre servant aux filtres et tris de colonnes : la plus longue période active, ramenée à une fenêtre précalculée."""
-    longest = max((p['sessions'] for p in config['periods'] if p['enabled']),default=21)
+    longest = max((p['sessions'] for p in config['periods'] if p['enabled']), default=21)
     return min(stored, key=lambda n: (abs(n - longest), n))
 
 
-SORT_KEYS = {'score_simple': lambda e, a: e.get('score_simple'), 'score_complex': lambda e, a: e.get('score_complex'), 'name': lambda e, a: (e['name'] or '').casefold(), 'symbol': lambda e, a: e['symbol'].casefold(), 'score': lambda e, a: e['score'],
-             'price': lambda e, a: a.get('price_eur'), 'volume': lambda e, a: a.get('volume'), 'fresh': lambda e, a: a.get('last_close') and a['last_close'].toordinal(),
-             'slope': lambda e, a: a.get('slope'), 'r2': lambda e, a: a.get('r2'), 'perf': lambda e, a: a.get('perf'),
-             'volatility': lambda e, a: a.get('volatility'), 'drawdown': lambda e, a: a.get('drawdown')}
+SORT_KEYS = {
+    'score_simple': lambda e, a: e.get('score_simple'),
+    'score_complex': lambda e, a: e.get('score_complex'),
+    'name': lambda e, a: (e['name'] or '').casefold(),
+    'symbol': lambda e, a: e['symbol'].casefold(),
+    'score': lambda e, a: e['score'],
+    'price': lambda e, a: a.get('price_eur'),
+    'volume': lambda e, a: a.get('volume'),
+    'fresh': lambda e, a: a.get('last_close') and a['last_close'].toordinal(),
+    'slope': lambda e, a: a.get('slope'),
+    'r2': lambda e, a: a.get('r2'),
+    'perf': lambda e, a: a.get('perf'),
+    'volatility': lambda e, a: a.get('volatility'),
+    'drawdown': lambda e, a: a.get('drawdown'),
+}
 
 
 def _num(view, key):
@@ -141,9 +186,9 @@ def scoped_entries(conn, config, view, rates=None, aux=None, now=None):
     Rang et score sont des percentiles parmi les titres retenus de la sélection (par groupe action / ETF) : changer les filtres change le classement."""
     rates = rates if rates is not None else latest_rates(conn)
     now = now or hours.utcnow()
-    entries = cached_verdicts(conn, config)         # verdict de chaque titre éligible pour CETTE configuration (jamais pour un préréglage par défaut)
+    entries = cached_verdicts(conn, config)  # verdict de chaque titre éligible pour CETTE configuration (jamais pour un préréglage par défaut)
     if config.get('version') in (3, 4):
-        entries = score_service.attach(conn, config, entries, data_version(conn))       # scores simple et complexe : calculés hors filtres, jamais recalculés dans la sélection
+        entries = score_service.attach(conn, config, entries, data_version(conn))  # scores simple et complexe : calculés hors filtres, jamais recalculés dans la sélection
     ref = reference_window(config)
     aux = aux if aux is not None else _aux(conn, ref, rates)
     kind, market = view.get('kind') or '', view.get('market') or ''
@@ -156,7 +201,7 @@ def scoped_entries(conn, config, view, rates=None, aux=None, now=None):
     if etf_ids and (region or requested_kind == 'large_etf'):
         with conn.cursor() as cur:
             for offset in range(0, len(etf_ids), 1000):
-                part = etf_ids[offset:offset + 1000]
+                part = etf_ids[offset : offset + 1000]
                 cur.execute("SELECT listing_id,data_json FROM etf_profiles WHERE state='ok' AND listing_id IN (%s)" % ','.join(['%s'] * len(part)), part)
                 for p in cur.fetchall():
                     try:
@@ -183,15 +228,29 @@ def scoped_entries(conn, config, view, rates=None, aux=None, now=None):
     large_instruments = set()
     if aum_by_instrument:
         ordered_aum = sorted(aum_by_instrument.values(), reverse=True)
-        cutoff = ordered_aum[max(0, -(-len(ordered_aum) // 10) - 1)]        # tri décroissant : le seuil est la valeur du dernier ETF du premier dixième
+        cutoff = ordered_aum[max(0, -(-len(ordered_aum) // 10) - 1)]  # tri décroissant : le seuil est la valeur du dernier ETF du premier dixième
         large_instruments = {iid for iid, amount in aum_by_instrument.items() if amount >= cutoff}
-    countries, categories = _choices(view.get('country')), {c.casefold() for c in _choices(view.get('category'))}         # plusieurs choix possibles, séparés par « | »
+    countries, categories = _choices(view.get('country')), {c.casefold() for c in _choices(view.get('category'))}  # plusieurs choix possibles, séparés par « | »
     caps = {c for c in _choices(view.get('cap')) if c in ('micro', 'small', 'mid', 'large', 'mega')}
     owned = set(view.get('owned_ids') or [])
-    base = [e for e in entries if (not kind or e['kind'] == kind) and (requested_kind != 'large_etf' or e['kind'] == 'etf' and e.get('instrument_id', e['id']) in large_instruments)
-            and (not region or (geography.equity_region(e.get('country')) if e['kind'] == 'equity' else (etf_data.get(e['id'], {}).get('geography_region') or geography.etf_region(etf_data.get(e['id'], {}).get('category')))) == region)
-            and (not market or e['mic'] == market)
-            and (not countries or e['country'] in countries) and (not categories or (e['category'] or '').casefold() in categories)]
+    base = [
+        e
+        for e in entries
+        if (not kind or e['kind'] == kind)
+        and (requested_kind != 'large_etf' or e['kind'] == 'etf' and e.get('instrument_id', e['id']) in large_instruments)
+        and (
+            not region
+            or (
+                geography.equity_region(e.get('country'))
+                if e['kind'] == 'equity'
+                else (etf_data.get(e['id'], {}).get('geography_region') or geography.etf_region(etf_data.get(e['id'], {}).get('category')))
+            )
+            == region
+        )
+        and (not market or e['mic'] == market)
+        and (not countries or e['country'] in countries)
+        and (not categories or (e['category'] or '').casefold() in categories)
+    ]
     if view.get('pea'):
         base = [e for e in base if pea_status(e['kind'], e['country'], e['mic']) == 'probable']
     if view.get('owned_only'):
@@ -199,17 +258,23 @@ def scoped_entries(conn, config, view, rates=None, aux=None, now=None):
     if view.get('open_now'):
         base = [e for e in base if e['mic'] in hours.HOURS and hours.is_open(e['mic'], now)]
     budget, min_price, max_price, max_vol, max_dd, min_volume = (_num(view, k) for k in ('budget', 'min_price', 'max_price', 'max_volatility', 'max_drawdown', 'min_volume'))
-    max_fee = _num(view, 'max_fee')                 # frais courants maximaux d'un ETF, en % par an ; sans effet sur les actions
+    max_fee = _num(view, 'max_fee')  # frais courants maximaux d'un ETF, en % par an ; sans effet sur les actions
 
     def keep(e):
         a = aux.get(e['id'], {})
-        if view.get('currency') and (e.get('price_currency') or e.get('currency')) not in _choices(view['currency']):return False
-        aum=_aum_eur(e,rates) if e['kind']=='etf' else None
-        for field,compare in [('min_aum',lambda v,t:v>=t),('max_aum',lambda v,t:v<=t)]:
-            threshold=_num(view,field)
-            if threshold is not None and e['kind']=='etf' and (aum is None or not compare(aum,threshold)):return False
+        if view.get('currency') and (e.get('price_currency') or e.get('currency')) not in _choices(view['currency']):
+            return False
+        aum = _aum_eur(e, rates) if e['kind'] == 'etf' else None
+        for field, compare in [('min_aum', lambda v, t: v >= t), ('max_aum', lambda v, t: v <= t)]:
+            threshold = _num(view, field)
+            if threshold is not None and e['kind'] == 'etf' and (aum is None or not compare(aum, threshold)):
+                return False
         price = a.get('price_eur')
-        if (budget is not None and (price is None or price > budget)) or (min_price is not None and (price is None or price < min_price)) or (max_price is not None and (price is None or price > max_price)):
+        if (
+            (budget is not None and (price is None or price > budget))
+            or (min_price is not None and (price is None or price < min_price))
+            or (max_price is not None and (price is None or price > max_price))
+        ):
             return False
         if max_vol is not None and (a.get('volatility') is None or a['volatility'] > max_vol):
             return False
@@ -217,19 +282,28 @@ def scoped_entries(conn, config, view, rates=None, aux=None, now=None):
             return False
         if min_volume is not None and (a.get('volume') is None or a['volume'] < min_volume):
             return False
-        if max_fee is not None and e['kind'] == 'etf' and (a.get('fee') is None or a['fee'] > max_fee):     # frais inconnus : l'ETF n'est pas retenu
+        if max_fee is not None and e['kind'] == 'etf' and (a.get('fee') is None or a['fee'] > max_fee):  # frais inconnus : l'ETF n'est pas retenu
             return False
-        if caps and (e['kind'] != 'equity' or a.get('cap') not in caps):       # la taille ne concerne que les actions : un ETF n'a pas de capitalisation boursière
+        if caps and (e['kind'] != 'equity' or a.get('cap') not in caps):  # la taille ne concerne que les actions : un ETF n'a pas de capitalisation boursière
             return False
         return not (view.get('fresh_only') and a.get('quality') != 'ok')
+
     base = [e for e in base if keep(e)]
-    if len(base) != len(entries) and not score_service.is_scores_mode(config):                   # sélection plus étroite que l'univers : on reclasse les retenus entre eux
+    if len(base) != len(entries) and not score_service.is_scores_mode(config):  # sélection plus étroite que l'univers : on reclasse les retenus entre eux
         retained = [e['id'] for e in base if e['status'] == 'retained']
         ranked = {v['key']: v for v in judge_universe(conn, config, retained)} if retained else {}
         out = []
         for e in base:
             v = ranked.get(e['id'])
-            out.append(dict(e, rank=v['rank'] if v else None, score=None if not v or v['score'] is None else round(v['score'], 4),score_parts=compact_parts(v) if v else [],score_missing=v.get('score_missing',0) if v else 0))
+            out.append(
+                dict(
+                    e,
+                    rank=v['rank'] if v else None,
+                    score=None if not v or v['score'] is None else round(v['score'], 4),
+                    score_parts=compact_parts(v) if v else [],
+                    score_missing=v.get('score_missing', 0) if v else 0,
+                )
+            )
         base = out
     return entries, base, ref, aux
 
@@ -238,7 +312,9 @@ def score_view(entry, detail):
     """Les deux scores d'un titre avec leur décomposition ; rangs globaux (parmi tous les titres notés du groupe), jamais ceux de la page ou du filtre."""
     out = {'rank_simple': entry.get('score_rank_simple'), 'rank_complex': entry.get('score_rank_complex')}
     if detail is None:
-        return dict(out, simple={'score': entry.get('score_simple'), 'status': entry.get('score_simple_status')}, complex={'score': entry.get('score_complex'), 'status': entry.get('score_complex_status')})
+        return dict(
+            out, simple={'score': entry.get('score_simple'), 'status': entry.get('score_simple_status')}, complex={'score': entry.get('score_complex'), 'status': entry.get('score_complex_status')}
+        )
     return dict(out, simple=detail['simple'], complex=detail['complex'], weights=detail['weights'], periods=detail['periods'], missing=detail['missing'], liquidity=detail['liquidity'])
 
 
@@ -246,23 +322,24 @@ def _ordered(rows, aux, config, status, sort, desc):
     """Classe les lignes selon le tri demandé ; renvoie (lignes, tri par proximité ?)."""
     proximity_order = status == 'rejected' and (sort == 'proximity' or sort == 'rank' and not score_service.is_scores_mode(config))
     if proximity_order:
-        rows = sorted(rows,key=lambda e: (*(e.get('proximity') or [999,999,float('inf')]), e['symbol']))
+        rows = sorted(rows, key=lambda e: (*(e.get('proximity') or [999, 999, float('inf')]), e['symbol']))
     elif sort in SORT_KEYS:
         key = SORT_KEYS[sort]
         have = [e for e in rows if key(e, aux.get(e['id'], {})) is not None]
         none = [e for e in rows if key(e, aux.get(e['id'], {})) is None]
         have.sort(key=lambda e: (key(e, aux.get(e['id'], {})), e['symbol']), reverse=desc)
         rows = have + none
-    else:   # rang : retenus par rang, puis écartés, puis non évaluables ; actions avant ETF
+    else:  # rang : retenus par rang, puis écartés, puis non évaluables ; actions avant ETF
         order = {'retained': 0, 'rejected': 1, 'unknown': 2}
-        rows.sort(key=lambda e: (order[e['status']], e['group'] == 'etf', e['rank'] or 10 ** 9, e['symbol']), reverse=desc)
+        rows.sort(key=lambda e: (order[e['status']], e['group'] == 'etf', e['rank'] or 10**9, e['symbol']), reverse=desc)
     return rows, proximity_order
 
 
 def _etf_page_context(conn, rows, page_rows, excluded_hits):
     """Concentration des dix premiers ETF de la vue, nature des fonds et groupes de la page : (concentration, natures, groupe par id, détail de groupe par id)."""
     from ..market_views import etf
-    etf_top = [e['id'] for e in rows if e.get('group') == 'etf'][:10]          # dix premiers ETF de la vue, avant pagination, dans l'ordre déjà déterminé
+
+    etf_top = [e['id'] for e in rows if e.get('group') == 'etf'][:10]  # dix premiers ETF de la vue, avant pagination, dans l'ordre déjà déterminé
     etf_concentration = etf.concentration(conn, etf_top)
     page_etf = [e['id'] for e in page_rows if e not in excluded_hits and e.get('group') == 'etf']
     fund_natures = {}
@@ -273,7 +350,7 @@ def _etf_page_context(conn, rows, page_rows, excluded_hits):
                 data = etf.decode(profile['data_json'])
                 fund_natures[profile['listing_id']] = next((str(data.get(k)).strip() for k in ('category', 'family', 'legal_type') if data.get(k)), None)
     cache = etf.load(conn, set(page_etf) | set(etf_top))
-    pgroups = etf.page_groups(cache, page_etf) if len(page_etf) > 1 else []          # toute la page, depuis les liens précalculés : aucune corrélation recalculée ici
+    pgroups = etf.page_groups(cache, page_etf) if len(page_etf) > 1 else []  # toute la page, depuis les liens précalculés : aucune corrélation recalculée ici
     group_of, group_info = {}, {}
     for g in pgroups:
         group_of[g['leader']] = g['id']
@@ -281,12 +358,22 @@ def _etf_page_context(conn, rows, page_rows, excluded_hits):
         for r in g['rows']:
             group_of[r['id']] = g['id']
             group_info[r['id']] = {'leader': False, 'why': r['why'], 'diff': r['diff'], 'coefficient': r['coefficient']}
-    banner = []                                          # le bandeau reprend la même méthode (lien direct avec le chef, même couverture), appliquée aux dix premiers ETF de la vue
+    banner = []  # le bandeau reprend la même méthode (lien direct avec le chef, même couverture), appliquée aux dix premiers ETF de la vue
     for g in etf.page_groups(cache, etf_top):
         m = [g['leader']] + g['members']
         if len(m) >= 3:
-            banner.append({'id': g['id'], 'size': len(m), 'members': m, 'symbols': [cache[i]['meta']['symbol'] for i in m], 'label': g['index'], 'min_coefficient': g['min_coefficient'],
-                           'unstable': False, 'basis': 'Corrélation des rendements hebdomadaires en EUR >= %s (52 semaines), lien direct avec le chef du groupe' % etf.NEAR_IDENTICAL})
+            banner.append(
+                {
+                    'id': g['id'],
+                    'size': len(m),
+                    'members': m,
+                    'symbols': [cache[i]['meta']['symbol'] for i in m],
+                    'label': g['index'],
+                    'min_coefficient': g['min_coefficient'],
+                    'unstable': False,
+                    'basis': 'Corrélation des rendements hebdomadaires en EUR >= %s (52 semaines), lien direct avec le chef du groupe' % etf.NEAR_IDENTICAL,
+                }
+            )
     etf_concentration['groups'] = banner
     return etf_concentration, fund_natures, group_of, group_info
 
@@ -352,7 +439,7 @@ def explore(conn, request):
     total = len(rows) + len(excluded_hits)
     if export:
         size, page = EXPORT_LIMIT, 1
-    page_rows = (rows + excluded_hits)[(page - 1) * size:page * size]      # pagination : uniquement après filtrage, évaluation et classement
+    page_rows = (rows + excluded_hits)[(page - 1) * size : page * size]  # pagination : uniquement après filtrage, évaluation et classement
     wanted = [e['id'] for e in page_rows if e not in excluded_hits]
     detail = {v['key']: v for v in judge_universe(conn, config, wanted)} if wanted else {}
     score_detail = score_service.details(conn, config, wanted)
@@ -363,35 +450,70 @@ def explore(conn, request):
             out.append(e)
             continue
         v = detail[e['id']]
-        v['rank'], v['score'] = e['rank'], e['score']      # rang et score viennent de la sélection complète, pas de la page
+        v['rank'], v['score'] = e['rank'], e['score']  # rang et score viennent de la sélection complète, pas de la page
         r = _row(v, rates, conn)
-        r['score_parts']=expanded_parts(e,config);r['score_missing']=e.get('score_missing',0)
-        r['scores']=score_view(e,score_detail.get(e['id']))
+        r['score_parts'] = expanded_parts(e, config)
+        r['score_missing'] = e.get('score_missing', 0)
+        r['scores'] = score_view(e, score_detail.get(e['id']))
         a = aux.get(e['id'], {})
-        r.update({'position': position, 'volume': a.get('volume'), 'last_close': a['last_close'].isoformat() if a.get('last_close') else None,
-                  'analyst': analyst_view(a.get('analyst')) if e['kind'] == 'equity' else None, 'ref': {k: a.get(k) for k in REF_FIELDS}, 'open': e['mic'] in hours.HOURS and hours.is_open(e['mic'], now),
-                  'signals': signals.row_signals(a, e['kind'], ref, prefilter_cfg, a.get('quote_age_days')), 'etf_group': group_of.get(e['id']), 'etf_group_info': group_info.get(e['id']),
-                  'aum_eur': _aum_eur(e, rates), 'fee': a.get('fee') if e['kind'] == 'etf' else None})
+        r.update(
+            {
+                'position': position,
+                'volume': a.get('volume'),
+                'last_close': a['last_close'].isoformat() if a.get('last_close') else None,
+                'analyst': analyst_view(a.get('analyst')) if e['kind'] == 'equity' else None,
+                'ref': {k: a.get(k) for k in REF_FIELDS},
+                'open': e['mic'] in hours.HOURS and hours.is_open(e['mic'], now),
+                'signals': signals.row_signals(a, e['kind'], ref, prefilter_cfg, a.get('quote_age_days')),
+                'etf_group': group_of.get(e['id']),
+                'etf_group_info': group_info.get(e['id']),
+                'aum_eur': _aum_eur(e, rates),
+                'fee': a.get('fee') if e['kind'] == 'etf' else None,
+            }
+        )
         if e['kind'] == 'etf':
             r['fund_nature'] = fund_natures.get(e['id'])
         out.append(r)
     if not export:
-        if config.get('version')==4:
-            for kind in ('equity','etf'):
-                subset=[r for r in out if r['kind']==kind];effective=explorer_config.effective(config,kind);n=max((p['sessions'] for p in effective['periods'] if p['enabled']),default=ref)
-                _attach_analysis_curves(conn,subset,n)
-                for r in subset:r['curve_sessions']=n;r['curve_label']=signals.period_label(n)
-        else:_attach_curves(conn, out, ref)
+        if config.get('version') == 4:
+            for kind in ('equity', 'etf'):
+                subset = [r for r in out if r['kind'] == kind]
+                effective = explorer_config.effective(config, kind)
+                n = max((p['sessions'] for p in effective['periods'] if p['enabled']), default=ref)
+                _attach_analysis_curves(conn, subset, n)
+                for r in subset:
+                    r['curve_sessions'] = n
+                    r['curve_label'] = signals.period_label(n)
+        else:
+            _attach_curves(conn, out, ref)
     reasons, markets, countries, categories = _facets(entries, base)
-    return {'scoring': score_service.summary(config, entries), 'etf_concentration': etf_concentration, 'config': config, 'total': total, 'page': page, 'pages': max(1, -(-total // size)), 'rows': out, 'ref_sessions': ref, 'curve_label': signals.period_label(ref), 'ordering': 'proximity' if proximity_order else sort if sort in SORT_KEYS else 'rank',
-            'universe': len(entries), 'examined': len(base), 'tradable': {'on': bool(view.get('tradable', True)), 'masked': masked}, 'level_filters': {'masked': level_masked, 'counts': level_counts},
-            'counts': {g: dict(c) for g, c in counts.items()}, 'scope_counts': scope_counts, 'populations': {g: sum(c.values()) for g, c in counts.items()},
-            'reasons': dict(reasons), 'facets': {'markets': dict(markets), 'countries': dict(sorted(countries.items())), 'categories': dict(sorted(categories.items()))}}
+    return {
+        'scoring': score_service.summary(config, entries),
+        'etf_concentration': etf_concentration,
+        'config': config,
+        'total': total,
+        'page': page,
+        'pages': max(1, -(-total // size)),
+        'rows': out,
+        'ref_sessions': ref,
+        'curve_label': signals.period_label(ref),
+        'ordering': 'proximity' if proximity_order else sort if sort in SORT_KEYS else 'rank',
+        'universe': len(entries),
+        'examined': len(base),
+        'tradable': {'on': bool(view.get('tradable', True)), 'masked': masked},
+        'level_filters': {'masked': level_masked, 'counts': level_counts},
+        'counts': {g: dict(c) for g, c in counts.items()},
+        'scope_counts': scope_counts,
+        'populations': {g: sum(c.values()) for g, c in counts.items()},
+        'reasons': dict(reasons),
+        'facets': {'markets': dict(markets), 'countries': dict(sorted(countries.items())), 'categories': dict(sorted(categories.items()))},
+    }
 
 
 def filter_metadata_coverage(conn):
     """Couverture AUM et région sur les instruments recommandables; compte sans double compte des cotations."""
     from ..market_views import etf
+
     profiles = etf.read_profiles(conn)
     rates = latest_rates(conn)
     with conn.cursor() as cur:
@@ -421,9 +543,18 @@ def filter_metadata_coverage(conn):
     groups = Counter((v['kind'], 'known' if v['region'] else 'unknown') for v in instruments.values())
     etfs = [v for v in instruments.values() if v['kind'] == 'etf']
     equities = [v for v in instruments.values() if v['kind'] == 'equity']
-    return {'instruments': len(instruments), 'etfs': {'total': len(etfs), 'aum_known': sum(v['aum'] for v in etfs), 'large_by_aum': sum(a >= cutoff for a in aum_values.values()) if cutoff is not None else 0, 'aum_decile_cutoff_eur': cutoff,
-            'region_known': groups[('etf', 'known')], 'region_unknown': groups[('etf', 'unknown')]},
-            'equities': {'total': len(equities), 'region_known': groups[('equity', 'known')], 'region_unknown': groups[('equity', 'unknown')]}}
+    return {
+        'instruments': len(instruments),
+        'etfs': {
+            'total': len(etfs),
+            'aum_known': sum(v['aum'] for v in etfs),
+            'large_by_aum': sum(a >= cutoff for a in aum_values.values()) if cutoff is not None else 0,
+            'aum_decile_cutoff_eur': cutoff,
+            'region_known': groups[('etf', 'known')],
+            'region_unknown': groups[('etf', 'unknown')],
+        },
+        'equities': {'total': len(equities), 'region_known': groups[('equity', 'known')], 'region_unknown': groups[('equity', 'unknown')]},
+    }
 
 
 def _choices(value):
@@ -440,19 +571,43 @@ def _search_excluded(conn, query, kind, market):
              WHERE (l.status='excluded' OR (l.status='candidate' AND l.is_primary=1)) AND (LOWER(i.name) LIKE %s OR LOWER(l.symbol) LIKE %s OR LOWER(i.isin) LIKE %s)"""
     args = [like, like, like]
     if kind:
-        sql += ' AND i.kind=%s'; args.append(kind)
+        sql += ' AND i.kind=%s'
+        args.append(kind)
     if market:
-        sql += ' AND l.mic=%s'; args.append(market)
+        sql += ' AND l.mic=%s'
+        args.append(market)
     with conn.cursor() as cur:
         cur.execute(sql + ' ORDER BY i.name, l.id', args)
         rows = cur.fetchall()
-    return [{'id': r['id'], 'symbol': r['symbol'], 'name': r['name'], 'isin': r['isin'], 'mic': r['mic'], 'market': MARKETS.get(r['mic'], r['mic']), 'kind': r['kind'],
-             'category': r['category'], 'country': r['country'], 'pea': False, 'currency': r['price_currency'] or r['currency'],
-             'price': float(r['price']) if r['price'] is not None else None, 'price_eur': None, 'price_time': r['price_time'].isoformat(sep=' ') if r['price_time'] else None,
-             'quote_at': r['quote_at'].isoformat(sep=' ') if r['quote_at'] else None,
-             'price_source': r['price_source'], 'status': 'excluded' if r['status'] == 'excluded' else 'unknown',
-             'status_label': 'Exclu' if r['status'] == 'excluded' else 'En attente d’analyse', 'excluded_reason': r['excluded_reason'], 'score': None, 'rank': None,
-             'quality': None, 'measures': {}, 'reasons': []} for r in rows]
+    return [
+        {
+            'id': r['id'],
+            'symbol': r['symbol'],
+            'name': r['name'],
+            'isin': r['isin'],
+            'mic': r['mic'],
+            'market': MARKETS.get(r['mic'], r['mic']),
+            'kind': r['kind'],
+            'category': r['category'],
+            'country': r['country'],
+            'pea': False,
+            'currency': r['price_currency'] or r['currency'],
+            'price': float(r['price']) if r['price'] is not None else None,
+            'price_eur': None,
+            'price_time': r['price_time'].isoformat(sep=' ') if r['price_time'] else None,
+            'quote_at': r['quote_at'].isoformat(sep=' ') if r['quote_at'] else None,
+            'price_source': r['price_source'],
+            'status': 'excluded' if r['status'] == 'excluded' else 'unknown',
+            'status_label': 'Exclu' if r['status'] == 'excluded' else 'En attente d’analyse',
+            'excluded_reason': r['excluded_reason'],
+            'score': None,
+            'rank': None,
+            'quality': None,
+            'measures': {},
+            'reasons': [],
+        }
+        for r in rows
+    ]
 
 
 def _attach_curves(conn, rows, sessions=63, points=66):
@@ -462,30 +617,41 @@ def _attach_curves(conn, rows, sessions=63, points=66):
     if not ids:
         return
     with conn.cursor() as cur:
-        cur.execute(f"SELECT listing_id, price_date, close_px FROM daily_prices WHERE listing_id IN ({','.join(['%s'] * len(ids))}) AND price_date >= %s ORDER BY listing_id, price_date",
-                    ids + [hours.utcnow().date() - datetime.timedelta(days=int(sessions * 1.6) + 12)])
+        cur.execute(
+            f"SELECT listing_id, price_date, close_px FROM daily_prices WHERE listing_id IN ({','.join(['%s'] * len(ids))}) AND price_date >= %s ORDER BY listing_id, price_date",
+            ids + [hours.utcnow().date() - datetime.timedelta(days=int(sessions * 1.6) + 12)],
+        )
         curves = defaultdict(list)
         for r in cur.fetchall():
             curves[r['listing_id']].append(float(r['close_px']))
     for r in rows:
-        r['curve'] = downsample(curves.get(r['id'], [])[-(sessions + 1):], points)
+        r['curve'] = downsample(curves.get(r['id'], [])[-(sessions + 1) :], points)
 
 
 def _attach_analysis_curves(conn, rows, sessions, points=66):
     """V4 sparklines use the same confirmed market dates and split basis as analysis."""
-    if not rows:return
-    calendars={m:window_calendars(m,expected_close(conn,m),[sessions]).get(sessions,[]) for m in {r['mic'] for r in rows}}
-    starts=[ds[0] for ds in calendars.values() if ds]
-    if not starts:return
-    ids=[r['id'] for r in rows];marks=','.join(['%s']*len(ids));bars=defaultdict(list);splits=defaultdict(list)
+    if not rows:
+        return
+    calendars = {m: window_calendars(m, expected_close(conn, m), [sessions]).get(sessions, []) for m in {r['mic'] for r in rows}}
+    starts = [ds[0] for ds in calendars.values() if ds]
+    if not starts:
+        return
+    ids = [r['id'] for r in rows]
+    marks = ','.join(['%s'] * len(ids))
+    bars = defaultdict(list)
+    splits = defaultdict(list)
     with conn.cursor() as cur:
-        cur.execute(f'SELECT listing_id,price_date,close_px,adj_close_px FROM daily_prices WHERE listing_id IN ({marks}) AND price_date>=%s ORDER BY listing_id,price_date',ids+[min(starts)])
-        for b in cur.fetchall():bars[b['listing_id']].append((str(b['price_date']),float(b['close_px']),None if b['adj_close_px'] is None else float(b['adj_close_px'])))
-        cur.execute(f"SELECT listing_id,event_date,ratio FROM corporate_events WHERE listing_id IN ({marks}) AND kind IN ('split','reverse_split')",ids)
-        for e in cur.fetchall():splits[e['listing_id']].append((str(e['event_date']),float(e['ratio']) if e['ratio'] else None))
+        cur.execute(f'SELECT listing_id,price_date,close_px,adj_close_px FROM daily_prices WHERE listing_id IN ({marks}) AND price_date>=%s ORDER BY listing_id,price_date', ids + [min(starts)])
+        for b in cur.fetchall():
+            bars[b['listing_id']].append((str(b['price_date']), float(b['close_px']), None if b['adj_close_px'] is None else float(b['adj_close_px'])))
+        cur.execute(f"SELECT listing_id,event_date,ratio FROM corporate_events WHERE listing_id IN ({marks}) AND kind IN ('split','reverse_split')", ids)
+        for e in cur.fetchall():
+            splits[e['listing_id']].append((str(e['event_date']), float(e['ratio']) if e['ratio'] else None))
     for row in rows:
-        ds=calendars[row['mic']]
-        dates,prices,_,breaks=prepare_series([b for b in bars[row['id']] if ds and b[0]<=ds[-1]],splits[row['id']])
-        observations=dict(zip(dates,prices));broken={dates[i] for i in breaks}
-        values=[None if d in broken else observations.get(d) for d in ds]
-        row['curve']=downsample(values,points);row['curve_dates']=downsample(ds,points)
+        ds = calendars[row['mic']]
+        dates, prices, _, breaks = prepare_series([b for b in bars[row['id']] if ds and b[0] <= ds[-1]], splits[row['id']])
+        observations = dict(zip(dates, prices))
+        broken = {dates[i] for i in breaks}
+        values = [None if d in broken else observations.get(d) for d in ds]
+        row['curve'] = downsample(values, points)
+        row['curve_dates'] = downsample(ds, points)

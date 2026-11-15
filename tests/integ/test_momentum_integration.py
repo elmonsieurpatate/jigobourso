@@ -1,4 +1,5 @@
 """Momentum 6 mois et 12 mois sur une vraie base : colonne et migration, calcul nocturne, classement de l'Explorer avec le filtre de négociabilité, fiche, suivi à 21 et 63 séances."""
+
 import datetime
 import math
 import os
@@ -26,6 +27,7 @@ def fixed_market_clock(monkeypatch):
 
 def sessions(n):
     import exchange_calendars as xc
+
     cal = xc.get_calendar('XETR', start='2025-01-02', end='2026-12-31')
     return [d.date() for d in cal.sessions if d.date() <= datetime.date(2026, 10, 27)][-n:]
 
@@ -40,13 +42,13 @@ def path(n, daily, last_month=None):
     return out
 
 
-UNIVERSE = (   # id, symbole, type, nombre de séances, cours, volume moyen
+UNIVERSE = (  # id, symbole, type, nombre de séances, cours, volume moyen
     (1, 'STAR.DE', 'equity', 360, path(360, 0.0040), 500_000),
-    (2, 'CRASH.DE', 'equity', 360, path(360, 0.0030, 0.6), 500_000),         # monte fort puis s'effondre le dernier mois : le dernier mois est ignoré
-    (3, 'SURGE.DE', 'equity', 360, path(360, 0.0000, 1.8), 500_000),          # plat puis flambée le dernier mois : ne compte pas
+    (2, 'CRASH.DE', 'equity', 360, path(360, 0.0030, 0.6), 500_000),  # monte fort puis s'effondre le dernier mois : le dernier mois est ignoré
+    (3, 'SURGE.DE', 'equity', 360, path(360, 0.0000, 1.8), 500_000),  # plat puis flambée le dernier mois : ne compte pas
     (4, 'LAG.DE', 'equity', 360, path(360, -0.0010), 500_000),
-    (5, 'ILLIQ.DE', 'equity', 360, path(360, 0.0050), 50),                    # très fort momentum mais quasi aucun échange : masqué par le filtre de négociabilité
-    (6, 'YOUNG.DE', 'equity', 100, path(100, 0.0100), 500_000),               # historique trop court : « non évaluable »
+    (5, 'ILLIQ.DE', 'equity', 360, path(360, 0.0050), 50),  # très fort momentum mais quasi aucun échange : masqué par le filtre de négociabilité
+    (6, 'YOUNG.DE', 'equity', 100, path(100, 0.0100), 500_000),  # historique trop court : « non évaluable »
     (7, 'ETFA.DE', 'etf', 360, path(360, 0.0010), 500_000),
 )
 
@@ -61,8 +63,10 @@ def seed(conn, only=None):
             cur.execute("INSERT INTO listings(id,instrument_id,mic,symbol,currency,status,is_primary) VALUES (%s,%s,'XETR',%s,'EUR','selected',1)", (lid, lid, symbol))
             days = sessions(360)[-n:]
             cur.executemany('INSERT INTO daily_prices(listing_id,price_date,close_px) VALUES (%s,%s,%s)', [(lid, d, round(c, 6)) for d, c in zip(days, closes)])
-            cur.execute("INSERT INTO latest_prices(listing_id,price,price_time,source,currency,avg_volume_3m,quote_at) VALUES (%s,%s,%s,'quote','EUR',%s,%s)",
-                        (lid, round(closes[-1], 6), datetime.datetime(2026, 10, 27, 16, 30), volume, datetime.datetime(2026, 10, 27, 20, 0)))
+            cur.execute(
+                "INSERT INTO latest_prices(listing_id,price,price_time,source,currency,avg_volume_3m,quote_at) VALUES (%s,%s,%s,'quote','EUR',%s,%s)",
+                (lid, round(closes[-1], 6), datetime.datetime(2026, 10, 27, 16, 30), volume, datetime.datetime(2026, 10, 27, 20, 0)),
+            )
     conn.commit()
     compute.compute_all(conn, NOW)
 
@@ -87,18 +91,19 @@ def test_nightly_compute_stores_the_momentum_and_leaves_short_histories_unknown(
         if n >= 253:
             assert abs(float(stored[lid]) - expected_momentum(closes)) < 1e-4, symbol
             assert abs(float(stored12[lid]) - expected_momentum12(closes)) < 1e-4, symbol
-    assert stored[6] is None and stored12[6] is None               # 100 séances : ni 127 ni 253, jamais estimé
+    assert stored[6] is None and stored12[6] is None  # 100 séances : ni 127 ni 253, jamais estimé
     assert abs(float(stored12[3])) < 1e-4 and float(stored12[2]) > float(stored12[4])
-    assert abs(float(stored[3])) < 1e-4 and float(stored[2]) > float(stored[4])    # le dernier mois n'entre pas dans la mesure
+    assert abs(float(stored[3])) < 1e-4 and float(stored[2]) > float(stored[4])  # le dernier mois n'entre pas dans la mesure
 
 
 def test_migrations_add_both_columns_without_touching_data():
     conn = connect()
     seed(conn)
     from scripts import migrate
+
     for column, name in (('momentum_6m', '20261031_momentum_6m.sql'), ('momentum_12m', '20261101_momentum_12m.sql')):
         sql = open(os.path.join(ROOT, 'db', 'migrations', name), encoding='utf-8').read()
-        migrate.check(sql, name)                                   # admissible : ajout seulement
+        migrate.check(sql, name)  # admissible : ajout seulement
         with conn.cursor() as cur:
             cur.execute('SELECT COUNT(*) n FROM series_state')
             before = cur.fetchone()['n']
@@ -106,9 +111,9 @@ def test_migrations_add_both_columns_without_touching_data():
             for statement in migrate.statements(sql):
                 cur.execute(statement)
             cur.execute('SELECT COUNT(*) n FROM series_state')
-            assert cur.fetchone()['n'] == before                   # les lignes existantes sont conservées
+            assert cur.fetchone()['n'] == before  # les lignes existantes sont conservées
             cur.execute(f'SELECT {column} FROM series_state LIMIT 1')
-            assert cur.fetchone()[column] is None                  # NULL jusqu'au prochain calcul : l'inconnu reste inconnu
+            assert cur.fetchone()[column] is None  # NULL jusqu'au prochain calcul : l'inconnu reste inconnu
         conn.commit()
     compute.compute_all(conn, NOW)
     with conn.cursor() as cur:
@@ -123,21 +128,21 @@ def test_explorer_ranks_by_momentum_and_keeps_the_tradability_filter():
     seed(conn)
     res = service.explore(conn, {'config': 'momentum', 'view': {'status': 'retained', 'kind': 'equity', 'page_size': 50}})
     symbols = [r['symbol'] for r in res['rows']]
-    assert 'ILLIQ.DE' not in symbols and res['tradable']['on'] and res['tradable']['masked'] >= 1       # filtre de négociabilité conservé
-    assert symbols == ['STAR.DE', 'CRASH.DE', 'SURGE.DE', 'LAG.DE']                                       # classés par progression entre J−126 et J−21
-    assert [r['rank'] for r in res['rows']] == [2, 3, 4, 5]                                               # rang d'origine du catalogue conservé : le titre masqué (ILLIQ.DE) reste n° 1, rien n'est recalculé
+    assert 'ILLIQ.DE' not in symbols and res['tradable']['on'] and res['tradable']['masked'] >= 1  # filtre de négociabilité conservé
+    assert symbols == ['STAR.DE', 'CRASH.DE', 'SURGE.DE', 'LAG.DE']  # classés par progression entre J−126 et J−21
+    assert [r['rank'] for r in res['rows']] == [2, 3, 4, 5]  # rang d'origine du catalogue conservé : le titre masqué (ILLIQ.DE) reste n° 1, rien n'est recalculé
     assert abs(res['rows'][0]['momentum'] - expected_momentum(UNIVERSE[0][4])) < 1e-4
-    assert 'YOUNG.DE' not in symbols                                                                       # historique trop court : pas « retenu »
+    assert 'YOUNG.DE' not in symbols  # historique trop court : pas « retenu »
     with conn.cursor() as cur:
         cur.execute("INSERT INTO etf_profiles(listing_id,fetched_at,version,state,data_json) VALUES (7,NOW(),3,'ok',%s)", ('{"category":"Real Estate","family":"Vanguard"}',))
     conn.commit()
     etf_rows = service.explore(conn, {'config': 'momentum', 'view': {'status': 'retained', 'kind': 'etf', 'page_size': 50}})['rows']
     assert etf_rows[0]['fund_nature'] == 'Real Estate'
     unfiltered = service.explore(conn, {'config': 'momentum', 'view': {'status': 'retained', 'kind': 'equity', 'tradable': False, 'page_size': 50}})
-    assert [r['symbol'] for r in unfiltered['rows']][0] == 'ILLIQ.DE'                                      # sans filtre, le plus fort momentum passe devant
+    assert [r['symbol'] for r in unfiltered['rows']][0] == 'ILLIQ.DE'  # sans filtre, le plus fort momentum passe devant
     unknown = service.explore(conn, {'config': 'momentum', 'view': {'status': 'unknown', 'kind': 'equity', 'page_size': 50}})
     assert 'YOUNG.DE' in [r['symbol'] for r in unknown['rows']]
-    for name in ('regular', 'fast', 'recovery', 'low_volatility'):                                         # les quatre autres profils fonctionnent toujours
+    for name in ('regular', 'fast', 'recovery', 'low_volatility'):  # les quatre autres profils fonctionnent toujours
         assert service.explore(conn, {'config': name, 'view': {'page_size': 5}})['config']['name'] == name
 
 
@@ -147,13 +152,13 @@ def test_fiche_exposes_the_momentum_and_the_experimental_flag():
     sheet = title_sheet.instrument_sheet(conn, {'listing_id': 1, 'config': 'momentum'})
     assert abs(sheet['state']['momentum_6m'] - expected_momentum(UNIVERSE[0][4])) < 1e-4
     assert sheet['strategy']['experimental'] is True and sheet['verdict']['status'] == 'retained'
-    assert sheet['verdict']['rank'] == 2 and sheet['verdict']['of'] == 5                                    # n° 2 du catalogue sur 5 actions retenues (le n° 1, très peu négociable, est masqué dans l'Explorer)
+    assert sheet['verdict']['rank'] == 2 and sheet['verdict']['of'] == 5  # n° 2 du catalogue sur 5 actions retenues (le n° 1, très peu négociable, est masqué dans l'Explorer)
     assert title_sheet.instrument_sheet(conn, {'listing_id': 1, 'config': 'regular'})['strategy']['experimental'] is False
 
 
 def test_tracking_records_both_strategies_at_21_and_63_sessions():
     conn = connect()
-    seed(conn, only={1, 4})                                        # deux actions suffisent : le rejeu du suivi est le test le plus long
+    seed(conn, only={1, 4})  # deux actions suffisent : le rejeu du suivi est le test le plus long
     day, rows = tracking.record_snapshot(conn)
     with conn.cursor() as cur:
         cur.execute("SELECT preset, COUNT(*) n FROM ranking_snapshots WHERE snap_date=%s GROUP BY preset", (day,))
@@ -183,12 +188,12 @@ def test_explorer_ranks_by_momentum_12_and_keeps_the_tradability_filter():
     symbols = [r['symbol'] for r in res['rows']]
     assert res['config']['name'] == 'momentum12' and 'ILLIQ.DE' not in symbols and res['tradable']['on'] and res['tradable']['masked'] >= 1
     assert symbols == ['STAR.DE', 'CRASH.DE', 'SURGE.DE', 'LAG.DE'] and [r['rank'] for r in res['rows']] == [2, 3, 4, 5]
-    assert abs(res['rows'][0]['momentum'] - expected_momentum12(UNIVERSE[0][4])) < 1e-4                    # la valeur affichée est celle de J−252 → J−21
+    assert abs(res['rows'][0]['momentum'] - expected_momentum12(UNIVERSE[0][4])) < 1e-4  # la valeur affichée est celle de J−252 → J−21
     assert 'YOUNG.DE' not in symbols
     unknown = service.explore(conn, {'config': 'momentum12', 'view': {'status': 'unknown', 'kind': 'equity', 'page_size': 50}})
     assert 'YOUNG.DE' in [r['symbol'] for r in unknown['rows']]
     six = service.explore(conn, {'config': 'momentum', 'view': {'status': 'retained', 'kind': 'equity', 'page_size': 50}})
-    assert abs(six['rows'][0]['momentum'] - res['rows'][0]['momentum']) > 1e-3                              # deux stratégies distinctes, deux mesures
+    assert abs(six['rows'][0]['momentum'] - res['rows'][0]['momentum']) > 1e-3  # deux stratégies distinctes, deux mesures
 
 
 def test_risk_adjusted_momentum_shows_eligible_trending_titles():
@@ -211,7 +216,7 @@ def test_fiche_exposes_both_momentums_and_the_flag():
     assert sheet['strategy']['experimental'] is True and sheet['strategy']['ranking'] == 'momentum12' and sheet['verdict']['status'] == 'retained'
     assert sheet['verdict']['rank'] == 2 and sheet['verdict']['of'] == 5
     custom = strategy.preset('momentum12')
-    custom['name'] = 'custom'                                       # réglages personnels fondés sur un classement par momentum : la mise en garde reste affichée
+    custom['name'] = 'custom'  # réglages personnels fondés sur un classement par momentum : la mise en garde reste affichée
     assert title_sheet.instrument_sheet(conn, {'listing_id': 1, 'config': custom})['strategy']['experimental'] is True
 
 
@@ -226,9 +231,10 @@ def test_explorer_capitalisation_filter_uses_the_size_classes():
     def symbols(cap):
         res = service.explore(conn, {'config': 'momentum', 'view': {'status': 'all', 'tradable': False, 'cap': cap, 'page_size': 50}})
         return sorted(r['symbol'] for r in res['rows'])
-    assert symbols('mid') == ['STAR.DE']                                                    # 2 à 10 Md€
-    assert symbols('micro|small') == ['CRASH.DE', 'SURGE.DE']                               # plusieurs choix possibles
-    assert symbols('large') == []                                                           # un ETF (ici 40 Md€) n'a pas de classe de taille d'actions : jamais classé « grande capitalisation »
-    assert 'LAG.DE' not in symbols('mid|small|micro|large|mega')                            # capitalisation inconnue : exclue dès qu'un filtre de taille est posé
-    assert len(symbols('')) >= 6                                                            # sans filtre : tout l'univers
-    assert symbols('inconnue') == symbols('')                                               # une valeur inconnue est ignorée, jamais une exclusion silencieuse
+
+    assert symbols('mid') == ['STAR.DE']  # 2 à 10 Md€
+    assert symbols('micro|small') == ['CRASH.DE', 'SURGE.DE']  # plusieurs choix possibles
+    assert symbols('large') == []  # un ETF (ici 40 Md€) n'a pas de classe de taille d'actions : jamais classé « grande capitalisation »
+    assert 'LAG.DE' not in symbols('mid|small|micro|large|mega')  # capitalisation inconnue : exclue dès qu'un filtre de taille est posé
+    assert len(symbols('')) >= 6  # sans filtre : tout l'univers
+    assert symbols('inconnue') == symbols('')  # une valeur inconnue est ignorée, jamais une exclusion silencieuse

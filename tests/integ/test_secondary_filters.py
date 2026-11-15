@@ -1,4 +1,5 @@
 """Real PHP/MariaDB regression coverage for secondary settings, no market engine."""
+
 import os
 import json
 from pathlib import Path
@@ -35,7 +36,6 @@ def test_secondary_filters_persistence_and_preservation():
     assert result.returncode == 0, result.stdout + result.stderr
     assert 'PASS:' in result.stdout
 
-    result = subprocess.run(['php', str(root / 'tests/php/secondary-metadata-persistence.php')],
-                            cwd=root, capture_output=True, text=True, timeout=45)
+    result = subprocess.run(['php', str(root / 'tests/php/secondary-metadata-persistence.php')], cwd=root, capture_output=True, text=True, timeout=45)
     assert result.returncode == 0, result.stdout + result.stderr
     assert 'PASS:' in result.stdout

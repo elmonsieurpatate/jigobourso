@@ -1,13 +1,14 @@
 """Faux client Yahoo : rejoue des séries construites par le test, sans réseau."""
+
 import datetime
 
 
 class FakeYahoo:
     def __init__(self, quotes=None, daily=None, intraday=None, declared_splits=None):
-        self.quote_data = quotes or {}      # symbole -> dict Quote
-        self.daily = daily or {}            # symbole -> (tz, [(date, close)])
-        self.intraday = intraday or {}      # symbole -> (tz, [(datetime_utc, close)])
-        self.declared_splits = declared_splits or {}   # symbole -> [(date ISO, parts nouvelles, parts anciennes)]
+        self.quote_data = quotes or {}  # symbole -> dict Quote
+        self.daily = daily or {}  # symbole -> (tz, [(date, close)])
+        self.intraday = intraday or {}  # symbole -> (tz, [(datetime_utc, close)])
+        self.declared_splits = declared_splits or {}  # symbole -> [(date ISO, parts nouvelles, parts anciennes)]
         self.calls = []
 
     def quotes(self, symbols):

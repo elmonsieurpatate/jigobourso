@@ -1,4 +1,5 @@
 """Faits de marché communs : éligibilité PEA, dernière collecte, dernière clôture attendue, classes de capitalisation, lecture des recommandations d'analystes."""
+
 from engine.market import hours
 from engine.shared.units import is_subunit
 from engine.market.collect import effective_expected_close
@@ -8,13 +9,69 @@ from engine.shared.units import to_eur_factor
 # PEA : actions d'une société dont le siège est dans l'UE ou l'EEE (Islande, Liechtenstein et Norvège compris ; pas le Royaume-Uni ni la Suisse),
 # achetées sur une place européenne (c'est ce que les courtiers acceptent dans un PEA). Une action américaine d'une société irlandaise n'est donc
 # pas « PEA probable ». Les ETF dépendent de leur indice et de leur domicile : toujours « à vérifier ».
-PEA_COUNTRIES = {'Austria', 'Belgium', 'Bulgaria', 'Croatia', 'Cyprus', 'Czech Republic', 'Denmark', 'Estonia', 'Finland', 'France', 'Germany', 'Greece',
-                 'Hungary', 'Iceland', 'Ireland', 'Italy', 'Latvia', 'Liechtenstein', 'Lithuania', 'Luxembourg', 'Malta', 'Netherlands', 'Norway', 'Poland',
-                 'Portugal', 'Romania', 'Slovakia', 'Slovenia', 'Spain', 'Sweden'}
+PEA_COUNTRIES = {
+    'Austria',
+    'Belgium',
+    'Bulgaria',
+    'Croatia',
+    'Cyprus',
+    'Czech Republic',
+    'Denmark',
+    'Estonia',
+    'Finland',
+    'France',
+    'Germany',
+    'Greece',
+    'Hungary',
+    'Iceland',
+    'Ireland',
+    'Italy',
+    'Latvia',
+    'Liechtenstein',
+    'Lithuania',
+    'Luxembourg',
+    'Malta',
+    'Netherlands',
+    'Norway',
+    'Poland',
+    'Portugal',
+    'Romania',
+    'Slovakia',
+    'Slovenia',
+    'Spain',
+    'Sweden',
+}
 
 
-PEA_MICS = {'XPAR', 'XAMS', 'XBRU', 'XLIS', 'XETR', 'XFRA', 'XSTU', 'XBER', 'XDUS', 'XHAM', 'XMUN', 'XHAN', 'XMIL', 'XMAD', 'XSTO', 'XOSL', 'XHEL', 'XCSE',
-            'XWBO', 'XDUB', 'XATH', 'XWAR', 'XPRA', 'XBUD', 'XBSE', 'XICE', 'XLUX'}
+PEA_MICS = {
+    'XPAR',
+    'XAMS',
+    'XBRU',
+    'XLIS',
+    'XETR',
+    'XFRA',
+    'XSTU',
+    'XBER',
+    'XDUS',
+    'XHAM',
+    'XMUN',
+    'XHAN',
+    'XMIL',
+    'XMAD',
+    'XSTO',
+    'XOSL',
+    'XHEL',
+    'XCSE',
+    'XWBO',
+    'XDUB',
+    'XATH',
+    'XWAR',
+    'XPRA',
+    'XBUD',
+    'XBSE',
+    'XICE',
+    'XLUX',
+}
 
 
 def pea_status(kind, country, mic):
@@ -63,7 +120,7 @@ def analyst_view(raw):
     return {'score': score, 'label': fr, 'raw': raw, 'text': ('%s (%s)' % (fr, ('%.1f' % score).replace('.', ','))) if fr else 'Note ' + ('%.1f' % score).replace('.', ',')}
 
 
-_SIZE_KEYS = ((300e6, 'micro'), (2e9, 'small'), (10e9, 'mid'), (200e9, 'large'), (float('inf'), 'mega'))     # clés du filtre « Capitalisation » de l'Explorer (mêmes seuils que les libellés ci-dessous)
+_SIZE_KEYS = ((300e6, 'micro'), (2e9, 'small'), (10e9, 'mid'), (200e9, 'large'), (float('inf'), 'mega'))  # clés du filtre « Capitalisation » de l'Explorer (mêmes seuils que les libellés ci-dessous)
 
 
 _SIZE_CLASSES = ((300e6, 'micro-capitalisation'), (2e9, 'petite capitalisation'), (10e9, 'capitalisation moyenne'), (200e9, 'grande capitalisation'), (float('inf'), 'très grande capitalisation'))

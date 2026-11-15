@@ -6,21 +6,56 @@ configuration enregistrée dans `settings['catalogue_rules']` les active, les d�
 défaut (`DEFAULT_CONFIG`) sont le point de départ et ce à quoi « restaurer les valeurs par défaut » revient.
 Les trois niveaux restent séparés : ce module ne connaît ni les cours Yahoo (niveau 2, `market/prefilter.py`) ni les stratégies (niveau 3).
 """
+
 import re
 
 # Places proposées par défaut (point de départ). Le choix est LIBRE : toute place présente dans les données importées peut être ajoutée ou retirée
 # depuis l'administration, sans modifier le code. Les noms ci-dessous servent seulement à l'affichage.
 DEFAULT_MARKETS = ('XNAS', 'XNYS', 'XASE', 'ARCX', 'BATS', 'XPAR', 'XAMS', 'XETR', 'XLON', 'XMIL', 'XMAD', 'XSTO', 'XOSL', 'XSWX')
 MARKET_NAMES = {
-    'XNAS': 'Nasdaq', 'XNYS': 'NYSE', 'XASE': 'NYSE American', 'ARCX': 'NYSE Arca', 'BATS': 'Cboe BZX',
-    'XPAR': 'Euronext Paris', 'XAMS': 'Euronext Amsterdam', 'XETR': 'Xetra', 'XLON': 'Bourse de Londres',
-    'XMIL': 'Borsa Italiana', 'XMAD': 'Bourse de Madrid', 'XSTO': 'Nasdaq Stockholm', 'XOSL': 'Oslo Børs', 'XSWX': 'SIX Swiss Exchange',
-    'XBRU': 'Euronext Bruxelles', 'XLIS': 'Euronext Lisbonne', 'XHEL': 'Nasdaq Helsinki', 'XCSE': 'Nasdaq Copenhague', 'XWBO': 'Bourse de Vienne', 'XDUB': 'Euronext Dublin',
-    'XATH': 'Bourse d’Athènes', 'XWAR': 'Bourse de Varsovie', 'XPRA': 'Bourse de Prague', 'XBUD': 'Bourse de Budapest', 'XIST': 'Borsa Istanbul', 'XFRA': 'Francfort',
-    'XTSE': 'Bourse de Toronto', 'XTSX': 'TSX Venture', 'XTKS': 'Bourse de Tokyo', 'XHKG': 'Hong Kong', 'XSHG': 'Shanghai', 'XSHE': 'Shenzhen', 'XKRX': 'Bourse de Corée',
-    'XASX': 'ASX Sydney', 'XSES': 'Singapour', 'XBOM': 'BSE Inde', 'XNSE': 'NSE Inde', 'XTAI': 'Taïwan', 'XJSE': 'Johannesburg', 'BVMF': 'B3 São Paulo', 'XMEX': 'Bourse du Mexique',
+    'XNAS': 'Nasdaq',
+    'XNYS': 'NYSE',
+    'XASE': 'NYSE American',
+    'ARCX': 'NYSE Arca',
+    'BATS': 'Cboe BZX',
+    'XPAR': 'Euronext Paris',
+    'XAMS': 'Euronext Amsterdam',
+    'XETR': 'Xetra',
+    'XLON': 'Bourse de Londres',
+    'XMIL': 'Borsa Italiana',
+    'XMAD': 'Bourse de Madrid',
+    'XSTO': 'Nasdaq Stockholm',
+    'XOSL': 'Oslo Børs',
+    'XSWX': 'SIX Swiss Exchange',
+    'XBRU': 'Euronext Bruxelles',
+    'XLIS': 'Euronext Lisbonne',
+    'XHEL': 'Nasdaq Helsinki',
+    'XCSE': 'Nasdaq Copenhague',
+    'XWBO': 'Bourse de Vienne',
+    'XDUB': 'Euronext Dublin',
+    'XATH': 'Bourse d’Athènes',
+    'XWAR': 'Bourse de Varsovie',
+    'XPRA': 'Bourse de Prague',
+    'XBUD': 'Bourse de Budapest',
+    'XIST': 'Borsa Istanbul',
+    'XFRA': 'Francfort',
+    'XTSE': 'Bourse de Toronto',
+    'XTSX': 'TSX Venture',
+    'XTKS': 'Bourse de Tokyo',
+    'XHKG': 'Hong Kong',
+    'XSHG': 'Shanghai',
+    'XSHE': 'Shenzhen',
+    'XKRX': 'Bourse de Corée',
+    'XASX': 'ASX Sydney',
+    'XSES': 'Singapour',
+    'XBOM': 'BSE Inde',
+    'XNSE': 'NSE Inde',
+    'XTAI': 'Taïwan',
+    'XJSE': 'Johannesburg',
+    'BVMF': 'B3 São Paulo',
+    'XMEX': 'Bourse du Mexique',
 }
-MARKETS = MARKET_NAMES       # compatibilité d'affichage (noms) : ne limite plus rien
+MARKETS = MARKET_NAMES  # compatibilité d'affichage (noms) : ne limite plus rien
 US_MICS = ('XNAS', 'XNYS', 'XASE', 'ARCX', 'BATS')
 MIC_FORMAT = re.compile(r'^[A-Z0-9]{3,6}$')
 
@@ -33,44 +68,115 @@ _SYMBOL_DERIVATIVE = re.compile(r'[-.](W|WS|WT|WTS|R|RT|U|UN)$')
 # ETF à effet de levier ou inverses. Marqueurs forts : toujours exclus. Marqueurs faibles (« short », « ultra ») : exclus sauf si le nom décrit un fonds
 # obligataire / monétaire à courte durée (« Short Duration », « Ultra Short Income », « Short Treasury Bond »…), ou à une stratégie sans levier
 # (« Ultra Buffer », « Long/Short Equity », « Short-Term REIT »), qui n'a rien de spéculatif.
-_LEVERAGED_STRONG = re.compile(r'(\b[2-9]x\b|\bx[2-9]\b|\bleverag|\bultra[- ]?(short|pro)\b(?![- ]*(term|duration|bond|income|municipal|muni|treasur|credit|maturity|dated))|\bdaily (short|inverse)|\binverse\b|\bshort\s+\d|\bbear\b|\blevered\b|\b-[1-9]x\b)', re.I)
+_LEVERAGED_STRONG = re.compile(
+    r'(\b[2-9]x\b|\bx[2-9]\b|\bleverag|\bultra[- ]?(short|pro)\b(?![- ]*(term|duration|bond|income|municipal|muni|treasur|credit|maturity|dated))|\bdaily (short|inverse)|\binverse\b|\bshort\s+\d|\bbear\b|\blevered\b|\b-[1-9]x\b)',
+    re.I,
+)
 _LEVERAGED_WEAK = re.compile(r'\b(short|ultra)\b', re.I)
-_FIXED_INCOME = re.compile(r'\b(bonds?|income|treasur\w*|municipal|muni|duration|dur|maturity|dated|credit|money market|cash|government|govt|corporate|clean energy|buffer|box|reit)\b|\bultra[- ]small\b|\blong/short\b|\bshort[- ]term\s+(fund|etf)\b', re.I)
+_FIXED_INCOME = re.compile(
+    r'\b(bonds?|income|treasur\w*|municipal|muni|duration|dur|maturity|dated|credit|money market|cash|government|govt|corporate|clean energy|buffer|box|reit)\b|\bultra[- ]small\b|\blong/short\b|\bshort[- ]term\s+(fund|etf)\b',
+    re.I,
+)
 _SPAC = re.compile(r'\b(acquisition (corp|corporation|co)|blank check|spac)\b', re.I)
 
 # Ordre réel d'application. 'perimeter' : la ligne écartée n'est pas enregistrée comme cotation (hors périmètre) ;
 # sinon la cotation existe, avec le statut « exclue » et son motif.
 RULES = (
-    {'id': 'incomplete', 'label': 'Ligne sans place ou sans symbole', 'perimeter': True, 'locked': True, 'kinds': ('equity', 'etf'),
-     'reason': 'ligne incomplète', 'role': 'Écarte les lignes qui ne permettent pas d’identifier une cotation.',
-     'help': 'Sans place de cotation ni symbole, Yahoo Finance ne peut pas être interrogé : la ligne est inutilisable. Règle technique, non modifiable.'},
-    {'id': 'duplicates', 'label': 'Doublons place + symbole', 'perimeter': True, 'locked': True, 'kinds': ('equity', 'etf'),
-     'reason': 'doublon', 'role': 'Garde une seule ligne par couple (place, symbole).',
-     'help': 'FinanceDatabase répète parfois la même cotation. La première ligne rencontrée est conservée, les suivantes sont ignorées. Règle technique, non modifiable.'},
-    {'id': 'types', 'label': 'Types de produits retenus', 'perimeter': True, 'kinds': ('equity', 'etf'), 'reason': 'type non retenu', 'group': 'products',
-     'role': 'Choisit les familles de produits analysées : actions, ETF.',
-     'help': 'Décochez « ETF » pour ne travailler que sur des actions (ou l’inverse). Les produits d’un type retiré sont écartés du catalogue, sans être supprimés : vos positions restent suivies.'},
-    {'id': 'markets', 'label': 'Places de cotation retenues', 'perimeter': True, 'kinds': ('equity', 'etf'), 'reason': 'place non retenue', 'group': 'markets',
-     'role': 'Ne garde que les places choisies. Toutes les places présentes dans FinanceDatabase sont proposées.',
-     'help': 'Seules les places cochées sont transmises à Yahoo Finance. Retirer une place écarte toutes ses cotations ; en ajouter une les réintègre au prochain filtrage, sans retélécharger FinanceDatabase. Règle désactivée = toutes les places.'},
-    {'id': 'categories', 'label': 'Catégories exclues', 'kinds': ('equity', 'etf'), 'reason': 'catégorie exclue', 'group': 'products', 'default_enabled': False,
-     'role': 'Écarte les secteurs (actions) ou catégories (ETF) cochés.',
-     'help': 'Utile pour retirer un secteur entier (ex. « Financials ») ou une famille d’ETF. Les catégories proposées sont celles des données importées.'},
-    {'id': 'delisted', 'group': 'quality', 'label': 'Titres radiés', 'kinds': ('equity', 'etf'), 'reason': 'titre radié',
-     'role': 'Écarte les titres marqués comme radiés de la cote.',
-     'help': 'Un titre radié ne cote plus : ses derniers cours sont figés et trompeurs. Désactiver cette règle les laisse entrer dans la collecte (déconseillé).'},
-    {'id': 'nameless', 'group': 'quality', 'label': 'Identité incomplète (nom absent)', 'kinds': ('equity', 'etf'), 'reason': 'identité incomplète',
-     'role': 'Écarte les lignes sans nom.',
-     'help': 'Sans nom, impossible de présenter le titre ni de repérer les produits dérivés. Ces lignes sont rares et presque toujours des fiches vides.'},
-    {'id': 'warrants', 'group': 'quality', 'label': 'Bons de souscription, droits et unités', 'kinds': ('equity', 'etf'), 'reason': 'bon de souscription, droit ou unité',
-     'role': 'Écarte les instruments dérivés d’une action (bons, droits, unités).',
-     'help': 'Détectés par le nom (« Warrants », « Rights », « Units ») ou le suffixe du symbole (-WT, .U…). Ce ne sont pas des actions ordinaires et leur cours se comporte très différemment.'},
-    {'id': 'spac', 'group': 'quality', 'label': 'Sociétés vides (SPAC)', 'kinds': ('equity',), 'reason': 'société vide (SPAC)',
-     'role': 'Écarte les sociétés d’acquisition sans activité.',
-     'help': 'Un SPAC est une coquille cotée qui lève de l’argent pour racheter une société. Son cours est quasi plat puis très volatil à l’annonce : il fausse les classements de tendance.'},
-    {'id': 'leveraged', 'group': 'quality', 'label': 'ETF à levier ou inverses', 'kinds': ('etf',), 'reason': 'ETF à effet de levier ou inverse',
-     'role': 'Écarte les ETF qui amplifient ou inversent l’indice.',
-     'help': 'Détectés par le nom (« 3x », « Ultra », « Short », « Inverse »…). Leur performance dérive de celle de l’indice sur la durée : ils ne se comparent pas aux ETF classiques.'},
+    {
+        'id': 'incomplete',
+        'label': 'Ligne sans place ou sans symbole',
+        'perimeter': True,
+        'locked': True,
+        'kinds': ('equity', 'etf'),
+        'reason': 'ligne incomplète',
+        'role': 'Écarte les lignes qui ne permettent pas d’identifier une cotation.',
+        'help': 'Sans place de cotation ni symbole, Yahoo Finance ne peut pas être interrogé : la ligne est inutilisable. Règle technique, non modifiable.',
+    },
+    {
+        'id': 'duplicates',
+        'label': 'Doublons place + symbole',
+        'perimeter': True,
+        'locked': True,
+        'kinds': ('equity', 'etf'),
+        'reason': 'doublon',
+        'role': 'Garde une seule ligne par couple (place, symbole).',
+        'help': 'FinanceDatabase répète parfois la même cotation. La première ligne rencontrée est conservée, les suivantes sont ignorées. Règle technique, non modifiable.',
+    },
+    {
+        'id': 'types',
+        'label': 'Types de produits retenus',
+        'perimeter': True,
+        'kinds': ('equity', 'etf'),
+        'reason': 'type non retenu',
+        'group': 'products',
+        'role': 'Choisit les familles de produits analysées : actions, ETF.',
+        'help': 'Décochez « ETF » pour ne travailler que sur des actions (ou l’inverse). Les produits d’un type retiré sont écartés du catalogue, sans être supprimés : vos positions restent suivies.',
+    },
+    {
+        'id': 'markets',
+        'label': 'Places de cotation retenues',
+        'perimeter': True,
+        'kinds': ('equity', 'etf'),
+        'reason': 'place non retenue',
+        'group': 'markets',
+        'role': 'Ne garde que les places choisies. Toutes les places présentes dans FinanceDatabase sont proposées.',
+        'help': 'Seules les places cochées sont transmises à Yahoo Finance. Retirer une place écarte toutes ses cotations ; en ajouter une les réintègre au prochain filtrage, sans retélécharger FinanceDatabase. Règle désactivée = toutes les places.',
+    },
+    {
+        'id': 'categories',
+        'label': 'Catégories exclues',
+        'kinds': ('equity', 'etf'),
+        'reason': 'catégorie exclue',
+        'group': 'products',
+        'default_enabled': False,
+        'role': 'Écarte les secteurs (actions) ou catégories (ETF) cochés.',
+        'help': 'Utile pour retirer un secteur entier (ex. « Financials ») ou une famille d’ETF. Les catégories proposées sont celles des données importées.',
+    },
+    {
+        'id': 'delisted',
+        'group': 'quality',
+        'label': 'Titres radiés',
+        'kinds': ('equity', 'etf'),
+        'reason': 'titre radié',
+        'role': 'Écarte les titres marqués comme radiés de la cote.',
+        'help': 'Un titre radié ne cote plus : ses derniers cours sont figés et trompeurs. Désactiver cette règle les laisse entrer dans la collecte (déconseillé).',
+    },
+    {
+        'id': 'nameless',
+        'group': 'quality',
+        'label': 'Identité incomplète (nom absent)',
+        'kinds': ('equity', 'etf'),
+        'reason': 'identité incomplète',
+        'role': 'Écarte les lignes sans nom.',
+        'help': 'Sans nom, impossible de présenter le titre ni de repérer les produits dérivés. Ces lignes sont rares et presque toujours des fiches vides.',
+    },
+    {
+        'id': 'warrants',
+        'group': 'quality',
+        'label': 'Bons de souscription, droits et unités',
+        'kinds': ('equity', 'etf'),
+        'reason': 'bon de souscription, droit ou unité',
+        'role': 'Écarte les instruments dérivés d’une action (bons, droits, unités).',
+        'help': 'Détectés par le nom (« Warrants », « Rights », « Units ») ou le suffixe du symbole (-WT, .U…). Ce ne sont pas des actions ordinaires et leur cours se comporte très différemment.',
+    },
+    {
+        'id': 'spac',
+        'group': 'quality',
+        'label': 'Sociétés vides (SPAC)',
+        'kinds': ('equity',),
+        'reason': 'société vide (SPAC)',
+        'role': 'Écarte les sociétés d’acquisition sans activité.',
+        'help': 'Un SPAC est une coquille cotée qui lève de l’argent pour racheter une société. Son cours est quasi plat puis très volatil à l’annonce : il fausse les classements de tendance.',
+    },
+    {
+        'id': 'leveraged',
+        'group': 'quality',
+        'label': 'ETF à levier ou inverses',
+        'kinds': ('etf',),
+        'reason': 'ETF à effet de levier ou inverse',
+        'role': 'Écarte les ETF qui amplifient ou inversent l’indice.',
+        'help': 'Détectés par le nom (« 3x », « Ultra », « Short », « Inverse »…). Leur performance dérive de celle de l’indice sur la durée : ils ne se comparent pas aux ETF classiques.',
+    },
 )
 RULE_IDS = tuple(r['id'] for r in RULES)
 BY_ID = {r['id']: r for r in RULES}
@@ -100,7 +206,7 @@ def normalize(config):
             raise ValueError(f'Règle « {rid} » invalide')
         spec = BY_ID[rid]
         if spec.get('locked'):
-            continue                                    # règles techniques : jamais modifiables
+            continue  # règles techniques : jamais modifiables
         if 'enabled' in given:
             if type(given['enabled']) is not bool:
                 raise ValueError(f'Activation de « {spec["label"]} » invalide')

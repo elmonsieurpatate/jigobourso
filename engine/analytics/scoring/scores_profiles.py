@@ -1,4 +1,5 @@
 """Profils de score : réglages officiels et personnels, application, nettoyage et construction de la configuration d'une stratégie."""
+
 import copy
 from engine.shared import settings
 from ..explorer import explorer_config as C
@@ -10,15 +11,29 @@ PERIOD_LABELS = {'day': 'Jour', 'week': 'Semaine', 'month': 'Mois', 'quarter': '
 
 
 def design():
-    return {'kappa': SC.KAPPA, 'threshold': SC.COVERAGE_THRESHOLD, 'anchor': SC.ANCHOR_LAMBDA, 'complex_weights': dict(SC.COMPLEX_WEIGHTS), 'tuning': dict(TUNING_DEFAULTS),
-            'tuning_ranges': {'sat_a': list(SC.SAT_A_RANGE), 'accel_ref': list(SC.ACCEL_REF_RANGE)}, 'vol_modes': list(SC.VOL_MODES), 'momentum_horizons': list(SC.MOMENTUM_HORIZONS)}
+    return {
+        'kappa': SC.KAPPA,
+        'threshold': SC.COVERAGE_THRESHOLD,
+        'anchor': SC.ANCHOR_LAMBDA,
+        'complex_weights': dict(SC.COMPLEX_WEIGHTS),
+        'tuning': dict(TUNING_DEFAULTS),
+        'tuning_ranges': {'sat_a': list(SC.SAT_A_RANGE), 'accel_ref': list(SC.ACCEL_REF_RANGE)},
+        'vol_modes': list(SC.VOL_MODES),
+        'momentum_horizons': list(SC.MOMENTUM_HORIZONS),
+    }
 
 
 def formula():
     """Constantes de conception des deux scores (lecture seule : changer une formule est une décision de conception, pas un réglage)."""
-    return {'saturation': {'a': SC.SAT_A, 'b': SC.SAT_B}, 'accel': {'k': SC.ACCEL_REF, 'r2': SC.ACCEL_R2}, 'gate_floor': SC.GATE_FLOOR,
-            'reliability_sessions': SC.RELIABILITY_SESSIONS, 'min_sessions': SC.MIN_SESSIONS,
-            'liquidity_floor_eur': SC.LIQUIDITY_FLOOR_EUR, 'liquidity_ceil_eur': SC.LIQUIDITY_CEIL_EUR}
+    return {
+        'saturation': {'a': SC.SAT_A, 'b': SC.SAT_B},
+        'accel': {'k': SC.ACCEL_REF, 'r2': SC.ACCEL_R2},
+        'gate_floor': SC.GATE_FLOOR,
+        'reliability_sessions': SC.RELIABILITY_SESSIONS,
+        'min_sessions': SC.MIN_SESSIONS,
+        'liquidity_floor_eur': SC.LIQUIDITY_FLOOR_EUR,
+        'liquidity_ceil_eur': SC.LIQUIDITY_CEIL_EUR,
+    }
 
 
 def profile_of(config):
@@ -28,15 +43,19 @@ def profile_of(config):
     by = {p['id']: p for p in config['periods']}
     liq = config.get('liquidity') or {}
     day = by['day']
-    return {'periods': {pid: dict({'sessions': by[pid]['sessions'], 'enabled': by[pid]['enabled'], 'require_history': by[pid]['require_history']},
-                                  **{f: by[pid][f] for f in THRESHOLDS}) for pid in SCORING_PERIODS},
-            'day_filter': {'enabled': bool(day['enabled']), 'min_return': day['min_return'] if day['min_return'] is not None else 0.0},
-            'liquidity': {f: liq.get(f) for f in LIQUIDITY},
-            'technical': {'require_fresh': bool((config.get('selection') or {}).get('require_fresh'))},
-            'filters': {'enabled': False},                      # filtres de consultation : désactivés par défaut, jamais appliqués aux notes
-            'weights_mode': 'custom' if weights else 'auto', 'weights': dict(weights),
-            'complex_weights': dict(SC.COMPLEX_WEIGHTS, **(sc.get('complex_weights') or {})),
-            'tuning': tuning_of(sc)}
+    return {
+        'periods': {
+            pid: dict({'sessions': by[pid]['sessions'], 'enabled': by[pid]['enabled'], 'require_history': by[pid]['require_history']}, **{f: by[pid][f] for f in THRESHOLDS}) for pid in SCORING_PERIODS
+        },
+        'day_filter': {'enabled': bool(day['enabled']), 'min_return': day['min_return'] if day['min_return'] is not None else 0.0},
+        'liquidity': {f: liq.get(f) for f in LIQUIDITY},
+        'technical': {'require_fresh': bool((config.get('selection') or {}).get('require_fresh'))},
+        'filters': {'enabled': False},  # filtres de consultation : désactivés par défaut, jamais appliqués aux notes
+        'weights_mode': 'custom' if weights else 'auto',
+        'weights': dict(weights),
+        'complex_weights': dict(SC.COMPLEX_WEIGHTS, **(sc.get('complex_weights') or {})),
+        'tuning': tuning_of(sc),
+    }
 
 
 TUNING_DEFAULTS = {'sat_a': SC.SAT_A, 'accel_ref': SC.ACCEL_REF, 'vol_mode': 'absolute', 'momentum_horizon': '6m'}
@@ -60,7 +79,7 @@ def apply_profile(config, profile):
             for f in THRESHOLDS:
                 if f in pp:
                     p[f] = pp[f]
-        if p['id'] == 'day' and 'day' not in (profile.get('periods') or {}) and isinstance(profile.get('day_filter'), dict):      # profil antérieur à la granularité Jour : ancien filtre « dernier jour »
+        if p['id'] == 'day' and 'day' not in (profile.get('periods') or {}) and isinstance(profile.get('day_filter'), dict):  # profil antérieur à la granularité Jour : ancien filtre « dernier jour »
             p['enabled'] = bool(profile['day_filter'].get('enabled'))
             p['min_return'] = profile['day_filter'].get('min_return', 0.0) if p['enabled'] else None
     if isinstance(profile.get('liquidity'), dict):
@@ -90,7 +109,7 @@ def neutral(config):
             for f in THRESHOLDS:
                 p[f] = None
         elif p['id'] == 'day':
-            p['enabled'], p['min_return'] = False, None                   # (jamais atteint tant que Jour est une granularité ; conservé par sécurité)
+            p['enabled'], p['min_return'] = False, None  # (jamais atteint tant que Jour est une granularité ; conservé par sécurité)
     c['liquidity'] = dict(c.get('liquidity') or {}, **{f: None for f in LIQUIDITY})
     return C.validate(c)
 
@@ -103,7 +122,7 @@ def clean_profile(raw):
     out = {'periods': {}}
     for pid in SCORING_PERIODS:
         pp = periods.get(pid)
-        if pid == 'day' and not isinstance(pp, dict):         # profil enregistré avant l'ajout de Jour : Jour désactivé (ou ancien filtre « dernier jour » repris tel quel)
+        if pid == 'day' and not isinstance(pp, dict):  # profil enregistré avant l'ajout de Jour : Jour désactivé (ou ancien filtre « dernier jour » repris tel quel)
             old = raw.get('day_filter') if isinstance(raw.get('day_filter'), dict) else {}
             pp = {'enabled': bool(old.get('enabled')), 'require_history': False, 'min_return': old.get('min_return') if old.get('enabled') else None}
         if not isinstance(pp, dict):
@@ -115,7 +134,7 @@ def clean_profile(raw):
     active = [pid for pid in SCORING_PERIODS if out['periods'][pid]['enabled']]
     if not active:
         raise ValueError('Au moins une granularité doit rester active')
-    d = out['periods']['day']                         # champ conservé pour les anciens lecteurs : reflet de la granularité Jour
+    d = out['periods']['day']  # champ conservé pour les anciens lecteurs : reflet de la granularité Jour
     out['day_filter'] = {'enabled': d['enabled'], 'min_return': d['min_return'] if d['min_return'] is not None else 0.0}
     liq = raw.get('liquidity') or {}
     out['liquidity'] = {f: C.number(liq.get(f), lo, hi, f) for f, (lo, hi) in LIQUIDITY.items()}
@@ -128,7 +147,7 @@ def clean_profile(raw):
     out['weights'] = {}
     if mode == 'custom':
         weights = raw.get('weights') or {}
-        vals = {pid: C.number(weights.get(pid, 0 if pid == 'day' else None), 0, 100, f'Poids {PERIOD_LABELS[pid]}') for pid in active}      # Jour sans poids saisi : 0 %
+        vals = {pid: C.number(weights.get(pid, 0 if pid == 'day' else None), 0, 100, f'Poids {PERIOD_LABELS[pid]}') for pid in active}  # Jour sans poids saisi : 0 %
         if any(v is None for v in vals.values()):
             raise ValueError('Chaque granularité active doit avoir un poids')
         if abs(sum(vals.values()) - 100) > TOLERANCE:
@@ -139,7 +158,7 @@ def clean_profile(raw):
         raise ValueError('Jour seul n’a aucun poids automatique : activez une autre granularité ou donnez-lui un poids personnalisé')
     cw = dict(raw.get('complex_weights') or {})
     for new in ('momentum', 'recovery'):
-        cw.setdefault(new, 0)                             # composantes ajoutées après coup : un profil enregistré sans elles les garde à 0
+        cw.setdefault(new, 0)  # composantes ajoutées après coup : un profil enregistré sans elles les garde à 0
     if set(cw) != set(SC.COMPLEX_WEIGHTS):
         raise ValueError('Poids du score complexe incomplets')
     cw = {k: C.number(v, 0, 100, 'Poids du score complexe') for k, v in cw.items()}

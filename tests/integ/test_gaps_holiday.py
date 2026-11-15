@@ -1,4 +1,5 @@
 """Jours fériés et trous de barres 15 min : une absence de données n'est pas un jour sans séance ; un titre peu échangé n'a pas de trou."""
+
 import datetime
 import os
 import pytest
@@ -11,7 +12,7 @@ if not os.environ.get('JIGO_TEST_DATABASE'):
     pytest.skip('base jetable non configurée', allow_module_level=True)
 
 UTC = datetime.timezone.utc
-NOW = datetime.datetime(2026, 10, 27, 18, 0, tzinfo=UTC)             # mardi 27 : Xetra fermée depuis 16:30 UTC
+NOW = datetime.datetime(2026, 10, 27, 18, 0, tzinfo=UTC)  # mardi 27 : Xetra fermée depuis 16:30 UTC
 D = lambda d: datetime.date(2026, 10, d)
 N = 20
 
@@ -52,49 +53,56 @@ def plan(conn):
 
 
 def test_missing_bars_with_closes_is_not_a_holiday(conn):
-    closes(conn, D(26)); bars(conn, D(27)); closes(conn, D(27))
+    closes(conn, D(26))
+    bars(conn, D(27))
+    closes(conn, D(27))
     daily_job_after(conn, datetime.datetime(2026, 10, 27, 17, 30))
     p, summary = plan(conn)
-    assert len(p.get('5d', [])) == N and summary['holiday'] == 0       # la séance du 26 sera redemandée
+    assert len(p.get('5d', [])) == N and summary['holiday'] == 0  # la séance du 26 sera redemandée
 
 
 def test_real_holiday_is_still_recognised(conn):
-    bars(conn, D(27)); closes(conn, D(27))                             # le 26 : ni barre ni clôture, une collecte quotidienne est passée
+    bars(conn, D(27))
+    closes(conn, D(27))  # le 26 : ni barre ni clôture, une collecte quotidienne est passée
     daily_job_after(conn, datetime.datetime(2026, 10, 27, 17, 30))
     p, summary = plan(conn)
     assert summary['holiday'] == 1 and not p.get('5d')
 
 
 def test_no_conclusion_before_the_daily_close_was_searched(conn):
-    bars(conn, D(27))                                                  # ni clôture du 26 ni collecte quotidienne passée : on ne dit pas « férié »
+    bars(conn, D(27))  # ni clôture du 26 ni collecte quotidienne passée : on ne dit pas « férié »
     p, summary = plan(conn)
     assert summary['holiday'] == 0 and len(p.get('5d', [])) == N
 
 
 def test_thin_titles_are_not_gaps_but_an_outage_and_an_empty_session_are(conn):
-    thin = lambda i, j: (i + j) % 3 != 0                               # 2 créneaux sur 3 : titres peu échangés, aucun trou réel
+    thin = lambda i, j: (i + j) % 3 != 0  # 2 créneaux sur 3 : titres peu échangés, aucun trou réel
     bars(conn, D(24), thin)
     bars(conn, D(26), lambda i, j: thin(i, j) and not 10 <= j <= 15)  # panne : 6 créneaux sans aucune donnée
-    closes(conn, D(23))                                                # le 23 : clôtures présentes mais aucune barre
+    closes(conn, D(23))  # le 23 : clôtures présentes mais aucune barre
     gaps = collect.session_gaps(conn, 'XETR', NOW)
     assert D(24) not in gaps and D(22) not in gaps
     assert D(26) in gaps and '6 créneaux' in gaps[D(26)]
     assert D(23) in gaps and 'clôtures' in gaps[D(23)]
-    assert set(gaps) == {D(23), D(26)}                                 # toute la rétention est surveillée (20 séances), pas seulement les deux dernières
+    assert set(gaps) == {D(23), D(26)}  # toute la rétention est surveillée (20 séances), pas seulement les deux dernières
 
 
 def test_stale_gap_rows_follow_the_data_without_asking_yahoo(conn):
     from engine.market import catchup
+
     thin = lambda i, j: (i + j) % 3 != 0
-    bars(conn, D(23), thin); bars(conn, D(26), thin)
+    bars(conn, D(23), thin)
+    bars(conn, D(26), thin)
     with conn.cursor() as cur:
-        cur.execute("INSERT INTO price_gaps(mic,session_date,state,detected_at,note) VALUES ('XETR',%s,'to_repair',%s,'ancienne médiane 20/34 créneaux'),('XETR',%s,'unrecoverable',%s,'conclu à tort')",
-                    (D(26), NOW.replace(tzinfo=None), D(23), NOW.replace(tzinfo=None)))
+        cur.execute(
+            "INSERT INTO price_gaps(mic,session_date,state,detected_at,note) VALUES ('XETR',%s,'to_repair',%s,'ancienne médiane 20/34 créneaux'),('XETR',%s,'unrecoverable',%s,'conclu à tort')",
+            (D(26), NOW.replace(tzinfo=None), D(23), NOW.replace(tzinfo=None)),
+        )
     conn.commit()
-    assert catchup.plan_intraday(conn, NOW) == []                      # aucune redemande à Yahoo pour une fausse alerte
+    assert catchup.plan_intraday(conn, NOW) == []  # aucune redemande à Yahoo pour une fausse alerte
     with conn.cursor() as cur:
         cur.execute("SELECT session_date, state FROM price_gaps")
-        assert {r['session_date']: r['state'] for r in cur.fetchall()} == {D(26): 'repaired', D(23): 'repaired'}      # « non récupérable » aussi est revérifié
+        assert {r['session_date']: r['state'] for r in cur.fetchall()} == {D(26): 'repaired', D(23): 'repaired'}  # « non récupérable » aussi est revérifié
 
 
 def test_partial_collection_is_a_gap_even_when_every_slot_is_still_covered(conn):

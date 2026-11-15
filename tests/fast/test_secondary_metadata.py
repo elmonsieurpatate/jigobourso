@@ -1,4 +1,5 @@
 """Fixed metadata groups: pure classification, no database, network or financial engine."""
+
 import json
 from pathlib import Path
 import shutil
@@ -61,12 +62,10 @@ def test_php_actual_classification_and_js_local_migration_agree():
     # Exercise every shipped ISO alias plus all explicit edge cases in both implementations.
     alias_cases = [('country', key, None, group) for key, group in CONFIG['country_aliases'].items()]
     cases = [list(c[:3]) for c in CASES + alias_cases]
-    result = subprocess.run(['php', 'tests/php/secondary-metadata.php'], cwd=ROOT,
-                            input=json.dumps(cases), text=True, capture_output=True, check=True)
+    result = subprocess.run(['php', 'tests/php/secondary-metadata.php'], cwd=ROOT, input=json.dumps(cases), text=True, capture_output=True, check=True)
     output = json.loads(result.stdout)
     assert [r['id'] for r in output] == [c[3] for c in CASES + alias_cases]
     assert output[next(i for i, c in enumerate(CASES) if c[1] == 'Pays non répertorié')]['reason'] == 'unmapped-country'
     assert output[next(i for i, c in enumerate(CASES) if c[1] == 'XXXX')]['reason'] == 'unmapped-mic'
-    js = subprocess.run(['node', 'tests/e2e/secondary-metadata.cjs'], cwd=ROOT,
-                        input=json.dumps(cases), text=True, capture_output=True, check=True)
+    js = subprocess.run(['node', 'tests/e2e/secondary-metadata.cjs'], cwd=ROOT, input=json.dumps(cases), text=True, capture_output=True, check=True)
     assert json.loads(js.stdout) == [c[3] for c in CASES + alias_cases]

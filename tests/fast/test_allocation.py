@@ -1,10 +1,17 @@
 """Répartition par zone et écart à la cible (stratégie prudente)."""
+
 import pytest
 
 from engine.analytics.portfolio import allocation as al
 
-CTX = {1: ('etf', None, {'category': 'United States Stock'}), 2: ('etf', None, {'category': 'Europe Stock'}), 3: ('etf', None, {'category': 'Diversified Emerging Mkts'}),
-       4: ('etf', None, {'category': 'World Large-Cap Blend'}), 5: ('equity', 'France', None), 6: ('equity', 'United States', None)}
+CTX = {
+    1: ('etf', None, {'category': 'United States Stock'}),
+    2: ('etf', None, {'category': 'Europe Stock'}),
+    3: ('etf', None, {'category': 'Diversified Emerging Mkts'}),
+    4: ('etf', None, {'category': 'World Large-Cap Blend'}),
+    5: ('equity', 'France', None),
+    6: ('equity', 'United States', None),
+}
 
 
 def test_validate_target():
@@ -26,7 +33,7 @@ def test_summary_against_prudent_target():
     rows = {r['zone']: r for r in s['rows']}
     assert s['total_eur'] == 1000 and s['unpriced'] == 1
     assert rows['us']['current_pct'] == 60 and rows['us']['gap_eur'] == -100 and rows['us']['off_target']
-    assert rows['eu']['gap_eur'] == 50 and rows['eu']['off_target']                # 20 % contre 25 % : 5 points, le seuil compte
+    assert rows['eu']['gap_eur'] == 50 and rows['eu']['off_target']  # 20 % contre 25 % : 5 points, le seuil compte
     assert rows['emerging']['gap_eur'] == 150 and rows['other']['gap_eur'] == -100
     assert s['rebalance_suggested'] and s['zones'][4] == 'other'
 

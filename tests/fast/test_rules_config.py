@@ -31,7 +31,7 @@ def test_prefilter_flags_and_old_format():
 
 def test_schedule_validation():
     assert schedule.normalize({'intraday': {'interval_minutes': 30}})['intraday']['interval_minutes'] == 30
-    assert set(schedule.normalize({})) == {'cron_interval_minutes', 'daily', 'intraday'}       # le cron ne planifie ni catalogue ni filtrage
+    assert set(schedule.normalize({})) == {'cron_interval_minutes', 'daily', 'intraday'}  # le cron ne planifie ni catalogue ni filtrage
     for bad in ({'intraday': {'interval_minutes': 1}}, {'ghost': {}}, {'cron_interval_minutes': 0}):
         with pytest.raises(ValueError):
             schedule.normalize(bad)
@@ -53,9 +53,9 @@ def test_categories_filter_is_optional():
 
 def test_stale_quote_rule_is_optional_and_adjustable():
     assert prefilter.decide('etf', 30.0, 100000, 1.0, None, age_days=3) == ('selected', None)
-    status, reason = prefilter.decide('etf', 30.0, 100000, 1.0, None, age_days=1800)           # titre mort : cours figé depuis 2021, il passait prix et liquidité
+    status, reason = prefilter.decide('etf', 30.0, 100000, 1.0, None, age_days=1800)  # titre mort : cours figé depuis 2021, il passait prix et liquidité
     assert status == 'excluded' and prefilter.step_of(reason) == 'stale'
-    assert prefilter.decide('etf', 30.0, 100000, 1.0, {'stale': {'max_days': 3000}}, age_days=1800)[0] == 'selected'            # seuil modifiable
-    assert prefilter.decide('etf', 30.0, 100000, 1.0, {'stale': {'enabled': False}}, age_days=1800)[0] == 'selected'             # désactivable
-    assert prefilter.decide('etf', 30.0, 100000, 1.0, None, age_days=None)[0] == 'selected'                                      # âge inconnu : pas de décision sur ce critère
+    assert prefilter.decide('etf', 30.0, 100000, 1.0, {'stale': {'max_days': 3000}}, age_days=1800)[0] == 'selected'  # seuil modifiable
+    assert prefilter.decide('etf', 30.0, 100000, 1.0, {'stale': {'enabled': False}}, age_days=1800)[0] == 'selected'  # désactivable
+    assert prefilter.decide('etf', 30.0, 100000, 1.0, None, age_days=None)[0] == 'selected'  # âge inconnu : pas de décision sur ce critère
     assert prefilter.default_config()['stale'] == {'enabled': True, 'max_days': 10}

@@ -1,4 +1,5 @@
 """Règles de calcul du Portefeuille (pf-math.js, exécuté sous Node) avec des exemples de flux indépendants."""
+
 import json, shutil, subprocess
 from pathlib import Path
 import pytest
@@ -34,7 +35,7 @@ def test_period_includes_new_purchases_but_does_not_subtract_sales():
 def test_unknown_value_is_not_zero():
     h = hist(['2026-01-01', '2026-01-02', '2026-01-03'], [0, None, 10], [100, None, 110], [100, 100, 100])
     r = js("PFM.position(D,D.lines[0],{i0:1,i1:2})", h)
-    assert r['result'] is None and r['reason']                                          # départ non valorisable : pas de zéro inventé
+    assert r['result'] is None and r['reason']  # départ non valorisable : pas de zéro inventé
     assert js("PFM.position(D,D.lines[0],PFM.resolveWindow(D,'all'))", h)['result'] == 10
 
 
@@ -42,7 +43,7 @@ def test_period_reference_is_calendar_based_and_clamps_month_end():
     dates = ['2026-01-28', '2026-02-27', '2026-02-28', '2026-03-31']
     h = hist(dates, [0, 1, 2, 3], [1, 2, 3, 4], [1, 1, 1, 1])
     w = js("PFM.resolveWindow(D,'1m')", h)
-    assert w['from'] == '2026-02-28' and w['i0'] == 2                                  # 31 mars − 1 mois = 28 février
+    assert w['from'] == '2026-02-28' and w['i0'] == 2  # 31 mars − 1 mois = 28 février
     assert js("PFM.resolveWindow(D,'1w')", h)['from'] == '2026-03-24'
 
 
@@ -55,7 +56,7 @@ def test_period_before_history_is_flagged_not_extrapolated():
 def test_contribution_uses_portfolio_capital_not_stock_return():
     h = hist(['2026-01-01', '2026-01-02'], [0, 10], [100, 110], [100, 100])
     c = js("PFM.contribution(PFM.position(D,D.lines[0],{i0:-1,i1:1}),PFM.portfolio(D,{i0:-1,i1:1}))", h)
-    assert c == pytest.approx(10)                                                      # 10 € sur 100 € engagés
+    assert c == pytest.approx(10)  # 10 € sur 100 € engagés
 
 
 def test_personal_peak_and_drop():

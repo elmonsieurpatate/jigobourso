@@ -1,4 +1,5 @@
 """L'aide interactive recalcule mesures et scores en JavaScript (help-math.js) sur des exemples fictifs : ces calculs doivent rester identiques à ceux du moteur Python."""
+
 import json
 import math
 import shutil
@@ -28,17 +29,31 @@ SESS = {'week': 5, 'month': 21, 'quarter': 63, 'half': 126}
 def python_eval(closes, ids, liquidity, anchor=0.5):
     inputs = {}
     for i in ids:
-        n = SESS[i]; w = closes[-1 - n:]
-        m = M.window_metrics(w); m.update(SI.path_inputs(w)); m.update(accel=None, r2_prev=None); inputs[n] = m
+        n = SESS[i]
+        w = closes[-1 - n :]
+        m = M.window_metrics(w)
+        m.update(SI.path_inputs(w))
+        m.update(accel=None, r2_prev=None)
+        inputs[n] = m
     periods = [{'id': i, 'sessions': SESS[i]} for i in ids]
     r = S.score_title(inputs, {'turnover_eur': liquidity, 'source': 'daily'}, periods, kappa=0.7, anchor=anchor)
-    return {'simple': r['simple']['score'], 'complex': r['complex']['score'], 'weights': r['weights'],
-            'slope': {i: inputs[SESS[i]]['slope'] for i in ids}, 'r2': {i: inputs[SESS[i]]['r2'] for i in ids}, 'vol': {i: inputs[SESS[i]]['volatility'] for i in ids}, 'dd': {i: inputs[SESS[i]]['drawdown'] for i in ids}}
+    return {
+        'simple': r['simple']['score'],
+        'complex': r['complex']['score'],
+        'weights': r['weights'],
+        'slope': {i: inputs[SESS[i]]['slope'] for i in ids},
+        'r2': {i: inputs[SESS[i]]['r2'] for i in ids},
+        'vol': {i: inputs[SESS[i]]['volatility'] for i in ids},
+        'dd': {i: inputs[SESS[i]]['drawdown'] for i in ids},
+    }
 
 
 def test_javascript_matches_python_engine():
     cases = [{'closes': c, 'ids': IDS[k], 'liq': liq, 'anchor': a} for c in CASES for k in IDS for liq, a in ((20e6, 0.5), (3e6, 0.0), (80e6, 1.0))]
-    code = "const HM=require(%s);const cases=JSON.parse(require('fs').readFileSync(0,'utf8'));console.log(JSON.stringify(cases.map(c=>{const r=HM.evaluate({closes:c.closes,liquidity:c.liq},c.ids,{anchor:c.anchor});const o={simple:r.simple.score,complex:r.complex.score,weights:r.weights,slope:{},r2:{},vol:{},dd:{}};r.periods.forEach(p=>{o.slope[p.id]=p.m.slope;o.r2[p.id]=p.m.r2;o.vol[p.id]=p.m.volatility;o.dd[p.id]=p.m.drawdown});return o;})))" % json.dumps(str(ROOT / 'app/public/assets/help-math.js'))
+    code = (
+        "const HM=require(%s);const cases=JSON.parse(require('fs').readFileSync(0,'utf8'));console.log(JSON.stringify(cases.map(c=>{const r=HM.evaluate({closes:c.closes,liquidity:c.liq},c.ids,{anchor:c.anchor});const o={simple:r.simple.score,complex:r.complex.score,weights:r.weights,slope:{},r2:{},vol:{},dd:{}};r.periods.forEach(p=>{o.slope[p.id]=p.m.slope;o.r2[p.id]=p.m.r2;o.vol[p.id]=p.m.volatility;o.dd[p.id]=p.m.drawdown});return o;})))"
+        % json.dumps(str(ROOT / 'app/public/assets/help-math.js'))
+    )
     out = subprocess.run(['node', '-e', code], input=json.dumps(cases), capture_output=True, text=True, timeout=60)
     assert out.returncode == 0, out.stderr
     got = json.loads(out.stdout)
@@ -53,7 +68,9 @@ def test_javascript_matches_python_engine():
 
 
 def test_fifo_and_dietz_examples():
-    code = "const HM=require(%s);console.log(JSON.stringify([HM.fifo([{qty:10,price:5},{qty:10,price:8}],[{qty:10,price:10}]),HM.dietz(1000,2300,[{amount:1000,t:0.5}])]))" % json.dumps(str(ROOT / 'app/public/assets/help-math.js'))
+    code = "const HM=require(%s);console.log(JSON.stringify([HM.fifo([{qty:10,price:5},{qty:10,price:8}],[{qty:10,price:10}]),HM.dietz(1000,2300,[{amount:1000,t:0.5}])]))" % json.dumps(
+        str(ROOT / 'app/public/assets/help-math.js')
+    )
     f, d = json.loads(subprocess.run(['node', '-e', code], capture_output=True, text=True, timeout=30).stdout)
     assert f['realized'] == 50 and f['qty'] == 10 and f['cost'] == 80 and f['avg'] == 8
     assert d['gain'] == 300 and d['den'] == 1500 and d['perf'] == pytest.approx(20.0)

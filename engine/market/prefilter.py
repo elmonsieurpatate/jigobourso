@@ -6,27 +6,73 @@ Exemple : DVDG.DE, 131 titres/jour à 42 € ≈ 5 k€/jour → exclu.
 Réglable dans l'administration (settings['prefilter']) : chaque règle s'active ou se désactive et a son seuil. Ce niveau ne connaît ni
 les règles du catalogue FinanceDatabase (niveau 1) ni les critères des stratégies (niveau 3).
 """
+
 PREFIX = 'préfiltre'
 
 RULES = (
-    {'id': 'stale', 'label': 'Dernier cours trop ancien', 'kinds': ('equity', 'etf'), 'unit': 'jours', 'step': 1, 'key': 'max_days', 'default': 10, 'max': 3650,
-     'reason': 'dernier cours trop ancien', 'role': 'Écarte les titres dont le dernier cours connu date de plus de N jours.',
-     'help': 'Un titre radié, suspendu ou liquidé garde un « dernier cours » figé qui passe les seuils de prix et de liquidité. 10 jours laissent passer week-ends et jours fériés ; mettez plus pour tolérer des suspensions longues, ou désactivez la règle.'},
-    {'id': 'price', 'label': 'Prix minimum', 'kinds': ('equity', 'etf'), 'unit': '€', 'step': 0.5, 'key': 'min_eur', 'default': 2.0, 'max': 1000.0,
-     'reason': 'cours inférieur', 'role': 'Écarte les titres dont le cours (converti en euros) est sous le seuil.',
-     'help': 'Les titres à quelques centimes ont des variations en pourcentage énormes et un écart achat/vente très coûteux : leurs pentes et leurs replis ne sont pas comparables à ceux des autres.'},
-    {'id': 'liquidity_equity', 'label': 'Liquidité minimale des actions', 'kinds': ('equity',), 'unit': '€/jour', 'step': 50_000, 'key': 'min_eur', 'default': 1_000_000.0, 'max': 1e9,
-     'reason': 'liquidité', 'role': 'Écarte les actions dont l’échange quotidien moyen (prix × volume moyen sur 3 mois) est sous le seuil.',
-     'help': 'Un titre peu échangé est difficile à acheter et à revendre au prix affiché. Le seuil est une valeur en euros échangée par jour, pas un nombre de titres.'},
-    {'id': 'liquidity_etf', 'label': 'Liquidité minimale des ETF', 'kinds': ('etf',), 'unit': '€/jour', 'step': 50_000, 'key': 'min_eur', 'default': 250_000.0, 'max': 1e9,
-     'reason': 'liquidité', 'role': 'Écarte les ETF dont l’échange quotidien moyen est sous le seuil.',
-     'help': 'Un ETF se négocie contre ses teneurs de marché : un seuil plus bas que pour les actions est raisonnable, mais un ETF presque jamais échangé reste risqué (DVDG.DE : ~5 000 €/jour).'},
-    {'id': 'unknown_volume', 'label': 'Volume moyen inconnu', 'kinds': ('equity', 'etf'),
-     'reason': 'volume moyen inconnu', 'role': 'Écarte les titres pour lesquels Yahoo ne donne pas de volume moyen.',
-     'help': 'Sans volume, la liquidité ne peut pas être vérifiée. Désactivez cette règle pour laisser passer ces titres (la règle de liquidité ne s’applique alors pas à eux).'},
+    {
+        'id': 'stale',
+        'label': 'Dernier cours trop ancien',
+        'kinds': ('equity', 'etf'),
+        'unit': 'jours',
+        'step': 1,
+        'key': 'max_days',
+        'default': 10,
+        'max': 3650,
+        'reason': 'dernier cours trop ancien',
+        'role': 'Écarte les titres dont le dernier cours connu date de plus de N jours.',
+        'help': 'Un titre radié, suspendu ou liquidé garde un « dernier cours » figé qui passe les seuils de prix et de liquidité. 10 jours laissent passer week-ends et jours fériés ; mettez plus pour tolérer des suspensions longues, ou désactivez la règle.',
+    },
+    {
+        'id': 'price',
+        'label': 'Prix minimum',
+        'kinds': ('equity', 'etf'),
+        'unit': '€',
+        'step': 0.5,
+        'key': 'min_eur',
+        'default': 2.0,
+        'max': 1000.0,
+        'reason': 'cours inférieur',
+        'role': 'Écarte les titres dont le cours (converti en euros) est sous le seuil.',
+        'help': 'Les titres à quelques centimes ont des variations en pourcentage énormes et un écart achat/vente très coûteux : leurs pentes et leurs replis ne sont pas comparables à ceux des autres.',
+    },
+    {
+        'id': 'liquidity_equity',
+        'label': 'Liquidité minimale des actions',
+        'kinds': ('equity',),
+        'unit': '€/jour',
+        'step': 50_000,
+        'key': 'min_eur',
+        'default': 1_000_000.0,
+        'max': 1e9,
+        'reason': 'liquidité',
+        'role': 'Écarte les actions dont l’échange quotidien moyen (prix × volume moyen sur 3 mois) est sous le seuil.',
+        'help': 'Un titre peu échangé est difficile à acheter et à revendre au prix affiché. Le seuil est une valeur en euros échangée par jour, pas un nombre de titres.',
+    },
+    {
+        'id': 'liquidity_etf',
+        'label': 'Liquidité minimale des ETF',
+        'kinds': ('etf',),
+        'unit': '€/jour',
+        'step': 50_000,
+        'key': 'min_eur',
+        'default': 250_000.0,
+        'max': 1e9,
+        'reason': 'liquidité',
+        'role': 'Écarte les ETF dont l’échange quotidien moyen est sous le seuil.',
+        'help': 'Un ETF se négocie contre ses teneurs de marché : un seuil plus bas que pour les actions est raisonnable, mais un ETF presque jamais échangé reste risqué (DVDG.DE : ~5 000 €/jour).',
+    },
+    {
+        'id': 'unknown_volume',
+        'label': 'Volume moyen inconnu',
+        'kinds': ('equity', 'etf'),
+        'reason': 'volume moyen inconnu',
+        'role': 'Écarte les titres pour lesquels Yahoo ne donne pas de volume moyen.',
+        'help': 'Sans volume, la liquidité ne peut pas être vérifiée. Désactivez cette règle pour laisser passer ces titres (la règle de liquidité ne s’applique alors pas à eux).',
+    },
 )
 BY_ID = {r['id']: r for r in RULES}
-DEFAULTS = {'min_price_eur': 2.0, 'min_liquidity_eur_equity': 1_000_000.0, 'min_liquidity_eur_etf': 250_000.0}      # ancien format, toujours accepté
+DEFAULTS = {'min_price_eur': 2.0, 'min_liquidity_eur_equity': 1_000_000.0, 'min_liquidity_eur_etf': 250_000.0}  # ancien format, toujours accepté
 
 
 def default_config():

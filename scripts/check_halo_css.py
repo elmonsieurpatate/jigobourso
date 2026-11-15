@@ -9,9 +9,21 @@ PUBLIC = ROOT / "app/public"
 ASSETS = PUBLIC / "assets"
 HALO = ASSETS / "halo.css"
 SHARED = {
-    "--bg", "--surface", "--surface-2", "--line", "--text", "--muted",
-    "--accent", "--font", "--radius", "--radius-sm", "--shadow",
-    "--h1-size", "--btn-size", "--control-h", "--cell-pad",
+    "--bg",
+    "--surface",
+    "--surface-2",
+    "--line",
+    "--text",
+    "--muted",
+    "--accent",
+    "--font",
+    "--radius",
+    "--radius-sm",
+    "--shadow",
+    "--h1-size",
+    "--btn-size",
+    "--control-h",
+    "--cell-pad",
 }
 
 errors = []
@@ -45,8 +57,19 @@ for sheet in ASSETS.glob("*.css"):
 # (titres, boutons, champs, cellules, badges, cartes, onglets). Elle ne garde que la mise en page.
 COMPONENT = r"(?:h[1-6]|button|input|select|textarea|th|td|\.btn|\.badge|\.card|\.tab|\.seg|\.chip|\.switch)"
 VISUAL = {
-    "font-size", "font-weight", "letter-spacing", "border-radius", "padding", "height", "min-height",
-    "background", "background-color", "border", "box-shadow", "line-height", "text-transform",
+    "font-size",
+    "font-weight",
+    "letter-spacing",
+    "border-radius",
+    "padding",
+    "height",
+    "min-height",
+    "background",
+    "background-color",
+    "border",
+    "box-shadow",
+    "line-height",
+    "text-transform",
 }
 # Exceptions légitimes, avec leur raison (feuille, sélecteur normalisé).
 EXCEPTIONS = {
@@ -68,8 +91,7 @@ for sheet in ASSETS.glob("*.css"):
             norm = " ".join(sel.split())
             last = re.split(r"[\s>+~]+", norm)[-1]
             base = re.sub(r":[\w-]+(\([^)]*\))?|\[[^\]]*\]", "", last)
-            if (re.fullmatch(COMPONENT + r"([.#][\w-]+)*", base) or re.fullmatch(r"(\.[\w-]+)?" + COMPONENT, base)) \
-                    and (sheet.name, norm) not in EXCEPTIONS:
+            if (re.fullmatch(COMPONENT + r"([.#][\w-]+)*", base) or re.fullmatch(r"(\.[\w-]+)?" + COMPONENT, base)) and (sheet.name, norm) not in EXCEPTIONS:
                 errors.append(f"{sheet.name}: surcharge locale de composant commun « {norm} » ({', '.join(sorted(bad))}) : à déplacer dans halo.css")
                 break
 

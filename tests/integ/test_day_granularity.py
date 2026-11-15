@@ -1,4 +1,5 @@
 """Var. 1J et granularité Jour sur une vraie base : colonne, tri, critère de recherche, poids de score, stratégies personnelles, colonnes enregistrées (vrai PHP + MariaDB)."""
+
 import json
 import os
 import subprocess
@@ -53,9 +54,9 @@ def test_var_1j_is_the_move_between_the_last_two_closed_sessions_in_every_table(
         one = {r['listing_id']: float(r['perf']) for r in cur.fetchall()}
     for sym, lid in (('UP.DE', 1), ('ZIG.DE', 2)):
         assert rows[sym]['change'] == pytest.approx(want[sym], abs=1e-3) and adm[sym]['change'] == pytest.approx(want[sym], abs=1e-3)
-        assert one[lid] == pytest.approx(want[sym], abs=1e-3)                                  # la mesure « Jour » est la même variation, jamais une autre
-    assert rows['UP.DE']['change'] != rows['UP.DE']['perf']['week']                            # ≠ performance de la période
-    assert 1 not in {int(k) for k in rows['UP.DE']['periods']}                                 # pas de pente ni de R² « sur une séance »
+        assert one[lid] == pytest.approx(want[sym], abs=1e-3)  # la mesure « Jour » est la même variation, jamais une autre
+    assert rows['UP.DE']['change'] != rows['UP.DE']['perf']['week']  # ≠ performance de la période
+    assert 1 not in {int(k) for k in rows['UP.DE']['periods']}  # pas de pente ni de R² « sur une séance »
 
 
 def test_scores_listing_sorts_on_var_1j_without_changing_global_ranks():
@@ -96,23 +97,23 @@ def test_day_weight_changes_scores_only_when_it_has_a_weight():
     p = dict(st['current'], name='growth_v4')
     p['periods'] = {k: dict(v) for k, v in p['periods'].items()}
     p['periods']['day'].update(enabled=True, min_return=0.0)
-    A.save(conn, {'profile': p})                                                      # Jour activé (critère de recherche), mode automatique : poids 0
+    A.save(conn, {'profile': p})  # Jour activé (critère de recherche), mode automatique : poids 0
     assert scores(conn) == before
     p['weights_mode'] = 'custom'
     p['weights'] = {'day': 0.0, 'week': 41.6, 'month': 58.4}
-    A.save(conn, {'profile': p})                                                      # poids explicite 0 %
+    A.save(conn, {'profile': p})  # poids explicite 0 %
     after_zero = scores(conn)
     assert {k: v[2] for k, v in after_zero.items()} == {k: v[2] for k, v in before.items()}
-    assert all(after_zero[k][0] == pytest.approx(before[k][0], abs=0.01) for k in before)      # poids 41,6 / 58,4 arrondis : écart inférieur au centième
+    assert all(after_zero[k][0] == pytest.approx(before[k][0], abs=0.01) for k in before)  # poids 41,6 / 58,4 arrondis : écart inférieur au centième
     p['weights'] = {'day': 30.0, 'week': 29.0, 'month': 41.0}
     A.save(conn, {'profile': p})
     weighted = scores(conn)
-    assert weighted != before                                                         # Jour pondéré : les notes tiennent compte de la variation 1J
+    assert weighted != before  # Jour pondéré : les notes tiennent compte de la variation 1J
     p['periods']['day']['enabled'] = False
     p['weights_mode'] = 'auto'
     p['weights'] = {}
     A.save(conn, {'profile': p})
-    assert scores(conn) == before                                                     # désactivé : retour exact aux notes initiales
+    assert scores(conn) == before  # désactivé : retour exact aux notes initiales
     sim = scores_ranking.simulate(conn, {'strategy': 'growth_v4', 'q': 'UP.DE'})
     assert [x['id'] for x in sim['periods']] == ['week', 'month']
     clean(conn)
@@ -124,7 +125,7 @@ def test_personal_strategy_with_day_enabled_keeps_its_scores():
     seed(conn)
 
     def doc(day_on):
-        per = {k: {'enabled': k in ('month', 'quarter'), 'slope': .08, 'r2': .65} for k in ('week', 'month', 'quarter', 'half', 'year', 'two_year')}
+        per = {k: {'enabled': k in ('month', 'quarter'), 'slope': 0.08, 'r2': 0.65} for k in ('week', 'month', 'quarter', 'half', 'year', 'two_year')}
         per['day'] = {'enabled': day_on, 'return': 0.0}
         return {'schema': 1, 'revision': 1, 'selected': 'cs-aaa', 'items': [{'id': 'cs-aaa', 'name': 'Blou', 'builtin': False, 'filters': [], 'config': {'periods': per, 'extra': [], 'join': 'and'}}]}
 
@@ -140,7 +141,7 @@ def test_personal_strategy_with_day_enabled_keeps_its_scores():
     on = R.table(conn, {'ct_id': 'cs-aaa', 'user_id': 7})
     assert on['strategy'] == 'ct:7:cs-aaa' and {r['symbol']: (r['simple'], r['complex'], r['rank_simple']) for r in on['rows']} == off
     blou = next(s for s in A.state(conn)['strategies'] if s['name'] == 'ct:7:cs-aaa')
-    assert blou['current']['periods']['day']['enabled'] and blou['auto_weights'].get('day', 0) == 0                         # Jour actif comme critère, jamais de poids automatique
+    assert blou['current']['periods']['day']['enabled'] and blou['auto_weights'].get('day', 0) == 0  # Jour actif comme critère, jamais de poids automatique
     clean(conn)
 
 
@@ -152,21 +153,25 @@ def php(code):
 
 
 def ct_config(cfg):
-    return php('try { echo json_encode(["ok" => ct_config(json_decode(' + json.dumps(json.dumps(cfg)) + ', true))]); } catch (ApiError $e) { echo json_encode(["error" => $e->getMessage(), "code" => $e->status]); }')
+    return php(
+        'try { echo json_encode(["ok" => ct_config(json_decode('
+        + json.dumps(json.dumps(cfg))
+        + ', true))]); } catch (ApiError $e) { echo json_encode(["error" => $e->getMessage(), "code" => $e->status]); }'
+    )
 
 
 def base_periods():
-    return {k: {'enabled': k == 'month', 'slope': .08, 'r2': .65} for k in ('week', 'month', 'quarter', 'half', 'year', 'two_year')}
+    return {k: {'enabled': k == 'month', 'slope': 0.08, 'r2': 0.65} for k in ('week', 'month', 'quarter', 'half', 'year', 'two_year')}
 
 
 def test_strategy_config_accepts_day_and_stays_compatible_with_strategies_saved_before():
     legacy = ct_config({'periods': base_periods(), 'extra': [], 'join': 'and'})['ok']
-    assert legacy['periods']['day'] == {'enabled': False, 'return': None}                                   # enregistrée avant l'ajout de Jour : désactivé
-    assert legacy['periods']['month'] == {'enabled': True, 'slope': 0.08, 'r2': 0.65}                       # le reste est identique
+    assert legacy['periods']['day'] == {'enabled': False, 'return': None}  # enregistrée avant l'ajout de Jour : désactivé
+    assert legacy['periods']['month'] == {'enabled': True, 'slope': 0.08, 'r2': 0.65}  # le reste est identique
     per = base_periods()
     per['day'] = {'enabled': True, 'return': 0.5, 'slope': 9, 'r2': 9}
     ok = ct_config({'periods': per, 'extra': [], 'join': 'and'})['ok']
-    assert ok['periods']['day'] == {'enabled': True, 'return': 0.5}                                         # jamais de pente ni de R² pour Jour
+    assert ok['periods']['day'] == {'enabled': True, 'return': 0.5}  # jamais de pente ni de R² pour Jour
     tree = {'kind': 'group', 'join': 'and', 'children': [{'kind': 'rule', 'metric': 'return', 'period': 'day', 'op': '>=', 'value': 1.0}]}
     assert ct_config({'periods': per, 'extra': [], 'join': 'and', 'tree': tree})['ok']['tree']['children'][0]['period'] == 'day'
     per['day'] = {'enabled': 'oui'}
@@ -178,10 +183,18 @@ def test_strategy_config_accepts_day_and_stays_compatible_with_strategies_saved_
 def test_saved_columns_survive_the_rename_and_new_columns_arrive_hidden():
     conn = connect()
     clean(conn)
-    old = {'schema': 1, 'revision': 3, 'layouts': {
-        'explorer.desktop': {'columns': [{'id': 'name', 'visible': True, 'width': None}, {'id': 'change', 'visible': True, 'width': 130}, {'id': 'rank', 'visible': False, 'width': None}],
-                             'sort': [{'key': 'change', 'dir': 'asc'}, {'key': 'name', 'dir': 'desc'}], 'filters': {'verdict': 'excluded', 'page_size': 100}},
-        'scores.mobile': {'columns': [{'id': 'simple', 'visible': True, 'width': None}, {'id': 'name', 'visible': True, 'width': None}], 'sort': [], 'filters': {'verdict': 'all'}}}}
+    old = {
+        'schema': 1,
+        'revision': 3,
+        'layouts': {
+            'explorer.desktop': {
+                'columns': [{'id': 'name', 'visible': True, 'width': None}, {'id': 'change', 'visible': True, 'width': 130}, {'id': 'rank', 'visible': False, 'width': None}],
+                'sort': [{'key': 'change', 'dir': 'asc'}, {'key': 'name', 'dir': 'desc'}],
+                'filters': {'verdict': 'excluded', 'page_size': 100},
+            },
+            'scores.mobile': {'columns': [{'id': 'simple', 'visible': True, 'width': None}, {'id': 'name', 'visible': True, 'width': None}], 'sort': [], 'filters': {'verdict': 'all'}},
+        },
+    }
     with conn.cursor() as cur:
         cur.execute("INSERT INTO settings(name,value_json,updated_at) VALUES ('table_layouts', %s, NOW())", (json.dumps(old),))
     conn.commit()
@@ -190,7 +203,7 @@ def test_saved_columns_survive_the_rename_and_new_columns_arrive_hidden():
     ids = [c['id'] for c in ex['columns']]
     assert ids[:3] == ['name', 'change', 'rank'] and ex['columns'][1]['visible'] and ex['columns'][1]['width'] == 130 and not ex['columns'][2]['visible']
     assert ex['sort'] == [{'key': 'change', 'dir': 'asc'}, {'key': 'name', 'dir': 'desc'}] and ex['filters']['verdict'] == 'excluded' and ex['filters']['page_size'] == 100
-    assert 'last_close' in ids and not next(c for c in ex['columns'] if c['id'] == 'last_close')['visible']      # nouvelle colonne : en fin de liste, masquée
+    assert 'last_close' in ids and not next(c for c in ex['columns'] if c['id'] == 'last_close')['visible']  # nouvelle colonne : en fin de liste, masquée
     sc = d['layouts']['scores.mobile']
     assert 'change' in [c['id'] for c in sc['columns']] and not next(c for c in sc['columns'] if c['id'] == 'change')['visible']
     assert next(c for c in d['catalog']['explorer']['columns'] if c['id'] == 'change')['label'] == 'Var. 1J (%)'

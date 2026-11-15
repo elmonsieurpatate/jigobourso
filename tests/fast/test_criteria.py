@@ -1,4 +1,5 @@
 """Moteur unique de décision des critères de recherche : retenue / exclue / indéterminée, unités, indépendance des scores."""
+
 from engine.analytics.scoring import criteria as CR
 
 

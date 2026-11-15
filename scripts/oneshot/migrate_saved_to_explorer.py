@@ -6,6 +6,7 @@
 Ensuite, à la main et avec sauvegarde : DROP TABLE saved_presets, saved_searches (les migrations de db/migrations/ n'ont pas le droit de supprimer).
 Connexion : variables JIGO_DB_* (comme le moteur).
 """
+
 import json
 import os
 import sys
@@ -15,8 +16,10 @@ from engine.shared.db import connect  # noqa: E402
 
 
 def payload(config, view):
-    return json.dumps({'schema': 4, 'config': json.loads(config) if isinstance(config, (str, bytes)) else config,
-                       'universe': (json.loads(view) if isinstance(view, (str, bytes)) else view) or {}}, ensure_ascii=False)
+    return json.dumps(
+        {'schema': 4, 'config': json.loads(config) if isinstance(config, (str, bytes)) else config, 'universe': (json.loads(view) if isinstance(view, (str, bytes)) else view) or {}},
+        ensure_ascii=False,
+    )
 
 
 def main(go):

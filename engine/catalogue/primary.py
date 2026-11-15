@@ -6,10 +6,34 @@
 Sans liquidité connue (chargement initial), le produit n'a pas d'origine reconnue : la plus haute priorité de place fait foi,
 et le choix est recalculé dès que les liquidités sont connues.
 """
-HOME_MARKET = {'Germany': 'XETR', 'France': 'XPAR', 'Netherlands': 'XAMS', 'United Kingdom': 'XLON', 'Italy': 'XMIL',
-               'Spain': 'XMAD', 'Sweden': 'XSTO', 'Norway': 'XOSL', 'Switzerland': 'XSWX', 'Belgium': 'XBRU', 'Portugal': 'XLIS', 'Finland': 'XHEL',
-               'Denmark': 'XCSE', 'Austria': 'XWBO', 'Ireland': 'XDUB', 'Poland': 'XWAR', 'Greece': 'XATH', 'Canada': 'XTSE', 'Japan': 'XTKS',
-               'Hong Kong': 'XHKG', 'Australia': 'XASX', 'Singapore': 'XSES', 'South Korea': 'XKRX', 'India': 'XNSE', 'Brazil': 'BVMF'}
+
+HOME_MARKET = {
+    'Germany': 'XETR',
+    'France': 'XPAR',
+    'Netherlands': 'XAMS',
+    'United Kingdom': 'XLON',
+    'Italy': 'XMIL',
+    'Spain': 'XMAD',
+    'Sweden': 'XSTO',
+    'Norway': 'XOSL',
+    'Switzerland': 'XSWX',
+    'Belgium': 'XBRU',
+    'Portugal': 'XLIS',
+    'Finland': 'XHEL',
+    'Denmark': 'XCSE',
+    'Austria': 'XWBO',
+    'Ireland': 'XDUB',
+    'Poland': 'XWAR',
+    'Greece': 'XATH',
+    'Canada': 'XTSE',
+    'Japan': 'XTKS',
+    'Hong Kong': 'XHKG',
+    'Australia': 'XASX',
+    'Singapore': 'XSES',
+    'South Korea': 'XKRX',
+    'India': 'XNSE',
+    'Brazil': 'BVMF',
+}
 US_COUNTRY = 'United States'
 US_MICS = ('XNAS', 'XNYS', 'XASE', 'ARCX', 'BATS')
 FALLBACK_ORDER = ('XNAS', 'XNYS', 'XETR', 'XPAR', 'XAMS', 'XLON', 'XMIL', 'XMAD', 'XSTO', 'XOSL', 'XSWX', 'XASE', 'ARCX', 'BATS')
@@ -25,8 +49,7 @@ def choose_primary(listings, country=None, liquidity=None):
     if len(listings) == 1:
         return listings[0]['id'], 'single'
     home = HOME_MARKET.get(country)
-    candidates = [l for l in listings if l['mic'] == home] if home else (
-        [l for l in listings if l['mic'] in US_MICS] if country == US_COUNTRY else [])
+    candidates = [l for l in listings if l['mic'] == home] if home else ([l for l in listings if l['mic'] in US_MICS] if country == US_COUNTRY else [])
     if candidates:
         return min(candidates, key=lambda l: _sort_key(l, liquidity))['id'], 'home_market'
     if any(liquidity.get(l['id']) for l in listings):

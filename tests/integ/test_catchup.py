@@ -1,5 +1,6 @@
 """Rattrapage autonome : après une panne de Yahoo ou un cron arrêté, tout ce qui manque est redemandé sans intervention, sans marteler Yahoo,
 et ce qui ne peut pas être récupéré est signalé au lieu d'être présenté comme à jour."""
+
 import datetime
 import os
 import pytest
@@ -25,6 +26,7 @@ def at(day, hh, mm=0):
 
 class Yahoo(FakeYahoo):
     """Faux Yahoo avec pannes : down=True lève une erreur réseau, limited=True un 429."""
+
     down = False
     limited = False
 
@@ -61,8 +63,7 @@ def full_day(day):
 
 
 def yahoo(days=(23, 26, 27), **kw):
-    y = Yahoo(intraday={s: ('UTC', [b for d in days for b in full_day(d)]) for s in SYMS},
-              daily={s: ('UTC', [(datetime.date(2026, 10, d), 10.0) for d in (23, 26, 27, 28)]) for s in SYMS})
+    y = Yahoo(intraday={s: ('UTC', [b for d in days for b in full_day(d)]) for s in SYMS}, daily={s: ('UTC', [(datetime.date(2026, 10, d), 10.0) for d in (23, 26, 27, 28)]) for s in SYMS})
     for k, v in kw.items():
         setattr(y, k, v)
     return y
@@ -83,8 +84,10 @@ def conn():
 def seed(conn, day, bars=True, closes=True):
     with conn.cursor() as cur:
         if bars:
-            cur.executemany('INSERT INTO intraday_prices(listing_id,slot_start,close_px,is_final) VALUES (%s,%s,10,1)',
-                            [(i, t) for i in range(1, N + 1) for t in intraday.expected_slot_starts('XETR', datetime.date(2026, 10, day))])
+            cur.executemany(
+                'INSERT INTO intraday_prices(listing_id,slot_start,close_px,is_final) VALUES (%s,%s,10,1)',
+                [(i, t) for i in range(1, N + 1) for t in intraday.expected_slot_starts('XETR', datetime.date(2026, 10, day))],
+            )
         if closes:
             cur.executemany('INSERT INTO daily_prices(listing_id,price_date,close_px) VALUES (%s,%s,10)', [(i, datetime.date(2026, 10, day)) for i in range(1, N + 1)])
     conn.commit()
@@ -109,9 +112,9 @@ def jobs(conn, kind):
 
 
 def test_outage_then_restart_catches_up_by_itself_without_hammering_yahoo(conn):
-    seed(conn, 26)                                                          # la veille est complète
+    seed(conn, 26)  # la veille est complète
     down = yahoo(down=True)
-    for hh in (9, 12, 15, 17):                                               # mardi 27 : Yahoo est tombé toute la journée, le cron tourne
+    for hh in (9, 12, 15, 17):  # mardi 27 : Yahoo est tombé toute la journée, le cron tourne
         tasks.tick(conn, down, at(27, hh, 5), 'cron')
     assert bars_of(conn, 27) == 0 and closes_of(conn, 27) == 0
     # le cron s'arrête toute la nuit puis revient mercredi 28, Yahoo toujours indisponible : rien de récupérable, mais tout est retenu et signalé
@@ -120,8 +123,8 @@ def test_outage_then_restart_catches_up_by_itself_without_hammering_yahoo(conn):
     assert st['open'] and st['daily']['waiting'] == N
     assert bars_of(conn, 27) == 0
     catch_before, daily_before = jobs(conn, 'catchup'), jobs(conn, 'daily:XETR')
-    tasks.tick(conn, down, at(28, 10, 10), 'cron')                            # 5 min plus tard : le délai de nouvelle tentative n'est pas écoulé
-    assert jobs(conn, 'catchup') == catch_before and jobs(conn, 'daily:XETR') == daily_before      # pas de rafale sur un Yahoo en panne
+    tasks.tick(conn, down, at(28, 10, 10), 'cron')  # 5 min plus tard : le délai de nouvelle tentative n'est pas écoulé
+    assert jobs(conn, 'catchup') == catch_before and jobs(conn, 'daily:XETR') == daily_before  # pas de rafale sur un Yahoo en panne
     # Yahoo revient : au premier passage suivant, tout est rattrapé (clôtures puis barres) sans aucune intervention
     back = yahoo()
     tasks.tick(conn, back, at(28, 11, 0), 'cron')
@@ -135,17 +138,19 @@ def test_outage_then_restart_catches_up_by_itself_without_hammering_yahoo(conn):
 
 
 def test_rate_limit_pauses_catchup_and_resumes(conn):
-    seed(conn, 26); seed(conn, 27, bars=False)                                 # le 27 a ses clôtures mais aucune barre
+    seed(conn, 26)
+    seed(conn, 27, bars=False)  # le 27 a ses clôtures mais aucune barre
     limited = yahoo(limited=True)
     tasks.tick(conn, limited, at(28, 9, 0), 'cron')
     assert catchup.status(conn, at(28, 9, 0))['cooldown_until']
-    assert catchup.plan_intraday(conn, at(28, 9, 5)) == []                    # pause après un 429
-    tasks.tick(conn, yahoo(), at(28, 9, 20), 'cron')                          # pause écoulée
+    assert catchup.plan_intraday(conn, at(28, 9, 5)) == []  # pause après un 429
+    tasks.tick(conn, yahoo(), at(28, 9, 20), 'cron')  # pause écoulée
     assert bars_of(conn, 27) == N * 34
 
 
 def test_normal_collection_stays_first_and_catchup_never_touches_catalogue_or_portfolios(conn):
-    seed(conn, 26); seed(conn, 27, bars=False)
+    seed(conn, 26)
+    seed(conn, 27, bars=False)
     before = count(conn, "SELECT COUNT(*) FROM listings WHERE status='selected'")
     y = Ranged(intraday=yahoo().intraday, daily=yahoo().daily)
     tasks.tick(conn, y, at(28, 9, 30), 'cron')
@@ -154,35 +159,37 @@ def test_normal_collection_stays_first_and_catchup_never_touches_catalogue_or_po
     with conn.cursor() as cur:
         cur.execute("SELECT job_type FROM jobs ORDER BY id")
         order = [r['job_type'] for r in cur.fetchall()]
-    assert order.index('intraday:XETR') < order.index('catchup')               # collecte normale d'abord, rattrapage ensuite
+    assert order.index('intraday:XETR') < order.index('catchup')  # collecte normale d'abord, rattrapage ensuite
     assert all(t.split(':')[0] in ('intraday', 'daily', 'maintenance', 'catchup') for t in order)
 
 
 def test_data_yahoo_never_provides_is_reported_with_its_own_answer(conn):
-    seed(conn, 26, bars=False); seed(conn, 27, bars=False)                     # clôtures présentes, barres jamais fournies par Yahoo
+    seed(conn, 26, bars=False)
+    seed(conn, 27, bars=False)  # clôtures présentes, barres jamais fournies par Yahoo
     empty = Empty(daily={s: ('UTC', [(datetime.date(2026, 10, d), 10.0) for d in (26, 27, 28)]) for s in SYMS})
     for hh, mm in ((18, 0), (18, 10), (18, 30), (19, 10), (20, 30), (22, 0)):
         tasks.tick(conn, empty, at(27, hh, mm), 'cron')
     st = catchup.status(conn, at(27, 22, 0))
-    assert [o['session'] for o in st['open']] == ['2026-10-27']                # le 27 : moins de 24 h après sa clôture, on continue, espacé
+    assert [o['session'] for o in st['open']] == ['2026-10-27']  # le 27 : moins de 24 h après sa clôture, on continue, espacé
     assert st['open'][0]['tries'] >= 3 and st['open'][0]['next_try']
     lost = {(u['mic'], u['session']): u['why'] for u in st['unrecoverable']}
-    assert set(lost) == {('XETR', '2026-10-26')}                               # le 26 : trois réponses complètes de Yahoo, plus de 24 h après la clôture, sans barre
+    assert set(lost) == {('XETR', '2026-10-26')}  # le 26 : trois réponses complètes de Yahoo, plus de 24 h après la clôture, sans barre
     assert f'Yahoo a répondu pour les {N} titres' in lost[('XETR', '2026-10-26')] and '0 titres en ont' in lost[('XETR', '2026-10-26')]
-    tasks.tick(conn, empty, at(28, 20, 0), 'cron')                             # le lendemain soir : le 27 aussi est conclu
+    tasks.tick(conn, empty, at(28, 20, 0), 'cron')  # le lendemain soir : le 27 aussi est conclu
     assert {u['session'] for u in catchup.status(conn, at(28, 20, 0))['unrecoverable']} == {'2026-10-26', '2026-10-27'}
-    assert count(conn, "SELECT COUNT(*) FROM price_gaps WHERE state='unrecoverable'") == 2 and count(conn, "SELECT GROUP_CONCAT(session_date) FROM price_gaps WHERE state='to_repair'") == '2026-10-28'      # le 28, tout juste publié, est suivi à son tour
-    seed(conn, 26, closes=False)                                               # si les barres finissent par exister, la séance redevient réparée (la table suit les données)
+    assert (
+        count(conn, "SELECT COUNT(*) FROM price_gaps WHERE state='unrecoverable'") == 2 and count(conn, "SELECT GROUP_CONCAT(session_date) FROM price_gaps WHERE state='to_repair'") == '2026-10-28'
+    )  # le 28, tout juste publié, est suivi à son tour
+    seed(conn, 26, closes=False)  # si les barres finissent par exister, la séance redevient réparée (la table suit les données)
     tasks.tick(conn, empty, at(28, 20, 15), 'cron')
     assert count(conn, "SELECT state FROM price_gaps WHERE session_date='2026-10-26'") == 'repaired'
 
 
 def test_thin_titles_without_trades_do_not_trigger_any_catchup(conn):
-    pct = lambda j: 92 if j < 3 or j >= 31 else 38                           # profil en U : peu d'échanges en milieu de séance
+    pct = lambda j: 92 if j < 3 or j >= 31 else 38  # profil en U : peu d'échanges en milieu de séance
     with conn.cursor() as cur:
         for day in (22, 23, 26, 27):
-            rows = [(i, t) for i in range(1, N + 1) for j, t in enumerate(intraday.expected_slot_starts('XETR', datetime.date(2026, 10, day)))
-                    if (i * 31 + j * 17 + day * 13) % 100 < pct(j)]
+            rows = [(i, t) for i in range(1, N + 1) for j, t in enumerate(intraday.expected_slot_starts('XETR', datetime.date(2026, 10, day))) if (i * 31 + j * 17 + day * 13) % 100 < pct(j)]
             cur.executemany('INSERT INTO intraday_prices(listing_id,slot_start,close_px,is_final) VALUES (%s,%s,10,1)', rows)
             cur.executemany('INSERT INTO daily_prices(listing_id,price_date,close_px) VALUES (%s,%s,10)', [(i, datetime.date(2026, 10, day)) for i in range(1, N + 1)])
     conn.commit()

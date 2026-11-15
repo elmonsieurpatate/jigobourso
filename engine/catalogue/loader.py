@@ -3,6 +3,7 @@
 Idempotent : un rechargement met à jour l'identité, applique les règles d'admission et recalcule la cotation principale.
 Les statuts décidés par le préfiltre de marché (motif « préfiltre : … ») et les cotations sélectionnées ne sont pas écrasés.
 """
+
 import csv
 import datetime
 import json
@@ -15,8 +16,7 @@ from . import rules
 from .primary import choose_primary
 
 csv.field_size_limit(sys.maxsize)
-ISIN_COUNTRY = {'DE': 'Germany', 'FR': 'France', 'NL': 'Netherlands', 'GB': 'United Kingdom', 'IT': 'Italy', 'ES': 'Spain',
-                'SE': 'Sweden', 'NO': 'Norway', 'CH': 'Switzerland', 'US': 'United States'}
+ISIN_COUNTRY = {'DE': 'Germany', 'FR': 'France', 'NL': 'Netherlands', 'GB': 'United Kingdom', 'IT': 'Italy', 'ES': 'Spain', 'SE': 'Sweden', 'NO': 'Norway', 'CH': 'Switzerland', 'US': 'United States'}
 PREFILTER_PREFIX = 'préfiltre'
 
 
@@ -47,14 +47,23 @@ def raw_rows(root):
         isin = (row.get('isin') or '').strip()
         country = (row.get('country') or '').strip() or ISIN_COUNTRY.get(isin[:2]) if kind == 'equity' else ISIN_COUNTRY.get(isin[:2])
         category = (row.get('sector') if kind == 'equity' else row.get('category_group')) or None
-        yield {'kind': kind, 'mic': mic[:12], 'symbol': symbol[:64], 'isin': isin if len(isin) == 12 else None, 'name': (row.get('name') or '')[:200],
-               'country': (country or None) and country[:60], 'category': (category or '')[:80] or None, 'currency': (row.get('currency') or '').strip()[:3] or None,
-               'delisted': 1 if str(row.get('delisted', '')).strip().lower() in ('true', '1') else 0, 'group_key': group_key(dict(row, mic=mic, symbol=symbol))}
+        yield {
+            'kind': kind,
+            'mic': mic[:12],
+            'symbol': symbol[:64],
+            'isin': isin if len(isin) == 12 else None,
+            'name': (row.get('name') or '')[:200],
+            'country': (country or None) and country[:60],
+            'category': (category or '')[:80] or None,
+            'currency': (row.get('currency') or '').strip()[:3] or None,
+            'delisted': 1 if str(row.get('delisted', '')).strip().lower() in ('true', '1') else 0,
+            'group_key': group_key(dict(row, mic=mic, symbol=symbol)),
+        }
 
 
 def chunks(rows, size=5000):
     for i in range(0, len(rows), size):
-        yield rows[i:i + size]
+        yield rows[i : i + size]
 
 
 RAW_COLUMNS = ('kind', 'mic', 'symbol', 'isin', 'name', 'country', 'category', 'currency', 'delisted', 'group_key')
@@ -98,7 +107,7 @@ def apply_rules(conn, config=None):
             if (step, reason) != (r['removed_step'], r['removed_reason']):
                 updates.append((step, reason, r['id']))
         groups = {}
-        for step, reason, rid in updates:                      # peu de motifs distincts : une requête par motif et par paquet d'identifiants
+        for step, reason, rid in updates:  # peu de motifs distincts : une requête par motif et par paquet d'identifiants
             groups.setdefault((step, reason), []).append(rid)
         for (step, reason), ids in groups.items():
             for part in chunks(ids, 2000):
@@ -115,8 +124,10 @@ def sync_listings(conn, config=None):
     marks = ','.join(['%s'] * len(perimeter_steps))
     instruments, listings = {}, []
     with conn.cursor() as cur:
-        cur.execute(f'SELECT kind, mic, symbol, isin, name, country, category, currency, group_key, removed_reason FROM catalogue_raw WHERE removed_step IS NULL OR removed_step NOT IN ({marks}) ORDER BY id',
-                    perimeter_steps)
+        cur.execute(
+            f'SELECT kind, mic, symbol, isin, name, country, category, currency, group_key, removed_reason FROM catalogue_raw WHERE removed_step IS NULL OR removed_step NOT IN ({marks}) ORDER BY id',
+            perimeter_steps,
+        )
         for r in cur.fetchall():
             if r['group_key'] not in instruments:
                 instruments[r['group_key']] = {'group_key': r['group_key'], 'isin': r['isin'], 'kind': r['kind'], 'name': r['name'], 'country': r['country'], 'category': r['category']}
@@ -125,7 +136,8 @@ def sync_listings(conn, config=None):
             cur.executemany(
                 """INSERT INTO instruments(group_key,isin,kind,name,country,category) VALUES (%s,%s,%s,%s,%s,%s)
                    ON DUPLICATE KEY UPDATE isin=VALUES(isin), name=VALUES(name), country=VALUES(country), category=VALUES(category)""",
-                [(i['group_key'], i['isin'], i['kind'], i['name'], i['country'], i['category']) for i in part])
+                [(i['group_key'], i['isin'], i['kind'], i['name'], i['country'], i['category']) for i in part],
+            )
         conn.commit()
         cur.execute('SELECT id, group_key FROM instruments')
         ids = {r['group_key']: r['id'] for r in cur.fetchall()}
@@ -136,13 +148,17 @@ def sync_listings(conn, config=None):
                    ON DUPLICATE KEY UPDATE instrument_id=VALUES(instrument_id), currency=VALUES(currency),
                      status=IF(VALUES(status)='excluded','excluded',IF(excluded_reason IS NOT NULL AND excluded_reason NOT LIKE 'préfiltre%%','candidate',status)),
                      excluded_reason=IF(VALUES(status)='excluded',VALUES(excluded_reason),IF(excluded_reason LIKE 'préfiltre%%',excluded_reason,NULL))""",
-                [(ids[l['key']], l['mic'], l['symbol'], l['currency'], 'excluded' if l['reason'] else 'candidate', l['reason']) for l in part])
+                [(ids[l['key']], l['mic'], l['symbol'], l['currency'], 'excluded' if l['reason'] else 'candidate', l['reason']) for l in part],
+            )
         conn.commit()
         # Cotations déjà connues dont la ligne est maintenant hors périmètre (place ou type retirés) : exclues, jamais supprimées.
-        scope = tuple(x for x in perimeter_steps if x not in ('incomplete', 'duplicates'))       # un doublon ne retire pas la ligne d'origine
-        cur.execute(f"""UPDATE listings l JOIN catalogue_raw r ON r.mic=l.mic AND r.symbol=l.symbol AND r.removed_step IN ({','.join(['%s'] * len(scope))})
+        scope = tuple(x for x in perimeter_steps if x not in ('incomplete', 'duplicates'))  # un doublon ne retire pas la ligne d'origine
+        cur.execute(
+            f"""UPDATE listings l JOIN catalogue_raw r ON r.mic=l.mic AND r.symbol=l.symbol AND r.removed_step IN ({','.join(['%s'] * len(scope))})
                         SET l.status='excluded', l.excluded_reason=r.removed_reason, l.is_primary=0, l.primary_reason=NULL
-                        WHERE l.status<>'excluded' OR l.excluded_reason<>r.removed_reason OR l.excluded_reason IS NULL""", scope)
+                        WHERE l.status<>'excluded' OR l.excluded_reason<>r.removed_reason OR l.excluded_reason IS NULL""",
+            scope,
+        )
         outside = cur.rowcount
     conn.commit()
     primaries = assign_primaries(conn)
@@ -159,8 +175,10 @@ def sync_listings(conn, config=None):
 
 def record_load(conn, read, commit):
     with conn.cursor() as cur:
-        cur.execute('INSERT INTO catalogue_loads(source_commit,loaded_at,rows_read,rows_kept,rules_json) VALUES (%s,%s,%s,%s,%s)',
-                    (commit, datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None, microsecond=0), read, 0, '{}'))
+        cur.execute(
+            'INSERT INTO catalogue_loads(source_commit,loaded_at,rows_read,rows_kept,rules_json) VALUES (%s,%s,%s,%s,%s)',
+            (commit, datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None, microsecond=0), read, 0, '{}'),
+        )
     conn.commit()
 
 

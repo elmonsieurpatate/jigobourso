@@ -6,6 +6,7 @@
   python scripts/migrate.py --check         vérifie seulement que les fichiers sont admissibles (CI)
 Connexion : variables JIGO_DB_* (comme le moteur).
 """
+
 import datetime
 import os
 import re
@@ -57,7 +58,7 @@ def _already_applied(error):
     code = error.args[0] if error.args else 0
     if code in ALREADY_APPLIED:
         return ALREADY_APPLIED[code]
-    if code == 1005 and 'errno: 121' in str(error):                              # nom de contrainte déjà utilisé (ancienne forme de 1826)
+    if code == 1005 and 'errno: 121' in str(error):  # nom de contrainte déjà utilisé (ancienne forme de 1826)
         return 'clé étrangère existante'
     return None
 
@@ -76,7 +77,7 @@ def apply(conn, directory=DIR, log=print):
             for st in statements(texts[f]):
                 try:
                     cur.execute(st)
-                except Exception as e:                                           # noqa: BLE001 : seules les erreurs « déjà appliqué » sont tolérées
+                except Exception as e:  # noqa: BLE001 : seules les erreurs « déjà appliqué » sont tolérées
                     why = _already_applied(e)
                     if not why:
                         raise
@@ -104,6 +105,7 @@ def main(argv):
         return 0
     sys.path.insert(0, ROOT)
     from engine.shared.db import connect
+
     conn = connect()
     try:
         if mode == '--pending':

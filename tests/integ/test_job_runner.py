@@ -1,4 +1,5 @@
 """Journal des traitements (engine/jobs/runner.py) : traitement périmé, verrou concurrent, démarrage en double, reprise d'une demande, échec."""
+
 import datetime
 import os
 import pytest
@@ -22,8 +23,7 @@ def conn():
 
 def add_job(conn, job_type, status, minutes_ago):
     with conn.cursor() as cur:
-        cur.execute('INSERT INTO jobs(job_type,trigger_by,status,started_at) VALUES (%s,%s,%s,%s)',
-                    (job_type, 'cron', status, runner._now() - datetime.timedelta(minutes=minutes_ago)))
+        cur.execute('INSERT INTO jobs(job_type,trigger_by,status,started_at) VALUES (%s,%s,%s,%s)', (job_type, 'cron', status, runner._now() - datetime.timedelta(minutes=minutes_ago)))
         jid = cur.lastrowid
     conn.commit()
     return jid
@@ -73,7 +73,7 @@ def test_compute_group_never_runs_two_at_once(conn):
     add_job(conn, 'metrics', 'running', 1)
     for other in ('maintenance', 'etf', 'metrics'):
         assert runner.run_job(conn, other, never_called) is None
-    jid = runner.run_job(conn, 'catchup', lambda log: (0, 0, 'ok'))      # hors groupe : indépendant
+    jid = runner.run_job(conn, 'catchup', lambda log: (0, 0, 'ok'))  # hors groupe : indépendant
     assert jid and status_of(conn, jid)['status'] == 'completed'
 
 
@@ -124,6 +124,7 @@ def test_errors_and_failure_are_recorded(conn):
 
     def boom(log):
         raise ValueError('cassé')
+
     jid = runner.run_job(conn, 'catchup', boom)
     s = status_of(conn, jid)
     assert s['status'] == 'failed' and 'ValueError: cassé' in s['summary']
@@ -165,6 +166,7 @@ def test_progress_step_and_log_refresh_the_heartbeat_and_long_traces_are_kept(co
         with conn.cursor() as cur:
             cur.execute('SELECT updated_at FROM jobs WHERE id=%s', (jid,))
             return cur.fetchone()['updated_at']
+
     jid = runner.run_job(conn, 'catchup', work)
     limit = runner._now() - datetime.timedelta(minutes=5)
     assert seen['progress'] > limit and seen['log'] > limit
@@ -181,9 +183,12 @@ def test_housekeeping_purges_expired_attempts_and_sessions(conn):
         cur.execute("INSERT INTO users(username,pass_hash,created_at) VALUES ('hk','x',%s)", (now,))
         uid = cur.lastrowid
         cur.executemany('INSERT INTO login_attempts(username,ip,at) VALUES (%s,%s,%s)', [('old', '1.1.1.1', old), ('new', '1.1.1.1', now)])
-        cur.executemany('INSERT INTO sessions(token_hash,user_id,created_at,last_seen,expires_at,ip,ua) VALUES (%s,%s,%s,%s,%s,%s,%s)',
-                        [('a' * 64, uid, old, old, old, '', ''), ('b' * 64, uid, now, now, now + datetime.timedelta(days=1), '', '')])
+        cur.executemany(
+            'INSERT INTO sessions(token_hash,user_id,created_at,last_seen,expires_at,ip,ua) VALUES (%s,%s,%s,%s,%s,%s,%s)',
+            [('a' * 64, uid, old, old, old, '', ''), ('b' * 64, uid, now, now, now + datetime.timedelta(days=1), '', '')],
+        )
     conn.commit()
     from engine.jobs import tasks
+
     out = tasks.housekeeping(conn, now.replace(tzinfo=datetime.timezone.utc))
     assert out['login_attempts'] == 1 and out['sessions'] == 1

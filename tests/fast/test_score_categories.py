@@ -1,4 +1,5 @@
 """Filtres « Score simple V4 » et « Score complexe V4 » : définitions proposées, rangement des notes, sélection sans effet sur notes ni rangs."""
+
 import json
 import pathlib
 
@@ -30,7 +31,7 @@ def test_the_two_filters_exist_like_the_other_editable_filters(which):
     assert m['id'] == mid and m['kind'] == 'numeric' and m['unit'] == '/100' and m['supportsUnknown']
     assert [c['name'] for c in m['categories']] == ['Très faible', 'Faible', 'Modéré', 'Élevé', 'Très élevé', 'Inconnu']
     assert len(DEFS['filters']) == 15 and sum(1 for x in DEFS['filters'] if x['editable']) == 11
-    assert all(c['active'] for c in m['categories'])                                # toutes incluses par défaut
+    assert all(c['active'] for c in m['categories'])  # toutes incluses par défaut
 
 
 def test_categories_cover_zero_to_hundred_without_gap_or_overlap(which):
@@ -40,7 +41,7 @@ def test_categories_cover_zero_to_hundred_without_gap_or_overlap(which):
         assert len(hits) == 1, (which, v, hits)
         assert SCAT.assign(v, c) == hits[0]
     bounds = [(x['min'], x['max']) for x in c if not x['unknown']]
-    assert bounds[0][0] is None and bounds[-1][1] is None                         # extrémités ouvertes : couvrent [0 ; 100] sans trou
+    assert bounds[0][0] is None and bounds[-1][1] is None  # extrémités ouvertes : couvrent [0 ; 100] sans trou
     assert all(bounds[i][1] == bounds[i + 1][0] for i in range(len(bounds) - 1))
     assert [x['name'] for x in c if SCAT._inside(x, 0) and not x['unknown']] == ['Très faible'] and SCAT.assign(100, c) == next(x['id'] for x in c if x['name'] == 'Très élevé')
 
@@ -49,11 +50,12 @@ def test_zero_hundred_partial_and_unavailable_scores(which):
     c = cats(which)
     ids = {x['name']: x['id'] for x in c}
     assert SCAT.assign(0.0, c) == ids['Très faible'] and SCAT.assign(100.0, c) == ids['Très élevé']
-    assert SCAT.assign(None, c) == ids['Inconnu']                                  # indisponible ≠ 0
-    partial = SC.score_title({5: None, 21: dict(slope=.7, r2=.9, up_fraction=.6, spike_share=.3, volatility=2, drawdown=5)}, {'turnover_eur': None},
-                             [dict(id='week', sessions=5), dict(id='month', sessions=21)])
+    assert SCAT.assign(None, c) == ids['Inconnu']  # indisponible ≠ 0
+    partial = SC.score_title(
+        {5: None, 21: dict(slope=0.7, r2=0.9, up_fraction=0.6, spike_share=0.3, volatility=2, drawdown=5)}, {'turnover_eur': None}, [dict(id='week', sessions=5), dict(id='month', sessions=21)]
+    )
     assert partial['simple']['status'] == 'partiel' and partial['simple']['score'] is not None
-    assert SCAT.assign(partial['simple']['score'], c) != ids['Inconnu']            # un score partiel reste une note, rangée par sa valeur
+    assert SCAT.assign(partial['simple']['score'], c) != ids['Inconnu']  # un score partiel reste une note, rangée par sa valeur
     assert SCAT.assign(partial['complex']['score'], c) != ids['Inconnu']
 
 

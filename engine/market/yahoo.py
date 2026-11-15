@@ -3,6 +3,7 @@
 Le transport est injectable : les tests rejouent des réponses enregistrées, sans réseau.
 Un 429 lève RateLimited ; l'appelant décide de la pause (jamais de boucle d'attente ici).
 """
+
 import http.cookiejar
 import json
 import re
@@ -34,7 +35,7 @@ class UrllibTransport:
 
     def __init__(self, timeout=30, min_interval=0.3):
         self.timeout = timeout
-        self.min_interval = min_interval        # pause minimale entre deux appels (politesse, évite les 429)
+        self.min_interval = min_interval  # pause minimale entre deux appels (politesse, évite les 429)
         self._last = 0.0
         self.opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
         self.opener.addheaders = [('User-Agent', UA), ('Accept', 'application/json, text/plain, */*')]
@@ -47,7 +48,7 @@ class UrllibTransport:
             if e.code == 429:
                 raise RateLimited(e.headers.get('Retry-After'))
             if e.code == 404 and 'fc.yahoo.com' in url:
-                return ''           # le cookie est posé malgré le 404
+                return ''  # le cookie est posé malgré le 404
             raise YahooError(f'HTTP {e.code}')
         except urllib.error.URLError as e:
             raise YahooError('réseau : ' + str(e.reason))
@@ -131,8 +132,14 @@ def parse_chart(payload):
         for p in day if isinstance(day, list) else [day]:
             if isinstance(p, dict) and isinstance(p.get('start'), int) and isinstance(p.get('end'), int):
                 periods.append((p['start'], p['end']))
-    return {'currency': (meta.get('currency') or '')[:3] or None, 'timezone': meta.get('exchangeTimezoneName') or meta.get('timezone'),
-            'regular_market_time': meta.get('regularMarketTime'), 'instrument_type': meta.get('instrumentType'), 'bars': bars, 'periods': periods}
+    return {
+        'currency': (meta.get('currency') or '')[:3] or None,
+        'timezone': meta.get('exchangeTimezoneName') or meta.get('timezone'),
+        'regular_market_time': meta.get('regularMarketTime'),
+        'instrument_type': meta.get('instrumentType'),
+        'bars': bars,
+        'periods': periods,
+    }
 
 
 def _num(v):
@@ -155,19 +162,24 @@ def _rating(v):
 
 def parse_quotes(payload):
     out = {}
-    for r in (((payload or {}).get('quoteResponse') or {}).get('result') or []):
+    for r in ((payload or {}).get('quoteResponse') or {}).get('result') or []:
         symbol = str(r.get('symbol') or '').upper()
         price = _num(r.get('regularMarketPrice'))
         if not symbol or price is None or price <= 0:
             continue
         t = r.get('regularMarketTime')
-        out[symbol] = {'price': price, 'price_time': datetime.fromtimestamp(t, timezone.utc).replace(tzinfo=None) if isinstance(t, (int, float)) else None,
-                       'avg_volume_3m': int(r['averageDailyVolume3Month']) if _num(r.get('averageDailyVolume3Month')) is not None else None,
-                       'currency': (r.get('currency') or '')[:3] or None,
-                       'market_cap': int(r['marketCap']) if _num(r.get('marketCap')) else None, 'quote_type': r.get('quoteType'),
-                       'expense_ratio': _fee(r.get('netExpenseRatio')), 'analyst_rating': _rating(r.get('averageAnalystRating')),
-                       'net_assets': int(r['netAssets']) if _num(r.get('netAssets')) and r['netAssets'] > 0 else None,
-                       'avg_volume_10d': int(r['averageDailyVolume10Day']) if _num(r.get('averageDailyVolume10Day')) is not None else None}
+        out[symbol] = {
+            'price': price,
+            'price_time': datetime.fromtimestamp(t, timezone.utc).replace(tzinfo=None) if isinstance(t, (int, float)) else None,
+            'avg_volume_3m': int(r['averageDailyVolume3Month']) if _num(r.get('averageDailyVolume3Month')) is not None else None,
+            'currency': (r.get('currency') or '')[:3] or None,
+            'market_cap': int(r['marketCap']) if _num(r.get('marketCap')) else None,
+            'quote_type': r.get('quoteType'),
+            'expense_ratio': _fee(r.get('netExpenseRatio')),
+            'analyst_rating': _rating(r.get('averageAnalystRating')),
+            'net_assets': int(r['netAssets']) if _num(r.get('netAssets')) and r['netAssets'] > 0 else None,
+            'avg_volume_10d': int(r['averageDailyVolume10Day']) if _num(r.get('averageDailyVolume10Day')) is not None else None,
+        }
     return out
 
 
@@ -197,8 +209,7 @@ def parse_spark(payload, requested):
             close = _num(close)
             if close is not None and close > 0 and isinstance(ts, int):
                 bars.append((ts, close))
-        out[symbol] = {'currency': (meta.get('currency') or '')[:3] or None,
-                       'timezone': meta.get('exchangeTimezoneName') or meta.get('timezone'), 'bars': bars}
+        out[symbol] = {'currency': (meta.get('currency') or '')[:3] or None, 'timezone': meta.get('exchangeTimezoneName') or meta.get('timezone'), 'bars': bars}
     return out
 
 

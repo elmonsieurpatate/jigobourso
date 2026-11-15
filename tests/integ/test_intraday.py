@@ -30,7 +30,7 @@ def make_bars(days):
     out = []
     for d in days:
         for i, s in enumerate(intraday.expected_slot_starts('XPAR', d)):
-            out.append((ts(s), 10 + i * .01, 10.2 + i * .01, 9.9 + i * .01, 10.1 + i * .01, 1000 + i))
+            out.append((ts(s), 10 + i * 0.01, 10.2 + i * 0.01, 9.9 + i * 0.01, 10.1 + i * 0.01, 1000 + i))
     return out
 
 
@@ -66,7 +66,7 @@ def test_provisional_bar_never_overwrites_a_final_one_but_gets_completed():
     with conn.cursor() as cur:
         cur.execute('INSERT INTO intraday_prices(listing_id,slot_start,close_px,is_final) VALUES (1,%s,50,1)', (slot,))
     conn.commit()
-    early = dt.datetime.combine(dt.date(2026, 10, 27), dt.time(7, 5), UTC)         # créneau pas terminé : barre provisoire
+    early = dt.datetime.combine(dt.date(2026, 10, 27), dt.time(7, 5), UTC)  # créneau pas terminé : barre provisoire
     intraday.store_chart(conn, 1, [(ts(slot), 1, 2, 0.5, 99, 7)], early)
     with conn.cursor() as cur:
         cur.execute('SELECT close_px, is_final, volume FROM intraday_prices WHERE listing_id=1')
@@ -81,5 +81,6 @@ def test_yahoo_failure_falls_back_to_stored_data_with_a_note():
     class Broken:
         def chart(self, *a, **k):
             raise RuntimeError('HTTP 429')
+
     v = intraday.view(conn, 1, now=NOW, client=Broken())
     assert v['supported'] and v['sessions'] == [] and any('indisponible' in n for n in v['notes'])

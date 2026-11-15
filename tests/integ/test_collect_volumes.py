@@ -1,4 +1,5 @@
 """Volumes quotidiens : un appel Chart par titre ; seul `daily_prices.volume` est écrit (jamais une clôture), uniquement pour des séances réglées déjà en base."""
+
 import datetime
 import os
 
@@ -15,7 +16,7 @@ if not os.environ.get('JIGO_TEST_DATABASE'):
 
 UTC = datetime.timezone.utc
 NOW = datetime.datetime(2026, 10, 30, 22, 0, tzinfo=UTC)
-DAYS = [datetime.date(2026, 10, d) for d in (5, 6, 7, 8, 9)]                 # lundi à vendredi
+DAYS = [datetime.date(2026, 10, d) for d in (5, 6, 7, 8, 9)]  # lundi à vendredi
 ROWS = [{'listing_id': i, 'symbol': s, 'mic': 'XNAS'} for i, s in ((1, 'AAA'), (2, 'BBB'), (3, 'CCC'))]
 
 
@@ -25,6 +26,7 @@ def ts(day):
 
 class ChartClient:
     """Yahoo simulé. `volumes` : volume par séance (None = absent) ; `rate_limit` / `broken` : symboles en 429 / en erreur."""
+
     def __init__(self, volumes=(1000, 0, 3000, 4000, 5000), rate_limit=None, broken=(), empty=()):
         self.calls, self.volumes, self.rate_limit, self.broken, self.empty = [], volumes, rate_limit, set(broken), set(empty)
 
@@ -33,7 +35,7 @@ class ChartClient:
         if symbol == self.rate_limit:
             raise RateLimited(60)
         if symbol in self.broken:
-            self.broken.discard(symbol)                                         # échec isolé : réussit à la reprise
+            self.broken.discard(symbol)  # échec isolé : réussit à la reprise
             raise RuntimeError('boom')
         if symbol in self.empty:
             return {'timezone': 'America/New_York', 'bars': []}
@@ -71,16 +73,16 @@ def checked(conn, lid):
 def test_volumes_match_dates_zero_is_kept_and_closes_never_change(conn):
     r = collect.fill_volumes_batch(conn, ChartClient(), ROWS[:1], NOW)
     got = state(conn, 1)
-    assert [got[d][1] for d in DAYS] == [1000, 0, 3000, 4000, 5000]            # même jour Yahoo / base ; le volume 0 est une donnée valide
-    assert all(got[d][0] == 99.0 for d in DAYS)                                 # les clôtures de Chart (777…) ne sont jamais écrites
+    assert [got[d][1] for d in DAYS] == [1000, 0, 3000, 4000, 5000]  # même jour Yahoo / base ; le volume 0 est une donnée valide
+    assert all(got[d][0] == 99.0 for d in DAYS)  # les clôtures de Chart (777…) ne sont jamais écrites
     assert r['examined'] == 1 and r['written'] == 5 and checked(conn, 1) is not None
 
 
 def test_unsettled_session_never_gets_a_volume(conn):
-    early = datetime.datetime(2026, 10, 6, 15, 0, tzinfo=UTC)                  # mardi 6 à 11 h à New York : séance en cours
+    early = datetime.datetime(2026, 10, 6, 15, 0, tzinfo=UTC)  # mardi 6 à 11 h à New York : séance en cours
     collect.fill_volumes_batch(conn, ChartClient(), ROWS[:1], early)
     got = state(conn, 1)
-    assert got[DAYS[1]][1] is None and got[DAYS[2]][1] is None                  # séance en cours et futures : rien
+    assert got[DAYS[1]][1] is None and got[DAYS[2]][1] is None  # séance en cours et futures : rien
     assert got[DAYS[0]][1] == 1000
 
 
@@ -91,9 +93,9 @@ def test_last_two_sessions_are_consolidated_older_volumes_are_kept(conn):
     conn.commit()
     collect.fill_volumes_batch(conn, ChartClient(), ROWS[:1], NOW)
     got = state(conn, 1)
-    assert got[DAYS[0]][1] == 1                                                 # ancienne séance déjà renseignée : conservée telle quelle
-    assert got[DAYS[3]][1] == 4000 and got[DAYS[4]][1] == 5000                  # deux dernières séances : volume consolidé relu
-    assert got[DAYS[1]][1] == 0 and got[DAYS[2]][1] == 3000                     # vides : remplies
+    assert got[DAYS[0]][1] == 1  # ancienne séance déjà renseignée : conservée telle quelle
+    assert got[DAYS[3]][1] == 4000 and got[DAYS[4]][1] == 5000  # deux dernières séances : volume consolidé relu
+    assert got[DAYS[1]][1] == 0 and got[DAYS[2]][1] == 3000  # vides : remplies
 
 
 def test_title_without_trades_stays_null_and_is_not_reasked_at_once(conn):
@@ -102,7 +104,7 @@ def test_title_without_trades_stays_null_and_is_not_reasked_at_once(conn):
     again = ChartClient()
     assert collect.fill_volumes_batch(conn, again, ROWS[:1], NOW)['examined'] == 0 and not again.calls
     empty = collect.fill_volumes_batch(conn, ChartClient(empty={'BBB'}), ROWS[1:2], NOW)
-    assert empty['examined'] == 1 and all(v[1] is None for v in state(conn, 2).values())      # réponse sans barre : aucune écriture, titre marqué
+    assert empty['examined'] == 1 and all(v[1] is None for v in state(conn, 2).values())  # réponse sans barre : aucune écriture, titre marqué
 
 
 def test_rerun_has_no_duplicates_and_no_new_calls(conn):
@@ -121,7 +123,7 @@ def test_rate_limit_stops_and_resume_asks_only_the_remaining_titles(conn):
     assert r['rate_limited'] and r['examined'] == 1 and checked(conn, 1) and not checked(conn, 2) and not checked(conn, 3)
     retry = ChartClient()
     r2 = collect.fill_volumes_batch(conn, retry, ROWS, NOW)
-    assert r2['examined'] == 2 and sorted(c[0] for c in retry.calls) == ['BBB', 'CCC']      # AAA déjà fait : non redemandé
+    assert r2['examined'] == 2 and sorted(c[0] for c in retry.calls) == ['BBB', 'CCC']  # AAA déjà fait : non redemandé
 
 
 def test_isolated_failure_does_not_stop_others_and_is_retried_at_the_end(conn):
@@ -137,11 +139,12 @@ def test_persistent_failure_is_logged_and_does_not_block_the_batch(conn):
             if symbol == 'BBB':
                 raise RuntimeError('toujours en erreur')
             return super().chart(symbol, range_, interval)
+
     r = collect.fill_volumes_batch(conn, Always(), ROWS, NOW)
     assert r['examined'] == 2 and r['errors'] == 1 and not checked(conn, 2)
     assert '2' in collect.setting(conn, collect.VOLUME_ERRORS, {})
-    assert collect.fill_volumes_batch(conn, ChartClient(), ROWS, NOW)['examined'] == 0     # échec récent : pas d'insistance automatique
-    assert collect.fill_volumes_batch(conn, ChartClient(), ROWS, NOW, since=NOW + datetime.timedelta(hours=1))['examined'] == 3   # le rattrapage manuel les reprend tous
+    assert collect.fill_volumes_batch(conn, ChartClient(), ROWS, NOW)['examined'] == 0  # échec récent : pas d'insistance automatique
+    assert collect.fill_volumes_batch(conn, ChartClient(), ROWS, NOW, since=NOW + datetime.timedelta(hours=1))['examined'] == 3  # le rattrapage manuel les reprend tous
 
 
 def test_four_threads_give_the_same_result(conn):
@@ -151,13 +154,13 @@ def test_four_threads_give_the_same_result(conn):
 
 def test_new_session_makes_checked_titles_candidates_again_with_the_short_window(conn):
     collect.fill_volumes_batch(conn, ChartClient(), ROWS[:1], NOW)
-    later = NOW + datetime.timedelta(days=3)                                    # lundi suivant réglé
+    later = NOW + datetime.timedelta(days=3)  # lundi suivant réglé
     c = ChartClient()
     r = collect.fill_volumes_batch(conn, c, ROWS[:1], later)
     assert r['examined'] == 1 and c.calls == [('AAA', collect.VOLUME_REFRESH_RANGE, '1d')]
     first = ChartClient()
     collect.fill_volumes_batch(conn, first, ROWS[1:2], NOW)
-    assert first.calls == [('BBB', collect.VOLUME_BACKFILL_RANGE, '1d')]         # jamais interrogé : un an
+    assert first.calls == [('BBB', collect.VOLUME_BACKFILL_RANGE, '1d')]  # jamais interrogé : un an
 
 
 def test_gap_closes_keep_the_volume_received_with_the_close(conn):
@@ -166,8 +169,8 @@ def test_gap_closes_keep_the_volume_received_with_the_close(conn):
     conn.commit()
     titles, added = collect.fill_daily_gaps(conn, ChartClient(), ROWS[:1], NOW)
     got = state(conn, 1)
-    assert added == 1 and got[DAYS[1]] == (778.0, 0)                            # clôture ajoutée avec son volume, y compris un volume nul
-    assert got[DAYS[0]] == (99.0, None)                                         # clôtures existantes intactes, volume non touché par ce chemin
+    assert added == 1 and got[DAYS[1]] == (778.0, 0)  # clôture ajoutée avec son volume, y compris un volume nul
+    assert got[DAYS[0]] == (99.0, None)  # clôtures existantes intactes, volume non touché par ce chemin
 
 
 def test_candidates_order_never_checked_first(conn):
@@ -178,13 +181,14 @@ def test_candidates_order_never_checked_first(conn):
 
 def test_manual_job_collects_everything_then_recomputes_and_closes_stay_identical(conn, monkeypatch):
     from engine.jobs import tasks
+
     monkeypatch.setattr(tasks.collect, 'collection_set', lambda c: ROWS)
     recomputed = []
     monkeypatch.setattr(tasks.compute, 'compute_all', lambda c, n: recomputed.append(1) or (3, 9))
     closes_before = [{d: v[0] for d, v in state(conn, i).items()} for i in (1, 2, 3)]
     examined, problems, summary = tasks.volumes_all(conn, ChartClient(), NOW, lambda *a, **k: None)
     assert examined == 3 and problems == 0 and recomputed == [1] and '15 volumes écrits' in summary
-    assert [{d: v[0] for d, v in state(conn, i).items()} for i in (1, 2, 3)] == closes_before     # clôtures historiques identiques
-    assert tasks.volumes_all(conn, ChartClient(), NOW, lambda *a, **k: None)[0] == 0              # relance : rien à refaire
+    assert [{d: v[0] for d, v in state(conn, i).items()} for i in (1, 2, 3)] == closes_before  # clôtures historiques identiques
+    assert tasks.volumes_all(conn, ChartClient(), NOW, lambda *a, **k: None)[0] == 0  # relance : rien à refaire
     cov = tasks.history_coverage(conn)
     assert 'volume_checked' in cov and 'volume_errors' in cov

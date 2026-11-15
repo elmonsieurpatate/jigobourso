@@ -1,4 +1,5 @@
 """Administration des scores sur une vraie base : simulation, suivi et profils, avec des séries enregistrées (aucune donnée d'exemple dans le produit)."""
+
 import datetime
 import os
 
@@ -20,13 +21,16 @@ NOW = datetime.datetime(2026, 10, 28, 2, 10, tzinfo=datetime.timezone.utc)
 
 def seed(conn):
     import exchange_calendars as xc
+
     calendar = xc.get_calendar('XETR', start='2026-01-05', end='2027-01-31')
     days = [d.date() for d in calendar.sessions if d.date() >= datetime.date(2026, 1, 5)][:260]
     with conn.cursor() as cur:
         cur.execute("INSERT INTO instruments(id,group_key,kind,name,country) VALUES (1,'sym:XETR:UP.DE','equity','Monte SE','Germany'),(2,'sym:XETR:ZIG.DE','equity','Zigzag AG','Germany')")
         cur.execute("INSERT INTO listings(id,instrument_id,mic,symbol,currency,status,is_primary) VALUES (1,1,'XETR','UP.DE','EUR','selected',1),(2,2,'XETR','ZIG.DE','EUR','selected',1)")
-        cur.executemany('INSERT INTO daily_prices(listing_id,price_date,close_px) VALUES (%s,%s,%s)',
-                        [(1, d, round(100 * 1.004 ** i, 6)) for i, d in enumerate(days)] + [(2, d, round(100 * 1.0015 ** i * (1.04 if i % 3 == 0 else 0.97), 6)) for i, d in enumerate(days)])
+        cur.executemany(
+            'INSERT INTO daily_prices(listing_id,price_date,close_px) VALUES (%s,%s,%s)',
+            [(1, d, round(100 * 1.004**i, 6)) for i, d in enumerate(days)] + [(2, d, round(100 * 1.0015**i * (1.04 if i % 3 == 0 else 0.97), 6)) for i, d in enumerate(days)],
+        )
         cur.executemany("INSERT INTO latest_prices(listing_id,price,price_time,source,currency,avg_volume_3m) VALUES (%s,%s,%s,'daily','EUR',%s)", [(1, 250.0, NOW, 300000), (2, 120.0, NOW, 50000)])
     conn.commit()
     compute.compute_all(conn, NOW)
@@ -36,7 +40,7 @@ def test_simulation_monitor_and_profiles_use_real_data_and_stay_independent_of_c
     conn = connect()
     reset_data(conn)
     empty = scores_ranking.simulate(conn, {'strategy': 'growth_v4'})
-    assert empty['empty'] and 'Aucun titre noté' in empty['reason']                    # sans données : jamais d'exemple fictif
+    assert empty['empty'] and 'Aucun titre noté' in empty['reason']  # sans données : jamais d'exemple fictif
     assert A.monitor(conn)['rated'] == 0
     seed(conn)
     mon = A.monitor(conn)
@@ -70,12 +74,13 @@ def test_simulation_monitor_and_profiles_use_real_data_and_stay_independent_of_c
 
 def test_general_ranking_rates_every_evaluable_title_and_filters_remove_none():
     from engine.analytics.explorer import universe_verdicts
+
     conn = connect()
     reset_data(conn)
     seed(conn)
     r = scores_ranking.ranking(conn, {'strategy': 'growth_v4'})
     s = r['summary']
-    assert s['universe'] == 2 and s['simple']['ranked'] == 2 and s['complex']['ranked'] == 2 and s['simple']['unavailable'] == 0      # tous notés, aucun quota
+    assert s['universe'] == 2 and s['simple']['ranked'] == 2 and s['complex']['ranked'] == 2 and s['simple']['unavailable'] == 0  # tous notés, aucun quota
     assert sum(s['simple']['distribution']['histogram']) == 2 and [x['symbol'] for x in r['top']['simple']][0] == 'UP.DE'
     assert abs(sum(w['weight'] for w in r['weights']) - 1) < 1e-9 and r['compared'] is None
     # classement par catégorie : courbes réelles, rang général inchangé, granularité = période active la plus longue
@@ -111,10 +116,12 @@ def test_general_ranking_rates_every_evaluable_title_and_filters_remove_none():
 
 def test_per_strategy_normalisations_persist_change_only_their_strategy_and_the_cache_key():
     from engine.analytics.scoring import score_service as S
+
     conn = connect()
     reset_data(conn)
     seed(conn)
     from engine.analytics.explorer import universe_verdicts
+
     ver = universe_verdicts.data_version(conn)
     before = {n: {e['id']: (e['simple'], e['complex']) for e in S.score_book(conn, scores_profiles.build_config(conn, n), ver).values()} for n in ('growth_v4', 'rebound')}
     key_before = S._key(scores_profiles.build_config(conn, 'rebound'), ver)
@@ -122,16 +129,18 @@ def test_per_strategy_normalisations_persist_change_only_their_strategy_and_the_
     p['tuning'] = dict(p['tuning'], sat_a=40.0, accel_ref=1.5, vol_mode='relative')
     A.save(conn, {'profile': dict(p, name='rebound')})
     st = {s['name']: s for s in A.state(conn)['strategies']}
-    assert st['rebound']['current']['tuning'] == {'sat_a': 40.0, 'accel_ref': 1.5, 'vol_mode': 'relative', 'momentum_horizon': '6m'}      # persisté et relu
-    assert st['growth_v4']['current']['tuning']['sat_a'] == 17.0                                                                          # autre stratégie : inchangée
-    assert S._key(scores_profiles.build_config(conn, 'rebound'), ver) != key_before                  # les nouveaux paramètres font partie de la clé de cache
+    assert st['rebound']['current']['tuning'] == {'sat_a': 40.0, 'accel_ref': 1.5, 'vol_mode': 'relative', 'momentum_horizon': '6m'}  # persisté et relu
+    assert st['growth_v4']['current']['tuning']['sat_a'] == 17.0  # autre stratégie : inchangée
+    assert S._key(scores_profiles.build_config(conn, 'rebound'), ver) != key_before  # les nouveaux paramètres font partie de la clé de cache
     assert S._key(scores_profiles.build_config(conn, 'growth_v4'), ver) == S._key(scores_profiles.base_config('growth_v4'), ver)
     after = {n: {e['id']: (e['simple'], e['complex']) for e in S.score_book(conn, scores_profiles.build_config(conn, n), ver).values()} for n in ('growth_v4', 'rebound')}
     assert after['growth_v4'] == before['growth_v4'] and after['rebound'] != before['rebound']
     sim = scores_ranking.simulate(conn, {'strategy': 'rebound', 'q': 'UP.DE'})
-    assert sim['tuning'] == {'sat_a': 40.0, 'accel_ref': 1.5, 'vol_mode': 'relative', 'momentum_horizon': '6m'}                           # la simulation affiche ce que le calcul utilise
+    assert sim['tuning'] == {'sat_a': 40.0, 'accel_ref': 1.5, 'vol_mode': 'relative', 'momentum_horizon': '6m'}  # la simulation affiche ce que le calcul utilise
     A.save(conn, {'reset': 'profile', 'name': 'rebound'})
-    assert scores_profiles.build_config(conn, 'rebound')['scoring']['sat_a'] == 17.0 and scores_profiles.build_config(conn, 'rebound')['scoring']['accel_ref'] == 0.25     # retour aux valeurs par défaut de la stratégie
+    assert (
+        scores_profiles.build_config(conn, 'rebound')['scoring']['sat_a'] == 17.0 and scores_profiles.build_config(conn, 'rebound')['scoring']['accel_ref'] == 0.25
+    )  # retour aux valeurs par défaut de la stratégie
     with pytest.raises(ValueError):
         A.save(conn, {'profile': dict(p, name='rebound', tuning=dict(p['tuning'], sat_a=1.0))})
 
@@ -139,12 +148,13 @@ def test_per_strategy_normalisations_persist_change_only_their_strategy_and_the_
 def test_stored_profile_without_new_fields_is_still_valid_and_momentum_strategies_use_series_state():
     from engine.analytics.scoring import score_service as S
     from engine.analytics.explorer import universe_verdicts
+
     conn = connect()
     reset_data(conn)
     seed(conn)
     old = scores_profiles.clean_profile(scores_profiles.profile_of(scores_profiles.base_config('growth_v4')))
     old.pop('tuning', None)
-    old['complex_weights'].pop('momentum')                                           # profil enregistré avant l'ajout du momentum (huit poids)
+    old['complex_weights'].pop('momentum')  # profil enregistré avant l'ajout du momentum (huit poids)
     A.save(conn, {'profile': dict(old, name='growth_v4')})
     cfg = scores_profiles.build_config(conn, 'growth_v4')
     assert cfg['scoring']['sat_a'] == 17.0 and S.params_for(cfg, 'equity')['complex_weights']['momentum'] == 0
@@ -156,14 +166,17 @@ def test_stored_profile_without_new_fields_is_still_valid_and_momentum_strategie
     book = S.score_book(conn, scores_profiles.build_config(conn, 'momentum_6m'), ver)
     assert book[1]['complex'] is not None and book[1]['complex'] > book[2]['complex']
     det = S.details(conn, scores_profiles.build_config(conn, 'momentum_6m'), [1])[1]['complex']['contributions']['momentum']
-    assert det['value'] == pytest.approx(75.0) and det['weight'] == pytest.approx(0.5)                # 45 % / 60 % de saturation
+    assert det['value'] == pytest.approx(75.0) and det['weight'] == pytest.approx(0.5)  # 45 % / 60 % de saturation
 
 
 def test_global_settings_never_override_profile_complex_weights():
     from engine.analytics.scoring import score_service as S
     from engine.shared import settings
+
     conn = connect()
     reset_data(conn)
-    settings.put(conn, S.SETTING, {'kappa': 0.7, 'threshold': 0.75, 'complex_weights': {'dynamics': 90, 'liquidity': 10}})      # ancien réglage global résiduel
+    settings.put(conn, S.SETTING, {'kappa': 0.7, 'threshold': 0.75, 'complex_weights': {'dynamics': 90, 'liquidity': 10}})  # ancien réglage global résiduel
     conn.commit()
-    assert S.params_for(scores_profiles.build_config(conn, 'growth_v4'), 'equity')['complex_weights'] == {k: float(v) for k, v in __import__('engine.analytics.scoring.scores', fromlist=['x']).COMPLEX_WEIGHTS.items()}
+    assert S.params_for(scores_profiles.build_config(conn, 'growth_v4'), 'equity')['complex_weights'] == {
+        k: float(v) for k, v in __import__('engine.analytics.scoring.scores', fromlist=['x']).COMPLEX_WEIGHTS.items()
+    }

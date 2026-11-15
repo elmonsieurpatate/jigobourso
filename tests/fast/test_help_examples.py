@@ -1,4 +1,5 @@
 """Les chiffres de l'exemple « Zébulon » et des échelles de notes écrits dans l'aide (help-content.js, aide.js) doivent rester ceux du moteur : si une règle change, ce test échoue et l'aide est à mettre à jour."""
+
 import pytest
 
 from engine.analytics.scoring import scores as S
@@ -37,6 +38,7 @@ def test_note_scales_quoted_in_help():
     def note(**m):
         base = {'slope': 0.3, 'r2': 0.9, 'volatility': 2.0, 'drawdown': 5.0, 'up_fraction': 0.6, 'spike_share': 0.3, 'accel': None, 'r2_prev': None}
         return S.period_components(dict(base, **m), 21)
+
     ap = lambda v: pytest.approx(v, abs=1e-6)
     assert note(r2=0.5)['r2'] == ap(0) and note(r2=0.95)['r2'] == ap(100)
     assert note(up_fraction=0.4)['up_days'] == ap(0) and note(up_fraction=0.8)['up_days'] == ap(100)

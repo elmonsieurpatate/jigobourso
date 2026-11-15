@@ -1,4 +1,5 @@
 """Entonnoir de l'administration : `funnel.items` reçoit des paramètres venus du navigateur ; aucun ne doit atteindre le SQL autrement que lié ou validé."""
+
 import os
 import pytest
 from engine.analytics.explorer import funnel
@@ -17,7 +18,9 @@ def conn():
     c = connect()
     reset_data(c)
     with c.cursor() as cur:
-        cur.execute("INSERT INTO catalogue_raw(group_key,kind,mic,symbol,isin,name,country,category,currency) VALUES ('isin:FR0000000001','equity','XPAR','AIR.PA','FR0000000001','Airbus','France','Industrials','EUR')")
+        cur.execute(
+            "INSERT INTO catalogue_raw(group_key,kind,mic,symbol,isin,name,country,category,currency) VALUES ('isin:FR0000000001','equity','XPAR','AIR.PA','FR0000000001','Airbus','France','Industrials','EUR')"
+        )
     c.commit()
     yield c
     reset_data(c)
@@ -35,8 +38,8 @@ def raw_count(conn):
 def test_text_filters_are_bound_not_interpolated(conn, payload, field):
     for stage, step in (('catalogue', 'raw'), ('catalogue', 'kept'), ('yahoo', 'asked')):
         out = funnel.items(conn, stage, step, **{field: payload})
-        assert out['total'] == 0 and not out['rows']          # l'injection n'élargit jamais la sélection
-    assert raw_count(conn) == 1                                  # et ne détruit rien
+        assert out['total'] == 0 and not out['rows']  # l'injection n'élargit jamais la sélection
+    assert raw_count(conn) == 1  # et ne détruit rien
 
 
 def test_search_text_still_finds_the_row(conn):

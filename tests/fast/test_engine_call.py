@@ -1,4 +1,5 @@
 """engine_call (PHP) sans base : délai maximal, stderr volumineux, emplacements. Un faux « python » remplace le moteur."""
+
 import json
 import os
 import shutil
@@ -15,11 +16,12 @@ def run(tmp_path, script, **env):
     fake = tmp_path / 'python'
     fake.write_text('#!/bin/sh\n' + textwrap.dedent(script))
     fake.chmod(0o755)
-    code = ("require " + json.dumps(ROOT + '/app/lib/engine.php') + ";"
-            "try { echo json_encode(['ok' => engine_call('presets', ['x' => 1])]); }"
-            "catch (ApiError $e) { echo json_encode(['status' => $e->status, 'message' => $e->getMessage()]); }")
-    out = subprocess.run(['php', '-r', code], capture_output=True, text=True, timeout=60,
-                         env=dict(os.environ, JIGO_PYTHON=str(fake), JIGO_ENGINE_ROOT=ROOT, JIGO_DATA_DIR=str(tmp_path), **env))
+    code = (
+        "require " + json.dumps(ROOT + '/app/lib/engine.php') + ";"
+        "try { echo json_encode(['ok' => engine_call('presets', ['x' => 1])]); }"
+        "catch (ApiError $e) { echo json_encode(['status' => $e->status, 'message' => $e->getMessage()]); }"
+    )
+    out = subprocess.run(['php', '-r', code], capture_output=True, text=True, timeout=60, env=dict(os.environ, JIGO_PYTHON=str(fake), JIGO_ENGINE_ROOT=ROOT, JIGO_DATA_DIR=str(tmp_path), **env))
     assert out.returncode == 0, out.stderr
     return json.loads(out.stdout)
 
@@ -44,12 +46,15 @@ def test_request_error_is_reported_as_422(tmp_path):
     assert r == {'status': 422, 'message': 'Stratégie invalide'}
 
 
-@pytest.mark.parametrize('script', [
-    "cat >/dev/null; echo 'boom' >&2; exit 1",           # le moteur plante
-    "cat >/dev/null; printf '{\"a\": 1'",                # JSON tronqué
-    "cat >/dev/null",                                    # aucune sortie
-    "cat >/dev/null; echo '\"texte\"'",                  # JSON valide mais pas un objet
-])
+@pytest.mark.parametrize(
+    'script',
+    [
+        "cat >/dev/null; echo 'boom' >&2; exit 1",  # le moteur plante
+        "cat >/dev/null; printf '{\"a\": 1'",  # JSON tronqué
+        "cat >/dev/null",  # aucune sortie
+        "cat >/dev/null; echo '\"texte\"'",  # JSON valide mais pas un objet
+    ],
+)
 def test_engine_failures_become_503_never_a_success(tmp_path, script):
     r = run(tmp_path, script)
     assert r.get('status') == 503 and 'ok' not in r

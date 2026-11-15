@@ -15,4 +15,3 @@ def test_etf_regions_use_explicit_fund_categories_and_leave_global_unknown():
     assert etf_region('United States Stock') == 'us'
     assert etf_region('World Large-Stock Blend') is None
     assert etf_region(None) is None
-

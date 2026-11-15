@@ -1,4 +1,5 @@
 """Rendu sans données, inconnues, échappement et accessibilité (un mot toujours accompagné de la couleur), sans navigateur réseau."""
+
 import pathlib
 import subprocess
 

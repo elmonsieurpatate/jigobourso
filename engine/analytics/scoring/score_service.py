@@ -5,6 +5,7 @@ Garanties (testées) :
   * ni les filtres de conformité, ni les seuils de la stratégie, ni la population affichée n'y entrent ; la clé de cache les ignore aussi ;
   * le rang « global » est le rang parmi TOUS les titres notés du même groupe (actions / ETF), pas parmi les titres retenus.
 """
+
 import datetime
 import hashlib
 import json
@@ -40,9 +41,18 @@ def params_for(config, kind):
     # Jour à 0 % (ou sans poids) n'entre dans aucun calcul : mêmes notes, même clé de cache qu'avant l'ajout de la granularité
     active = [p for p in active if p['sessions'] != SC.DAY_SESSIONS or (p.get('weight') or 0.0) > 0]
     ids = {p['id'] for p in active}
-    return {'periods': active, 'required': [p['id'] for p in cfg['periods'] if p['id'] in ids and p.get('require_history')],
-            'kappa': float(sc['kappa']), 'complex_weights': {k: float(v) for k, v in dict(SC.COMPLEX_WEIGHTS, **sc['complex_weights']).items()}, 'threshold': float(sc['threshold']), 'anchor': float(sc.get('anchor', SC.ANCHOR_LAMBDA)),
-            'sat_a': float(sc.get('sat_a', SC.SAT_A)), 'accel_ref': float(sc.get('accel_ref', SC.ACCEL_REF)), 'vol_mode': sc.get('vol_mode', 'absolute'), 'momentum_horizon': sc.get('momentum_horizon', '6m')}
+    return {
+        'periods': active,
+        'required': [p['id'] for p in cfg['periods'] if p['id'] in ids and p.get('require_history')],
+        'kappa': float(sc['kappa']),
+        'complex_weights': {k: float(v) for k, v in dict(SC.COMPLEX_WEIGHTS, **sc['complex_weights']).items()},
+        'threshold': float(sc['threshold']),
+        'anchor': float(sc.get('anchor', SC.ANCHOR_LAMBDA)),
+        'sat_a': float(sc.get('sat_a', SC.SAT_A)),
+        'accel_ref': float(sc.get('accel_ref', SC.ACCEL_REF)),
+        'vol_mode': sc.get('vol_mode', 'absolute'),
+        'momentum_horizon': sc.get('momentum_horizon', '6m'),
+    }
 
 
 def _f(v):
@@ -58,20 +68,32 @@ def load_inputs(conn, sessions, ids=None):
         args = list(ids)
     out = {}
     with conn.cursor() as cur:
-        cur.execute(f"""SELECT r.listing_id, i.kind, l.mic, ls.turnover_eur, ls.source, ls.days, ss.momentum_6m, ss.momentum_12m FROM v_recommendable r JOIN listings l ON l.id=r.listing_id
-                        JOIN instruments i ON i.id=l.instrument_id LEFT JOIN liquidity_state ls ON ls.listing_id=r.listing_id LEFT JOIN series_state ss ON ss.listing_id=r.listing_id WHERE 1=1{scope}""", args)
+        cur.execute(
+            f"""SELECT r.listing_id, i.kind, l.mic, ls.turnover_eur, ls.source, ls.days, ss.momentum_6m, ss.momentum_12m FROM v_recommendable r JOIN listings l ON l.id=r.listing_id
+                        JOIN instruments i ON i.id=l.instrument_id LEFT JOIN liquidity_state ls ON ls.listing_id=r.listing_id LEFT JOIN series_state ss ON ss.listing_id=r.listing_id WHERE 1=1{scope}""",
+            args,
+        )
         for r in cur.fetchall():
-            out[r['listing_id']] = {'kind': 'etf' if r['kind'] == 'etf' else 'equity', 'mic': r['mic'], 'inputs': {},
-                                    'liquidity': {'turnover_eur': _f(r['turnover_eur']), 'source': r['source'], 'days': r['days']},
-                                    'momentum': {'6m': _f(r['momentum_6m']), '12m': _f(r['momentum_12m'])}}
+            out[r['listing_id']] = {
+                'kind': 'etf' if r['kind'] == 'etf' else 'equity',
+                'mic': r['mic'],
+                'inputs': {},
+                'liquidity': {'turnover_eur': _f(r['turnover_eur']), 'source': r['source'], 'days': r['days']},
+                'momentum': {'6m': _f(r['momentum_6m']), '12m': _f(r['momentum_12m'])},
+            }
         if sessions:
             marks = ','.join(['%s'] * len(sessions))
-            cur.execute(f"""SELECT m.listing_id, m.sessions, m.slope, m.r2, m.perf, m.volatility, m.drawdown, m.coverage, x.up_fraction, x.spike_share, x.accel, x.r2_prev
+            cur.execute(
+                f"""SELECT m.listing_id, m.sessions, m.slope, m.r2, m.perf, m.volatility, m.drawdown, m.coverage, x.up_fraction, x.spike_share, x.accel, x.r2_prev
                             FROM strategy_metrics m JOIN v_recommendable r ON r.listing_id=m.listing_id LEFT JOIN score_inputs x ON x.listing_id=m.listing_id AND x.sessions=m.sessions
-                            WHERE m.sessions IN ({marks}){scope}""", list(sessions) + args)
+                            WHERE m.sessions IN ({marks}){scope}""",
+                list(sessions) + args,
+            )
             for r in cur.fetchall():
                 if r['listing_id'] in out:
-                    out[r['listing_id']]['inputs'][r['sessions']] = {k: _f(r[k]) for k in ('slope', 'r2', 'perf', 'volatility', 'drawdown', 'coverage', 'up_fraction', 'spike_share', 'accel', 'r2_prev')}
+                    out[r['listing_id']]['inputs'][r['sessions']] = {
+                        k: _f(r[k]) for k in ('slope', 'r2', 'perf', 'volatility', 'drawdown', 'coverage', 'up_fraction', 'spike_share', 'accel', 'r2_prev')
+                    }
     return out
 
 
@@ -80,15 +102,28 @@ def _score_all(data, config):
     result = {}
     for lid, d in data.items():
         p = params[d['kind']]
-        result[lid] = SC.score_title(d['inputs'], d['liquidity'], p['periods'], kappa=p['kappa'], required=p['required'], threshold=p['threshold'], complex_weights=p['complex_weights'], anchor=p['anchor'],
-                                 sat_a=p['sat_a'], accel_ref=p['accel_ref'], vol_mode=p['vol_mode'], momentum=d.get('momentum'), momentum_horizon=p['momentum_horizon'], recovery_perf=(d['inputs'].get(126) or {}).get('perf'))
+        result[lid] = SC.score_title(
+            d['inputs'],
+            d['liquidity'],
+            p['periods'],
+            kappa=p['kappa'],
+            required=p['required'],
+            threshold=p['threshold'],
+            complex_weights=p['complex_weights'],
+            anchor=p['anchor'],
+            sat_a=p['sat_a'],
+            accel_ref=p['accel_ref'],
+            vol_mode=p['vol_mode'],
+            momentum=d.get('momentum'),
+            momentum_horizon=p['momentum_horizon'],
+            recovery_perf=(d['inputs'].get(126) or {}).get('perf'),
+        )
     return result
 
 
 def _key(config, version):
     # `required` (périodes obligatoires) et `threshold` (fiabilité) n'ont plus d'effet sur les notes (V4.2) : ils ne font pas partie de la clé
-    payload = {'format': CACHE_FORMAT, 'score_version': SC.VERSION,
-               'params': {k: {f: v for f, v in params_for(config, k).items() if f not in ('required', 'threshold')} for k in ('equity', 'etf')}}
+    payload = {'format': CACHE_FORMAT, 'score_version': SC.VERSION, 'params': {k: {f: v for f, v in params_for(config, k).items() if f not in ('required', 'threshold')} for k in ('equity', 'etf')}}
     return hashlib.sha1(('scores-v1:' + json.dumps(payload, sort_keys=True, separators=(',', ':'))).encode()).hexdigest()
 
 
@@ -107,8 +142,10 @@ def score_book(conn, config, data_version):
         s, c = r['simple'], r['complex']
         entries.append([lid, _r(s['score']), s['status'], _r(s['coverage'], 4), _r(c['score']), c['status'], _r(c['coverage'], 4), s.get('why') or c.get('why')])
     with conn.cursor() as cur:
-        cur.execute('REPLACE INTO result_cache(cache_key, data_version, built_at, payload) VALUES (%s,%s,%s,%s)',
-                    (key, data_version, datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None, microsecond=0), packed(entries)))
+        cur.execute(
+            'REPLACE INTO result_cache(cache_key, data_version, built_at, payload) VALUES (%s,%s,%s,%s)',
+            (key, data_version, datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None, microsecond=0), packed(entries)),
+        )
     conn.commit()
     return {e[0]: dict(zip(FIELDS, e)) for e in entries}
 
@@ -129,9 +166,16 @@ def attach(conn, config, entries, data_version):
     choice = config['ranking'].get('sort', 'simple') if mode else None
     for e in entries:
         b = book.get(e['id']) or {}
-        e.update(score_simple=b.get('simple'), score_complex=b.get('complex'), score_simple_status=b.get('simple_status', 'inconnu'), score_complex_status=b.get('complex_status', 'inconnu'),
-                 score_coverage=b.get('simple_coverage'), score_why=b.get('why'),
-                 score_rank_simple=ranks[('simple', e['group'])].get(e['id']), score_rank_complex=ranks[('complex', e['group'])].get(e['id']))
+        e.update(
+            score_simple=b.get('simple'),
+            score_complex=b.get('complex'),
+            score_simple_status=b.get('simple_status', 'inconnu'),
+            score_complex_status=b.get('complex_status', 'inconnu'),
+            score_coverage=b.get('simple_coverage'),
+            score_why=b.get('why'),
+            score_rank_simple=ranks[('simple', e['group'])].get(e['id']),
+            score_rank_complex=ranks[('complex', e['group'])].get(e['id']),
+        )
         if mode:
             e['score'] = e['score_simple'] if choice == 'simple' else e['score_complex']
             e['rank'] = e['score_rank_simple'] if choice == 'simple' else e['score_rank_complex']
@@ -157,8 +201,14 @@ def summary(config, entries):
     out = {}
     for kind, p in params.items():
         weights = SC.resolve_weights(p['periods'], p['kappa']) if p['periods'] else {}
-        out[kind] = {'periods': [dict(x, weight=weights.get(x['id'])) for x in p['periods']], 'required': p['required'], 'kappa': p['kappa'],
-                     'threshold': p['threshold'], 'complex_weights': dict(SC.COMPLEX_WEIGHTS, **p['complex_weights']), 'counts': dict(counts[kind])}
+        out[kind] = {
+            'periods': [dict(x, weight=weights.get(x['id'])) for x in p['periods']],
+            'required': p['required'],
+            'kappa': p['kappa'],
+            'threshold': p['threshold'],
+            'complex_weights': dict(SC.COMPLEX_WEIGHTS, **p['complex_weights']),
+            'counts': dict(counts[kind]),
+        }
     return out
 
 
@@ -168,6 +218,7 @@ SETTING = 'scores_v4'
 def admin_defaults(conn):
     """Réglages globaux des scores saisis dans l'administration ({kappa, complex_weights, threshold}) ; vide = valeurs de conception."""
     from engine.shared import settings
+
     raw = settings.get(conn, SETTING, {}) or {}
     return C.validate_scoring(raw, [])
 
@@ -180,7 +231,7 @@ def apply_global(conn, config):
     base = C.validate_scoring(None, [])
     admin = admin_defaults(conn)
     sc = dict(config.get('scoring') or base)
-    for field in ('kappa', 'threshold', 'anchor'):               # les poids du score complexe sont propres à chaque stratégie : aucun repli global (ambiguïté supprimée)
+    for field in ('kappa', 'threshold', 'anchor'):  # les poids du score complexe sont propres à chaque stratégie : aucun repli global (ambiguïté supprimée)
         if sc.get(field) == base[field]:
             sc[field] = admin[field]
     return dict(config, scoring=sc)

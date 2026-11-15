@@ -1,5 +1,6 @@
 """Plan de suivi : réglage individuel des règles (route tracking/rules). Mode automatique par défaut, valeur personnalisée jamais écrasée par le moteur,
 retour à l'automatique règle par règle, activation indépendante ; aucune transaction, aucun lot, aucune ancienne règle d'alerte n'est touché. PHP 8.3."""
+
 import datetime as dt
 
 import pytest
@@ -20,7 +21,9 @@ def seed_prices():
         d -= dt.timedelta(days=1)
     days.sort()
     with conn.cursor() as cur:
-        cur.executemany('INSERT INTO daily_prices(listing_id,price_date,close_px) VALUES (1,%s,%s)', [(day, round(100 * (1.6 ** (i / 199)) * (1.012 if i % 2 else 0.988), 4)) for i, day in enumerate(days)])
+        cur.executemany(
+            'INSERT INTO daily_prices(listing_id,price_date,close_px) VALUES (1,%s,%s)', [(day, round(100 * (1.6 ** (i / 199)) * (1.012 if i % 2 else 0.988), 4)) for i, day in enumerate(days)]
+        )
         cur.execute('UPDATE latest_prices SET price=160 WHERE listing_id=1')
     conn.commit()
     conn.close()
@@ -69,12 +72,13 @@ def test_defaults_are_automatic_and_active(world):
 
 def test_custom_stop_then_return_to_automatic_without_touching_other_rules(world):
     a, pf = setup(world)
-    conn = connect(); before = counts(conn)
+    conn = connect()
+    before = counts(conn)
     auto = rule(plan_of(a, pf), 'stop')['auto']
     assert set_rule(a, pf, 'recul', mode='custom', value=12)[0] == 200
     assert set_rule(a, pf, 'stop', mode='custom', value=130)[0] == 200
     p = plan_of(a, pf)
-    assert rule(p, 'stop')['mode'] == 'custom' and abs(rule(p, 'stop')['effective'] - 130) < 1e-9 and abs(rule(p, 'stop')['auto'] - auto) < 1e-6   # la suggestion continue d'être calculée
+    assert rule(p, 'stop')['mode'] == 'custom' and abs(rule(p, 'stop')['effective'] - 130) < 1e-9 and abs(rule(p, 'stop')['auto'] - auto) < 1e-6  # la suggestion continue d'être calculée
     assert rule(p, 'recul')['mode'] == 'custom' and rule(p, 'recul')['custom'] == 12
     # activation seule : aucune valeur n'est touchée
     assert set_rule(a, pf, 'trend', enabled=False)[0] == 200 and set_rule(a, pf, 'stop', enabled=False)[0] == 200
@@ -87,7 +91,7 @@ def test_custom_stop_then_return_to_automatic_without_touching_other_rules(world
     p = plan_of(a, pf)
     assert rule(p, 'stop')['mode'] == 'auto' and abs(rule(p, 'stop')['effective'] - auto) < 1e-6
     assert rule(p, 'recul')['mode'] == 'custom' and rule(p, 'recul')['custom'] == 12 and rule(p, 'trend')['enabled'] is False
-    assert counts(conn) == before                                  # transactions, lots, origines, anciennes règles et événements, stratégie : intacts
+    assert counts(conn) == before  # transactions, lots, origines, anciennes règles et événements, stratégie : intacts
 
 
 def test_personal_objective_and_stop_share_levels_without_overwriting_each_other(world):
@@ -101,26 +105,36 @@ def test_personal_objective_and_stop_share_levels_without_overwriting_each_other
     assert set_rule(a, pf, 'stop', mode='auto')[0] == 200
     conn = connect()
     with conn.cursor() as cur:
-        cur.execute('SELECT COUNT(*) n FROM position_levels'); assert cur.fetchone()['n'] == 0          # plus aucun niveau : ligne supprimée
-        cur.execute('SELECT COUNT(*) n FROM position_plan_rules'); assert cur.fetchone()['n'] == 0      # pas de ligne = tout automatique et actif
+        cur.execute('SELECT COUNT(*) n FROM position_levels')
+        assert cur.fetchone()['n'] == 0  # plus aucun niveau : ligne supprimée
+        cur.execute('SELECT COUNT(*) n FROM position_plan_rules')
+        assert cur.fetchone()['n'] == 0  # pas de ligne = tout automatique et actif
 
 
 def test_validation_and_ownership(world):
     a, pf = setup(world)
-    for kw, code in (({'rule': 'inconnue'}, 422), ({'rule': 'recul', 'mode': 'custom', 'value': 0}, 422), ({'rule': 'recul', 'mode': 'custom', 'value': 100}, 422), ({'rule': 'recul', 'mode': 'custom', 'value': 'abc'}, 422),
-                     ({'rule': 'stop', 'mode': 'custom', 'value': -5}, 422), ({'rule': 'stop', 'mode': 'custom'}, 422), ({'rule': 'trend', 'mode': 'custom', 'value': 5}, 422), ({'rule': 'stop', 'mode': 'bizarre'}, 422)):
+    for kw, code in (
+        ({'rule': 'inconnue'}, 422),
+        ({'rule': 'recul', 'mode': 'custom', 'value': 0}, 422),
+        ({'rule': 'recul', 'mode': 'custom', 'value': 100}, 422),
+        ({'rule': 'recul', 'mode': 'custom', 'value': 'abc'}, 422),
+        ({'rule': 'stop', 'mode': 'custom', 'value': -5}, 422),
+        ({'rule': 'stop', 'mode': 'custom'}, 422),
+        ({'rule': 'trend', 'mode': 'custom', 'value': 5}, 422),
+        ({'rule': 'stop', 'mode': 'bizarre'}, 422),
+    ):
         assert a.call('tracking/rules', dict(portfolio_id=pf, listing_id=1, **kw))[0] == code, kw
     assert set_rule(a, pf, 'target', mode='custom', value=140)[0] == 200
-    assert set_rule(a, pf, 'stop', mode='custom', value=150)[0] == 422                      # le filet doit rester sous l'objectif
-    assert a.call('tracking/rules', {'portfolio_id': pf, 'listing_id': 2, 'rule': 'trend', 'enabled': False})[0] == 404     # titre non détenu
+    assert set_rule(a, pf, 'stop', mode='custom', value=150)[0] == 422  # le filet doit rester sous l'objectif
+    assert a.call('tracking/rules', {'portfolio_id': pf, 'listing_id': 2, 'rule': 'trend', 'enabled': False})[0] == 404  # titre non détenu
     bob = login(world, 'bob', 'bob-secret-12345')
-    assert bob.call('tracking/rules', {'portfolio_id': pf, 'listing_id': 1, 'rule': 'trend', 'enabled': False})[0] == 404    # cloisonnement entre utilisateurs
+    assert bob.call('tracking/rules', {'portfolio_id': pf, 'listing_id': 1, 'rule': 'trend', 'enabled': False})[0] == 404  # cloisonnement entre utilisateurs
 
 
 def test_exit_state_follows_the_effective_protection(world):
     a, pf = setup(world)
     assert rule(plan_of(a, pf), 'stop')['triggered'] is False
-    assert set_rule(a, pf, 'stop', mode='custom', value=170)[0] == 200                     # protection personnelle au-dessus du cours (160)
+    assert set_rule(a, pf, 'stop', mode='custom', value=170)[0] == 200  # protection personnelle au-dessus du cours (160)
     p = plan_of(a, pf)
     assert p['advice']['state'] == 'exit' and p['advice']['rule'] == 'stop' and 'personnelle' in p['advice']['headline']
     assert set_rule(a, pf, 'stop', mode='auto')[0] == 200

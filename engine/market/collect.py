@@ -3,6 +3,7 @@
 Toutes les fonctions prennent une connexion, un client Yahoo et une date `now` (UTC, aware) : testables sans réseau ni horloge.
 Le jeu de collecte vient de v_collect_set : sélectionnées principales + cotations détenues (même exclues ou secondaires).
 """
+
 import datetime
 import json
 import statistics
@@ -14,7 +15,7 @@ from concurrent.futures import ThreadPoolExecutor
 from . import hours, prefilter
 from .yahoo import RateLimited, local_date
 
-DAILY_KEEP_DAYS = 610          # ≈ 420 séances US (580 jours n'en gardaient que 380-399 : jamais « complet » à 400)
+DAILY_KEEP_DAYS = 610  # ≈ 420 séances US (580 jours n'en gardaient que 380-399 : jamais « complet » à 400)
 SPARK_BATCH = 20
 QUOTE_BATCH = 50
 CHUNK = 2000
@@ -36,7 +37,7 @@ def collection_set(conn, mic=None):
 
 def _batches(items, size):
     for i in range(0, len(items), size):
-        yield items[i:i + size]
+        yield items[i : i + size]
 
 
 def naive_utc(now):
@@ -63,16 +64,32 @@ def refresh_quotes(conn, client, rows, now, progress=None, stats=None):
         data = []
         for symbol, q in quotes.items():
             if symbol in by_symbol:
-                data.append((by_symbol[symbol], q['price'], q['price_time'] or naive_utc(now), q['currency'], q['avg_volume_3m'], q['market_cap'], naive_utc(now), q.get('expense_ratio'), q.get('avg_volume_10d'), q.get('analyst_rating'), q.get('net_assets')))
+                data.append(
+                    (
+                        by_symbol[symbol],
+                        q['price'],
+                        q['price_time'] or naive_utc(now),
+                        q['currency'],
+                        q['avg_volume_3m'],
+                        q['market_cap'],
+                        naive_utc(now),
+                        q.get('expense_ratio'),
+                        q.get('avg_volume_10d'),
+                        q.get('analyst_rating'),
+                        q.get('net_assets'),
+                    )
+                )
         with conn.cursor() as cur:
-            cur.executemany("""INSERT INTO latest_prices(listing_id,price,price_time,source,currency,avg_volume_3m,market_cap,quote_at,expense_ratio,avg_volume_10d,analyst_rating,net_assets)
+            cur.executemany(
+                """INSERT INTO latest_prices(listing_id,price,price_time,source,currency,avg_volume_3m,market_cap,quote_at,expense_ratio,avg_volume_10d,analyst_rating,net_assets)
                                VALUES (%s,%s,%s,'quote',%s,%s,%s,%s,%s,%s,%s,%s)
                                ON DUPLICATE KEY UPDATE price=IF(source='intraday' AND price_time>VALUES(price_time),price,VALUES(price)),
                                  price_time=IF(source='intraday' AND price_time>VALUES(price_time),price_time,VALUES(price_time)),
                                  source=IF(source='intraday' AND price_time>VALUES(price_time),source,'quote'),
                                  currency=IF(source='intraday' AND price_time>VALUES(price_time),currency,VALUES(currency)), avg_volume_3m=VALUES(avg_volume_3m), market_cap=VALUES(market_cap), quote_at=VALUES(quote_at),
                                  expense_ratio=VALUES(expense_ratio), avg_volume_10d=VALUES(avg_volume_10d), analyst_rating=VALUES(analyst_rating), net_assets=VALUES(net_assets)""",
-                            data)
+                data,
+            )
         conn.commit()
         ok += len(data)
         err += len(part) - len(data)
@@ -104,7 +121,7 @@ def refresh_fx(conn, client, now):
 from engine.shared.units import to_eur_factor  # noqa: E402
 
 
-FX_HISTORY_DAYS = 300        # profondeur d'historique de change visée (les transactions plus anciennes exigent un taux saisi à la main)
+FX_HISTORY_DAYS = 300  # profondeur d'historique de change visée (les transactions plus anciennes exigent un taux saisi à la main)
 
 
 def backfill_fx(conn, client, now):
@@ -116,8 +133,7 @@ def backfill_fx(conn, client, now):
         cur.execute('SELECT currency, MIN(rate_date) first FROM fx_rates GROUP BY currency')
         first = {r['currency']: r['first'] for r in cur.fetchall()}
     tried = setting(conn, 'fx_backfill_tried', {})
-    wanted = sorted(c for c, d in first.items() if d > today - datetime.timedelta(days=FX_HISTORY_DAYS)
-                    and (not tried.get(c) or (today - datetime.date.fromisoformat(tried[c])).days >= 7))
+    wanted = sorted(c for c, d in first.items() if d > today - datetime.timedelta(days=FX_HISTORY_DAYS) and (not tried.get(c) or (today - datetime.date.fromisoformat(tried[c])).days >= 7))
     added = 0
     for part in _batches(wanted, SPARK_BATCH):
         pairs = {f'{c}EUR=X': c for c in part}
@@ -133,8 +149,10 @@ def backfill_fx(conn, client, now):
         for c in part:
             tried[c] = today.isoformat()
         with conn.cursor() as cur:
-            cur.execute('INSERT INTO settings(name, value_json, updated_at) VALUES (%s,%s,%s) ON DUPLICATE KEY UPDATE value_json=VALUES(value_json), updated_at=VALUES(updated_at)',
-                        ('fx_backfill_tried', json.dumps(tried), naive_utc(now)))
+            cur.execute(
+                'INSERT INTO settings(name, value_json, updated_at) VALUES (%s,%s,%s) ON DUPLICATE KEY UPDATE value_json=VALUES(value_json), updated_at=VALUES(updated_at)',
+                ('fx_backfill_tried', json.dumps(tried), naive_utc(now)),
+            )
         conn.commit()
     return added
 
@@ -152,14 +170,22 @@ def apply_prefilter(conn, now=None):
     rates = latest_rates(conn)
     changed = {'selected': 0, 'excluded': 0}
     with conn.cursor() as cur:
-        cur.execute("""SELECT l.id, l.status, l.excluded_reason, i.kind, p.price, p.avg_volume_3m, p.currency, p.price_time
+        cur.execute(
+            """SELECT l.id, l.status, l.excluded_reason, i.kind, p.price, p.avg_volume_3m, p.currency, p.price_time
                        FROM listings l JOIN instruments i ON i.id=l.instrument_id JOIN latest_prices p ON p.listing_id=l.id
-                       WHERE p.quote_at IS NOT NULL AND (l.excluded_reason IS NULL OR l.excluded_reason LIKE %s)""", (prefilter.PREFIX + '%',))
+                       WHERE p.quote_at IS NOT NULL AND (l.excluded_reason IS NULL OR l.excluded_reason LIKE %s)""",
+            (prefilter.PREFIX + '%',),
+        )
         updates = []
         for r in cur.fetchall():
-            status, reason = prefilter.decide(r['kind'], float(r['price']) if r['price'] is not None else None,
-                                              r['avg_volume_3m'], to_eur_factor(r['currency'], rates), params,
-                                              age_days=(now - r['price_time']).total_seconds() / 86400 if r['price_time'] else None)
+            status, reason = prefilter.decide(
+                r['kind'],
+                float(r['price']) if r['price'] is not None else None,
+                r['avg_volume_3m'],
+                to_eur_factor(r['currency'], rates),
+                params,
+                age_days=(now - r['price_time']).total_seconds() / 86400 if r['price_time'] else None,
+            )
             if status is None and r['price'] is not None and to_eur_factor(r['currency'], rates) is None:
                 # Aucun taux de change : on ne décide pas, mais on le dit (sinon le titre reste « candidat » sans explication).
                 status, reason = 'candidate', f'{prefilter.PREFIX} : devise {r["currency"] or "inconnue"} non convertible en euros (taux indisponible)'
@@ -183,7 +209,7 @@ def store_gap_bars(conn, r, data, now):
         for ts, _o, _h, _l, close, volume in data['bars']:
             day = local_date(ts, data['timezone'])
             if day not in have and hours.is_settled(r['mic'], day, now):
-                out[day] = (close, volume)                    # le volume de la même barre est conservé (None si Yahoo n'en donne pas : jamais zéro inventé)
+                out[day] = (close, volume)  # le volume de la même barre est conservé (None si Yahoo n'en donne pas : jamais zéro inventé)
         if out:
             cur.executemany('INSERT IGNORE INTO daily_prices(listing_id,price_date,close_px,volume) VALUES (%s,%s,%s,%s)', [(r['listing_id'], d, c, v) for d, (c, v) in out.items()])
     conn.commit()
@@ -195,14 +221,14 @@ def fill_daily_gaps(conn, client, rows, now, range_='1y'):
     N'ajoute que les jours manquants (jamais de modification d'une clôture déjà en base) et seulement des séances terminées. Renvoie (titres examinés, clôtures ajoutées)."""
     added = 0
     for r in rows:
-        data = client.chart(r['symbol'], range_, '1d')                       # RateLimited remonte : le passage s'arrête, la suite reprend plus tard
+        data = client.chart(r['symbol'], range_, '1d')  # RateLimited remonte : le passage s'arrête, la suite reprend plus tard
         added += store_gap_bars(conn, r, data, now)
     return len(rows), added
 
 
-GAP_LIMIT = 150            # titres examinés au plus par passage de maintenance
-GAP_BUDGET_S = 60          # ...et au plus ce temps (secondes) : un appel Yahoo par titre
-GAP_RETRY_DAYS = 30        # un titre déjà examiné n'est pas redemandé avant ce délai (les jours que Yahoo n'a vraiment pas restent absents)
+GAP_LIMIT = 150  # titres examinés au plus par passage de maintenance
+GAP_BUDGET_S = 60  # ...et au plus ce temps (secondes) : un appel Yahoo par titre
+GAP_RETRY_DAYS = 30  # un titre déjà examiné n'est pas redemandé avant ce délai (les jours que Yahoo n'a vraiment pas restent absents)
 
 
 def fill_gaps_batch(conn, client, rows, now, limit=GAP_LIMIT, budget_s=GAP_BUDGET_S, force=False, progress=None, workers=1, client_factory=None):
@@ -214,15 +240,21 @@ def fill_gaps_batch(conn, client, rows, now, limit=GAP_LIMIT, budget_s=GAP_BUDGE
     missing = {}
     with conn.cursor() as cur:
         for part in _batches(list(by_id), CHUNK):
-            cur.execute(f"SELECT listing_id, expected_252 - observed_252 m FROM series_state WHERE coverage_252 < 1 AND expected_252 IS NOT NULL AND listing_id IN ({','.join(['%s'] * len(part))})", part)
+            cur.execute(
+                f"SELECT listing_id, expected_252 - observed_252 m FROM series_state WHERE coverage_252 < 1 AND expected_252 IS NOT NULL AND listing_id IN ({','.join(['%s'] * len(part))})", part
+            )
             missing.update({r['listing_id']: int(r['m']) for r in cur.fetchall()})
     todo = [i for i in sorted(missing, key=lambda i: (missing[i], i)) if not tried.get(str(i)) or (today - datetime.date.fromisoformat(tried[str(i)])).days >= (1 if force else GAP_RETRY_DAYS)]
+
     def save_tried():
         keep = {k: v for k, v in tried.items() if (today - datetime.date.fromisoformat(v)).days < GAP_RETRY_DAYS}
         with conn.cursor() as cur:
-            cur.execute('INSERT INTO settings(name, value_json, updated_at) VALUES (%s,%s,%s) ON DUPLICATE KEY UPDATE value_json=VALUES(value_json), updated_at=VALUES(updated_at)',
-                        ('gap_fill_tried', json.dumps(keep), naive_utc(now)))
+            cur.execute(
+                'INSERT INTO settings(name, value_json, updated_at) VALUES (%s,%s,%s) ON DUPLICATE KEY UPDATE value_json=VALUES(value_json), updated_at=VALUES(updated_at)',
+                ('gap_fill_tried', json.dumps(keep), naive_utc(now)),
+            )
         conn.commit()
+
     started, done, added, limited, saved = time.monotonic(), 0, 0, False, 0
     local = threading.local()
 
@@ -235,30 +267,31 @@ def fill_gaps_batch(conn, client, rows, now, limit=GAP_LIMIT, budget_s=GAP_BUDGE
             c = local.client
         try:
             return i, c.chart(by_id[i]['symbol'], '1y', '1d'), None
-        except Exception as e:                                                         # noqa: BLE001
+        except Exception as e:  # noqa: BLE001
             return i, None, e
+
     chunk = workers * 4 if workers > 1 else 1
     pool = ThreadPoolExecutor(max_workers=workers) if workers > 1 else None
     try:
         for start in range(0, len(todo[:limit]), chunk):
             if time.monotonic() - started > budget_s:
                 break
-            ids = todo[:limit][start:start + chunk]
+            ids = todo[:limit][start : start + chunk]
             results = list(pool.map(fetch, ids)) if pool else [fetch(i) for i in ids]
             stop = False
             for i, data, err in results:
                 if isinstance(err, RateLimited):
-                    limited = stop = True                                              # le titre n'est pas marqué : il sera repris
+                    limited = stop = True  # le titre n'est pas marqué : il sera repris
                     continue
                 if err is not None:
-                    continue                                                           # réponse absente ou illisible : réessai au prochain passage
+                    continue  # réponse absente ou illisible : réessai au prochain passage
                 added += store_gap_bars(conn, by_id[i], data, now)
                 tried[str(i)] = today.isoformat()
                 done += 1
                 if progress:
                     progress(done, min(len(todo), limit))
             if done - saved >= 50:
-                save_tried()                                                           # un arrêt en cours de route ne perd pas ce qui est fait
+                save_tried()  # un arrêt en cours de route ne perd pas ce qui est fait
                 saved = done
             if stop:
                 break
@@ -272,11 +305,11 @@ def fill_gaps_batch(conn, client, rows, now, limit=GAP_LIMIT, budget_s=GAP_BUDGE
 # ───────── volumes quotidiens (Yahoo Chart) ─────────
 # Les clôtures viennent de Spark (sans volume) : le volume d'une séance s'obtient par un appel Chart par titre, la même mécanique que les clôtures manquantes
 # (un fil de travail par appel Yahoo, écriture en base dans le fil principal, arrêt au premier 429, reprise). Seul `daily_prices.volume` est écrit : jamais un cours.
-VOLUME_BUDGET_S = 90           # temps d'un passage de maintenance ; le rattrapage manuel n'a pas ce plafond
-VOLUME_BACKFILL_RANGE = '1y'   # titre jamais interrogé : un an de volumes en un appel
-VOLUME_REFRESH_RANGE = '1mo'   # titre déjà interrogé : nouvelles séances + deux dernières séances à consolider
-VOLUME_REFRESH_SESSIONS = 2    # le volume d'une séance fraîchement réglée peut encore bouger : les deux dernières séances sont relues
-VOLUME_RETRY_HOURS = 6         # un titre sans volume exploitable (ou en échec) n'est pas redemandé avant ce délai
+VOLUME_BUDGET_S = 90  # temps d'un passage de maintenance ; le rattrapage manuel n'a pas ce plafond
+VOLUME_BACKFILL_RANGE = '1y'  # titre jamais interrogé : un an de volumes en un appel
+VOLUME_REFRESH_RANGE = '1mo'  # titre déjà interrogé : nouvelles séances + deux dernières séances à consolider
+VOLUME_REFRESH_SESSIONS = 2  # le volume d'une séance fraîchement réglée peut encore bouger : les deux dernières séances sont relues
+VOLUME_RETRY_HOURS = 6  # un titre sans volume exploitable (ou en échec) n'est pas redemandé avant ce délai
 VOLUME_ERRORS = 'volume_errors'
 
 
@@ -294,8 +327,11 @@ def store_volumes(conn, r, data, now, refresh=VOLUME_REFRESH_SESSIONS):
         cur.execute('SELECT price_date, close_px, volume FROM daily_prices WHERE listing_id=%s ORDER BY price_date', (lid,))
         have = cur.fetchall()
         recent = {x['price_date'] for x in have[-refresh:]}
-        out = [(lid, x['price_date'], x['close_px'], by_day[x['price_date']]) for x in have
-               if x['price_date'] in by_day and (x['volume'] is None or (x['price_date'] in recent and x['volume'] != by_day[x['price_date']]))]
+        out = [
+            (lid, x['price_date'], x['close_px'], by_day[x['price_date']])
+            for x in have
+            if x['price_date'] in by_day and (x['volume'] is None or (x['price_date'] in recent and x['volume'] != by_day[x['price_date']]))
+        ]
         if out:
             # close_px est relu tel quel et ne figure pas dans la clause de mise à jour : la clôture enregistrée ne peut pas changer
             cur.executemany('INSERT INTO daily_prices(listing_id,price_date,close_px,volume) VALUES (%s,%s,%s,%s) ON DUPLICATE KEY UPDATE volume=VALUES(volume)', out)
@@ -319,8 +355,11 @@ def volume_candidates(conn, rows, now, since=None):
             cur.execute(f'SELECT listing_id, volume_checked_at FROM liquidity_state WHERE listing_id IN ({marks})', part)
             checked.update({x['listing_id']: x['volume_checked_at'] for x in cur.fetchall()})
             if since is None:
-                cur.execute(f"""SELECT d.listing_id FROM daily_prices d JOIN (SELECT listing_id, MAX(price_date) m FROM daily_prices WHERE listing_id IN ({marks}) GROUP BY listing_id) x
-                                ON x.listing_id=d.listing_id AND x.m=d.price_date WHERE d.volume IS NULL""", part)
+                cur.execute(
+                    f"""SELECT d.listing_id FROM daily_prices d JOIN (SELECT listing_id, MAX(price_date) m FROM daily_prices WHERE listing_id IN ({marks}) GROUP BY listing_id) x
+                                ON x.listing_id=d.listing_id AND x.m=d.price_date WHERE d.volume IS NULL""",
+                    part,
+                )
                 lastnull.update(x['listing_id'] for x in cur.fetchall())
     stamp = naive_utc(now)
     retry_before = stamp - datetime.timedelta(hours=VOLUME_RETRY_HOURS)
@@ -338,7 +377,7 @@ def volume_candidates(conn, rows, now, since=None):
         if r['mic'] not in thresholds:
             try:
                 thresholds[r['mic']] = hours.settle_utc(r['mic'], latest_settled(r['mic'], now))
-            except Exception:                                                              # noqa: BLE001 : place sans horaires connus : au plus un passage par jour
+            except Exception:  # noqa: BLE001 : place sans horaires connus : au plus un passage par jour
                 thresholds[r['mic']] = stamp - datetime.timedelta(days=1)
         if at < thresholds[r['mic']] or (lid in lastnull and at < retry_before):
             todo.append((True, at, lid, VOLUME_REFRESH_RANGE))
@@ -352,12 +391,13 @@ def fill_volumes_batch(conn, client, rows, now, limit=100000, budget_s=VOLUME_BU
     pas marqué : il sera repris), au budget de temps, ou à `limit`. Un échec isolé n'arrête pas les autres titres ; il est repris à la fin du passage (une fois), puis au passage suivant.
     Reprise : un titre marqué (`liquidity_state.volume_checked_at`) n'est plus candidat avant la prochaine séance réglée (ou, en rattrapage, avant `since`)."""
     from engine.shared.db import ensure
+
     by_id = {r['listing_id']: r for r in rows}
     plan = volume_candidates(conn, rows, now, since)
     errors_seen = setting(conn, VOLUME_ERRORS, {})
     stamp_s = naive_utc(now).strftime('%Y-%m-%dT%H')
     cutoff = naive_utc(now) - datetime.timedelta(hours=VOLUME_RETRY_HOURS)
-    if since is None:                                       # le passage automatique n'insiste pas sur un titre en échec récent
+    if since is None:  # le passage automatique n'insiste pas sur un titre en échec récent
         plan = [(i, g) for i, g in plan if not (errors_seen.get(str(i)) and datetime.datetime.strptime(errors_seen[str(i)], '%Y-%m-%dT%H') > cutoff)]
     todo = plan[:limit]
     started = time.monotonic()
@@ -374,19 +414,19 @@ def fill_volumes_batch(conn, client, rows, now, limit=100000, budget_s=VOLUME_BU
             c = local.client
         try:
             return lid, c.chart(by_id[lid]['symbol'], rng, '1d'), None
-        except Exception as e:                                                             # noqa: BLE001
+        except Exception as e:  # noqa: BLE001
             return lid, None, e
 
     def handle(results):
         for lid, data, err in results:
             if isinstance(err, RateLimited):
                 stats['rate_limited'] = True
-                continue                                                                   # non marqué : repris au prochain passage
+                continue  # non marqué : repris au prochain passage
             if err is not None or not data or not data.get('bars'):
                 if err is not None or data is None:
                     failed.append(lid)
                     continue
-            ensure(conn)                                                                   # la connexion a pu être fermée pendant l'attente de Yahoo (20 s d'inactivité)
+            ensure(conn)  # la connexion a pu être fermée pendant l'attente de Yahoo (20 s d'inactivité)
             n = store_volumes(conn, by_id[lid], data, now)
             stats['examined'] += 1
             stats['written'] += n
@@ -403,14 +443,14 @@ def fill_volumes_batch(conn, client, rows, now, limit=100000, budget_s=VOLUME_BU
             for start in range(0, len(items), chunk):
                 if time.monotonic() - started > budget_s or stats['rate_limited']:
                     return
-                part = items[start:start + chunk]
+                part = items[start : start + chunk]
                 handle(list(pool.map(fetch, part)) if pool else [fetch(i) for i in part])
         finally:
             if pool:
                 pool.shutdown()
 
     run_pass(todo)
-    if failed and not stats['rate_limited'] and time.monotonic() - started <= budget_s:     # reprise des échecs une fois, en fin de passage
+    if failed and not stats['rate_limited'] and time.monotonic() - started <= budget_s:  # reprise des échecs une fois, en fin de passage
         again, failed[:] = [(i, g) for i, g in todo if i in set(failed)], []
         stats['retried'] = len(again)
         run_pass(again)
@@ -419,7 +459,10 @@ def fill_volumes_batch(conn, client, rows, now, limit=100000, budget_s=VOLUME_BU
     stats['errors'] = len(failed)
     keep = {k: v for k, v in errors_seen.items() if datetime.datetime.strptime(v, '%Y-%m-%dT%H') > cutoff - datetime.timedelta(days=1)}
     with conn.cursor() as cur:
-        cur.execute('INSERT INTO settings(name, value_json, updated_at) VALUES (%s,%s,%s) ON DUPLICATE KEY UPDATE value_json=VALUES(value_json), updated_at=VALUES(updated_at)', (VOLUME_ERRORS, json.dumps(keep), naive_utc(now)))
+        cur.execute(
+            'INSERT INTO settings(name, value_json, updated_at) VALUES (%s,%s,%s) ON DUPLICATE KEY UPDATE value_json=VALUES(value_json), updated_at=VALUES(updated_at)',
+            (VOLUME_ERRORS, json.dumps(keep), naive_utc(now)),
+        )
     conn.commit()
     stats['remaining'] = max(0, len(plan) - stats['examined'] - len(failed))
     return stats
@@ -497,7 +540,7 @@ def daily_plan(conn, rows, now):
             plan['2y'].append(r)
             continue
         n, first, last = st
-        if n < FULL_SESSIONS and first > today - datetime.timedelta(days=DAILY_KEEP_DAYS - 20):       # historique court : un titre récent n'a peut-être rien de plus
+        if n < FULL_SESSIONS and first > today - datetime.timedelta(days=DAILY_KEEP_DAYS - 20):  # historique court : un titre récent n'a peut-être rien de plus
             t = tried.get(str(r['listing_id']))
             if not t or (today - datetime.date.fromisoformat(t)).days > 30:
                 plan['2y'].append(r)
@@ -519,8 +562,10 @@ def mark_backfill_tried(conn, rows, now):
         for part in _batches(ids, CHUNK):
             cur.execute(f"SELECT listing_id FROM daily_prices WHERE listing_id IN ({','.join(['%s'] * len(part))}) GROUP BY listing_id HAVING COUNT(*) < %s", part + [FULL_SESSIONS])
             keep.update({str(r['listing_id']): naive_utc(now).date().isoformat() for r in cur.fetchall()})
-        cur.execute('INSERT INTO settings(name, value_json, updated_at) VALUES (%s,%s,%s) ON DUPLICATE KEY UPDATE value_json=VALUES(value_json), updated_at=VALUES(updated_at)',
-                    ('daily_backfill_tried', json.dumps(keep), naive_utc(now)))
+        cur.execute(
+            'INSERT INTO settings(name, value_json, updated_at) VALUES (%s,%s,%s) ON DUPLICATE KEY UPDATE value_json=VALUES(value_json), updated_at=VALUES(updated_at)',
+            ('daily_backfill_tried', json.dumps(keep), naive_utc(now)),
+        )
     conn.commit()
 
 
@@ -529,13 +574,19 @@ def observed_holiday(conn, mic, day):
     titres suivis ont une clôture ce jour-là. Une panne du fournisseur (beaucoup d'erreurs, ou collecte pas encore passée) n'est jamais prise pour un férié."""
     settled = hours.settle_utc(mic, day)
     with conn.cursor() as cur:
-        cur.execute("""SELECT 1 FROM jobs WHERE job_type IN ('history', %s) AND status IN ('completed','completed_with_errors') AND COALESCE(items_ok, 0) > 0
-                       AND items_error <= 0.05 * (COALESCE(items_ok, 0) + items_error) AND started_at > %s LIMIT 1""", ('daily:' + mic, settled))
+        cur.execute(
+            """SELECT 1 FROM jobs WHERE job_type IN ('history', %s) AND status IN ('completed','completed_with_errors') AND COALESCE(items_ok, 0) > 0
+                       AND items_error <= 0.05 * (COALESCE(items_ok, 0) + items_error) AND started_at > %s LIMIT 1""",
+            ('daily:' + mic, settled),
+        )
         if not cur.fetchone():
             return False
-        cur.execute("""SELECT COUNT(*) total, COUNT(d.listing_id) closed
+        cur.execute(
+            """SELECT COUNT(*) total, COUNT(d.listing_id) closed
                        FROM v_collect_set c JOIN listings l ON l.id=c.listing_id
-                       LEFT JOIN daily_prices d ON d.listing_id=c.listing_id AND d.price_date=%s WHERE l.mic=%s""", (day, mic))
+                       LEFT JOIN daily_prices d ON d.listing_id=c.listing_id AND d.price_date=%s WHERE l.mic=%s""",
+            (day, mic),
+        )
         r = cur.fetchone()
     total = int(r['total'] or 0)
     return total > 0 and int(r['closed'] or 0) < 0.05 * total
@@ -561,7 +612,7 @@ def is_holiday(conn, mic, group, day, settled):
     with conn.cursor() as cur:
         cur.execute("SELECT 1 FROM jobs WHERE job_type IN ('history', %s) AND status IN ('completed','completed_with_errors') AND started_at > %s LIMIT 1", ('daily:' + mic, settled))
         if not cur.fetchone():
-            return False                                    # la clôture du jour n'a pas encore été cherchée : on ne conclut pas
+            return False  # la clôture du jour n'a pas encore été cherchée : on ne conclut pas
         with_close = 0
         for part in _batches(ids, CHUNK):
             cur.execute(f"SELECT COUNT(DISTINCT listing_id) n FROM daily_prices WHERE price_date=%s AND listing_id IN ({','.join(['%s'] * len(part))})", [day] + part)
@@ -575,6 +626,7 @@ def intraday_plan(conn, rows, now, previous=True):
     Une séance sans aucune barre pour toute la place (jour férié) n'est pas redemandée une fois qu'une collecte est passée après sa clôture.
     Les places sans horaires connus n'ont pas de barres de 15 minutes."""
     from engine.market import intraday as intra
+
     plan, summary = defaultdict(list), {'complete': 0, 'unknown_hours': 0, 'holiday': 0}
     by_mic = defaultdict(list)
     for r in rows:
@@ -593,8 +645,11 @@ def intraday_plan(conn, rows, now, previous=True):
         counts = {}
         with conn.cursor() as cur:
             for part in _batches([r['listing_id'] for r in group], CHUNK):
-                cur.execute(f"""SELECT listing_id, SUM(slot_start>=%s AND slot_start<%s) c0, SUM(slot_start>=%s AND slot_start<%s) c1 FROM intraday_prices
-                                WHERE slot_start>=%s AND listing_id IN ({','.join(['%s'] * len(part))}) GROUP BY listing_id""", [s0, e0, s1, e1, s0] + part)
+                cur.execute(
+                    f"""SELECT listing_id, SUM(slot_start>=%s AND slot_start<%s) c0, SUM(slot_start>=%s AND slot_start<%s) c1 FROM intraday_prices
+                                WHERE slot_start>=%s AND listing_id IN ({','.join(['%s'] * len(part))}) GROUP BY listing_id""",
+                    [s0, e0, s1, e1, s0] + part,
+                )
                 counts.update({r['listing_id']: (int(r['c0']), int(r['c1'])) for r in cur.fetchall()})
             holiday0 = holiday1 = False
             for end, which, day in ((e0, 0, prev_day), (e1, 1, cur_day)):
@@ -607,7 +662,7 @@ def intraday_plan(conn, rows, now, previous=True):
         live = hours.is_open(mic, now) or s1 <= naive < e1 + datetime.timedelta(minutes=hours.SETTLE_MINUTES)
         for r in group:
             c0, c1 = counts.get(r['listing_id'], (0, 0))
-            miss0 = previous and not holiday0 and c0 < 0.8 * expected      # le passage du cron laisse la séance précédente au rattrapage (catchup.py)
+            miss0 = previous and not holiday0 and c0 < 0.8 * expected  # le passage du cron laisse la séance précédente au rattrapage (catchup.py)
             miss1 = not holiday1 and (live or c1 < 0.8 * expected)
             if miss0:
                 plan['5d'].append(r)
@@ -651,7 +706,7 @@ def collect_intraday(conn, client, rows, now, range_='1d', progress=None, failed
             lid = by_symbol[symbol]['listing_id']
             slots = {}
             for ts, close in series['bars']:
-                slots[hours.slot_of(ts)] = close           # dernier prix du créneau
+                slots[hours.slot_of(ts)] = close  # dernier prix du créneau
             for slot, close in slots.items():
                 bars.append((lid, slot, close, 1 if slot + datetime.timedelta(minutes=hours.SLOT_MINUTES) <= cutoff else 0))
             if slots:
@@ -659,14 +714,19 @@ def collect_intraday(conn, client, rows, now, range_='1d', progress=None, failed
                 latest.append((lid, slots[last], last, series['currency']))
                 ok += 1
         with conn.cursor() as cur:
-            cur.executemany("""INSERT INTO intraday_prices(listing_id,slot_start,close_px,is_final) VALUES (%s,%s,%s,%s)
-                               ON DUPLICATE KEY UPDATE close_px=IF(is_final=1,close_px,VALUES(close_px)), is_final=GREATEST(is_final,VALUES(is_final))""", bars)
-            cur.executemany("""INSERT INTO latest_prices(listing_id,price,price_time,source,currency) VALUES (%s,%s,%s,'intraday',%s)
+            cur.executemany(
+                """INSERT INTO intraday_prices(listing_id,slot_start,close_px,is_final) VALUES (%s,%s,%s,%s)
+                               ON DUPLICATE KEY UPDATE close_px=IF(is_final=1,close_px,VALUES(close_px)), is_final=GREATEST(is_final,VALUES(is_final))""",
+                bars,
+            )
+            cur.executemany(
+                """INSERT INTO latest_prices(listing_id,price,price_time,source,currency) VALUES (%s,%s,%s,'intraday',%s)
                                ON DUPLICATE KEY UPDATE price=IF(price_time IS NULL OR price_time<=VALUES(price_time),VALUES(price),price),
                                  source=IF(price_time IS NULL OR price_time<=VALUES(price_time),'intraday',source),
                                  price_time=IF(price_time IS NULL OR price_time<=VALUES(price_time),VALUES(price_time),price_time),
                                  currency=COALESCE(VALUES(currency),currency)""",
-                            [(a, b, c, d) for a, b, c, d in latest])
+                [(a, b, c, d) for a, b, c, d in latest],
+            )
         conn.commit()
         lines += len(bars)
         err += len(part) - len(data)
@@ -705,10 +765,10 @@ def prune_intraday(conn, now, sessions=None):
 
 
 # ───────── trous ─────────
-GAP_MISSING_RATIO = 0.4        # un créneau est manquant s'il compte moins de 40 % de la part de titres qu'il a d'habitude
-GAP_MIN_SLOTS = 2              # il faut au moins 2 créneaux manquants dans la séance
-GAP_EMPTY_RATIO = 0.05         # sous 5 % des titres avec une barre, la séance est « vide »
-GAP_COVERAGE_RATIO = 0.85      # une séance couvre au moins 85 % du nombre de titres habituel
+GAP_MISSING_RATIO = 0.4  # un créneau est manquant s'il compte moins de 40 % de la part de titres qu'il a d'habitude
+GAP_MIN_SLOTS = 2  # il faut au moins 2 créneaux manquants dans la séance
+GAP_EMPTY_RATIO = 0.05  # sous 5 % des titres avec une barre, la séance est « vide »
+GAP_COVERAGE_RATIO = 0.85  # une séance couvre au moins 85 % du nombre de titres habituel
 
 
 def _quantile(values, q):
@@ -719,9 +779,9 @@ def _quantile(values, q):
 def settled_at(mic, day):
     """Instant (UTC naïf) où la clôture officielle de la séance `day` est publiée (fermeture + délai de règlement)."""
     from zoneinfo import ZoneInfo
+
     tz, _, closes = hours.spec(mic)
-    return (datetime.datetime.combine(day, closes, ZoneInfo(tz)).astimezone(datetime.timezone.utc).replace(tzinfo=None)
-            + datetime.timedelta(minutes=hours.SETTLE_MINUTES))
+    return datetime.datetime.combine(day, closes, ZoneInfo(tz)).astimezone(datetime.timezone.utc).replace(tzinfo=None) + datetime.timedelta(minutes=hours.SETTLE_MINUTES)
 
 
 def recent_sessions(mic, now, n=2):
@@ -738,6 +798,7 @@ def recent_sessions(mic, now, n=2):
 def session_titles(conn, mic, day, ids):
     """Nombre de titres de la place qui ont au moins une barre de 15 minutes pendant la séance `day`."""
     from engine.market import intraday as intra
+
     start, end = intra.session_window(mic, day)
     n = 0
     with conn.cursor() as cur:
@@ -757,6 +818,7 @@ def session_gaps(conn, mic, now, sessions=None):
       - titres couverts nettement sous le niveau habituel (collecte interrompue en cours de route) : trou ;
       - séance sans barre ni clôture : jour férié (ou clôtures pas encore collectées : revu dès qu'elles arrivent), pas un trou."""
     from engine.market import intraday as intra
+
     rows = collection_set(conn, mic)
     ids = [r['listing_id'] for r in rows]
     if not ids or not hours.known(mic):
@@ -782,7 +844,7 @@ def session_gaps(conn, mic, now, sessions=None):
         if max(ratios[day]) < GAP_EMPTY_RATIO:
             if closes.get(day, 0) >= GAP_EMPTY_RATIO * n:
                 out[day] = 'aucune barre alors que les clôtures quotidiennes existent (données Yahoo absentes)'
-            continue                                                 # sans barre ni clôture : jour férié
+            continue  # sans barre ni clôture : jour férié
         usable.append(day)
     titles = {day: session_titles(conn, mic, day, ids) for day in usable}
     for day in usable:

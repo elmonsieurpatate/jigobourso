@@ -25,15 +25,15 @@ def test_one_missing_weekly_close_does_not_compress_time_or_fake_path_indicators
     got, info = dated_window_metrics(dates, prices)
     assert info['observations'] == 5 and info['expected_closes'] == 6
     assert info['coverage'] == pytest.approx(5 / 6)
-    assert got['slope'] == pytest.approx(100 * math.expm1(.01))
+    assert got['slope'] == pytest.approx(100 * math.expm1(0.01))
     assert got['r2'] == pytest.approx(1.0)
-    assert got['perf'] == pytest.approx(100 * math.expm1(.05))
+    assert got['perf'] == pytest.approx(100 * math.expm1(0.05))
     assert got['volatility'] is None and got['drawdown'] is None and got['er'] is None
 
 
 def test_isolated_hole_can_still_pass_trend_but_not_fabricated_risk_metrics():
     dates = [f'd{i:03d}' for i in range(22)]
-    prices = {d: 100 * math.exp(.005 * i) for i, d in enumerate(dates) if i != 9}
+    prices = {d: 100 * math.exp(0.005 * i) for i, d in enumerate(dates) if i != 9}
     metrics, info = dated_window_metrics(dates, prices)
     metrics.update(info)
     regular = strategy.preset('regular')
@@ -53,16 +53,16 @@ def test_multiple_missing_sessions_below_sample_floor_are_not_evaluable():
     dates = [f'd{i:03d}' for i in range(22)]
     prices = {d: 100 + i for i, d in enumerate(dates) if i not in (8, 9, 10, 11, 12)}
     got, info = dated_window_metrics(dates, prices)
-    assert info['coverage'] < .80
+    assert info['coverage'] < 0.80
     assert got['slope'] is None and got['r2'] is None and got['perf'] is None
 
 
 def test_missing_boundary_still_allows_supported_regression_but_not_endpoint_return():
     dates = [f'd{i:03d}' for i in range(22)]
-    prices = {d: 100 * math.exp(.005 * i) for i, d in enumerate(dates) if i != 0}
+    prices = {d: 100 * math.exp(0.005 * i) for i, d in enumerate(dates) if i != 0}
     got, info = dated_window_metrics(dates, prices)
-    assert info['coverage'] >= .80
-    assert got['slope'] == pytest.approx(100 * math.expm1(.005))
+    assert info['coverage'] >= 0.80
+    assert got['slope'] == pytest.approx(100 * math.expm1(0.005))
     assert got['r2'] == pytest.approx(1.0)
     assert got['perf'] is None
 
@@ -70,8 +70,7 @@ def test_missing_boundary_still_allows_supported_regression_but_not_endpoint_ret
 def test_long_gap_never_becomes_one_observed_daily_move():
     dates = [f'd{i:03d}' for i in range(64)]
     # Reference dimensions of WHCA.AS: 52 observed closes in a 64-close window.
-    prices = {d: math.exp(i * .002 + (.14 if i % 2 else -.14)) for i, d in enumerate(dates)
-              if not 20 <= i < 32}
+    prices = {d: math.exp(i * 0.002 + (0.14 if i % 2 else -0.14)) for i, d in enumerate(dates) if not 20 <= i < 32}
     got, info = dated_window_metrics(dates, prices)
     assert info['observations'] == 52 and info['expected_closes'] == 64
     assert info['coverage'] == pytest.approx(52 / 64)
@@ -86,11 +85,11 @@ def test_long_gap_never_becomes_one_observed_daily_move():
 
 def test_analyze_series_uses_expected_sessions_and_does_not_fill_missing_prices():
     dates = [f'd{i:03d}' for i in range(6)]
-    bars = [(d, 100 * math.exp(.01 * i), None) for i, d in enumerate(dates) if i != 2]
+    bars = [(d, 100 * math.exp(0.01 * i), None) for i, d in enumerate(dates) if i != 2]
     _, closes, _, _, measures, missing, _ = analyze_series(bars, [5], session_windows={5: dates})
     assert len(closes) == 5
     assert measures[5]['coverage'] == pytest.approx(5 / 6)
-    assert measures[5]['slope'] == pytest.approx(100 * math.expm1(.01))
+    assert measures[5]['slope'] == pytest.approx(100 * math.expm1(0.01))
     assert missing == {}
 
 

@@ -1,4 +1,5 @@
 """Données de l'administration : une page = un appel (FinanceDatabase, Yahoo Finance, Actions / ETF, historique des traitements)."""
+
 import datetime
 
 from ..shared.dates import iso
@@ -27,14 +28,21 @@ def _level(conn, name):
         spec['is_default'] = spec['current'] == spec['default']
         spec.setdefault('group', 'liquidity' if name == 'prefilter' else 'quality')
         rules.append(spec)
-    return {'level': name, 'rules': rules, 'technical': technical, 'is_default': current == mod.DEFAULT_CONFIG, 'groups': GROUPS,
-            'applied_at': applied and applied['at'], 'pending': applied is None or applied['hash'] != settings.digest(current)}
+    return {
+        'level': name,
+        'rules': rules,
+        'technical': technical,
+        'is_default': current == mod.DEFAULT_CONFIG,
+        'groups': GROUPS,
+        'applied_at': applied and applied['at'],
+        'pending': applied is None or applied['hash'] != settings.digest(current),
+    }
 
 
 def rules_save(conn, level, config):
     if level not in LEVELS:
         raise ValueError('Niveau inconnu')
-    settings.put(conn, SETTING[level], LEVELS[level].normalize(config))      # ValueError affichable si invalide
+    settings.put(conn, SETTING[level], LEVELS[level].normalize(config))  # ValueError affichable si invalide
     return _level(conn, level)
 
 
@@ -48,8 +56,11 @@ def rules_reset(conn, level):
 # ───────── traitements ─────────
 def _last_job(conn, job_type):
     with conn.cursor() as cur:
-        cur.execute("""SELECT id, job_type, trigger_by, status, started_at, finished_at, items_ok, items_error, summary, TIMESTAMPDIFF(SECOND, started_at, finished_at) duration_s
-                       FROM jobs WHERE job_type=%s ORDER BY id DESC LIMIT 1""", (job_type,))
+        cur.execute(
+            """SELECT id, job_type, trigger_by, status, started_at, finished_at, items_ok, items_error, summary, TIMESTAMPDIFF(SECOND, started_at, finished_at) duration_s
+                       FROM jobs WHERE job_type=%s ORDER BY id DESC LIMIT 1""",
+            (job_type,),
+        )
         r = cur.fetchone()
     return None if not r else {**r, 'started_at': iso(r['started_at']), 'finished_at': iso(r['finished_at'])}
 
@@ -81,8 +92,11 @@ def jobs_list(conn, request):
     with conn.cursor() as cur:
         cur.execute('SELECT COUNT(*) n FROM jobs' + sql, args)
         total = cur.fetchone()['n']
-        cur.execute('SELECT id, job_type, trigger_by, status, started_at, finished_at, items_ok, items_error, summary, TIMESTAMPDIFF(SECOND, started_at, finished_at) duration_s '
-                    'FROM jobs' + sql + ' ORDER BY id DESC LIMIT 40 OFFSET %s', args + [(page - 1) * 40])
+        cur.execute(
+            'SELECT id, job_type, trigger_by, status, started_at, finished_at, items_ok, items_error, summary, TIMESTAMPDIFF(SECOND, started_at, finished_at) duration_s '
+            'FROM jobs' + sql + ' ORDER BY id DESC LIMIT 40 OFFSET %s',
+            args + [(page - 1) * 40],
+        )
         rows = cur.fetchall()
     return {'total': total, 'page': page, 'pages': max(1, -(-total // 40)), 'jobs': rows}
 
@@ -121,10 +135,20 @@ def fdb_state(conn):
         p['name'] = cat_rules.MARKET_NAMES.get(p['mic'], '')
         p['hours_known'] = hours.known(p['mic'])
         p['default'] = p['mic'] in cat_rules.DEFAULT_MARKETS
-    return {'import': {'last': _last_job(conn, 'fdb_import'), 'load': None if not load else {'commit': load['source_commit'][:8], 'loaded_at': iso(load['loaded_at']), 'rows_read': load['rows_read']},
-                       'raw_rows': raw, 'source': 'FinanceDatabase (github.com/JerBouma/FinanceDatabase)'},
-            'filters': level, 'places': sorted(places.values(), key=lambda p: (-(p['equity'] + p['etf']), p['mic'])), 'categories': categories,
-            'last_filter': _last_job(conn, 'fdb_filter'), 'funnel': funnel.last_run(conn, 'catalogue'), 'running': _running(conn)}
+    return {
+        'import': {
+            'last': _last_job(conn, 'fdb_import'),
+            'load': None if not load else {'commit': load['source_commit'][:8], 'loaded_at': iso(load['loaded_at']), 'rows_read': load['rows_read']},
+            'raw_rows': raw,
+            'source': 'FinanceDatabase (github.com/JerBouma/FinanceDatabase)',
+        },
+        'filters': level,
+        'places': sorted(places.values(), key=lambda p: (-(p['equity'] + p['etf']), p['mic'])),
+        'categories': categories,
+        'last_filter': _last_job(conn, 'fdb_filter'),
+        'funnel': funnel.last_run(conn, 'catalogue'),
+        'running': _running(conn),
+    }
 
 
 # ───────── page Yahoo Finance ─────────
@@ -140,7 +164,7 @@ def yahoo_state(conn):
         held_extra = cur.fetchone()['n']
     info, filt, fdb_filter, hist = _last_job(conn, 'yahoo_info'), _last_job(conn, 'yahoo_filter'), _last_job(conn, 'fdb_filter'), _last_job(conn, 'history')
     ok = ('completed', 'completed_with_errors')
-    pending = [] 
+    pending = []
     if fdb_filter and fdb_filter['status'] in ok and (not info or (info['finished_at'] or '') < (fdb_filter['finished_at'] or '')):
         pending.append('Le filtrage FinanceDatabase a changé depuis le dernier import Yahoo : relancez l’import des informations Yahoo.')
     if info and info['status'] in ok and (not filt or (filt['finished_at'] or '') < (info['finished_at'] or '')):
@@ -148,18 +172,35 @@ def yahoo_state(conn):
     level = _level(conn, 'prefilter')
     final = kinds.get('equity', 0) + kinds.get('etf', 0)
     coverage = tasks.history_coverage(conn) if final else {'absent': 0, 'partial': 0, 'complete': 0, 'last_day': None, 'gap_titles': 0, 'gap_days': 0, 'gap_small': 0}
-    return {'info': {'last': info, 'stats': stats.get('yahoo_info'), 'quotes': q['n'], 'quote_at': iso(q['t']), 'asked_now': len(tasks.info_set(conn))},
-            'filters': level, 'funnel': funnel.last_run(conn, 'yahoo'), 'last_filter': filt, 'pending': pending,
-            'final': {'equity': kinds.get('equity', 0), 'etf': kinds.get('etf', 0), 'total': final, 'held_extra': held_extra, 'coverage': coverage,
-                      'last_history': hist, 'stats': stats.get('history'), 'cron_daily': stats.get('daily'), 'cron_intraday': stats.get('intraday'), 'full': collect.FULL_SESSIONS},
-            'running': _running(conn)}
+    return {
+        'info': {'last': info, 'stats': stats.get('yahoo_info'), 'quotes': q['n'], 'quote_at': iso(q['t']), 'asked_now': len(tasks.info_set(conn))},
+        'filters': level,
+        'funnel': funnel.last_run(conn, 'yahoo'),
+        'last_filter': filt,
+        'pending': pending,
+        'final': {
+            'equity': kinds.get('equity', 0),
+            'etf': kinds.get('etf', 0),
+            'total': final,
+            'held_extra': held_extra,
+            'coverage': coverage,
+            'last_history': hist,
+            'stats': stats.get('history'),
+            'cron_daily': stats.get('daily'),
+            'cron_intraday': stats.get('intraday'),
+            'full': collect.FULL_SESSIONS,
+        },
+        'running': _running(conn),
+    }
 
 
 # ───────── page Actions / ETF ─────────
 SORTS = {'name': 'r.name', 'mic': 'r.mic', 'symbol': 'r.symbol', 'country': 'r.country', 'price_time': 'p.price_time', 'closes': 's.closes_count'}
 FDB_STEP = {r['id']: r['label'] for r in cat_rules.RULES}
-Y_EXPR = ("CASE WHEN r.removed_step IS NOT NULL OR l.id IS NULL THEN 'na' WHEN l.status='excluded' THEN 'removed' WHEN l.is_primary=0 THEN 'secondary' "
-          "WHEN l.status='selected' THEN 'kept' ELSE 'pending' END")
+Y_EXPR = (
+    "CASE WHEN r.removed_step IS NOT NULL OR l.id IS NULL THEN 'na' WHEN l.status='excluded' THEN 'removed' WHEN l.is_primary=0 THEN 'secondary' "
+    "WHEN l.status='selected' THEN 'kept' ELSE 'pending' END"
+)
 FINAL_EXPR = "((r.removed_step IS NULL AND l.status='selected' AND l.is_primary=1) OR h.listing_id IS NOT NULL)"
 D_EXPR = f"CASE WHEN NOT {FINAL_EXPR} THEN 'na' WHEN s.closes_count IS NULL OR s.closes_count=0 THEN 'absent' WHEN s.closes_count>=%s THEN 'complete' ELSE 'partial' END"
 
@@ -167,6 +208,7 @@ D_EXPR = f"CASE WHEN NOT {FINAL_EXPR} THEN 'na' WHEN s.closes_count IS NULL OR s
 def _intraday_statuses(conn, rows, now):
     """{listing_id: 'complete' | 'partial' | 'absent' | 'na'} pour les lignes de la page : 2 requêtes GROUP BY par place (et non 2 par ligne)."""
     from engine.market import intraday as intra
+
     out, by_mic = {}, {}
     for r in rows:
         if not (r['in_final'] and r['lid']):
@@ -228,10 +270,13 @@ def titles(conn, req):
         raw_total = cur.fetchone()['n']
         cur.execute(f'SELECT COUNT(*) n {frm}{sql_where}', args)
         total = cur.fetchone()['n']
-        cur.execute(f"""SELECT r.kind, r.mic, r.symbol, r.isin, r.name, r.country, r.category, r.removed_step, r.removed_reason, l.id lid, l.status, l.excluded_reason, l.is_primary,
+        cur.execute(
+            f"""SELECT r.kind, r.mic, r.symbol, r.isin, r.name, r.country, r.category, r.removed_step, r.removed_reason, l.id lid, l.status, l.excluded_reason, l.is_primary,
                                p.price, p.currency pcur, p.price_time, p.quote_at, p.avg_volume_3m, s.closes_count, s.last_close_date, {Y_EXPR} y_state, {FINAL_EXPR} in_final,
                                h.listing_id IS NOT NULL held, {D_EXPR} d_state
-                        {frm}{sql_where} ORDER BY {order}, r.id LIMIT 50 OFFSET %s""", [collect.FULL_SESSIONS] + args + [(page - 1) * 50])
+                        {frm}{sql_where} ORDER BY {order}, r.id LIMIT 50 OFFSET %s""",
+            [collect.FULL_SESSIONS] + args + [(page - 1) * 50],
+        )
         rows = cur.fetchall()
         info_done = bool(settings.get(conn, 'last_stats', {}).get('yahoo_info'))
     for r in rows:
@@ -260,8 +305,7 @@ def titles(conn, req):
             r[k] = iso(r[k])
         r['price'] = None if r['price'] is None else float(r['price'])
         r['in_fdb_universe'] = r['removed_step'] is None
-    return {'total': total, 'raw_total': raw_total, 'page': page, 'pages': max(1, -(-total // 50)), 'rows': rows, 'full': collect.FULL_SESSIONS,
-            'places': [r['mic'] for r in _distinct_mics(conn)]}
+    return {'total': total, 'raw_total': raw_total, 'page': page, 'pages': max(1, -(-total // 50)), 'rows': rows, 'full': collect.FULL_SESSIONS, 'places': [r['mic'] for r in _distinct_mics(conn)]}
 
 
 def _distinct_mics(conn):

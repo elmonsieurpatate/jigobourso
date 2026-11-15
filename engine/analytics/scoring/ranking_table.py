@@ -3,6 +3,7 @@
 Lecture seule. Aucun score n'est recalculé ici : ils viennent du moteur commun (`score_service.score_book`, mis en cache) ; le tri, les filtres et la pagination se font dans la page.
 Une donnée absente reste None (jamais 0). Les groupes pays / secteur / place / type reprennent exactement les correspondances de l'administration (`secondary_metadata_groups.json`).
 """
+
 import json
 import os
 
@@ -17,11 +18,40 @@ from . import score_service
 from ..explorer import universe_verdicts
 
 CONFIG = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))), 'app', 'config', 'secondary_metadata_groups.json')
-ACCENTS = str.maketrans({'é': 'e', 'è': 'e', 'ê': 'e', 'ë': 'e', 'à': 'a', 'â': 'a', 'ä': 'a', 'á': 'a', 'ã': 'a', 'å': 'a', 'î': 'i', 'ï': 'i', 'í': 'i', 'ì': 'i', 'ô': 'o', 'ö': 'o', 'ó': 'o',
-                         'ò': 'o', 'õ': 'o', 'û': 'u', 'ü': 'u', 'ú': 'u', 'ù': 'u', 'ç': 'c', 'ñ': 'n', 'ý': 'y', 'ÿ': 'y'})
+ACCENTS = str.maketrans(
+    {
+        'é': 'e',
+        'è': 'e',
+        'ê': 'e',
+        'ë': 'e',
+        'à': 'a',
+        'â': 'a',
+        'ä': 'a',
+        'á': 'a',
+        'ã': 'a',
+        'å': 'a',
+        'î': 'i',
+        'ï': 'i',
+        'í': 'i',
+        'ì': 'i',
+        'ô': 'o',
+        'ö': 'o',
+        'ó': 'o',
+        'ò': 'o',
+        'õ': 'o',
+        'û': 'u',
+        'ü': 'u',
+        'ú': 'u',
+        'ù': 'u',
+        'ç': 'c',
+        'ñ': 'n',
+        'ý': 'y',
+        'ÿ': 'y',
+    }
+)
 MISSING = {'', 'unknown', 'inconnu', 'inconnue', 'n/a', 'n.a.', 'none', 'null', 'not available', 'unavailable', '-', '—'}
 WINDOWS = {'week': 5, 'month': 21, 'quarter': 63, 'half': 126}
-REFERENCE = 21                                           # fenêtre des mesures affichées (un mois)
+REFERENCE = 21  # fenêtre des mesures affichées (un mois)
 QUALITY = {'ok': 0, 'insufficient': 1, 'incomplete': 1, 'stale': 1, 'inconsistent_adjustments': 2, 'break': 2}
 
 
@@ -48,17 +78,20 @@ def classify(cfg, which, raw, kind=None):
 
 
 def _num(v):
-    return None if v is None else round(float(v), 4)             # 4 décimales suffisent à l'affichage et aux catégories : réponse plus légère
+    return None if v is None else round(float(v), 4)  # 4 décimales suffisent à l'affichage et aux catégories : réponse plus légère
 
 
 def _fetch(conn, ids):
     marks = ','.join(['%s'] * len(ids))
     out = {i: {} for i in ids}
     with conn.cursor() as cur:
-        cur.execute(f"""SELECT l.id, l.symbol, l.mic, l.currency, i.name, i.kind, i.isin, i.country, i.category, p.price, p.price_time, p.avg_volume_3m, p.analyst_rating,
+        cur.execute(
+            f"""SELECT l.id, l.symbol, l.mic, l.currency, i.name, i.kind, i.isin, i.country, i.category, p.price, p.price_time, p.avg_volume_3m, p.analyst_rating,
                                s.last_close_date, s.close_px, s.daily_change, s.quality, s.coverage_252, q.turnover_eur, q.source AS liquidity_source, q.days AS liquidity_days
                         FROM listings l JOIN instruments i ON i.id=l.instrument_id LEFT JOIN latest_prices p ON p.listing_id=l.id LEFT JOIN series_state s ON s.listing_id=l.id
-                        LEFT JOIN liquidity_state q ON q.listing_id=l.id WHERE l.id IN ({marks})""", ids)
+                        LEFT JOIN liquidity_state q ON q.listing_id=l.id WHERE l.id IN ({marks})""",
+            ids,
+        )
         for r in cur.fetchall():
             out[r['id']].update(r)
         cur.execute(f"SELECT listing_id, sessions, slope, r2, perf, volatility, drawdown, coverage FROM strategy_metrics WHERE listing_id IN ({marks}) AND sessions IN (1,5,21,63,126,252)", ids)
@@ -70,7 +103,7 @@ def _fetch(conn, ids):
     return out
 
 
-CRITERIA_FIELDS = {'min_slope': 'slope', 'min_r2': 'r2'}      # critères de RECHERCHE : granularités actives, pente et R² seulement ; rendement, volatilité, drawdown n'y sont jamais des seuils
+CRITERIA_FIELDS = {'min_slope': 'slope', 'min_r2': 'r2'}  # critères de RECHERCHE : granularités actives, pente et R² seulement ; rendement, volatilité, drawdown n'y sont jamais des seuils
 
 
 def criteria(conn=None, request=None):
@@ -111,7 +144,7 @@ def norm_of(request):
 
 def _base(conn, request):
     scores_specs.refresh(conn)
-    if request.get('ct_id'):                                                       # stratégie du Classement : ses propres réglages de scores
+    if request.get('ct_id'):  # stratégie du Classement : ses propres réglages de scores
         name = scores_specs.resolve(conn, request['ct_id'], request.get('user_id') or 0)
     else:
         name = request.get('strategy') or 'growth_v4'
@@ -147,7 +180,7 @@ def table(conn, request):
     name, cfg, book = _base(conn, request)
     norm = norm_of(request)
     ids = evaluable(book)
-    simple, rank_s, pos_s = ordered(book, 'simple')            # même fonction que l'administration des scores : même ordre, mêmes rangs
+    simple, rank_s, pos_s = ordered(book, 'simple')  # même fonction que l'administration des scores : même ordre, mêmes rangs
     complex_, rank_c, pos_c = ordered(book, 'complex')
     tie_s, tie_c = _ties(rank_s), _ties(rank_c)
     data = _fetch(conn, ids) if ids else {}
@@ -170,28 +203,76 @@ def table(conn, request):
         spike = _num((d.get('x') or {}).get('spike_share'))
         perf = {k: _num((m.get(n) or {}).get('perf')) for k, n in WINDOWS.items()}
         quality = QUALITY.get(d.get('quality'))
-        extra = {'up_fraction': None if up is None else round(100 * up, 3), 'gain_share': None if spike is None else round(100 * spike, 3), 'quality': quality,
-                 'coverage': None if d.get('coverage_252') is None else round(100 * float(d['coverage_252']), 3)}
-        rows.append({
-            'id': lid, 'symbol': d['symbol'], 'name': d['name'], 'mic': d['mic'], 'currency': d.get('currency'), 'kind': d['kind'], 'isin': d.get('isin'),
-            'country': d.get('country'), 'category': d.get('category'),
-            'group': {'country': classify(groups, 'country', d.get('country')), 'market': classify(groups, 'market', d['mic']),
-                      'sector': classify(groups, 'sector', d.get('category'), d['kind']), 'asset': 'asset:' + d['kind']},
-            'price': None if price is None else round(price, 4), 'price_eur': None if price is None or not factor else round(price * factor, 4), 'price_time': d['price_time'].isoformat() if d.get('price_time') else None,
-            'last_close': d['last_close_date'].isoformat() if d.get('last_close_date') else None, 'change': _num(d.get('daily_change')),
-            'periods': {str(n): {'slope': _num(v.get('slope')), 'r2': _num(v.get('r2'))} for n, v in m.items() if n > 1},
-            'slope': _num(mo.get('slope')), 'r2': _num(mo.get('r2')), 'perf': perf, 'volatility': _num(mo.get('volatility')), 'drawdown': _num(mo.get('drawdown')),
-            'turnover_eur': _num(d.get('turnover_eur')), 'liquidity_source': d.get('liquidity_source'), 'avg_volume': _num(d.get('avg_volume_3m')),
-            'analyst': d.get('analyst_rating'), 'quality': d.get('quality'),
-            'simple': _num(e['simple']), 'complex': _num(e['complex']), 'simple_status': e['simple_status'], 'complex_status': e['complex_status'],
-            'rank_simple': rank_s.get(lid), 'rank_complex': rank_c.get(lid), 'pos_simple': pos_s.get(lid), 'pos_complex': pos_c.get(lid),
-            'status': verdict['status'], 'tie_simple': tie_s.get(rank_s.get(lid), 1), 'tie_complex': tie_c.get(rank_c.get(lid), 1), 'curve': [round(x, 2) for x in curves.get(lid, [])], 'extra': extra})
+        extra = {
+            'up_fraction': None if up is None else round(100 * up, 3),
+            'gain_share': None if spike is None else round(100 * spike, 3),
+            'quality': quality,
+            'coverage': None if d.get('coverage_252') is None else round(100 * float(d['coverage_252']), 3),
+        }
+        rows.append(
+            {
+                'id': lid,
+                'symbol': d['symbol'],
+                'name': d['name'],
+                'mic': d['mic'],
+                'currency': d.get('currency'),
+                'kind': d['kind'],
+                'isin': d.get('isin'),
+                'country': d.get('country'),
+                'category': d.get('category'),
+                'group': {
+                    'country': classify(groups, 'country', d.get('country')),
+                    'market': classify(groups, 'market', d['mic']),
+                    'sector': classify(groups, 'sector', d.get('category'), d['kind']),
+                    'asset': 'asset:' + d['kind'],
+                },
+                'price': None if price is None else round(price, 4),
+                'price_eur': None if price is None or not factor else round(price * factor, 4),
+                'price_time': d['price_time'].isoformat() if d.get('price_time') else None,
+                'last_close': d['last_close_date'].isoformat() if d.get('last_close_date') else None,
+                'change': _num(d.get('daily_change')),
+                'periods': {str(n): {'slope': _num(v.get('slope')), 'r2': _num(v.get('r2'))} for n, v in m.items() if n > 1},
+                'slope': _num(mo.get('slope')),
+                'r2': _num(mo.get('r2')),
+                'perf': perf,
+                'volatility': _num(mo.get('volatility')),
+                'drawdown': _num(mo.get('drawdown')),
+                'turnover_eur': _num(d.get('turnover_eur')),
+                'liquidity_source': d.get('liquidity_source'),
+                'avg_volume': _num(d.get('avg_volume_3m')),
+                'analyst': d.get('analyst_rating'),
+                'quality': d.get('quality'),
+                'simple': _num(e['simple']),
+                'complex': _num(e['complex']),
+                'simple_status': e['simple_status'],
+                'complex_status': e['complex_status'],
+                'rank_simple': rank_s.get(lid),
+                'rank_complex': rank_c.get(lid),
+                'pos_simple': pos_s.get(lid),
+                'pos_complex': pos_c.get(lid),
+                'status': verdict['status'],
+                'tie_simple': tie_s.get(rank_s.get(lid), 1),
+                'tie_complex': tie_c.get(rank_c.get(lid), 1),
+                'curve': [round(x, 2) for x in curves.get(lid, [])],
+                'extra': extra,
+            }
+        )
     with conn.cursor() as cur:
         cur.execute('SELECT COUNT(*) AS n FROM v_recommendable')
         universe = int(cur.fetchone()['n'])
     counts = CR.counts(r['status'] for r in rows)
-    return {'strategy': name, 'label': scores_specs.spec(name)['label'], 'counts': counts, 'context': 'missing' if norm is None else 'ok', 'reference_sessions': REFERENCE, 'universe': universe, 'evaluated': len(rows),
-            'scored': {'simple': len(simple), 'complex': len(complex_)}, 'default_sort': 'complex', 'rows': rows}      # tri par défaut systématique : score complexe
+    return {
+        'strategy': name,
+        'label': scores_specs.spec(name)['label'],
+        'counts': counts,
+        'context': 'missing' if norm is None else 'ok',
+        'reference_sessions': REFERENCE,
+        'universe': universe,
+        'evaluated': len(rows),
+        'scored': {'simple': len(simple), 'complex': len(complex_)},
+        'default_sort': 'complex',
+        'rows': rows,
+    }  # tri par défaut systématique : score complexe
 
 
 def curves(conn, request):

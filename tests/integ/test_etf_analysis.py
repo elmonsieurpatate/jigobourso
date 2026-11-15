@@ -1,4 +1,5 @@
 """Réponses attendues indépendantes : deux mêmes rendements => r=1 ; pondérations en EUR."""
+
 import datetime as dt
 import json
 import math
@@ -26,7 +27,7 @@ def conn():
         while day <= dt.date(2026, 10, 29):
             if day.weekday() < 5:
                 for lid in range(1, 5):
-                    price = (100 + i + 2 * math.sin(i * .3)) * lid
+                    price = (100 + i + 2 * math.sin(i * 0.3)) * lid
                     cur.execute('INSERT INTO daily_prices(listing_id,price_date,close_px) VALUES (%s,%s,%s)', (lid, day, price))
                 i += 1
             day += dt.timedelta(days=1)
@@ -39,8 +40,7 @@ def conn():
 
 def test_coverage_is_read_only_and_complete(conn):
     before = etf.coverage(conn)
-    assert before['selected_primary'] == dict(listings=4, instruments=4, cached=1, state_ok=1, holdings=1,
-                                            ten_valid_weights=0, some_valid_weights=0, sectors=1, fees=1, legacy_weight_ambiguity=0)
+    assert before['selected_primary'] == dict(listings=4, instruments=4, cached=1, state_ok=1, holdings=1, ten_valid_weights=0, some_valid_weights=0, sectors=1, fees=1, legacy_weight_ambiguity=0)
     assert etf.coverage(conn)['selected_primary'] == before['selected_primary']
 
 
@@ -53,12 +53,11 @@ def test_precomputed_similarity_metadata_and_portfolio(conn, monkeypatch):
     assert p[1]['similar'][0]['coefficient'] == 1
     assert p[1]['similar'][0]['weeks'] >= etf.MIN_WEEKS and p[1]['similar'][0]['partitions'] == 5
     assert p[1]['profile']['holdings'][0]['weight'] is None
-    r = etf.portfolio(conn, [{'listing_id': 1, 'kind': 'etf', 'symbol': 'A', 'value': 100},
-                             {'listing_id': 2, 'kind': 'etf', 'symbol': 'B', 'value': 300}])
+    r = etf.portfolio(conn, [{'listing_id': 1, 'kind': 'etf', 'symbol': 'A', 'value': 100}, {'listing_id': 2, 'kind': 'etf', 'symbol': 'B', 'value': 300}])
     assert r['known_eur'] == 100 and r['unknown_eur'] == 300 and r['unknown_percent'] == 75
     assert len(r['similar_pairs']) == 1 and r['similar_pairs'][0]['coefficient'] == 1
     alert = etf.concentration(conn, [1, 2, 3, 4])
-    assert alert['sample'] == 4 and len(alert['groups']) == 1 and alert['groups'][0]['size'] == 4 and alert['groups'][0]['min_coefficient'] >= .9
+    assert alert['sample'] == 4 and len(alert['groups']) == 1 and alert['groups'][0]['size'] == 4 and alert['groups'][0]['min_coefficient'] >= 0.9
     with conn.cursor() as cur:
         cur.execute('SELECT COUNT(*) n FROM portfolio_transactions')
         assert cur.fetchone()['n'] == 0

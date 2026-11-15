@@ -1,4 +1,5 @@
 """Deployment-mode regression tests: workflow gates and local mocked transport only."""
+
 import ast
 import json
 import os
@@ -25,7 +26,9 @@ def expression_value(expression, context):
     context = {'github.event.head_commit.message': '', **context}
     for key in sorted(context, key=len, reverse=True):
         expression = expression.replace(key, repr(context[key]))
-    expression = re.sub(r"contains\(('(?:[^'\\]|\\.)*'|\"(?:[^\"\\]|\\.)*\"),\s*('(?:[^'\\]|\\.)*'|\"(?:[^\"\\]|\\.)*\")\)", lambda m: repr(ast.literal_eval(m[2]) in ast.literal_eval(m[1])), expression)
+    expression = re.sub(
+        r"contains\(('(?:[^'\\]|\\.)*'|\"(?:[^\"\\]|\\.)*\"),\s*('(?:[^'\\]|\\.)*'|\"(?:[^\"\\]|\\.)*\")\)", lambda m: repr(ast.literal_eval(m[2]) in ast.literal_eval(m[1])), expression
+    )
     expression = expression.replace('always()', 'True').replace('&&', ' and ').replace('||', ' or ')
     expression = re.sub(r'!(?!=)', ' not ', expression)
     tree = ast.parse(expression.strip(), mode='eval')
@@ -34,40 +37,52 @@ def expression_value(expression, context):
     return eval(compile(tree, '<workflow condition>', 'eval'), {'__builtins__': {}})
 
 
-@pytest.mark.parametrize('event,operation,mode,expected', [
-    ('push', '', '', True),
-    ('workflow_dispatch', 'deploy', 'full', True),
-    ('workflow_dispatch', 'deploy', '', True),
-    ('workflow_dispatch', 'deploy', 'quick', False),
-    ('workflow_dispatch', 'diagnostic', 'full', False),
-    ('workflow_dispatch', 'rollback', 'full', False),
-])
+@pytest.mark.parametrize(
+    'event,operation,mode,expected',
+    [
+        ('push', '', '', True),
+        ('workflow_dispatch', 'deploy', 'full', True),
+        ('workflow_dispatch', 'deploy', '', True),
+        ('workflow_dispatch', 'deploy', 'quick', False),
+        ('workflow_dispatch', 'diagnostic', 'full', False),
+        ('workflow_dispatch', 'rollback', 'full', False),
+    ],
+)
 def test_full_tests_selection(event, operation, mode, expected):
     assert expression_value(job_condition('tests'), {'github.event_name': event, 'inputs.operation': operation, 'inputs.validation': mode}) is expected
 
 
-@pytest.mark.parametrize('event,operation,mode,syntax,tests,main,cancelled,expected', [
-    ('push', '', '', 'success', 'success', True, False, True),
-    ('push', '', '', 'success', 'skipped', True, False, False),
-    ('push', '', '', 'success', 'failure', True, False, False),
-    ('workflow_dispatch', 'deploy', 'full', 'success', 'success', True, False, True),
-    ('workflow_dispatch', 'deploy', 'full', 'success', 'skipped', True, False, False),
-    ('workflow_dispatch', 'deploy', 'full', 'success', 'failure', True, False, False),
-    ('workflow_dispatch', 'deploy', 'quick', 'success', 'skipped', True, False, True),
-    ('workflow_dispatch', 'deploy', 'quick', 'failure', 'skipped', True, False, False),
-    ('workflow_dispatch', 'deploy', 'quick', 'skipped', 'skipped', True, False, False),
-    ('workflow_dispatch', 'deploy', 'quick', 'success', 'failure', True, False, False),
-    ('workflow_dispatch', 'deploy', 'quick', 'success', 'cancelled', True, False, False),
-    ('workflow_dispatch', 'deploy', 'quick', 'success', 'skipped', True, True, False),
-    ('workflow_dispatch', 'deploy', 'quick', 'success', 'skipped', False, False, False),
-    ('workflow_dispatch', 'deploy', 'full', 'success', 'success', False, False, False),
-    ('workflow_dispatch', 'diagnostic', 'full', 'success', 'skipped', True, False, True),
-    ('workflow_dispatch', 'rollback', 'full', 'success', 'skipped', True, False, True),
-])
+@pytest.mark.parametrize(
+    'event,operation,mode,syntax,tests,main,cancelled,expected',
+    [
+        ('push', '', '', 'success', 'success', True, False, True),
+        ('push', '', '', 'success', 'skipped', True, False, False),
+        ('push', '', '', 'success', 'failure', True, False, False),
+        ('workflow_dispatch', 'deploy', 'full', 'success', 'success', True, False, True),
+        ('workflow_dispatch', 'deploy', 'full', 'success', 'skipped', True, False, False),
+        ('workflow_dispatch', 'deploy', 'full', 'success', 'failure', True, False, False),
+        ('workflow_dispatch', 'deploy', 'quick', 'success', 'skipped', True, False, True),
+        ('workflow_dispatch', 'deploy', 'quick', 'failure', 'skipped', True, False, False),
+        ('workflow_dispatch', 'deploy', 'quick', 'skipped', 'skipped', True, False, False),
+        ('workflow_dispatch', 'deploy', 'quick', 'success', 'failure', True, False, False),
+        ('workflow_dispatch', 'deploy', 'quick', 'success', 'cancelled', True, False, False),
+        ('workflow_dispatch', 'deploy', 'quick', 'success', 'skipped', True, True, False),
+        ('workflow_dispatch', 'deploy', 'quick', 'success', 'skipped', False, False, False),
+        ('workflow_dispatch', 'deploy', 'full', 'success', 'success', False, False, False),
+        ('workflow_dispatch', 'diagnostic', 'full', 'success', 'skipped', True, False, True),
+        ('workflow_dispatch', 'rollback', 'full', 'success', 'skipped', True, False, True),
+    ],
+)
 def test_production_job_gate(event, operation, mode, syntax, tests, main, cancelled, expected):
-    context = {'github.event_name': event, 'inputs.operation': operation, 'inputs.validation': mode,
-               'github.ref': 'refs/heads/main' if main else 'refs/heads/feature/test',
-               'needs.syntax.result': syntax, 'needs.tests.result': tests, 'cancelled()': cancelled}
+    context = {
+        'github.event_name': event,
+        'inputs.operation': operation,
+        'inputs.validation': mode,
+        'github.ref': 'refs/heads/main' if main else 'refs/heads/feature/test',
+        'needs.syntax.result': syntax,
+        'needs.tests.result': tests,
+        'cancelled()': cancelled,
+    }
     assert expression_value(job_condition('hostinger'), context) is expected
 
 
@@ -88,7 +103,8 @@ def isolated_deployment(tmp_path, mode, fail_public=False):
     (project / 'requirements.txt').write_text('')
     (project / 'README.md').write_text('fixture')
     commands = tmp_path / 'commands.jsonl'
-    binaries = tmp_path / 'bin'; binaries.mkdir()
+    binaries = tmp_path / 'bin'
+    binaries.mkdir()
     transport = '''#!/usr/bin/env python3
 import datetime,json,os,pathlib,sys
 tool=pathlib.Path(sys.argv[0]).name
@@ -109,15 +125,25 @@ elif tool=='curl':
  if '-w' in args: print('500' if os.environ.get('MOCK_FAIL_PUBLIC') else ('401' if 'secondary-filters' in command else '200'),end='')
 '''
     for tool in ('ssh', 'scp', 'rsync', 'curl'):
-        executable = binaries / tool; executable.write_text(transport); executable.chmod(0o700)
-    runner = tmp_path / 'runner'; runner.mkdir()
-    env = dict(os.environ, PATH=str(binaries) + os.pathsep + os.environ['PATH'], RUNNER_TEMP=str(runner),
-               JIGO_DEPLOY_VALIDATION=mode, JIGO_DEPLOY_DOMAIN='/isolated/demo.invalid',
-               JIGO_DEPLOY_BASE='http://unreachable.invalid', MOCK_COMMANDS=str(commands), GITHUB_SHA='a' * 40)
+        executable = binaries / tool
+        executable.write_text(transport)
+        executable.chmod(0o700)
+    runner = tmp_path / 'runner'
+    runner.mkdir()
+    env = dict(
+        os.environ,
+        PATH=str(binaries) + os.pathsep + os.environ['PATH'],
+        RUNNER_TEMP=str(runner),
+        JIGO_DEPLOY_VALIDATION=mode,
+        JIGO_DEPLOY_DOMAIN='/isolated/demo.invalid',
+        JIGO_DEPLOY_BASE='http://unreachable.invalid',
+        MOCK_COMMANDS=str(commands),
+        GITHUB_SHA='a' * 40,
+    )
     env.pop('JIGO_DEPLOY_SANDBOX', None)
-    if fail_public: env['MOCK_FAIL_PUBLIC'] = '1'
-    result = subprocess.run(['bash', str(project / 'ops/deploy.sh'), 'deploy'], cwd=project, env=env,
-                            capture_output=True, text=True, timeout=15)
+    if fail_public:
+        env['MOCK_FAIL_PUBLIC'] = '1'
+    result = subprocess.run(['bash', str(project / 'ops/deploy.sh'), 'deploy'], cwd=project, env=env, capture_output=True, text=True, timeout=15)
     log = [json.loads(line) for line in commands.read_text().splitlines()] if commands.exists() else []
     return result, log
 
@@ -153,9 +179,16 @@ def test_invalid_validation_mode_stops_before_any_transport(tmp_path):
 
 
 def test_explicit_push_marker_selects_quick_and_keeps_main_gate():
-    context = {'github.event_name': 'push', 'github.event.head_commit.message': 'Livrer les menus [deploy quick]',
-               'github.ref': 'refs/heads/main', 'needs.syntax.result': 'success', 'needs.tests.result': 'skipped',
-               'inputs.operation': '', 'inputs.validation': '', 'cancelled()': False}
+    context = {
+        'github.event_name': 'push',
+        'github.event.head_commit.message': 'Livrer les menus [deploy quick]',
+        'github.ref': 'refs/heads/main',
+        'needs.syntax.result': 'success',
+        'needs.tests.result': 'skipped',
+        'inputs.operation': '',
+        'inputs.validation': '',
+        'cancelled()': False,
+    }
     assert expression_value(job_condition('tests'), context) is False
     assert expression_value(job_condition('hostinger'), context) is True
     assert expression_value(job_condition('hostinger'), {**context, 'github.ref': 'refs/heads/feature/test'}) is False
@@ -167,6 +200,7 @@ def test_before_delivery_fingerprint_script_depends_only_on_db_php():
     """La livraison envoie ce script au serveur par l'entrée standard alors que le code applicatif y est encore l'ancienne version :
     il ne doit charger que db.php (régression du 14/11 : le contrôle complet exigeait des fonctions absentes de l'ancien code)."""
     import re
+
     script = (ROOT / 'scripts/release/financial_fingerprint.php').read_text()
     assert re.findall(r"require(?:_once)?\s+([^;]+);", script) == ["__DIR__ . '/../../app/lib/db.php'"]
     deploy = (ROOT / 'ops/deploy.sh').read_text()
@@ -178,7 +212,7 @@ def test_pre_transfer_diagnostic_tolerates_the_previous_module_layout():
     """Le diagnostic des classements s'exécute sur le code déjà en place (avant le transfert) : il doit importer l'ancien comme le nouvel emplacement
     d'un module déplacé (régression du 14/11, universe_verdicts)."""
     deploy = (ROOT / 'ops/deploy.sh').read_text()
-    block = deploy[deploy.index('Contrôle des classements'):deploy.index('Mode rapide : diagnostic exhaustif')]
+    block = deploy[deploy.index('Contrôle des classements') : deploy.index('Mode rapide : diagnostic exhaustif')]
     assert 'except ImportError' in block and 'from engine.analytics.admin import universe_verdicts' in block
 
 
@@ -186,7 +220,9 @@ def test_deploy_checks_never_hide_a_failure_behind_and_echo():
     """`contrôle && echo ok` n'arrête pas un script en `set -e` quand le contrôle échoue (découvert par la répétition locale : un moteur cassé aurait été déployé).
     Les contrôles doivent s'écrire `contrôle || { message; exit 1; }`."""
     deploy = (ROOT / 'ops/deploy.sh').read_text().splitlines()
-    risky = [(n + 1, line.strip()[:90]) for n, line in enumerate(deploy)
-             if re.search(r'^\s*(test |command -v |gzip -t|tar czf|\S*python\S* -c )', line) and re.search(r'&&\s*(echo|printf)', line)
-             and '||' not in line]
+    risky = [
+        (n + 1, line.strip()[:90])
+        for n, line in enumerate(deploy)
+        if re.search(r'^\s*(test |command -v |gzip -t|tar czf|\S*python\S* -c )', line) and re.search(r'&&\s*(echo|printf)', line) and '||' not in line
+    ]
     assert risky == [], risky

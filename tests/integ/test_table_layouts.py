@@ -1,4 +1,5 @@
 """Administration des colonnes : quatre configurations indépendantes, ordre, largeurs, tri, filtres, révision, réinitialisation, compatibilité (vrai PHP + MariaDB)."""
+
 import json
 import os
 import subprocess
@@ -25,7 +26,13 @@ def php(code):
 
 
 def call(fn, arg):
-    return php('try { echo json_encode(["ok" => ' + fn + '(json_decode(' + json.dumps(json.dumps(arg)) + ', true))]); } catch (ApiError $e) { echo json_encode(["error" => $e->getMessage(), "code" => $e->status]); }')
+    return php(
+        'try { echo json_encode(["ok" => '
+        + fn
+        + '(json_decode('
+        + json.dumps(json.dumps(arg))
+        + ', true))]); } catch (ApiError $e) { echo json_encode(["error" => $e->getMessage(), "code" => $e->status]); }'
+    )
 
 
 def read():
@@ -58,7 +65,7 @@ def test_four_independent_configurations_with_defaults_and_catalog():
     for page, p in CATALOG.items():
         for dev in ('desktop', 'mobile'):
             c = d['layouts'][page + '.' + dev]
-            assert [x['id'] for x in c['columns']] == [x['id'] for x in p['columns']]                 # ordre du catalogue
+            assert [x['id'] for x in c['columns']] == [x['id'] for x in p['columns']]  # ordre du catalogue
             assert [x['id'] for x in c['columns'] if x['visible']] == [i for i in [x['id'] for x in p['columns']] if i in p['defaults'][dev]['visible']]
             assert c['filters']['verdict'] == p['defaults'][dev]['filters']['verdict'] and c['sort'] == []
     assert d['layouts']['explorer.desktop']['filters']['verdict'] == 'retained' and d['layouts']['scores.desktop']['filters']['verdict'] == 'all'
@@ -68,7 +75,9 @@ def test_four_independent_configurations_with_defaults_and_catalog():
 def test_save_order_visibility_width_sort_filters_and_leave_the_other_three_untouched():
     fresh()
     before = read()['layouts']
-    order = ['name', 'simple', 'status', 'rank', 'perfMonth', 'slope', 'r2', 'turnover'] + [c['id'] for c in CATALOG['explorer']['columns'] if c['id'] not in ('name', 'simple', 'status', 'rank', 'perfMonth', 'slope', 'r2', 'turnover')]
+    order = ['name', 'simple', 'status', 'rank', 'perfMonth', 'slope', 'r2', 'turnover'] + [
+        c['id'] for c in CATALOG['explorer']['columns'] if c['id'] not in ('name', 'simple', 'status', 'rank', 'perfMonth', 'slope', 'r2', 'turnover')
+    ]
     new = cfg('explorer', 'mobile', visible={'name', 'simple', 'status', 'rank'}, order=order)
     new['columns'][0]['width'] = 200
     new['sort'] = [{'key': 'complex', 'dir': 'desc'}, {'key': 'perfMonth', 'dir': 'desc'}, {'key': 'name', 'dir': 'asc'}]
@@ -78,11 +87,11 @@ def test_save_order_visibility_width_sort_filters_and_leave_the_other_three_unto
     after = read()
     assert after['revision'] == 1 and after['saved']['explorer.mobile'] and not after['saved']['explorer.desktop']
     got = after['layouts']['explorer.mobile']
-    assert [c['id'] for c in got['columns']][:8] == order[:8] and got['columns'][0]['width'] == 200                   # ordre exact conservé, masquées comprises
+    assert [c['id'] for c in got['columns']][:8] == order[:8] and got['columns'][0]['width'] == 200  # ordre exact conservé, masquées comprises
     assert [c['id'] for c in got['columns'] if c['visible']] == ['name', 'simple', 'status', 'rank']
     assert got['sort'] == new['sort'] and got['filters'] == {'verdict': 'all', 'page_size': 100}
     for k in ('explorer.desktop', 'scores.desktop', 'scores.mobile'):
-        assert after['layouts'][k] == before[k], k                                                                   # indépendance des quatre configurations
+        assert after['layouts'][k] == before[k], k  # indépendance des quatre configurations
 
 
 def test_hidden_column_keeps_its_position_when_shown_again():
@@ -91,7 +100,7 @@ def test_hidden_column_keeps_its_position_when_shown_again():
     ids = [c['id'] for c in base['columns']]
     hide = cfg('scores', 'desktop', visible=set(ids) - {'status'})
     assert 'ok' in call('tl_write', {'page': 'scores', 'device': 'desktop', 'config': hide, 'revision': 0})
-    assert [c['id'] for c in read()['layouts']['scores.desktop']['columns']] == ids                                 # position conservée
+    assert [c['id'] for c in read()['layouts']['scores.desktop']['columns']] == ids  # position conservée
     show = cfg('scores', 'desktop', visible=set(ids))
     assert 'ok' in call('tl_write', {'page': 'scores', 'device': 'desktop', 'config': show, 'revision': 1})
     assert [c['id'] for c in read()['layouts']['scores.desktop']['columns']] == ids
@@ -100,21 +109,24 @@ def test_hidden_column_keeps_its_position_when_shown_again():
 def test_invalid_configurations_are_refused_never_saved_silently():
     fresh()
     good = cfg('explorer', 'desktop')
+
     def bad(mut, expect):
-        c = json.loads(json.dumps(good)); mut(c)
+        c = json.loads(json.dumps(good))
+        mut(c)
         r = call('tl_write', {'page': 'explorer', 'device': 'desktop', 'config': c, 'revision': 0})
         assert r.get('code') == 422 and expect in r['error'], r
+
     bad(lambda c: [x.update(visible=False) for x in c['columns'] if x['id'] == 'name'], 'Titre')
     bad(lambda c: c['columns'].append({'id': 'inconnue', 'visible': True, 'width': None}), 'inconnue')
     bad(lambda c: c['columns'].append(dict(c['columns'][0])), 'double')
     bad(lambda c: c['columns'].__delitem__(3), 'manquante')
     bad(lambda c: c['columns'][1].update(width=10), 'Largeur')
-    bad(lambda c: c.update(sort=[{'key': 'trend', 'dir': 'asc'}]), 'Tri invalide')                                 # colonne non triable
+    bad(lambda c: c.update(sort=[{'key': 'trend', 'dir': 'asc'}]), 'Tri invalide')  # colonne non triable
     bad(lambda c: c.update(sort=[{'key': 'simple', 'dir': 'asc'}, {'key': 'simple', 'dir': 'desc'}]), 'Tri invalide')
     bad(lambda c: c.update(sort=[{'key': k, 'dir': 'asc'} for k in ('simple', 'complex', 'name', 'price')]), 'Tri invalide')
     bad(lambda c: c.update(filters={'verdict': 'peut-etre', 'page_size': 50}), 'Statut')
     bad(lambda c: c.update(filters={'verdict': 'all', 'page_size': 7}), 'page')
-    assert read()['revision'] == 0                                                                                     # rien n'a été enregistré
+    assert read()['revision'] == 0  # rien n'a été enregistré
 
 
 def test_concurrent_revision_is_refused_and_reset_restores_defaults_only_for_one_configuration():
@@ -133,8 +145,17 @@ def test_concurrent_revision_is_refused_and_reset_restores_defaults_only_for_one
 
 def test_old_documents_stay_readable_when_the_catalogue_evolves():
     fresh()
-    doc = {'schema': 1, 'revision': 5, 'layouts': {'scores.desktop': {'columns': [{'id': 'disparue', 'visible': True, 'width': None}, {'id': 'simple', 'visible': True, 'width': None}, {'id': 'name', 'visible': False, 'width': 9999}],
-                                                                       'sort': [{'key': 'disparue', 'dir': 'asc'}], 'filters': {'verdict': 'nimporte'}}}}
+    doc = {
+        'schema': 1,
+        'revision': 5,
+        'layouts': {
+            'scores.desktop': {
+                'columns': [{'id': 'disparue', 'visible': True, 'width': None}, {'id': 'simple', 'visible': True, 'width': None}, {'id': 'name', 'visible': False, 'width': 9999}],
+                'sort': [{'key': 'disparue', 'dir': 'asc'}],
+                'filters': {'verdict': 'nimporte'},
+            }
+        },
+    }
     conn = connect()
     try:
         with conn.cursor() as cur:
@@ -144,7 +165,7 @@ def test_old_documents_stay_readable_when_the_catalogue_evolves():
         conn.close()
     c = read()['layouts']['scores.desktop']
     ids = [x['id'] for x in c['columns']]
-    assert ids[:2] == ['simple', 'name'] and set(ids) == {x['id'] for x in CATALOG['scores']['columns']}            # inconnue ignorée, nouvelles colonnes ajoutées en fin
+    assert ids[:2] == ['simple', 'name'] and set(ids) == {x['id'] for x in CATALOG['scores']['columns']}  # inconnue ignorée, nouvelles colonnes ajoutées en fin
     assert next(x for x in c['columns'] if x['id'] == 'name')['visible'] is True and next(x for x in c['columns'] if x['id'] == 'name')['width'] is None
     assert c['sort'] == [] and c['filters']['verdict'] == 'all'
 
@@ -159,13 +180,13 @@ def test_personal_layouts_are_isolated_between_users_and_fall_back_to_the_common
     finally:
         with_conn.close()
     base = php('echo json_encode(tl_read(7));')['layouts']['scores.desktop']
-    assert base == read()['layouts']['scores.desktop']                              # sans réglage personnel : défaut commun
+    assert base == read()['layouts']['scores.desktop']  # sans réglage personnel : défaut commun
     mine = dict(base, sort=[{'key': 'complex', 'dir': 'desc'}])
     r = php('echo json_encode(tl_write(["page"=>"scores","device"=>"desktop","config"=>json_decode(' + json.dumps(json.dumps(mine)) + ',true),"revision"=>0], 7));')
     assert r['saved']['scores.desktop'] and r['revision'] == 1
     assert php('echo json_encode(tl_read(7));')['layouts']['scores.desktop']['sort'] == mine['sort']
     other = php('echo json_encode(tl_read(8));')
-    assert other['layouts']['scores.desktop']['sort'] == base['sort'] and not other['saved']['scores.desktop']      # l'autre utilisateur ne voit rien
-    assert read()['layouts']['scores.desktop']['sort'] == base['sort']                                              # le défaut commun reste intact
+    assert other['layouts']['scores.desktop']['sort'] == base['sort'] and not other['saved']['scores.desktop']  # l'autre utilisateur ne voit rien
+    assert read()['layouts']['scores.desktop']['sort'] == base['sort']  # le défaut commun reste intact
     back = php('echo json_encode(tl_write(["action"=>"reset","page"=>"scores","device"=>"desktop","revision"=>1], 7));')
     assert not back['saved']['scores.desktop'] and back['layouts']['scores.desktop']['sort'] == base['sort']

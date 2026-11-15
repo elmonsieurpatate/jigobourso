@@ -7,6 +7,7 @@
 
 Une clôture absente rend ces mesures indisponibles (None) : on ne comble jamais un trou.
 """
+
 import math
 from ..series.measures import window_metrics
 
@@ -24,8 +25,7 @@ def path_inputs(closes):
         return {'up_fraction': None, 'spike_share': None}
     steps = [closes[i] / closes[i - 1] - 1 for i in range(1, len(closes))]
     total = math.log(closes[-1] / closes[0])
-    return {'up_fraction': sum(1 for s in steps if s > 0) / len(steps),
-            'spike_share': (math.log1p(max(steps)) / total) if total > 0 else 1.0}
+    return {'up_fraction': sum(1 for s in steps if s > 0) / len(steps), 'spike_share': (math.log1p(max(steps)) / total) if total > 0 else 1.0}
 
 
 def window_inputs(current_dates, previous_dates, observations):

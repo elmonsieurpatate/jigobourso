@@ -1,4 +1,5 @@
 """Adaptations de scores par utilisateur : isolation, statuts, restaurations indépendantes, retour automatique à Officielle (vraie base)."""
+
 import os
 
 import pytest
@@ -54,7 +55,7 @@ def test_adaptation_is_private_and_independent_between_users():
     assert by_id(A.strategies_status(conn, {}))['growth_v4']['scores']['modified'] >= 1
     assert by_id(A.strategies_status(conn, {}))['growth_v4']['criteria']['state'] == 'official'
     scores_specs.set_user(2)
-    assert by_id(A.strategies_status(conn, {}))['growth_v4']['status'] == 'official'        # l'autre utilisateur ne voit rien
+    assert by_id(A.strategies_status(conn, {}))['growth_v4']['status'] == 'official'  # l'autre utilisateur ne voit rien
     scores_specs.set_user(1)
     A.user_save(conn, {'reset': 'profile', 'name': 'growth_v4'})
     assert by_id(A.strategies_status(conn, {}))['growth_v4']['status'] == 'official'

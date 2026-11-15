@@ -1,5 +1,6 @@
 """Garantie : un titre exclu (liquidité insuffisante) n'apparaît dans aucun classement, quelle que soit la période.
 Cas de référence : DVDG.DE, ETF exclu, tendance parfaite."""
+
 import datetime
 import os
 import pytest
@@ -17,7 +18,9 @@ def seed(conn):
     reset_data(conn)
     with conn.cursor() as cur:
         pass
-        cur.execute("INSERT INTO instruments(id,group_key,isin,kind,name) VALUES (1,'isin:DE000A000001','DE000A000001','equity','Bon SA'),(2,'isin:DE000A000002','DE000A000002','etf','DVDG ETF'),(3,'isin:DE000A000003','DE000A000003','equity','Multi SA')")
+        cur.execute(
+            "INSERT INTO instruments(id,group_key,isin,kind,name) VALUES (1,'isin:DE000A000001','DE000A000001','equity','Bon SA'),(2,'isin:DE000A000002','DE000A000002','etf','DVDG ETF'),(3,'isin:DE000A000003','DE000A000003','equity','Multi SA')"
+        )
         cur.execute("""INSERT INTO listings(id,instrument_id,mic,symbol,currency,status,excluded_reason,is_primary) VALUES
             (10,1,'XETR','GOOD.DE','EUR','selected',NULL,1),
             (20,2,'XETR','DVDG.DE','EUR','excluded','liquidité insuffisante',1),
@@ -41,10 +44,10 @@ def test_excluded_never_recommended_even_when_held():
     conn = connect()
     seed(conn)
     candidates = recommendable_candidates(conn)
-    assert {c['key'] for c in candidates} == {10, 30}      # ni 20 (exclu), ni 31 (non principale)
+    assert {c['key'] for c in candidates} == {10, 30}  # ni 20 (exclu), ni 31 (non principale)
     for name in S.PRESETS:
         cfg = S.preset(name)
-        for period in cfg['periods']:                      # chaque période seule : jour, semaine, mois, trimestre, semestre, année
+        for period in cfg['periods']:  # chaque période seule : jour, semaine, mois, trimestre, semestre, année
             for p in cfg['periods']:
                 p['enabled'] = p is period
             period.update(min_slope=0.0)
@@ -56,4 +59,4 @@ def test_excluded_never_recommended_even_when_held():
         cur.execute("SELECT listing_id FROM v_collect_set WHERE held=1")
         assert {r['listing_id'] for r in cur.fetchall()} == {20}
         cur.execute("SELECT COUNT(*) n FROM v_collect_set WHERE listing_id=20")
-        assert cur.fetchone()['n'] == 1                    # collectée une seule fois
+        assert cur.fetchone()['n'] == 1  # collectée une seule fois

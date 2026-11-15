@@ -1,4 +1,5 @@
 """Modèles d'alerte par stratégie : règles issues des critères réellement actifs, seuils lus dans la configuration, évaluation sur données réelles."""
+
 import copy
 import datetime
 
@@ -29,7 +30,7 @@ def test_every_threshold_comes_from_the_strategy_configuration():
 def test_fast_regular_calm_use_their_own_active_criteria_only():
     fast = tpl('fast')
     assert {k for k, _, _ in kinds(fast)} <= {'slope_min', 'momentum_min', 'r2_min', 'er_min'}
-    assert ('r2_min', 'week', 0) not in kinds(fast) and not any(k == 'r2_min' for k, _, _ in kinds(fast))   # R² seulement s'il est actif
+    assert ('r2_min', 'week', 0) not in kinds(fast) and not any(k == 'r2_min' for k, _, _ in kinds(fast))  # R² seulement s'il est actif
     reg = tpl('regular')
     assert {g for _, g, _ in kinds(reg)} == {'month', 'quarter'} and {k for k, _, _ in kinds(reg)} == {'slope_min', 'r2_min'}
     calm = tpl('low_volatility')

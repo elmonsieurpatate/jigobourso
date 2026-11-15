@@ -5,14 +5,14 @@ Ce module ne calcule aucune note : il range une note déjà produite par le mote
 Garanties : une ligne retenue est renvoyée telle quelle (note, rang, statut inchangés) ; une ligne exclue n'est ni modifiée ni supprimée du calcul ;
 un score partiel reste une note numérique rangée dans sa catégorie ; seule une note absente (None) va dans la catégorie « inconnue ».
 """
+
 FILTERS = {'simple': ('score_simple', 'score_simple_v4'), 'complex': ('score_complex', 'score_complex_v4')}
 SETTING = 'explorer_secondary_filters'
 DEFAULTS_SETTING = 'explorer_secondary_defaults'
 
 
 def _inside(c, v):
-    return ((c['min'] is None or v > c['min'] or (v == c['min'] and c['minIncluded']))
-            and (c['max'] is None or v < c['max'] or (v == c['max'] and c['maxIncluded'])))
+    return (c['min'] is None or v > c['min'] or (v == c['min'] and c['minIncluded'])) and (c['max'] is None or v < c['max'] or (v == c['max'] and c['maxIncluded']))
 
 
 def assign(value, categories):
@@ -31,5 +31,3 @@ def measure(definitions, which):
                 if m['id'] == mid:
                     return m['categories'], bool(f.get('enabled'))
     return [], False
-
-

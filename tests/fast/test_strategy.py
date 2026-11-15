@@ -52,7 +52,7 @@ def test_regular_retains_steady_rise_and_rejects_flat_and_noisy():
     by = {v['key']: v for v in r}
     assert by[1]['status'] == 'retained'
     assert by[2]['status'] == 'rejected'
-    assert by[3]['status'] == 'rejected'          # hausse bruitée : R² insuffisant
+    assert by[3]['status'] == 'rejected'  # hausse bruitée : R² insuffisant
 
 
 def test_insufficient_history_is_unknown_not_rejected():
@@ -64,14 +64,14 @@ def test_insufficient_history_is_unknown_not_rejected():
 def test_failure_wins_over_missing():
     c = S.preset('regular')
     c['periods'][3]['enabled'] = True
-    c['periods'][3].update(min_slope=0.0)       # trimestre: manque (n=40) ; mois: échoue (plat)
+    c['periods'][3].update(min_slope=0.0)  # trimestre: manque (n=40) ; mois: échoue (plat)
     r = S.evaluate(c, [cand(1, 0.0, n=40)])
     assert r[0]['status'] == 'rejected'
 
 
 def test_break_window_not_evaluated():
     data = bars(0.003, 100)
-    data = data[:80] + [(d, p / 2, a) for d, p, a in data[80:]]   # saut -50 % non expliqué
+    data = data[:80] + [(d, p / 2, a) for d, p, a in data[80:]]  # saut -50 % non expliqué
     r = S.evaluate(S.preset('regular'), [{'key': 1, 'symbol': 'X', 'group': 'equity', 'bars': data}])
     assert r[0]['status'] == 'unknown' and r[0]['breaks']
 
@@ -88,7 +88,7 @@ def test_ranking_separate_groups_and_order():
     cfg['periods'][0]['enabled'] = False
     r = {v['key']: v for v in S.evaluate(cfg, cs)}
     assert [r[k]['rank'] for k in (3, 2, 1)] == [1, 2, 3]
-    assert r[4]['rank'] == 1 and r[4]['score'] == 50.0      # seul ETF : classé dans son groupe
+    assert r[4]['rank'] == 1 and r[4]['score'] == 50.0  # seul ETF : classé dans son groupe
 
 
 def test_only_given_candidates_are_ranked():
@@ -108,7 +108,7 @@ def test_technical_filter():
 
 def test_fast_with_added_last_day_rejects_decline_only_when_direction_is_defined():
     c = S.preset('fast')
-    candidate = {'bars': [(f'd{i:04d}', 100 * 1.01 ** i * (.98 if i == 59 else 1), None) for i in range(60)]}
+    candidate = {'bars': [(f'd{i:04d}', 100 * 1.01**i * (0.98 if i == 59 else 1), None) for i in range(60)]}
     # Strong week/month do not imply a positive last close-to-close return.
     assert S.evaluate_one(c, candidate)['status'] == 'retained'
     day = next(p for p in c['periods'] if p['id'] == 'day')

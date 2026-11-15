@@ -1,6 +1,7 @@
 """Dépendances du moteur Python (F11) : aucun cycle d'import (imports différés compris) et couches respectées.
 
 Graphe construit par analyse statique de tous les `import` de engine/ (en tête de module ou dans une fonction)."""
+
 import ast
 import os
 
@@ -34,7 +35,7 @@ def imports(name, path):
             base = node.module or ''
             if node.level:
                 parts = name.split('.') if is_pkg else name.split('.')[:-1]
-                parts = parts[:len(parts) - (node.level - 1)]
+                parts = parts[: len(parts) - (node.level - 1)]
                 base = '.'.join(parts + ([base] if base else []))
             for a in node.names:
                 found.add(base + '.' + a.name if base + '.' + a.name in MODS else base)
@@ -49,21 +50,27 @@ def cycles():
     index, low, stack, on, out, counter = {}, {}, [], set(), [], [0]
 
     def visit(v):
-        index[v] = low[v] = counter[0]; counter[0] += 1
-        stack.append(v); on.add(v)
+        index[v] = low[v] = counter[0]
+        counter[0] += 1
+        stack.append(v)
+        on.add(v)
         for w in GRAPH[v]:
             if w not in index:
-                visit(w); low[v] = min(low[v], low[w])
+                visit(w)
+                low[v] = min(low[v], low[w])
             elif w in on:
                 low[v] = min(low[v], index[w])
         if low[v] == index[v]:
             comp = []
             while True:
-                w = stack.pop(); on.discard(w); comp.append(w)
+                w = stack.pop()
+                on.discard(w)
+                comp.append(w)
                 if w == v:
                     break
             if len(comp) > 1:
                 out.append(sorted(comp))
+
     for v in GRAPH:
         if v not in index:
             visit(v)
@@ -84,26 +91,33 @@ def test_calculation_packages_do_not_depend_on_administration():
 
 
 def test_providers_and_shared_code_do_not_depend_on_analytics_or_jobs():
-    allowed = {('engine.market.splits', 'engine.analytics.series.series')}      # le fournisseur de splits applique le même ajustement de série que le calcul
+    allowed = {('engine.market.splits', 'engine.analytics.series.series')}  # le fournisseur de splits applique le même ajustement de série que le calcul
     assert [e for e in edges('engine.market', 'engine.analytics') if e not in allowed] == []
     assert edges('engine.market', 'engine.jobs') == []
     assert edges('engine.shared', 'engine.analytics') == [] and edges('engine.shared', 'engine.jobs') == []
 
 
 def test_pure_calculation_modules_use_neither_database_nor_network_nor_admin():
-    pure = ['engine.analytics.series.series', 'engine.analytics.series.measures', 'engine.analytics.scoring.scores', 'engine.analytics.scoring.criteria',
-            'engine.analytics.scoring.configurable_score', 'engine.analytics.explorer.explorer_config', 'engine.analytics.explorer.strategy',
-            'engine.shared.units']
+    pure = [
+        'engine.analytics.series.series',
+        'engine.analytics.series.measures',
+        'engine.analytics.scoring.scores',
+        'engine.analytics.scoring.criteria',
+        'engine.analytics.scoring.configurable_score',
+        'engine.analytics.explorer.explorer_config',
+        'engine.analytics.explorer.strategy',
+        'engine.shared.units',
+    ]
     forbidden = ('engine.shared.db', 'engine.market.yahoo', 'engine.analytics.admin', 'pymysql', 'urllib', 'socket', 'requests', 'http')
     bad = [(m, t) for m in pure for t in RAW[m] if t == 'http' or any(t == f or t.startswith(f + '.') for f in forbidden)]
     assert bad == []
 
 
 def test_no_function_grows_beyond_the_current_ceiling():
-    """Plafond de longueur des fonctions (lignes) : les plus longues font environ 100 lignes (strategy.rank, history.build, etf.build) ; aucune fonction ne doit dépasser 105."""
+    """Plafond de longueur des fonctions (lignes) : mesuré après formatage (une instruction par ligne) : strategy.rank 188, cli._main 155, title_sheet.instrument_sheet 146 ; aucune fonction ne doit dépasser 190."""
     longest = []
     for name, path in MODS.items():
         for node in ast.walk(ast.parse(open(path, encoding='utf-8').read())):
             if isinstance(node, ast.FunctionDef):
                 longest.append((node.end_lineno - node.lineno + 1, name, node.name))
-    assert max(longest)[0] <= 105, sorted(longest, reverse=True)[:3]
+    assert max(longest)[0] <= 190, sorted(longest, reverse=True)[:3]

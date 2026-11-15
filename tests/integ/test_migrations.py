@@ -1,4 +1,5 @@
 """Migrations de schéma : ajouts seulement, une fois chacune, jamais de perte de données."""
+
 import importlib.util
 import os
 import pytest
@@ -35,10 +36,10 @@ def test_apply_once_keeps_existing_rows(tmp_path):
     (tmp_path / '20260101_add_b.sql').write_text('-- ajout\nALTER TABLE zz_mig ADD COLUMN b INT NULL;')
     assert migrate.pending(conn, str(tmp_path)) == ['20260101_add_b.sql']
     assert migrate.apply(conn, str(tmp_path)) == ['20260101_add_b.sql']
-    assert migrate.apply(conn, str(tmp_path)) == []                           # une seule fois
+    assert migrate.apply(conn, str(tmp_path)) == []  # une seule fois
     with conn.cursor() as cur:
         cur.execute('SELECT COUNT(*) n FROM zz_mig')
-        assert cur.fetchone()['n'] == 2                                       # aucune ligne perdue
+        assert cur.fetchone()['n'] == 2  # aucune ligne perdue
         cur.execute('DROP TABLE zz_mig')
     conn.commit()
     (tmp_path / '20260102_bad.sql').write_text('ALTER TABLE zz_mig DROP COLUMN a;')
@@ -57,7 +58,7 @@ def test_resume_after_a_partially_applied_migration(tmp_path):
         cur.execute('DROP TABLE IF EXISTS zz_mig2, schema_migrations')
         cur.execute('CREATE TABLE zz_mig2 (a INT PRIMARY KEY)')
         cur.execute('INSERT INTO zz_mig2 VALUES (7)')
-        cur.execute('ALTER TABLE zz_mig2 ADD COLUMN b INT NULL')                      # la première instruction est déjà là
+        cur.execute('ALTER TABLE zz_mig2 ADD COLUMN b INT NULL')  # la première instruction est déjà là
     conn.commit()
     (tmp_path / '20260201_two.sql').write_text('ALTER TABLE zz_mig2 ADD COLUMN b INT NULL;\nALTER TABLE zz_mig2 ADD COLUMN c INT NULL;\nCREATE INDEX ix_zz ON zz_mig2 (c);')
     messages = []

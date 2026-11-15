@@ -1,8 +1,9 @@
 """Préparation d'une série de clôtures : choix cours bruts / ajustés et détection des ruptures de cours."""
+
 import datetime
 import math
 
-BREAK_RATIO = 1.6   # variation d'une séance à l'autre au-delà de laquelle un saut est suspect (×1,6 ou ÷1,6)
+BREAK_RATIO = 1.6  # variation d'une séance à l'autre au-delà de laquelle un saut est suspect (×1,6 ou ÷1,6)
 
 
 def usable_closes(bars):
@@ -22,9 +23,11 @@ def find_breaks(dates, closes, basis, split_dates=()):
     # A declared split without trustworthy adjusted prices is NOT an economic return.
     # It invalidates a crossing window, even if its ratio is below the jump heuristic.
     unexplained_splits = set(split_dates) if basis == 'raw' else set()
-    return [i for i in range(1, len(closes))
-            if closes[i] / closes[i - 1] > BREAK_RATIO or closes[i] / closes[i - 1] < 1 / BREAK_RATIO
-            or (basis == 'raw' and any(dates[i - 1] < d <= dates[i] for d in unexplained_splits))]
+    return [
+        i
+        for i in range(1, len(closes))
+        if closes[i] / closes[i - 1] > BREAK_RATIO or closes[i] / closes[i - 1] < 1 / BREAK_RATIO or (basis == 'raw' and any(dates[i - 1] < d <= dates[i] for d in unexplained_splits))
+    ]
 
 
 def clean_window(closes, sessions, break_indexes):
@@ -39,9 +42,9 @@ def clean_window(closes, sessions, break_indexes):
 
 
 # ── Erreurs de données identifiables (sans inventer de prix ni effacer un vrai mouvement) ──
-UNIT_FACTOR = 100.0        # livres / pence (Londres), rands / cents, shekels / agorot : Yahoo bascule parfois d'une unité à l'autre
-UNIT_TOLERANCE = 0.06      # un vrai mouvement n'est jamais de ×100 en une séance : un saut de ×100 ou ÷100 (± 6 %) est un changement d'unité
-SPIKE_FACTOR = 4.0         # un cours isolé à plus de ×4 (ou ÷4) de ses DEUX voisines, qui se ressemblent, est une erreur de donnée ponctuelle
+UNIT_FACTOR = 100.0  # livres / pence (Londres), rands / cents, shekels / agorot : Yahoo bascule parfois d'une unité à l'autre
+UNIT_TOLERANCE = 0.06  # un vrai mouvement n'est jamais de ×100 en une séance : un saut de ×100 ou ÷100 (± 6 %) est un changement d'unité
+SPIKE_FACTOR = 4.0  # un cours isolé à plus de ×4 (ou ÷4) de ses DEUX voisines, qui se ressemblent, est une erreur de donnée ponctuelle
 
 
 def _near_day(day, others, tolerance=5):
@@ -117,9 +120,9 @@ def prepare_series(bars, splits=()):
     return dates, closes, basis, breaks
 
 
-MOMENTUM_LONG = 126      # séances : début de la fenêtre du « Momentum 6 mois » (J−126)
-MOMENTUM_LONG_12 = 252   # séances : début de la fenêtre du « Momentum 12 mois » (J−252)
-MOMENTUM_SKIP = 21       # séances : fin des deux fenêtres (J−21) ; le dernier mois est volontairement ignoré
+MOMENTUM_LONG = 126  # séances : début de la fenêtre du « Momentum 6 mois » (J−126)
+MOMENTUM_LONG_12 = 252  # séances : début de la fenêtre du « Momentum 12 mois » (J−252)
+MOMENTUM_SKIP = 21  # séances : fin des deux fenêtres (J−21) ; le dernier mois est volontairement ignoré
 
 
 def _momentum(dates, closes, breaks, expected, long_window):
@@ -166,6 +169,7 @@ def analyze_series(bars, windows, splits=(), session_windows=None, technical_ses
     invalidate crossing windows. No arbitrary cut-off changes the price basis.
     """
     from .measures import window_metrics, technical_state, dated_window_metrics, dated_technical_state
+
     dates, closes, basis, breaks = prepare_series(bars, splits)
     observations = dict(zip(dates, closes))
     measures, missing = {}, {}
@@ -195,5 +199,5 @@ def analyze_series(bars, windows, splits=(), session_windows=None, technical_ses
     if technical_sessions is not None:
         tech = dated_technical_state(technical_sessions, observations)
     else:
-        tech = technical_state(closes[breaks[-1]:] if breaks else closes)
+        tech = technical_state(closes[breaks[-1] :] if breaks else closes)
     return dates, closes, basis, breaks, measures, missing, tech

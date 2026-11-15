@@ -1,4 +1,5 @@
 """Parcours complet voulu : Import FinanceDatabase → Filtrage → Import Yahoo → Filtrage Yahoo → catalogue final → historiques → cron (entretien seulement)."""
+
 import csv
 import datetime
 import os
@@ -17,12 +18,14 @@ if not os.environ.get('JIGO_TEST_DATABASE'):
     pytest.skip('base jetable non configurée', allow_module_level=True)
 
 UTC = datetime.timezone.utc
-NOW = datetime.datetime(2026, 10, 27, 18, 0, tzinfo=UTC)          # mardi, Xetra fermée et clôture publiée
+NOW = datetime.datetime(2026, 10, 27, 18, 0, tzinfo=UTC)  # mardi, Xetra fermée et clôture publiée
 FIELDS = ('symbol', 'name', 'mic', 'isin', 'currency', 'delisted', 'sector', 'country')
-EQUITIES = [('LIQ.DE', 'Liquide SE', 'XETR', 'DE0000000001', 'EUR', 'False', 'Tech', 'Germany'),
-            ('PEN.DE', 'Penny SE', 'XETR', 'DE0000000002', 'EUR', 'False', 'Tech', 'Germany'),
-            ('FAR.T', 'Loin KK', 'XTKS', 'JP0000000004', 'JPY', 'False', 'Tech', 'Japan'),
-            ('UNK.Q', 'Inconnue SA', 'XQQQ', 'ZZ0000000005', 'EUR', 'False', 'Tech', 'Nowhere')]
+EQUITIES = [
+    ('LIQ.DE', 'Liquide SE', 'XETR', 'DE0000000001', 'EUR', 'False', 'Tech', 'Germany'),
+    ('PEN.DE', 'Penny SE', 'XETR', 'DE0000000002', 'EUR', 'False', 'Tech', 'Germany'),
+    ('FAR.T', 'Loin KK', 'XTKS', 'JP0000000004', 'JPY', 'False', 'Tech', 'Japan'),
+    ('UNK.Q', 'Inconnue SA', 'XQQQ', 'ZZ0000000005', 'EUR', 'False', 'Tech', 'Nowhere'),
+]
 
 
 def q(price, volume, cur='EUR'):
@@ -52,9 +55,11 @@ def env(tmp_path, monkeypatch):
     days = [datetime.date(2024, 1, 1) + datetime.timedelta(days=i) for i in range(1200)]
     days = [d for d in days if d.weekday() < 5 and d <= datetime.date(2026, 10, 27)][-420:]
     last2 = days[-2:]
-    client = FakeYahoo(quotes={'LIQ.DE': q(100.0, 50000), 'PEN.DE': q(0.5, 9_000_000), 'ETF.DE': q(50.0, 10000), 'FAR.T': q(3000.0, 400000, 'JPY'), 'UNK.Q': q(20.0, 100000)},
-                       daily={s: ('Europe/Berlin', [(d, 100.0 + i * 0.1) for i, d in enumerate(days)]) for s in ('LIQ.DE', 'ETF.DE', 'PEN.DE')},
-                       intraday={s: ('Europe/Berlin', sessions_bars('XETR', last2)) for s in ('LIQ.DE', 'ETF.DE')})
+    client = FakeYahoo(
+        quotes={'LIQ.DE': q(100.0, 50000), 'PEN.DE': q(0.5, 9_000_000), 'ETF.DE': q(50.0, 10000), 'FAR.T': q(3000.0, 400000, 'JPY'), 'UNK.Q': q(20.0, 100000)},
+        daily={s: ('Europe/Berlin', [(d, 100.0 + i * 0.1) for i, d in enumerate(days)]) for s in ('LIQ.DE', 'ETF.DE', 'PEN.DE')},
+        intraday={s: ('Europe/Berlin', sessions_bars('XETR', last2)) for s in ('LIQ.DE', 'ETF.DE')},
+    )
     yield c, client
     c.close()
 
@@ -88,17 +93,17 @@ def test_full_parcours_then_cron_only_maintains(env):
     with conn.cursor() as cur:
         cur.execute('SELECT COUNT(*) n FROM catalogue_raw')
         assert cur.fetchone()['n'] == 5 and tasks.history_coverage(conn)['complete'] == 0
-    assert statuses(conn) == {}                                         # l'import ne filtre rien et ne crée aucune cotation
+    assert statuses(conn) == {}  # l'import ne filtre rien et ne crée aucune cotation
     go(conn, client, 'fdb_filter')
     st = statuses(conn)
-    assert st['LIQ.DE'][0] == 'candidate' and 'FAR.T' not in st and 'UNK.Q' not in st      # places par défaut seulement
+    assert st['LIQ.DE'][0] == 'candidate' and 'FAR.T' not in st and 'UNK.Q' not in st  # places par défaut seulement
     go(conn, client, 'yahoo_info')
     info = settings.get(conn, 'last_stats')['yahoo_info']
     assert info['requested'] == 3 and info['recovered'] == 3 and info['missing'] == 0
     go(conn, client, 'yahoo_filter')
     st = statuses(conn)
     assert st['LIQ.DE'][0] == 'selected' and st['ETF.DE'][0] == 'selected' and st['PEN.DE'][0] == 'excluded'
-    assert len(collect.collection_set(conn)) == 2                         # catalogue final : LIQ.DE + ETF.DE
+    assert len(collect.collection_set(conn)) == 2  # catalogue final : LIQ.DE + ETF.DE
     # historiques
     go(conn, client, 'history')
     h = settings.get(conn, 'last_stats')['history']
@@ -118,7 +123,7 @@ def test_full_parcours_then_cron_only_maintains(env):
     with conn.cursor() as cur:
         cur.execute('SELECT COUNT(*) n FROM catalogue_raw')
         raw = cur.fetchone()['n']
-    later = NOW + datetime.timedelta(days=1, hours=1)                      # mercredi : clôture de la veille déjà collectée → maintenance + rien d'autre
+    later = NOW + datetime.timedelta(days=1, hours=1)  # mercredi : clôture de la veille déjà collectée → maintenance + rien d'autre
     done = tasks.tick(conn, client, later, 'cron')
     assert {k for k, _, _ in done} <= {'daily', 'intraday', 'maintenance', 'catchup'}
     assert statuses(conn) == before
@@ -134,7 +139,7 @@ def test_free_places_flow_through_the_whole_pipeline(env):
     conn, client = env
     go(conn, client, 'fdb_import')
     cfg = settings.catalogue_rules(conn)
-    cfg['markets']['values'] = sorted(set(cfg['markets']['values']) | {'XTKS', 'XQQQ'})      # places absentes du code, ajoutées sans le modifier
+    cfg['markets']['values'] = sorted(set(cfg['markets']['values']) | {'XTKS', 'XQQQ'})  # places absentes du code, ajoutées sans le modifier
     adminsvc.rules_save(conn, 'catalogue', cfg)
     go(conn, client, 'fdb_filter')
     st = statuses(conn)

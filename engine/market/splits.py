@@ -14,6 +14,7 @@ est donc corrigé.
    par passage), pour les sauts « real_move » : une déclaration tardive les fait passer en « confirmed » ; une réponse absente ou illisible n'est jamais comptée comme une vérification.
 Une chute réelle de 50 % n'est donc jamais « corrigée » : il faut une déclaration du fournisseur.
 """
+
 import datetime
 
 import pymysql.err
@@ -25,7 +26,7 @@ from engine.market.yahoo import RateLimited
 # CSH2 GBP (LU1230136894) : split 250 pour 1 le 27/10/2026 ;
 # la détection reste un candidat, seule la déclaration fournisseur confirme le split.
 COMMON_RATIOS = (1.5, 2, 2.5, 3, 4, 5, 6, 7, 8, 10, 15, 20, 25, 30, 40, 50, 100, 250)
-TOLERANCE = 0.08          # écart toléré entre le saut observé et le ratio exact (le cours bouge aussi le jour du split)
+TOLERANCE = 0.08  # écart toléré entre le saut observé et le ratio exact (le cours bouge aussi le jour du split)
 
 
 def split_ratio(price_ratio):
@@ -33,9 +34,9 @@ def split_ratio(price_ratio):
     if not price_ratio or price_ratio <= 0:
         return None
     for k in COMMON_RATIOS:
-        if abs(price_ratio * k - 1) <= TOLERANCE:               # le cours est divisé par k : split k pour 1
+        if abs(price_ratio * k - 1) <= TOLERANCE:  # le cours est divisé par k : split k pour 1
             return float(k)
-        if abs(price_ratio / k - 1) <= TOLERANCE:               # le cours est multiplié par k : regroupement 1 pour k
+        if abs(price_ratio / k - 1) <= TOLERANCE:  # le cours est multiplié par k : regroupement 1 pour k
             return 1.0 / k
     return None
 
@@ -110,21 +111,23 @@ def detect(conn, now):
             if ratio is None or not 0.00000001 <= ratio < 10000000000:
                 continue
             with conn.cursor() as cur:
-                cur.execute("INSERT IGNORE INTO split_log(listing_id,event_date,price_ratio,ratio,status,detected_at) VALUES (%s,%s,%s,%s,'detected',%s)",
-                            (r['listing_id'], day, round(pair[0] / pair[1], 8), round(ratio, 8), stamp))
+                cur.execute(
+                    "INSERT IGNORE INTO split_log(listing_id,event_date,price_ratio,ratio,status,detected_at) VALUES (%s,%s,%s,%s,'detected',%s)",
+                    (r['listing_id'], day, round(pair[0] / pair[1], 8), round(ratio, 8), stamp),
+                )
             new += 1
     conn.commit()
     return new
 
 
-RECHECK_MAX_CHECKS = 3       # réponses de Yahoo au total pour un saut : la vérification initiale et deux revérifications
-RECHECK_DELAYS = {1: 7, 2: 14}   # jours à attendre avant la 2e réponse (après la 1re), puis avant la 3e (après la 2e)
-RECHECK_WINDOW_DAYS = 60     # au-delà de 60 jours après le saut, une déclaration tardive est improbable : plus de revérification
-RECHECK_LIMIT = 30           # titres interrogés au plus par passage de maintenance (en plus de la vérification initiale)
-RECHECK_RETRY_DAYS = 3       # délai avant un nouvel essai quand Yahoo n'a pas répondu (la tentative n'est pas comptée)
+RECHECK_MAX_CHECKS = 3  # réponses de Yahoo au total pour un saut : la vérification initiale et deux revérifications
+RECHECK_DELAYS = {1: 7, 2: 14}  # jours à attendre avant la 2e réponse (après la 1re), puis avant la 3e (après la 2e)
+RECHECK_WINDOW_DAYS = 60  # au-delà de 60 jours après le saut, une déclaration tardive est improbable : plus de revérification
+RECHECK_LIMIT = 30  # titres interrogés au plus par passage de maintenance (en plus de la vérification initiale)
+RECHECK_RETRY_DAYS = 3  # délai avant un nouvel essai quand Yahoo n'a pas répondu (la tentative n'est pas comptée)
 
-DATE_TOLERANCE_DAYS = 5      # écart toléré entre la date du saut dans nos données et la date déclarée par Yahoo
-RATIO_TOLERANCE = 0.15       # le ratio déclaré doit expliquer le saut observé à 15 % près (le cours bouge aussi le jour du split)
+DATE_TOLERANCE_DAYS = 5  # écart toléré entre la date du saut dans nos données et la date déclarée par Yahoo
+RATIO_TOLERANCE = 0.15  # le ratio déclaré doit expliquer le saut observé à 15 % près (le cours bouge aussi le jour du split)
 
 
 def match_declared(declared, event_date, price_ratio):
@@ -180,7 +183,7 @@ def verify(conn, client, now, limit=150):
             declared = client.splits(events[0]['symbol'])
         except RateLimited:
             raise
-        except Exception:                                                      # noqa: BLE001 : réponse absente ou illisible : on réessaiera au prochain passage
+        except Exception:  # noqa: BLE001 : réponse absente ou illisible : on réessaiera au prochain passage
             out['unanswered'] += len(events)
             continue
         for r in events:
@@ -188,13 +191,17 @@ def verify(conn, client, now, limit=150):
             with conn.cursor() as cur:
                 if hit:
                     ratio, _ = hit
-                    cur.execute('INSERT INTO corporate_events(listing_id,event_date,kind,ratio) VALUES (%s,%s,%s,%s) ON DUPLICATE KEY UPDATE ratio=VALUES(ratio)',
-                                (lid, r['event_date'], 'split' if ratio > 1 else 'reverse_split', round(ratio, 8)))
+                    cur.execute(
+                        'INSERT INTO corporate_events(listing_id,event_date,kind,ratio) VALUES (%s,%s,%s,%s) ON DUPLICATE KEY UPDATE ratio=VALUES(ratio)',
+                        (lid, r['event_date'], 'split' if ratio > 1 else 'reverse_split', round(ratio, 8)),
+                    )
                     cur.execute("UPDATE split_log SET status='confirmed', ratio=%s, checked_at=%s WHERE listing_id=%s AND event_date=%s", (round(ratio, 8), stamp, lid, r['event_date']))
                     out['confirmed'] += 1
                 elif recheck_cols:
-                    cur.execute("UPDATE split_log SET status='real_move', checked_at=%s, checks=1, recheck_after=%s WHERE listing_id=%s AND event_date=%s",
-                                (stamp, next_recheck(1, stamp.date()), lid, r['event_date']))
+                    cur.execute(
+                        "UPDATE split_log SET status='real_move', checked_at=%s, checks=1, recheck_after=%s WHERE listing_id=%s AND event_date=%s",
+                        (stamp, next_recheck(1, stamp.date()), lid, r['event_date']),
+                    )
                     out['real_move'] += 1
                 else:
                     cur.execute("UPDATE split_log SET status='real_move', checked_at=%s WHERE listing_id=%s AND event_date=%s", (stamp, lid, r['event_date']))
@@ -214,16 +221,19 @@ def recheck(conn, client, now, limit=RECHECK_LIMIT):
     stamp = _stamp(now)
     today = stamp.date()
     with conn.cursor() as cur:
-        cur.execute("""SELECT s.listing_id, s.event_date, s.price_ratio, s.checks, l.symbol FROM split_log s JOIN listings l ON l.id=s.listing_id
+        cur.execute(
+            """SELECT s.listing_id, s.event_date, s.price_ratio, s.checks, l.symbol FROM split_log s JOIN listings l ON l.id=s.listing_id
                        WHERE s.status='real_move' AND s.checks < %s AND s.event_date >= %s AND (s.recheck_after IS NULL OR s.recheck_after <= %s)
-                       ORDER BY s.listing_id, s.event_date""", (RECHECK_MAX_CHECKS, today - datetime.timedelta(days=RECHECK_WINDOW_DAYS), today))
+                       ORDER BY s.listing_id, s.event_date""",
+            (RECHECK_MAX_CHECKS, today - datetime.timedelta(days=RECHECK_WINDOW_DAYS), today),
+        )
         rows = cur.fetchall()
     refused = manual_rejections(conn)
     by_listing = {}
     for r in rows:
         if (r['listing_id'], r['event_date']) not in refused:
             by_listing.setdefault(r['listing_id'], []).append(r)
-    todo = list(by_listing)[:max(0, limit)]
+    todo = list(by_listing)[: max(0, limit)]
     out['waiting'] = sum(len(v) for k, v in by_listing.items() if k not in todo)
     for lid in todo:
         events = by_listing[lid]
@@ -231,10 +241,11 @@ def recheck(conn, client, now, limit=RECHECK_LIMIT):
             declared = client.splits(events[0]['symbol'])
         except RateLimited:
             raise
-        except Exception:                                                      # noqa: BLE001 : réponse absente ou illisible : ni confirmation ni vérification comptée
+        except Exception:  # noqa: BLE001 : réponse absente ou illisible : ni confirmation ni vérification comptée
             with conn.cursor() as cur:
-                cur.executemany('UPDATE split_log SET recheck_after=%s WHERE listing_id=%s AND event_date=%s',
-                                [(today + datetime.timedelta(days=RECHECK_RETRY_DAYS), lid, r['event_date']) for r in events])
+                cur.executemany(
+                    'UPDATE split_log SET recheck_after=%s WHERE listing_id=%s AND event_date=%s', [(today + datetime.timedelta(days=RECHECK_RETRY_DAYS), lid, r['event_date']) for r in events]
+                )
             conn.commit()
             out['unanswered'] += len(events)
             continue
@@ -243,15 +254,20 @@ def recheck(conn, client, now, limit=RECHECK_LIMIT):
             with conn.cursor() as cur:
                 if hit:
                     ratio, _ = hit
-                    cur.execute('INSERT INTO corporate_events(listing_id,event_date,kind,ratio) VALUES (%s,%s,%s,%s) ON DUPLICATE KEY UPDATE ratio=VALUES(ratio)',
-                                (lid, r['event_date'], 'split' if ratio > 1 else 'reverse_split', round(ratio, 8)))
-                    cur.execute("UPDATE split_log SET status='confirmed', ratio=%s, checked_at=%s, checks=checks+1, recheck_after=NULL WHERE listing_id=%s AND event_date=%s",
-                                (round(ratio, 8), stamp, lid, r['event_date']))
+                    cur.execute(
+                        'INSERT INTO corporate_events(listing_id,event_date,kind,ratio) VALUES (%s,%s,%s,%s) ON DUPLICATE KEY UPDATE ratio=VALUES(ratio)',
+                        (lid, r['event_date'], 'split' if ratio > 1 else 'reverse_split', round(ratio, 8)),
+                    )
+                    cur.execute(
+                        "UPDATE split_log SET status='confirmed', ratio=%s, checked_at=%s, checks=checks+1, recheck_after=NULL WHERE listing_id=%s AND event_date=%s",
+                        (round(ratio, 8), stamp, lid, r['event_date']),
+                    )
                     out['confirmed'] += 1
                 else:
                     checks = r['checks'] + 1
-                    cur.execute('UPDATE split_log SET checked_at=%s, checks=%s, recheck_after=%s WHERE listing_id=%s AND event_date=%s',
-                                (stamp, checks, next_recheck(checks, today), lid, r['event_date']))
+                    cur.execute(
+                        'UPDATE split_log SET checked_at=%s, checks=%s, recheck_after=%s WHERE listing_id=%s AND event_date=%s', (stamp, checks, next_recheck(checks, today), lid, r['event_date'])
+                    )
                     out['rechecked'] += 1
         conn.commit()
     return out

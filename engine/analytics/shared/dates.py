@@ -1,4 +1,5 @@
 """Dates sérialisées pour l'interface."""
+
 import datetime
 
 

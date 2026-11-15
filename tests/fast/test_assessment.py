@@ -1,4 +1,5 @@
 """Résumé du profil : appréciation descriptive, période sur les pastilles, filtres de niveau (masquage seul, sans effet sur rang ni score)."""
+
 import pathlib
 
 from engine.analytics.admin import service
@@ -19,9 +20,9 @@ def pills(r2=0.9, vol=1.0, dd=10.0, daily=10_000_000.0, ref=21, quality='ok'):
 def test_pills_name_the_period_they_really_measure():
     reg, risk, liq, _ = pills()
     assert (reg['period'], risk['period']) == ('1 mois', '1 mois')
-    assert liq['period'] == '3 mois'                                  # volume moyen 3 mois, quelle que soit la période de la stratégie
+    assert liq['period'] == '3 mois'  # volume moyen 3 mois, quelle que soit la période de la stratégie
     assert signals.regularity(0.9, 63)['period'] == '3 mois' and signals.risk(1, 1, 252)['period'] == '1 an'
-    assert signals.regularity(None, 21)['period'] == '1 mois'         # même inconnue, la pastille dit sa période
+    assert signals.regularity(None, 21)['period'] == '1 mois'  # même inconnue, la pastille dit sa période
 
 
 def test_a_strong_rise_with_everything_favourable_is_very_favourable():
@@ -32,7 +33,7 @@ def test_a_strong_rise_with_everything_favourable_is_very_favourable():
 
 
 def test_a_strong_rise_is_never_favourable_when_a_risk_is_important():
-    for bad in (dict(vol=6.0, dd=60.0), dict(r2=0.2), dict(daily=1_000.0)):          # volatilité forte, hausse irrégulière, négociabilité limitée
+    for bad in (dict(vol=6.0, dd=60.0), dict(r2=0.2), dict(daily=1_000.0)):  # volatilité forte, hausse irrégulière, négociabilité limitée
         a = signals.assessment(measures(), 21, pills(**bad))
         assert a['code'] == 'mixed' and 'risque important' in a['reason'], bad
     a = signals.assessment(measures(), 21, pills(vol=6.0, dd=60.0, r2=0.2))
@@ -42,15 +43,15 @@ def test_a_strong_rise_is_never_favourable_when_a_risk_is_important():
 
 
 def test_one_vigilance_point_keeps_favourable_but_two_make_it_mixed():
-    one = signals.assessment(measures(), 21, pills(vol=2.0))                                 # volatilité modérée
+    one = signals.assessment(measures(), 21, pills(vol=2.0))  # volatilité modérée
     assert one['code'] == 'favorable' and any('volatilité modérée' in c for c in one['cautions'])
-    two = signals.assessment(measures(), 21, pills(vol=2.0, daily=2_000_000.0))              # + négociabilité à surveiller
+    two = signals.assessment(measures(), 21, pills(vol=2.0, daily=2_000_000.0))  # + négociabilité à surveiller
     assert two['code'] == 'mixed' and '2 points de vigilance' in two['reason']
 
 
 def test_texts_keep_their_units_and_never_give_advice():
     a = signals.assessment(measures(), 21, pills(daily=2_300_000.0))
-    assert any('2,3 M€' in c for c in a['cautions'])                                         # « M€ » jamais mis en minuscules
+    assert any('2,3 M€' in c for c in a['cautions'])  # « M€ » jamais mis en minuscules
     text = ' '.join([a['label'], a['reason'], a['closing']] + a['strengths'] + a['cautions']).lower()
     assert 'acheter' not in text.replace('conseil d’achat', '') and 'vendre' not in text.replace('de vente', '')
 
@@ -61,9 +62,9 @@ def test_a_falling_curve_is_unfavourable_and_missing_data_is_undetermined():
     short = signals.assessment(measures(), 21, pills(quality='insufficient'))
     assert short['code'] == 'undetermined' and 'historique court' in short['reason']
     broke = signals.assessment(measures(), 21, pills(quality='break'))
-    assert broke['code'] == 'mixed' and 'rupture de cours' in broke['cautions']                  # période mesurée : la rupture est un risque important, pas un motif d'ignorer la mesure
+    assert broke['code'] == 'mixed' and 'rupture de cours' in broke['cautions']  # période mesurée : la rupture est un risque important, pas un motif d'ignorer la mesure
     unknown = signals.assessment(measures(), 21, [signals.regularity(None, 21), signals.risk(None, None, 21), signals.liquidity(1e7, 'equity', None, 1)])
-    assert unknown['code'] == 'undetermined'                                                  # deux indicateurs inconnus : rien n'est supposé
+    assert unknown['code'] == 'undetermined'  # deux indicateurs inconnus : rien n'est supposé
 
 
 def test_one_unknown_indicator_never_gives_very_favourable_and_stays_listed_as_unknown():
@@ -78,7 +79,7 @@ def test_a_recent_drop_contradicting_the_background_trend_is_reported_and_caps_t
     assert a['code'] == 'mixed' and any('repli récent' in c for c in a['cautions'])
     rebound = signals.contradiction(measures(week=(1, 1, 3), month=(1, 1, 14.0), quarter=(1, 1, 5.0), year=(-0.2, 0.5, -30.0)))
     assert rebound['kind'] == 'rise'
-    assert signals.contradiction(measures(year=None, quarter=None)) is None                  # sans mesure de fond, rien n'est affirmé
+    assert signals.contradiction(measures(year=None, quarter=None)) is None  # sans mesure de fond, rien n'est affirmé
 
 
 def test_an_extreme_rise_is_flagged_and_cannot_be_very_favourable():
@@ -110,11 +111,11 @@ def test_level_filters_only_hide_and_never_change_rank_score_or_order():
     assert [e['id'] for e in kept] == [0, 2, 4, 5] and [(e['rank'], e['score']) for e in kept] == [(1, 100), (3, 98), (5, 96), (6, 95)]
     assert counts['regularity'] == {'ok': 4, 'bad': 2}
     allrows, _ = service.level_filtered_rows(base, aux_for(levels), 21, None, {})
-    assert allrows == base                                                                    # aucun choix : rien n'est masqué
+    assert allrows == base  # aucun choix : rien n'est masqué
     both, _ = service.level_filtered_rows(base, aux_for(levels), 21, None, {'regularity': {'ok'}, 'liquidity': {'bad'}})
-    assert both == []                                                                         # les filtres se cumulent
+    assert both == []  # les filtres se cumulent
     exact, _ = service.level_filtered_rows(base, aux_for(levels), 21, None, {'regularity': {'ok'}}, query='s1')
-    assert 1 in [e['id'] for e in exact]                                                      # un titre retrouvé par son symbole exact n'est jamais masqué
+    assert 1 in [e['id'] for e in exact]  # un titre retrouvé par son symbole exact n'est jamais masqué
 
 
 def test_existing_assessment_is_preserved_in_the_full_sheet():

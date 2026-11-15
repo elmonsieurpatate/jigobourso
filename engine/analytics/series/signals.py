@@ -6,20 +6,21 @@ insuffisant, OU « rien détecté » : une absence de problème détecté n'est 
 Les seuils reprennent les critères existants : régularité = niveaux de R² des profils (strategy.R2_LEVELS), risque = profil « faible volatilité » (1,5 % par séance, repli 20 %),
 liquidité = minima du préfiltre (réglables dans l'administration) multipliés par 4.
 """
+
 import math
 
 from ..shared.text import fr
 from ..shared.numbers import finite
 from ..explorer import strategy
 
-R2_OK = strategy.R2_LEVELS['balanced']        # 0,75
-R2_WARN = strategy.R2_LEVELS['flexible']      # 0,556 : seuil du profil « croissance régulière »
-VOL_OK, DD_OK = 1.5, 20.0                     # profil « faible volatilité »
-RISK_FACTOR = 2.0                             # orange jusqu'à deux fois ces seuils
-LIQ_FACTOR = 4.0                              # vert à partir de quatre fois le minimum du préfiltre
+R2_OK = strategy.R2_LEVELS['balanced']  # 0,75
+R2_WARN = strategy.R2_LEVELS['flexible']  # 0,556 : seuil du profil « croissance régulière »
+VOL_OK, DD_OK = 1.5, 20.0  # profil « faible volatilité »
+RISK_FACTOR = 2.0  # orange jusqu'à deux fois ces seuils
+LIQ_FACTOR = 4.0  # vert à partir de quatre fois le minimum du préfiltre
 DEFAULT_MIN_LIQUIDITY = {'etf': 250_000.0, 'equity': 1_000_000.0}
-TOP10_WARN, TOP10_BAD = 40.0, 70.0            # poids des dix premières lignes d'un ETF
-FAMILY_WARN, FAMILY_BAD = 30.0, 50.0          # part de la valeur d'un portefeuille dans une même famille d'ETF
+TOP10_WARN, TOP10_BAD = 40.0, 70.0  # poids des dix premières lignes d'un ETF
+FAMILY_WARN, FAMILY_BAD = 30.0, 50.0  # part de la valeur d'un portefeuille dans une même famille d'ETF
 
 
 def sig(key, level, label, text, tip=None, **extra):
@@ -54,7 +55,7 @@ def regularity(r2, sessions=None, extra=''):
 
 def risk(vol, dd, sessions=None):
     vol, dd, win, period = finite(vol), finite(dd), f' sur {sessions} séances' if sessions else '', period_label(sessions)
-    tip = (f'Vert : variation ≤ {VOL_OK:g} %/séance et repli ≤ {DD_OK:g} % (profil « faible volatilité») · orange : jusqu\'à {RISK_FACTOR:g} fois · rouge : au-delà.')
+    tip = f'Vert : variation ≤ {VOL_OK:g} %/séance et repli ≤ {DD_OK:g} % (profil « faible volatilité») · orange : jusqu\'à {RISK_FACTOR:g} fois · rouge : au-delà.'
     if vol is None and dd is None:
         return sig('risk', 'unknown', 'Volatilité inconnue', 'Volatilité et repli non calculables.', tip, period=period)
     parts = []
@@ -72,9 +73,9 @@ def risk(vol, dd, sessions=None):
     return sig('risk', 'bad', 'Volatilité forte', text, tip, period=period)
 
 
-LIQUIDITY_PERIOD = '3 mois'                    # vraie durée de la mesure (volume moyen 3 mois × cours), indépendante de la période de la stratégie
-STALE_QUOTE_DAYS = 10                          # un volume moyen plus ancien n'est plus une preuve : « non déterminée », jamais « peu négociable »
-FLOOR_FACTOR = 2.0                             # sous 2 fois le minimum du préfiltre (ordre de 10 000 € ≤ 0,5 % de la valeur d'un jour pour une action, ≤ 2 % pour un ETF) : négociabilité limitée
+LIQUIDITY_PERIOD = '3 mois'  # vraie durée de la mesure (volume moyen 3 mois × cours), indépendante de la période de la stratégie
+STALE_QUOTE_DAYS = 10  # un volume moyen plus ancien n'est plus une preuve : « non déterminée », jamais « peu négociable »
+FLOOR_FACTOR = 2.0  # sous 2 fois le minimum du préfiltre (ordre de 10 000 € ≤ 0,5 % de la valeur d'un jour pour une action, ≤ 2 % pour un ETF) : négociabilité limitée
 
 
 def liquidity_levels(kind, prefilter=None):
@@ -108,22 +109,32 @@ def row_signals(aux, kind, ref_sessions, prefilter=None, quote_age_days=None):
     """Les trois pastilles d'une ligne de classement, depuis les mesures de la fenêtre de référence (les mêmes que les colonnes du tableau)."""
     aux = aux or {}
     price, volume = finite(aux.get('price_eur')), finite(aux.get('volume'))
-    return [regularity(aux.get('r2'), ref_sessions), risk(aux.get('volatility'), aux.get('drawdown'), ref_sessions),
-            liquidity(price * volume if price is not None and volume is not None else None, kind, prefilter, quote_age_days)]
+    return [
+        regularity(aux.get('r2'), ref_sessions),
+        risk(aux.get('volatility'), aux.get('drawdown'), ref_sessions),
+        liquidity(price * volume if price is not None and volume is not None else None, kind, prefilter, quote_age_days),
+    ]
 
 
 # ───────── appréciation globale (descriptive) ─────────
 # Aucune formule de score : un petit jeu de règles lisibles, appliqué aux indicateurs qui existent déjà (pente et performance de la fenêtre de la stratégie, pastilles de
 # régularité / volatilité / négociabilité, qualité des données). Ce n'est ni un conseil d'achat ou de vente, ni une entrée du score, du filtre ou du classement.
-APPRECIATIONS = {'very_favorable': ('Très favorable', 'ok'), 'favorable': ('Favorable', 'ok'), 'mixed': ('Mitigé', 'warn'), 'unfavorable': ('Défavorable', 'bad'), 'undetermined': ('Indéterminé', 'unknown')}
+APPRECIATIONS = {
+    'very_favorable': ('Très favorable', 'ok'),
+    'favorable': ('Favorable', 'ok'),
+    'mixed': ('Mitigé', 'warn'),
+    'unfavorable': ('Défavorable', 'bad'),
+    'undetermined': ('Indéterminé', 'unknown'),
+}
 APPRECIATION_RULES = [
     ('Très favorable', 'hausse forte sur la période de la stratégie, avec régularité, volatilité et négociabilité toutes favorables et aucun autre point de vigilance.'),
     ('Favorable', 'hausse sur la période, aucun risque important et au plus un point de vigilance.'),
     ('Mitigé', 'hausse mais avec un ou deux risques importants, plusieurs points de vigilance, une tendance récente qui contredit celle de fond, ou pas de tendance nette.'),
     ('Défavorable', 'courbe en baisse sur la période, ou trois risques importants ou plus.'),
-    ('Indéterminé', 'mesures absentes, historique trop court ou plusieurs indicateurs non évaluables : rien n’est supposé.')]
-EXTREME_RISE = 100.0          # hausse (%) sur la période de la stratégie à partir de laquelle on signale qu'un mouvement aussi rapide peut se retourner vite
-BACKGROUND_MOVE, RECENT_DROP, RECENT_RISE = 10.0, -5.0, 10.0        # tendance de fond (%), repli récent (%), rebond récent (%) qui rendent la tendance « contradictoire »
+    ('Indéterminé', 'mesures absentes, historique trop court ou plusieurs indicateurs non évaluables : rien n’est supposé.'),
+]
+EXTREME_RISE = 100.0  # hausse (%) sur la période de la stratégie à partir de laquelle on signale qu'un mouvement aussi rapide peut se retourner vite
+BACKGROUND_MOVE, RECENT_DROP, RECENT_RISE = 10.0, -5.0, 10.0  # tendance de fond (%), repli récent (%), rebond récent (%) qui rendent la tendance « contradictoire »
 CLOSING = 'Une tendance peut s’arrêter à tout moment : cette appréciation décrit le profil observé, ce n’est pas un conseil d’achat ou de vente.'
 
 
@@ -155,7 +166,10 @@ def contradiction(measures):
             if long <= short or perf.get(short) is None or perf.get(long) is None:
                 continue
             if perf[long] >= BACKGROUND_MOVE and perf[short] <= RECENT_DROP:
-                return {'kind': 'drop', 'text': f'Repli récent ({_pct(perf[short])} sur {period_label(short)}) alors que la tendance de fond est à la hausse ({_pct(perf[long])} sur {period_label(long)}).'}
+                return {
+                    'kind': 'drop',
+                    'text': f'Repli récent ({_pct(perf[short])} sur {period_label(short)}) alors que la tendance de fond est à la hausse ({_pct(perf[long])} sur {period_label(long)}).',
+                }
             if perf[long] <= -BACKGROUND_MOVE and perf[short] >= RECENT_RISE:
                 return {'kind': 'rise', 'text': f'Rebond récent ({_pct(perf[short])} sur {period_label(short)}) dans une tendance de fond à la baisse ({_pct(perf[long])} sur {period_label(long)}).'}
     return None
@@ -176,7 +190,7 @@ def assessment(measures, ref, pills, quality=None):
     trend, period, perf, slope, r2 = trend_class(m.get('slope'), m.get('perf')), period_label(ref), finite(m.get('perf')), finite(m.get('slope')), finite(m.get('r2'))
     reg, rsk, liq, data, spec = (by_key.get(k) for k in ('regularity', 'risk', 'liquidity', 'data', 'risks'))
     up = trend in ('strong', 'steady', 'gentle')
-    strengths, cautions, unknowns, big, minor = [], [], [], [], []       # big : risques importants (rouge) ; minor : points de vigilance (orange)
+    strengths, cautions, unknowns, big, minor = [], [], [], [], []  # big : risques importants (rouge) ; minor : points de vigilance (orange)
 
     def note(level, short, long):
         cautions.append(long)
@@ -250,14 +264,27 @@ def assessment(measures, ref, pills, quality=None):
         code, reason = 'mixed', f'{len(minor)} points de vigilance : ' + ', '.join(minor[:3]) + '.'
     label, level = APPRECIATIONS[code]
     facts = [f'Période de la stratégie : {period}. Pente {fr(slope, 3)} %/séance, performance {_pct(perf)}.'] if trend is not None else []
-    return {'code': code, 'level': level, 'label': label, 'period': period, 'reason': reason, 'strengths': strengths, 'cautions': cautions, 'unknowns': unknowns,
-            'contradiction': contra, 'horizons': horizons, 'facts': facts, 'rules': [{'label': l, 'rule': r} for l, r in APPRECIATION_RULES], 'closing': CLOSING,
-            'nothing_flagged': not cautions and not unknowns and code != 'undetermined'}
+    return {
+        'code': code,
+        'level': level,
+        'label': label,
+        'period': period,
+        'reason': reason,
+        'strengths': strengths,
+        'cautions': cautions,
+        'unknowns': unknowns,
+        'contradiction': contra,
+        'horizons': horizons,
+        'facts': facts,
+        'rules': [{'label': l, 'rule': r} for l, r in APPRECIATION_RULES],
+        'closing': CLOSING,
+        'nothing_flagged': not cautions and not unknowns and code != 'undetermined',
+    }
 
 
 def history_facts(closes, sessions):
     """Détails pédagogiques de la fiche : part de séances en hausse et poids du meilleur jour dans la hausse (cours de la fenêtre, jamais d'interpolation)."""
-    c = [x for x in closes[-(sessions + 1):] if x and x > 0]
+    c = [x for x in closes[-(sessions + 1) :] if x and x > 0]
     if len(c) < 10:
         return {}
     steps = [math.log(c[i + 1] / c[i]) for i in range(len(c) - 1)]
@@ -282,7 +309,14 @@ def data_quality(quality, corrections, price_stale, break_dates=None, coverage=N
     if quality == 'insufficient':
         return sig('data', 'unknown', 'Historique court', 'Moins de 22 clôtures : les mesures sont peu fiables ou absentes.', tip)
     if quality == 'break':
-        return sig('data', 'bad', 'Rupture de cours', 'Un saut de cours inhabituel (variation de plus de ×1,6 ou de moins de ÷1,6 en une séance) dans l\'année rend certaines périodes non évaluables par prudence : son origine (split non ajusté, erreur de données ou vrai mouvement) n\'est pas établie' + (f' (dates : {break_dates}).' if break_dates else '.'), tip)
+        return sig(
+            'data',
+            'bad',
+            'Rupture de cours',
+            'Un saut de cours inhabituel (variation de plus de ×1,6 ou de moins de ÷1,6 en une séance) dans l\'année rend certaines périodes non évaluables par prudence : son origine (split non ajusté, erreur de données ou vrai mouvement) n\'est pas établie'
+            + (f' (dates : {break_dates}).' if break_dates else '.'),
+            tip,
+        )
     if quality == 'stale' or price_stale:
         return sig('data', 'warn', 'Cours ancien', 'La dernière clôture ou le dernier cours est plus ancien que prévu pour cette place.', tip)
     if quality == 'incomplete':
@@ -307,9 +341,21 @@ def similarity(analysis):
     close = [s for s in sim if 0.90 <= s['coefficient'] < 0.97]
     unstable = any(not s.get('stable', True) for s in twins + close)
     if twins:
-        return sig('similarity', 'warn', f'{len(twins)} ETF quasi identique{"s" if len(twins) > 1 else ""}', 'Évolue presque exactement comme ' + ', '.join(s['symbol'] for s in twins[:3]) + '.' + (' Résultat instable sur la période.' if unstable else ''), tip)
+        return sig(
+            'similarity',
+            'warn',
+            f'{len(twins)} ETF quasi identique{"s" if len(twins) > 1 else ""}',
+            'Évolue presque exactement comme ' + ', '.join(s['symbol'] for s in twins[:3]) + '.' + (' Résultat instable sur la période.' if unstable else ''),
+            tip,
+        )
     if close:
-        return sig('similarity', 'warn', f'{len(close)} ETF très proche{"s" if len(close) > 1 else ""}', 'Évolue de façon très proche de ' + ', '.join(s['symbol'] for s in close[:3]) + '.' + (' Résultat instable sur la période.' if unstable else ''), tip)
+        return sig(
+            'similarity',
+            'warn',
+            f'{len(close)} ETF très proche{"s" if len(close) > 1 else ""}',
+            'Évolue de façon très proche de ' + ', '.join(s['symbol'] for s in close[:3]) + '.' + (' Résultat instable sur la période.' if unstable else ''),
+            tip,
+        )
     return sig('similarity', 'unknown', 'Aucun jumeau détecté', 'Aucun ETF comparable avec une corrélation de 0,90 ou plus (cela ne prouve pas une bonne diversification).', tip)
 
 
@@ -333,7 +379,9 @@ def specific_risks(name, category, leveraged_name=False):
     if leveraged_name:
         return sig('risks', 'bad', 'Levier ou inverse', 'Le nom indique un effet de levier ou une exposition inverse : la performance dérive de celle de l\'indice sur la durée.', tip)
     if cat in ('commodities', 'derivatives'):
-        return sig('risks', 'warn', 'Matières premières / dérivés', 'Catégorie « ' + category + ' » : ces fonds peuvent utiliser des contrats à terme ; leur rendement n\'est pas celui d\'actions.', tip)
+        return sig(
+            'risks', 'warn', 'Matières premières / dérivés', 'Catégorie « ' + category + ' » : ces fonds peuvent utiliser des contrats à terme ; leur rendement n\'est pas celui d\'actions.', tip
+        )
     return sig('risks', 'unknown', 'Aucun risque spécifique détecté', 'Aucun point de vigilance trouvé par ces contrôles. Cela ne signifie pas « sans risque ».', tip)
 
 

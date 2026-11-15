@@ -1,4 +1,5 @@
 """Classement par catégorie et courbes (administration des scores V4) : rang général inchangé par la catégorie, courbes réelles seulement."""
+
 import json
 import os
 
@@ -9,9 +10,15 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 
 
 class Cur:
-    def __init__(self, conn): self.c = conn
-    def __enter__(self): return self
-    def __exit__(self, *a): return False
+    def __init__(self, conn):
+        self.c = conn
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
     def execute(self, sql, args=()):
         self.c.sql = sql
         if 'corporate_events' in sql:
@@ -19,21 +26,27 @@ class Cur:
         elif 'daily_prices' in sql:
             ids = [a for a in args if isinstance(a, int)]
             import datetime
-            self.rows = [{'listing_id': i, 'price_date': datetime.date(2026, 9, 1) + datetime.timedelta(days=k), 'close_px': 100 + k, 'adj_close_px': 100 + k} for i in ids for k in range(self.c.points)]
+
+            self.rows = [
+                {'listing_id': i, 'price_date': datetime.date(2026, 9, 1) + datetime.timedelta(days=k), 'close_px': 100 + k, 'adj_close_px': 100 + k} for i in ids for k in range(self.c.points)
+            ]
         else:
             ids = list(args)
             self.rows = [{'id': i, 'symbol': 'S%d' % i, 'mic': 'XPAR', 'name': 'N%d' % i, 'kind': 'equity', 'isin': None} for i in ids]
-    def fetchall(self): return self.rows
+
+    def fetchall(self):
+        return self.rows
 
 
 class Conn:
     points = 40
-    def cursor(self): return Cur(self)
+
+    def cursor(self):
+        return Cur(self)
 
 
 def book(values):
-    return {i: dict(id=i, simple=v, complex=None if v is None else v / 2, simple_status='ok', complex_status='ok', simple_coverage=1, complex_coverage=1)
-            for i, v in enumerate(values, 1)}
+    return {i: dict(id=i, simple=v, complex=None if v is None else v / 2, simple_status='ok', complex_status='ok', simple_coverage=1, complex_coverage=1) for i, v in enumerate(values, 1)}
 
 
 def cats():
@@ -44,7 +57,8 @@ def cats():
 def test_series_keeps_last_sessions_plus_one_and_never_invents():
     out = scores_ranking.series(Conn(), [1, 2], 21)
     assert len(out[1]) == 22 and out[1][-1] == 139
-    short = Conn(); short.points = 3
+    short = Conn()
+    short.points = 3
     assert len(scores_ranking.series(short, [1], 21)[1]) == 3
     assert scores_ranking.series(Conn(), [], 21) == {} and scores_ranking.series(Conn(), [1], 0) == {1: []}
 
@@ -76,16 +90,20 @@ def test_rank_of_and_suggestions_carry_scores_and_curve():
 
 def test_dated_series_has_iso_dates_and_prices():
     import datetime
+
     class C2(Conn):
         def cursor(self):
             c = Cur(self)
             orig = c.execute
+
             def ex(sql, args=()):
                 orig(sql, args)
                 if 'daily_prices' in sql:
                     c.rows = [{'listing_id': 1, 'price_date': datetime.date(2026, 10, 1) + datetime.timedelta(days=k), 'close_px': 100 + k, 'adj_close_px': 100 + k} for k in range(30)]
+
             c.execute = ex
             return c
+
     out = scores_ranking.dated_series(C2(), 1, 21)
     assert len(out) == 22 and out[-1] == {'d': '2026-10-30', 'p': 129.0} and out[0]['d'] == '2026-10-09'
     assert scores_ranking.dated_series(C2(), 1, 0) == []

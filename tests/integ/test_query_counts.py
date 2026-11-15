@@ -1,5 +1,6 @@
 """Étape 9 : mesure des requêtes SQL par appel d'API (recherche de N+1). Les plafonds ci-dessous sont les mesures du 14/11 avec une marge ; ils
 décrivent le contrat actuel (docs/DATA_CONTRACT.md) et signalent toute dérive."""
+
 import os
 
 import pytest
@@ -27,7 +28,7 @@ def cost(client, route, params=''):
     before = questions()
     status, _ = client.call(route, params=params)
     assert status == 200
-    return questions() - before - 2                          # les deux lectures de mesure elles-mêmes
+    return questions() - before - 2  # les deux lectures de mesure elles-mêmes
 
 
 def test_portfolio_list_grows_linearly_and_detail_is_bounded(world):
@@ -42,8 +43,8 @@ def test_portfolio_list_grows_linearly_and_detail_is_bounded(world):
     two = cost(a, 'portfolios')
     per_portfolio = two - one
     print(f'portefeuilles : {one} requêtes ; +1 portefeuille = +{per_portfolio}')
-    assert 0 < per_portfolio <= 12                          # coût fixe par portefeuille (valorisation) : linéaire, connu
-    cost(a, 'portfolio', f'&id={ids[0]}')                    # appel d'échauffement : le premier appel d'une session coûte davantage (43 contre 33 requêtes)
+    assert 0 < per_portfolio <= 12  # coût fixe par portefeuille (valorisation) : linéaire, connu
+    cost(a, 'portfolio', f'&id={ids[0]}')  # appel d'échauffement : le premier appel d'une session coûte davantage (43 contre 33 requêtes)
     detail = cost(a, 'portfolio', f'&id={ids[0]}')
     print(f'détail d’un portefeuille : {detail} requêtes')
     assert detail <= 60
@@ -58,6 +59,7 @@ def test_engine_route_reports_its_timing_breakdown(world):
     """Une lenteur doit être attribuable : attente d'emplacement, moteur Python, décodage, total (en-tête Server-Timing)."""
     import re
     import urllib.request
+
     a = login(world, 'alice', 'alice-secret-1234')
     req = urllib.request.Request(f'{world}/api.php?r=strategy/presets')
     resp = a.opener.open(req, timeout=60)

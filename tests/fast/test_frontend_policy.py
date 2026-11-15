@@ -1,4 +1,5 @@
 """Politique de sécurité du front : aucun script en ligne (donc CSP sans 'unsafe-inline' pour les scripts), en-têtes présents."""
+
 import glob
 import os
 import re
@@ -56,7 +57,10 @@ def test_no_inline_style_attribute_in_scripts_or_pages():
 
 # Interpolations nues d'un champ de texte libre : chacune a été relue, la sortie est du texte (J.confirm échappe, messages via textContent).
 REVIEWED_FREE_TEXT = {
-    ('admin-categories-model.js', '${other.name}'), ('filtres.js', '${category.name}'), ('filtres.js', '${filter().name}'), ('splits.js', '${row.symbol}'),
+    ('admin-categories-model.js', '${other.name}'),
+    ('filtres.js', '${category.name}'),
+    ('filtres.js', '${filter().name}'),
+    ('splits.js', '${row.symbol}'),
 }
 
 

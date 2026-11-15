@@ -16,10 +16,10 @@ if not os.environ.get('JIGO_TEST_DATABASE'):
 
 NOW = datetime.datetime(2026, 10, 28, 2, 10, tzinfo=datetime.timezone.utc)
 
+
 @pytest.fixture(autouse=True)
 def fixed_market_clock(monkeypatch):
     monkeypatch.setattr(service.hours, 'utcnow', lambda: NOW)
-
 
 
 def seed(conn):
@@ -33,11 +33,17 @@ def seed(conn):
         d -= datetime.timedelta(days=1)
     days.reverse()
     with conn.cursor() as cur:
-        cur.execute("INSERT INTO instruments(id,group_key,kind,name,country) VALUES (1,'sym:XETR:A.DE','equity','Hausse nette','Germany'),(2,'sym:XETR:B.DE','equity','Plate','Germany'),(3,'sym:XETR:C.DE','etf','Fonds sain',NULL)")
-        cur.execute("INSERT INTO listings(id,instrument_id,mic,symbol,currency,status,is_primary) VALUES (1,1,'XETR','A.DE','EUR','selected',1),(2,2,'XETR','B.DE','EUR','selected',1),(3,3,'XETR','C.DE','EUR','selected',1)")
+        cur.execute(
+            "INSERT INTO instruments(id,group_key,kind,name,country) VALUES (1,'sym:XETR:A.DE','equity','Hausse nette','Germany'),(2,'sym:XETR:B.DE','equity','Plate','Germany'),(3,'sym:XETR:C.DE','etf','Fonds sain',NULL)"
+        )
+        cur.execute(
+            "INSERT INTO listings(id,instrument_id,mic,symbol,currency,status,is_primary) VALUES (1,1,'XETR','A.DE','EUR','selected',1),(2,2,'XETR','B.DE','EUR','selected',1),(3,3,'XETR','C.DE','EUR','selected',1)"
+        )
         for lid, growth in ((1, 1.004), (2, 1.0), (3, 1.002)):
-            cur.executemany('INSERT INTO daily_prices(listing_id,price_date,close_px) VALUES (%s,%s,%s)',
-                            [(lid, day, round(100 * growth ** i * (1 + (0.0005 if i % 2 else -0.0005) * (lid != 2)), 6)) for i, day in enumerate(days)])
+            cur.executemany(
+                'INSERT INTO daily_prices(listing_id,price_date,close_px) VALUES (%s,%s,%s)',
+                [(lid, day, round(100 * growth**i * (1 + (0.0005 if i % 2 else -0.0005) * (lid != 2)), 6)) for i, day in enumerate(days)],
+            )
     conn.commit()
     compute.compute_all(conn, NOW)
 
@@ -75,22 +81,22 @@ def test_explorer_cache_is_identical_and_invalidated():
     first = service.explore(conn, request)
     with conn.cursor() as cur:
         cur.execute('SELECT COUNT(*) n FROM result_cache')
-        assert cur.fetchone()['n'] == 2                                 # verdicts de la configuration + scores globaux (indépendants des filtres)
-    assert service.explore(conn, request) == first                      # lecture du cache
+        assert cur.fetchone()['n'] == 2  # verdicts de la configuration + scores globaux (indépendants des filtres)
+    assert service.explore(conn, request) == first  # lecture du cache
     with conn.cursor() as cur:
         cur.execute('DELETE FROM result_cache')
     conn.commit()
-    assert service.explore(conn, request) == first                      # recalcul complet : même résultat
+    assert service.explore(conn, request) == first  # recalcul complet : même résultat
     version = universe_verdicts.data_version(conn)
     with conn.cursor() as cur:
         cur.execute("INSERT INTO jobs(job_type,status,started_at,finished_at) VALUES ('nightly','completed',%s,%s)", (datetime.datetime.utcnow(),) * 2)
     conn.commit()
-    assert universe_verdicts.data_version(conn) != version                        # un traitement terminé invalide le cache
+    assert universe_verdicts.data_version(conn) != version  # un traitement terminé invalide le cache
     with conn.cursor() as cur:
         cur.execute("UPDATE listings SET status='excluded', excluded_reason='test' WHERE id=1")
     conn.commit()
     after = service.explore(conn, request)
-    assert 1 not in [r['id'] for r in after['rows']]                    # exclu : jamais proposé, cache ou pas
+    assert 1 not in [r['id'] for r in after['rows']]  # exclu : jamais proposé, cache ou pas
 
 
 def test_explorer_filters_sorts_and_reasons():
@@ -103,19 +109,20 @@ def test_explorer_filters_sorts_and_reasons():
 
     def run(**view):
         return service.explore(conn, dict(base, view=dict({'status': 'all', 'page_size': 50}, **view)))
+
     everyone = run()
     assert everyone['total'] == 3 and everyone['ref_sessions'] == 63
     assert {r['symbol'] for r in run(kind='etf')['rows']} == {'C.DE'}
-    assert {r['symbol'] for r in run(budget=1)['rows']} == set()                    # budget inférieur à tout prix : rien
-    assert {r['symbol'] for r in run(budget=150)['rows']} == {'B.DE', 'C.DE'}          # budget : prix d'une part inférieur ou égal
+    assert {r['symbol'] for r in run(budget=1)['rows']} == set()  # budget inférieur à tout prix : rien
+    assert {r['symbol'] for r in run(budget=150)['rows']} == {'B.DE', 'C.DE'}  # budget : prix d'une part inférieur ou égal
     by_slope = [r['symbol'] for r in run(sort='slope', dir='desc')['rows']]
-    assert by_slope[0] == 'A.DE' and by_slope[-1] == 'B.DE'                          # tri par colonne : la plus forte pente d'abord
+    assert by_slope[0] == 'A.DE' and by_slope[-1] == 'B.DE'  # tri par colonne : la plus forte pente d'abord
     assert run(sort='slope', dir='asc')['rows'][0]['symbol'] == 'B.DE'
     assert [r['symbol'] for r in run(min_score=1)['rows']] and all(r['score'] >= 1 for r in run(min_score=1)['rows'])
-    assert [r['symbol'] for r in run(max_volatility=0.0001)['rows']] == ['B.DE']      # seul le titre plat a une volatilité nulle
+    assert [r['symbol'] for r in run(max_volatility=0.0001)['rows']] == ['B.DE']  # seul le titre plat a une volatilité nulle
     assert run(fresh_only=True)['total'] == 3
     r = run()
-    assert r['reasons'] and all(k.count('|') == 2 for k in r['reasons'])            # statistiques d'exclusion : 'période|critère|f'
+    assert r['reasons'] and all(k.count('|') == 2 for k in r['reasons'])  # statistiques d'exclusion : 'période|critère|f'
     assert sum(r['scope_counts'].values()) == 3 and 'Germany' in r['facets']['countries']
     assert len(run(export=True)['rows']) == 3
 
@@ -138,11 +145,11 @@ def test_custom_criteria_drive_results_not_presets():
     conn = connect()
     seed(conn)
     view = {'status': 'all', 'page_size': 50}
-    free = service.explore(conn, {'config': _custom(month={}), 'view': view})                   # aucun seuil : tout titre mesurable est retenu
+    free = service.explore(conn, {'config': _custom(month={}), 'view': view})  # aucun seuil : tout titre mesurable est retenu
     assert free['scope_counts']['retained'] == 3
     strict = service.explore(conn, {'config': _custom(month={'min_slope': 0.3}), 'view': view})
-    assert {r['symbol'] for r in strict['rows'] if r['status'] == 'retained'} == {'A.DE'}      # seule la forte pente passe
-    other = service.explore(conn, {'config': _custom(week={'min_slope': 0.0}), 'view': view})   # autre période : autre résultat
+    assert {r['symbol'] for r in strict['rows'] if r['status'] == 'retained'} == {'A.DE'}  # seule la forte pente passe
+    other = service.explore(conn, {'config': _custom(week={'min_slope': 0.0}), 'view': view})  # autre période : autre résultat
     assert other['config']['periods'][1]['enabled'] and not other['config']['periods'][2]['enabled']
     assert free != strict
 
@@ -157,12 +164,12 @@ def test_rank_is_recomputed_inside_the_filtered_selection_and_pagination_comes_a
     full = {r['symbol']: r for r in service.explore(conn, {'config': cfg, 'view': {'status': 'retained', 'kind': 'equity'}})['rows']}
     assert full['A.DE']['rank'] == 1 and full['B.DE']['rank'] == 2
     only_b = service.explore(conn, {'config': cfg, 'view': {'status': 'retained', 'kind': 'equity', 'budget': 120}})
-    assert [(r['symbol'], r['rank']) for r in only_b['rows']] == [('B.DE', 1)]               # reclassé dans la sélection : rang 1, pas 2
+    assert [(r['symbol'], r['rank']) for r in only_b['rows']] == [('B.DE', 1)]  # reclassé dans la sélection : rang 1, pas 2
     assert only_b['examined'] == 1 and only_b['universe'] == 3
     p1 = service.explore(conn, {'config': cfg, 'view': {'status': 'all', 'page_size': 2, 'page': 1}})
     p2 = service.explore(conn, {'config': cfg, 'view': {'status': 'all', 'page_size': 2, 'page': 2}})
     ids = [r['id'] for r in p1['rows'] + p2['rows']]
-    assert p1['total'] == 3 and len(ids) == 3 and len(set(ids)) == 3 and p1['pages'] == 2     # aucune ligne perdue ni doublée entre les pages
+    assert p1['total'] == 3 and len(ids) == 3 and len(set(ids)) == 3 and p1['pages'] == 2  # aucune ligne perdue ni doublée entre les pages
 
 
 def test_sheet_verdict_matches_explorer_for_the_same_configuration():
@@ -175,7 +182,7 @@ def test_sheet_verdict_matches_explorer_for_the_same_configuration():
         assert sheet['verdict']['status'] == row['status'] and sheet['verdict']['rank'] == row['rank'] and sheet['verdict']['score'] == row['score']
         assert [p['id'] for p in sheet['strategy']['periods']] == ['week', 'month'] and sheet['strategy']['source'] == 'test'
     default = title_sheet.instrument_sheet(conn, {'config': 'regular', 'listing_id': 1})
-    assert [p['id'] for p in default['strategy']['periods']] == ['month', 'quarter']          # la fiche annonce la configuration qu'elle a utilisée
+    assert [p['id'] for p in default['strategy']['periods']] == ['month', 'quarter']  # la fiche annonce la configuration qu'elle a utilisée
 
 
 def test_excluded_listing_never_becomes_a_recommendation():

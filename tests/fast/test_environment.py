@@ -1,4 +1,5 @@
 """Installation reproductible : bornes de requirements.txt, contrôle d'environnement, empreinte du moteur, restauration du code ET des dépendances."""
+
 import os
 import subprocess
 import sys
@@ -20,7 +21,10 @@ def test_every_dependency_is_bounded_for_reproducible_installs():
 
 def test_version_comparison_and_parsing():
     assert check_env.parse('PyMySQL>=1.1,<2\n# note\n\nnumpy>=1.24,<2  # fin\nexchange_calendars==4.3') == [
-        ('PyMySQL', [('>=', '1.1'), ('<', '2')]), ('numpy', [('>=', '1.24'), ('<', '2')]), ('exchange_calendars', [('==', '4.3')])]
+        ('PyMySQL', [('>=', '1.1'), ('<', '2')]),
+        ('numpy', [('>=', '1.24'), ('<', '2')]),
+        ('exchange_calendars', [('==', '4.3')]),
+    ]
     assert check_env.satisfies('1.26.4', [('>=', '1.24'), ('<', '2')])
     assert not check_env.satisfies('2.0.0', [('<', '2')]) and not check_env.satisfies('4.3.1', [('==', '4.3')])
     assert check_env.satisfies('4.3', [('==', '4.3.0')])
@@ -42,8 +46,15 @@ def engine_hash(root):
 
 
 def tree(tmp_path):
-    for rel in ['engine/core.py', 'db/schema.sql', 'engine/analytics/admin/service.py', 'engine/analytics/explorer/universe_verdicts.py',
-                'engine/analytics/admin/title_sheet.py', 'engine/analytics/market_views/market_facts.py', 'engine/analytics/series/signals.py']:
+    for rel in [
+        'engine/core.py',
+        'db/schema.sql',
+        'engine/analytics/admin/service.py',
+        'engine/analytics/explorer/universe_verdicts.py',
+        'engine/analytics/admin/title_sheet.py',
+        'engine/analytics/market_views/market_facts.py',
+        'engine/analytics/series/signals.py',
+    ]:
         f = tmp_path / rel
         f.parent.mkdir(parents=True, exist_ok=True)
         f.write_text('v1')
@@ -53,8 +64,13 @@ def tree(tmp_path):
 def test_engine_hash_ignores_display_only_files_and_bytecode(tmp_path):
     root = tree(tmp_path)
     base = engine_hash(root)
-    for rel in ['engine/analytics/admin/service.py', 'engine/analytics/explorer/universe_verdicts.py', 'engine/analytics/admin/title_sheet.py',
-                'engine/analytics/market_views/market_facts.py', 'engine/analytics/series/signals.py']:
+    for rel in [
+        'engine/analytics/admin/service.py',
+        'engine/analytics/explorer/universe_verdicts.py',
+        'engine/analytics/admin/title_sheet.py',
+        'engine/analytics/market_views/market_facts.py',
+        'engine/analytics/series/signals.py',
+    ]:
         (root / rel).write_text('modifié')
         assert engine_hash(root) == base, rel
     (root / 'engine/core.pyc').write_text('x')
@@ -74,6 +90,7 @@ def test_engine_hash_changes_with_producing_code_and_schema(tmp_path):
 def test_hash_exclusions_name_files_that_exist():
     """Un module déplacé sans mettre à jour la liste ferait recalculer (ou ne plus recalculer) à tort : chaque exclusion doit exister."""
     import re
+
     for path in re.findall(r"! -path (\S+)", (ROOT / 'scripts/release/engine_hash.sh').read_text()):
         assert (ROOT / path).is_file(), path
 
@@ -81,7 +98,7 @@ def test_hash_exclusions_name_files_that_exist():
 def test_deploy_uses_the_single_hash_script_before_and_after():
     deploy = (ROOT / 'ops/deploy.sh').read_text()
     assert deploy.count('engine_hash.sh') == 2 and '! -path engine/' not in deploy
-    assert "< scripts/release/engine_hash.sh" in deploy        # « avant » : envoyé au serveur, l'ancien code ne l'a pas
+    assert "< scripts/release/engine_hash.sh" in deploy  # « avant » : envoyé au serveur, l'ancien code ne l'a pas
 
 
 RESTORE_MARK = ('# Code ET dépendances', '"$ROOT/.venv/bin/python" -c "import sys; sys.path.insert')
@@ -89,7 +106,7 @@ RESTORE_MARK = ('# Code ET dépendances', '"$ROOT/.venv/bin/python" -c "import s
 
 def restore_block():
     deploy = (ROOT / 'ops/deploy.sh').read_text()
-    return deploy[deploy.index(RESTORE_MARK[0]):deploy.index(RESTORE_MARK[1])]
+    return deploy[deploy.index(RESTORE_MARK[0]) : deploy.index(RESTORE_MARK[1])]
 
 
 def fake_server(tmp_path, installed, sha):
@@ -109,8 +126,7 @@ def fake_server(tmp_path, installed, sha):
 
 
 def run_restore(root, backups):
-    return subprocess.run(['bash', '-c', 'set -euo pipefail\n' + restore_block()], env={**os.environ, 'ROOT': str(root), 'BACKUPS': str(backups)},
-                          capture_output=True, text=True)
+    return subprocess.run(['bash', '-c', 'set -euo pipefail\n' + restore_block()], env={**os.environ, 'ROOT': str(root), 'BACKUPS': str(backups)}, capture_output=True, text=True)
 
 
 def pack(backups, site_content, name):
@@ -128,12 +144,14 @@ def test_restore_puts_back_the_dependencies_saved_before_an_upgrade(tmp_path):
     assert result.returncode == 0, result.stderr
     assert (site / 'paquet.txt').read_text() == 'ancienne'
     import hashlib
+
     assert (root / '.requirements.sha').read_text().strip() == hashlib.sha256(b'numpy<2\n').hexdigest()
     assert 'dépendances Python restaurées' in result.stdout
 
 
 def test_restore_leaves_dependencies_alone_when_unchanged_or_first_run(tmp_path):
     import hashlib
+
     same = hashlib.sha256(b'numpy<2\n').hexdigest()
     root, backups, site = fake_server(tmp_path / 'a', 'actuelle', same)
     pack(backups, 'ancienne', 'site-packages-20260101000000.tgz')

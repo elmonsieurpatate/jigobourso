@@ -1,5 +1,6 @@
 """Plan de suivi des positions : scénarios financiers chiffrés (voir research/suivi_positions/SPEC_SUIVI_POSITIONS.md).
 Aucune base : les séries sont synthétiques. Un test par exigence du cahier des charges."""
+
 import datetime
 import math
 
@@ -29,8 +30,21 @@ def path(points, noise=0.0):
 def plan(closes, strategy=None, pru=None, stop=None, open_idx=0, qty=10, kind='stock', price=None, fx=1.0, label=None, target=None, rules=None):
     dates = days(len(closes))
     cur = closes[-1] if price is None else price
-    pos = {'listing_id': 1, 'kind': kind, 'qty': qty, 'avg_cost': pru if pru is not None else closes[open_idx], 'price': cur / fx, 'price_eur': cur, 'currency': 'USD' if fx != 1 else 'EUR',
-           'open_date': dates[open_idx], 'stop_px': stop, 'target_px': target, 'rules': rules, 'watch_key': strategy, 'watch_label': label}
+    pos = {
+        'listing_id': 1,
+        'kind': kind,
+        'qty': qty,
+        'avg_cost': pru if pru is not None else closes[open_idx],
+        'price': cur / fx,
+        'price_eur': cur,
+        'currency': 'USD' if fx != 1 else 'EUR',
+        'open_date': dates[open_idx],
+        'stop_px': stop,
+        'target_px': target,
+        'rules': rules,
+        'watch_key': strategy,
+        'watch_label': label,
+    }
     return pp.build(pos, dates, closes, [], datetime.date(2026, 11, 9))
 
 
@@ -122,14 +136,14 @@ def test_momentum_alert_armed_after_entry():
 
 def test_momentum_already_negative_at_open_is_not_an_alert():
     c = path([(0, 200), (160, 140), (320, 100)], noise=0.012)
-    p = plan(c, 'regular', pru=200, open_idx=140)         # ouverte quand m6−1 est déjà négatif
+    p = plan(c, 'regular', pru=200, open_idx=140)  # ouverte quand m6−1 est déjà négatif
     assert p['momentum']['available'] and p['momentum']['value'] < 0
     assert p['momentum']['active'] is False and p['momentum']['negative_at_open'] is True
     assert 'momentum de moyen terme est devenu' not in texts(p)
 
 
 def test_momentum_does_not_claim_recent_reversal():
-    c = path([(0, 100), (150, 200), (300, 140), (330, 175)], noise=0.012)   # rebond récent
+    c = path([(0, 100), (150, 200), (300, 140), (330, 175)], noise=0.012)  # rebond récent
     p = plan(c, 'regular', pru=100)
     if p['momentum']['active']:
         assert 'peut remonter' in p['advice']['detail']
@@ -189,7 +203,7 @@ def test_missing_price():
 
 def test_currency_conversion_explicit():
     c = path([(0, 100), (260, 160)], noise=0.012)
-    p = plan(c, 'regular', pru=90, fx=0.5)                # cours en devise = 2 × cours en euros
+    p = plan(c, 'regular', pru=90, fx=0.5)  # cours en devise = 2 × cours en euros
     assert abs(p['prices']['fx'] - 0.5) < 1e-12
     assert abs(p['prices']['high'] - max(c) * 0.5 / 0.5 * 1.0) < 1e-6 * max(c) or p['prices']['high'] > 0
     assert p['prices']['local_currency'] == 'USD'
@@ -217,7 +231,8 @@ def test_risk_bands_are_monotone_and_documented():
 def test_suggested_formula():
     c = path([(0, 100), (260, 160)], noise=0.012)
     p = plan(c, 'regular', pru=100)
-    sigma = p['risk']['sigma63']; i, b = pp.band_of(sigma)
+    sigma = p['risk']['sigma63']
+    i, b = pp.band_of(sigma)
     assert abs(p['prices']['suggested'] - p['prices']['high'] * (1 - b[3] / 100)) < 1e-9
     # σ63 recalculé à la main : écart-type des 63 derniers rendements log
     r = [math.log(c[k] / c[k - 1]) for k in range(len(c) - 63, len(c))]
@@ -279,13 +294,13 @@ def test_automatic_protection_crossed_is_exit_with_the_rule_named():
 def test_personal_protection_is_the_effective_level_and_never_overwritten():
     c = gibo()
     auto = plan(c, 'recovery', pru=85.47)
-    perso = plan(c, 'recovery', pru=85.47, stop=130.0)             # filet personnalisé avec la stratégie Rebond : permis
+    perso = plan(c, 'recovery', pru=85.47, stop=130.0)  # filet personnalisé avec la stratégie Rebond : permis
     r = rule(perso, 'stop')
     assert r['mode'] == 'custom' and r['effective'] == 130.0 and r['custom'] == 130.0
     assert abs(r['auto'] - auto['prices']['suggested']) < 1e-9, 'le moteur continue de calculer sa suggestion'
     assert perso['prices']['effective'] == 130.0 and perso['prices']['effective_source'] == 'custom'
     assert 'Protection personnelle : ' in perso['advice']['protection'] and '(automatique : ' in perso['advice']['protection']
-    assert perso['advice']['state'] == 'watch'                      # cours 160 > 130 : non franchie
+    assert perso['advice']['state'] == 'watch'  # cours 160 > 130 : non franchie
     c2 = c[:-1] + [128.0]
     crossed = plan(c2, 'recovery', pru=85.47, stop=130.0)
     assert crossed['advice']['state'] == 'exit' and crossed['advice']['rule'] == 'stop'
@@ -295,7 +310,7 @@ def test_personal_protection_is_the_effective_level_and_never_overwritten():
 def test_return_to_automatic_restores_only_that_rule():
     c = gibo()
     custom = plan(c, 'recovery', pru=85.47, stop=130.0, rules={'recul': {'custom': 30.0}, 'trend': {'enabled': False}})
-    back = plan(c, 'recovery', pru=85.47, stop=None, rules={'recul': {'custom': 30.0}, 'trend': {'enabled': False}})   # seul le filet revient à l'automatique
+    back = plan(c, 'recovery', pru=85.47, stop=None, rules={'recul': {'custom': 30.0}, 'trend': {'enabled': False}})  # seul le filet revient à l'automatique
     assert rule(back, 'stop')['mode'] == 'auto' and rule(back, 'stop')['effective'] == back['prices']['suggested']
     assert rule(back, 'recul')['mode'] == 'custom' and rule(back, 'recul')['custom'] == 30.0
     assert rule(back, 'trend')['enabled'] is False and rule(custom, 'stop')['mode'] == 'custom'
@@ -313,7 +328,7 @@ def test_personal_objective_reached_is_exit_and_never_automatic():
     c = path([(0, 100), (260, 160)], noise=0.012)
     none = plan(c, 'regular', pru=100)
     assert rule(none, 'target')['mode'] == 'none' and not rule(none, 'target')['triggered'] and none['advice']['state'] == 'keep'
-    below = plan(c, 'regular', pru=100, target=150.0)                       # objectif déjà dépassé
+    below = plan(c, 'regular', pru=100, target=150.0)  # objectif déjà dépassé
     assert rule(below, 'target')['triggered'] and below['advice']['state'] == 'exit' and below['advice']['rule'] == 'target'
     assert below['advice']['headline'] == 'Sortie à envisager — Ton objectif de gain de 150,00 € est atteint.'
     far = plan(c, 'regular', pru=100, target=300.0)
@@ -321,7 +336,7 @@ def test_personal_objective_reached_is_exit_and_never_automatic():
 
 
 def test_custom_recul_threshold_means_reevaluate_while_automatic_means_watch():
-    c = path([(0, 100), (200, 160), (240, 148)], noise=0.012)               # recul ≈ 7,5 %, volatilité modérée (repli médian ≈ 8,5 %)
+    c = path([(0, 100), (200, 160), (240, 148)], noise=0.012)  # recul ≈ 7,5 %, volatilité modérée (repli médian ≈ 8,5 %)
     auto = plan(c, 'low_volatility', pru=100)
     custom = plan(c, 'low_volatility', pru=100, rules={'recul': {'custom': 5.0}})
     assert rule(custom, 'recul')['mode'] == 'custom' and rule(custom, 'recul')['triggered']
@@ -346,12 +361,12 @@ def test_disabled_rules_are_not_evaluated_but_still_computed():
 
 
 def test_several_rules_triggered_main_is_highest_priority_and_others_are_listed():
-    c = decline_series()                                                      # 100 -> 200 -> 140 : tendance dégradée, recul 30 %, protection automatique franchie
+    c = decline_series()  # 100 -> 200 -> 140 : tendance dégradée, recul 30 %, protection automatique franchie
     p = plan(c, 'low_volatility', pru=100, stop=150.0, target=130.0, rules={'recul': {'custom': 10.0}})
     a = p['advice']
     assert a['state'] == 'exit' and a['rule'] == 'stop' and 'personnelle' in a['headline']
     keys = [o['key'] for o in a['others']]
-    assert keys[0] == 'target' and {'recul', 'trend'} <= set(keys)           # objectif atteint (sortie) avant la réévaluation, avant la vigilance
+    assert keys[0] == 'target' and {'recul', 'trend'} <= set(keys)  # objectif atteint (sortie) avant la réévaluation, avant la vigilance
     states = [o['state'] for o in a['others']]
     order = {'exit': 0, 'reevaluate': 1, 'watch': 2}
     assert states == sorted(states, key=lambda x: order[x])
@@ -364,7 +379,7 @@ def test_insufficient_data_personal_rules_still_work_and_nothing_is_invented():
     s = rule(p, 'stop')
     assert s['auto'] is None and s['effective'] is None and 'indisponible' in s['note'] and rule(p, 'recul')['auto'] is None
     assert p['advice']['state'] == 'na' and 'Protection automatique indisponible' in p['advice']['protection']
-    hit = plan(c, 'regular', pru=100, stop=130.0)                             # protection personnelle déjà franchie : signalée malgré l'historique court
+    hit = plan(c, 'regular', pru=100, stop=130.0)  # protection personnelle déjà franchie : signalée malgré l'historique court
     assert hit['advice']['state'] == 'exit' and 'personnelle' in hit['advice']['headline']
 
 

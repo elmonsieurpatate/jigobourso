@@ -4,12 +4,13 @@ Valeurs ACTUELLES en euros, fournies par le registre PHP. Zone d'une action : pa
 zone d'un ETF : catégorie géographique explicite du fonds (Yahoo/Morningstar). Un ETF « Monde » ou sans catégorie reste « autre » : rien n'est deviné.
 Le calcul est descriptif : il dit combien il faudrait acheter ou vendre par zone pour revenir à la cible, il ne passe aucun ordre.
 """
+
 from ..market_views import geography
 
 ZONES = ('us', 'eu', 'emerging')
 LABELS = {'us': 'États-Unis', 'eu': 'Europe', 'emerging': 'Émergents', 'other': 'Autre ou inconnue'}
 PRUDENT = {'us': 50.0, 'eu': 25.0, 'emerging': 25.0}
-TOLERANCE = 5.0                  # points d'écart à partir desquels un rééquilibrage est suggéré
+TOLERANCE = 5.0  # points d'écart à partir desquels un rééquilibrage est suggéré
 
 
 def _number(v):
@@ -45,6 +46,7 @@ def zone_of(kind, country, profile_data):
 def _context(conn, ids):
     """{listing_id: (kind, country, données du profil ETF)} en lecture seule."""
     from ..market_views import etf
+
     if not ids:
         return {}
     with conn.cursor() as cur:
@@ -75,13 +77,29 @@ def summarize(positions, context, target=None):
         current = 100 * values[z] / total if total else None
         goal = (target or {}).get(z, 0.0) if target else None
         gap = None if goal is None or not total else goal * total / 100 - values[z]
-        rows.append({'zone': z, 'label': LABELS[z], 'value_eur': values[z], 'current_pct': current, 'target_pct': goal, 'gap_eur': gap,
-                     'off_target': goal is not None and current is not None and abs(current - goal) >= TOLERANCE})
-    return {'total_eur': total, 'unpriced': unpriced, 'target': target, 'rows': rows, 'zones': zones_by_listing,
-            'rebalance_suggested': any(r['off_target'] for r in rows) if target else False, 'tolerance': TOLERANCE}
+        rows.append(
+            {
+                'zone': z,
+                'label': LABELS[z],
+                'value_eur': values[z],
+                'current_pct': current,
+                'target_pct': goal,
+                'gap_eur': gap,
+                'off_target': goal is not None and current is not None and abs(current - goal) >= TOLERANCE,
+            }
+        )
+    return {
+        'total_eur': total,
+        'unpriced': unpriced,
+        'target': target,
+        'rows': rows,
+        'zones': zones_by_listing,
+        'rebalance_suggested': any(r['off_target'] for r in rows) if target else False,
+        'tolerance': TOLERANCE,
+    }
 
 
 def portfolio_allocation(conn, request):
-    positions = list(request.get('positions', []))          # un titre saisi sans cotation reconnue compte en « autre »
+    positions = list(request.get('positions', []))  # un titre saisi sans cotation reconnue compte en « autre »
     target = validate_target(request['target']) if request.get('target') else None
     return summarize(positions, _context(conn, {int(p['listing_id']) for p in positions if p.get('listing_id')}), target)

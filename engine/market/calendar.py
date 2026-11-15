@@ -4,6 +4,7 @@ Un MIC inconnu ou un calendrier non disponible ne retombe jamais sur un
 calendrier lundi-vendredi : le calcul doit échouer fermé plutôt que compter
 un jour férié comme une séance.
 """
+
 import datetime
 from functools import lru_cache
 
@@ -11,19 +12,69 @@ from functools import lru_cache
 # Alias limités aux places ayant le même calendrier de jours de négociation.
 # Les places régionales allemandes partagent le calendrier de Francfort.
 _CALENDAR_BY_MIC = {
-    'XASE': 'XNYS', 'ARCX': 'XNYS', 'XNAS': 'XNAS', 'XNYS': 'XNYS', 'BATS': 'BATS',
-    'XFRA': 'XFRA', 'XETR': 'XETR', 'XBER': 'XFRA', 'XSTU': 'XFRA', 'XDUS': 'XFRA',
-    'XHAM': 'XFRA', 'XMUN': 'XFRA', 'XHAN': 'XFRA',
-    'XPAR': 'XPAR', 'XAMS': 'XAMS', 'XBRU': 'XBRU', 'XLON': 'XLON', 'XMIL': 'XMIL',
-    'XMAD': 'XMAD', 'XSTO': 'XSTO', 'XOSL': 'XOSL', 'XSWX': 'XSWX', 'XHEL': 'XHEL',
-    'XCSE': 'XCSE', 'XICE': 'XICE', 'XWBO': 'XWBO', 'XDUB': 'XDUB', 'XLIS': 'XLIS',
-    'XWAR': 'XWAR', 'XPRA': 'XPRA', 'XBUD': 'XBUD', 'XBSE': 'XBSE', 'XIST': 'XIST',
-    'XTSE': 'XTSE', 'XCNQ': 'XTSE', 'XTSX': 'XTSE', 'XMEX': 'XMEX', 'BVMF': 'BVMF',
-    'XSGO': 'XSGO', 'XBUE': 'XBUE', 'XTKS': 'XTKS', 'XHKG': 'XHKG', 'XSHG': 'XSHG',
-    'XSHE': 'XSHG', 'XKRX': 'XKRX', 'XKOS': 'XKRX', 'XASX': 'XASX', 'XNZE': 'XNZE',
-    'XSES': 'XSES', 'XBOM': 'XBOM', 'XNSE': 'XBOM', 'XTAI': 'XTAI', 'XTAE': 'XTAE',
-    'XJSE': 'XJSE', 'XBKK': 'XBKK', 'XIDX': 'XIDX', 'XKLS': 'XKLS', 'XKAR': 'XKAR',
-    'XPHS': 'XPHS', 'XSAU': 'XSAU', 'XBOG': 'XBOG', 'XLIM': 'XLIM', 'XCBF': 'XCBF',
+    'XASE': 'XNYS',
+    'ARCX': 'XNYS',
+    'XNAS': 'XNAS',
+    'XNYS': 'XNYS',
+    'BATS': 'BATS',
+    'XFRA': 'XFRA',
+    'XETR': 'XETR',
+    'XBER': 'XFRA',
+    'XSTU': 'XFRA',
+    'XDUS': 'XFRA',
+    'XHAM': 'XFRA',
+    'XMUN': 'XFRA',
+    'XHAN': 'XFRA',
+    'XPAR': 'XPAR',
+    'XAMS': 'XAMS',
+    'XBRU': 'XBRU',
+    'XLON': 'XLON',
+    'XMIL': 'XMIL',
+    'XMAD': 'XMAD',
+    'XSTO': 'XSTO',
+    'XOSL': 'XOSL',
+    'XSWX': 'XSWX',
+    'XHEL': 'XHEL',
+    'XCSE': 'XCSE',
+    'XICE': 'XICE',
+    'XWBO': 'XWBO',
+    'XDUB': 'XDUB',
+    'XLIS': 'XLIS',
+    'XWAR': 'XWAR',
+    'XPRA': 'XPRA',
+    'XBUD': 'XBUD',
+    'XBSE': 'XBSE',
+    'XIST': 'XIST',
+    'XTSE': 'XTSE',
+    'XCNQ': 'XTSE',
+    'XTSX': 'XTSE',
+    'XMEX': 'XMEX',
+    'BVMF': 'BVMF',
+    'XSGO': 'XSGO',
+    'XBUE': 'XBUE',
+    'XTKS': 'XTKS',
+    'XHKG': 'XHKG',
+    'XSHG': 'XSHG',
+    'XSHE': 'XSHG',
+    'XKRX': 'XKRX',
+    'XKOS': 'XKRX',
+    'XASX': 'XASX',
+    'XNZE': 'XNZE',
+    'XSES': 'XSES',
+    'XBOM': 'XBOM',
+    'XNSE': 'XBOM',
+    'XTAI': 'XTAI',
+    'XTAE': 'XTAE',
+    'XJSE': 'XJSE',
+    'XBKK': 'XBKK',
+    'XIDX': 'XIDX',
+    'XKLS': 'XKLS',
+    'XKAR': 'XKAR',
+    'XPHS': 'XPHS',
+    'XSAU': 'XSAU',
+    'XBOG': 'XBOG',
+    'XLIM': 'XLIM',
+    'XCBF': 'XCBF',
 }
 
 
@@ -35,6 +86,7 @@ def _sessions(mic, end_date, count):
         return None
     try:
         import exchange_calendars as xc
+
         end = datetime.date.fromisoformat(str(end_date)[:10])
         # Au moins 2 années de marge pour compter les séances à partir du jour
         # de référence même quand une place a de longues fermetures saisonnières.
@@ -42,7 +94,7 @@ def _sessions(mic, end_date, count):
         cal = xc.get_calendar(calendar_name, start=start.isoformat(), end=end.isoformat())
         labels = cal.sessions
         result = [str(x.date()) for x in labels if x.date() <= end]
-        return result[-int(count):] if len(result) >= int(count) else None
+        return result[-int(count) :] if len(result) >= int(count) else None
     except (ImportError, ValueError, KeyError, TypeError):
         return None
 
@@ -66,11 +118,12 @@ def _next_sessions(mic, after_date, count):
         return None
     try:
         import exchange_calendars as xc
+
         after = datetime.date.fromisoformat(str(after_date)[:10])
         end = after + datetime.timedelta(days=max(30, int(count) * 4))
         cal = xc.get_calendar(calendar_name, start=after.isoformat(), end=end.isoformat())
         result = [str(x.date()) for x in cal.sessions if x.date() > after]
-        return result[:int(count)] if len(result) >= int(count) else None
+        return result[: int(count)] if len(result) >= int(count) else None
     except (ImportError, ValueError, KeyError, TypeError):
         return None
 
