@@ -147,6 +147,7 @@ import sys
 import importlib.metadata as md
 import os, base64, subprocess, re
 sys.path.insert(0, 'scripts')
+import engine  # limite les threads BLAS avant les imports des paquets
 import check_env
 from pathlib import Path
 text = base64.b64decode('$expected_requirements').decode()

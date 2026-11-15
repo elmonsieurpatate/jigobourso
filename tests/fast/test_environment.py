@@ -225,3 +225,42 @@ def test_failed_dependency_repair_can_restore_the_original_venv(tmp_path):
     assert (root / '.deployment-venv-backup').is_file()
     assert run_restore(root, backups).returncode == 0
     assert (site / 'paquet.txt').read_text() == 'ancienne'
+
+
+def test_environment_entrypoint_initializes_blas_before_importing_numpy(tmp_path):
+    import shutil
+
+    scripts = tmp_path / 'scripts'
+    scripts.mkdir()
+    shutil.copyfile(ROOT / 'scripts/check_env.py', scripts / 'check_env.py')
+    engine = tmp_path / 'engine'
+    engine.mkdir()
+    shutil.copyfile(ROOT / 'engine/__init__.py', engine / '__init__.py')
+    (engine / 'cli.py').write_text('')
+    (tmp_path / 'requirements.txt').write_text('numpy>=1.24,<2\n')
+    metadata = tmp_path / 'numpy-1.26.4.dist-info'
+    metadata.mkdir()
+    (metadata / 'METADATA').write_text('Name: numpy\nVersion: 1.26.4\n')
+    (tmp_path / 'numpy.py').write_text(
+        'import os\nassert all(os.environ.get(n) == \'1\' for n in (\'OPENBLAS_NUM_THREADS\', \'OMP_NUM_THREADS\', \'MKL_NUM_THREADS\', \'NUMEXPR_NUM_THREADS\')), \'BLAS initialisé trop tard\'\n'
+    )
+    result = subprocess.run(
+        [sys.executable, str(scripts / 'check_env.py')],
+        cwd=tmp_path,
+        env={k: v for k, v in os.environ.items() if not k.endswith('_NUM_THREADS') and k != 'PYTHONPATH'},
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert 'Environnement conforme' in result.stdout
+
+
+def test_interrupted_environment_check_does_not_reinstall_packages(tmp_path):
+    root, backups, site = dependency_server(tmp_path, 'ancienne')
+    py = root / '.venv/bin/python'
+    py.write_text(py.read_text().replace('grep -qx conforme "$site/paquet.txt"', 'exit 130'))
+    result = ensure_dependencies(root, backups)
+    assert result.returncode == 130
+    assert (site / 'paquet.txt').read_text() == 'ancienne'
+    assert not list(backups.glob('site-packages-*.tgz'))
+    assert not (root / '.deployment-venv-backup').exists()

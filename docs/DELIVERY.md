@@ -67,3 +67,10 @@ l'empreinte. Le marqueur `.deployment-venv-backup` conserve la sauvegarde exacte
 jusqu'à la réussite de toute la livraison : un échec tardif restaure aussi le venv
 quand le manifeste n'a pas changé. Trois tests sur serveur factice couvrent la
 réparation, l'absence d'installation inutile et la restauration après échec.
+
+Le contrôleur importe le moteur **avant NumPy/pandas** pour appliquer la limite
+BLAS définie dans `engine/__init__.py`. Un arrêt par signal (code >= 128) interrompt
+la livraison sans réinstaller les paquets ; il ne doit pas être assimilé à une
+version hors bornes. Régression couverte en processus isolé et sur installateur
+factice. Le diagnostic ne publie que des catégories d'erreurs, jamais les messages
+bruts, chemins privés ou versions des paquets.

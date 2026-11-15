@@ -18,6 +18,10 @@ check_runtime() {
     if grep -q "can't open file" "$report"; then echo "Erreur contrôle : fichier inaccessible"; fi
   fi
   rm -f "$report"
+  if [ "$status" -ge 128 ]; then
+    echo "Erreur : contrôle interrompu, réinstallation non tentée" >&2
+    exit "$status"
+  fi
   return "$status"
 }
 want=$(sha256sum requirements.txt | cut -d' ' -f1)

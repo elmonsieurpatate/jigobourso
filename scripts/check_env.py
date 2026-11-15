@@ -68,11 +68,15 @@ def main():
         print(f'requirements.txt illisible : {exc}', file=sys.stderr)
         return 2
     sys.path.insert(0, str(ROOT))
-    found = problems(text)
+    # engine.__init__ borne BLAS avant le premier import de numpy/pandas.
+    # Sur l'hébergement mutualisé, inverser cet ordre peut interrompre Python
+    # (130) sans aucun problème de version des paquets.
+    found = []
     try:
         importlib.import_module('engine.cli')
     except Exception as exc:
         found.append(f'engine.cli : import impossible ({exc})')
+    found.extend(problems(text))
     for line in found:
         print('ÉCART', line)
     if not found:

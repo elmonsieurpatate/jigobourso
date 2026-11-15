@@ -93,3 +93,12 @@ le code. L'installateur comparait seulement l'empreinte du manifeste : corrigé
 pour vérifier le venv réel avant de décider qu'aucune installation n'est requise.
 Sauvegarde et restauration du venv préservées même avec une empreinte identique ;
 14 tests d'environnement passent, dont 3 nouveaux cas de réparation/restauration.
+
+Le relevé de `43718017928` précise finalement **code 130** : ce n'était pas une
+preuve de versions incompatibles. Le contrôleur chargeait NumPy avant
+`engine.__init__`, qui borne les threads BLAS pour l'hébergement mutualisé.
+L'ordre est corrigé ; un test isolé vérifie la configuration avant le premier
+import de NumPy. Une interruption du contrôle ne déclenche désormais aucune
+réinstallation. 16 tests d'environnement passent. Les métadonnées multiples
+observées en lecture seule n'ont pas été supprimées : leur présence ne prouvait
+pas qu'elles étaient la cause. Les essais précédents ont restauré code et venv.
