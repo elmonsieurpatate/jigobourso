@@ -13,7 +13,14 @@ const base = process.env.BASE || 'http://127.0.0.1:18089';
     for (const theme of ['light', 'dark']) for (const width of [390, 1280, 768, 900, 901, 320]) {
       await page.setViewportSize({ width, height: 900 });
       await page.evaluate(t => J.applyTheme(t), theme);
-      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+      // Attendre l'état CSS final de la coque, pas un nombre arbitraire de
+      // frames : la transition de la barre latérale peut démarrer plus tard
+      // sur le runner CI, même avec reduced-motion.
+      await page.waitForFunction(width => {
+        const body = document.body, root = getComputedStyle(document.documentElement);
+        const target = width <= 900 ? 0 : parseFloat(root.getPropertyValue(body.classList.contains('side-collapsed') ? '--side-rail' : '--side-w'));
+        return innerWidth === width && Math.abs(parseFloat(getComputedStyle(body).paddingLeft) - target) < .5;
+      }, width);
       const r = await page.locator('#layout').evaluate(el => ({
         columns: getComputedStyle(el).gridTemplateColumns.split(' ').length,
         main: el.querySelector('#main').getBoundingClientRect().width,
