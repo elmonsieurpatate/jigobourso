@@ -1,6 +1,6 @@
 {
   "app": "jigobourso-v2",
-  "status": "success",
-  "commit": "8d235c0c0acd920b7c6b709d7aad6c5ab01bd7e3",
-  "run_url": "https://github.com/elmonsieurpatate/jigobourso/actions/runs/43668002652"
+  "status": "tests_failure",
+  "commit": "d0c602065f042d9a876a010723db9acc7461ab1c",
+  "run_url": "https://github.com/elmonsieurpatate/jigobourso/actions/runs/43674098867"
 }
