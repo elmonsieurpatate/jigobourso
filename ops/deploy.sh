@@ -65,7 +65,7 @@ tmp=$(mktemp -d "$BACKUPS/restore.XXXXXX")
 trap 'rm -rf "$tmp"' EXIT
 tar xzf "$BACKUPS/$FILE" -C "$tmp"
 cd "$tmp/jigobourso-v2"
-rsync -rlt --delete --exclude=__pycache__ app engine db docs scripts README.md requirements.txt "$ROOT/"
+rsync -rlt --delete-delay --delay-updates --exclude=__pycache__ app engine db docs scripts README.md requirements.txt "$ROOT/"
 # Code ET dépendances : si les dépendances installées ne correspondent plus au requirements.txt restauré, on remet le venv sauvegardé avant la mise à jour.
 want=$(sha256sum "$ROOT/requirements.txt" | cut -d' ' -f1)
 if [ -f "$ROOT/.requirements.sha" ] && [ "$want" != "$(cat "$ROOT/.requirements.sha")" ]; then
@@ -231,7 +231,8 @@ set +e
   phase="transfert du code"
   trap 'rc=$?; if [ "$rc" -ne 0 ]; then echo "Échec déploiement : étape ${phase} (code ${rc})" >&2; fi' EXIT
   echo "== Transfert du code"
-  rsync -rlt --delete --exclude=__pycache__ --exclude=.venv --exclude=private --exclude=data --exclude=logs \
+  # --delay-updates : chaque fichier est copié sous un nom temporaire puis tous sont mis en place à la fin (fenêtre de mélange de versions réduite à quelques renommages) ; --delete-delay : suppressions après le transfert.
+  rsync -rlt --delete-delay --delay-updates --exclude=__pycache__ --exclude=.venv --exclude=private --exclude=data --exclude=logs \
     -e "ssh ${ssh_opts[*]}" \
     app engine db docs scripts README.md requirements.txt "$remote:$root/"
 
@@ -283,6 +284,8 @@ else
 fi
 .venv/bin/python -c "import engine.cli" || { echo "moteur non importable : retour arrière" >&2; exit 1; }
 echo "moteur importable"
+.venv/bin/python scripts/check_env.py > /dev/null 2>&1 || { echo "dépendances non conformes à requirements.txt : retour arrière" >&2; exit 1; }
+echo "dépendances conformes à requirements.txt"
 echo "== Contrôle d'intégrité financière"
 php scripts/release/check_financial_integrity.php > "$ROOT/logs/financial-integrity.json"
 chmod 600 "$ROOT/logs/financial-integrity.json"

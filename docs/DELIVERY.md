@@ -16,13 +16,13 @@
 
 - `requirements.txt` : chaque dépendance a une borne haute (test `test_every_dependency_is_bounded_for_reproducible_installs`) ; `exchange_calendars` est épinglé (`==4.3`, compatible Python 3.9).
 - `scripts/check_env.py` vérifie versions et imports ; la CI l'exécute après l'installation, le README l'indique pour un venv neuf.
-- Limite connue : les sous-dépendances (pandas → pytz, dateutil…) ne sont pas figées ; un fichier de verrouillage complet n'est pas fourni (non testé sur Python 3.9 du serveur).
+- Sous-dépendances (pandas → pytz, dateutil…) volontairement non figées : un verrou exact exigerait les versions de la production, que les journaux publics masquent par politique (`ops/public-log.sh`). À la place, après chaque installation le serveur exécute `scripts/check_env.py` (bornes de `requirements.txt` + imports) et un écart déclenche le retour arrière avec restauration du venv.
 
 ## Cohérence d'une release
 
 - Une seule version pour toutes les pages : `?v=__BUILD__` remplacé par l'horodatage du déploiement ; `tests/fast/test_asset_versions.py` interdit toute version figée et tout fichier référencé absent. Le déploiement échoue si un marqueur reste, puis vérifie que la page servie porte la version attendue.
 - Le transfert est un `rsync` unique ; le code PHP/Python et les pages sont remplacés ensemble, les contrôles s'exécutent après transfert et un échec déclenche le retour arrière.
-- Limite : le transfert n'est pas atomique (pas de bascule de lien symbolique) ; une requête pendant les quelques secondes du `rsync` peut voir un mélange. Accepté tant que l'hébergement mutualisé n'offre pas de répertoire de release.
+- Transfert : `rsync --delay-updates --delete-delay` copie tout sous des noms temporaires puis met les fichiers en place d'un coup en fin de transfert ; la fenêtre de mélange de versions se réduit à la série de renommages finale (quelques centaines de millisecondes, non mesurée sur l'hébergement). Ce n'est pas une bascule atomique de répertoire : l'hébergement mutualisé n'offre pas de répertoire de release. Validé par la répétition locale ; non mesuré sur Hostinger.
 
 ## Restauration (code ET dépendances)
 

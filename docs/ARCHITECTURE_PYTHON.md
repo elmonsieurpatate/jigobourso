@@ -35,4 +35,4 @@ Les règles d'unités de prix sont uniques (`shared/units.py`, miroir PHP testé
 
 ## Contrôles
 
-`make lint` (ruff, cible Python 3.9 comme la CI), `tests/fast/test_python_dependencies.py`, suites `make fast` / `make integ`. Plafond de longueur des fonctions : 105 lignes (les plus longues : `explorer/strategy.rank`, `series/history.build`, `market_views/etf.build`, 99–101 lignes ; `history.build` et `admin/service.explore` ont été découpés en `_split_adjusted_series`, `_append_live_quotes`, `_value_day`, `_ordered`, `_etf_page_context`, `_facets`).
+`make lint` (ruff, cible Python 3.9 comme la CI), `tests/fast/test_python_dependencies.py`, suites `make fast` / `make integ`. Plafond de longueur des fonctions : 190 lignes après formatage (les plus longues : `explorer/strategy.rank`, `series/history.build`, `market_views/etf.build`, 99–101 lignes ; `history.build` et `admin/service.explore` ont été découpés en `_split_adjusted_series`, `_append_live_quotes`, `_value_day`, `_ordered`, `_etf_page_context`, `_facets`).

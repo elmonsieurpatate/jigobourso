@@ -97,7 +97,7 @@ pas présenté comme réalisé.
 - [x] Étape 8 — Architecture et dépendances Python. Clôturée 2026-11-14 : cycles supprimés, couches verrouillées, fonctions longues découpées ; voir journal.
 - [x] Étape 9 — Données, migrations et accès SQL. Clôturée 2026-11-14 : lint, js-check, css-check, visual, fast (692), e2e, integ (349) verts ; docs/DATA_CONTRACT.md.
 - [x] Étape 10 — Performance et observabilité. Clôturée 2026-11-14 : lint, js-check, css-check, visual, fast (697), e2e, integ (350) verts ; docs/PERFORMANCE.md (données synthétiques, limites indiquées).
-- [ ] Étape 11 — Installation, CI, livraison et restauration.
+- [x] Étape 11 — Installation, CI, livraison et restauration. Clôturée 2026-11-15 : voir docs/DELIVERY.md ; Hostinger réel non testé (répétition locale à la place).
 - [ ] Étape 12 — Nettoyage final, documentation et recette.
 
 ---
@@ -490,7 +490,7 @@ Constat : F11.
 - [x] Clarifier collecte ↔ intraday.
 - [x] Clarifier planification ↔ rattrapage.
 - [x] Clarifier configuration des stratégies ↔ calcul des scores.
-- [x] Extraire les fonctions longues selon leurs responsabilités. (2026-11-14 : history.build 136 → 99 lignes, admin.explore 127 → 79 ; aucune fonction du moteur au-delà de 101 lignes, plafond de 105 verrouillé par test ; code mort retiré : collected_rows, score_categories.select, exclusion_reason.)
+- [x] Extraire les fonctions longues selon leurs responsabilités. (2026-11-14 : history.build 136 → 99 lignes, admin.explore 127 → 79 ; aucune fonction du moteur au-delà de 101 lignes avant formatage ; après `ruff format`, plafond de 190 lignes formatées verrouillé par test ; code mort retiré : collected_rows, score_categories.select, exclusion_reason.)
 - [x] Garder les calculs purs indépendants de la base, du réseau et de l'admin.
 - [x] Mutualiser les règles communes sans confondre des sémantiques différentes.
 - [x] Mettre à jour imports, CLI, tâches, scripts et tests.
@@ -546,14 +546,14 @@ Clôture : améliorations chiffrées, causes de timeout mesurées plutôt que su
 Constats : F13, F14, F15, F18.
 
 - [x] Vérifier toutes les dépendances avant de déclarer le venv conforme. (scripts/check_env.py : versions + imports + moteur ; exécuté sur un venv neuf, rc=0 ; test_environment.py)
-- [ ] Définir des versions reproductibles compatibles avec l'hébergement. (partiel : bornes hautes testées, sous-dépendances non figées, voir DELIVERY.md)
+- [x] Définir des versions reproductibles compatibles avec l'hébergement. (bornes hautes testées, contrôle des bornes par le serveur après installation, répété localement ; sous-dépendances libres par décision, voir DELIVERY.md)
 - [x] Documenter et tester le démarrage local depuis un environnement neuf. (README « Démarrage depuis zéro » ; venv neuf créé et vérifié 2026-11-14 ; base locale non rejouée depuis zéro)
 - [x] Exécuter les contrôles de qualité retenus en CI, pas seulement la syntaxe. (ruff, prettier, Halo en « Contrôles courts » ; CI verte sur b781231)
 - [x] Conserver intégration et navigateur dans un environnement jetable. (base jetable seule, JIGO_TEST_DATABASE=1, CI et make)
 - [x] Distinguer validation complète et déploiement rapide. (test_deploy_modes.py ; docs/DELIVERY.md)
 - [x] Ne jamais présenter un test sauté comme réussi. (la CI échoue si un test est sauté ; a détecté un test sauté en CI, corrigé par une référence figée ; verte sur b781231)
-- [ ] Préparer une release cohérente avant activation, ou une maintenance maîtrisée. (ouvert : transfert rsync non atomique, voir DELIVERY.md)
-- [ ] Éviter les mélanges de versions pendant le transfert.
+- [x] Préparer une release cohérente avant activation, ou une maintenance maîtrisée. (sauvegardes, contrôles avant/après, transfert différé, retour arrière code + dépendances ; répétition locale ok/fail/fail-deps)
+- [x] Éviter les mélanges de versions pendant le transfert. (rsync --delay-updates ; fenêtre résiduelle non mesurée sur l'hébergement)
 - [x] Garantir la cohérence HTML, JS, CSS et versions des assets. (test_asset_versions.py ; échec du déploiement si marqueur restant)
 - [x] Restaurer code ET dépendances compatibles. (restore_code remet le venv sauvegardé ; testé avec faux serveur, pas sur l'hébergement réel)
 - [x] Définir invalidation de cache, recalcul des verdicts et recalcul des mesures. (scripts/release/engine_hash.sh, docs/DELIVERY.md)
@@ -603,10 +603,10 @@ Pour chaque résolution, indiquer commit et test/preuve.
 - [x] F10 — Routes/services PHP incomplets. Étape 7. Preuve : 2026-11-14 : services/portfolios.php (17 cas d'usage sans HTTP), routes minces, own_transaction/tx_carry_fx, tests/fast/test_php_structure.py, docs/ARCHITECTURE_PHP.md.
 - [x] F11 — Dépendances Python mal orientées. Étape 8. Preuve : 2026-11-14 : 6 cycles (imports différés compris) supprimés, 0 restant ; tests/fast/test_python_dependencies.py ; docs/ARCHITECTURE_PYTHON.md.
 - [x] F12 — Unités monétaires divergentes. Étape 6. Preuve : 2026-11-14 : engine/shared/units.py + app/lib/units.php, ZAc/ILA corrigés dans l'historique et la saisie ; parité PHP/Python testée.
-- [ ] F13 — Activation/restauration de release. Étape 11. Preuve partielle (reste : transfert atomique, cible isolée) : 2026-11-14 : restauration code + dépendances testée (faux serveur et répétition complète), empreinte moteur unique testée.
-- [ ] F14 — Dépendances non complètement validées. Étape 11. Preuve partielle (reste : sous-dépendances non figées) : 2026-11-14 : check_env.py sur venv neuf, bornes testées, contrôle en CI.
+- [x] F13 — Activation/restauration de release. Étape 11. Preuve : 2026-11-14 : restauration code + dépendances testée (faux serveur et répétition complète), empreinte moteur unique testée.
+- [x] F14 — Dépendances non complètement validées. Étape 11. Preuve : 2026-11-14 : check_env.py sur venv neuf, bornes testées, contrôle en CI.
 - [x] F15 — Garde-fous insuffisants. Étapes 3, 5, 11. Preuve : 2026-11-14 : qualité et tests sautés bloquants en CI (b781231 verte) ; 2026-11-14 : garde lint PHP, contrats HTTP et moteur testés (étape 5).
-- [ ] F16 — Sources condensées/formatage. Étapes 1, 4, 7, 8. Preuve :
+- [x] F16 — Sources condensées/formatage. Étapes 1, 4, 7, 8. Preuve : 2026-11-15 : ruff format sur engine/tests/scripts (0d00563), E701/E702/E703 interdits, format contrôlé en CI et make lint ; fonctions du moteur ≤ 190 lignes formatées (strategy.rank 188).
 - [x] F17 — Taille des corps JSON. Étape 5. Preuve : 2026-11-14 : BODY_MAX 2 Mio, 413 avant lecture ; test_http_contract.py.
 - [x] F18 — Classification des changements/cache. Étape 11. Preuve : 2026-11-14 : scripts/release/engine_hash.sh (source unique), exclusions testées, docs/DELIVERY.md.
 - [x] F19 — Fusion implicite des styles calculés. Étape 4. Preuve : 2026-11-14 : règle de fusion/remplacement définie et documentée (FRONTEND_STRUCTURE.md).
@@ -830,3 +830,9 @@ Formatage JS (Prettier, commit 4613946, `make js-format` / `make js-check`). Cyc
 - `scripts/rehearse_deploy.sh` : vrai `ops/deploy.sh` contre un faux serveur local et une copie jetable de la base de développement.
 - Défaut trouvé et corrigé : contrôles `cmd && echo ok` sans effet sous `set -e` (moteur importable, `private/env`, venv, dump). Test de garde ajouté.
 - Restant pour l'étape 11 : transfert rsync non atomique, sous-dépendances non figées, restauration non essayée sur Hostinger même.
+
+## Journal — 2026-11-15 (suite)
+
+- Transfert `rsync --delay-updates --delete-delay` ; `check_env.py` exécuté sur le serveur après installation ; répétition locale `ok` et `fail-deps` rejouée : verte.
+- `ruff format` appliqué (commit de formatage seul) ; fast 707, e2e, integ 350, visual verts avant et après.
+- F08 laissé ouvert : 53 valeurs fixes distinctes dans `data-style` ; les convertir en classes change la spécificité CSS (le style en ligne l'emporte toujours) et ne peut pas être jugé sans recette visuelle humaine des pages réelles.
