@@ -23,8 +23,8 @@ php scripts/create_user.php filters-other personal-filters-local-only > /dev/nul
 php scripts/create_user.php filters-admin personal-filters-local-only --admin > /dev/null
 export BASE=http://127.0.0.1:18089
 run personal-filters timeout 120s node tests/e2e/personal-filters.cjs
-run scores-preview node tests/e2e/scores-preview.cjs
-run financial node tests/e2e/financial.cjs
+run scores-preview timeout 120s node tests/e2e/scores-preview.cjs
+run financial timeout 180s node tests/e2e/financial.cjs
 run keyboard node tests/e2e/keyboard.cjs
 run title-layout node tests/e2e/title-layout.cjs
 run strategies-ui timeout 240s node tests/e2e/strategies-ui.cjs      # avant account-navigation : celui-ci provoque des échecs de connexion volontaires
