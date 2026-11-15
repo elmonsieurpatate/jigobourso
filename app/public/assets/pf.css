@@ -11,7 +11,7 @@
 .pf-home {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--sp-14);
   color: var(--text);
 }
 .pf-home .muted {
@@ -40,21 +40,21 @@
   margin: 0;
 }
 .pf-home h3 {
-  margin: 16px 0 8px;
+  margin: var(--sp-16) 0 var(--sp-8);
 }
 .px-head p {
-  margin: 2px 0 0;
-  font-size: 0.82rem;
+  margin: var(--sp-2) 0 0;
+  font-size: var(--fs-11);
 }
 .px-ha {
   display: flex;
-  gap: 8px;
+  gap: var(--sp-8);
   flex-wrap: wrap;
   align-items: center;
 }
 .px-zones {
   display: flex;
-  gap: 4px;
+  gap: var(--sp-4);
   border-bottom: 1px solid var(--line);
   overflow-x: auto;
   scrollbar-width: none;
@@ -72,21 +72,21 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 10px;
+  gap: var(--sp-10);
   flex-wrap: wrap;
-  margin-bottom: 10px;
+  margin-bottom: var(--sp-10);
 }
 
 .px-link {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--sp-8);
   border: 0;
   background: none;
   color: var(--accent);
   font: 600 0.86rem system-ui;
-  padding: 6px 0;
+  padding: var(--sp-6) 0;
   cursor: pointer;
   text-decoration: none;
 }
@@ -94,18 +94,18 @@
 .px-syn {
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.5fr);
-  gap: 14px 24px;
+  gap: var(--sp-14) var(--sp-24);
 }
 .px-val strong {
   display: block;
-  font-size: 2rem;
-  line-height: 1.15;
+  font-size: var(--fs-28);
+  line-height: var(--lh-tight);
 }
 .px-pill {
   display: inline-block;
-  margin-top: 4px;
+  margin-top: var(--sp-4);
   font-weight: 700;
-  font-size: 0.9rem;
+  font-size: var(--fs-13);
 }
 .px-pill small {
   font-weight: 400;
@@ -113,7 +113,7 @@
 .px-kv {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
+  gap: var(--sp-8);
   margin: 0;
 }
 .px-kv dt,
@@ -121,58 +121,58 @@
 .px-hh span,
 .px-kv2 dt,
 .px-tax > span {
-  font-size: 0.72rem;
+  font-size: var(--fs-10);
   color: var(--muted);
 }
 .px-kv dd {
-  margin: 2px 0 0;
+  margin: var(--sp-2) 0 0;
   font-weight: 700;
-  font-size: 0.92rem;
+  font-size: var(--fs-13);
 }
 .px-evo {
   grid-column: 1/-1;
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 8px;
+  gap: var(--sp-8);
   border-top: 1px solid var(--line);
-  padding-top: 10px;
+  padding-top: var(--sp-10);
 }
 .px-evo div {
   display: flex;
   flex-direction: column;
 }
 .px-evo b {
-  font-size: 0.95rem;
+  font-size: var(--fs-13);
 }
 .px-evo small {
-  font-size: 0.74rem;
+  font-size: var(--fs-10);
 }
 .px-hh {
   grid-column: 1/-1;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  gap: var(--sp-8);
 }
 .px-hh div {
   display: flex;
   flex-direction: column;
   background: var(--surface-2, var(--bg));
-  border-radius: 8px;
-  padding: 8px 10px;
+  border-radius: var(--radius-8);
+  padding: var(--sp-8) var(--sp-10);
 }
 /* résumé de surveillance */
 .px-sum {
   display: flex;
   align-items: center;
-  gap: 6px 18px;
+  gap: var(--sp-6) var(--sp-20);
   flex-wrap: wrap;
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 10px 14px;
+  border-radius: var(--radius-12);
+  padding: var(--sp-10) var(--sp-14);
   color: var(--text);
   text-decoration: none;
-  font-size: 0.84rem;
+  font-size: var(--fs-12);
 }
 a.px-sum {
   cursor: pointer;
@@ -189,11 +189,11 @@ a.px-sum:hover {
   font-weight: 700;
   min-width: 22px;
   height: 22px;
-  border-radius: 11px;
+  border-radius: var(--radius-12);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.75rem;
+  font-size: var(--fs-11);
   color: var(--on-solid);
   background: var(--muted);
 }
@@ -211,25 +211,25 @@ a.px-sum:hover {
 }
 .px-card .px-sum {
   border: 0;
-  padding: 0 0 10px;
+  padding: 0 0 var(--sp-10);
 }
 /* graphique */
 .px-top {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 8px;
+  gap: var(--sp-8);
   flex-wrap: wrap;
-  margin-bottom: 8px;
+  margin-bottom: var(--sp-8);
 }
 .px-tabs,
 .px-seg {
   display: flex;
-  gap: 2px;
+  gap: var(--sp-2);
   background: var(--surface-2, var(--bg));
   border: 1px solid var(--line);
-  border-radius: 9px;
-  padding: 2px;
+  border-radius: var(--radius-8);
+  padding: var(--sp-2);
 }
 .px-tabs button,
 .px-seg button {
@@ -238,11 +238,11 @@ a.px-sum:hover {
 }
 .px-per {
   display: flex;
-  gap: 4px;
+  gap: var(--sp-4);
   overflow-x: auto;
   scrollbar-width: thin;
-  padding: 2px 0 6px;
-  margin-bottom: 2px;
+  padding: var(--sp-2) 0 var(--sp-6);
+  margin-bottom: var(--sp-2);
   -webkit-overflow-scrolling: touch;
 }
 .px-per button {
@@ -251,8 +251,8 @@ a.px-sum:hover {
 }
 
 .px-cur {
-  margin: 0 0 4px;
-  font-size: 0.8rem;
+  margin: 0 0 var(--sp-4);
+  font-size: var(--fs-11);
   color: var(--muted);
 }
 .px-plot {
@@ -261,7 +261,7 @@ a.px-sum:hover {
   transition: opacity 0.15s;
 }
 .px-plot.loading {
-  opacity: 0.55;
+  opacity: 0.5;
 }
 .px-plot .px-spin {
   position: absolute;
@@ -279,16 +279,16 @@ a.px-sum:hover {
   justify-content: center;
   text-align: center;
   color: var(--muted);
-  padding: 20px;
+  padding: var(--sp-20);
   border: 1px dashed var(--line);
-  border-radius: 10px;
-  font-size: 0.9rem;
+  border-radius: var(--radius-12);
+  font-size: var(--fs-13);
 }
 .px-leg {
   display: flex;
-  gap: 6px;
+  gap: var(--sp-6);
   flex-wrap: wrap;
-  margin-top: 8px;
+  margin-top: var(--sp-8);
   max-height: 96px;
   overflow-y: auto;
 }
@@ -302,28 +302,28 @@ a.px-sum:hover {
   display: inline-block;
 }
 .px-chip.off {
-  opacity: 0.45;
+  opacity: 0.5;
   text-decoration: line-through;
 }
 .px-meta {
-  margin-top: 8px;
-  font-size: 0.78rem;
+  margin-top: var(--sp-8);
+  font-size: var(--fs-11);
   color: var(--muted);
 }
 .px-meta summary {
   cursor: pointer;
 }
 .px-meta ul {
-  margin: 6px 0 0;
-  padding-left: 18px;
+  margin: var(--sp-6) 0 0;
+  padding-left: var(--sp-20);
 }
 .px-meta li {
-  margin: 2px 0;
+  margin: var(--sp-2) 0;
 }
 .px-note {
-  font-size: 0.78rem;
+  font-size: var(--fs-11);
   color: var(--muted);
-  margin: 8px 0 0;
+  margin: var(--sp-8) 0 0;
 }
 /* tableaux compacts */
 .px-tw {
@@ -332,7 +332,7 @@ a.px-sum:hover {
 .px-t {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.84rem;
+  font-size: var(--fs-12);
 }
 .px-t th {
   text-align: left;
@@ -352,7 +352,7 @@ a.px-sum:hover {
   background: var(--surface-2, var(--bg));
 }
 .px-t tr.closed {
-  opacity: 0.65;
+  opacity: 0.7;
 }
 .px-t .c-title b {
   display: block;
@@ -364,7 +364,7 @@ a.px-sum:hover {
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--muted);
-  font-size: 0.76rem;
+  font-size: var(--fs-11);
 }
 .px-t .c-strat .ell {
   color: var(--text);
@@ -378,9 +378,9 @@ a.px-sum:hover {
   white-space: nowrap;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  border-radius: 999px;
-  padding: 3px 9px;
+  gap: var(--sp-4);
+  border-radius: var(--radius-pill);
+  padding: var(--sp-4) var(--sp-10);
   font: 600 0.72rem system-ui;
   border: 1px solid var(--line);
   background: var(--surface-2, var(--bg));
@@ -410,9 +410,9 @@ a.px-sum:hover {
 }
 .px-chk {
   display: flex;
-  gap: 6px;
+  gap: var(--sp-6);
   align-items: center;
-  font-size: 0.8rem;
+  font-size: var(--fs-11);
   color: var(--muted);
 }
 /* panneau de détail */
@@ -422,7 +422,7 @@ body.px-lock {
 #px-drawer-root {
   position: fixed;
   inset: 0;
-  z-index: 60;
+  z-index: var(--z-drawer);
 }
 .px-back {
   position: absolute;
@@ -444,9 +444,9 @@ body.px-lock {
 .px-dh {
   display: flex;
   justify-content: space-between;
-  gap: 10px;
+  gap: var(--sp-10);
   align-items: flex-start;
-  padding: 14px 16px;
+  padding: var(--sp-14) var(--sp-16);
   border-bottom: 1px solid var(--line);
   background: var(--surface);
 }
@@ -456,7 +456,7 @@ body.px-lock {
 .px-dh h2 span {
   font-weight: 400;
   color: var(--muted);
-  font-size: 0.88rem;
+  font-size: var(--fs-12);
 }
 .px-dh small {
   color: var(--muted);
@@ -464,44 +464,44 @@ body.px-lock {
 .px-db {
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 4px 16px 24px;
+  padding: var(--sp-4) var(--sp-16) var(--sp-24);
   flex: 1;
 }
 .px-db section {
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 12px 14px;
-  margin-top: 12px;
+  border-radius: var(--radius-12);
+  padding: var(--sp-12) var(--sp-14);
+  margin-top: var(--sp-12);
 }
 .px-db section h3 {
-  margin: 0 0 8px;
+  margin: 0 0 var(--sp-8);
 }
 .px-kv2 {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 8px 14px;
+  gap: var(--sp-8) var(--sp-14);
   margin: 0;
 }
 .px-kv2 dd {
-  margin: 2px 0 0;
+  margin: var(--sp-2) 0 0;
   font-weight: 600;
-  font-size: 0.88rem;
+  font-size: var(--fs-12);
 }
 .px-list > div {
   display: flex;
-  gap: 10px;
+  gap: var(--sp-10);
   align-items: center;
   flex-wrap: wrap;
-  padding: 6px 0;
+  padding: var(--sp-6) 0;
   border-bottom: 1px solid var(--line);
-  font-size: 0.82rem;
+  font-size: var(--fs-11);
 }
 .px-list > div > span:nth-child(3) {
   flex: 1;
 }
 /* tableaux en cartes sur petit écran */
-@media (max-width: 1180px) {
+@media (max-width: 1100px) {
   .px-t .c-w,
   .px-t .c-strat {
     display: none;
@@ -510,12 +510,12 @@ body.px-lock {
     grid-template-columns: 1fr;
   }
 }
-@media (max-width: 820px) {
+@media (max-width: 760px) {
   .px-t .c-contrib {
     display: none;
   }
 }
-@media (max-width: 640px) {
+@media (max-width: 600px) {
   .px-kv {
     grid-template-columns: 1fr 1fr;
   }
@@ -523,7 +523,7 @@ body.px-lock {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
   .px-val strong {
-    font-size: 1.7rem;
+    font-size: var(--fs-24);
   }
   .px-t thead {
     display: none;
@@ -537,24 +537,24 @@ body.px-lock {
   }
   .px-t tr {
     border: 1px solid var(--line);
-    border-radius: 10px;
-    margin-bottom: 8px;
-    padding: 8px 10px;
+    border-radius: var(--radius-12);
+    margin-bottom: var(--sp-8);
+    padding: var(--sp-8) var(--sp-10);
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 4px 10px;
+    gap: var(--sp-4) var(--sp-10);
   }
   .px-t td {
     border: 0;
     display: flex;
     justify-content: space-between;
-    gap: 8px;
+    gap: var(--sp-8);
     text-align: right;
   }
   .px-t td[data-l]::before {
     content: attr(data-l);
     color: var(--muted);
-    font-size: 0.72rem;
+    font-size: var(--fs-10);
     text-align: left;
   }
   .px-t .c-title {
@@ -570,7 +570,7 @@ body.px-lock {
     justify-content: flex-start;
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: var(--sp-6);
     text-align: left;
   }
   .px-t .c-act .px-t .c-w,
@@ -605,9 +605,9 @@ body.px-lock {
   align-items: center;
 }
 .px-hk {
-  margin-top: 6px;
+  margin-top: var(--sp-6);
   grid-template-columns: repeat(3, auto);
-  gap: 4px 18px;
+  gap: var(--sp-4) var(--sp-20);
   justify-content: start;
 }
 .px-dact {
@@ -617,7 +617,7 @@ body.px-lock {
   display: flex;
   border-bottom: 1px solid var(--line);
   background: var(--surface);
-  padding: 0 8px;
+  padding: 0 var(--sp-8);
 }
 .px-tabs2 button {
   flex: 1;
@@ -630,23 +630,23 @@ body.px-lock {
 .px-db > section {
   border: 0;
   background: none;
-  padding: 8px 0;
+  padding: var(--sp-8) 0;
 }
 .px-origin {
-  margin: 8px 0 12px;
+  margin: var(--sp-8) 0 var(--sp-12);
 }
 .px-figseg {
-  margin: 4px 0 8px;
+  margin: var(--sp-4) 0 var(--sp-8);
   display: inline-flex;
 }
 .px-part {
   display: block;
   color: var(--warn);
-  font-size: 0.7rem;
+  font-size: var(--fs-10);
 }
 .px-tech {
-  margin-top: 12px;
-  font-size: 0.82rem;
+  margin-top: var(--sp-12);
+  font-size: var(--fs-11);
 }
 .px-tech summary {
   cursor: pointer;
@@ -657,7 +657,7 @@ body.px-lock {
   border-color: var(--text);
   font-weight: 800;
 }
-@media (max-width: 640px) {
+@media (max-width: 600px) {
   .px-hk {
     grid-template-columns: repeat(2, auto);
   }
@@ -686,20 +686,20 @@ body.px-lock {
   grid-column: 1/-1;
   display: flex;
   flex-wrap: wrap;
-  gap: 2px 12px;
+  gap: var(--sp-2) var(--sp-12);
   align-items: baseline;
   background: var(--surface-2, var(--bg));
-  border-radius: 8px;
-  padding: 8px 10px;
+  border-radius: var(--radius-8);
+  padding: var(--sp-8) var(--sp-10);
 }
 .px-tax > b {
-  font-size: 0.95rem;
+  font-size: var(--fs-13);
 }
 .px-tax > small {
   flex-basis: 100%;
   color: var(--muted);
-  font-size: 0.7rem;
-  line-height: 1.35;
+  font-size: var(--fs-10);
+  line-height: var(--lh-snug);
 }
 .px-hk dd {
   white-space: nowrap;
@@ -713,8 +713,8 @@ body.px-lock {
 .fold-h {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 14px 18px;
+  gap: var(--sp-10);
+  padding: var(--sp-14) var(--sp-20);
   cursor: pointer;
   user-select: none;
 }
@@ -722,25 +722,25 @@ body.px-lock {
   margin: 0;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--sp-8);
 }
 .fold-x {
   margin-left: auto;
   font-weight: 600;
 }
 .fold-b {
-  padding: 0 18px 16px;
+  padding: 0 var(--sp-20) var(--sp-16);
 }
 .folded .fold-b {
   display: none;
 }
 .cnt {
-  font-size: 0.75rem;
+  font-size: var(--fs-11);
   font-weight: 700;
   background: var(--surface-2);
   color: var(--muted);
-  border-radius: 999px;
-  padding: 1px 8px;
+  border-radius: var(--radius-pill);
+  padding: var(--sp-2) var(--sp-8);
 }
 .hide-s {
   display: none;
@@ -750,20 +750,20 @@ body.px-lock {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 16px;
-  margin-bottom: 18px;
+  gap: var(--sp-16);
+  margin-bottom: var(--sp-20);
 }
 .pf-toolbar h1 {
-  margin: 0 0 8px;
+  margin: 0 0 var(--sp-8);
 }
 .pf-toolbar select {
   max-width: 300px;
 }
 .pf-nav {
   display: flex;
-  gap: 4px;
+  gap: var(--sp-4);
   border-bottom: 1px solid var(--line);
-  margin: 0 0 18px;
+  margin: 0 0 var(--sp-20);
   overflow-x: auto;
 }
 .pf-nav button {
@@ -772,15 +772,15 @@ body.px-lock {
   cursor: pointer;
 }
 .pf-panel > * + * {
-  margin-top: 14px;
+  margin-top: var(--sp-14);
 }
 .lot-detail summary {
   cursor: pointer;
   color: var(--accent);
-  padding: 6px 0;
+  padding: var(--sp-6) 0;
 }
 .lot-detail {
-  padding: 12px 0;
+  padding: var(--sp-12) 0;
   border-bottom: 1px solid var(--line);
 }
 .pf-nav button:focus-visible {
@@ -789,7 +789,7 @@ body.px-lock {
 }
 .pf-toolbar {
   align-items: flex-start;
-  gap: 10px;
+  gap: var(--sp-10);
 }
 
 .pf-toolbar select {
@@ -825,21 +825,21 @@ body.px-lock {
   text-overflow: ellipsis;
   white-space: nowrap;
   overflow: hidden;
-  font: 600 10px system-ui;
+  font: 600 var(--fs-10) system-ui;
   border: 1px solid;
-  border-radius: 5px;
-  padding: 3px 5px;
+  border-radius: var(--radius-4);
+  padding: var(--sp-4) var(--sp-6);
   cursor: pointer;
 }
 .fc-tip {
   position: absolute;
-  padding: 9px;
+  padding: var(--sp-10);
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-8);
   box-shadow: var(--shadow-pop);
   z-index: 5;
-  font-size: 0.72rem;
+  font-size: var(--fs-10);
   max-width: calc(100% - 8px);
   max-height: 220px;
   overflow: auto;
@@ -850,14 +850,14 @@ body.px-lock {
   display: none;
 }
 .fc-tip div {
-  margin-top: 5px;
+  margin-top: var(--sp-6);
 }
 .fc-tip i {
   display: inline-block;
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  margin-right: 5px;
+  margin-right: var(--sp-6);
 }
 .fc-selection {
   position: absolute;
@@ -871,7 +871,7 @@ body.px-lock {
 .fc-svg {
   display: block;
   width: 100%;
-  font: 10px system-ui;
+  font: var(--fs-10) system-ui;
   fill: var(--muted);
 }
 .fc-svg path {
@@ -887,7 +887,7 @@ body.px-lock {
   top: 30px;
   bottom: 0;
   border-left: 1px dashed var(--ok);
-  opacity: 0.8;
+  opacity: 0.85;
 }
 .fc-trade-line.dim {
   opacity: 0.18;
@@ -906,14 +906,14 @@ body.px-lock {
 .tx-filters {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--sp-8);
   align-items: end;
-  margin-bottom: 12px;
+  margin-bottom: var(--sp-12);
 }
 .tx-filters label {
-  font-size: 0.75rem;
+  font-size: var(--fs-11);
   display: grid;
-  gap: 3px;
+  gap: var(--sp-4);
 }
 .tx-filters select,
 .tx-filters input {
@@ -933,11 +933,11 @@ body.px-lock {
   max-width: 100%;
 }
 .fc-svg {
-  font-size: 9px;
+  font-size: var(--fs-10);
 }
 .fc-plot {
   touch-action: pan-y;
 }
 .fc-buy-label.dim {
-  opacity: 0.4;
+  opacity: 0.5;
 }

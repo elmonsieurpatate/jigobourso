@@ -62,7 +62,7 @@
         .map((r) => {
           const m = meta(r.id),
             off = !m.enabled;
-          return `<div class="card tight" data-style="margin-bottom:10px;${off ? "opacity:.8" : ""}"><div class="row between u-align-items-flex-start">
+          return `<div class="card tight" data-style="${off ? "opacity:.8" : ""}"><div class="row between u-align-items-flex-start">
           <div class="row u-flex-wrap-nowrap u-align-items-flex-start u-min-width-0">${SUI.ico(r.id, r.builtin ? "builtin" : "personal")}<div class="u-min-width-0"><b>${esc(r.name)}</b> ${SUI.badge(status[r.id] ? status[r.id].status : r.builtin ? "official" : "personal")} ${off ? ' <span class="badge sm">Désactivée</span>' : ""}${r.id === view.selected ? ' <span class="badge sm ok outline">Dernière utilisée</span>' : ""}
           <div class="small muted u-white-space-pre-line u-max-width-70ch">${esc(m.description || "Aucune explication.")} <a href="aide.html#strategie-${esc(r.builtin ? r.id : "personnelles")}">Fiche d’aide</a></div>${statusBlock(r)}
           <div class="small muted">${r.row ? (r.builtin ? "Réglages modifiés" : "Enregistrée") + " le " + esc(when(r.row.updated_at)) : "Valeurs d’origine"}</div></div></div>

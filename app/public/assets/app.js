@@ -405,7 +405,7 @@ J.buildShell = function (page, user) {
   const file = location.pathname.split("/").pop() || "index.html",
     store = J.store.text;
   const nav = J.NAV(user.is_admin),
-    narrow = () => matchMedia("(max-width: 960px)").matches;
+    narrow = () => matchMedia("(max-width: 900px)").matches;
   const isOn = (c) => {
     const href = c.href.split("#")[0].split("?")[0];
     return href === file && c.on(new URLSearchParams(location.search), location.hash);
@@ -475,7 +475,7 @@ J.buildShell = function (page, user) {
       sync();
     }
   });
-  matchMedia("(max-width: 960px)").addEventListener("change", () => {
+  matchMedia("(max-width: 900px)").addEventListener("change", () => {
     body.classList.remove("side-open");
     sync();
   });

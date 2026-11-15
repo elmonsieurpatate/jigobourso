@@ -221,8 +221,8 @@
     <div class="u-text-align-right"><div class="px">${J.money(s.price, s.currency)}</div><div class="muted">${s.price ? J.priceLabel(s) + " · " + J.dateTime(s.price_time) : "Pas de cours"}</div>${lastDay !== null ? `<div class="${J.cls(lastDay)} fw-bold">${J.pct(lastDay)} <span class="muted fw-normal">sur la dernière séance</span></div>` : ""}
     ${s.price_eur !== null && s.currency !== "EUR" ? `<div class="muted small">≈ ${J.eur(s.price_eur)}</div>` : ""}<div class="mt-3"><button class="btn sm" id="add">+ Ajouter à un portefeuille</button></div></div></div>
   ${s.price_stale ? '<div class="notice warn">Cours ancien : aucune cotation récente confirmée. Le prix affiché reste daté, il ne représente pas un cours actuel.</div>' : ""}
-  <div class="row small u-gap-14px u-margin-10px-0">${ext.map(([name, url]) => `<a href="${J.esc(url)}" target="_blank" rel="noopener noreferrer">${name} ↗</a>`).join("")}</div>
-  ${notice ? `<div class="grid u-gap-10px u-margin-bottom-14px">${notice}</div>` : ""}
+  <div class="row small u-gap-14px">${ext.map(([name, url]) => `<a href="${J.esc(url)}" target="_blank" rel="noopener noreferrer">${name} ↗</a>`).join("")}</div>
+  ${notice ? `<div class="grid u-gap-10px">${notice}</div>` : ""}
   <div class="tabs big" id="tabs">${hasTabs.map((t) => `<button data-t="${t}">${tabLabel[t]}</button>`).join("")}</div>
   <div class="grid u-grid-template-columns-v3 u-align-items-start" id="layout"><div id="main"></div>
    <div>
@@ -231,7 +231,7 @@
     <div class="card"><h2>Repères</h2><div class="metric-grid u-grid-template-columns-1fr-1fr"><div class="metric"><div class="l">Moy. 20 j</div><div class="v">${J.num(st.ma20, 2)}</div></div><div class="metric"><div class="l">Moy. 50 j</div><div class="v">${J.num(st.ma50, 2)}</div></div><div class="metric"><div class="l">Écart moy. 20 j</div><div class="v">${J.pct(st.gap_to_ma20, 1)}</div></div><div class="metric"><div class="l">Volume moy. 3 m</div><div class="v">${s.avg_volume_3m !== null ? J.num(s.avg_volume_3m, 0) : "–"}</div></div><div class="metric" title="Variation du cours entre il y a 126 et il y a 21 séances (le dernier mois est ignoré). Mesure du passé."><div class="l">Momentum 6 mois</div><div class="v ${J.cls(st.momentum_6m)}">${st.momentum_6m !== null && st.momentum_6m !== undefined ? J.pct(st.momentum_6m, 1) : "non évaluable"}</div></div><div class="metric" title="Variation du cours entre il y a 252 et il y a 21 séances (le dernier mois est ignoré). Mesure du passé."><div class="l">Momentum 12 mois</div><div class="v ${J.cls(st.momentum_12m)}">${st.momentum_12m !== null && st.momentum_12m !== undefined ? J.pct(st.momentum_12m, 1) : "non évaluable"}</div></div></div></div>
     ${sib ? `<div class="card"><h2>Autres cotations du produit</h2><div class="small u-display-grid u-gap-6px">${sib}</div></div>` : ""}
    </div></div>`;
-  if (innerWidth < 960) J.$("#layout").style.gridTemplateColumns = "minmax(0,1fr)";
+  if (innerWidth < 900) J.$("#layout").style.gridTemplateColumns = "minmax(0,1fr)";
 
   const measuresCard = () => {
     const periodSlope = (x, n) => (x == null ? null : 100 * Math.expm1(n * Math.log1p(x / 100)));

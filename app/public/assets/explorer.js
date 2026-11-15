@@ -141,7 +141,7 @@
   const LEGACY_VISIBLE = () =>
     Object.keys(REG).map((id) => [
       id,
-      (window.matchMedia("(max-width:700px)").matches
+      (window.matchMedia("(max-width:760px)").matches
         ? ["rank", "name", "status", "price", "change", "slope", "simple", "complex"]
         : [
             "rank",
@@ -855,7 +855,7 @@
         $(`[data-open-filter="${k}"]`).setAttribute("aria-expanded", "true");
         $(`#ct-list-${k} input[type=search]`).value = "";
         searchCategories(k, "");
-        if (!matchMedia("(max-width:700px)").matches && !matchMedia("(pointer:coarse)").matches)
+        if (!matchMedia("(max-width:760px)").matches && !matchMedia("(pointer:coarse)").matches)
           $(`#ct-list-${k} input[type=search]`).focus();
         positionFilter(k);
       }

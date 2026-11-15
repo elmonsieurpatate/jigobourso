@@ -26,6 +26,31 @@ Mobile (≤ 700 px) : `--control-h` 40 px, `--control-h-sm` 32 px, champs à 16 
 
 Titres, kicker, boutons (`.btn`, `.primary`, `.ghost`, `.danger`, `.sm`, `.lg`, `.icon`), champs (`input`, `select`, `textarea`), cases et boutons radio natifs (`accent-color`), interrupteur `input.switch`, onglets `.tabs`, segments `.seg`, badges `.badge`, cartes `.card`, tableaux (`th`, `td`, `.table-wrap`), messages `.notice`, états `.empty`/`.spinner`, dialogues et menus.
 
+## Échelles communes (espacements, textes, rayons, empilement)
+
+Toutes les feuilles utilisent les mêmes valeurs ; les jetons sont définis une fois dans `halo.css` (`:root`) et vérifiés par `scripts/css_scale.py` (`python scripts/css_scale.py check`, test `tests/fast/test_css_scale.py`, CI).
+
+| Famille | Jetons / valeurs |
+|---|---|
+| Espacements (margin, padding, gap) | `--sp-2 4 6 8 10 12 14 16 20 24 32 40 48` (px). Au-delà de 48 : largeur propre à une mise en page. Négatifs : marges de recouvrement uniquement ; `1px` : filet. |
+| Texte | `--fs-10 11 12 13 14 15 16 18 20 24 28 32` (px, `html` = 14 px) |
+| Interlignage | `--lh-none` 1 · `--lh-tight` 1,25 · `--lh-snug` 1,4 · `--lh-normal` 1,5 · `--lh-loose` 1,6 |
+| Rayons | `--radius-4 8 12 16`, `--radius-pill` ; `--radius`, `--radius-sm`, `--control-radius`, `--panel-radius` en dérivent |
+| Empilement | local 1 à 10 dans un composant ; global `--z-bar` 20 · `--z-header` 30 · `--z-pop` 50 · `--z-backdrop` 55 · `--z-drawer` 60 · `--z-fly` 80 · `--z-top` 1000 |
+| Points de rupture | 380, 600, 760, 900, 1100, 1400 px (les `min-width` valent la limite + 1) ; les seuils JavaScript reprennent les mêmes valeurs |
+| Bordures | 1, 2, 3, 4 px |
+| Opacités atténuées | 0,5 · 0,7 · 0,85 (les voiles décoratifs < 0,3 sont conservés) |
+
+Les égalités se résolvent vers la valeur supérieure. `python scripts/css_scale.py apply` convertit une valeur hors échelle.
+
+### Rythme vertical des pages
+
+Les blocs d'une page (en-tête, cartes, panneaux, tableaux, notices) sont séparés de `--sp-16` **par le conteneur seul** (`display: grid; gap: var(--sp-16)` sur `main.wrap`, `#page`, `#px-page`, `#main`, `.pf-panel`, `.pf-home`, `.bilan-layout`, `.tracking-layout`, `.as`, `.admin-flow`, `.admin-filter-form`, colonnes de `.ac-grid`). Les marges verticales des enfants directs sont neutralisées : ne pas poser de `mt-*`, `mb-*` ni de `margin` sur un bloc de page, ajouter le bloc suffit. Écart à l'intérieur d'une carte : 8 à 12 px selon le contenu (non unifié).
+
+### Mesure
+
+`scripts/probe_layout.sh` (base jetable) rend les 30 vues réelles à 1280 et 390 px : débordement horizontal, écarts entre blocs, valeurs réellement rendues. `--out`, `--compare` et `--shots` comparent deux états.
+
 ## Garde-fous
 
 - `make css-check` : formatage Prettier 3.3.3 (`.prettierrc`) et `scripts/check_halo_css.py` : jetons uniques, `halo.css` dernière feuille, aucune couleur littérale hors `halo.css`, **aucune surcharge visuelle d'un composant commun dans une feuille de page**.

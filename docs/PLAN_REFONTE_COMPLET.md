@@ -189,12 +189,12 @@ Centraliser les composants n'impose pas un CSS monolithique.
       succès, vigilance et danger. Preuve : `:root` clair et sombre de halo.css.
 - [x] Couleurs de texte adaptées aux fonds, en clair et sombre. Preuve : mesures clair/sombre sur 14 pages.
 - [x] Typographie : familles, tailles, graisses, interlignages et chiffres. Preuve : variables --h*, --*-size, tabular-nums.
-- [ ] Espacements et densités réellement partagés.
+- [x] Espacements et densités réellement partagés. Preuve 2026-11-15 : échelle `--sp-*` (13 valeurs) appliquée aux 11 feuilles, 0 valeur hors échelle (`css_scale.py check`, test_css_scale.py) ; rendu : 38 → 22 valeurs d'espacement distinctes sur 60 vues ; écart entre blocs de page = 16 px partout (gap du conteneur).
 - [x] Rayons, ombres, focus et transitions. Preuve : --control-radius, --panel-radius, --shadow*, :focus-visible.
-- [ ] Niveaux de superposition des menus, en-têtes, fenêtres et notifications.
+- [x] Niveaux de superposition des menus, en-têtes, fenêtres et notifications. Preuve 2026-11-15 : jetons `--z-bar/header/pop/backdrop/drawer/fly/top`, 10 usages ; test_css_scale.py.
 - [ ] Palettes de données séparées si nécessaires : catégories, séries, jauges.
 - [ ] Contrastes et lisibilité des valeurs vérifiés.
-- [ ] Pas de token artificiel pour chaque nombre isolé sans usage commun.
+- [x] Pas de token artificiel pour chaque nombre isolé sans usage commun. Preuve 2026-11-15 : chaque jeton d'échelle est utilisé (au moins 1 à 217 fois) ; valeurs isolées > 48 px conservées en dur.
 
 ## Galerie de référence
 
@@ -842,3 +842,13 @@ Formatage JS (Prettier, commit 4613946, `make js-format` / `make js-check`). Cyc
 - 65 présentations fixes de `data-style` converties en classes atomiques `u-…` (`base.css`), `.is-off` pour `#runbar`, `#as-cur`, `#as-dot` (réaffichés par script : `classList` à la place de `style.display`).
 - Gardes : test_frontend_policy.py ; sonde de parité en navigateur (0 écart sur 347 vérifications).
 - La recette visuelle « Visuel ok » précède cette conversion : un nouveau coup d'œil sur admin, aide, fiche titre et stratégies est recommandé.
+
+## Journal — harmonisation CSS (2026-11-15)
+
+- Constat : les étapes 1 à 3 avaient été closes sans que « espacements partagés » le soit ; mesure avant : 138 marges, 177 paddings, 71 tailles de texte, 26 points de rupture, 31 rayons distincts dans les déclarations.
+- `scripts/css_scale.py` (échelles, conversion, contrôle) ; test `tests/fast/test_css_scale.py` ; jetons dans `halo.css` ; doc `docs/DESIGN_HALO.md` (échelles et rythme vertical).
+- Rythme vertical : l'écart entre blocs d'une page vient du conteneur (grid gap 16 px) ; marges locales des enfants neutralisées ; `mt-*`/`margin` retirés de `titre.js` et `mes-strategies.js` aux niveaux de page.
+- Doublons `base.css`/`halo.css` (`.btn`, `.card`, `h1`, `h2`, `th`) fusionnés dans `halo.css`.
+- Seuils JavaScript alignés sur les points de rupture (960 → 900, 700 → 760).
+- Mesure après (`scripts/probe_layout.sh`, 60 vues) : valeurs rendues distinctes espacements 38 → 22, tailles 43 → 18, interlignages 14 → 8, rayons 16 → 6 ; aucune page à défilement horizontal ; tous les écarts entre blocs de page à 16 px ; il reste des écarts intérieurs aux cartes (8 à 12 px) non unifiés.
+- Effet visible : rayons 9 → 8 px, boutons 36 → 38 px de haut, titres de section 19 → 20 px, pages 0 à 50 px plus hautes ; référence `tests/visual/galerie.json` régénérée.

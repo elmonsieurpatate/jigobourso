@@ -1,7 +1,7 @@
 /* Réglages d'affichage des tableaux (colonnes, ordre, largeurs, tri et filtres initiaux), définis dans Administration → Colonnes.
    Quatre configurations indépendantes : page (explorer | scores) × affichage (desktop | mobile). Lecture seule ici ; l'écriture est réservée à l'administration. */
 window.TableLayout = (() => {
-  const mq = window.matchMedia("(max-width:700px)");
+  const mq = window.matchMedia("(max-width:760px)");
   const device = () => (mq.matches ? "mobile" : "desktop");
   let cache = null;
   async function load() {

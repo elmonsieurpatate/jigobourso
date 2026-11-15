@@ -1,22 +1,22 @@
 .ac-head {
   display: grid;
-  gap: 8px;
-  margin-bottom: 12px;
+  gap: var(--sp-8);
+  margin-bottom: var(--sp-12);
 }
 .ac-pick {
   display: flex;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: var(--sp-16);
   align-items: flex-end;
 }
 .ac-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
-  gap: 14px;
+  gap: var(--sp-14);
   align-items: start;
 }
 .ac-grid .card {
-  margin-bottom: 14px;
+  margin-bottom: var(--sp-14);
 }
 .ac-side {
   position: sticky;
@@ -24,7 +24,7 @@
 }
 .ac-list {
   list-style: none;
-  margin: 10px 0 0;
+  margin: var(--sp-10) 0 0;
   padding: 0;
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -33,9 +33,9 @@
 .ac-row {
   display: grid;
   grid-template-columns: 30px 26px minmax(0, 1fr) auto auto;
-  gap: 8px;
+  gap: var(--sp-8);
   align-items: center;
-  padding: 6px 10px;
+  padding: var(--sp-6) var(--sp-10);
   border-bottom: 1px solid var(--line);
   background: var(--surface);
 }
@@ -43,7 +43,7 @@
   border-bottom: 0;
 }
 .ac-row.off .ac-name {
-  opacity: 0.55;
+  opacity: 0.5;
   text-decoration: line-through;
   text-decoration-thickness: 1px;
 }
@@ -58,9 +58,9 @@
   touch-action: none;
   user-select: none;
   text-align: center;
-  font-size: 1.25rem;
-  line-height: 1;
-  padding: 8px 0;
+  font-size: var(--fs-18);
+  line-height: var(--lh-none);
+  padding: var(--sp-8) 0;
   color: var(--muted);
 }
 .ac-handle:active {
@@ -70,11 +70,11 @@
   color: var(--muted);
   font-variant-numeric: tabular-nums;
   text-align: right;
-  font-size: 0.8rem;
+  font-size: var(--fs-11);
 }
 .ac-vis {
   display: flex;
-  gap: 8px;
+  gap: var(--sp-8);
   align-items: center;
   min-width: 0;
   flex-wrap: wrap;
@@ -87,15 +87,15 @@
 }
 .ac-move {
   display: flex;
-  gap: 4px;
+  gap: var(--sp-4);
 }
 .ac-sortrow,
 .ac-filter {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
-  margin: 6px 0;
+  gap: var(--sp-8);
+  margin: var(--sp-6) 0;
 }
 .ac-sortrow > span:first-child,
 .ac-filter > span:first-child {
@@ -111,8 +111,8 @@
   flex-wrap: wrap;
   justify-content: flex-end;
   align-items: center;
-  gap: 8px;
-  padding: 10px 0;
+  gap: var(--sp-8);
+  padding: var(--sp-10) 0;
   background: var(--bg, var(--surface));
   border-top: 1px solid var(--line);
 }
@@ -138,7 +138,7 @@
 .ac-table {
   border-collapse: collapse;
   width: 100%;
-  font-size: 0.82rem;
+  font-size: var(--fs-11);
 }
 .ac-table th,
 .ac-table td {
@@ -147,13 +147,13 @@
 }
 .ac-badge {
   font-style: normal;
-  font-size: 0.68rem;
+  font-size: var(--fs-10);
   font-weight: 700;
-  padding: 1px 6px;
-  border-radius: 999px;
+  padding: var(--sp-2) var(--sp-6);
+  border-radius: var(--radius-pill);
   border: 1px solid var(--line);
 }
-@media (max-width: 980px) {
+@media (max-width: 900px) {
   .ac-grid {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -161,7 +161,7 @@
     position: static;
   }
 }
-@media (max-width: 640px) {
+@media (max-width: 600px) {
   .ac-row {
     grid-template-columns: 34px 22px minmax(0, 1fr);
   }
@@ -170,7 +170,7 @@
     grid-column: 3;
   }
   .ac-handle {
-    padding: 12px 0;
+    padding: var(--sp-12) 0;
   }
   .ac-row .btn {
     min-width: 44px;
