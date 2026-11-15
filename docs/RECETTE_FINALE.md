@@ -1,4 +1,40 @@
-# Recette finale et synthèse (étape 12) — 2026-11-14
+# Recette finale et synthèse (étape 12)
+
+## Reprise de clôture — 15 novembre 2026
+
+Base `origin/main` : **7a55926**. Voir `CLOTURE_REFONTE.md` pour les changements,
+les preuves et les limites. Les résultats ci-dessous concernent cette reprise.
+
+| Contrôle | Résultat |
+|---|---|
+| Ruff, format Python, syntaxe PHP (47 fichiers), Prettier JS/CSS, syntaxe JS, migrations additives (17), garde-fous Halo et échelles | OK |
+| Tests rapides | **714 réussis**, aucun sauté |
+| Intégration PHP/Python/MariaDB sur base jetable | **351 réussis**, aucun sauté |
+| E2E financier, stratégies, navigation et compte | OK |
+| Clavier du dialogue commun et onglets, 4 contextes | OK |
+| Tactile émulé, 2 thèmes : sélecteur borné, aucune recherche au changement, un appel au clic, chargement explicite, défilement horizontal | OK |
+| Fiche titre, 12 redimensionnements de 320 à 1280 px | OK ; régression de colonne mobile corrigée |
+| Galerie, 390/1280 px × clair/sombre | Référence régénérée pour police locale et espacements voulus ; comparaison suivante OK |
+| Contraste calculé | **196 paires** conformes ; texte 4,5:1, séries 3:1 |
+| Utilitaires | **63/63 classes**, 756 comparaisons de contrat ; vraies pages : 42 classes rencontrées, 326 comparaisons, aucun écart |
+| Mise en page | 120 vues initiales ; 36 vues fiche/aide revérifiées après correction ; aucun débordement de page |
+| Intégrité financière et catalogue secondaire, base jetable | OK, aucune anomalie financière |
+
+Les éléments hors écran dans un menu fermé ou une zone défilante ne sont pas
+assimilés à un débordement de page. Les captures ont été examinées sur la fiche,
+l'aide, l'explorateur, les stratégies et l'administration. Les tests portent sur
+Chromium, Python 3.12, PHP 8.2 et MariaDB 10.11. CI Python 3.9, appareils réels et
+restauration Hostinger réelle restent des vérifications externes explicites.
+Aucun push ni déploiement de cette reprise.
+
+Les premières tentatives locales ont révélé deux limites du harnais, corrigées
+avant la recette finale : la galerie `file:` est interdite par ce navigateur
+(gérée par `GALLERY_URL` HTTP), et l'arrêt du client `docker exec` laissait un
+serveur PHP de test vivant avec un ancien répertoire de courrier. Le conteneur
+de test a été redémarré avant le rejeu complet. Aucun test de compte n'a été
+supprimé ou rendu permissif pour obtenir le résultat ci-dessus.
+
+## Historique des lots précédents (14 novembre)
 
 ## Suites rejouées après les derniers changements de code
 

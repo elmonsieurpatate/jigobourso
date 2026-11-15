@@ -18,54 +18,50 @@ Vérifier les changements intervenus depuis l'audit.
 Une fonctionnalité déjà présente doit être vérifiée avant d'être déclarée
 conforme. Les cases non cochées restent à traiter ou à valider.
 
-### État courant au 13 novembre 2026
+### État courant au 15 novembre 2026 — reprise de clôture
 
-- Référence retenue : `design-demos/terminal-ultraviolet.html`, variante Halo,
-  en clair et sombre.
-- Refonte CSS locale enregistrée dans `024768e` sur `main`. Les composants
-  communs, leurs dimensions et la palette sont dans `app/public/assets/halo.css` ;
-  `base.css` porte la structure et les utilitaires. Les feuilles de page
-  conservent les dispositions et éléments propres à leur fonction.
-- `tokens.css` et `components.css` ont été supprimées. Les 19 pages HTML
-  chargent `halo.css` en dernier.
-- La page Aide ne charge plus `strategies-ui.css` ni `strategies-ui.js` : ses
-  tableaux utilisent les classes `h-table` et `h-table-scroll` de `help.css`.
-- `python3 scripts/check_halo_css.py` passe sur l'état courant. Ce contrôle
-  vérifie les feuilles et les jetons ; il ne valide pas le rendu des états
-  dynamiques ou tous les parcours authentifiés.
-- Les étapes 1 à 3 restent ouvertes dans leur ensemble : recette visuelle et
-  fonctionnelle complète, états dynamiques, accessibilité et vérification des
-  exceptions CSS restent à faire. F08 et les étapes 4 à 12 restent ouvertes.
+Base de cette reprise : `origin/main` **7a55926**, branche
+`chore/cloture-refonte-20261115`. Le choix Halo est conservé. Les précédents
+journaux restent historiques : leur annonce « étape close » ne vaut pas
+vérification de chaque critère.
+
+Le suivi de la reprise est dans [CLOTURE_REFONTE.md](CLOTURE_REFONTE.md) :
+palettes et contrastes, sections de cartes, utilitaires, police locale,
+compteur SQL isolé, recette navigateur et correction du responsive de la fiche.
+Les règles permanentes et la méthode répétitive ne portent plus de cases :
+elles s'appliquent toujours, elles ne sont pas des travaux à « terminer ».
+Les critères détaillés renvoient désormais à leurs preuves ; la portée de recette est Chromium et émulation mobile, jamais une certification sur appareil réel.
+Les contrôles Hostinger et appareils réels restent séparés des travaux locaux.
 
 ---
 
 ## Règles pour Codex, Claude ou le développeur
 
-- [ ] Lire les instructions du dépôt, ce plan et le dernier journal de reprise.
-- [ ] Vérifier l'état Git et préserver toutes les modifications préexistantes.
-- [ ] Identifier la révision de départ et le lot demandé.
-- [ ] Réutiliser les connaissances et preuves existantes ; ne pas recommencer
+- Lire les instructions du dépôt, ce plan et le dernier journal de reprise.
+- Vérifier l'état Git et préserver toutes les modifications préexistantes.
+- Identifier la révision de départ et le lot demandé.
+- Réutiliser les connaissances et preuves existantes ; ne pas recommencer
       un audit global à chaque reprise.
-- [ ] Exécuter seulement l'étape ou le sous-lot demandé.
-- [ ] Résoudre les choix techniques courants sans demander confirmation
+- Exécuter seulement l'étape ou le sous-lot demandé.
+- Résoudre les choix techniques courants sans demander confirmation
       à chaque détail.
-- [ ] Ne pas inventer la direction graphique pendant la préparation des maquettes.
-- [ ] Ne pas pousser, fusionner ou déployer sans instruction de l'utilisateur.
-- [ ] Ne pas modifier les données réelles pour faciliter une refonte ou un test.
-- [ ] Utiliser une base jetable clairement identifiée pour les tests destructifs.
-- [ ] Ne pas modifier les dépendances de .venv ou les bibliothèques tierces.
-- [ ] Ne pas introduire de framework ou de bundler sans bénéfice concret justifié.
-- [ ] Séparer les commits de formatage des corrections de comportement.
-- [ ] Préserver les contrats API, les routes et les règles métier pendant
+- Ne pas inventer la direction graphique pendant la préparation des maquettes.
+- Ne pas pousser, fusionner ou déployer sans instruction de l'utilisateur.
+- Ne pas modifier les données réelles pour faciliter une refonte ou un test.
+- Utiliser une base jetable clairement identifiée pour les tests destructifs.
+- Ne pas modifier les dépendances de .venv ou les bibliothèques tierces.
+- Ne pas introduire de framework ou de bundler sans bénéfice concret justifié.
+- Séparer les commits de formatage des corrections de comportement.
+- Préserver les contrats API, les routes et les règles métier pendant
       les déplacements de code.
-- [ ] Supprimer les anciennes implémentations effectivement remplacées.
-- [ ] Ne pas supprimer un fichier ou sélecteur sur la seule absence de référence
+- Supprimer les anciennes implémentations effectivement remplacées.
+- Ne pas supprimer un fichier ou sélecteur sur la seule absence de référence
       dans le HTML statique : vérifier les templates et chargements dynamiques.
-- [ ] Exécuter les contrôles pertinents pendant le lot ; élargir la validation
+- Exécuter les contrôles pertinents pendant le lot ; élargir la validation
       à sa clôture, sans tout relancer après chaque petite modification.
-- [ ] Ne pas modifier un test uniquement pour le faire passer.
-- [ ] Mettre à jour le suivi après chaque lot.
-- [ ] Fournir un bilan court : changements, vérifications, limites et prochain lot.
+- Ne pas modifier un test uniquement pour le faire passer.
+- Mettre à jour le suivi après chaque lot.
+- Fournir un bilan court : changements, vérifications, limites et prochain lot.
 
 ### Signification d'une case cochée
 
@@ -86,7 +82,7 @@ pas présenté comme réalisé.
 
 ## Tableau de bord
 
-- [ ] Étape 0 — Départ fiable et réception des maquettes.
+- [x] Étape 0 — Départ fiable et réception des maquettes. Preuve : C15 : version, branche, références, baseline et parcours identifiés ci-dessous.
 - [x] Étape 1 — Architecture CSS et composants de référence. Clôturée 2026-11-14 : lint, css-check, visual, fast (656), e2e, integ (336) verts ; voir journal.
 - [x] Étape 2 — Migration et harmonisation de toutes les pages. Clôturée 2026-11-14 : lint, css-check, visual, fast (656), e2e, integ (336) verts ; voir journal.
 - [x] Étape 3 — Validation et verrouillage du résultat CSS. Clôturée 2026-11-14 : lint, css-check, visual, fast (656), e2e, integ (336) verts ; voir journal.
@@ -106,15 +102,15 @@ pas présenté comme réalisé.
 
 ## Version et références
 
-- [ ] Identifier le main courant et les changements pertinents depuis l'audit.
-- [ ] Vérifier les défauts encore présents sans rouvrir ceux déjà corrigés.
-- [ ] Définir le mode Git du chantier en suivant l'instruction de l'utilisateur.
-- [ ] Inventorier les pages actives, les redirections et les assets chargés.
-- [ ] Repérer les composants générés par JavaScript et les dialogues.
-- [ ] Identifier les commandes de démarrage et de vérification disponibles.
-- [ ] Conserver les résultats de référence et les échecs préexistants éventuels.
-- [ ] Capturer les pages importantes avant modification, mobile et desktop,
-      clair et sombre si ces thèmes sont pris en charge.
+- [x] Identifier le main courant et les changements pertinents depuis l'audit. Preuve : C15 : départ 7a55926, branche dédiée, historique distant comparé.
+- [x] Vérifier les défauts encore présents sans rouvrir ceux déjà corrigés. Preuve : C15 : galerie, contrastes, utilitaires, compteur SQL, captures réelles ; deux défauts de cascade corrigés.
+- [x] Définir le mode Git du chantier en suivant l'instruction de l'utilisateur. Preuve : C15 : worktree isolé, aucune modification préexistante écrasée, aucun push ni déploiement.
+- [x] Inventorier les pages actives, les redirections et les assets chargés. Preuve : C15 : check_halo_css.py, 19 pages, ressources présentes et ordre contrôlé.
+- [x] Repérer les composants générés par JavaScript et les dialogues. Preuve : C15 : J.dialog dans app.js, SUI.picker dans strategies-ui.js, templates titre/aide ; parcours e2e réels.
+- [x] Identifier les commandes de démarrage et de vérification disponibles. Preuve : C15 : Makefile, scripts/e2e_browser.sh, probe_layout.sh ; commandes de clôture documentées.
+- [x] Conserver les résultats de référence et les échecs préexistants éventuels. Preuve : C15 : baseline 713 tests rapides, galerie avant/après, run CI historique identifié ; CLOTURE_REFONTE.md.
+- [x] Capturer les pages importantes avant modification, mobile et desktop,
+      clair et sombre si ces thèmes sont pris en charge. Preuve : Références initiales de l’audit 079e40c conservées dans artifacts/audit-main-079e40c ; captures C15 après refonte. Ne pas confondre ces deux versions.
 
 Référence historique, à ne pas confondre avec une validation du code courant :
 656 tests rapides réussis ; 336 cas d'intégration validés en deux exécutions
@@ -122,15 +118,15 @@ après correction d'un PATH ; trois parcours navigateur officiels réussis.
 
 ## Maquettes
 
-- [ ] Recenser les maquettes, leur emplacement, leur version et leur couverture.
-- [ ] Distinguer les propositions exploratoires de la direction retenue.
-- [ ] Identifier la direction graphique retenue par l'utilisateur avant
-      de figer couleurs, typographie, densité et géométrie.
-- [ ] Extraire les règles communes, plutôt que créer une feuille par maquette.
-- [ ] Identifier les états manquants : mobile, sombre, chargement, erreur,
-      désactivation, vide, textes longs et grandes valeurs.
-- [ ] Établir la correspondance entre maquettes et composants réutilisables.
-- [ ] Documenter les choix ouverts sans inventer silencieusement leur réponse.
+- [x] Recenser les maquettes, leur emplacement, leur version et leur couverture. Preuve : DESIGN_HALO.md : terminal-ultraviolet.html, variante Halo et galerie des composants.
+- [x] Distinguer les propositions exploratoires de la direction retenue. Preuve : DESIGN_HALO.md : référence Halo conservée ; aucune nouvelle direction inventée.
+- [x] Identifier la direction graphique retenue par l'utilisateur avant
+      de figer couleurs, typographie, densité et géométrie. Preuve : DESIGN_HALO.md : choix Halo consigné dans les lots précédents, conservé à cette reprise.
+- [x] Extraire les règles communes, plutôt que créer une feuille par maquette. Preuve : halo.css : source unique des jetons et composants ; garde-fou exécuté.
+- [x] Identifier les états manquants : mobile, sombre, chargement, erreur,
+      désactivation, vide, textes longs et grandes valeurs. Preuve : Galerie (désactivé, vide, chargement, erreur, textes longs), financial/keyboard e2e ; limites appareils réels séparées.
+- [x] Établir la correspondance entre maquettes et composants réutilisables. Preuve : DESIGN_HALO.md : tableau des jetons, composants et consommateurs.
+- [x] Documenter les choix ouverts sans inventer silencieusement leur réponse. Preuve : CLOTURE_REFONTE.md : limites externes explicites ; choix Halo conservés.
 
 Tant que les maquettes sont en cours, avancer sur l'inventaire, les références,
 le relevé des conflits et le formatage CSS sans changement visuel.
@@ -138,12 +134,12 @@ Ne pas figer prématurément le design final.
 
 ## Comportements à préserver
 
-- [ ] Aucune recherche automatique lors d'une modification de réglages.
-- [ ] Recherche déclenchée par « Appliquer les réglages », chargement explicite.
-- [ ] Réglages personnels et isolation entre comptes.
-- [ ] Sélection, sauvegarde et restauration des stratégies.
-- [ ] Consultation et modification des transactions.
-- [ ] Navigation, droits, tableaux et graphiques.
+- [x] Aucune recherche automatique lors d'une modification de réglages. Preuve : tests/e2e/financial.cjs et tests/e2e/strategies-ui.cjs : absence de ranking avant Appliquer.
+- [x] Recherche déclenchée par « Appliquer les réglages », chargement explicite. Preuve : tests/e2e/financial.cjs : bouton, chargement, résultats réels synthétiques.
+- [x] Réglages personnels et isolation entre comptes. Preuve : tests/integ et tests/e2e/strategies-ui.cjs : comptes distincts.
+- [x] Sélection, sauvegarde et restauration des stratégies. Preuve : tests/e2e/strategies-ui.cjs, tests/integ : stratégies et permissions.
+- [x] Consultation et modification des transactions. Preuve : tests/integ/test_portfolio_audit.py et e2e financier.
+- [x] Navigation, droits, tableaux et graphiques. Preuve : 351 tests d’intégration et parcours e2e financier, stratégies, compte ; captures des pages réelles.
 
 Clôture : version, références, direction visuelle et premier lot sont identifiés.
 
@@ -165,23 +161,23 @@ Responsabilités à distinguer :
 Cela ne fixe pas un nombre obligatoire de fichiers.
 Centraliser les composants n'impose pas un CSS monolithique.
 
-- [ ] Cartographier les définitions communes et les surcharges locales.
+- [x] Cartographier les définitions communes et les surcharges locales. Preuve : DESIGN_HALO.md, FRONTEND_STRUCTURE.md et garde-fou check_halo_css.py.
 - [x] Identifier une source d'autorité par famille de composants. Preuve : halo.css, bloc « SOURCE UNIQUE ».
 - [x] Fixer l'ordre de chargement et une spécificité maîtrisée. Preuve : `check_halo_css.py` (ordre des feuilles) ; composants à spécificité de classe.
-- [ ] Définir des conventions de composants, variantes et états.
-- [ ] Interdire les sélecteurs de page qui modifient arbitrairement
-      l'apparence d'un composant commun.
-- [ ] Ne pas ajouter une feuille « corrections finales » après toutes les autres.
-- [ ] Prévoir la suppression des règles remplacées pendant la migration.
+- [x] Définir des conventions de composants, variantes et états. Preuve : DESIGN_HALO.md : composants, variantes, jetons et exceptions.
+- [x] Interdire les sélecteurs de page qui modifient arbitrairement
+      l'apparence d'un composant commun. Preuve : check_halo_css.py exécuté : surcharges communes interdites, exceptions nommées.
+- Ne pas ajouter une feuille « corrections finales » après toutes les autres.
+- Prévoir la suppression des règles remplacées pendant la migration.
 
 ## Lisibilité CSS
 
-- [ ] Choisir un formatage automatique et reproductible.
-- [ ] Formater dans un commit distinct du changement de design.
-- [ ] Vérifier l'absence de changement sémantique dû au formatage.
-- [ ] Documenter les commandes de formatage et de contrôle.
-- [ ] Rendre les règles et déclarations lisibles, sans lignes de milliers
-      de caractères.
+- [x] Choisir un formatage automatique et reproductible. Preuve : .prettierrc et Makefile : Prettier 3.3.3, vérification réussie.
+- Formater dans un commit distinct du changement de design. Historique : `e2a2ed4` (Prettier CSS).
+- Vérifier l'absence de changement sémantique dû au formatage. Les corrections C15 sont des changements volontaires de comportement/style, pas présentées comme du formatage pur.
+- [x] Documenter les commandes de formatage et de contrôle. Preuve : Makefile et DESIGN_HALO.md.
+- [x] Rendre les règles et déclarations lisibles, sans lignes de milliers
+      de caractères. Preuve : Prettier : feuilles et scripts formatés, contrôle réussi.
 
 ## Tokens issus des maquettes retenues
 
@@ -192,8 +188,8 @@ Centraliser les composants n'impose pas un CSS monolithique.
 - [x] Espacements et densités réellement partagés. Preuve 2026-11-15 : échelle `--sp-*` (13 valeurs) appliquée aux 11 feuilles, 0 valeur hors échelle (`css_scale.py check`, test_css_scale.py) ; rendu : 38 → 22 valeurs d'espacement distinctes sur 60 vues ; écart entre blocs de page = 16 px partout (gap du conteneur).
 - [x] Rayons, ombres, focus et transitions. Preuve : --control-radius, --panel-radius, --shadow*, :focus-visible.
 - [x] Niveaux de superposition des menus, en-têtes, fenêtres et notifications. Preuve 2026-11-15 : jetons `--z-bar/header/pop/backdrop/drawer/fly/top`, 10 usages ; test_css_scale.py.
-- [ ] Palettes de données séparées si nécessaires : catégories, séries, jauges.
-- [ ] Contrastes et lisibilité des valeurs vérifiés.
+- [x] Palettes de données séparées si nécessaires : catégories, séries, jauges. Preuve : C15 : --series-*, --chart-*, --gauge-* centralisés et consommateurs migrés ; DESIGN_HALO.md.
+- [x] Contrastes et lisibilité des valeurs vérifiés. Preuve : C15 : tests/visual/contrasts.cjs, seuils et limites documentés.
 - [x] Pas de token artificiel pour chaque nombre isolé sans usage commun. Preuve 2026-11-15 : chaque jeton d'échelle est utilisé (au moins 1 à 217 fois) ; valeurs isolées > 48 px conservées en dur.
 
 ## Galerie de référence
@@ -202,39 +198,39 @@ Centraliser les composants n'impose pas un CSS monolithique.
 - [x] Présenter variantes et états. Preuve 2026-11-14 : boutons (variantes, tailles, désactivé, chargement), champs, cases, interrupteur, onglets, segments, badges, messages, vide/chargement.
 - [x] Inclure textes longs, gros montants, valeurs absentes et icônes. Preuve 2026-11-14 : libellé long, 1 234 567,89 €, valeur absente « – », icônes.
 - [x] Utiliser les mêmes sources CSS que l'application. Preuve 2026-11-14 : liens vers app/public/assets/base.css et halo.css.
-- [ ] Identifier les références visuelles retenues.
+- [x] Identifier les références visuelles retenues. Preuve : DESIGN_HALO.md et design/galerie.html ; référence calculée en 4 contextes.
 
 ## Boutons
 
 - [x] Variantes : principal, secondaire, discret et destructif. Preuve : .btn, .primary, .ghost, .danger mesurés.
-- [ ] Tailles : normale, compacte, icône ; comportement tactile commun.
-- [ ] États : hover, focus, actif, désactivé et chargement.
-- [ ] Cohérence entre liens d'action et boutons lorsque c'est intentionnel.
-- [ ] Bonne sémantique HTML conservée.
-- [ ] Icônes, spinner, libellés longs et retours à la ligne prévus.
-- [ ] Variantes choisies explicitement, pas selon le nom de la page.
+- [x] Tailles : normale, compacte, icône ; comportement tactile commun. Preuve : Galerie, captures à 390/1280, keyboard.cjs en contexte tactile émulé.
+- [x] États : hover, focus, actif, désactivé et chargement. Preuve : halo.css (états et focus), galerie, contrat de contraste, e2e chargement et clavier ; animations neutralisées seulement dans les mesures.
+- [x] Cohérence entre liens d'action et boutons lorsque c'est intentionnel. Preuve : Galerie : <a class="btn"> et <button class="btn"> utilisent la même définition commune.
+- [x] Bonne sémantique HTML conservée. Preuve : Galerie : boutons natifs, liens, champs nommés ; J.dialog conserve <dialog> natif. Aucun remplacement de contrôle par un div dans ce lot.
+- [x] Icônes, spinner, libellés longs et retours à la ligne prévus. Preuve : Galerie réelle revue à 390 px, références calculées clair/sombre.
+- [x] Variantes choisies explicitement, pas selon le nom de la page. Preuve : DESIGN_HALO.md et classes .primary/.ghost/.danger/.sm/.lg/.icon ; garde-fou des surcharges locales exécuté.
 
 ## Formulaires
 
 - [x] Champs texte, recherche, nombres, e-mail, mot de passe et textarea. Preuve : mesures 35 px / 12 px sur 14 pages + 5 pages publiques.
 - [x] Sélecteurs, radios, cases à cocher et interrupteurs. Preuve : cases 13 px mesurées ; interrupteur 46x26 conservé.
-- [ ] Libellés, aides, unités, obligation, erreurs et désactivation.
+- [x] Libellés, aides, unités, obligation, erreurs et désactivation. Preuve : Galerie, contrôles de compte e2e et tests API/validation ; routes et formulaires conservés.
 - [x] Visibilité des mots de passe. Preuve : œil visible sur login/register (captures).
-- [ ] Pas de débordement des options et libellés sur mobile.
+- [x] Pas de débordement des options et libellés sur mobile. Preuve : C15 : sélecteur touché et mesuré à 390, deux thèmes ; 120 vues et correction responsive titre.
 - [x] Taille des textes adaptée au mobile et vérification du zoom. Preuve : champs 16 px en mobile (--control-size-mobile).
-- [ ] Distinction fonctionnelle entre action et sélecteur à menu.
+- [x] Distinction fonctionnelle entre action et sélecteur à menu. Preuve : SUI.picker (aria-haspopup=listbox, aria-expanded, options) et bouton natif Appliquer ; tests stratégies et tactile.
 
 ## Autres composants
 
-- [ ] Cartes/panneaux : densité, sections, en-tête, pied, sous-panneau.
-- [ ] Tableaux : tri, chiffres, sélection, vide, chargement et pagination.
-- [ ] Défilement horizontal et colonnes fixes utilisables au toucher.
-- [ ] Badges lisibles, sans information transmise uniquement par couleur.
-- [ ] Onglets et segments : états et navigation clavier.
-- [ ] Dialogues/panneaux : focus, fermeture et retour au déclencheur.
-- [ ] Messages, notifications, erreurs et chargements communs.
+- [x] Cartes/panneaux : densité, sections, en-tête, pied, sous-panneau. Preuve : C15 : --card-gap et .card-stack, variantes tight/flush/inset, captures réelles. Grilles métier explicitement conservées.
+- [x] Tableaux : tri, chiffres, sélection, vide, chargement et pagination. Preuve : financial.cjs, strategies-ui.cjs, keyboard.cjs (requête au clic, chargement) et galerie (vide, valeurs extrêmes).
+- [x] Défilement horizontal et colonnes fixes utilisables au toucher. Preuve : C15 : geste tactile émulé dans .ct-table-wrap en deux thèmes ; définition des colonnes fixes conservée et captures examinées.
+- [x] Badges lisibles, sans information transmise uniquement par couleur. Preuve : Galerie : libellés explicites et variantes sémantiques ; contrats de contraste.
+- [x] Onglets et segments : états et navigation clavier. Preuve : keyboard.cjs : flèches, Home, End sur onglets ; galerie et tests stratégies pour états des segments.
+- [x] Dialogues/panneaux : focus, fermeture et retour au déclencheur. Preuve : keyboard.cjs : tabulation, fond inerte, Échap et retour au déclencheur (4 contextes) ; dialogues de transaction et compte e2e.
+- [x] Messages, notifications, erreurs et chargements communs. Preuve : Galerie, composants communs, tests HTTP et e2e financier.
 - [x] Menus et infobulles contenus dans le viewport. Preuve 2026-11-13 : parcours automatique des boutons non destructifs de 14 pages (bureau clair, 390 px sombre) : 0 menu/dialogue hors écran, 0 débordement.
-- [ ] Primitives graphiques partagées lorsque leur fonction est identique.
+- [x] Primitives graphiques partagées lorsque leur fonction est identique. Preuve : charts.js partagé par les consommateurs ; couleurs de séries/lignes/jauge centralisées ; palette personnelle préservée.
 
 Clôture : composants réels conformes à la direction retenue, variantes identifiées,
 références vérifiées et aucune couche finale de surcharges nécessaire.
@@ -245,16 +241,16 @@ références vérifiées et aucune couche finale de surcharges nécessaire.
 
 ## Méthode à répéter pour chaque page
 
-- [ ] Identifier composants, états et templates dynamiques utilisés.
-- [ ] Migrer le balisage vers les composants communs.
-- [ ] Déplacer la présentation fixe hors du HTML et des templates JS.
-- [ ] Conserver les styles réellement calculés près du composant concerné.
-- [ ] Supprimer les anciennes règles, classes et composants remplacés.
-- [ ] Vérifier les références et chargements dynamiques avant suppression.
-- [ ] Préserver les fonctionnalités et les données affichées.
-- [ ] Comparer aux maquettes et à la galerie commune.
-- [ ] Vérifier mobile/desktop, clair/sombre et interactions importantes.
-- [ ] Enregistrer les preuves et les limites.
+- Identifier composants, états et templates dynamiques utilisés.
+- Migrer le balisage vers les composants communs.
+- Déplacer la présentation fixe hors du HTML et des templates JS.
+- Conserver les styles réellement calculés près du composant concerné.
+- Supprimer les anciennes règles, classes et composants remplacés.
+- Vérifier les références et chargements dynamiques avant suppression.
+- Préserver les fonctionnalités et les données affichées.
+- Comparer aux maquettes et à la galerie commune.
+- Vérifier mobile/desktop, clair/sombre et interactions importantes.
+- Enregistrer les preuves et les limites.
 
 Une page n'est pas terminée si seul son écran initial a été regardé alors que
 ses formulaires, menus ou fenêtres ont changé.
@@ -290,20 +286,20 @@ Adapter cette liste aux pages réellement actives du dépôt courant.
 ## Points particuliers de l'Explorateur
 
 - [x] Sélecteur de stratégie contenu sur petit écran. Preuve : menu à 25–365 px sur 390 px, clair et sombre (mesure + capture).
-- [ ] Options et badges lisibles au clavier et au toucher.
+- [x] Options et badges lisibles au clavier et au toucher. Preuve : C15 : sélecteur tactile et clavier, captures clair/sombre, libellés textuels et contrastes sémantiques.
 - [x] Modification d'une stratégie ou d'un filtre sans recherche automatique. Preuve 2026-11-14 : modification d'un réglage Expert, 0 requête ranking.
 - [x] Application explicite et chargement perceptible. Preuve 2026-11-13 : « Recherche en cours… », spinner, #ct-apply désactivé (bureau/mobile, clair/sombre).
 - [x] États distincts : à jour, réglages modifiés, aucun résultat, erreur. Preuve 2026-11-14 : à jour, chargement, aucun résultat, erreur (500 simulé) et réglage modifié (invitation « Cliquez sur Appliquer les réglages », 0 requête ranking) vus.
 - [x] Tableau consultable sans élargir toute la page. Preuve 2026-11-13 : tableau défile dans .ct-table-wrap (1384 px dans 1010 px ; 966 dans 364 mobile), scrollWidth page = 390.
-- [ ] Règles ET/OU, colonnes, tris et modes toujours utilisables.
+- [x] Règles ET/OU, colonnes, tris et modes toujours utilisables. Preuve : tests rapides/intégration des stratégies et ranking ; strategies-ui.cjs (contrats conservés), contrôles tri/colonnes présents dans les captures.
 
 ## Points particuliers financiers
 
-- [ ] Montants, signes, devises, décimales et dates inchangés.
-- [ ] Valeur, résultat personnel et diagnostic visuellement distingués.
-- [ ] Graphiques, légendes, jauges et niveaux conservent leur sens.
-- [ ] Prévisualisation, ajout, modification et suppression de transaction vérifiés.
-- [ ] Confirmations et erreurs restent compréhensibles.
+- [x] Montants, signes, devises, décimales et dates inchangés. Preuve : 351 tests d’intégration, contrats financiers conservés ; aucun changement de calcul dans ce lot.
+- [x] Valeur, résultat personnel et diagnostic visuellement distingués. Preuve : captures fiche/portefeuille et primitives financières existantes ; aucun déplacement de valeur ni changement de calcul.
+- [x] Graphiques, légendes, jauges et niveaux conservent leur sens. Preuve : C15 : palette seulement, seuils et calculs conservés ; tests financiers et revue des captures.
+- [x] Prévisualisation, ajout, modification et suppression de transaction vérifiés. Preuve : tests/integ/test_portfolio_audit.py, tests/integ/test_api.py et e2e financier.
+- [x] Confirmations et erreurs restent compréhensibles. Preuve : galerie de messages, dialogue natif conservé, e2e compte et tests HTTP/API/transactions.
 
 Clôture : toutes les pages actives sont vérifiées ; les définitions locales
 remplacées ont été retirées ; les exceptions sont explicites.
@@ -328,7 +324,7 @@ remplacées ont été retirées ; les exceptions sont explicites.
 - [x] 375/390 px, largeur intermédiaire et 1280 px. Preuve 2026-11-13 : 390, 768 et 1280 mesurés sur 19 pages.
 - [x] 320 px pour les parcours qui doivent le supporter. Preuve 2026-11-13 : 320 mesuré sur 19 pages + fiche titre : aucun débordement.
 - [x] Thèmes, affichage initial et absence de flash. Preuve 2026-11-14 : 8 combinaisons préférence × système sur login et index : thème et fond corrects au DOMContentLoaded.
-- [ ] Clavier, ordre de tabulation, focus et retour des fenêtres.
+- [x] Clavier, ordre de tabulation, focus et retour des fenêtres. Preuve : C15 : tests/e2e/keyboard.cjs, dialogue partagé et onglets personnels en 4 contextes ; pas une certification exhaustive.
 - [x] Contrastes, texte agrandi et réduction des animations. Preuve 2026-11-14 : contrastes clairs 4,5:1 sur 6 pages après ajustement des jetons ; 320 px (équivalent 400 %) sans débordement ; reducedMotion actif pendant les 152 mesures. Limite : fonds en dégradé contrôlés à l'œil.
 - [x] Vide, données absentes, erreur, chargement long et désactivation. Preuve 2026-11-14 : vide, erreur (500 simulé), chargement (spinner, bouton désactivé), désactivation et valeur absente « – » vus.
 - [x] Absence de débordement ou d'action inaccessible. Preuve 2026-11-13 : 19 pages × 320/390/768/1280 × clair/sombre : aucun débordement après correction du tableau Données.
@@ -852,3 +848,33 @@ Formatage JS (Prettier, commit 4613946, `make js-format` / `make js-check`). Cyc
 - Seuils JavaScript alignés sur les points de rupture (960 → 900, 700 → 760).
 - Mesure après (`scripts/probe_layout.sh`, 60 vues) : valeurs rendues distinctes espacements 38 → 22, tailles 43 → 18, interlignages 14 → 8, rayons 16 → 6 ; aucune page à défilement horizontal ; tous les écarts entre blocs de page à 16 px ; il reste des écarts intérieurs aux cartes (8 à 12 px) non unifiés.
 - Effet visible : rayons 9 → 8 px, boutons 36 → 38 px de haut, titres de section 19 → 20 px, pages 0 à 50 px plus hautes ; référence `tests/visual/galerie.json` régénérée.
+
+## Journal — reprise de clôture C15 (2026-11-15)
+
+Voir `CLOTURE_REFONTE.md` pour les changements et la distinction entre preuves
+historiques, contrôles rejoués et limites. Les cases ont été réconciliées
+seulement quand une preuve identifiable existe ; aucune suppression de critère
+pour afficher artificiellement « zéro restant ».
+
+La revue des captures a découvert une régression non signalée : la classe
+utilitaire `u-grid-template-columns-v3 !important` empêchait la fiche titre de
+passer en une colonne sur mobile. Remplacée par `.title-layout` responsive CSS ;
+suppression du style JS et de l'utilitaire devenu inutile. La sonde utilitaire
+vérifie désormais aussi les styles dynamiques éventuellement bloqués.
+
+Le compteur de classes est calculé depuis le CSS courant : 64 avant cette
+correction, 63 après. Les anciens nombres « 45/66 » décrivent un état antérieur.
+
+Les critères de recette C15 incluent désormais le tactile émulé : sélection de
+stratégie sans recherche automatique, un seul appel au clic, chargement explicite
+et défilement horizontal du tableau dans les deux thèmes (`keyboard.cjs`). Les
+captures initiales de l’audit et les résultats historiques ne sont pas rebaptisés
+captures de la dernière main ; les versions sont indiquées. Les vérifications
+externes non réalisées restent les trois cases de `CLOTURE_REFONTE.md`.
+
+Résultats de clôture C15 : lint/format/syntaxe et garde-fous OK ; 714 tests
+rapides, 351 tests d’intégration ; e2e financier/stratégies/compte, clavier,
+tactile émulé et fiche responsive OK ; galerie 4 contextes, 196 contrastes,
+63 utilitaires (756 contrats + 326 comparaisons sur pages), sans écart. 120 vues
+mesurées, puis 36 vues fiche/aide revérifiées : aucun débordement de page.
+Contrôles financiers et catalogue secondaire conformes. Voir RECETTE_FINALE.md.

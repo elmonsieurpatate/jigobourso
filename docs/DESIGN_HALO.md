@@ -18,9 +18,9 @@ Référence visuelle : `design-demos/terminal-ultraviolet.html`, variante Halo (
 | Champs et boutons | `--control-h --control-h-sm --control-radius --control-size --control-size-mobile --btn-size --btn-size-sm --btn-pad --btn-pad-sm` |
 | Cases, onglets, segments | `--check-size --tab-size --tab-pad --seg-size --seg-pad` |
 | Tableaux et badges | `--th-size --td-size --cell-pad --badge-size --badge-pad` |
-| Cartes | `--card-pad --panel-radius --panel-bg` |
+| Cartes | `--card-pad --card-gap --panel-radius --panel-bg` |
 
-Mobile (≤ 700 px) : `--control-h` 40 px, `--control-h-sm` 32 px, champs à 16 px (évite le zoom iOS). ≤ 640 px : `--card-pad` 14 px.
+Mobile (≤ 600 px) : `--control-h` 40 px, `--control-h-sm` 32 px, champs à 16 px (évite le zoom iOS). ≤ 600 px : `--card-pad` 14 px.
 
 ## Composants communs (tous dans `halo.css`)
 
@@ -45,24 +45,24 @@ Les égalités se résolvent vers la valeur supérieure. `python scripts/css_sca
 
 ### Rythme vertical des pages
 
-Les blocs d'une page (en-tête, cartes, panneaux, tableaux, notices) sont séparés de `--sp-16` **par le conteneur seul** (`display: grid; gap: var(--sp-16)` sur `main.wrap`, `#page`, `#px-page`, `#main`, `.pf-panel`, `.pf-home`, `.bilan-layout`, `.tracking-layout`, `.as`, `.admin-flow`, `.admin-filter-form`, colonnes de `.ac-grid`). Les marges verticales des enfants directs sont neutralisées : ne pas poser de `mt-*`, `mb-*` ni de `margin` sur un bloc de page, ajouter le bloc suffit. Écart à l'intérieur d'une carte : 8 à 12 px selon le contenu (non unifié).
+Les blocs d'une page (en-tête, cartes, panneaux, tableaux, notices) sont séparés de `--sp-16` **par le conteneur seul** (`display: grid; gap: var(--sp-16)` sur `main.wrap`, `#page`, `#px-page`, `#main`, `.pf-panel`, `.pf-home`, `.bilan-layout`, `.tracking-layout`, `.as`, `.admin-flow`, `.admin-filter-form`, colonnes de `.ac-grid`). Les marges verticales des enfants directs sont neutralisées : ne pas poser de `mt-*`, `mb-*` ni de `margin` sur un bloc de page, ajouter le bloc suffit. Les sections verticales d'une carte utilisent `--card-gap` (12 px), porté par `.card-stack`, `.sr-card`, `.ps-card` et `.admin-filter-aside` ; les marges des enfants sont neutralisées. Utiliser `.card-stack` pour une nouvelle carte de sections. Les lignes d'actions, les grilles de mesures et les repères d'une jauge gardent leurs écarts métier : ne pas leur appliquer un espacement uniforme à l'aveugle.
 
 ### Mesure
 
-`scripts/probe_layout.sh` (base jetable) rend les 30 vues réelles à 1280 et 390 px : débordement horizontal, écarts entre blocs, valeurs réellement rendues. `--out`, `--compare` et `--shots` comparent deux états.
+`scripts/probe_layout.sh` (base jetable) rend les 30 vues réelles à 1280 et 390 px ; `--themes` ajoute le thème sombre (120 vues), `--only` limite les routes par expression régulière. Il mesure débordement horizontal, écarts entre blocs, valeurs réellement rendues. `--out`, `--compare` et `--shots` comparent deux états.
 
 ## Garde-fous
 
 - `make css-check` : formatage Prettier 3.3.3 (`.prettierrc`) et `scripts/check_halo_css.py` : jetons uniques, `halo.css` dernière feuille, aucune couleur littérale hors `halo.css`, **aucune surcharge visuelle d'un composant commun dans une feuille de page**.
 - Exceptions autorisées (liste `EXCEPTIONS` du script, avec raison) : colonnes figées de l'Explorateur (fond opaque), tableaux transformés en cartes sur mobile (bordures de ligne).
-- `!important` : 2 usages justifiés (`[hidden]`, réduction des animations).
+- `!important` : masquage `[hidden]`, réduction des animations et classes utilitaires (elles remplacent la priorité des anciens styles en ligne).
 - Le remplacement d'un `style` par un `data-style` n'est pas une centralisation : les `data-style` restants (108) portent des valeurs calculées (couleurs de catégories ou de séries, largeurs, hauteurs) ou de la mise en page.
 
 ## Galerie et références visuelles
 
 - `design/galerie.html` : tous les composants et états avec les feuilles réelles (hors `app/public` : le test `test_core_is_loaded_before_app_on_every_page` impose `core.js` sur toute page déployée).
-- `make visual` compare les styles calculés de la galerie (clair/sombre, 1280/390 px) à `tests/visual/galerie.json`. Écart voulu : `make visual-update`, puis commit de la référence. Captures de revue : `tests/visual/out/` (ignorées par Git).
-- Variables requises : `PLAYWRIGHT_MODULE` et `JIGO_CHROMIUM`.
+- `make visual` compare les styles calculés de la galerie (clair/sombre, 1280/390 px) à `tests/visual/galerie.json`. `make visual` vérifie aussi les contrastes et toutes les classes utilitaires. Écart voulu : `make visual-update`, puis commit de la référence. Captures de revue : `tests/visual/out/` (ignorées par Git).
+- Variables requises : `PLAYWRIGHT_MODULE` et `JIGO_CHROMIUM`. `GALLERY_URL` permet de servir la galerie par HTTP quand le navigateur interdit les URL `file:`. Les trois sondes acceptent cette variable. La capture attend `document.fonts.ready`, pour ne pas comparer aléatoirement une police de secours.
 
 ## Choix de design conservés
 
@@ -70,8 +70,18 @@ h3 à 15 px (la maquette est à 20 px) ; champs à 16 px sur mobile ; cases à c
 
 ## Contrastes
 
-Texte atténué et couleurs d'état du thème clair assombris (`--muted` #596988, `--accent` #4963ae, `--ok` #27726a, `--warn` #8c6130, `--danger` #a5556c) pour atteindre 4,5:1 sur le fond de page. Mesure automatique sur 6 pages ; les fonds en dégradé (boutons principaux, puces) ne sont pas résolus par la mesure et ont été contrôlés à l'œil.
+`tests/visual/contrasts.cjs` vérifie 196 paires clair/sombre calculées par Chromium : texte à 4,5:1 sur les surfaces, variantes sémantiques, navigation et extrémités du dégradé principal ; lignes et séries à 3:1 contre leur fond. Les animations sont neutralisées pendant la mesure. Ce contrat ne prétend pas mesurer chaque pixel ou les couleurs libres saisies par l'utilisateur.
+
+Les couleurs de données sont distinctes des couleurs d'interface dans `halo.css` :
+- `--series-1` à `--series-12` : séries du portefeuille, adaptées au thème. Les SVG et légendes utilisent les variables directement : changer le thème actualise aussi les graphiques déjà présents.
+- `--chart-ma`, `--chart-ma2`, `--chart-level` : lignes d'analyse.
+- `--gauge-*` : continuum rouge → vert fixe, indépendant du thème ; position des seuils toujours calculée par le moteur. Les niveaux sont nommés et chiffrés hors du dégradé : la couleur seule n'est pas une instruction financière.
+- Catégories personnelles : couleurs de données conservées ; les pastilles restent accompagnées de leur libellé. Une couleur utilisateur arbitraire ne reçoit pas de garantie de contraste.
+
+Space Grotesk est servie depuis `assets/fonts/`, avec sa licence OFL. Aucun appel à Google Fonts : la CSP du site n'autorise que les sources locales. Le test `test_stylesheets_only_reference_local_fonts_under_the_self_csp` protège ce contrat.
 
 ## Limites connues
 
 Émulation mobile uniquement (pas d'appareil réel). Dialogues de création et de renommage de stratégie vérifiés par les tests e2e, pas à l'écran.
+
+Le clavier du dialogue partagé (tabulation, fond inerte, Échap, retour au déclencheur) et des onglets personnels est couvert dans `tests/e2e/keyboard.cjs`, en quatre contextes. Cela ne constitue pas une certification d'accessibilité de tous les parcours.
