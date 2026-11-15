@@ -301,3 +301,48 @@ def test_restore_refuses_corrupt_dependencies_before_deleting_the_current_ones(t
     result = run_restore(root, backups)
     assert result.returncode != 0 and 'corrompue' in result.stderr
     assert (site / 'paquet.txt').read_text() == 'actuelle'
+
+
+def test_dependency_repair_reuses_paired_snapshot_without_generic_archives(tmp_path):
+    root, backups, site = dependency_server(tmp_path, 'ancienne')
+    chosen = 'environment-code-test.tgz'
+    with tarfile.open(backups / chosen, 'w:gz') as tar:
+        tar.add(site / 'paquet.txt', arcname='paquet.txt')
+    (backups / 'code-test.tgz.venv').write_text(chosen + '\n')
+    result = subprocess.run(
+        ['bash', str(ROOT / 'scripts/release/ensure_dependencies.sh'), str(root), str(backups)],
+        env={**os.environ, 'CODE_BACKUP': 'code-test.tgz'},
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert (root / '.deployment-venv-backup').read_text().strip() == chosen
+    assert not list(backups.glob('site-packages-*.tgz'))
+    assert (site / 'paquet.txt').read_text().strip() == 'conforme'
+
+
+def test_system_pip_is_refused_when_its_python_differs_from_the_venv(tmp_path):
+    root, backups, site = dependency_server(tmp_path, 'ancienne')
+    python = root / '.venv/bin/python'
+    script = (
+        python.read_text()
+        .replace(
+            'then echo "$site";',
+            'then case "$2" in *version_info*) echo 3.9 ;; *) echo "$site" ;; esac;',
+        )
+        .replace('then exit 0;', 'then exit 1;')
+    )
+    python.write_text(script)
+    tools = tmp_path / 'system-tools'
+    tools.mkdir()
+    system = tools / 'python3'
+    system.write_text('#!/bin/sh\necho 3.12\n')
+    system.chmod(0o755)
+    result = subprocess.run(
+        ['bash', str(ROOT / 'scripts/release/ensure_dependencies.sh'), str(root), str(backups)],
+        env={**os.environ, 'PATH': str(tools) + os.pathsep + os.environ['PATH']},
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode != 0 and 'Python système incompatible' in result.stderr
+    assert (site / 'paquet.txt').read_text() == 'ancienne'

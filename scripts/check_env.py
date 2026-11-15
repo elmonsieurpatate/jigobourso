@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-IMPORTS = {'PyMySQL': 'pymysql', 'numpy': 'numpy', 'pandas': 'pandas', 'exchange_calendars': 'exchange_calendars'}
+IMPORTS = {'PyMySQL': 'pymysql', 'numpy': 'numpy', 'pandas': 'pandas', 'exchange_calendars': 'exchange_calendars', 'python-dateutil': 'dateutil'}
 
 
 def parse(text):

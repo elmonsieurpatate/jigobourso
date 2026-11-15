@@ -1,0 +1,4 @@
+pytest==8.4.2
+ruff==0.17.4
+tinycss2==1.4.0
+cssselect2==0.8.0

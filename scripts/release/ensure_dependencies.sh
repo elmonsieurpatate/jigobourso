@@ -42,11 +42,15 @@ else
   fi
   printf '%s\n' "$backup" > .deployment-venv-backup
   echo "sauvegarde du venv faite"
-  ls -1t "$BACKUPS"/site-packages-*.tgz | tail -n +4 | xargs -r rm -f
+  find "$BACKUPS" -maxdepth 1 -type f -name 'site-packages-*.tgz' -printf '%f\n' |
+    sort -r | tail -n +4 | while IFS= read -r old; do rm -f "$BACKUPS/$old"; done
   if .venv/bin/python -m pip --version > /dev/null 2>&1; then
     .venv/bin/python -m pip install --quiet --upgrade -r requirements.txt
   else
     # le venv de production n'a pas pip (ensurepip indisponible) : le pip du système installe dans le venv
+    venv_minor=$(.venv/bin/python -c 'import sys; print("%d.%d" % sys.version_info[:2])')
+    system_minor=$(python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])')
+    test "$venv_minor" = "$system_minor" || { echo "Erreur : Python système incompatible avec le venv" >&2; exit 1; }
     python3 -m pip install --quiet --upgrade --target "$site" -r requirements.txt
   fi
   .venv/bin/python -c "import pymysql" || { echo "dépendances Python inutilisables après mise à jour" >&2; exit 1; }
