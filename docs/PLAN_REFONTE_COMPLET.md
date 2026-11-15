@@ -559,7 +559,7 @@ Constats : F13, F14, F15, F18.
 - [x] Définir invalidation de cache, recalcul des verdicts et recalcul des mesures. (scripts/release/engine_hash.sh, docs/DELIVERY.md)
 - [x] Tester ces décisions, notamment les exclusions du hash moteur. (test_environment.py, test_execution_architecture.py)
 - [x] Vérifier sauvegardes et conservation des données. (dumps vérifiés gzip -t, empreintes financière et comptes avant/après ; deploy.sh)
-- [ ] Tester la procédure sur une cible isolée avant toute livraison autorisée. (ouvert : secret serveur sandbox absent, non vérifiable seul)
+- [x] Tester la procédure sur une cible isolée avant toute livraison autorisée. (2026-11-15 : répétition locale du vrai deploy.sh sur copie jetable d'une base pleine, scripts/rehearse_deploy.sh ; a trouvé et fait corriger un défaut de retour arrière ; l'essai Hostinger lui-même n'a pas été fait, voir docs/DELIVERY.md)
 
 Clôture : installation, activation et restauration reproductibles et cohérentes.
 
@@ -603,7 +603,7 @@ Pour chaque résolution, indiquer commit et test/preuve.
 - [x] F10 — Routes/services PHP incomplets. Étape 7. Preuve : 2026-11-14 : services/portfolios.php (17 cas d'usage sans HTTP), routes minces, own_transaction/tx_carry_fx, tests/fast/test_php_structure.py, docs/ARCHITECTURE_PHP.md.
 - [x] F11 — Dépendances Python mal orientées. Étape 8. Preuve : 2026-11-14 : 6 cycles (imports différés compris) supprimés, 0 restant ; tests/fast/test_python_dependencies.py ; docs/ARCHITECTURE_PYTHON.md.
 - [x] F12 — Unités monétaires divergentes. Étape 6. Preuve : 2026-11-14 : engine/shared/units.py + app/lib/units.php, ZAc/ILA corrigés dans l'historique et la saisie ; parité PHP/Python testée.
-- [ ] F13 — Activation/restauration de release. Étape 11. Preuve partielle (reste : transfert atomique, cible isolée) : 2026-11-14 : restauration code + dépendances testée, empreinte moteur unique testée.
+- [ ] F13 — Activation/restauration de release. Étape 11. Preuve partielle (reste : transfert atomique, cible isolée) : 2026-11-14 : restauration code + dépendances testée (faux serveur et répétition complète), empreinte moteur unique testée.
 - [ ] F14 — Dépendances non complètement validées. Étape 11. Preuve partielle (reste : sous-dépendances non figées) : 2026-11-14 : check_env.py sur venv neuf, bornes testées, contrôle en CI.
 - [x] F15 — Garde-fous insuffisants. Étapes 3, 5, 11. Preuve : 2026-11-14 : qualité et tests sautés bloquants en CI (b781231 verte) ; 2026-11-14 : garde lint PHP, contrats HTTP et moteur testés (étape 5).
 - [ ] F16 — Sources condensées/formatage. Étapes 1, 4, 7, 8. Preuve :
@@ -824,3 +824,9 @@ Formatage JS (Prettier, commit 4613946, `make js-format` / `make js-check`). Cyc
 - CI : ruff, prettier, règles Halo dans les contrôles courts ; `check_env.py` après installation ; échec si un test est sauté (rapides et intégration).
 - `docs/DELIVERY.md` : chaîne de validation, restauration, recalcul, sauvegardes, limites.
 - Ouvert : transfert non atomique ; sous-dépendances non figées ; essai isolé Hostinger (secret serveur absent) ; restauration des dépendances non testée sur l'hébergement réel.
+
+## Journal — répétition de déploiement (2026-11-15)
+
+- `scripts/rehearse_deploy.sh` : vrai `ops/deploy.sh` contre un faux serveur local et une copie jetable de la base de développement.
+- Défaut trouvé et corrigé : contrôles `cmd && echo ok` sans effet sous `set -e` (moteur importable, `private/env`, venv, dump). Test de garde ajouté.
+- Restant pour l'étape 11 : transfert rsync non atomique, sous-dépendances non figées, restauration non essayée sur Hostinger même.

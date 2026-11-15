@@ -81,7 +81,8 @@ if [ -f "$ROOT/.requirements.sha" ] && [ "$want" != "$(cat "$ROOT/.requirements.
     echo "dépendances différentes mais aucune sauvegarde du venv : vérification manuelle requise" >&2
   fi
 fi
-"$ROOT/.venv/bin/python" -c "import sys; sys.path.insert(0, '$ROOT'); import engine.cli, pymysql, numpy, pandas, exchange_calendars" && echo "moteur et dépendances importables après restauration"
+"$ROOT/.venv/bin/python" -c "import sys; sys.path.insert(0, '$ROOT'); import engine.cli, pymysql, numpy, pandas, exchange_calendars" || { echo "moteur ou dépendances non importables après restauration" >&2; exit 1; }
+echo "moteur et dépendances importables après restauration"
 printf 'restored_from=%s\ndate=%s\n' "$FILE" "$(date -u +%FT%TZ)" > "$ROOT/.deployed"
 echo "code restauré depuis $FILE"
 REMOTE
@@ -91,11 +92,14 @@ echo "== Contrôles du serveur (lecture seule)"
 remote_sh "ROOT=$root DOMAIN=$domain bash -s" <<'REMOTE'
 set -euo pipefail
 test "$(realpath -e "$ROOT")" = "$ROOT"
-test -f "$ROOT/private/env" && test -f "$ROOT/private/cron.key" && echo "private/ présent (non lu)"
+{ test -f "$ROOT/private/env" && test -f "$ROOT/private/cron.key"; } || { echo "private/env ou private/cron.key absent" >&2; exit 1; }
+echo "private/ présent (non lu)"
 test -x "$ROOT/.venv/bin/python" && "$ROOT/.venv/bin/python" --version
-test "$(readlink "$DOMAIN/public_html/v2")" = "../jigobourso-v2/app/public" && echo "public_html/v2 -> app/public OK"
+test "$(readlink "$DOMAIN/public_html/v2")" = "../jigobourso-v2/app/public" || { echo "public_html/v2 ne pointe pas vers app/public" >&2; exit 1; }
+echo "public_html/v2 -> app/public OK"
 php --version | head -1
-command -v rsync mariadb-dump > /dev/null && echo "rsync et mariadb-dump OK"
+command -v rsync mariadb-dump > /dev/null || { echo "rsync ou mariadb-dump absent" >&2; exit 1; }
+echo "rsync et mariadb-dump OK"
 df -h "$DOMAIN" | tail -1
 # Lecture seule : identifiant de la version en place.
 if [ -f "$ROOT/.deployed" ]; then
@@ -242,9 +246,11 @@ site=$(.venv/bin/python -c "import sysconfig; print(sysconfig.get_paths()['purel
 if [ "$have" = "$want" ]; then
   echo "dépendances Python inchangées"
 elif [ -z "$have" ]; then
-  .venv/bin/python -c "import pymysql" && printf '%s\n' "$want" > .requirements.sha && echo "dépendances Python existantes validées (première exécution)"
+  .venv/bin/python -c "import pymysql" || { echo "dépendances Python inutilisables" >&2; exit 1; }
+  printf '%s\n' "$want" > .requirements.sha; echo "dépendances Python existantes validées (première exécution)"
 else
-  tar czf "$BACKUPS/site-packages-$(date -u +%Y%m%d%H%M%S).tgz" -C "$site" . && echo "sauvegarde du venv faite"
+  tar czf "$BACKUPS/site-packages-$(date -u +%Y%m%d%H%M%S).tgz" -C "$site" . || { echo "sauvegarde du venv impossible : mise à jour refusée" >&2; exit 1; }
+  echo "sauvegarde du venv faite"
   ls -1t "$BACKUPS"/site-packages-*.tgz | tail -n +4 | xargs -r rm -f
   if .venv/bin/python -m pip --version > /dev/null 2>&1; then
     .venv/bin/python -m pip install --quiet --upgrade -r requirements.txt
@@ -252,7 +258,8 @@ else
     # le venv de production n'a pas pip (ensurepip indisponible) : le pip du système installe dans le venv
     python3 -m pip install --quiet --upgrade --target "$site" -r requirements.txt
   fi
-  .venv/bin/python -c "import pymysql" && printf '%s\n' "$want" > .requirements.sha && echo "dépendances Python mises à jour"
+  .venv/bin/python -c "import pymysql" || { echo "dépendances Python inutilisables après mise à jour" >&2; exit 1; }
+  printf '%s\n' "$want" > .requirements.sha; echo "dépendances Python mises à jour"
 fi
 set -a; . ./private/env; set +a
 export MYSQL_PWD="$JIGO_DB_PASSWORD" PYTHONPATH="$ROOT"
@@ -266,14 +273,16 @@ if [ -n "$todo" ]; then
   echo "migrations en attente : $(echo "$todo" | tr '\n' ' ')"
   dump="$BACKUPS/db-$(date -u +%Y%m%d%H%M%S).sql.gz"
   mariadb-dump "${dbconn[@]}" --single-transaction --quick "$JIGO_DB_NAME" | gzip > "$dump"
-  gzip -t "$dump" && echo "sauvegarde de la base : $(basename "$dump") ($(du -h "$dump" | cut -f1))"
+  gzip -t "$dump" || { echo "sauvegarde de la base corrompue : migration refusée" >&2; exit 1; }
+  echo "sauvegarde de la base : $(basename "$dump") ($(du -h "$dump" | cut -f1))"
   chmod 600 "$dump"
   ls -1t "$BACKUPS"/db-*.sql.gz | tail -n +4 | xargs -r rm -f
   .venv/bin/python scripts/migrate.py --apply
 else
   echo "aucune migration en attente"
 fi
-.venv/bin/python -c "import engine.cli" && echo "moteur importable"
+.venv/bin/python -c "import engine.cli" || { echo "moteur non importable : retour arrière" >&2; exit 1; }
+echo "moteur importable"
 echo "== Contrôle d'intégrité financière"
 php scripts/release/check_financial_integrity.php > "$ROOT/logs/financial-integrity.json"
 chmod 600 "$ROOT/logs/financial-integrity.json"

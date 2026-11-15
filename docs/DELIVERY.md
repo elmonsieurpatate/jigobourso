@@ -44,6 +44,15 @@ Les données (`private/ data/ logs/`) et la base ne sont jamais restaurées par 
 - Avant tout remplacement : dump `portfolios`, `portfolio_transactions`, `position_levels` (vérifié par `gzip -t`), sauvegarde du code, du venv si les dépendances changent, dump complet de la base si des migrations sont en attente (3 conservés).
 - Empreinte financière et comptes comparées avant/après : toute différence fait échouer la livraison.
 
-## Cible isolée
+## Cible isolée : répétition locale
 
-L'essai isolé Hostinger (`sandbox_runner.sh`) exige un secret serveur (`~/tmp-backtest/.sandbox_pw`). Absent, le déploiement le dit (« Essai Hostinger isolé indisponible ») et poursuit avec les validations CI. **Non vérifié ici** : présence du secret, exécution réelle de l'essai.
+L'essai isolé Hostinger (`sandbox_runner.sh`) exige un secret serveur (`~/tmp-backtest/.sandbox_pw`) et un script (`scripts/sandbox_hostinger.sh`) absent du dépôt : il n'a jamais tourné. Décision : il est remplacé par une répétition locale.
+
+`scripts/rehearse_deploy.sh <ok|fail|fail-deps|diagnostic> [commit_en_place]` exécute le **vrai** `ops/deploy.sh` contre un faux serveur (dossier temporaire, venv propre, copie jetable d'une base de développement pleine, `ssh` et `rsync` exécutés en local). Le code en place est par défaut une ancienne version (avant le déplacement des modules). Ni la production ni la base de développement ne sont touchées.
+
+Résultats du 2026-11-15 (base de 3,8 M de prix, 20 transactions) :
+- `diagnostic` et `ok` : réussis (migrations, contrôles financiers, comptes, 20 transactions conservées, recalcul déclenché) ;
+- `fail` : **a révélé un défaut** (un moteur cassé n'arrêtait pas le déploiement : contrôles écrits `test && echo`, sans effet sous `set -e`). Corrigé dans `ops/deploy.sh`, verrouillé par `test_deploy_checks_never_hide_a_failure_behind_and_echo` ; ensuite le moteur cassé déclenche le retour arrière ;
+- `fail-deps` : code **et** dépendances restaurés (paquet ajouté retiré).
+
+Non couvert par la répétition : particularités de l'hébergement (PHP 8.2 réel, droits de fichiers, venv sans pip, SSH, `sendmail` réel — remplacé par un faux).

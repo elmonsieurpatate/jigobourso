@@ -180,3 +180,13 @@ def test_pre_transfer_diagnostic_tolerates_the_previous_module_layout():
     deploy = (ROOT / 'ops/deploy.sh').read_text()
     block = deploy[deploy.index('Contrôle des classements'):deploy.index('Mode rapide : diagnostic exhaustif')]
     assert 'except ImportError' in block and 'from engine.analytics.admin import universe_verdicts' in block
+
+
+def test_deploy_checks_never_hide_a_failure_behind_and_echo():
+    """`contrôle && echo ok` n'arrête pas un script en `set -e` quand le contrôle échoue (découvert par la répétition locale : un moteur cassé aurait été déployé).
+    Les contrôles doivent s'écrire `contrôle || { message; exit 1; }`."""
+    deploy = (ROOT / 'ops/deploy.sh').read_text().splitlines()
+    risky = [(n + 1, line.strip()[:90]) for n, line in enumerate(deploy)
+             if re.search(r'^\s*(test |command -v |gzip -t|tar czf|\S*python\S* -c )', line) and re.search(r'&&\s*(echo|printf)', line)
+             and '||' not in line]
+    assert risky == [], risky
