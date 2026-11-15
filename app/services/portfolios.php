@@ -286,3 +286,10 @@ function pf_bilan(array $u, array $b = []) {
     $all['excluded'] = $excluded;
     return ['integrity' => ['ok' => !$issues, 'issues' => $issues], 'portfolios' => $rows, 'totals' => $all, 'realized_by_year' => $years];
 }
+
+// Données d’export : la route reste responsable des en-têtes et de l’encodage CSV.
+function pf_export_data(array $u, int $id): array {
+    $p = own_portfolio($id, $u);
+    $rows = q('SELECT * FROM portfolio_transactions WHERE portfolio_id = ? ORDER BY trade_at, id', [$p['id']])->fetchAll();
+    return ['portfolio' => $p, 'transactions' => $rows];
+}

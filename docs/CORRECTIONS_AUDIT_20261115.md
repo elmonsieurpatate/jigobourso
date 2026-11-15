@@ -10,7 +10,7 @@ corrections locales.
 - [x] A03 — Aperçus automatiques : erreurs visibles et reprise possible.
 - [x] A04 — Séparation effective structure / composants / mise en page métier.
 - [x] A05 — Garde-fou CSS structurel et tests négatifs.
-- [ ] A06 — Cas d'usage PHP hors des routes, contrats et garde-fous communs.
+- [x] A06 — Cas d'usage PHP hors des routes, contrats et garde-fous communs.
 - [ ] A07 — Contrôleurs JS séparés par responsabilité.
 - [ ] A08 — Validation commune PR/main sans secret de production côté PR.
 - [ ] A09 — Runner des parcours actifs, scénarios historiques classés.
@@ -47,3 +47,10 @@ Comparaison des styles calculés avant/après sur le même DOM : 56 pages/contex
 zéro écart. Sonde de disposition : 120 pages/contextes, aucun défilement horizontal
 de page ; 22 contextes contiennent des éléments internes hors fenêtre (à distinguer
 d'une page débordante). Suite rapide : 736 réussites. Qualité Python/JS/CSS/PHP valide.
+
+A06 : cas d’usage du suivi, des alertes, de l’administration, de la recherche,
+de la fiche et du compte extraits en services à paramètres explicites. Les routes
+gardent authentification, méthode et sortie HTTP (dont mails après réponse et CSV).
+Le contrôle de propriété reste dans les services ; aucune règle financière modifiée.
+Les routes de ces six domaines ne contiennent plus de SQL ; tests de frontière
+et de dépendances ajoutés. Après extraction : 351 tests d’intégration réussis.
