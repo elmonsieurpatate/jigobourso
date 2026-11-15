@@ -98,7 +98,7 @@ pas présenté comme réalisé.
 - [x] Étape 9 — Données, migrations et accès SQL. Clôturée 2026-11-14 : lint, js-check, css-check, visual, fast (692), e2e, integ (349) verts ; docs/DATA_CONTRACT.md.
 - [x] Étape 10 — Performance et observabilité. Clôturée 2026-11-14 : lint, js-check, css-check, visual, fast (697), e2e, integ (350) verts ; docs/PERFORMANCE.md (données synthétiques, limites indiquées).
 - [x] Étape 11 — Installation, CI, livraison et restauration. Clôturée 2026-11-15 : voir docs/DELIVERY.md ; Hostinger réel non testé (répétition locale à la place).
-- [ ] Étape 12 — Nettoyage final, documentation et recette.
+- [x] Étape 12 — Nettoyage final, documentation et recette. Clôturée 2026-11-15 ; F07 et F08 restent ouverts (voir docs/RECETTE_FINALE.md).
 
 ---
 
@@ -318,7 +318,7 @@ remplacées ont été retirées ; les exceptions sont explicites.
 - [x] Règles adaptées contre les surcharges locales interdites. Preuve 2026-11-13 : check_halo_css.py : refus de toute surcharge visuelle d'un composant commun hors halo.css (test : .btn{padding} refusé).
 - [x] Exceptions légitimes documentées. Preuve 2026-11-13 : 5 exceptions avec raison dans EXCEPTIONS de check_halo_css.py (colonnes figées, tableaux en cartes mobile).
 - [x] Styles calculés comparés pour un même composant dans plusieurs pages. Preuve : script de mesure, 56 combinaisons page/thème/largeur.
-- [x] Références visuelles stables avec procédure de mise à jour. Preuve 2026-11-14 : `make visual` / `make visual-update`, tests/visual/galerie.json (4 contextes, styles calculés) ; procédure dans docs/DESIGN_HALO.md.
+- [x] Références visuelles stables avec procédure de mise à jour. Preuve 2026-11-14 : `make visual` / `make visual-update`, tests/visual/galerie.cjson (4 contextes, styles calculés) ; procédure dans docs/DESIGN_HALO.md.
 - [x] Conservation des !important réellement justifiés. Preuve : 2 restants ([hidden], réduction des animations).
 - [x] Le remplacement style → data-style n'est pas accepté comme preuve Preuve 2026-11-14 : data-style 142 → 108, restants = valeurs calculées ou mise en page ; règle écrite dans docs/DESIGN_HALO.md.
       de centralisation.
@@ -569,7 +569,7 @@ Clôture : installation, activation et restauration reproductibles et cohérente
 
 - [x] Vérifier les parcours de bout en bout sur une base locale représentative. (e2e sur base jetable synthétique, 2026-11-14)
 - [x] Rejouer les suites rapides, intégration, navigateur et release pertinentes. (fast 706, integ 350, e2e, release-check, visual ; voir docs/RECETTE_FINALE.md)
-- [ ] Refaire la recette visuelle après les derniers changements de code. (galerie automatisée OK ; recette manuelle des pages réelles non refaite)
+- [x] Refaire la recette visuelle après les derniers changements de code. (galerie automatisée OK ; recette manuelle des pages réelles : « Visuel ok » par l'utilisateur, 2026-11-15)
 - [x] Vérifier les cas financiers et permissions multi-utilisateurs. (test_financial_parity, test_account, account-navigation)
 - [x] Supprimer les anciennes fonctions, règles, classes et fichiers remplacés. (collected_rows, select, exclusion_reason retirés ; reste documenté)
 - [x] Vérifier références dynamiques, imports et compatibilités avant suppression. (recherche sur engine, app, scripts, ops, tests ; tests verts)
@@ -578,7 +578,7 @@ Clôture : installation, activation et restauration reproductibles et cohérente
 - [x] Mettre à jour README, architecture, design, conventions et commandes. (2026-11-15 : README, DELIVERY, ARCHITECTURE*, RECETTE_FINALE ; références à des fichiers contrôlées par recherche, deux périmées corrigées ; docs de design inchangés car aucun changement de design depuis l'étape 4)
 - [x] Indiquer les limites de couverture : navigateurs, appareils, données, (docs/RECETTE_FINALE.md)
       volumes et hébergement non testés.
-- [ ] Revoir chaque case cochée et sa preuve.
+- [x] Revoir chaque case cochée et sa preuve. (2026-11-15 : 209 cases cochées ; chemins de fichiers cités vérifiés par script, une référence périmée corrigée ; preuves exécutables rejouées par les suites complètes ; contenu des preuves non relu ligne par ligne)
 - [x] Fournir une synthèse : conservé, remplacé, supprimé, vérifié, différé. (docs/RECETTE_FINALE.md)
 
 Terminé signifie : une architecture comprise et vérifiée, des composants
