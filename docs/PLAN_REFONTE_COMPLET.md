@@ -575,7 +575,7 @@ Clôture : installation, activation et restauration reproductibles et cohérente
 - [x] Vérifier références dynamiques, imports et compatibilités avant suppression. (recherche sur engine, app, scripts, ops, tests ; tests verts)
 - [x] Retirer les adaptateurs transitoires devenus inutiles. (exclusion_reason retiré ; legacy_upgrade conservé (configurations V3 en base))
 - [x] Documenter les exceptions restantes et leur raison. (docs/RECETTE_FINALE.md)
-- [ ] Mettre à jour README, architecture, design, conventions et commandes. (README et docs de livraison faits ; documents de design non relus)
+- [x] Mettre à jour README, architecture, design, conventions et commandes. (2026-11-15 : README, DELIVERY, ARCHITECTURE*, RECETTE_FINALE ; références à des fichiers contrôlées par recherche, deux périmées corrigées ; docs de design inchangés car aucun changement de design depuis l'étape 4)
 - [x] Indiquer les limites de couverture : navigateurs, appareils, données, (docs/RECETTE_FINALE.md)
       volumes et hébergement non testés.
 - [ ] Revoir chaque case cochée et sa preuve.

@@ -1,4 +1,6 @@
 #!/bin/bash
+# OBSOLÈTE (2026-11-15) : jamais exécuté, scripts/sandbox_hostinger.sh et le secret ~/tmp-backtest/.sandbox_pw n'existent pas. Le déploiement l'ignore tant que le secret manque.
+# Remplacé par la répétition locale : scripts/rehearse_deploy.sh (voir docs/DELIVERY.md).
 # Lance l'essai isolé (scripts/sandbox_hostinger.sh) sur l'hébergement, pour un commit donné de GitHub, EN ARRIÈRE-PLAN. Appelé par une tâche planifiée temporaire.
 #   bash sandbox_runner.sh <commit> [lecture]    sans « lecture » : télécharge le commit dans ~/tmp-backtest/momentum-test/<commit> et lance l'essai ; avec « lecture » : affiche la fin du journal.
 # Le mot de passe de la base d'essai est lu dans ~/tmp-backtest/.sandbox_pw (créé à part, jamais dans le dépôt). La base de production n'est que LUE (copie).

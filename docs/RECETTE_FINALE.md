@@ -4,13 +4,15 @@
 
 | Suite | Résultat |
 |---|---|
-| `make lint` (ruff + `php -l`), `js-check`, `css-check` | OK |
+| `make lint` (ruff, format, `php -l`), `js-check`, `css-check` | OK |
 | `make visual` (galerie de référence, 4 contextes) | OK au rejeu isolé ; **un échec constaté une fois** lors de l'enchaînement complet (écarts de largeur de quelques pixels), non reproduit seul : sensible à la charge de la machine, cause non identifiée |
 | `make fast` | 706 réussis, 0 sauté |
 | `make e2e` (parcours navigateur sur base jetable synthétique) | OK |
 | `make integ` (MariaDB jetable, 350 tests : financier, API, comptes, migrations, requêtes) | 350 réussis, 0 sauté |
 | `make release-check` (intégrité financière et catalogue, base jetable) | OK |
-| CI GitHub sur `b781231` : contrôles courts, tests complets, déploiement `hostinger` | verte ; le déploiement s'est exécuté sur Hostinger |
+| CI GitHub sur `8d235c0` : contrôles courts, tests complets, déploiement `hostinger` | verte ; le déploiement s'est exécuté sur Hostinger |
+| Répétition locale du déploiement (`scripts/rehearse_deploy.sh`, copie d'une base pleine) : `diagnostic`, `ok`, `fail`, `fail-deps` | conformes (a révélé et fait corriger un défaut de retour arrière) |
+| Après `ruff format` : fast 707, e2e, integ 350, visual | OK |
 
 ## Ce qui est vérifié
 - Cas financiers : splits, unités de prix (parité PHP/Python), ventes à découvert, achats à prix zéro, empreinte avant/après livraison, reprise de migration partielle.
@@ -25,12 +27,12 @@
 - **Supprimé** : `collected_rows`, `score_categories.select`, `rules.exclusion_reason` (aucun appelant hors tests ; références dynamiques vérifiées par recherche sur `engine`, `app`, `scripts`, `ops`, `tests`), réexports et cycles d'import.
 - **Vérifié** : voir tableau ci-dessus.
 - **Différé / non vérifié** :
-  - essai isolé Hostinger : secret serveur absent, jamais exécuté ici ;
+  - essai isolé Hostinger : abandonné (secret et script absents), remplacé par la répétition locale ;
   - restauration des dépendances sur l'hébergement réel (testée seulement avec un faux serveur) ;
-  - transfert non atomique, sous-dépendances Python non figées (voir `docs/DELIVERY.md`) ;
+  - transfert différé mais non atomique, fenêtre non mesurée sur l'hébergement ; sous-dépendances Python libres par décision (voir `docs/DELIVERY.md`) ;
   - recette visuelle manuelle des pages réelles après le dernier changement de code (la galerie automatisée est verte) ;
   - revue case par case du plan par une personne, mise à jour des documents de design hors README ;
-  - F07 (états dynamiques), F08 (présentation fixe dans `data-style`), F16 (sources condensées : le découpage des fonctions longues est fait, mais des lignes à points-virgules subsistent).
+  - F07 (états dynamiques) et F08 (53 valeurs fixes dans `data-style` : conversion en classes = changement de spécificité CSS, à juger lors de la recette visuelle humaine). F16 est résolu (formatage).
 
 ## Limites de couverture
 - Données : bases synthétiques et copie de développement ; mesures de performance à 9 600 titres × 400 séances synthétiques, pas la production.

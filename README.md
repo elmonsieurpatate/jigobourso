@@ -26,13 +26,13 @@ make check                              # lint + tests rapides
 ```
 
 Prérequis : Python 3.9+ (le serveur est en 3.9 ; développement testé en 3.12), PHP ≥ 8.1, MariaDB 10.11, Node (formatage et navigateur).
-Livraison, restauration et reprise : `docs/DELIVERY.md`.
+Livraison, restauration et reprise : `docs/DELIVERY.md`. Répétition locale du déploiement : `scripts/rehearse_deploy.sh ok` (voir ce document).
 
 ## Commandes
 
 ```
 make fast    # tests rapides, sans base ni réseau
-make lint    # ruff + php -l
+make lint    # ruff + contrôle du format + php -l
 make check   # lint + fast : filet avant tout changement
 make integ   # base jetable jigobourso_it (≈ 4 min) : collecte, calcul, API, sécurité
 make dev-db  # base de développement vide (jigobourso_v2)
