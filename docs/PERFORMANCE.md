@@ -29,7 +29,7 @@ Pistes non retenues faute de problème mesuré : pagination du classement côté
 
 ## Assets
 
-81 fichiers dans `app/public/assets`, tous référencés par au moins une page ou un autre asset, aucun manquant, aucun chargé deux fois (`tests/fast/test_assets.py`). Poids cumulé non compressé des scripts et feuilles de style par page : de 139 Ko (connexion) à 369 Ko (portefeuilles) ; plafond de non-régression à 450 Ko. Les pages d'authentification chargent 140 Ko : non optimisé, aucun problème mesuré.
+81 fichiers dans `app/public/assets`, tous référencés par au moins une page ou un autre asset, aucun manquant, aucun chargé deux fois (`tests/fast/test_assets.py`). Après séparation des sources et construction CSS (audit du 15 novembre), poids cumulé non compressé des scripts et feuilles par page : 200 101 à 414 853 octets ; plafond existant de 450 000 octets conservé. Les apparences métier assemblées dans Halo augmentent la part commune ; aucune amélioration de réseau réel n’est déduite de ces seuls poids. Les sources restent lisibles et seuls les espaces des sorties CSS sont compressés.
 
 ## Diagnostic des lenteurs et des erreurs
 
@@ -49,3 +49,41 @@ Aucun comportement financier n'est corrigé implicitement ; couverts par les tes
 ## Limites
 
 Données synthétiques sans bruit réel ; un seul utilisateur ; une machine ; pas d'hébergement mutualisé ; pas de réseau lent ni d'appareil mobile mesuré.
+
+## Mesurer une recherche sur l’hébergement actuel
+
+`scripts/measure_search.cjs` mesure le parcours Appliquer → API → rendu sur le site
+fourni par `BASE`, sans semis ni changement de données financières. Il utilise une
+connexion normale : les sessions et caches dérivés habituels de l’application
+peuvent être actualisés. Ce n’est pas un outil SQL strictement SELECT.
+
+Fournir `PERF_USER` et `PERF_PASSWORD` par l’environnement, jamais dans un fichier
+commité. Avec `PLAYWRIGHT_MODULE` et `JIGO_CHROMIUM` configurés :
+
+```sh
+BASE=https://jigobourso.turnjoy.dev node scripts/measure_search.cjs > mesure-recherche.json
+```
+
+Deux profils : bureau et Chromium mobile avec 150 ms de latence, 1,6 Mbit/s et CPU
+ralenti ×4. Cinq recherches par profil (PERF_RUNS réglable de 2 à 10) ; p50/p95,
+durée jusqu’au rendu, octets JSON décodés et transférés, gzip, tas JS, débordement
+et Server-Timing sont conservés. Les durées moteur sont désormais publiées aussi
+lors d’un échec ou timeout, sans être perdues dans le nettoyage du processus.
+
+Les résultats ne contiennent ni compte ni cours. Une mesure locale, même ralentie,
+ne valide pas Hostinger, Safari ni un iPhone physique. **Ces mesures réelles restent
+à recueillir avec un compte autorisé et un appareil réel** ; aucun résultat local
+n’est rebaptisé mesure de production. Ne pas conclure à l’inutilité d’une pagination
+ou d’un cache en production à partir du seul coût du tri sur le poste local.
+
+La mesure de recherche choisit le verdict « Toutes » avant le clic pour compter
+les lignes rendues même quand les seuils excluent tous les titres synthétiques.
+Elle conserve les réglages de stratégie et n’enregistre aucune préférence sur le
+serveur. Le temps s’arrête au rendu, avant la copie du corps de réponse vers Node ;
+Resource Timing fournit séparément encodedBodySize et transferSize quand disponibles.
+
+Essai de l’outil sur 45 titres synthétiques :
+[rapport local du 15 novembre](measurements/search-local-20261115.json), deux
+répétitions par profil. Il vérifie que la collecte fonctionne avec des lignes
+visibles ; ce faible volume et cet échantillon ne constituent pas une référence
+de performance, encore moins une mesure de production.

@@ -35,11 +35,22 @@ jobs:
       - name: Tests financiers, API et migrations sur base jetable
         run: |
           set -euo pipefail
-          python -m pip install -r requirements.txt pytest
-          scripts/lint_php.sh
-          python scripts/migrate.py --check
-          python -m compileall -q engine scripts
-          for file in app/public/assets/*.js tests/e2e/*.cjs; do node --check "$file"; done
-          python -m pytest tests/fast -q
+          python -m pip install -r requirements.txt -r requirements-dev.txt
+          npm ci --ignore-scripts --no-audit --no-fund
+          scripts/validate_quality.sh
+          scripts/test_suite.sh fast
           MYSQL_PWD=local-test-only mysql -h127.0.0.1 -uroot jigobourso_it < db/schema.sql
-          python -m pytest tests/integ -q
+          scripts/test_suite.sh integ
+      - name: Même recette navigateur que main
+        run: |
+          set -euo pipefail
+          npm install --prefix "$RUNNER_TEMP/financial-browser" --no-save playwright-core@1.56.1 > /dev/null
+          export PLAYWRIGHT_MODULE="$RUNNER_TEMP/financial-browser/node_modules/playwright-core" JIGO_CHROMIUM="$(command -v google-chrome || command -v chromium)"
+          export JIGO_TEST_MAIL_DIR="$RUNNER_TEMP/account-mail" JIGO_E2E_RESULTS="$PWD/audit-results"
+          scripts/e2e_browser.sh
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with:
+          name: pr-browser
+          path: audit-results/
+          retention-days: 1

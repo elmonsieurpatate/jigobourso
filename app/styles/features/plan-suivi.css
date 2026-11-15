@@ -1,0 +1,444 @@
+/* Plan de suivi d'une position (jauge, repères, tuiles, conseil). Couleurs du thème ; rouge/orange/jaune/vert de la jauge fixes (lisibles en clair et en sombre). */
+.ps-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-16);
+}
+.ps-t strong {
+  font-size: var(--fs-24);
+  line-height: var(--lh-none);
+}
+.ps-id small {
+  color: var(--muted);
+}
+.ps-gain strong {
+  font-size: var(--fs-24);
+  line-height: var(--lh-none);
+}
+.ps-gain span {
+  font-weight: 600;
+}
+.ps-track {
+  border-radius: var(--radius-16);
+}
+.ps-shield {
+  filter: drop-shadow(0 1px 1px var(--shadow-marker-color));
+}
+.ps-shield.own {
+  color: var(--danger);
+}
+.ps-shield.sug {
+  color: var(--info);
+}
+.ps-tick {
+  background: var(--text);
+  border-radius: var(--radius-4);
+}
+.ps-dot {
+  border-radius: 50%;
+  background: var(--brand);
+  border: 4px solid var(--ring);
+  box-shadow: 0 0 0 2px var(--brand);
+}
+.ps-flagm {
+  background: var(--ok);
+  border: 2px solid var(--ring);
+}
+.ps-lb.ps-off b {
+  text-decoration: line-through;
+}
+.ps-hdot {
+  border-radius: 50%;
+  background: var(--muted);
+  border: 2px solid var(--ring);
+}
+.ps-lb {
+  font-size: var(--fs-11);
+  line-height: var(--lh-tight);
+}
+.ps-lb b {
+  font-weight: 500;
+  color: var(--muted);
+}
+.ps-lb strong {
+  font-size: var(--fs-14);
+}
+.ps-lb em {
+  font-style: normal;
+  font-weight: 600;
+}
+.ps-lb .sug,
+.ps-lb.ps-m-suggested b {
+  color: var(--info);
+}
+.ps-lb.ps-m-personal b {
+  color: var(--danger);
+}
+.ps-lb.ps-m-target b {
+  color: var(--ok);
+}
+.ps-scale {
+  color: var(--muted);
+  font-size: var(--fs-10);
+}
+.ps-legend li {
+  font-size: var(--fs-12);
+  border-bottom: 1px solid var(--line);
+}
+.ps-legend li:last-child {
+  border-bottom: 0;
+}
+.ps-legend em {
+  font-style: normal;
+  font-weight: 600;
+  color: var(--muted);
+}
+.ps-legend .ps-dot {
+  border-width: 3px;
+}
+.ps-tile {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-16);
+  background: var(--surface);
+}
+.ps-tile b {
+  font-size: var(--fs-16);
+}
+.ps-ic {
+  border-radius: 50%;
+  background: var(--surface-2);
+  color: var(--muted);
+}
+.ps-risk {
+  border-radius: var(--radius-pill);
+  font: 700 0.9rem system-ui;
+}
+.ps-risk.r-mod {
+  background: var(--info-soft);
+  color: var(--info);
+}
+.ps-na {
+  color: var(--muted);
+  font-weight: 500;
+  font-size: var(--fs-13);
+}
+.ps-flag {
+  color: var(--warn);
+  font-weight: 700;
+}
+.ps-advice {
+  border-radius: var(--radius-16);
+}
+.ps-advice b {
+  font-size: var(--fs-15);
+}
+.ps-advice p {
+  color: var(--text);
+}
+.ps-advice details {
+  font-size: var(--fs-12);
+}
+.ps-advice.ok {
+  background: var(--up-soft);
+}
+.ps-advice.ok .ps-ai,
+.ps-advice.ok b {
+  color: var(--up);
+}
+.ps-advice.watch {
+  background: var(--warn-soft);
+}
+.ps-advice.watch .ps-ai,
+.ps-advice.watch b {
+  color: var(--warn);
+}
+.ps-advice.reeval {
+  background: var(--caution-soft);
+}
+.ps-advice.reeval .ps-ai,
+.ps-advice.reeval b {
+  color: var(--caution-ink);
+}
+.ps-advice.exit {
+  background: var(--down-soft);
+}
+.ps-advice.exit .ps-ai,
+.ps-advice.exit b {
+  color: var(--down);
+}
+.ps-line b {
+  font-size: var(--fs-15);
+}
+.ps-state {
+  border-radius: var(--radius-8);
+  font: 800 0.72rem system-ui;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: var(--muted);
+  color: var(--on-solid);
+}
+.ps-advice.ok .ps-state {
+  background: var(--ok);
+}
+.ps-advice.watch .ps-state {
+  background: var(--warn);
+}
+.ps-advice.reeval .ps-state {
+  background: var(--caution);
+}
+.ps-advice.exit .ps-state {
+  background: var(--danger);
+}
+.ps-advice.na .ps-state {
+  background: var(--surface);
+  color: var(--muted);
+  border: 1px solid var(--line);
+}
+.ps-prot {
+  font-size: var(--fs-12);
+  font-weight: 600;
+}
+.ps-detail {
+  font-size: var(--fs-13);
+}
+.ps-more .ps-full,
+.ps-more .ps-others,
+.ps-more .ps-why {
+  font-size: var(--fs-12);
+}
+.ps-others li small {
+  color: var(--muted);
+}
+.ps-os {
+  border-radius: var(--radius-4);
+  font: 700 0.68rem system-ui;
+  text-transform: uppercase;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--text);
+}
+.ps-advice.na {
+  background: var(--surface-2);
+}
+.ps-advice.na .ps-ai {
+  color: var(--muted);
+}
+.ps-notes {
+  color: var(--muted);
+  font-size: var(--fs-12);
+}
+.ps-origin {
+  color: var(--muted);
+  font-size: var(--fs-11);
+}
+.ps-foot p {
+  color: var(--muted);
+  font-size: var(--fs-12);
+}
+.ps-method {
+  font-size: var(--fs-11);
+  color: var(--muted);
+}
+.px-w.rv {
+  background: var(--caution);
+  border-color: var(--caution);
+  color: var(--on-solid);
+}
+.px-sum .n.rv {
+  background: var(--caution);
+}
+@container pscard (max-width: 640px) {
+  .ps-t strong,
+  .ps-gain strong {
+    font-size: var(--fs-18);
+  }
+} /* ───────── Suivi des positions : une ligne par position (même jauge, mêmes conseils que le détail) ───────── */ /* en-têtes repliables des sections « Positions » et « Suivi des positions » */
+.px-fold {
+  background: none;
+  border: 0;
+  font: inherit;
+  font-size: var(--fs-15);
+  font-weight: 700;
+  color: var(--text);
+  border-radius: var(--radius-8);
+}
+.px-fold .chv {
+  color: var(--muted);
+}
+.px-fold .hint {
+  font-size: var(--fs-10);
+  font-weight: 600;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+}
+.psr-sum {
+  font-size: var(--fs-11);
+  color: var(--muted);
+}
+.psr-sum i {
+  font-style: normal;
+  font-weight: 700;
+  border-radius: var(--radius-12);
+  font-size: var(--fs-10);
+  color: var(--on-solid);
+  background: var(--muted);
+}
+.psr-sum i.exit {
+  background: var(--danger);
+}
+.psr-sum i.reevaluate {
+  background: var(--caution);
+}
+.psr-sum i.watch {
+  background: var(--warn);
+}
+.psr-sum i.keep {
+  background: var(--ok);
+}
+.psr-note {
+  font-size: var(--fs-11);
+  color: var(--muted);
+} /* dialogue « Configurer » */
+dialog .ps-rule {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-12);
+}
+dialog .ps-rule legend {
+  font-weight: 700;
+}
+.ps-tag {
+  border-radius: var(--radius-pill);
+  font: 700 0.72rem system-ui;
+  background: var(--info-soft);
+  color: var(--info);
+} /* Suivi des positions : grille type tableau, une ligne compacte par position */
+.psr-list {
+  border-top: 1px solid var(--line);
+}
+.psr-cols {
+  font-size: var(--fs-10);
+  font-weight: 700;
+  color: var(--muted);
+  background: var(--surface-2, transparent);
+  border-radius: var(--radius-8);
+}
+.psr {
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+}
+.psr::before {
+  border-radius: var(--radius-4);
+  background: var(--muted);
+}
+.psr.st-ok::before {
+  background: var(--ok);
+}
+.psr.st-watch::before {
+  background: var(--gold);
+}
+.psr.st-reevaluate::before {
+  background: var(--caution);
+}
+.psr.st-exit::before {
+  background: var(--danger);
+}
+.psr.st-na::before {
+  background: var(--muted);
+}
+.psr-name {
+  background: none;
+  border: 0;
+  font: inherit;
+  color: inherit;
+}
+.psr-name:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-8);
+}
+.psr-name strong {
+  font-size: var(--fs-14);
+  line-height: var(--lh-tight);
+}
+.psr-name small {
+  color: var(--muted);
+  font-size: var(--fs-10);
+}
+.psr-gain strong {
+  font-size: var(--fs-13);
+  line-height: var(--lh-tight);
+}
+.psr-gain span {
+  font-weight: 600;
+  font-size: var(--fs-10);
+}
+.psr-gauge .ps-track {
+  border-radius: var(--radius-4);
+}
+.psr-gauge .ps-lb {
+  font-size: var(--fs-10);
+  line-height: var(--lh-tight);
+}
+.psr-gauge .ps-lb strong {
+  font-size: var(--fs-11);
+}
+.psr-gauge .ps-dot {
+  border-width: 2px;
+}
+.psr-adv.ps-advice {
+  background: none;
+  border-radius: 0;
+}
+.psr-adv .ps-state {
+  font-size: var(--fs-11);
+  border-radius: var(--radius-8);
+}
+.psr-msg {
+  font-size: var(--fs-12);
+  line-height: var(--lh-tight);
+  color: var(--text);
+}
+.psr-cfg {
+  font-size: var(--fs-11);
+}
+.psr-more {
+  border-top: 1px dashed var(--line);
+}
+.psr-hl {
+  font-size: var(--fs-11);
+  color: var(--muted);
+}
+:root[data-theme="dark"] .psr-adv.ps-advice {
+  background: none;
+} /* Suivi des positions : repères en traits verticaux fins (aucune icône) */
+.ps-tk {
+  border-radius: var(--radius-4);
+  background: var(--text);
+}
+.ps-mk.ps-m-suggested .ps-tk {
+  background: var(--info);
+}
+.ps-mk.ps-m-personal .ps-tk {
+  background: var(--danger);
+}
+.ps-mk.ps-m-target .ps-tk {
+  background: var(--ok);
+}
+.psr-gauge .ps-lb b {
+  font-weight: 500;
+}
+.psr-gauge .ps-lb.ps-m-current strong {
+  font-weight: 800;
+}
+.psr-cfg,
+.psr-exp {
+  background: transparent;
+  box-shadow: none;
+}
+.psr-gauge .ps-tk {
+  box-shadow: 0 0 0 1px var(--marker-light-shadow);
+}
+:root[data-theme="dark"] .psr-gauge .ps-tk {
+  box-shadow: 0 0 0 1px var(--marker-dark-shadow);
+}

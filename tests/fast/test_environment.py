@@ -126,7 +126,22 @@ def fake_server(tmp_path, installed, sha):
 
 
 def run_restore(root, backups):
-    return subprocess.run(['bash', '-c', 'set -euo pipefail\n' + restore_block()], env={**os.environ, 'ROOT': str(root), 'BACKUPS': str(backups)}, capture_output=True, text=True)
+    return subprocess.run(
+        ['bash', '-c', 'set -euo pipefail\n' + restore_block()], env={**os.environ, 'ROOT': str(root), 'BACKUPS': str(backups), 'FILE': 'code-test.tgz'}, capture_output=True, text=True
+    )
+
+
+def associate(backups, archive):
+    import hashlib
+    import shutil
+
+    source = backups / archive
+    name = archive if archive.startswith('environment-') else 'environment-test.tgz'
+    if source.name != name:
+        shutil.copyfile(source, backups / name)
+    (backups / 'code-test.tgz.venv').write_text(name)
+    (backups / 'code-test.tgz.requirements').write_text(hashlib.sha256(b'numpy<2\n').hexdigest())
+    (backups / (name + '.sha256')).write_text(hashlib.sha256((backups / name).read_bytes()).hexdigest())
 
 
 def pack(backups, site_content, name):
@@ -135,11 +150,12 @@ def pack(backups, site_content, name):
     (src / 'paquet.txt').write_text(site_content)
     with tarfile.open(backups / name, 'w:gz') as t:
         t.add(src / 'paquet.txt', arcname='./paquet.txt')
+    associate(backups, name)
 
 
 def test_restore_puts_back_the_dependencies_saved_before_an_upgrade(tmp_path):
     root, backups, site = fake_server(tmp_path, 'nouvelle', 'autre-empreinte')
-    pack(backups, 'ancienne', 'site-packages-20260101000000.tgz')
+    pack(backups, 'ancienne', 'environment-20260101000000.tgz')
     result = run_restore(root, backups)
     assert result.returncode == 0, result.stderr
     assert (site / 'paquet.txt').read_text() == 'ancienne'
@@ -149,22 +165,22 @@ def test_restore_puts_back_the_dependencies_saved_before_an_upgrade(tmp_path):
     assert 'dépendances Python restaurées' in result.stdout
 
 
-def test_restore_leaves_dependencies_alone_when_unchanged_or_first_run(tmp_path):
+def test_restore_uses_the_paired_environment_even_with_same_or_missing_manifest(tmp_path):
     import hashlib
 
     same = hashlib.sha256(b'numpy<2\n').hexdigest()
     root, backups, site = fake_server(tmp_path / 'a', 'actuelle', same)
-    pack(backups, 'ancienne', 'site-packages-20260101000000.tgz')
-    assert run_restore(root, backups).returncode == 0 and (site / 'paquet.txt').read_text() == 'actuelle'
+    pack(backups, 'ancienne', 'environment-20260101000000.tgz')
+    assert run_restore(root, backups).returncode == 0 and (site / 'paquet.txt').read_text() == 'ancienne'
     root, backups, site = fake_server(tmp_path / 'b', 'actuelle', None)
-    pack(backups, 'ancienne', 'site-packages-20260101000000.tgz')
-    assert run_restore(root, backups).returncode == 0 and (site / 'paquet.txt').read_text() == 'actuelle'
+    pack(backups, 'ancienne', 'environment-20260101000000.tgz')
+    assert run_restore(root, backups).returncode == 0 and (site / 'paquet.txt').read_text() == 'ancienne'
 
 
-def test_restore_signals_missing_dependency_backup_without_failing_the_code_restore(tmp_path):
+def test_restore_refuses_an_unpaired_backup_without_touching_dependencies(tmp_path):
     root, backups, site = fake_server(tmp_path, 'nouvelle', 'autre-empreinte')
     result = run_restore(root, backups)
-    assert result.returncode == 0 and 'vérification manuelle requise' in result.stderr and (site / 'paquet.txt').read_text() == 'nouvelle'
+    assert result.returncode != 0 and 'Erreur' in result.stderr and (site / 'paquet.txt').read_text() == 'nouvelle'
 
 
 def dependency_server(tmp_path, installed):
@@ -203,6 +219,7 @@ def test_deploy_repairs_a_drifted_venv_even_with_an_unchanged_manifest(tmp_path)
     assert (site / 'paquet.txt').read_text().strip() == 'conforme'
     assert (root / '.deployment-venv-backup').is_file()
     assert len(list(backups.glob('site-packages-*.tgz'))) == 1
+    associate(backups, next(backups.glob('site-packages-*.tgz')).name)
     # Un échec plus tard doit restaurer le venv précédent, même empreinte égale.
     assert run_restore(root, backups).returncode == 0
     assert (site / 'paquet.txt').read_text() == 'ancienne'
@@ -223,6 +240,7 @@ def test_failed_dependency_repair_can_restore_the_original_venv(tmp_path):
     result = ensure_dependencies(root, backups, fail=True)
     assert result.returncode != 0
     assert (root / '.deployment-venv-backup').is_file()
+    associate(backups, next(backups.glob('site-packages-*.tgz')).name)
     assert run_restore(root, backups).returncode == 0
     assert (site / 'paquet.txt').read_text() == 'ancienne'
 
@@ -264,3 +282,67 @@ def test_interrupted_environment_check_does_not_reinstall_packages(tmp_path):
     assert (site / 'paquet.txt').read_text() == 'ancienne'
     assert not list(backups.glob('site-packages-*.tgz'))
     assert not (root / '.deployment-venv-backup').exists()
+
+
+def test_restore_selects_the_environment_bound_to_the_chosen_release(tmp_path):
+    root, backups, site = fake_server(tmp_path, 'actuelle', 'autre')
+    pack(backups, 'choisie', 'environment-old.tgz')
+    pack(backups, 'plus recente mais autre', 'environment-new.tgz')
+    associate(backups, 'environment-old.tgz')
+    assert run_restore(root, backups).returncode == 0
+    assert (site / 'paquet.txt').read_text() == 'choisie'
+
+
+def test_restore_refuses_corrupt_dependencies_before_deleting_the_current_ones(tmp_path):
+    root, backups, site = fake_server(tmp_path, 'actuelle', 'autre')
+    pack(backups, 'ancienne', 'environment-chosen.tgz')
+    with (backups / 'environment-chosen.tgz').open('ab') as f:
+        f.write(b'corruption')
+    result = run_restore(root, backups)
+    assert result.returncode != 0 and 'corrompue' in result.stderr
+    assert (site / 'paquet.txt').read_text() == 'actuelle'
+
+
+def test_dependency_repair_reuses_paired_snapshot_without_generic_archives(tmp_path):
+    root, backups, site = dependency_server(tmp_path, 'ancienne')
+    chosen = 'environment-code-test.tgz'
+    with tarfile.open(backups / chosen, 'w:gz') as tar:
+        tar.add(site / 'paquet.txt', arcname='paquet.txt')
+    (backups / 'code-test.tgz.venv').write_text(chosen + '\n')
+    result = subprocess.run(
+        ['bash', str(ROOT / 'scripts/release/ensure_dependencies.sh'), str(root), str(backups)],
+        env={**os.environ, 'CODE_BACKUP': 'code-test.tgz'},
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert (root / '.deployment-venv-backup').read_text().strip() == chosen
+    assert not list(backups.glob('site-packages-*.tgz'))
+    assert (site / 'paquet.txt').read_text().strip() == 'conforme'
+
+
+def test_system_pip_is_refused_when_its_python_differs_from_the_venv(tmp_path):
+    root, backups, site = dependency_server(tmp_path, 'ancienne')
+    python = root / '.venv/bin/python'
+    script = (
+        python.read_text()
+        .replace(
+            'then echo "$site";',
+            'then case "$2" in *version_info*) echo 3.9 ;; *) echo "$site" ;; esac;',
+        )
+        .replace('then exit 0;', 'then exit 1;')
+    )
+    python.write_text(script)
+    tools = tmp_path / 'system-tools'
+    tools.mkdir()
+    system = tools / 'python3'
+    system.write_text('#!/bin/sh\necho 3.12\n')
+    system.chmod(0o755)
+    result = subprocess.run(
+        ['bash', str(ROOT / 'scripts/release/ensure_dependencies.sh'), str(root), str(backups)],
+        env={**os.environ, 'PATH': str(tools) + os.pathsep + os.environ['PATH']},
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode != 0 and 'Python système incompatible' in result.stderr
+    assert (site / 'paquet.txt').read_text() == 'ancienne'

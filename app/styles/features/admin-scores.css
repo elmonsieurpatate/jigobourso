@@ -1,0 +1,192 @@
+.as-principle {
+  font-size: var(--fs-13);
+}
+.as-hint {
+  color: var(--muted);
+  font-size: var(--fs-12);
+  line-height: var(--lh-snug);
+}
+.as-lbl {
+  font-weight: 700;
+}
+.as-period {
+  border-bottom: 1px dashed var(--line);
+}
+.as-pill {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-radius: var(--radius-pill);
+  font-weight: 700;
+  font-size: var(--fs-12);
+}
+.as-total {
+  border-radius: var(--radius-12);
+  font-size: var(--fs-13);
+}
+.as-formula {
+  background: var(--surface-2);
+  border-radius: var(--radius-12);
+  font-size: var(--fs-13);
+}
+.as-comp {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-12);
+}
+.as-field label {
+  font-weight: 600;
+  font-size: var(--fs-13);
+}
+.as-i {
+  color: var(--accent);
+  font-weight: 700;
+}
+.as-cw {
+  font-size: var(--fs-13);
+}
+.as-bar-bg {
+  background: var(--surface-2);
+  border-radius: var(--radius-pill);
+}
+.as-bar-fg {
+  background: var(--accent);
+  border-radius: var(--radius-pill);
+}
+.as-pct {
+  color: var(--muted);
+}
+.as-chk {
+  font-size: var(--fs-12);
+}
+.as-score {
+  background: var(--info-soft);
+  border-radius: var(--radius-12);
+}
+.as-score.c {
+  background: var(--up-soft);
+}
+.as-score span {
+  font-size: var(--fs-11);
+  color: var(--muted);
+}
+.as-score b {
+  font-size: var(--fs-24);
+}
+.as-score small {
+  color: var(--muted);
+  font-size: var(--fs-10);
+}
+.as-tile {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.as-tile b {
+  font-size: var(--fs-24);
+}
+.as-tile small {
+  color: var(--muted);
+  font-size: var(--fs-11);
+}
+.as-bar {
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+  box-shadow: 0 -4px 16px var(--shadow-card-inset-color);
+}
+.as-saved {
+  color: var(--up);
+  font-weight: 600;
+}
+.as-dirty {
+  color: var(--warn);
+  font-weight: 700;
+}
+.as-lastday {
+  font-size: var(--fs-12);
+}
+.as-hist i {
+  background: var(--accent);
+  border-radius: var(--radius-4) var(--radius-4) 0 0;
+}
+.as-win button small {
+  font-weight: 500;
+  font-size: var(--fs-10);
+  color: var(--muted);
+}
+.as-win button.on small {
+  color: var(--glyph-on-solid-color);
+}
+.as-read {
+  font-size: var(--fs-12);
+  line-height: var(--lh-tight);
+}
+.as-read .pos {
+  color: var(--ok);
+  font-weight: 700;
+}
+.as-read .neg {
+  color: var(--danger);
+  font-weight: 700;
+}
+.as-ch.up {
+  color: var(--ok);
+}
+.as-ch.dn {
+  color: var(--danger);
+}
+.as-ch .t {
+  fill: var(--muted);
+  font-size: var(--fs-11);
+}
+.as-ch .mkt {
+  font-size: var(--fs-10);
+}
+.as-ch .mk {
+  stroke: var(--muted);
+}
+.as-ch .cur {
+  stroke: var(--muted);
+}
+.as-ch circle {
+  fill: currentColor;
+  stroke: var(--surface);
+} /* Mobile : barre d'actions compacte (une seule ligne, défilable), tableaux défilables dans leur carte, champ de recherche confortable */
+.as-search {
+  font-size: var(--fs-16);
+} /* Simulation : le bloc de recherche et le bloc du résultat ne se touchent plus */ /* Normalisations par stratégie : bloc empilé (libellé, réglage, explication), jamais tronqué */
+.as-tune {
+  border-top: 1px solid var(--line);
+}
+.as-tune-head {
+  font-size: var(--fs-13);
+}
+.as-tune .as-num {
+  font-size: var(--fs-14);
+}
+.as-tune .as-unit {
+  font-size: var(--fs-12);
+} /* Notes : colonne d'alignement fixe ; « * » = note calculée sur des données incomplètes (plus de pastille qui décale les colonnes) */
+.as-flag {
+  color: var(--warn);
+  font-weight: 700;
+}
+.as-status {
+  font-style: normal;
+  font-size: var(--fs-10);
+  font-weight: 700;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--line);
+}
+.as-status.na {
+  color: var(--muted);
+}
+.seg button b {
+  font-variant-numeric: tabular-nums;
+}
+.as-rkwrap {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.as-rktable th button:focus-visible {
+  outline: 2px solid var(--accent);
+}

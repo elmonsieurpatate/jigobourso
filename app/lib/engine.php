@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/http.php';
+require_once __DIR__ . '/engine_process.php';
 
 const ENGINE_TIMEOUT = 90;     // secondes : au-delà, le processus est arrêté et l'appel échoue proprement
 const ENGINE_SLOTS = 4;        // appels simultanés au plus (hébergement mutualisé) ; les suivants attendent quelques secondes puis reçoivent un 503
@@ -58,39 +59,30 @@ function engine_call(string $command, array $request) {
     if (isset($request['config']) && is_array($request['config'])) $request['config']=explorer_config_shape($request['config']);
     $env = engine_env(['JIGO_DB_HOST', 'JIGO_DB_PORT', 'JIGO_DB_SOCKET', 'JIGO_DB_NAME', 'JIGO_DB_USER', 'JIGO_DB_PASSWORD']);
     $t0 = microtime(true);
-    $slot = engine_acquire();
-    $t1 = microtime(true);
-    $errFile = tempnam(sys_get_temp_dir(), 'jigo-eng-');
+    $deadline = $t0 + max(0.01, (float)cfg('JIGO_ENGINE_TIMEOUT', ENGINE_TIMEOUT));
+    $payload = json_encode($request, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
     try {
+        $slot = engine_acquire(min(8.0, max(0.0, $deadline - microtime(true))));
+    } finally {
+        $t1 = microtime(true);
+        request_timing('slot', $t1 - $t0);
+    }
+    $errFile = null;
+    try {
+        $errFile = @tempnam(sys_get_temp_dir(), 'jigo-eng-');
+        if ($errFile === false) throw new ApiError('Moteur d’analyse indisponible', 503);
         $proc = proc_open([python_bin(), '-m', 'engine.cli', $command], [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['file', $errFile, 'w']], $pipes, engine_root(), $env + ['PYTHONPATH' => engine_root()]);
         if (!is_resource($proc)) throw new ApiError('Moteur d’analyse indisponible', 503);
-        // La requête est petite ; l'écriture ne bloque pas (tube de 64 Ko) sauf requête énorme, bornée par body() côté PHP.
-        fwrite($pipes[0], json_encode($request, JSON_UNESCAPED_UNICODE));
-        fclose($pipes[0]);
-        stream_set_blocking($pipes[1], false);
-        $stdout = '';
-        $deadline = microtime(true) + (float)cfg('JIGO_ENGINE_TIMEOUT', ENGINE_TIMEOUT);
-        $timedOut = false;
-        while (true) {
-            $r = [$pipes[1]]; $w = $e = null;
-            $left = $deadline - microtime(true);
-            if ($left <= 0) { $timedOut = true; break; }
-            if (stream_select($r, $w, $e, 0, (int)min(500000, $left * 1e6)) === false) break;
-            $chunk = fread($pipes[1], 65536);
-            if ($chunk !== false && $chunk !== '') $stdout .= $chunk;
-            if (feof($pipes[1])) break;
-        }
-        fclose($pipes[1]);
-        if ($timedOut) { proc_terminate($proc, 9); proc_close($proc); error_log('engine ' . $command . ': délai dépassé'); throw new ApiError('Le moteur d’analyse a mis trop de temps à répondre.', 503); }
-        $code = proc_close($proc);
+        [$stdout, $code] = engine_exchange($proc, $pipes, $payload, $deadline);
         $stderr = (string)@file_get_contents($errFile, false, null, max(0, (int)@filesize($errFile) - 400));
     } finally {
-        @unlink($errFile);
+        request_timing('engine', microtime(true) - $t1);
+        if (is_string($errFile)) @unlink($errFile);
         engine_release($slot);
     }
     $t2 = microtime(true);
     $data = json_decode($stdout, true);
-    request_timing('slot', $t1 - $t0); request_timing('engine', $t2 - $t1); request_timing('decode', microtime(true) - $t2);   // attente d'emplacement, moteur Python (démarrage, SQL, calcul), décodage
+    request_timing('decode', microtime(true) - $t2);   // attente d'emplacement, moteur Python (démarrage, SQL, calcul), décodage
     if ($code === 2 && is_array($data) && isset($data['error'])) throw new ApiError($data['error'], 422);
     if ($code !== 0 || !is_array($data)) {
         error_log('engine ' . $command . ' code ' . $code . ': ' . $stderr);

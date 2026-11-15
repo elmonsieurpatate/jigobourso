@@ -1,0 +1,9 @@
+{
+  "name": "jigobourso-assets",
+  "private": true,
+  "description": "Outils de développement uniquement : formatage et compression CSS sans changer les classes.",
+  "devDependencies": {
+    "esbuild": "0.25.12",
+    "prettier": "3.3.3"
+  }
+}

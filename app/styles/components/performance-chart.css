@@ -1,0 +1,75 @@
+/* Graphique de performance et sa légende. */
+.lc-grid {
+  stroke: var(--line);
+}
+.lc-zero {
+  stroke: var(--muted);
+}
+.lc-cross {
+  stroke: var(--muted);
+}
+.lc-dot {
+  stroke: var(--surface);
+}
+.lc-mk.buy {
+  fill: var(--accent);
+}
+.lc-mk.sell {
+  fill: var(--down);
+}
+.lc-y span {
+  font-size: var(--fs-10);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.lc-x span {
+  font-size: var(--fs-10);
+  color: var(--muted);
+}
+.lc-tip {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-12);
+  box-shadow: 0 8px 24px var(--shadow-tooltip-color);
+  font-size: var(--fs-11);
+}
+.lc-tip-d {
+  font-weight: 700;
+}
+.lc-tip-r {
+  line-height: var(--lh-normal);
+}
+.lc-tip-r i,
+.lc-chip i {
+  border-radius: 50%;
+}
+.lc-tip-r b {
+  font-variant-numeric: tabular-nums;
+}
+.lc-tip-m {
+  font-size: var(--fs-11);
+  font-weight: 600;
+}
+.lc-tip-m.buy {
+  color: var(--accent);
+}
+.lc-tip-m.sell {
+  color: var(--down);
+}
+.lc-empty {
+  color: var(--muted);
+}
+.lc-chip {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: var(--radius-pill);
+  font: inherit;
+  font-size: var(--fs-11);
+  color: var(--text);
+}
+.lc-chip.off {
+  text-decoration: line-through;
+}
+.lc-chip:hover {
+  border-color: var(--accent);
+}

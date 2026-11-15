@@ -1,0 +1,29 @@
+/* Tracés et mini-graphiques communs. */
+.chart text {
+  fill: var(--muted);
+  font-size: var(--fs-11);
+}
+.chart .grid,
+.intraday-svg .hgrid,
+.as-ch .g,
+.hc-grid {
+  stroke: var(--line);
+}
+.chart .line {
+  fill: none;
+  stroke: var(--accent);
+}
+.chart .area {
+  fill: var(--accent);
+}
+.chart .ma {
+  fill: none;
+  stroke: var(--chart-ma);
+}
+.spark path {
+  fill: none;
+}
+.spark .area {
+  fill: currentColor;
+  stroke: none;
+}

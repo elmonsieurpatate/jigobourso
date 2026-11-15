@@ -6,6 +6,32 @@
 
 Pour une modification visuelle, changer d'abord la variable ou le composant partagé ; ajouter une règle de page seulement si le besoin est propre à cette page. Tester les deux thèmes, 390 px, clavier, états vide/erreur et le cache d'asset (`?v=`). Pour une suppression, chercher les références dans HTML, JS, PHP et tests avant de retirer le fichier.
 
+## Sources CSS et fichiers servis
+
+Les fichiers de `app/public/assets/*.css` sont générés. Ne pas les corriger à la main.
+Les sources lisibles et le manifeste de construction sont dans `app/styles/` :
+
+- `theme/tokens.css` : palette, polices et variables communes ;
+- `components/` : apparence et dimensions des composants partagés, par famille ;
+- `features/` : apparence réellement propre à un métier ;
+- `layout/` : disposition des pages et utilitaires explicitement nommés.
+
+`manifest.json` fixe l'ordre de cascade. Les styles métier assemblés dans Halo sont
+conditionnés par la présence du lien vers la feuille de cette page (`:where` n'ajoute
+aucune spécificité). Les URL publiques et leur ordre de chargement sont conservés.
+Les animations qui changent une apparence appartiennent aussi aux composants.
+
+Installation des outils : `npm ci --ignore-scripts` et les dépendances Python de
+développement. `make css-format` formate les sources puis reconstruit les 11 feuilles ;
+`make css-check` vérifie le formatage, leur synchronisation et les frontières de
+responsabilité. Le compilateur CSS épinglé ne compresse que les espaces ; il ne
+renomme pas les classes et ne construit aucun JavaScript. Les sources restent lisibles.
+
+Le garde-fou analyse les déclarations et les sélecteurs, y compris `:is`, `:where`,
+les règles conditionnelles et les animations. Une surcharge de couleur ou de bordure
+dans une mise en page échoue. Les géométries des boutons et autres contrôles partagés
+restent également dans leurs composants. Les utilitaires explicites sont conservés.
+
 ## Versions des fichiers CSS et JS
 
 Toutes les pages référencent leurs fichiers avec le même marqueur : `assets/app.js?v=__BUILD__`. Ne jamais écrire une version à la main (`?v=2026…`) : `ops/deploy.sh` remplace `__BUILD__` par l'identifiant du déploiement (date UTC `AAAAMMJJhhmm`) dans toutes les pages, puis vérifie qu'aucun marqueur ne reste. En local le marqueur est servi tel quel, ce qui est sans effet.
@@ -48,7 +74,7 @@ Règle : un script de page ne redéfinit ni `$`, ni `esc`, ni un formateur de no
 
 | Page | Modèle (sans DOM) | Vue | État et câblage | Persistance / réseau |
 |---|---|---|---|---|
-| Classement | `explorer-model.js`, `explorer-filters.js` | `explorer-view.js` | `explorer.js` | `explorer-storage.js` (seul fichier qui connaît les clés `localStorage`) ; API via `J.api` |
+| Classement | `explorer-model.js`, `explorer-filters.js`, `explorer-session.js` (restauration et migrations pures) | `explorer-view.js` | `explorer.js` | `explorer-storage.js` (seul fichier qui connaît les clés `localStorage`) ; API via `J.api` |
 | Scores admin | — | `admin-scores-view.js` | `admin-scores.js` | `J.api` |
 | Colonnes | `table-layout.js` (partagé Classement/Scores) | `admin-columns.js` | `admin-columns.js` | `J.api` |
 | Catégories | `admin-categories-model.js` | `filtres.js` | `filtres.js` | `secondary-filter-store.js` |
@@ -67,3 +93,22 @@ Règle : un script de page ne redéfinit ni `$`, ni `esc`, ni un formateur de no
 - Un élément que le script masque puis réaffiche utilise `.is-off` (`classList.add/remove("is-off")`), jamais `style.display`.
 - `tests/fast/test_frontend_policy.py` interdit tout `data-style` fixe et vérifie que chaque classe `u-…` utilisée est définie et inversement.
 - `scripts/probe_utilities.cjs` (navigateur, base jetable) vérifie que chaque classe rencontrée donne le même style calculé que l'ancien style en ligne : 2026-11-15, 347 vérifications sur 45 des 66 classes (onglets d'administration, chapitres d'aide, fiches titre, stratégies), 0 écart. Les 21 autres classes n'apparaissent que dans des états non atteints par la sonde.
+
+## Clarification des contrôleurs après audit
+
+`explorer-session.js` reconstruit l’état et migre les sauvegardes sans DOM, réseau
+ni accès au stockage. Le contrôleur lit les entrées, persiste seulement si nécessaire
+et branche les événements. La restauration copie ses entrées et conserve le
+cloisonnement des choix par compte (régressions Node dans explorer-model.cjs).
+Les colonnes et le rendu du tableau Scores sont dans admin-scores-view.js ; le
+contrôleur garde sélection, chargements et événements. Les demandes d’aperçu passent
+par le cache asynchrone commun à états pending/ready/error, avec reprise explicite.
+Cela ne transforme pas les contrôleurs en fichiers vides : ils coordonnent encore
+les parcours et leur état, ce qui reste leur rôle.
+
+Les règles héritées de la feuille de base ne restent pas dans un bloc
+« foundation » indifférencié : navigation, graphiques de marché/performance,
+signaux, indicateurs, réglages de stratégie, filtres, états, risque et accessibilité
+ont chacun leur source dans components. Leur ordre explicite dans le manifeste
+conserve la cascade ; ce découpage supplémentaire ne change aucun octet des
+11 sorties compilées, vérifié par build_styles --check.

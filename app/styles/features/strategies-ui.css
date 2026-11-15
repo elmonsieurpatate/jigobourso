@@ -1,0 +1,116 @@
+/* Éléments communs des stratégies : badges de statut, icônes, fenêtre d'information, sélecteur groupé, bandeau, fiches d'aide. */
+.sui-ic {
+  fill: none;
+  stroke: currentColor;
+}
+.sui-ico {
+  border-radius: var(--radius-12);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.sui-info {
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  border-radius: var(--radius-pill);
+  line-height: 0;
+}
+.sui-pop {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-12);
+  box-shadow: var(--shadow);
+  font-size: var(--fs-12);
+}
+.sui-pick-btn {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-12);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+.sui-list {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-12);
+  box-shadow: var(--shadow);
+}
+.sui-grp {
+  font-size: var(--fs-10);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.sui-opt {
+  border: 0;
+  border-radius: var(--radius-8);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+}
+.sui-opt:hover,
+.sui-opt[aria-selected="true"] {
+  background: var(--accent-soft);
+}
+.sui-banner {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-12);
+  background: var(--surface);
+  font-size: var(--fs-12);
+}
+.sui-banner b {
+  font-weight: 600;
+}
+.sui-cmp {
+  font-size: var(--fs-12);
+}
+.sui-cmp .mod {
+  background: var(--info-soft);
+} /* aide */
+.help-mode {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+}
+.sui-emoji {
+  font-size: var(--fs-18);
+  line-height: var(--lh-none);
+}
+.sui-desc {
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-8);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: var(--fs-13);
+  line-height: var(--lh-normal);
+}
+.sui-desc a {
+  font-weight: 600;
+}
+.ct-company-text .ct-sector {
+  font-size: var(--fs-11);
+  color: var(--muted);
+  font-weight: 400;
+}
+.help-dl dt {
+  font-weight: 700;
+}
+.sui-ico .sui-emoji {
+  font-size: var(--fs-18);
+}
+.ms-ic .sui-emoji {
+  font-size: var(--fs-18);
+} /* Éditeur personnel de stratégies. */
+input:checked + .ms-ic {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 2px var(--accent);
+}
+input:focus-visible + .ms-ic {
+  outline: 2px solid var(--accent);
+}
+.ms-ic {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-12);
+}

@@ -28,21 +28,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Syntaxe PHP, Python, JavaScript et migrations additives
+      - name: Dépendances des contrôles
         run: |
-          set -euo pipefail
-          scripts/lint_php.sh
-          python3 scripts/migrate.py --check
-          python3 -m compileall -q engine scripts
-          for file in app/public/assets/*.js; do node --check "$file"; done
-      - name: Qualité du code (ruff, formatage JS/CSS, règles Halo)
-        run: |
-          set -euo pipefail
-          python3 -m pip install --quiet ruff==0.17.4
-          python3 -m ruff check .
-          python3 -m ruff format --check engine tests scripts
-          npx --yes prettier@3.3.3 --check 'app/public/assets/*.js' 'app/public/assets/*.css'
-          python3 scripts/check_halo_css.py
+          python3 -m pip install --quiet -r requirements-dev.txt
+          npm ci --ignore-scripts --no-audit --no-fund
+      - name: Contrôles communs aux PR et à main
+        run: scripts/validate_quality.sh
+
   tests:
     name: Tests complets
     needs: syntax
@@ -71,14 +63,12 @@ jobs:
           python-version: "3.9"
       - name: Dépendances
         run: |
-          python -m pip install -r requirements.txt pytest
+          python -m pip install -r requirements.txt -r requirements-dev.txt
           python scripts/check_env.py
       - name: Tests rapides
         run: |
           set -euo pipefail
-          python -m pytest tests/fast -q --tb=line -rsfE | tee "$RUNNER_TEMP/jigobourso-deploy.log"
-          # un test sauté n'est pas un test réussi : la CI échoue s'il en reste un
-          if grep -qE '^SKIPPED|[0-9]+ skipped' "$RUNNER_TEMP/jigobourso-deploy.log"; then echo "::error title=tests rapides sautés::$(grep -E '^SKIPPED|[0-9]+ skipped' "$RUNNER_TEMP/jigobourso-deploy.log" | cut -c1-300 | tr '\n' '|')"; exit 1; fi
+          scripts/test_suite.sh fast | tee "$RUNNER_TEMP/jigobourso-deploy.log"
       - name: Tests d'intégration (base jetable du runner)
         env:
           JIGO_TEST_DATABASE: "1"
@@ -90,32 +80,15 @@ jobs:
         run: |
           set -euo pipefail
           MYSQL_PWD=local-test-only mysql -h127.0.0.1 -uroot jigobourso_it < db/schema.sql
-          timeout 240s python -m pytest tests/integ -q --tb=line -rsfE | tee -a "$RUNNER_TEMP/integ.log" "$RUNNER_TEMP/jigobourso-deploy.log"
-          if grep -qE '^SKIPPED|[0-9]+ skipped' "$RUNNER_TEMP/integ.log"; then echo "::error title=tests d'intégration sautés::$(grep -E '^SKIPPED|[0-9]+ skipped' "$RUNNER_TEMP/integ.log" | cut -c1-300 | tr '\n' '|')"; exit 1; fi
+          scripts/test_suite.sh integ | tee -a "$RUNNER_TEMP/jigobourso-deploy.log"
       - name: Browser financial smoke (isolated synthetic database)
         env: {JIGO_TEST_DATABASE: '1', JIGO_DB_HOST: 127.0.0.1, JIGO_DB_PORT: '3306', JIGO_DB_NAME: jigobourso_it, JIGO_DB_USER: root, JIGO_DB_PASSWORD: local-test-only}
         run: |
           set -euo pipefail
-          mkdir -p audit-results
-          PYTHONPATH="$PWD" python tests/seeds/account_seed.py
-          php scripts/create_user.php review_user review-local-password --admin --email=review@example.test > /dev/null
-          php scripts/create_user.php plain_user plain-local-password --email=plain@example.test > /dev/null
-          PYTHONPATH="$PWD" python tests/seeds/etf_seed.py
-          export JIGO_PYTHON="$(command -v python)" JIGO_ENGINE_ROOT="$PWD"
           npm install --prefix "$RUNNER_TEMP/financial-browser" --no-save playwright-core@1.56.1 > /dev/null
           export PLAYWRIGHT_MODULE="$RUNNER_TEMP/financial-browser/node_modules/playwright-core" JIGO_CHROMIUM="$(command -v google-chrome || command -v chromium)"
-          export JIGO_TEST_MAIL_DIR="$RUNNER_TEMP/account-mail"
-          install -d -m 700 "$JIGO_TEST_MAIL_DIR"
-          php -S 127.0.0.1:18089 -t app/public > audit-results/php-server.log 2>&1 &
-          php_pid=$!
-          show() { for f in audit-results/browser.log audit-results/account-browser.log audit-results/strategies-ui.log audit-results/php-server.log; do [ -f "$f" ] && echo "::error title=$f::$(grep -v ' 200 \| Accepted\| Closing\| \[200\]' "$f" | tail -c 1400 | tr '\n' '|')"; done; true; }
-          trap 'rc=$?; if [ "$rc" -ne 0 ]; then show; fi; kill "$php_pid"' EXIT      # les journaux ne sont affichés qu'en cas d'échec
-          make visual
-          node tests/e2e/financial.cjs > audit-results/browser.log 2>&1
-          node tests/e2e/keyboard.cjs
-          node tests/e2e/title-layout.cjs
-          timeout 240s node tests/e2e/strategies-ui.cjs > audit-results/strategies-ui.log 2>&1      # avant account-navigation : celui-ci provoque des échecs de connexion volontaires qui bloquent les connexions suivantes
-          timeout 180s node tests/e2e/account-navigation.cjs > audit-results/account-browser.log 2>&1
+          export JIGO_TEST_MAIL_DIR="$RUNNER_TEMP/account-mail" JIGO_E2E_RESULTS="$PWD/audit-results"
+          scripts/e2e_browser.sh
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:

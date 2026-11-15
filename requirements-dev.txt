@@ -1,2 +1,14 @@
-pytest
-ruff
+# Verrou des outils de développement et de leurs dépendances (Python 3.9).
+# Installer avec requirements.txt ; contraintes sources : requirements-dev.in.
+cssselect2==0.8.0
+exceptiongroup==1.3.1
+iniconfig==2.1.0
+packaging==26.3
+pluggy==1.6.0
+Pygments==2.21.0
+pytest==8.4.2
+ruff==0.17.4
+tinycss2==1.4.0
+tomli==2.5.0
+typing_extensions==4.16.0
+webencodings==0.5.1

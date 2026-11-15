@@ -1,0 +1,38 @@
+/* Indicateurs, valeurs et barres simples. */
+.page-head p {
+  color: var(--muted);
+}
+.metric {
+  background: var(--surface-2);
+  border-radius: var(--radius-12);
+  padding: var(--sp-10) var(--sp-12);
+}
+.metric .l {
+  color: var(--muted);
+  font-size: var(--fs-11);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.metric .v {
+  font-size: var(--fs-16);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.metric .s {
+  color: var(--muted);
+  font-size: var(--fs-11);
+}
+.hero .px {
+  font-size: var(--fs-28);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.bar {
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+}
+.bar i {
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+}

@@ -1,0 +1,26 @@
+/* Contrôles des filtres et choix groupés. */
+.filters {
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-2);
+}
+.filters > label {
+  font-size: var(--fs-11);
+  font-weight: 600;
+  color: var(--muted);
+  line-height: var(--lh-tight);
+}
+.filters > label :is(input, select) {
+  color: var(--text);
+  font-weight: 400;
+}
+.filters .check {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--fs-13);
+  font-weight: 600;
+}
+.filters .check:hover {
+  border-color: var(--accent);
+}

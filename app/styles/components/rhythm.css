@@ -1,0 +1,36 @@
+/* Rythme vertical commun : les blocs d'une page (en-tête, cartes, panneaux, tableaux, notices) sont toujours séparés de --sp-16, quelle que soit la page.
+   L'écart vient du conteneur (gap), jamais des marges des blocs : une marge locale ne peut plus le déformer. */ /* Conteneurs de blocs : chacun sépare ses enfants de --sp-16 par son seul gap (les marges locales des enfants sont ignorées). */
+main.wrap:not(.auth-wrap),
+#page,
+#px-page,
+#main,
+.pf-panel,
+.pf-home,
+.bilan-layout,
+.tracking-layout,
+.as,
+.admin-flow,
+.admin-filter-form,
+.ac-grid > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: var(--sp-16);
+}
+:is(
+    main.wrap:not(.auth-wrap),
+    #page,
+    #px-page,
+    #main,
+    .pf-panel,
+    .pf-home,
+    .bilan-layout,
+    .tracking-layout,
+    .as,
+    .admin-flow,
+    .admin-filter-form,
+    .ac-grid > div
+  )
+  > * {
+  margin-block: 0;
+}

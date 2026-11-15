@@ -14,9 +14,17 @@
 
 ## Dépendances
 
-- `requirements.txt` : chaque dépendance a une borne haute (test `test_every_dependency_is_bounded_for_reproducible_installs`) ; `exchange_calendars` est épinglé (`==4.3`, compatible Python 3.9).
-- `scripts/check_env.py` vérifie versions et imports ; la CI l'exécute après l'installation, le README l'indique pour un venv neuf.
-- Sous-dépendances (pandas → pytz, dateutil…) volontairement non figées : un verrou exact exigerait les versions de la production, que les journaux publics masquent par politique (`ops/public-log.sh`). À la place, après chaque installation le serveur exécute `scripts/check_env.py` (bornes de `requirements.txt` + imports) et un écart déclenche le retour arrière avec restauration du venv.
+- `requirements.in` conserve les contraintes runtime ; `requirements.txt` verrouille
+  les versions directes et transitives, résolues sous Python 3.9 et vérifiées avec
+  les tests sous Python 3.9 et 3.12. `requirements-dev.in` et `requirements-dev.txt`
+  font de même pour les outils. Une modification des contraintes exige une nouvelle
+  résolution puis la recette ; ne pas éditer quelques versions transitives au hasard.
+- `scripts/check_env.py` vérifie les versions et imports des 11 paquets runtime.
+  Le moteur est importé avant NumPy pour appliquer les limites BLAS.
+- `package-lock.json` fixe les outils CSS de développement : `npm ci --ignore-scripts`.
+  Les sorties CSS sont déjà commitées ; le serveur de production n’a pas besoin de Node.
+- Sans pip dans le venv, le pip système n’est utilisé que si son Python possède
+  la même version majeure/mineure que le venv. Un écart arrête la livraison.
 
 ## Cohérence d'une release
 
@@ -27,12 +35,19 @@
 ## Restauration (code ET dépendances)
 
 `restore_code` (retour arrière automatique ou opération `rollback`) :
-1. restaure `app engine db docs scripts README.md requirements.txt` depuis la dernière sauvegarde `code-*.tgz` (5 conservées) ;
-2. si l'empreinte de `requirements.txt` restauré ne correspond plus à `.requirements.sha`, remet le venv sauvegardé avant la mise à jour (`site-packages-*.tgz`, 3 conservées) ;
-3. vérifie que le moteur et les dépendances s'importent.
 
-Testé localement avec un faux serveur (`tests/fast/test_environment.py`) : restauration, dépendances inchangées, première exécution, sauvegarde absente. Non testé sur l'hébergement réel.
-Les données (`private/ data/ logs/`) et la base ne sont jamais restaurées par cette opération ; les migrations sont additives.
+1. choisit l’archive de code et son snapshot d’environnement associé ;
+2. vérifie avant remplacement les sidecars, checksums, manifeste et version Python ;
+3. restaure le code et précisément cet environnement, puis contrôle leurs imports ;
+4. valide l’empreinte seulement si les contrôles réussissent.
+
+Chaque sauvegarde du code possède son snapshot, même si requirements.txt n’a pas
+changé. Aucun repli vers « le dernier venv disponible » ; aucune réussite si le
+snapshot manque. **Les anciennes archives dépourvues d’association sont refusées**
+avant de toucher au code actif. Ce changement de contrat impose de conserver une
+nouvelle sauvegarde complète valide avant la première livraison de ce mécanisme.
+La rétention conserve cinq paires code/environnement et leurs sidecars. La réparation
+des dépendances réutilise le snapshot associé, sans nécessiter d’archive générique.
 
 ## Invalidation et recalcul
 
@@ -41,7 +56,7 @@ Les données (`private/ data/ logs/`) et la base ne sont jamais restaurées par 
 
 ## Sauvegardes
 
-- Avant tout remplacement : dump `portfolios`, `portfolio_transactions`, `position_levels` (vérifié par `gzip -t`), sauvegarde du code, du venv si les dépendances changent, dump complet de la base si des migrations sont en attente (3 conservés).
+- Avant tout remplacement : dump `portfolios`, `portfolio_transactions`, `position_levels` (vérifié par `gzip -t`), sauvegarde appariée du code et du venv, dump complet de la base si des migrations sont en attente (3 conservés).
 - Empreinte financière et comptes comparées avant/après : toute différence fait échouer la livraison.
 
 ## Cible isolée : répétition locale
@@ -74,3 +89,23 @@ la livraison sans réinstaller les paquets ; il ne doit pas être assimilé à u
 version hors bornes. Régression couverte en processus isolé et sur installateur
 factice. Le diagnostic ne publie que des catégories d'erreurs, jamais les messages
 bruts, chemins privés ou versions des paquets.
+
+## Barrières PR/main après audit
+
+`validate_quality.sh`, `test_suite.sh` et `e2e_browser.sh` sont les points d’entrée
+communs aux deux workflows. Ruff, formatage, construction CSS synchronisée,
+frontières Halo, tests non sautés et parcours actifs sont ainsi exécutés avant
+fusion. Le workflow PR conserve contents:read et ne reçoit aucun secret de production.
+L’exception de déploiement rapide reste explicite dans le workflow de main.
+
+## Limite restant ouverte : publication atomique
+
+Le verrouillage des dépendances et les restaurations appariées ne rendent pas
+atomique le rsync actuel. Sa fenêtre de renommages reste possible ; les mesures
+locales ne prouvent pas son comportement Hostinger. Une bascule de release doit
+préserver les chemins des crons/hPanel, private/data/logs, le venv et les liens
+public_html, puis être répétée avec requêtes et tâches concurrentes et retour arrière.
+Cette évolution d’hébergement reste ouverte (A11) ; elle n’est pas assimilée à une
+correction déjà livrée. Aucune garantie d’atomicité n’est ajoutée à la documentation.
+
+Étude des options et critères de bascule : [RELEASE_ATOMICITY.md](RELEASE_ATOMICITY.md).

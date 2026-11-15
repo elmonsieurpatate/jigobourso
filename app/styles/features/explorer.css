@@ -1,0 +1,560 @@
+/* Styles propres au classement. */
+.ct-heading p {
+  color: var(--muted);
+}
+.ct-strategy {
+  border-bottom: 1px solid var(--line);
+}
+.ct-strategy-icon {
+  font-size: var(--fs-28);
+  color: var(--accent);
+  background: var(--up-soft);
+  border-radius: var(--radius-12);
+}
+.ct-strategy label {
+  font-weight: 650;
+}
+.ct-provisional,
+.ct-strategy .ct-provisional {
+  font-size: var(--fs-11);
+  color: var(--muted);
+}
+.ct-period-heading span {
+  font-size: var(--fs-12);
+  color: var(--muted);
+}
+.ct-period {
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+.ct-period.active {
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+}
+.ct-period.selected {
+  box-shadow: inset 0 0 0 1px var(--accent);
+  border-color: var(--accent);
+}
+.ct-period button small {
+  font-weight: 400;
+  color: var(--muted);
+}
+.ct-period label {
+  color: var(--muted);
+}
+.ct-sliders {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-12);
+}
+.ct-control + .ct-control {
+  border-left: 1px solid var(--line);
+}
+.ct-control label {
+  font-weight: 650;
+  font-size: var(--fs-13);
+}
+.ct-number span,
+.ct-empty small,
+.ct-bottom-note,
+.ct-preview p,
+.ct-strategy-state {
+  font-size: var(--fs-11);
+  color: var(--muted);
+}
+.ct-illustration figcaption {
+  color: var(--muted);
+}
+.ct-control-help {
+  font-size: var(--fs-11);
+  color: var(--muted);
+}
+.ct-config-footer {
+  background: var(--surface-2);
+  border-radius: 0 0 var(--radius-16) var(--radius-16);
+  font-size: var(--fs-12);
+}
+.ct-secondary summary > span:nth-child(2) {
+  color: var(--muted);
+  font-size: var(--fs-12);
+}
+.ct fieldset {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-8);
+}
+.ct legend {
+  font-weight: 650;
+  font-size: var(--fs-13);
+}
+.ct-option {
+  font-size: var(--fs-12);
+}
+.ct-option i {
+  border-radius: 50%;
+}
+.ct-ranking h2 span {
+  font-size: var(--fs-13);
+  font-weight: 400;
+  color: var(--muted);
+}
+.ct table {
+  font-size: var(--fs-12);
+}
+.ct-empty > span {
+  color: var(--accent);
+  font-size: var(--fs-32);
+}
+.ct-empty p {
+  color: var(--muted);
+  font-size: var(--fs-13);
+}
+.ct-note {
+  font-size: var(--fs-12);
+  color: var(--muted);
+}
+@media (max-width: 760px) {
+  .ct-provisional {
+    font-size: var(--fs-11);
+  }
+  .ct-period-heading span {
+    font-size: var(--fs-11);
+  }
+  .ct-control + .ct-control {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+  .ct-secondary summary {
+    font-size: var(--fs-12);
+  }
+  .ct-ranking h2 span {
+    font-size: var(--fs-11);
+  }
+} /* Constructeur de requêtes : indicateur / opérateur / valeur / période. */
+.ct-builder-toolbar {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-8);
+  background: var(--surface-2);
+}
+.ct-rule-layout {
+  border: 1px solid color-mix(in srgb, var(--ok) 45%, var(--line));
+  border-radius: var(--radius-12);
+  background: linear-gradient(110deg, var(--surface), var(--up-soft));
+}
+.ct-group-content {
+  border-left: 2px solid var(--line);
+  border-radius: var(--radius-8);
+}
+.ct-builder-group.nested {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-8);
+  background: var(--surface);
+}
+.ct-rule-remove {
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: var(--fs-18);
+}
+.ct-preview {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-8);
+  font-size: var(--fs-11);
+}
+.ct-preview-group {
+  border-left: 1px solid var(--line);
+}
+.ct-preview em {
+  font-style: normal;
+  color: var(--muted);
+}
+.ct-valid {
+  background: var(--up-soft);
+  color: var(--accent);
+  border-radius: var(--radius-8);
+  font-weight: 650;
+}
+.ct-no-rules {
+  font-size: var(--fs-12);
+  color: var(--muted);
+}
+@media (max-width: 760px) {
+  .ct-builder-row {
+    border-bottom: 1px solid var(--line);
+  }
+} /* Palette violette partagée et menus natifs sans répétition du SVG en thème sombre. */
+.ct {
+  color-scheme: light;
+}
+:root[data-theme="dark"] .ct {
+  color-scheme: dark;
+}
+.ct select {
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 12px 8px;
+}
+.ct option {
+  background: var(--surface);
+  color: var(--text);
+}
+.ct-rule-layout {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  background: var(--surface);
+} /* Un seul bloc compact, partagé entre les modes ; un indicateur ouvre une liste. */
+.ct-filter-actions {
+  font-size: var(--fs-11);
+  color: var(--muted);
+}
+#ct-filter-summary {
+  font-size: var(--fs-11);
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-radius: var(--radius-8);
+  font-weight: 650;
+}
+#ct-masked-count {
+  background: var(--surface-2);
+  border-radius: var(--radius-8);
+}
+.ct-filter-source,
+.ct-filter-logic,
+.ct-ranking-note {
+  font-size: var(--fs-11);
+  color: var(--muted);
+}
+.ct-multi-trigger b {
+  font-size: var(--fs-11);
+  font-weight: 600;
+  background: var(--surface-2);
+  border-radius: var(--radius-8);
+}
+.ct-multi-popup {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-8);
+  box-shadow: var(--shadow-pop);
+}
+.ct-category-search {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-8);
+  color: var(--muted);
+}
+.ct-category-option {
+  font-size: var(--fs-11);
+  border-radius: var(--radius-4);
+}
+.ct-category-option:hover {
+  background: var(--surface-2);
+}
+.ct-category-option i {
+  border-radius: 50%;
+}
+.ct-category-option small {
+  font-size: var(--fs-11);
+  color: var(--muted);
+}
+.ct-multi-popup footer {
+  border-top: 1px solid var(--line);
+  font-size: var(--fs-11);
+  color: var(--muted);
+}
+.ct-no-category {
+  font-size: var(--fs-11);
+  color: var(--muted);
+}
+@media (max-width: 760px) {
+  .ct-multi:nth-child(n) .ct-multi-popup {
+    box-shadow: none;
+  }
+} /* Six accès principaux ; les indicateurs complémentaires restent repliés. */
+.ct-secondary .ct-more-filters > summary {
+  font-size: var(--fs-11);
+  color: var(--muted);
+}
+.ct-secondary .ct-more-filters > summary span {
+  font-size: var(--fs-11);
+} /* Classement de démonstration : lignes serrées, rang stable et valeurs fictives signalées. */
+.ct-demo-badge {
+  font-size: var(--fs-11);
+  font-weight: 650;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line));
+  border-radius: var(--radius-8);
+}
+.ct-ranking table {
+  font-size: var(--fs-12);
+}
+.ct-ranking td {
+  font-variant-numeric: tabular-nums;
+}
+.ct-ranking tbody tr:hover {
+  background: var(--surface-2);
+}
+.ct-ranking .ct-rank-cell {
+  color: var(--muted);
+  font-size: var(--fs-11);
+}
+.ct-company-mark {
+  border-radius: var(--radius-8);
+  background: var(--mark);
+  color: white;
+  font-weight: 750;
+  font-size: var(--fs-10);
+}
+.ct-company-text > b {
+  font-size: var(--fs-12);
+  color: var(--text);
+}
+.ct-company-text > span {
+  font-size: var(--fs-11);
+  color: var(--muted);
+}
+.ct-ranking .ct-cell-change,
+.ct-ranking .ct-cell-slope {
+  font-weight: 650;
+}
+.ct-score {
+  line-height: var(--lh-none);
+  border-radius: var(--radius-8);
+  font-size: var(--fs-12);
+  font-weight: 750;
+}
+.ct-mini-curve polyline {
+  fill: none;
+  stroke: currentColor;
+}
+.ct-mini-curve circle {
+  fill: currentColor;
+}
+.ct-mini-curve.positive {
+  color: var(--up);
+}
+.ct-mini-curve.negative {
+  color: var(--down);
+}
+.ct-pagination {
+  border-top: 1px solid var(--line);
+  font-size: var(--fs-11);
+  color: var(--muted);
+}
+@media (max-width: 1400px) {
+  .ct-company-text > span {
+    font-size: var(--fs-11);
+  }
+}
+@media (max-width: 760px) {
+  .ct-ranking-note {
+    line-height: var(--lh-snug);
+  }
+  .ct-ranking .ct-rank-cell {
+    font-size: var(--fs-11);
+  }
+  .ct-ranking td.ct-cell-name,
+  .ct-ranking th.ct-name-heading {
+    background: var(--surface);
+    box-shadow: 2px 0 0 var(--line);
+  }
+  .ct-ranking th.ct-name-heading {
+    background: var(--surface-2);
+  }
+  .ct-company-text > b {
+    font-size: var(--fs-12);
+  }
+  .ct-company-text > span {
+    font-size: var(--fs-11);
+  }
+  .ct-ranking .ct-score {
+    font-size: var(--fs-11);
+  }
+  .ct-pagination {
+    font-size: var(--fs-11);
+  }
+  .ct-multi-trigger > span:first-child {
+    line-height: var(--lh-tight);
+  }
+  .ct-category-option {
+    font-size: var(--fs-13);
+  }
+  .ct-category-option small {
+    font-size: var(--fs-11);
+  }
+  .ct-multi-popup footer {
+    font-size: var(--fs-11);
+  }
+}
+@media (max-width: 760px) {
+  .ct-mobile-scroll-hint {
+    color: var(--accent);
+  }
+} /* Mobile : en-tête, réglages et commandes du classement plus compacts (rien ne change au-dessus de 700 px). */
+@media (max-width: 760px) {
+  .ct-heading p {
+    font-size: var(--fs-14);
+  }
+  .ct-ranking-controls #ct-sort-direction {
+    font-size: var(--fs-18);
+  }
+} /* Habillage plus sobre : mêmes fonctions, moins de hauteur et de bruit visuel. */
+.ct-heading p {
+  font-size: var(--fs-13);
+}
+.ct-panel {
+  box-shadow: none;
+}
+.ct-strategy-icon {
+  border-radius: var(--radius-8);
+}
+.ct-period-heading span {
+  font-size: var(--fs-11);
+}
+.ct-period {
+  border-radius: var(--radius-8);
+}
+.ct-period button small {
+  font-size: var(--fs-11);
+}
+.ct-period label {
+  font-size: var(--fs-11);
+}
+.ct-illustration figcaption {
+  font-size: var(--fs-11);
+}
+.ct-config-footer {
+  font-size: var(--fs-11);
+}
+@media (max-width: 760px) {
+  .ct-strategy .ct-provisional {
+    font-size: var(--fs-11);
+  }
+  .ct-period label {
+    font-size: 0;
+  }
+} /* Mobile : réglages encore plus denses (valeur sur la ligne du titre, aide discrète). */
+@media (max-width: 760px) {
+  .ct-strategy label {
+    font-size: var(--fs-13);
+  }
+  .ct-control > label {
+    font-size: var(--fs-13);
+  }
+  .ct-control .ct-number span {
+    font-size: var(--fs-11);
+  }
+  .ct-control-help {
+    font-size: var(--fs-11);
+  }
+} /* Gestion des stratégies : même ligne que le sélecteur, retour à la ligne sur mobile */
+.ct-strategy-desc {
+  font-size: var(--fs-11);
+  color: var(--muted);
+}
+.ct-panel.ct-collapsed .ct-strategy {
+  border-bottom: 0;
+} /* Classement réel : chiffres aux couleurs des catégories de filtres, ligne cliquable, sous-lignes */
+.ct-cat {
+  color: color-mix(in srgb, var(--cat) 78%, var(--text));
+  font-weight: 650;
+}
+.ct-cat::before {
+  border-radius: 50%;
+  background: var(--cat);
+}
+.ct-sub {
+  font-size: var(--fs-11);
+  color: var(--muted);
+  font-weight: 400;
+}
+a.ct-company {
+  color: inherit;
+  text-decoration: none;
+}
+a.ct-company:hover b,
+a.ct-company:focus-visible b {
+  text-decoration: underline;
+}
+.ct-kind {
+  font-style: normal;
+  font-size: var(--fs-10);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-4);
+  color: var(--muted);
+}
+.ct-kind.held {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.ct-score {
+  font-weight: 700;
+}
+#ct-strategy-count {
+  font-weight: 600;
+} /* Bloc « Stratégie » : une ligne claire (choix) + une ligne d'actions discrètes ; jamais de menu étroit ni de boutons en vrac */
+.ct .ct-strategy label {
+  font-weight: 700;
+  font-size: var(--fs-14);
+} /* ── Disposition des commandes de l'Explorateur (dimensions et couleurs : halo.css) ── */
+.ct #ct-masked-count,
+.ct #ct-filter-summary {
+  font-size: var(--fs-12);
+}
+@media (max-width: 760px) {
+  .ct .ct-ranking-controls #ct-sort-direction {
+    font-size: var(--fs-18);
+  }
+} /* Filtres secondaires : commandes dans le panneau (le chevron ne fait qu'ouvrir/fermer), pastille de comptage dans l'en-tête */ /* Sélecteur Retenues | Exclues | Toutes et badge de statut */
+.ct .ct-seg button b {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.ct .ct-seg button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.ct .ct-status {
+  font-style: normal;
+  font-size: var(--fs-11);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--line);
+}
+.ct .ct-status.na {
+  color: var(--muted);
+}
+.ct .ct-undetermined {
+  font-size: var(--fs-12);
+  color: var(--muted);
+} /* Le sélecteur enrichi remplace le select dans la même cellule de grille. */
+#ct-search-status {
+  color: var(--muted);
+  font-size: var(--fs-13);
+}
+@media (max-width: 760px) {
+  .ct .ct-strategy label {
+    font-size: var(--fs-12);
+    color: var(--muted);
+    font-weight: 600;
+  }
+  .ct .ct-strategy .sui-pick-btn > .sui-ico {
+    border-radius: var(--radius-8);
+  }
+  .ct .ct-strategy .sui-pick-btn .grow {
+    font-size: var(--fs-15);
+    line-height: var(--lh-tight);
+    font-weight: 600;
+  }
+  .ct .ct-strategy .sui-opt {
+    font-size: var(--fs-14);
+  }
+}
+#ct-ranking-status {
+  color: var(--muted);
+  font-size: var(--fs-13);
+} /* enfants directs du panneau : alignés sur le padding de la carte */
+.ct-preview {
+  font-size: var(--fs-12);
+}

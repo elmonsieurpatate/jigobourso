@@ -72,3 +72,15 @@ def test_services_do_not_depend_on_routes_or_the_http_request():
     # Cas d'usage des portefeuilles : jamais d'accès direct à la requête.
     code = re.sub(r'//[^\n]*', '', FILES['services/portfolios.php'])
     assert '$_GET' not in code and '$_POST' not in code and 'body()' not in code and 'header(' not in code
+
+
+def test_routes_delegate_database_work_to_services():
+    for name in ('alerts', 'admin', 'explore', 'auth', 'tracking', 'portfolios'):
+        code = re.sub(r'//[^\n]*|/\*.*?\*/', '', FILES[f'routes/{name}.php'], flags=re.S)
+        assert not re.search(r'(?<![\w>:$])q\s*\(', code), name
+
+
+def test_extracted_use_cases_have_explicit_request_inputs():
+    for name in ('alerts_actions', 'admin_actions', 'explore_actions', 'auth_actions', 'tracking', 'portfolios'):
+        code = re.sub(r'//[^\n]*|/\*.*?\*/', '', FILES[f'services/{name}.php'], flags=re.S)
+        assert not re.search(r'\$_(?:GET|POST|COOKIE|SERVER)\b|\b(?:body|header|require_user|require_admin|need_post)\s*\(', code), name

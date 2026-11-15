@@ -5,6 +5,8 @@ require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/settings.php';
 require_once __DIR__ . '/../lib/account.php';
 
+require_once __DIR__ . '/../services/auth_actions.php';
+
 return [
     'auth/me' => function () {
         $u = current_user();
@@ -19,18 +21,8 @@ return [
     'auth/register' => function () {
         need_post();
         $b = body();
-        $code = (string)setting_value('invite_code', '');
-        $key = attempt_key('register', client_ip());
-        if (login_blocked($key)) throw new ApiError('Trop d’essais : réessayez plus tard', 429);
-        if ($code === '' || !hash_equals(mb_strtolower($code), mb_strtolower(str_in($b, 'code', 60)))) {
-            q('INSERT INTO login_attempts(username, ip, at) VALUES (?,?,?)', [$key, client_ip(), now_utc()]);
-            throw new ApiError('Mot d’invitation incorrect ou inscriptions fermées', 403);
-        }
-        $email = mb_strtolower(trim(str_in($b, 'email', 190, false)));
-        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) throw new ApiError('Une adresse e-mail valide est nécessaire pour créer un compte', 422);
-        if (q('SELECT 1 FROM users WHERE email = ?', [$email])->fetch()) throw new ApiError('Cette adresse e-mail est déjà utilisée', 409);
-        $username = str_in($b, 'username', 30);
-        $id = create_user($username, password_input($b, 'password'), $email, false);
+        $registered = auth_register($b, client_ip());
+        $id = $registered['id']; $username = $registered['username']; $email = $registered['email'];
         // Réponse immédiate, puis envoi des courriers (bienvenue + alerte aux administrateurs) : le transport SMTP ne retarde plus l'inscription.
         out_then(['user_id' => $id, 'welcome_mail' => 'queued'], function () use ($username, $email) {
             send_welcome_mail($username, $email);
@@ -38,59 +30,17 @@ return [
         });
         return [];
     },
-    'auth/password' => function () {
-        need_post();
-        $u = require_user();
-        $b = body();
-        $fresh=tx(function () use ($u,$b) {
-            $fresh=q('SELECT * FROM users WHERE id=? FOR UPDATE',[$u['id']])->fetch();
-            if (!password_verify(password_input($b,'current'),$fresh['pass_hash'])) throw new ApiError('Mot de passe actuel incorrect',403);
-            $new=password_input($b,'new');valid_password($new);
-            q('UPDATE users SET pass_hash=? WHERE id=?',[password_hash($new,PASSWORD_DEFAULT),$u['id']]);
-            q('UPDATE account_tokens SET used_at=? WHERE user_id=? AND used_at IS NULL',[now_utc(),$u['id']]);
-            q('DELETE FROM sessions WHERE user_id=? AND token_hash<>?',[$u['id'],hash('sha256',$_COOKIE[COOKIE])]);
-            return $fresh;
-        });
-        notify_account_change($fresh,'password');
-        return ['ok' => true];
-    },
+    'auth/password' => function () { need_post(); $u = require_user(); return auth_change_password($u, body(), (string)($_COOKIE[COOKIE] ?? '')); },
     'auth/recover' => function () {
         need_post();$b=body();$email=mb_strtolower(str_in($b,'email',190));
-        account_throttle('recover',$email);
-        $u=q('SELECT * FROM users WHERE email=? AND active=1',[$email])->fetch();
+        $u = auth_recovery_user($email);
         // Réponse identique et immédiate que l'adresse existe ou non (ni message d'échec d'envoi, ni écart de durée) ; l'envoi se fait après la réponse.
         out_then(['ok'=>true,'message'=>'Si cette adresse correspond à un compte actif, un lien a été envoyé. Vérifiez aussi les courriers indésirables.'], function () use ($u,$email) {
             if ($u && !issue_account_link($u,'reset',$email)) error_log('account_mail: recovery link not delivered');
         });
     },
-    'auth/reset' => function () {
-        need_post();$b=body();account_throttle('reset',client_ip());$new=password_input($b,'new');valid_password($new);
-        [$user]=consume_account_link(str_in($b,'token',64),'reset',function($u,$t) use($new) {
-            q('UPDATE users SET pass_hash=? WHERE id=?',[password_hash($new,PASSWORD_DEFAULT),$u['id']]);
-            q('DELETE FROM sessions WHERE user_id=?',[$u['id']]);
-        });
-        notify_account_change($user,'password');
-        return ['ok'=>true];
-    },
+    'auth/reset' => function () { need_post(); return auth_reset_password(body(), client_ip()); },
     'auth/account' => function () { need_post();return update_account(require_user(),body()); },
-    'auth/verify-email' => function () {
-        need_post();$b=body();account_throttle('verify',client_ip());
-        [$user,$token]=consume_account_link(str_in($b,'token',64),'email',function($u,$t) {
-            if (q('SELECT id FROM users WHERE email=? AND id<>?',[$t['target_email'],$u['id']])->fetch()) throw new ApiError('Cette adresse n’est plus disponible.',409);
-            q('UPDATE users SET email=? WHERE id=?',[$t['target_email'],$u['id']]);
-        });
-        notify_account_change($user,'email',$token['target_email']); // l'ancienne adresse est prévenue du remplacement
-        return ['ok'=>true];
-    },
-    'auth/prefs' => function () {
-        need_post();
-        $u = require_user();
-        $b = body();
-        $allowed = ['mode' => ['simple', 'advanced'], 'theme' => ['light', 'dark', 'auto'], 'help_level' => ['beginner', 'expert']];
-        $prefs = $u['prefs_json'] ? json_decode($u['prefs_json'], true) : [];
-        foreach ($allowed as $k => $values) if (isset($b[$k]) && in_array($b[$k], $values, true)) $prefs[$k] = $b[$k];
-        if (isset($b['help_last']) && is_string($b['help_last']) && preg_match('/^[a-z0-9-]{1,40}$/', $b['help_last'])) $prefs['help_last'] = $b['help_last']; // dernier chapitre de l'aide
-        q('UPDATE users SET prefs_json = ? WHERE id = ?', [json_encode($prefs), $u['id']]);
-        return ['prefs' => $prefs];
-    },
+    'auth/verify-email' => function () { need_post(); return auth_verify_email(body(), client_ip()); },
+    'auth/prefs' => function () { need_post(); $u = require_user(); return auth_save_preferences($u, body()); },
 ];

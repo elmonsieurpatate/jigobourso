@@ -1,0 +1,40 @@
+/* États sémantiques des données, scores et protections. */
+.chev {
+  border-right: 2px solid var(--muted);
+  border-bottom: 2px solid var(--muted);
+}
+.cnt.warn,
+.as-total.ko,
+.ct-valid.invalid,
+.ct-score.low,
+.ac-validation.warning,
+.ps-ic.ic-pulse,
+.ps-risk.r-high,
+.ps-tag.custom {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+.ps {
+  font-size: var(--fs-11);
+  color: var(--muted);
+}
+.sp .l {
+  fill: none;
+  stroke: currentColor;
+}
+.sp .a {
+  fill: currentColor;
+}
+.sp .b {
+  stroke: var(--accent);
+}
+td.per b {
+  font-variant-numeric: tabular-nums;
+}
+.protection-track i {
+  background: var(--up);
+}
+.sr-only,
+.ct .sr-only {
+  border: 0;
+}

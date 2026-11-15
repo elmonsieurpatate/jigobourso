@@ -1,4 +1,9 @@
-# Jigobourso v2 — architecture (refonte totale)
+# Jigobourso v2 — dossier historique de conception
+
+Ce document conserve les décisions de construction initiales et leurs hypothèses.
+Ses chemins, volumes et mentions de chantier ne décrivent pas tous l’état livré.
+Pour l’architecture courante : [structure frontend](FRONTEND_STRUCTURE.md),
+[contrat API](API_CONTRACT.md), [livraison](DELIVERY.md) et [audit et corrections](CORRECTIONS_AUDIT_20261115.md).
 
 Évolution Explorer du 4 novembre 2026 : [configuration V4, moteur et sauvegardes](EXPLORER_V4.md), [validations exécutées et limites](EXPLORER_V4_VALIDATION.md). Les indications historiques ci-dessous ne remplacent pas ce contrat versionné.
 
@@ -75,7 +80,7 @@ Reprise seulement par **réécriture propre**, sans l'architecture ni les dépen
 ## 7. Tests
 
 - `make fast` : pytest sans base ni réseau (séries réelles figées, Yahoo rejoué).
-- `make integ` : MariaDB jetable (port 33307, base `jigobourso_v2`), jamais la production.
+- `make integ` : MariaDB jetable (port 33307, base `jigobourso_it`), jamais la production.
 - Parité : pour chaque profil × période × mode de tri, statuts et rangs du nouveau moteur égaux à ceux de l'ancien sur le jeu de référence (P0).
 - Parcours de bout en bout : connexion → Explorer → fiche → achat dans un portefeuille → bilan → administration.
 

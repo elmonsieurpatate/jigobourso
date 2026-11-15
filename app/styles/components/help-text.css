@@ -1,0 +1,8 @@
+/* Texte d’aide et pied de page. */
+.help {
+  border-bottom: 1px dotted var(--muted);
+}
+footer.wrap {
+  color: var(--muted);
+  font-size: var(--fs-11);
+}

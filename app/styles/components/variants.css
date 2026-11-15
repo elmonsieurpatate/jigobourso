@@ -1,0 +1,74 @@
+/* Pages en grille : un module trop large ne doit pas élargir la page. */
+.portfolio-page #page > *,
+.data-page #page > *,
+.strategies-page #page > *,
+.admin-page #page > * {
+  min-width: 0;
+} /* Barres de carte, bouton large et valeur KPI réduite : variantes communes (remplacent des data-style). */
+.card-bar {
+  padding: var(--sp-14) var(--sp-20);
+}
+.card-bar-sm {
+  padding: var(--sp-12) var(--sp-20);
+}
+.card-bar-sub {
+  padding-top: 0;
+  padding-bottom: var(--sp-12);
+}
+.btn.lg {
+  min-height: 44px;
+  padding: var(--sp-12) var(--sp-20);
+  font-size: var(--fs-16);
+}
+.kpi .v.sm {
+  font-size: var(--fs-18);
+}
+.stat {
+  font-size: var(--fs-20);
+  font-weight: 700;
+} /* Jauge de progression, carte mise en avant, graisse utilitaire. */
+.meter {
+  height: 8px;
+  border-radius: var(--radius-4);
+  background: var(--line);
+  overflow: hidden;
+}
+.meter-fill {
+  height: 100%;
+  background: var(--accent);
+}
+.card-accent {
+  border: 2px solid var(--accent);
+}
+.fw-bold {
+  font-weight: 700;
+}
+.fw-normal {
+  font-weight: 400;
+}
+.p-2 {
+  padding: var(--sp-8);
+}
+.fieldset-bare {
+  border: 0;
+  padding: 0;
+  margin: 0;
+} /* Contrôles du sélecteur de période, de la recherche de catégories et des curseurs sur petit écran */
+@media (max-width: 760px) {
+  .ct-period button {
+    font-size: var(--fs-12);
+    padding: var(--sp-8) var(--sp-6) var(--sp-8) var(--sp-10);
+  }
+  .ct .ct-category-search input {
+    font-size: var(--fs-16);
+    min-height: 44px;
+    height: 44px;
+  }
+  .ct-control .ct-number input {
+    height: 34px;
+    font-size: var(--fs-16);
+  }
+  .ct-control .ct-slider-row > button {
+    height: 34px;
+  }
+}

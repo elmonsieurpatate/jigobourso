@@ -1,14 +1,14 @@
 # Jigobourso v2
 
 Aide à la sélection d'actions et d'ETF (analyse descriptive des cours passés) et suivi de portefeuilles.
-PHP 8.1+ (site et API) · Python 3 (moteur : catalogue, collecte, calculs) · MariaDB · front statique sans bundler.
-Aucun framework ; une seule dépendance Python d'exécution (PyMySQL).
+PHP 8.1+ (site et API) · Python 3 (moteur : catalogue, collecte, calculs) · MariaDB · front statique, compilation CSS uniquement.
+Aucun framework. Dépendances directes : PyMySQL, NumPy, pandas et exchange_calendars ; leurs versions et dépendances transitives sont verrouillées dans requirements.txt.
 
 ## Organisation
 
 | Dossier | Contenu |
 |---|---|
-| `app/` | `public/` (pages HTML, `assets/` JS et CSS, `api.php`), `lib/`, `routes/`, `services/` (PHP) |
+| `app/` | `styles/` (sources CSS), `public/` (pages HTML, `assets/` JS et CSS, `api.php`), `lib/`, `routes/`, `services/` (PHP) |
 | `engine/` | moteur Python : `catalogue/`, `market/`, `analytics/` (admin, explorer, market_views, portfolio, scoring, series, shared), `jobs/`, `shared/`, `cli.py` |
 | `db/` | `schema.sql` (schéma unique) et `migrations/` |
 | `scripts/` | base locale, migrations, vérifications de version (voir `scripts/README.md`) |
@@ -19,13 +19,16 @@ Aucun framework ; une seule dépendance Python d'exécution (PyMySQL).
 ## Démarrage depuis zéro
 
 ```
-python3 -m venv .venv && .venv/bin/pip install -r requirements.txt pytest ruff==0.17.4
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt -r requirements-dev.txt
+npm ci --ignore-scripts
+make css-check
 .venv/bin/python scripts/check_env.py   # 0 = dépendances conformes à requirements.txt, moteur importable
 make dev-db                             # MariaDB locale (docker) + base jigobourso_v2 vide
 make check                              # lint + tests rapides
 ```
 
-Prérequis : Python 3.9+ (le serveur est en 3.9 ; développement testé en 3.12), PHP ≥ 8.1, MariaDB 10.11, Node (formatage et navigateur).
+Prérequis : Python 3.9 à 3.12 (le serveur est en 3.9), PHP ≥ 8.1, MariaDB 10.11, Node (formatage et navigateur).
 Livraison, restauration et reprise : `docs/DELIVERY.md`. Répétition locale du déploiement : `scripts/rehearse_deploy.sh ok` (voir ce document).
 
 ## Commandes

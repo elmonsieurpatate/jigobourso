@@ -7,7 +7,7 @@ const text = s => s.replace(/\s+/g, ' ').trim();
   const b = await chromium.launch({ executablePath: process.env.JIGO_CHROMIUM, args: ['--no-sandbox'] }); const report = [];
   try {
     for (const width of [320, 390, 768, 1440]) {
-      const ctx = await b.newContext({ viewport: { width, height: width > 700 ? 1000 : 900 }, isMobile: width < 600, hasTouch: width < 600 });
+      const ctx = await b.newContext({extraHTTPHeaders:{Origin:BASE}, viewport: { width, height: width > 700 ? 1000 : 900 }, isMobile: width < 600, hasTouch: width < 600 });
       const page = await ctx.newPage(), errors = [];
       page.on('pageerror', e => errors.push(e.message)); page.on('console', m => { if (m.type() === 'error' && !/favicon|Failed to load resource/.test(m.text())) errors.push(m.text()); });
       assert.equal((await ctx.request.post(BASE + '/api.php?r=auth/login', { data: { username: 'plan_suivi', password: 'plan-suivi-local-2026' } })).ok(), true);
@@ -68,7 +68,7 @@ const text = s => s.replace(/\s+/g, ' ').trim();
       for (const sym of ['CROWD', 'GIBO', 'MULTIRULE', 'LOSSPERS']) { const lb = row(sym).locator('.ps-lb'); if (await row(sym).locator('.ps-labels').first().isVisible()) { const r = await lb.evaluateAll(els => els.map(e => { const b = e.getBoundingClientRect(); return [b.left, b.top, b.right, b.bottom]; }));
         for (let i = 0; i < r.length; i++) for (let j = i + 1; j < r.length; j++) assert.ok(r[i][2] <= r[j][0] + 1 || r[j][2] <= r[i][0] + 1 || r[i][3] <= r[j][1] + 1 || r[j][3] <= r[i][1] + 1, `étiquettes ${sym} ${i}/${j} superposées`); } }
       // 5. sept stratégies : chaque ligne affiche sa stratégie de surveillance
-      for (const [sym, chip] of Object.entries({ FAST: /Croissance rapide/, REGULAR: /Croissance régulière/, CALM: /Hausse calme/, REBOUND: /Rebond/, MOM6: /Momentum 6 mois/, MOM12: /Momentum 12 mois/, MOMRISK: /ajusté au risque/, NOSTRAT: /non définie/ })) assert.match(await row(sym).locator('.ps-chip').innerText(), chip, sym);
+      for (const [sym, chip] of Object.entries({ FAST: /Croissance rapide/, REGULAR: /Croissance régulière/, CALM: /Hausse calme/, REBOUND: /Rebond/, MOM6: /Momentum 6 mois/, MOM12: /Momentum 12 mois/, MOMRISK: /ajusté au risque/, NOSTRAT: /non définie/ })) assert.match(await row(sym).getByTitle('Stratégie de surveillance de la position', { exact: true }).innerText(), chip, sym);
       // 6. cohérence ligne / détail : même état, même message, même protection
       const detail = async sym => { await page.locator(`#px-sec-suivi .psr:has(.psr-name strong:text-is("${sym}")) .psr-name`).click(); await page.locator('.px-drawer').waitFor(); await page.locator('.px-tabs2 [data-tab="suivi"]').click(); await page.locator('.ps-card').waitFor(); };
       const close = async () => { await page.locator('.px-dact [data-close]').click(); await page.locator('.px-drawer').waitFor({ state: 'detached' }); };
@@ -108,7 +108,7 @@ const text = s => s.replace(/\s+/g, ' ').trim();
         assert.deepEqual(await stopOf('LOSSPERS'), lv0, 'autres protections personnelles intactes');
       }
       // 9. changement de stratégie de surveillance : n'écrase aucune protection personnelle
-      await cfg('PERSOSTOP'); await page.locator('dialog #ps-st').selectOption('rebound'); await save(); assert.match(await row('PERSOSTOP').locator('.ps-chip').innerText(), /Rebond/); assert.match(await row('PERSOSTOP').locator('.psr-gauge').innerText(), /110,00/, 'Rebond garde la protection personnelle');
+      await cfg('PERSOSTOP'); await page.locator('dialog #ps-st').selectOption('rebound'); await save(); assert.match(await row('PERSOSTOP').getByTitle('Stratégie de surveillance de la position', { exact: true }).innerText(), /Rebond/); assert.match(await row('PERSOSTOP').locator('.psr-gauge').innerText(), /110,00/, 'Rebond garde la protection personnelle');
       await cfg('PERSOSTOP'); await page.locator('dialog #ps-st').selectOption('regular'); await save();
       // 10. détail : onglets, PRU multi-lots, lots réglables, colonne Suivi du tableau
       await detail('MULTILOT'); assert.match(text(await page.locator('.ps-card').innerText()), /PRU 120,00 €/); assert.equal(await page.locator('.ps-card .ps-gauge').count(), 1); { const origin = await page.locator('.ps-card .ps-origin').innerText(); for (const o of ['Croissance rapide', 'Croissance régulière', 'Rebond']) assert.match(origin, new RegExp(o)); }
@@ -120,7 +120,7 @@ const text = s => s.replace(/\s+/g, ' ').trim();
       for (const theme of ['dark', 'light']) { await page.evaluate(t => { document.documentElement.dataset.theme = t; }, theme);
         const bad = await sec.evaluate(c => { const lum = rgb => { const v = rgb.match(/[\d.]+/g).slice(0, 3).map(Number).map(x => { x /= 255; return x <= .03928 ? x / 12.92 : ((x + .055) / 1.055) ** 2.4; }); return .2126 * v[0] + .7152 * v[1] + .0722 * v[2]; };
           const bgOf = el => { for (let e = el; e; e = e.parentElement) { const b = getComputedStyle(e).backgroundColor; const a = b.match(/[\d.]+/g); if (a && (a.length < 4 || +a[3] > .5)) return b; } return 'rgb(255,255,255)'; };
-          return [...c.querySelectorAll('.psr-msg, .psr-more p, .ps-state, .psr-gain strong, .ps-lb b, .ps-lb strong, .psr-hl, .ps-chip')].filter(e => e.offsetParent && e.textContent.trim()).map(e => { const f = lum(getComputedStyle(e).color), g = lum(bgOf(e)), [hi, lo] = f > g ? [f, g] : [g, f]; return { t: e.textContent.trim().slice(0, 30), r: (hi + .05) / (lo + .05) }; }).filter(x => x.r < 4.5); });
+          return [...c.querySelectorAll('.psr-msg, .psr-more p, .ps-state, .psr-gain strong, .ps-lb b, .ps-lb strong, .psr-hl, .psr-id .badge')].filter(e => e.offsetParent && e.textContent.trim()).map(e => { const f = lum(getComputedStyle(e).color), g = lum(bgOf(e)), [hi, lo] = f > g ? [f, g] : [g, f]; return { t: e.textContent.trim().slice(0, 30), r: (hi + .05) / (lo + .05) }; }).filter(x => x.r < 4.5); });
         assert.deepEqual(bad, [], 'contraste insuffisant (' + theme + ')'); await shot('suivi-' + theme); }
       // 12. zone Transactions inchangée
       await page.locator('.px-zones [data-zone="transactions"]').click(); assert.ok(await page.locator('.px-tx').count()); await page.locator('[data-hist]').first().click(); await page.waitForSelector('#back-home'); assert.match(await page.locator('#panel-manage').innerText(), /Lots et réglages/); assert.doesNotMatch(await page.locator('#panel-manage').innerText(), /Lots et réglages des alertes/); await page.locator('#back-home').click(); await page.locator('.px-zones').waitFor(); await page.locator('.px-zones [data-zone="transactions"]').click(); await page.locator('.px-zones [data-zone="overview"]').click();

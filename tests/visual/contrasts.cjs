@@ -1,12 +1,13 @@
 // Contrats de contraste sur les vraies couleurs calculées par Chromium (WCAG 2.2).
 // Textes usuels : 4,5:1. Séries/lignes graphiques : 3:1 contre leur surface.
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright-core');
-const path = require('path');
+const galleryServer = require('./gallery-server.cjs');
 (async () => {
+  const gallery = await galleryServer();
   const browser = await chromium.launch({ executablePath: process.env.JIGO_CHROMIUM });
   try {
     const page = await browser.newPage();
-    await page.goto(process.env.GALLERY_URL || 'file://' + path.resolve(__dirname, '../../design/galerie.html'));
+    await page.goto(gallery.url);
     await page.addStyleTag({ content: '* { transition: none !important; animation: none !important; }' });
     const failures = []; let checked = 0;
     for (const theme of ['light', 'dark']) {
@@ -43,5 +44,5 @@ const path = require('path');
     }
     if (failures.length) throw new Error(failures.join('\n'));
     console.log(`Contrastes : ${checked} paires conformes (clair/sombre, textes et séries).`);
-  } finally { await browser.close(); }
+  } finally { await browser.close(); await gallery.close(); }
 })().catch(e => { console.error(e.message); process.exitCode = 1; });

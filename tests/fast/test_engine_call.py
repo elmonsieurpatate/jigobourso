@@ -12,14 +12,16 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 pytestmark = pytest.mark.skipif(not shutil.which('php'), reason='php absent')
 
 
-def run(tmp_path, script, **env):
+def run(tmp_path, script, request=None, **env):
     fake = tmp_path / 'python'
     fake.write_text('#!/bin/sh\n' + textwrap.dedent(script))
     fake.chmod(0o755)
+    request_file = tmp_path / 'request.json'
+    request_file.write_text(json.dumps(request or {'x': 1}))
     code = (
         "require " + json.dumps(ROOT + '/app/lib/engine.php') + ";"
-        "try { echo json_encode(['ok' => engine_call('presets', ['x' => 1])]); }"
-        "catch (ApiError $e) { echo json_encode(['status' => $e->status, 'message' => $e->getMessage()]); }"
+        "try { echo json_encode(['ok' => engine_call('presets', json_decode(file_get_contents(" + json.dumps(str(request_file)) + "), true))]); }"
+        "catch (ApiError $e) { echo json_encode(['status' => $e->status, 'message' => $e->getMessage()] + (getenv('JIGO_TEST_TIMINGS') ? ['timings' => request_timing()] : [])); }"
     )
     out = subprocess.run(['php', '-r', code], capture_output=True, text=True, timeout=60, env=dict(os.environ, JIGO_PYTHON=str(fake), JIGO_ENGINE_ROOT=ROOT, JIGO_DATA_DIR=str(tmp_path), **env))
     assert out.returncode == 0, out.stderr
@@ -58,3 +60,20 @@ def test_request_error_is_reported_as_422(tmp_path):
 def test_engine_failures_become_503_never_a_success(tmp_path, script):
     r = run(tmp_path, script)
     assert r.get('status') == 503 and 'ok' not in r
+
+
+@pytest.mark.parametrize('script,large_request', [('exec sleep 3', True), ("echo '{\"ok\":true}'; exec 1>&-; exec sleep 3", False)])
+def test_deadline_covers_stdin_and_process_exit(tmp_path, script, large_request):
+    import time
+
+    started = time.monotonic()
+    result = run(tmp_path, script, {'padding': 'x' * 131072} if large_request else None, JIGO_ENGINE_TIMEOUT='0.2')
+    assert result['status'] == 503 and 'trop de temps' in result['message']
+    assert time.monotonic() - started < 2
+
+
+def test_timeout_keeps_its_phase_timings_for_diagnostics(tmp_path):
+    result = run(tmp_path, 'exec sleep 3', JIGO_ENGINE_TIMEOUT='0.2', JIGO_TEST_TIMINGS='1')
+    assert result['status'] == 503
+    assert result['timings']['slot'] >= 0
+    assert result['timings']['engine'] >= 0.19

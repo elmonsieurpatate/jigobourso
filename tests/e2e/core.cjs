@@ -91,5 +91,18 @@ const hang = (url, o) => new Promise((_, rej) => o.signal.addEventListener('abor
   await assert.rejects(J.api('x'), /Réponse illisible/);
   ctx.fetch = async () => ({ ok: false, status: 502, json: async () => { throw new SyntaxError('<html>'); } });
   await assert.rejects(J.api('x'), /Erreur 502/);
+  // Les aperçus dédupliquent une demande, gardent l'erreur puis réessaient explicitement.
+  let attempts = 0, changes = 0;
+  const memo = J.asyncMemo(async () => { if (++attempts === 1) throw Error('503 simulé'); return { month: 1 }; }, () => changes++);
+  const first = memo.read('weights', {}); assert.strictEqual(memo.read('weights', {}), first);
+  await new Promise(setImmediate);
+  assert.strictEqual(attempts, 1); assert.strictEqual(memo.peek('weights').state, 'error');
+  memo.read('weights', {}); await new Promise(setImmediate); assert.strictEqual(attempts, 1);
+  memo.retry('weights'); await new Promise(setImmediate);
+  assert.strictEqual(attempts, 2); eq(memo.peek('weights').value, { month: 1 }); assert.strictEqual(changes, 2);
+  let release, staleChanges = 0;
+  const pendingMemo = J.asyncMemo(() => new Promise(resolve => { release = resolve; }), () => staleChanges++);
+  pendingMemo.read('old', {}); await new Promise(setImmediate); pendingMemo.clear(); release(42);
+  await new Promise(setImmediate); assert.strictEqual(staleChanges, 0); assert.strictEqual(pendingMemo.peek('old'), undefined);
   console.log('core.js : OK');
 })().catch(e => { console.error(e); process.exit(1); });

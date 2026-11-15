@@ -1,0 +1,111 @@
+/* Cartes et panneaux. */
+:is(.card, .ct-panel, .ac-panel, .ps-card, .as-tile, .h-side, .sr-card, .px-card, .px-sum, .hcard) {
+  background: var(--panel-bg);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: var(--panel-radius);
+  box-shadow: var(--shadow);
+}
+.card {
+  min-width: 0;
+  padding: var(--card-pad);
+} /* Sections verticales d'une carte : un seul écart, porté par le conteneur.
+   Les grilles de mesures et les lignes d'actions gardent leur géométrie métier. */
+:is(.card-stack, .sr-card, .ps-card, .admin-filter-aside) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: var(--card-gap);
+}
+:is(.card-stack, .sr-card, .ps-card, .admin-filter-aside) > * {
+  margin-block: 0;
+}
+.card.tight {
+  padding: var(--sp-12) var(--sp-14);
+}
+.card.flush {
+  padding: 0;
+}
+.card.inset,
+.metric,
+.sess-card {
+  background: var(--surface-2);
+  box-shadow: none;
+}
+.card.flat {
+  box-shadow: none;
+}
+.card + .card {
+  margin-top: var(--sp-16);
+}
+.card h2 {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+}
+.hcard,
+.px-card {
+  padding: var(--sp-14);
+}
+.ac-editability.editable,
+.hb-jigo .hb-t {
+  background: var(--ok-soft);
+  color: var(--ok-ink);
+}
+.ac-badge.ok,
+.as-status.ok,
+.ct .ct-status.ok {
+  color: var(--ok);
+  border-color: currentColor;
+}
+.ac-badge.no,
+.as-status.no,
+.ct .ct-status.no {
+  color: var(--danger);
+  border-color: currentColor;
+}
+.as-total.ok,
+.ct-score.high,
+.ac-status.active,
+.ac-validation.success,
+.ps-ic.t-up,
+.ps-ic.ic-bars,
+.ps-risk.r-low {
+  background: var(--up-soft);
+  color: var(--up);
+}
+.as-tile span,
+.px-l,
+.ps-tile small {
+  color: var(--muted);
+  font-size: var(--fs-11);
+}
+.as-hist small,
+.ct-preview-group > b,
+.ct-preview small,
+.ct-missing,
+.ac-category-interval small {
+  color: var(--muted);
+  font-size: var(--fs-10);
+}
+.ct-group-actions .ct-delete-group,
+.px-ph h2 span,
+.px-fold h2 span {
+  color: var(--muted);
+  font-weight: 400;
+}
+.ht-i.on {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 700;
+}
+.ps-advice summary,
+.ps-more summary,
+.sr-card summary {
+  color: var(--muted);
+}
+.kpi .v,
+.metric .v {
+  font-weight: 700;
+  letter-spacing: -0.035em;
+}

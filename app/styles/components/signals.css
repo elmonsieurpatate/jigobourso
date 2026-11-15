@@ -1,0 +1,44 @@
+/* Signaux et explications. */
+.sig {
+  font-size: var(--fs-10);
+  color: var(--muted);
+}
+.sig i {
+  border-radius: 50%;
+  background: var(--muted);
+}
+.sig.ok i {
+  background: var(--up);
+}
+.sig.warn i {
+  background: var(--warn);
+}
+.sig.bad i {
+  background: var(--down);
+}
+.sig.unknown i {
+  background: transparent;
+  border: 2px solid var(--muted);
+}
+.sig.ok {
+  color: var(--up);
+}
+.sig.warn {
+  color: var(--warn);
+}
+.sig.bad {
+  color: var(--down);
+}
+.card.assess .reason {
+  font-weight: 600;
+}
+.sig.big {
+  font-size: var(--fs-14);
+}
+ul.reading .sig {
+  font-size: var(--fs-12);
+}
+details.why summary {
+  font-size: var(--fs-10);
+  color: var(--muted);
+}

@@ -1,9 +1,13 @@
-PyMySQL>=1.1,<2
-
-numpy>=1.24,<2
-
-# Calendriers de séances officiels pour dater les fenêtres de cotation.
-# 4.3 reste compatible avec Python 3.9 (Hostinger); pandas 3.x a retiré
-# une API utilisée par cette version, d'où la borne supérieure.
-exchange_calendars==4.3
-pandas>=1.5,<3
+# Verrou runtime résolu avec Python 3.9 ; contraintes sources : requirements.in.
+# Toute mise à jour exige une nouvelle résolution et les tests Python 3.9 / API.
+exchange-calendars==4.3
+korean_lunar_calendar==0.4.0
+numpy==1.26.4
+pandas==2.3.3
+pyluach==2.3.0
+PyMySQL==1.2.4
+python-dateutil==3.0.0
+pytz==2026.6
+six==1.17.0
+toolz==1.2.0
+tzdata==2026.6

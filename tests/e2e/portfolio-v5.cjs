@@ -7,7 +7,7 @@ const PERIODS = ['1d', '2d', '5d', '1w', '2w', '1m', '3m', '6m', '1y', '2y', '3y
   const b = await chromium.launch({ executablePath: process.env.JIGO_CHROMIUM, args: ['--no-sandbox'] }); const report = [];
   try {
     for (const width of [320, 375, 390, 430, 768, 1024, 1440]) {
-      const ctx = await b.newContext({ viewport: { width, height: width > 700 ? 1000 : 900 }, isMobile: width < 600, hasTouch: width < 600 });
+      const ctx = await b.newContext({extraHTTPHeaders:{Origin:BASE}, viewport: { width, height: width > 700 ? 1000 : 900 }, isMobile: width < 600, hasTouch: width < 600 });
       const page = await ctx.newPage(), errors = []; page.on('pageerror', e => errors.push(e.message)); page.on('console', m => { if (m.type() === 'error' && !/favicon|Failed to load resource/.test(m.text())) errors.push(m.text()); }); page.setDefaultTimeout(20000);
       assert.equal((await ctx.request.post(BASE + '/api.php?r=auth/login', { data: { username: 'audit_portfolio', password: 'audit-local-validation-2026' } })).ok(), true);
       const list = (await (await ctx.request.get(BASE + '/api.php?r=portfolios')).json()).portfolios;
@@ -85,6 +85,8 @@ const PERIODS = ['1d', '2d', '5d', '1w', '2w', '1m', '3m', '6m', '1y', '2y', '3y
       await page.locator('.px-zones [data-zone="transactions"]').click(); await page.locator('.px-tx').waitFor(); await noOverflow('transactions');
       assert.deepEqual(errors, [], 'erreurs JS'); await ctx.close(); console.log('ok pf', width);
     }
-    fs.writeFileSync((SHOTS || '.') + '/pf5-periods-report.json', JSON.stringify(report, null, 1)); console.log('ok portefeuille');
+    const reportDirectory = process.env.JIGO_E2E_RESULTS || SHOTS || '/tmp';
+    fs.mkdirSync(reportDirectory, { recursive: true });
+    fs.writeFileSync(reportDirectory + '/pf5-periods-report.json', JSON.stringify(report, null, 1)); console.log('ok portefeuille');
   } finally { await b.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });

@@ -1,0 +1,157 @@
+/* Cours quotidiens et intraday : axes, bougies et légendes. */
+.intraday-svg .vgrid {
+  stroke: var(--line);
+}
+.intraday-svg .axis,
+.intraday-svg .sess-sub,
+.price-svg .axis {
+  fill: var(--muted);
+  font: var(--fs-11) var(--font);
+}
+.intraday-svg .sess-title {
+  fill: var(--text);
+  font: 700 var(--fs-13) var(--font);
+}
+.intraday-svg .band {
+  fill: var(--surface-2);
+}
+.intraday-svg .wick.up,
+.intraday-svg .body.up {
+  stroke: var(--up);
+  fill: var(--up);
+}
+.intraday-svg .wick.down,
+.intraday-svg .body.down {
+  stroke: var(--down);
+  fill: var(--down);
+}
+.intraday-svg .dot {
+  fill: var(--muted);
+}
+.intraday-svg .line {
+  fill: none;
+  stroke: var(--accent);
+}
+.intraday-svg .vol.up {
+  fill: var(--up);
+}
+.intraday-svg .vol.down {
+  fill: var(--down);
+}
+.intraday-svg .hole {
+  fill: url(#hatch);
+}
+.intraday-svg .hatch-line {
+  stroke: var(--warn);
+}
+.intraday-svg .future {
+  fill: var(--surface-2);
+}
+.intraday-svg .prevclose {
+  stroke: var(--muted);
+}
+.intraday-svg .prevclose-label {
+  fill: var(--muted);
+  font: var(--fs-10) var(--font);
+}
+.intraday-svg .lastline {
+  stroke: var(--accent);
+}
+.intraday-svg .lasttag {
+  fill: var(--accent);
+}
+.intraday-svg .lasttext {
+  fill: var(--accent-ink);
+  font: 700 var(--fs-11) var(--font);
+}
+.intraday-svg .cross {
+  stroke: var(--text);
+}
+.chart-tip {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-12);
+  box-shadow: var(--shadow);
+  font-size: var(--fs-11);
+}
+.tip-grid b,
+.as-rktable .as-c-rank,
+.as-rktable .as-c-num,
+.hdemo td.n,
+.hdemo th.n {
+  font-variant-numeric: tabular-nums;
+}
+.sess-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-16);
+  background: var(--surface-2);
+}
+.lg:not(.btn) {
+  border-radius: var(--radius-4);
+}
+.lg.up {
+  background: var(--up);
+}
+.lg.down {
+  background: var(--down);
+}
+.lg.hole {
+  background: repeating-linear-gradient(45deg, var(--warn) 0 2px, transparent 2px 5px);
+}
+.lg.dash {
+  border-top: 2px dashed var(--muted);
+  border-radius: 0;
+}
+.price-svg .hgrid {
+  stroke: var(--line);
+}
+.price-svg .pline {
+  fill: none;
+}
+.price-svg .pline.up {
+  stroke: var(--up);
+}
+.price-svg .pline.down {
+  stroke: var(--down);
+}
+.price-svg .area.up {
+  fill: var(--up);
+}
+.price-svg .area.down {
+  fill: var(--down);
+}
+.price-svg .ma20 {
+  fill: none;
+  stroke: var(--gold);
+}
+.price-svg .ma50 {
+  fill: none;
+  stroke: var(--chart-ma2);
+}
+.price-svg .vol.up {
+  fill: var(--up);
+}
+.price-svg .vol.down {
+  fill: var(--down);
+}
+.price-svg .extreme {
+  fill: var(--surface);
+  stroke: var(--text);
+}
+.price-svg .hdot {
+  fill: var(--surface);
+  stroke: var(--text);
+}
+.price-svg .lastline {
+  stroke: var(--text);
+}
+.price-svg .lasttag {
+  fill: var(--text);
+}
+.price-svg .lasttext {
+  fill: var(--bg);
+  font: 700 var(--fs-11) var(--font);
+}
+.price-svg .cross {
+  stroke: var(--text);
+}
