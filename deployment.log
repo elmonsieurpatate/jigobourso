@@ -12,3 +12,5 @@ Erreur contrôle environnement : code 1
 Erreur dépendance : PyMySQL
 Erreur : dépendances toujours non conformes après installation
 Échec déploiement : étape dépendances Python et migration du schéma (code 1)
+site OK : accueil 200, API répond (200)
+Code restauré ; les données et la base n'ont pas été touchées (les migrations déjà appliquées sont additives).
