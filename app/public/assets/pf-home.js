@@ -42,20 +42,7 @@
   const pt = (v) => (isNum(v) ? J.numS(v, 2) + " pt" : "–");
   const cl = (v) => (isNum(v) ? (v > 0.004 ? "up" : v < -0.004 ? "down" : "") : "");
   const cssv = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim() || "#2563eb";
-  const pal = () => [
-    "#0891b2",
-    "#d97706",
-    "#7c3aed",
-    "#db2777",
-    "#65a30d",
-    "#dc2626",
-    "#059669",
-    "#ca8a04",
-    "#4f46e5",
-    "#0d9488",
-    "#9333ea",
-    "#ea580c",
-  ];
+  const pal = () => Array.from({ length: 12 }, (_, i) => `var(--series-${i + 1})`);
   const pkey = (p) => (p.listing_id ? String(p.listing_id) : "S" + String(p.symbol).toUpperCase());
   const all = () => [...C.D.positions, ...C.D.closed];
   const open = () => C.D.positions.filter((p) => p.qty > 0);

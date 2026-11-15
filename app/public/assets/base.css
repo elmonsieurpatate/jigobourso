@@ -78,6 +78,16 @@ main.wrap {
     grid-template-columns: 1fr;
   }
 }
+/* La fiche se réorganise aussi après un redimensionnement, sans style posé par JS. */
+.title-layout {
+  grid-template-columns: minmax(0, 2.3fr) minmax(270px, 1fr);
+}
+@media (max-width: 900px) {
+  .title-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .row {
   display: flex;
   gap: var(--sp-12);
@@ -1723,17 +1733,6 @@ details.help > summary {
   background: var(--warn-soft);
   color: var(--warn);
 }
-.hs {
-  display: flex;
-  flex-direction: column;
-}
-.hs span {
-  font-size: var(--fs-11);
-  color: var(--muted);
-}
-.hs b {
-  font-variant-numeric: tabular-nums;
-}
 .ps {
   font-size: var(--fs-11);
   color: var(--muted);
@@ -2212,9 +2211,6 @@ dialog .ps-rule-top {
 }
 .u-grid-template-columns-v2 {
   grid-template-columns: minmax(0, 210px) minmax(0, 1fr) !important;
-}
-.u-grid-template-columns-v3 {
-  grid-template-columns: minmax(0, 2.3fr) minmax(270px, 1fr) !important;
 }
 .u-height-200px {
   height: 200px !important;

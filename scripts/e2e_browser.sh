@@ -17,6 +17,8 @@ trap 'kill $pid 2>/dev/null' EXIT
 for _ in $(seq 50); do curl -sf -o /dev/null http://127.0.0.1:18089/login.html && break; sleep .2; done
 run() { local name=$1; shift; "$@" > "$out/$name.log" 2>&1 || { echo "ÉCHEC $name :"; tail -c 1500 "$out/$name.log"; exit 1; }; }
 run financial node tests/e2e/financial.cjs
+run keyboard node tests/e2e/keyboard.cjs
+run title-layout node tests/e2e/title-layout.cjs
 run strategies-ui timeout 240s node tests/e2e/strategies-ui.cjs      # avant account-navigation : celui-ci provoque des échecs de connexion volontaires
 run account-navigation timeout 180s node tests/e2e/account-navigation.cjs
 echo "e2e navigateur : OK"

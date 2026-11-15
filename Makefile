@@ -27,6 +27,8 @@ css-check:   ## vérifie formatage + garde-fous Halo
 	python3 scripts/check_halo_css.py
 visual:   ## compare les styles calculés de la galerie à la référence (PLAYWRIGHT_MODULE, JIGO_CHROMIUM requis)
 	node tests/visual/galerie.cjs
+	node tests/visual/contrasts.cjs
+	node scripts/probe_utilities.cjs --contracts-only
 visual-update:   ## régénère la référence après un changement de design voulu
 	node tests/visual/galerie.cjs --update
 check: lint fast   ## filet de sécurité avant tout refactor

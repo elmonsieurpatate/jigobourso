@@ -14,7 +14,7 @@ function pagesList() {
   for (const t of ['fdb', 'yahoo', 'titres', 'cron', 'logs', 'users', 'scores', 'colonnes', 'settings']) pages.push('admin.html#' + t);
   for (const id of [1, 2]) for (const t of ['cours', 'analyse', 'fiche']) pages.push('titre.html?id=' + id + '#' + t);
   pages.push('aide.html#/intro');
-  return pages;
+  return arg('--only') ? pages.filter(p => new RegExp(arg('--only')).test(p)) : pages;
 }
 
 function measure() {
@@ -61,15 +61,16 @@ function compare(a, b) {
   if (arg('--compare') && !arg('--out')) { compare(JSON.parse(fs.readFileSync(arg('--compare'))), JSON.parse(fs.readFileSync(arg('--now')))); return; }
   const browser = await chromium.launch({ executablePath: process.env.JIGO_CHROMIUM });
   const res = {};
-  for (const w of [1280, 390]) {
-    const ctx = await browser.newContext({ viewport: { width: w, height: 900 } }), page = await ctx.newPage();
+  for (const [w, mode] of [1280, 390].flatMap(w => (process.argv.includes('--themes') ? ['light', 'dark'] : ['light']).map(mode => [w, mode]))) {
+    const ctx = await browser.newContext({ viewport: { width: w, height: 900 }, reducedMotion: 'reduce' }), page = await ctx.newPage();
     await page.goto(BASE + '/login.html'); await page.fill('#u', process.env.USER_NAME); await page.fill('#p', process.env.PASS);
     await page.click('#auth-form button.primary'); await page.waitForURL('**/index.html');
     for (const p of pagesList()) {
-      try { await page.goto(BASE + '/' + p, { waitUntil: 'networkidle', timeout: 60000 }); } catch (e) { continue; }
+      try { await page.goto(BASE + '/' + p, { waitUntil: 'networkidle', timeout: 60000 }); } catch (e) { throw new Error(`${p}: navigation impossible: ${e.message}`); }
       await page.waitForTimeout(900);
-      res[w + ' ' + p] = await page.evaluate(measure);
-      if (arg('--shots') && w === 1280) { fs.mkdirSync(arg('--shots'), { recursive: true }); await page.screenshot({ path: path.join(arg('--shots'), p.replace(/[^a-z0-9]+/gi, '_') + '.png'), fullPage: true }); }
+      await page.evaluate(async mode => { document.documentElement.dataset.theme = mode; await document.fonts.ready; }, mode);
+      res[w + (process.argv.includes('--themes') ? '/' + mode : '') + ' ' + p] = await page.evaluate(measure);
+      if (arg('--shots')) { fs.mkdirSync(arg('--shots'), { recursive: true }); await page.screenshot({ path: path.join(arg('--shots'), `${w}-${mode}-` + p.replace(/[^a-z0-9]+/gi, '_') + '.png'), fullPage: true }); }
     }
     await ctx.close();
   }
@@ -85,4 +86,5 @@ function compare(a, b) {
   console.log('pages dont le défilement horizontal apparaît (scrollWidth > fenêtre) :', po.length, po.map(([k, r]) => k + ' +' + r.pageOverflow).join(' ; '));
   console.log('pages avec élément dépassant la fenêtre (hors zones défilantes) :', ov.length); ov.slice(0, 20).forEach(([k, r]) => console.log('  ', k, r.overflow.slice(0, 3).join(' | ')));
   if (arg('--compare')) compare(JSON.parse(fs.readFileSync(arg('--compare'))), res);
+  if (po.length) process.exitCode = 1;
 })();

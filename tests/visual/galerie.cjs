@@ -17,10 +17,11 @@ const TARGETS = {
   const browser = await chromium.launch({ executablePath: process.env.JIGO_CHROMIUM });
   const snap = {}; fs.mkdirSync(OUT, { recursive: true });
   for (const [w, mode] of [[1280, 'light'], [1280, 'dark'], [390, 'light'], [390, 'dark']]) {
-    const ctx = await browser.newContext({ viewport: { width: w, height: 900 }, colorScheme: mode });
+    const ctx = await browser.newContext({ viewport: { width: w, height: 900 }, colorScheme: mode, reducedMotion: 'reduce' });
     const pg = await ctx.newPage();
-    await pg.goto('file://' + path.join(ROOT, 'design/galerie.html'));
+    await pg.goto(process.env.GALLERY_URL || 'file://' + path.join(ROOT, 'design/galerie.html'));
     await pg.evaluate(m => { document.documentElement.dataset.theme = m; }, mode);
+    await pg.evaluate(() => document.fonts.ready);
     snap[`${w}/${mode}`] = await pg.evaluate(([T, P]) => {
       const r = {};
       for (const [k, s] of Object.entries(T)) {

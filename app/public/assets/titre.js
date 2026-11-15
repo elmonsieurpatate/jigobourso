@@ -224,14 +224,13 @@
   <div class="row small u-gap-14px">${ext.map(([name, url]) => `<a href="${J.esc(url)}" target="_blank" rel="noopener noreferrer">${name} ↗</a>`).join("")}</div>
   ${notice ? `<div class="grid u-gap-10px">${notice}</div>` : ""}
   <div class="tabs big" id="tabs">${hasTabs.map((t) => `<button data-t="${t}">${tabLabel[t]}</button>`).join("")}</div>
-  <div class="grid u-grid-template-columns-v3 u-align-items-start" id="layout"><div id="main"></div>
+  <div class="grid title-layout u-align-items-start" id="layout"><div id="main"></div>
    <div>
     <div class="card"><div class="row between"><h2 class="m-0">Mes portefeuilles</h2></div>
       ${held ? `<table class="dense"><tbody>${s.holdings.map((h) => `<tr><td><a href="portefeuilles.html?id=${h.portfolio_id}">${J.esc(h.portfolio)}</a></td><td class="num">${J.num(h.qty, 4)}</td><td class="num ${J.cls(h.unrealized)}">${h.unrealized !== null ? J.eur(h.unrealized) + '<div class="small">' + J.pct(h.unrealized_pct, 1) + "</div>" : "–"}</td></tr>`).join("")}</tbody></table>` : '<p class="muted small mt-2">Vous ne détenez pas ce titre.</p>'}</div>
     <div class="card"><h2>Repères</h2><div class="metric-grid u-grid-template-columns-1fr-1fr"><div class="metric"><div class="l">Moy. 20 j</div><div class="v">${J.num(st.ma20, 2)}</div></div><div class="metric"><div class="l">Moy. 50 j</div><div class="v">${J.num(st.ma50, 2)}</div></div><div class="metric"><div class="l">Écart moy. 20 j</div><div class="v">${J.pct(st.gap_to_ma20, 1)}</div></div><div class="metric"><div class="l">Volume moy. 3 m</div><div class="v">${s.avg_volume_3m !== null ? J.num(s.avg_volume_3m, 0) : "–"}</div></div><div class="metric" title="Variation du cours entre il y a 126 et il y a 21 séances (le dernier mois est ignoré). Mesure du passé."><div class="l">Momentum 6 mois</div><div class="v ${J.cls(st.momentum_6m)}">${st.momentum_6m !== null && st.momentum_6m !== undefined ? J.pct(st.momentum_6m, 1) : "non évaluable"}</div></div><div class="metric" title="Variation du cours entre il y a 252 et il y a 21 séances (le dernier mois est ignoré). Mesure du passé."><div class="l">Momentum 12 mois</div><div class="v ${J.cls(st.momentum_12m)}">${st.momentum_12m !== null && st.momentum_12m !== undefined ? J.pct(st.momentum_12m, 1) : "non évaluable"}</div></div></div></div>
     ${sib ? `<div class="card"><h2>Autres cotations du produit</h2><div class="small u-display-grid u-gap-6px">${sib}</div></div>` : ""}
    </div></div>`;
-  if (innerWidth < 900) J.$("#layout").style.gridTemplateColumns = "minmax(0,1fr)";
 
   const measuresCard = () => {
     const periodSlope = (x, n) => (x == null ? null : 100 * Math.expm1(n * Math.log1p(x / 100)));

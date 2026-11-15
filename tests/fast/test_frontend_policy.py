@@ -91,3 +91,16 @@ def test_data_style_is_reserved_to_computed_values_and_every_utility_class_exist
     defined = set(re.findall(r'\.(u-[a-z0-9-]+|is-off)\s*\{', css))
     assert used <= defined, sorted(used - defined)
     assert defined <= used, f'classes définies mais inutilisées : {sorted(defined - used)}'
+
+
+def test_stylesheets_only_reference_local_fonts_under_the_self_csp():
+    from pathlib import Path
+
+    assets = Path(PUBLIC) / 'assets'
+    for sheet in assets.glob('*.css'):
+        source = sheet.read_text()
+        assert not re.search(r'@import\s+(?:url\()?\s*[\"\']?https?://', source), sheet.name
+        for face in re.findall(r'@font-face\s*\{([^}]+)\}', source):
+            for url in re.findall(r'url\([\"\']?([^\"\')]+)', face):
+                assert not re.match(r'(?:https?:)?//', url), 'La CSP ne permet que les polices locales'
+                assert (sheet.parent / url).is_file(), url

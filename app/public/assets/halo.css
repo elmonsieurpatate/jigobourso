@@ -1,7 +1,13 @@
 /* Halo — langage visuel commun à toutes les pages Jigobourso.
    Chargé après les feuilles de disposition propres aux pages. Les composants
    partagés sont définis ici ; les CSS locaux conservent les grilles métier. */
-@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap");
+@font-face {
+  font-family: "Space Grotesk";
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  src: url("fonts/SpaceGrotesk-wght.ttf") format("truetype");
+}
 :root {
   --bg: #f2f5fc;
   --surface: #fff;
@@ -24,7 +30,7 @@
   --warn: #8c6130;
   --warn-soft: #f7ecda;
   --warn-ink: #80521e;
-  --info: #526fc2;
+  --info: #4965b5;
   --info-soft: #e8edff;
   --info-ink: #405bab;
   --up: var(--ok);
@@ -42,10 +48,10 @@
   --side-bg: #e9eef9;
   --side-bg-2: #eef2ff;
   --side-line: #d9e1f0;
-  --side-ink: #647396;
-  --side-muted: #7e8eae;
-  --side-active: #526fc2;
-  --side-active-ink: #526fc2;
+  --side-ink: #596988;
+  --side-muted: #596988;
+  --side-active: #4963ae;
+  --side-active-ink: #4963ae;
   --on-dark: #24345b;
   --on-dark-ok: #287d70;
   --on-dark-danger: #a94b69;
@@ -92,6 +98,7 @@
   --badge-size: 10px;
   --badge-pad: var(--sp-4) var(--sp-10);
   --card-pad: var(--sp-20) var(--sp-20);
+  --card-gap: var(--sp-12);
   --panel-bg: linear-gradient(140deg, var(--halo-highlight), var(--surface) 62%);
   --thead: #f2f5fd;
   --accent-border: #b4c2ec;
@@ -144,9 +151,30 @@
   --radius-8: 8px;
   --radius-12: 12px;
   --radius-16: 16px;
-  --chart-ma: #f59e0b;
-  --chart-ma2: #6c8cd5;
+  --chart-ma: #9b6500;
+  --chart-ma2: #526fc2;
   --chart-level: #c2410c;
+  /* La jauge conserve le même sens dans les deux thèmes. Les repères sont nommés et chiffrés. */
+  --data-icon-ink: #24345b;
+  --gauge-exit: #d6342d;
+  --gauge-danger: #ea6a1e;
+  --gauge-watch: #f0a30a;
+  --gauge-neutral: #e6c200;
+  --gauge-hold: #7fb11e;
+  --gauge-good: #1f8f4e;
+  --gauge-strong: #14783f;
+  --series-1: #087e99;
+  --series-2: #a56705;
+  --series-3: #7c3aed;
+  --series-4: #bd2168;
+  --series-5: #527f0a;
+  --series-6: #c52222;
+  --series-7: #047959;
+  --series-8: #926303;
+  --series-9: #4f46e5;
+  --series-10: #087c73;
+  --series-11: #9333ea;
+  --series-12: #ba4308;
   --accent-2: #38bdf8;
   --overlay: rgba(0, 0, 0, 0.45);
   --avatar-1: #12a77b;
@@ -183,7 +211,7 @@
   --side-bg-2: #293b5b;
   --side-line: #384b6a;
   --side-ink: #aab6d5;
-  --side-muted: #7e8eae;
+  --side-muted: #aab6d5;
   --side-active: #a9bfff;
   --side-active-ink: #a9bfff;
   --on-dark: #edf1ff;
@@ -204,6 +232,21 @@
   --caution: #f59e4b;
   --caution-soft: rgba(245, 158, 75, 0.2);
   --caution-ink: #ffb877;
+  --chart-ma: #f5b749;
+  --chart-ma2: #a9bfff;
+  --chart-level: #ff9c72;
+  --series-1: #55cce5;
+  --series-2: #f5b749;
+  --series-3: #bc9aff;
+  --series-4: #ff91bf;
+  --series-5: #b1d86a;
+  --series-6: #ff9696;
+  --series-7: #62dcb9;
+  --series-8: #e5c469;
+  --series-9: #a9a4ff;
+  --series-10: #70d7cd;
+  --series-11: #d3a2ff;
+  --series-12: #ffb184;
 }
 :root[data-theme="light"] {
   color-scheme: light;
@@ -753,6 +796,17 @@ button.badge:hover {
 .card {
   min-width: 0;
   padding: var(--card-pad);
+}
+/* Sections verticales d'une carte : un seul écart, porté par le conteneur.
+   Les grilles de mesures et les lignes d'actions gardent leur géométrie métier. */
+:is(.card-stack, .sr-card, .ps-card, .admin-filter-aside) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: var(--card-gap);
+}
+:is(.card-stack, .sr-card, .ps-card, .admin-filter-aside) > * {
+  margin-block: 0;
 }
 .card.tight {
   padding: var(--sp-12) var(--sp-14);
@@ -1310,7 +1364,6 @@ summary {
 }
 .ps-card {
   padding: var(--sp-16);
-  gap: var(--sp-12);
 }
 .ps-tile,
 .as-tile {
@@ -1591,13 +1644,13 @@ summary {
   background: var(--halo-control);
 }
 .admin-filter-aside h3 {
-  margin: 0 0 var(--sp-10);
+  margin: 0;
 }
 .admin-filter-aside p {
   color: var(--muted);
   font-size: var(--fs-11);
   line-height: var(--lh-normal);
-  margin: var(--sp-10) 0 0;
+  margin: 0;
 }
 .admin-filter-aside details {
   border-top: 1px solid var(--line);
@@ -1829,6 +1882,9 @@ summary {
 .settings-page .as-grid > .card,
 .settings-page .as-grid2 > .card {
   margin: 0;
+}
+.help-wrap .hcard-i {
+  color: var(--data-icon-ink);
 }
 .help-wrap .h-ico {
   background: var(--accent-soft);
