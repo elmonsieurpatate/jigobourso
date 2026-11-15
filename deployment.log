@@ -1,2 +1,6 @@
 == Validation du déploiement : full
 == Contrôles du serveur (lecture seule)
+== Contrôle des classements (lecture seule)
+diagnostic Explorer regular: 237 retenus, 99 non évaluables sur 9611
+diagnostic Explorer momentum_risk: 3592 retenus, 1409 non évaluables sur 9611
+== Conformité des dépendances (lecture seule)
