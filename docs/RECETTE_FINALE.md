@@ -75,3 +75,14 @@ supprimé ou rendu permissif pour obtenir le résultat ci-dessus.
 - Navigateurs : Chromium (Chrome for Testing) uniquement ; ni Firefox ni Safari, ni appareils réels (largeurs 390 et 1280 px émulées).
 - Hébergement : Python 3.9 et PHP 8.2 de production non reproduits localement (développement en Python 3.12) ; la CI utilise Python 3.9.
 - Volumes réels et charge concurrente non testés.
+
+## Livraison — premier passage CI du 15 novembre
+
+Run `43714229168` : syntaxe, 714 tests rapides et 351 tests d’intégration
+Python 3.9 réussis. Déploiement bloqué par la galerie : huit écarts sur des
+largeurs intrinsèques en `ch` et le rayon natif des radios. Le flottement des
+largeurs a ensuite été reproduit localement entre deux exécutions identiques.
+Correction du harnais : galerie servie en HTTP local, police chargée explicitement,
+largeurs introductives contrôlées contre leur conteneur plutôt que figées en
+pixels ; forme native radio exclue, ses dimensions et les autres propriétés
+restent contrôlées. Aucun style applicatif modifié ni test métier désactivé.
