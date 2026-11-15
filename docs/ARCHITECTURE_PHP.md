@@ -36,3 +36,19 @@ Les cas d'usage de portefeuille (`services/portfolios.php`) sont testables sans 
 ## Formatage
 
 Aucun formateur PHP n'est installé dans le projet : le style dense existant est conservé et seul `php -l` est imposé (`make lint-php`). Les déplacements de code de l'étape 7 (routes → services) ne changent aucune logique ; les corrections fonctionnelles sont dans des commits distincts (étapes 5 et 6).
+
+## Cas d’usage extraits après audit du 15 novembre
+
+Les routes de compte, recherche, administration, alertes, suivi et portefeuille
+ne contiennent plus de requêtes SQL. Les services `auth_actions`, `explore_actions`,
+`admin_actions`, `alerts_actions`, `tracking` et `portfolios` reçoivent leurs
+paramètres explicitement. Les routes gardent l’authentification et les entrées/sorties
+HTTP ; les services gardent le contrôle de propriété et les règles métier. L’export
+sépare la lecture de ses données du flux CSV et conserve la protection des cellules.
+`services/cron.php` reste un adaptateur historique de cron HTTP (clé/méthode/journal),
+pas un cas d’usage appelé par ces nouvelles routes.
+
+Le garde-fou vérifie l’absence de SQL dans ces routes et d’accès à GET/POST/COOKIE/
+SERVER ou body/header dans les cas d’usage extraits. Il ne prétend pas prouver toutes
+les propriétés de l’application : les tests API vérifient les permissions et les
+résultats, notamment sessions et parcours financiers.

@@ -1,5 +1,11 @@
 # Plan complet de refonte — Jigobourso
 
+> Suivi courant après l’audit de main `2bb2cec` :
+> [CORRECTIONS_AUDIT_20261115.md](CORRECTIONS_AUDIT_20261115.md) et
+> [matrice de validation](VALIDATION_AUDIT_20261115.md).
+> Les étapes et journaux ci-dessous conservent leur contexte historique ;
+> une étape cochée ne valide pas implicitement chacun de ses critères.
+
 ## Objectif
 
 Obtenir une application lisible, cohérente visuellement, testable et organisée

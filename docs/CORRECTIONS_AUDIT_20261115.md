@@ -16,7 +16,7 @@ corrections locales.
 - [x] A09 — Runner des parcours actifs, scénarios historiques classés.
 - [ ] A10 — Mesure reproductible et représentative, sans optimisation supposée.
 - [ ] A11 — Releases cohérentes et dépendances reproductibles.
-- [ ] A12 — Documentation courante, historique et preuves cohérents.
+- [x] A12 — Documentation courante, historique et preuves cohérents.
 
 ## Journal
 
@@ -84,3 +84,16 @@ leurs transitives, résolution Python 3.9 ; 739 tests rapides exécutés sous Py
 20 tests d’environnement passent, dont refus avant installation si incompatible.
 La réparation sait réutiliser une paire sans ancienne archive générique.
 La publication atomique reste ouverte : voir RELEASE_ATOMICITY.md.
+
+A10, partie locale : Server-Timing conserve slot/engine même en échec ; le bouton
+Appliquer attend l’initialisation pour éviter un clic perdu. Un outil de mesure
+répète le parcours sur bureau et réseau/CPU mobile simulés, avec p50/p95, tailles,
+mémoire JS et durées serveur. Il n’écrit aucune donnée financière. Les vrais temps
+Hostinger/concurrence et un appareil physique ne sont pas inventés : A10 reste ouvert.
+
+A12 : README, architecture PHP, structure frontend, dépendances, livraison et
+recettes corrigés. Le dossier de conception et les journaux sont identifiés comme
+historiques. Matrice précise : VALIDATION_AUDIT_20261115.md. Deux points restent
+ouverts et ne sont pas masqués par une case d’étape : A10 (mesures réelles) et A11
+(fenêtre de transition de release). Les limites sont détaillées dans PERFORMANCE.md,
+DELIVERY.md et l’étude RELEASE_ATOMICITY.md.
