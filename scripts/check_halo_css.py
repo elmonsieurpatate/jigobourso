@@ -7,7 +7,7 @@ from pathlib import Path
 import re
 import sys
 import tinycss2
-from style_tools import CONTROL_GEOMETRY, declarations, rules, selectors, targets_shared, utility, visual, walk
+from style_tools import GROUPS, CONTROL_GEOMETRY, declarations, rules, selectors, targets_shared, utility, visual, walk
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -33,6 +33,8 @@ def layout_errors(source, name):
             keyword = node.lower_at_keyword
             if keyword in ('import', 'font-face', 'property'):
                 errors.append(f'{name}: @{keyword} réservé aux sources de thème et composants')
+            elif keyword not in GROUPS and not keyword.endswith('keyframes') and keyword != 'charset':
+                errors.append(f'{name}: @{keyword} non autorisé dans une mise en page')
             elif node.content is not None:
                 children = tinycss2.parse_rule_list(node.content, skip_whitespace=True, skip_comments=True)
                 if keyword.endswith('keyframes'):

@@ -97,3 +97,8 @@ historiques. Matrice précise : VALIDATION_AUDIT_20261115.md. Deux points resten
 ouverts et ne sont pas masqués par une case d’étape : A10 (mesures réelles) et A11
 (fenêtre de transition de release). Les limites sont détaillées dans PERFORMANCE.md,
 DELIVERY.md et l’étude RELEASE_ATOMICITY.md.
+
+Complément A05 : contournements reproduits par @starting-style et @-moz-document
+fermés. Les directives non reconnues sont refusées dans les mises en page au lieu
+d’être ignorées ; trois régressions supplémentaires passent. Suite rapide finale :
+744 réussites. Les feuilles compilées et leur rendu ne changent pas.

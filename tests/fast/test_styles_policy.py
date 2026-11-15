@@ -23,6 +23,9 @@ from build_styles import outputs  # noqa: E402
         '@keyframes disguise { to { color: red; } }',
         '@media (width < 600px) { @keyframes disguise { to { background: red; } } }',
         '@import url(other.css);',
+        '@starting-style { .btn { color: red; } }',
+        '@-moz-document url-prefix() { .btn { color: red; } }',
+        '@future-group { .btn { color: red; } }',
         '@font-face { font-family: other; src: url(other.woff); }',
     ],
 )

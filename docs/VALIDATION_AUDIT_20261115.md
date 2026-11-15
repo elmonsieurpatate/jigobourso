@@ -18,7 +18,7 @@ ni migration de topologie en production.
 | Parcours actifs | e2e_browser.sh | runner complet réussi sur base jetable ; seeds en série, vrais comptes et API ; scénarios historiques classés dans tests/e2e/README.md |
 | Suivi et portefeuille | plan-suivi, portfolio-v5 | conseils/règles/protections et graphiques vérifiés ; suivi 320–1440 px, portefeuille 7 largeurs de 320 à 1440 px |
 | Splits | split-reviews | mauvais ratio, décision, refus/réexamen, audit, idempotence, rôles et origine ; mobile et bureau |
-| Qualité et rapides | validate_quality.sh et test_suite.sh fast | PHP, migrations, ruff, formatage, syntaxe, CSS ; 741 tests rapides réussis ; 739 de ces tests également exécutés dans un environnement Python 3.9 frais sans saut avant les deux dernières régressions PHP |
+| Qualité et rapides | validate_quality.sh et test_suite.sh fast | PHP, migrations, ruff, formatage, syntaxe, CSS ; 744 tests rapides réussis ; 739 de ces tests également exécutés dans un environnement Python 3.9 frais sans saut avant les deux dernières régressions PHP |
 | CI PR/main | mêmes scripts qualité, pytest et navigateur dans les deux workflows | commandes validées localement ; PR en contents:read, aucun secret de production ; le résultat GitHub du prochain run reste à confirmer |
 | Performances Hostinger / appareil réel | measure_search.cjs, Server-Timing, PERFORMANCE.md | outil exercé localement et phases conservées sur erreur ; **mesures authentifiées sur Hostinger, charge concurrente et iPhone physique encore à recueillir** |
 | Cohérence pendant la livraison | manifestes verrouillés, sauvegardes appariées, RELEASE_ATOMICITY.md | dépendances et restauration corrigées ; **fenêtre réelle de rsync non mesurée, bascule atomique non implémentée** |
