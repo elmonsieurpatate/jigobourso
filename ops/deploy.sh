@@ -140,13 +140,14 @@ fi
 
 if [ "$operation" = diagnostic ]; then
   echo "== Conformité des dépendances (lecture seule)"
-  remote_sh "cd $root && .venv/bin/python -" <<'PYDEPS'
+  remote_sh "cd $root && JIGO_EXPECTED_REQUIREMENTS=$(base64 -w0 requirements.txt) .venv/bin/python -" <<'PYDEPS'
 import sys
 import importlib.metadata as md
+import os, base64
 sys.path.insert(0, 'scripts')
 import check_env
 from pathlib import Path
-text = Path('requirements.txt').read_text()
+text = base64.b64decode(os.environ['JIGO_EXPECTED_REQUIREMENTS']).decode()
 found = check_env.problems(text)
 for name, _ in check_env.parse(text):
     errors = [e for e in found if e.startswith(name + ' ') or e.startswith(name + ' :')]
