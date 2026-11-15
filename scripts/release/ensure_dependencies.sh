@@ -5,12 +5,27 @@ set -euo pipefail
 ROOT=${1:?racine du site}
 BACKUPS=${2:?dossier de sauvegarde}
 cd "$ROOT"
+check_runtime() {
+  local report status
+  report=$(mktemp)
+  status=0
+  .venv/bin/python scripts/check_env.py > "$report" 2>&1 || status=$?
+  if [ "$status" -ne 0 ]; then
+    echo "Erreur contrôle environnement : code $status"
+    # Aucun chemin, version, message d'exception ou paramètre privé publié.
+    { grep -oE 'ÉCART (PyMySQL|numpy|pandas|exchange_calendars|engine.cli)' "$report" || true; } | sort -u | sed 's/^ÉCART /Erreur dépendance : /'
+    { grep -oE '(ModuleNotFoundError|ImportError|NameError|TypeError|UnicodeEncodeError|PermissionError|SyntaxError):' "$report" || true; } | sort -u | sed 's/^/Erreur contrôle : /'
+    if grep -q "can't open file" "$report"; then echo "Erreur contrôle : fichier inaccessible"; fi
+  fi
+  rm -f "$report"
+  return "$status"
+}
 want=$(sha256sum requirements.txt | cut -d' ' -f1)
 have=$(cat .requirements.sha 2>/dev/null || true)
 site=$(.venv/bin/python -c "import sysconfig; print(sysconfig.get_paths()['purelib'])")
-if [ "$have" = "$want" ] && .venv/bin/python scripts/check_env.py > /dev/null 2>&1; then
+if [ "$have" = "$want" ] && check_runtime; then
   echo "dépendances Python inchangées"
-elif [ -z "$have" ] && .venv/bin/python scripts/check_env.py > /dev/null 2>&1; then
+elif [ -z "$have" ] && check_runtime; then
   .venv/bin/python -c "import pymysql" || { echo "dépendances Python inutilisables" >&2; exit 1; }
   printf '%s\n' "$want" > .requirements.sha; echo "dépendances Python existantes validées (première exécution)"
 else
@@ -26,6 +41,6 @@ else
     python3 -m pip install --quiet --upgrade --target "$site" -r requirements.txt
   fi
   .venv/bin/python -c "import pymysql" || { echo "dépendances Python inutilisables après mise à jour" >&2; exit 1; }
-  .venv/bin/python scripts/check_env.py > /dev/null 2>&1 || { echo "Erreur : dépendances toujours non conformes après installation" >&2; exit 1; }
+  check_runtime || { echo "Erreur : dépendances toujours non conformes après installation" >&2; exit 1; }
   printf '%s\n' "$want" > .requirements.sha; echo "dépendances Python mises à jour"
 fi
