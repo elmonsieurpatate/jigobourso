@@ -52,7 +52,6 @@
     );
   const categorySignature = JSON.stringify(categoryPayload.definitions || categoryPayload.categories);
   state.categorySignature = categorySignature;
-  // Jeu fictif immuable. Le formulaire de stratégie n'entre jamais dans son calcul.
   // Colonnes : identifiants et libellés viennent du catalogue de l'administration (app/config/table_columns.json) ; ici, seulement la valeur de tri et le rendu de chaque identifiant.
   const REG = M.registry(() => rankKey());
   const LEGACY_LABELS = {
@@ -1194,7 +1193,7 @@
   render();
 })().catch((error) => {
   const p = document.querySelector("#ct-feedback");
-  p.textContent = "Impossible d’ouvrir la page de test : " + error.message;
+  p.textContent = "Impossible de préparer la recherche : " + error.message;
 });
 
 // Bloc « Stratégie » : réglages repliés par défaut (Afficher / Masquer), choix mémorisé dans ce navigateur.

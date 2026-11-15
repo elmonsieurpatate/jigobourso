@@ -61,21 +61,28 @@ function engine_call(string $command, array $request) {
     $t0 = microtime(true);
     $deadline = $t0 + max(0.01, (float)cfg('JIGO_ENGINE_TIMEOUT', ENGINE_TIMEOUT));
     $payload = json_encode($request, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
-    $slot = engine_acquire(min(8.0, max(0.0, $deadline - microtime(true))));
-    $t1 = microtime(true);
-    $errFile = tempnam(sys_get_temp_dir(), 'jigo-eng-');
     try {
+        $slot = engine_acquire(min(8.0, max(0.0, $deadline - microtime(true))));
+    } finally {
+        $t1 = microtime(true);
+        request_timing('slot', $t1 - $t0);
+    }
+    $errFile = null;
+    try {
+        $errFile = @tempnam(sys_get_temp_dir(), 'jigo-eng-');
+        if ($errFile === false) throw new ApiError('Moteur d’analyse indisponible', 503);
         $proc = proc_open([python_bin(), '-m', 'engine.cli', $command], [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['file', $errFile, 'w']], $pipes, engine_root(), $env + ['PYTHONPATH' => engine_root()]);
         if (!is_resource($proc)) throw new ApiError('Moteur d’analyse indisponible', 503);
         [$stdout, $code] = engine_exchange($proc, $pipes, $payload, $deadline);
         $stderr = (string)@file_get_contents($errFile, false, null, max(0, (int)@filesize($errFile) - 400));
     } finally {
-        @unlink($errFile);
+        request_timing('engine', microtime(true) - $t1);
+        if (is_string($errFile)) @unlink($errFile);
         engine_release($slot);
     }
     $t2 = microtime(true);
     $data = json_decode($stdout, true);
-    request_timing('slot', $t1 - $t0); request_timing('engine', $t2 - $t1); request_timing('decode', microtime(true) - $t2);   // attente d'emplacement, moteur Python (démarrage, SQL, calcul), décodage
+    request_timing('decode', microtime(true) - $t2);   // attente d'emplacement, moteur Python (démarrage, SQL, calcul), décodage
     if ($code === 2 && is_array($data) && isset($data['error'])) throw new ApiError($data['error'], 422);
     if ($code !== 0 || !is_array($data)) {
         error_log('engine ' . $command . ' code ' . $code . ': ' . $stderr);

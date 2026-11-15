@@ -1,0 +1,83 @@
+{
+  "measured_at": "2026-11-15T20:14:51.583Z",
+  "origin": "http://127.0.0.1:18089",
+  "kind": "Chromium, réseau et CPU simulés ; pas un appareil physique",
+  "verdict": "all",
+  "profiles": [
+    {
+      "profile": {
+        "name": "bureau",
+        "width": 1280,
+        "latency": 0,
+        "bytes": -1,
+        "cpu": 1
+      },
+      "runs": [
+        {
+          "apply_to_render_ms": 256,
+          "decoded_json_bytes": 44673,
+          "wire_bytes": null,
+          "encoding": null,
+          "server_timing": "app;dur=113, slot;dur=0, engine;dur=107, decode;dur=0",
+          "rows": 44,
+          "heap_bytes": 5002141,
+          "overflow": false,
+          "transfer_bytes": 44973,
+          "wire_body_bytes": 44673
+        },
+        {
+          "apply_to_render_ms": 224,
+          "decoded_json_bytes": 44673,
+          "wire_bytes": null,
+          "encoding": null,
+          "server_timing": "app;dur=120, slot;dur=0, engine;dur=115, decode;dur=0",
+          "rows": 44,
+          "heap_bytes": 4667490,
+          "overflow": false,
+          "transfer_bytes": 44973,
+          "wire_body_bytes": 44673
+        }
+      ],
+      "p50_ms": 224,
+      "p95_ms": 256
+    },
+    {
+      "profile": {
+        "name": "mobile 4G simulé",
+        "width": 390,
+        "latency": 150,
+        "bytes": 200000,
+        "cpu": 4
+      },
+      "runs": [
+        {
+          "apply_to_render_ms": 722,
+          "decoded_json_bytes": 44673,
+          "wire_bytes": null,
+          "encoding": null,
+          "server_timing": "app;dur=141, slot;dur=0, engine;dur=136, decode;dur=0",
+          "rows": 44,
+          "heap_bytes": 3333374,
+          "overflow": false,
+          "transfer_bytes": 44973,
+          "wire_body_bytes": 44673
+        },
+        {
+          "apply_to_render_ms": 732,
+          "decoded_json_bytes": 44673,
+          "wire_bytes": null,
+          "encoding": null,
+          "server_timing": "app;dur=130, slot;dur=0, engine;dur=125, decode;dur=0",
+          "rows": 44,
+          "heap_bytes": 4016594,
+          "overflow": false,
+          "transfer_bytes": 44973,
+          "wire_body_bytes": 44673
+        }
+      ],
+      "p50_ms": 722,
+      "p95_ms": 732
+    }
+  ],
+  "scope": "Smoke test local : 45 titres synthétiques, 2 répétitions par profil ; aucune mesure de production."
+}

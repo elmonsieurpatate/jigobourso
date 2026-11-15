@@ -21,7 +21,7 @@ def run(tmp_path, script, request=None, **env):
     code = (
         "require " + json.dumps(ROOT + '/app/lib/engine.php') + ";"
         "try { echo json_encode(['ok' => engine_call('presets', json_decode(file_get_contents(" + json.dumps(str(request_file)) + "), true))]); }"
-        "catch (ApiError $e) { echo json_encode(['status' => $e->status, 'message' => $e->getMessage()]); }"
+        "catch (ApiError $e) { echo json_encode(['status' => $e->status, 'message' => $e->getMessage()] + (getenv('JIGO_TEST_TIMINGS') ? ['timings' => request_timing()] : [])); }"
     )
     out = subprocess.run(['php', '-r', code], capture_output=True, text=True, timeout=60, env=dict(os.environ, JIGO_PYTHON=str(fake), JIGO_ENGINE_ROOT=ROOT, JIGO_DATA_DIR=str(tmp_path), **env))
     assert out.returncode == 0, out.stderr
@@ -70,3 +70,10 @@ def test_deadline_covers_stdin_and_process_exit(tmp_path, script, large_request)
     result = run(tmp_path, script, {'padding': 'x' * 131072} if large_request else None, JIGO_ENGINE_TIMEOUT='0.2')
     assert result['status'] == 503 and 'trop de temps' in result['message']
     assert time.monotonic() - started < 2
+
+
+def test_timeout_keeps_its_phase_timings_for_diagnostics(tmp_path):
+    result = run(tmp_path, 'exec sleep 3', JIGO_ENGINE_TIMEOUT='0.2', JIGO_TEST_TIMINGS='1')
+    assert result['status'] == 503
+    assert result['timings']['slot'] >= 0
+    assert result['timings']['engine'] >= 0.19

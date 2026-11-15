@@ -26,7 +26,7 @@
             else withDay(saved.profiles[id]); // stratégies ajoutées depuis la sauvegarde
         if (M.isValidSaved(saved, profiles)) state = saved;
       } catch (_) {
-        /* Stockage absent ou ancien : valeurs de démonstration. */
+        /* Stockage absent ou ancien : valeurs par défaut. */
       }
       const adminSelections = secondary.defaults(categoryPayload, categories);
       const userKey = String(user.id ?? "offline");

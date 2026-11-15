@@ -6,8 +6,35 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE),fs=require('fs');
   page.setDefaultTimeout(20000);page.on('pageerror',e=>errors.push(e.message));
   const r={width,synthetic_local_database:true};
   try{
+   let releaseStartup, releaseSearch;
+   let searchRequests = 0;
+   if (width === 375) {
+     const startup = new Promise(resolve => { releaseStartup = resolve; });
+     const searching = new Promise(resolve => { releaseSearch = resolve; });
+     const startupRequest = page.waitForRequest(request => new URL(request.url()).searchParams.get('r') === 'ranking/criteria', { timeout: 20000 });
+     const searchRequest = page.waitForRequest(request => new URL(request.url()).searchParams.get('r') === 'ranking/table', { timeout: 20000 });
+     page.startupRequest = startupRequest; page.searchRequest = searchRequest;
+     await page.route('**/api.php?*', async route => {
+       const name = new URL(route.request().url()).searchParams.get('r');
+       if (name === 'ranking/criteria') { await startup; }
+       if (name === 'ranking/table') { searchRequests++; await searching; }
+       await route.continue();
+     });
+   }
    await page.goto('http://127.0.0.1:18089/login.html');await page.fill('#u','review_user');await page.fill('#p','review-local-password');await page.click('#auth-form button.primary');await page.waitForURL('**/index.html');
-   await page.waitForFunction(()=>/Cliquez sur/.test(document.querySelector('#ct-ranking-status')?.textContent||''),null,{timeout:60000});await page.click('#ct-apply');await page.waitForFunction(()=>document.querySelector('#ct-strategy-count')?.textContent.trim().length>0,null,{timeout:60000});await page.locator('#ct-verdict [data-verdict="all"]').click();await page.waitForSelector('#ct-table-body tr:not(.ct-loading)',{timeout:60000});{const labels=await page.$$eval('#ct-strategy option',o=>o.map(x=>x.textContent.trim()));for(const w of ['Croissance rapide','Croissance régulière','Rebond','Hausse calme','Momentum 6 mois','Momentum 12 mois','Momentum ajusté du risque'])if(!labels.some(l=>l.includes(w)))throw new Error('Classement : stratégie absente '+w+' ('+labels.join('|')+')');}
+   if (width === 375) {
+     await page.startupRequest;
+     if (!await page.locator('#ct-apply').isDisabled()) throw new Error('Appliquer actif avant initialisation');
+     if (searchRequests !== 0) throw new Error('Recherche déclenchée au chargement');
+     releaseStartup();
+   }
+   await page.waitForFunction(()=>/Cliquez sur/.test(document.querySelector('#ct-ranking-status')?.textContent||''),null,{timeout:60000});await page.click('#ct-apply');
+   if (width === 375) {
+     await page.searchRequest;
+     if (searchRequests !== 1 || !await page.locator('#ct-apply').isDisabled() || !/Recherche en cours/.test(await page.locator('#ct-apply').innerText())) throw new Error('Recherche sans état de chargement explicite');
+     releaseSearch();
+   }
+   await page.waitForFunction(()=>document.querySelector('#ct-strategy-count')?.textContent.trim().length>0,null,{timeout:60000});await page.locator('#ct-verdict [data-verdict="all"]').click();await page.waitForSelector('#ct-table-body tr:not(.ct-loading)',{timeout:60000});{const labels=await page.$$eval('#ct-strategy option',o=>o.map(x=>x.textContent.trim()));for(const w of ['Croissance rapide','Croissance régulière','Rebond','Hausse calme','Momentum 6 mois','Momentum 12 mois','Momentum ajusté du risque'])if(!labels.some(l=>l.includes(w)))throw new Error('Classement : stratégie absente '+w+' ('+labels.join('|')+')');}
    r.login=true;r.explorer_rows=await page.locator('#ct-table-body tr:not(.ct-loading)').count();r.explorer_overflow=await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth);
    if(!r.explorer_rows||await page.locator('a.ct-company').count()===0)throw new Error('Classement vide ou sans lien vers la fiche');
    if(await page.locator('.ct-panel.ct-collapsed').count()!==1)throw new Error('Les réglages de stratégie devraient être masqués par défaut');
