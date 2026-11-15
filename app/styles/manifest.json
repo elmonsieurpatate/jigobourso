@@ -1,0 +1,149 @@
+{
+  "outputs": {
+    "base.css": [
+      {
+        "source": "layout/base.css"
+      }
+    ],
+    "admin-columns.css": [
+      {
+        "source": "layout/admin-columns.css"
+      }
+    ],
+    "admin-scores.css": [
+      {
+        "source": "layout/admin-scores.css"
+      }
+    ],
+    "strategies-ui.css": [
+      {
+        "source": "layout/strategies-ui.css"
+      }
+    ],
+    "explorer.css": [
+      {
+        "source": "layout/explorer.css"
+      }
+    ],
+    "pf.css": [
+      {
+        "source": "layout/pf.css"
+      }
+    ],
+    "plan-suivi.css": [
+      {
+        "source": "layout/plan-suivi.css"
+      }
+    ],
+    "splits.css": [
+      {
+        "source": "layout/splits.css"
+      }
+    ],
+    "help.css": [
+      {
+        "source": "layout/help.css"
+      }
+    ],
+    "filtres.css": [
+      {
+        "source": "layout/filtres.css"
+      }
+    ],
+    "halo.css": [
+      {
+        "source": "theme/tokens.css"
+      },
+      {
+        "source": "components/foundation.css"
+      },
+      {
+        "source": "features/admin-columns.css",
+        "when_stylesheet": "admin-columns.css"
+      },
+      {
+        "source": "features/admin-scores.css",
+        "when_stylesheet": "admin-scores.css"
+      },
+      {
+        "source": "features/strategies-ui.css",
+        "when_stylesheet": "strategies-ui.css"
+      },
+      {
+        "source": "features/explorer.css",
+        "when_stylesheet": "explorer.css"
+      },
+      {
+        "source": "features/pf.css",
+        "when_stylesheet": "pf.css"
+      },
+      {
+        "source": "features/plan-suivi.css",
+        "when_stylesheet": "plan-suivi.css"
+      },
+      {
+        "source": "features/splits.css",
+        "when_stylesheet": "splits.css"
+      },
+      {
+        "source": "features/help.css",
+        "when_stylesheet": "help.css"
+      },
+      {
+        "source": "features/filtres.css",
+        "when_stylesheet": "filtres.css"
+      },
+      {
+        "source": "components/typography.css"
+      },
+      {
+        "source": "components/buttons.css"
+      },
+      {
+        "source": "components/fields.css"
+      },
+      {
+        "source": "components/choices.css"
+      },
+      {
+        "source": "components/tabs.css"
+      },
+      {
+        "source": "components/segments.css"
+      },
+      {
+        "source": "components/badges.css"
+      },
+      {
+        "source": "components/cards.css"
+      },
+      {
+        "source": "components/tables.css"
+      },
+      {
+        "source": "components/feedback.css"
+      },
+      {
+        "source": "components/touch.css"
+      },
+      {
+        "source": "components/shell.css"
+      },
+      {
+        "source": "components/page-shell.css"
+      },
+      {
+        "source": "components/page-composition.css"
+      },
+      {
+        "source": "components/admin-layout.css"
+      },
+      {
+        "source": "components/variants.css"
+      },
+      {
+        "source": "components/rhythm.css"
+      }
+    ]
+  }
+}

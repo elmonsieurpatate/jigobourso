@@ -1,0 +1,147 @@
+.ac-head {
+  display: grid;
+  gap: var(--sp-8);
+  margin-bottom: var(--sp-12);
+}
+.ac-pick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-16);
+  align-items: flex-end;
+}
+.ac-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: var(--sp-14);
+  align-items: start;
+}
+.ac-grid .card {
+  margin-bottom: var(--sp-14);
+}
+.ac-side {
+  position: sticky;
+  top: 72px;
+}
+.ac-list {
+  list-style: none;
+  margin: var(--sp-10) 0 0;
+  padding: 0;
+  overflow: hidden;
+}
+.ac-row {
+  display: grid;
+  grid-template-columns: 30px 26px minmax(0, 1fr) auto auto;
+  gap: var(--sp-8);
+  align-items: center;
+  padding: var(--sp-6) var(--sp-10);
+}
+.ac-row.off .ac-name {
+  opacity: 0.5;
+}
+.ac-row.drag {
+  position: relative;
+  z-index: 2;
+}
+.ac-handle {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  text-align: center;
+  padding: var(--sp-8) 0;
+}
+.ac-handle:active {
+  cursor: grabbing;
+}
+.ac-pos {
+  text-align: right;
+}
+.ac-vis {
+  display: flex;
+  gap: var(--sp-8);
+  align-items: center;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.ac-width input {
+  width: 72px;
+}
+.ac-move {
+  display: flex;
+  gap: var(--sp-4);
+}
+.ac-sortrow,
+.ac-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-8);
+  margin: var(--sp-6) 0;
+}
+.ac-sortrow > span:first-child,
+.ac-filter > span:first-child {
+  min-width: 120px;
+}
+.ac-sortrow select {
+  max-width: 100%;
+}
+.ac-actions {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--sp-8);
+  padding: var(--sp-10) 0;
+}
+.ac-actions > span {
+  margin-right: auto;
+}
+.ac-frame {
+  overflow: hidden;
+}
+.ac-frame.mobile {
+  max-width: 375px;
+  margin: 0 auto;
+}
+.ac-scroll {
+  overflow-x: auto;
+}
+.ac-table {
+  border-collapse: collapse;
+  width: 100%;
+}
+.ac-table th,
+.ac-table td {
+  white-space: nowrap;
+  text-align: left;
+}
+.ac-badge {
+  padding: var(--sp-2) var(--sp-6);
+}
+@media (max-width: 900px) {
+  .ac-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ac-side {
+    position: static;
+  }
+}
+@media (max-width: 600px) {
+  .ac-row {
+    grid-template-columns: 34px 22px minmax(0, 1fr);
+  }
+  .ac-width,
+  .ac-move {
+    grid-column: 3;
+  }
+  .ac-handle {
+    padding: var(--sp-12) 0;
+  }
+  .ac-row .btn {
+    min-width: 44px;
+  }
+  .ac-actions .btn {
+    flex: 1 1 100%;
+  }
+}

@@ -4,7 +4,7 @@ PY = $(CURDIR)/.venv/bin/python
 SQLROOT = mariadb -h127.0.0.1 -P33307 -uroot -plocal-test-only
 DBENV = JIGO_TEST_DATABASE=1 JIGO_DB_HOST=127.0.0.1 JIGO_DB_PORT=33307 JIGO_DB_NAME=jigobourso_it JIGO_DB_USER=root JIGO_DB_PASSWORD=local-test-only
 
-.PHONY: js-format js-check visual visual-update css-format css-check release-check e2e fast integ db-reset dev-db lint lint-py lint-php check
+.PHONY: js-format js-check visual visual-update css-build css-format css-check release-check e2e fast integ db-reset dev-db lint lint-py lint-php check
 # Le code exige PHP >= 8.1 (expression throw, array_is_list) ; le serveur est en 8.2.
 PHP ?= $(shell command -v php8.3 || command -v php8.2 || command -v php8.4 || echo php)
 fast:
@@ -15,16 +15,20 @@ lint-py:
 	$(CURDIR)/.venv/bin/ruff format --check engine tests scripts
 lint-php:
 	@PHP=$(PHP) scripts/lint_php.sh
-css-format:   ## formate les feuilles CSS (Prettier 3.3.3, config .prettierrc)
-	npx --yes prettier@3.3.3 --write 'app/public/assets/*.css'
+css-build:   ## construit les CSS servis à partir de app/styles
+	$(PY) scripts/build_styles.py
+css-format:   ## formate les sources puis reconstruit les CSS publics
+	npx --no-install prettier --write 'app/styles/**/*.css'
+	$(PY) scripts/build_styles.py
 js-format:   ## formate les scripts JS (Prettier 3.3.3, config .prettierrc)
-	npx --yes prettier@3.3.3 --write 'app/public/assets/*.js'
+	npx --no-install prettier --write 'app/public/assets/*.js'
 js-check:   ## vérifie le formatage et la syntaxe des scripts JS
-	npx --yes prettier@3.3.3 --check 'app/public/assets/*.js'
+	npx --no-install prettier --check 'app/public/assets/*.js'
 	@for f in app/public/assets/*.js; do node --check $$f || exit 1; done; echo 'JS : syntaxe OK'
 css-check:   ## vérifie formatage + garde-fous Halo
-	npx --yes prettier@3.3.3 --check 'app/public/assets/*.css'
-	python3 scripts/check_halo_css.py
+	npx --no-install prettier --check 'app/styles/**/*.css'
+	$(PY) scripts/build_styles.py --check
+	$(PY) scripts/check_halo_css.py
 visual:   ## compare les styles calculés de la galerie à la référence (PLAYWRIGHT_MODULE, JIGO_CHROMIUM requis)
 	node tests/visual/galerie.cjs
 	node tests/visual/contrasts.cjs

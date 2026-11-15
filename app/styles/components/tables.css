@@ -1,0 +1,171 @@
+/* Tableaux : en-tête, cellules, tri, survol. */
+table {
+  border-collapse: collapse;
+}
+th {
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: var(--cell-pad);
+  border-bottom: 1px solid var(--line);
+  background: var(--thead);
+  color: var(--muted);
+  font: 800 var(--th-size) / var(--lh-normal) var(--font);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-align: left;
+}
+th button {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+}
+td {
+  padding: var(--cell-pad);
+  border-bottom: 1px solid var(--line);
+  color: var(--text);
+  font: 400 var(--td-size) / 1.45 var(--font);
+}
+th.num,
+th.n {
+  text-align: right;
+}
+td.small,
+th.small {
+  font-size: var(--td-size);
+}
+th.sortable:hover {
+  color: var(--text);
+}
+th.sorted,
+th[aria-sort="ascending"],
+th[aria-sort="descending"] {
+  color: var(--accent);
+}
+tbody tr:hover td {
+  background: var(--halo-hover);
+}
+tr:last-child td {
+  border-bottom: 0;
+}
+.num,
+.px-t .num {
+  font-variant-numeric: tabular-nums;
+}
+:is(.table-wrap.boxed, .ct-table-wrap, .px-table-wrap) {
+  border: 1px solid var(--line);
+  border-radius: var(--control-radius);
+  overflow: auto;
+}
+:is(.empty, .ct-empty, .sr-empty, .px-empty, .ct-loading td) {
+  color: var(--muted);
+} /* Tableaux transformés en cartes sur mobile : la disposition prime sur le remplissage commun. */ /* Variantes issues des feuilles de pages (déplacées pour garder halo.css source unique) */
+.as-group td {
+  background: var(--surface-2);
+  font-weight: 700;
+  font-size: var(--fs-11);
+  color: var(--muted);
+}
+tr[data-child-of] td {
+  background: color-mix(in srgb, var(--surface-2) 55%, transparent);
+}
+.card.fold {
+  padding: 0;
+}
+.ct-period button {
+  background: none;
+  border: 0;
+  color: var(--text);
+  padding: var(--sp-14) var(--sp-6) var(--sp-6);
+  font-weight: 650;
+}
+.ct-number input {
+  font-weight: 650;
+}
+.ct .ct-group-operator select {
+  height: 28px;
+  padding: var(--sp-2) var(--sp-4);
+  background: var(--accent);
+  color: white;
+  font-size: var(--fs-11);
+  font-weight: 750;
+  border: 0;
+  border-radius: var(--radius-8);
+  background-image: none;
+}
+body .ct .ct-group-operator select {
+  background-image: none;
+  background-color: var(--accent);
+  color: var(--accent-ink);
+  padding: var(--sp-2) var(--sp-4);
+}
+.ct .ct-category-search input {
+  height: 32px;
+  background: transparent;
+  border: 0;
+  font-size: var(--fs-11);
+  padding: var(--sp-4) 0;
+  border-radius: 0;
+}
+.ct-ranking th button {
+  border: 0;
+  background: none;
+  color: inherit;
+  padding: 0;
+  font-weight: 650;
+  font-size: inherit;
+}
+.ct-period button {
+  padding: var(--sp-10) var(--sp-6) var(--sp-2);
+  font-size: var(--fs-13);
+}
+.ac .ac-search input {
+  height: 34px;
+  border: 0;
+  background: transparent;
+  font-size: var(--fs-11);
+  padding: 0;
+}
+.ac-editor > header > button {
+  border: 0;
+  background: none;
+  font-size: var(--fs-20);
+}
+.ac .ac-editor input[type="color"] {
+  padding: var(--sp-4);
+  cursor: pointer;
+}
+.px-t th button {
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  padding: var(--sp-4) 0;
+}
+.px-fig td.px-na {
+  color: var(--muted);
+  font-size: var(--fs-11);
+}
+.fc-tip button {
+  font: inherit;
+  background: none;
+  color: var(--accent);
+  border: 0;
+  cursor: pointer;
+  padding: var(--sp-4);
+}
+@media (max-width: 760px) {
+  .ac td {
+    padding: 0;
+  }
+  .px-t td {
+    padding: var(--sp-2) 0;
+  }
+}

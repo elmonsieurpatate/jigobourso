@@ -1,0 +1,49 @@
+/* Les autres vues d'administration utilisent les mêmes en-têtes de module. */
+.admin-page #page > .card:not(.admin-stage) {
+  min-width: 0;
+  padding: var(--sp-20);
+  overflow: hidden;
+}
+.admin-page #page > .card:not(.admin-stage) > h2 {
+  margin: -20px -20px var(--sp-16);
+  padding: var(--sp-14) var(--sp-20);
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(140deg, var(--halo-highlight), var(--surface) 70%);
+}
+.admin-page #page > .card:not(.admin-stage) .grid.cols-4 {
+  gap: var(--sp-10);
+}
+.admin-page #page > .card:not(.admin-stage) .kpi {
+  padding: var(--sp-12) var(--sp-14);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--halo-control);
+}
+.admin-page #page > .card:not(.admin-stage) .kpi .v {
+  font-size: var(--fs-18);
+}
+.admin-page #page > .card:not(.admin-stage) .frow {
+  padding: var(--sp-10) var(--sp-12);
+  border-bottom: 1px solid var(--line);
+}
+.admin-page #page > .card:not(.admin-stage) .frow:last-child {
+  border-bottom: 0;
+}
+.admin-page #page > .card:not(.admin-stage) .admin-rule-group {
+  margin-bottom: var(--sp-12);
+}
+.title-page #page {
+  min-width: 0;
+}
+.title-page .hero {
+  margin-bottom: var(--sp-14);
+}
+@media (max-width: 600px) {
+  .admin-page #page > .card:not(.admin-stage) {
+    padding: var(--sp-14);
+  }
+  .admin-page #page > .card:not(.admin-stage) > h2 {
+    margin: -14px -14px var(--sp-14);
+    padding: var(--sp-12) var(--sp-14);
+  }
+}

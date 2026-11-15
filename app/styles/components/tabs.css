@@ -1,0 +1,55 @@
+/* Onglets (.tabs et variantes) : soulignés. */
+:is(.tabs, .pf-nav, .px-zones, .px-tabs2, .sr-tabs) {
+  display: flex;
+  gap: var(--sp-4);
+  border-bottom: 1px solid var(--line);
+  margin-bottom: var(--sp-12);
+  overflow-x: auto;
+}
+:is(.tabs button, .pf-nav button, .px-zones button, .px-tabs2 button, .sr-tabs button) {
+  padding: var(--tab-pad);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  font: 700 var(--tab-size) / 1.45 var(--font);
+  white-space: nowrap;
+}
+:is(.tabs button, .pf-nav button, .px-zones button, .px-tabs2 button, .sr-tabs button):hover {
+  color: var(--text);
+}
+:is(
+    .tabs button.on,
+    .tabs button.selected,
+    .tabs button[aria-selected="true"],
+    .pf-nav button.on,
+    .px-zones button.on,
+    .px-tabs2 button.on,
+    .sr-tabs button[aria-current="true"]
+  ) {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+.tabs button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -3px;
+}
+.tabs button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.tabs .count {
+  background: var(--surface-2);
+  border-radius: var(--radius-pill);
+  padding: var(--sp-2) var(--sp-10);
+  font-size: var(--fs-11);
+  font-weight: 600;
+  margin-left: var(--sp-4);
+}
+.tabs button.on .count,
+.tabs button.selected .count {
+  background: var(--accent-soft);
+  color: var(--accent);
+}

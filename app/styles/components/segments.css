@@ -1,0 +1,36 @@
+/* Segments (.seg et variantes) : choix exclusif compact. */
+:is(.seg, .ct-seg, .as-seg, .px-seg, .px-tabs) {
+  display: inline-flex;
+  gap: var(--sp-2);
+  padding: var(--sp-4);
+  border: 1px solid var(--line);
+  border-radius: var(--control-radius);
+  background: var(--thead);
+}
+:is(.seg button, .ct-seg button, .as-seg button, .px-seg button, .px-tabs button) {
+  padding: var(--seg-pad);
+  border: 0;
+  border-radius: var(--control-radius);
+  background: none;
+  color: var(--muted);
+  font: 700 var(--seg-size) / 1.45 var(--font);
+}
+:is(.seg button, .ct-seg button, .as-seg button, .px-seg button, .px-tabs button):hover {
+  color: var(--text);
+}
+:is(
+    .seg button.on,
+    .seg button[aria-pressed="true"],
+    .ct-seg button[aria-checked="true"],
+    .as-seg button.on,
+    .px-seg button.on,
+    .px-tabs button.on
+  ) {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 1px 4px var(--shadow-segment);
+}
+.seg button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}

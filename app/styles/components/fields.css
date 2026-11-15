@@ -1,0 +1,78 @@
+/* Champs : texte, nombre, e-mail, mot de passe, liste déroulante, zone de texte. */
+:is(
+    input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"], [type="hidden"]),
+    select,
+    textarea
+  ) {
+  box-sizing: border-box;
+  padding: var(--sp-8) var(--sp-10);
+  border: 1px solid var(--line);
+  border-radius: var(--control-radius);
+  background-color: var(--halo-control);
+  color: var(--text);
+  font: 500 var(--control-size) / 1.45 var(--font);
+  box-shadow: none;
+}
+:is(
+    input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"], [type="hidden"]),
+    select
+  ) {
+  height: var(--control-h);
+  min-height: var(--control-h);
+}
+textarea {
+  min-height: 65px;
+  resize: vertical;
+}
+:is(
+    input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"], [type="hidden"]),
+    select,
+    textarea
+  ):hover {
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--line));
+}
+:is(input, select, textarea):focus-visible {
+  outline: 0;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+:is(input, select, textarea)[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+:is(input, select, textarea)[readonly] {
+  color: var(--muted);
+}
+:is(input, select, textarea):disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+input::placeholder,
+textarea::placeholder {
+  color: var(--muted);
+  opacity: 0.85;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="color"] {
+  padding: var(--sp-4);
+}
+select:not([multiple], [size]) {
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+  padding-right: var(--sp-32);
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 12px 8px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%23667696' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+:root[data-theme="dark"] select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%23adb9d6' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}

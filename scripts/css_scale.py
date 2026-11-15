@@ -8,7 +8,7 @@ import pathlib
 import re
 import sys
 
-ASSETS = pathlib.Path(__file__).resolve().parents[1] / 'app' / 'public' / 'assets'
+ASSETS = pathlib.Path(__file__).resolve().parents[1] / 'app' / 'styles'
 ROOT_PX = 14  # html { font-size: 14px } dans halo.css : 1rem = 14px
 
 SPACING = (2, 4, 6, 8, 10, 12, 14, 16, 20, 24, 32, 40, 48)  # px ; au-delà de 48, la valeur appartient à une mise en page précise
@@ -188,7 +188,7 @@ def violations(text, name=''):
 
 def main():
     cmd = sys.argv[1] if len(sys.argv) > 1 else 'check'
-    files = [ASSETS / sys.argv[2]] if len(sys.argv) > 2 else sorted(ASSETS.glob('*.css'))
+    files = [ASSETS / sys.argv[2]] if len(sys.argv) > 2 else sorted(ASSETS.rglob('*.css'))
     bad = 0
     for f in files:
         text = f.read_text(encoding='utf-8')

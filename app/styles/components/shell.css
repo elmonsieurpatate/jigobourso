@@ -1,0 +1,233 @@
+/* Navigation : même surface, rythme et états que la référence Halo. */
+.side {
+  background: linear-gradient(150deg, var(--halo-highlight), var(--side-bg) 55%);
+  border-right: 1px solid var(--line);
+  color: var(--text);
+}
+.side .brand {
+  color: var(--text);
+  letter-spacing: -0.06em;
+}
+.side .brand small {
+  color: var(--muted);
+}
+.side .sec,
+.side .sh {
+  color: var(--muted);
+}
+.side .nv,
+.side .sv {
+  color: var(--muted);
+  border-radius: var(--radius-sm);
+}
+.side .nv {
+  padding: var(--sp-8) var(--sp-12);
+  margin: var(--sp-2) 0;
+}
+.side .sv {
+  padding: var(--sp-6) var(--sp-10);
+}
+.side .nv:hover,
+.side .sv:hover,
+.side-foot .who:hover {
+  background: var(--halo-hover);
+  color: var(--text);
+}
+.side .nv.on,
+.side .grp.cur > .nv,
+.side .sv.on {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.side .nv.on svg.ic,
+.side .grp.cur > .nv svg.ic {
+  color: var(--accent);
+}
+.side .sub {
+  border-left-color: var(--line);
+}
+.side .sv::before {
+  color: var(--accent);
+}
+.side .who {
+  color: var(--text);
+}
+.side-foot {
+  border-top-color: var(--line);
+}
+.side-foot .who {
+  color: var(--text);
+}
+.side-foot .who span {
+  color: var(--muted);
+}
+.side .avatar {
+  background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 55%, var(--ok)));
+  color: var(--accent-ink);
+}
+.fly {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-pop);
+}
+.fly .ttl {
+  color: var(--text);
+}
+.fly .sv {
+  color: var(--muted);
+}
+.fly .sv:hover {
+  color: var(--text);
+}
+.hdr {
+  background: color-mix(in srgb, var(--halo-top) 94%, transparent);
+  border-bottom: 1px solid var(--line);
+  backdrop-filter: blur(12px);
+}
+.crumbs {
+  color: var(--muted);
+  font-size: var(--fs-12);
+}
+.crumbs b {
+  color: var(--text);
+}
+.hdr .quick input {
+  background: var(--halo-control);
+}
+.ct-heading {
+  margin-top: 0;
+  margin-bottom: var(--sp-16);
+}
+.ct-strategy {
+  padding: var(--sp-16) var(--sp-20);
+  gap: var(--sp-12);
+}
+.ct-strategy-icon {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.ct-ranking-head {
+  padding: var(--sp-16) var(--sp-20);
+}
+.ct-ranking-note,
+.ct-bottom-note {
+  color: var(--muted);
+}
+.ct-filters {
+  gap: var(--sp-12);
+  padding: var(--sp-14) var(--sp-20);
+}
+.ct fieldset {
+  border-color: var(--line);
+  border-radius: var(--radius-sm);
+}
+.ac-filter-selector {
+  background: linear-gradient(140deg, var(--halo-highlight), var(--surface) 62%);
+  border-color: var(--line);
+  padding: var(--sp-14) var(--sp-20);
+  margin-bottom: var(--sp-14);
+}
+.ac-overview {
+  gap: var(--sp-20);
+  padding: var(--sp-20);
+  background: linear-gradient(140deg, var(--halo-highlight), var(--surface) 62%);
+}
+.ac-overview-main p {
+  color: var(--muted);
+}
+.ac-guidance,
+.ac-editor,
+.ac-measure-bar {
+  border-color: var(--line);
+  border-radius: var(--radius-sm);
+}
+.pf-home {
+  gap: var(--sp-12);
+}
+.px-card,
+.px-sum,
+.ps-card {
+  border-color: var(--line);
+  border-radius: var(--radius);
+}
+.ps-card {
+  padding: var(--sp-16);
+}
+.ps-tile,
+.as-tile {
+  border-color: var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  box-shadow: none;
+}
+.h-side {
+  background: var(--surface);
+  border-color: var(--line);
+}
+.as-grid,
+.as-grid2,
+.as-two,
+.as-tiles {
+  gap: var(--sp-12);
+}
+.as-bar {
+  background: var(--surface);
+  border-top-color: var(--line);
+}
+.auth-brand {
+  color: var(--accent);
+}
+@media (max-width: 900px) {
+  main.wrap {
+    padding: var(--sp-20) var(--sp-16) var(--sp-40);
+  }
+}
+@media (max-width: 600px) {
+  :root {
+    --card-pad: var(--sp-14);
+  }
+  main.wrap {
+    padding: var(--sp-16) var(--sp-12) var(--sp-32);
+  }
+  .page-head,
+  .ct-heading,
+  .ac-page-heading {
+    gap: var(--sp-8);
+    margin-bottom: var(--sp-12);
+  }
+  .ct-strategy,
+  .ct-ranking-head {
+    padding: var(--sp-12);
+  }
+  .ct-filters {
+    padding: var(--sp-12);
+  }
+  .ac-filter-selector,
+  .ac-overview {
+    padding: var(--sp-14);
+  }
+  :root {
+    --control-h: 40px;
+    --control-h-sm: 32px;
+  }
+}
+.side .nv .lbl,
+.side .sv {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  line-height: var(--lh-tight);
+}
+.side .nv .lbl {
+  min-width: 0;
+}
+.side .sv {
+  min-height: 30px;
+}
+.side .sub {
+  margin-left: var(--sp-12);
+  padding-left: var(--sp-10);
+}
+.side .sec {
+  padding-top: var(--sp-14);
+}

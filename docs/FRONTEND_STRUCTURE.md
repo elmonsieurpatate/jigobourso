@@ -6,6 +6,32 @@
 
 Pour une modification visuelle, changer d'abord la variable ou le composant partagé ; ajouter une règle de page seulement si le besoin est propre à cette page. Tester les deux thèmes, 390 px, clavier, états vide/erreur et le cache d'asset (`?v=`). Pour une suppression, chercher les références dans HTML, JS, PHP et tests avant de retirer le fichier.
 
+## Sources CSS et fichiers servis
+
+Les fichiers de `app/public/assets/*.css` sont générés. Ne pas les corriger à la main.
+Les sources lisibles et le manifeste de construction sont dans `app/styles/` :
+
+- `theme/tokens.css` : palette, polices et variables communes ;
+- `components/` : apparence et dimensions des composants partagés, par famille ;
+- `features/` : apparence réellement propre à un métier ;
+- `layout/` : disposition des pages et utilitaires explicitement nommés.
+
+`manifest.json` fixe l'ordre de cascade. Les styles métier assemblés dans Halo sont
+conditionnés par la présence du lien vers la feuille de cette page (`:where` n'ajoute
+aucune spécificité). Les URL publiques et leur ordre de chargement sont conservés.
+Les animations qui changent une apparence appartiennent aussi aux composants.
+
+Installation des outils : `npm ci --ignore-scripts` et les dépendances Python de
+développement. `make css-format` formate les sources puis reconstruit les 11 feuilles ;
+`make css-check` vérifie le formatage, leur synchronisation et les frontières de
+responsabilité. Le compilateur CSS épinglé ne compresse que les espaces ; il ne
+renomme pas les classes et ne construit aucun JavaScript. Les sources restent lisibles.
+
+Le garde-fou analyse les déclarations et les sélecteurs, y compris `:is`, `:where`,
+les règles conditionnelles et les animations. Une surcharge de couleur ou de bordure
+dans une mise en page échoue. Les géométries des boutons et autres contrôles partagés
+restent également dans leurs composants. Les utilitaires explicites sont conservés.
+
 ## Versions des fichiers CSS et JS
 
 Toutes les pages référencent leurs fichiers avec le même marqueur : `assets/app.js?v=__BUILD__`. Ne jamais écrire une version à la main (`?v=2026…`) : `ops/deploy.sh` remplace `__BUILD__` par l'identifiant du déploiement (date UTC `AAAAMMJJhhmm`) dans toutes les pages, puis vérifie qu'aucun marqueur ne reste. En local le marqueur est servi tel quel, ce qui est sans effet.

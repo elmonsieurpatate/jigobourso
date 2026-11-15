@@ -1,0 +1,248 @@
+/* Centre d'aide : mise en page en cours didactique (un chapitre à la fois). */
+.h-side {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-16);
+  background: var(--surface);
+}
+.ht-gl {
+  font-size: var(--fs-10);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 700;
+}
+.ht-i {
+  border-radius: var(--radius-8);
+  color: var(--text);
+  font-size: var(--fs-13);
+}
+.ht-i.sub {
+  font-size: var(--fs-12);
+}
+.ht-ic svg,
+.h-ico svg,
+.hcard-i svg {
+  fill: none;
+  stroke: currentColor;
+}
+.ht-ok {
+  font-style: normal;
+  color: var(--up);
+  font-size: var(--fs-11);
+}
+.h-main:focus:not(:focus-visible) {
+  outline: 0;
+}
+.h-crumb {
+  font-size: var(--fs-12);
+  color: var(--muted);
+}
+.h-crumb a {
+  color: var(--muted);
+}
+.h-ico {
+  border-radius: var(--radius-12);
+}
+.h-lead {
+  color: var(--muted);
+  font-size: var(--fs-15);
+  line-height: var(--lh-normal);
+}
+.h-body {
+  font-size: var(--fs-15);
+  line-height: var(--lh-loose);
+}
+.h-body h2 {
+  padding-top: var(--sp-6);
+  border-top: 1px solid var(--line);
+}
+.h-body h2:first-child {
+  border-top: 0;
+}
+.h-body code,
+.h-body .formula {
+  background: var(--surface-2);
+  border-radius: var(--radius-8);
+  font-size: 0.92em;
+}
+.h-body .formula {
+  font-family: ui-monospace, monospace;
+  font-size: var(--fs-13);
+}
+.h-nav {
+  border-top: 1px solid var(--line);
+}
+.h-prog i {
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+}
+.h-prog small {
+  color: var(--muted);
+} /* encadrés */
+.hb {
+  border-radius: var(--radius-12);
+  border: 1px solid var(--line);
+}
+.hb-t {
+  font-weight: 700;
+  font-size: var(--fs-13);
+}
+.hb-c {
+  background: var(--surface);
+}
+.hb-example .hb-t {
+  background: var(--warn-soft);
+  color: var(--warn-ink);
+}
+.hb-warn .hb-t {
+  background: var(--danger-soft);
+  color: var(--danger-ink);
+}
+.hf figcaption {
+  font-size: var(--fs-12);
+  color: var(--muted);
+  line-height: var(--lh-normal);
+}
+.hd {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-12);
+  background: var(--surface);
+}
+.hd summary {
+  font-weight: 700;
+}
+.hs-n {
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 700;
+}
+.hcard[data-go]:hover {
+  border-color: var(--accent);
+}
+.hcard-i {
+  border-radius: var(--radius-12);
+}
+.hcard p {
+  font-size: var(--fs-13);
+  color: var(--muted);
+  line-height: var(--lh-normal);
+} /* démonstrations */
+.h-table {
+  font-size: var(--fs-12);
+}
+.h-table .mod {
+  background: var(--info-soft);
+}
+.hdemo {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: var(--radius-16);
+}
+.hdemo .ctl label {
+  font-size: var(--fs-12);
+  color: var(--muted);
+  font-weight: 600;
+}
+.hdemo .fic {
+  background: var(--warn-soft);
+  color: var(--warn-ink);
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-10);
+  font-weight: 700;
+}
+.hdemo .big {
+  font-size: var(--fs-20);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.hdemo .kpi {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-12);
+  padding: var(--sp-8) var(--sp-12);
+  background: var(--surface-2);
+}
+.hdemo .kpi small {
+  color: var(--muted);
+}
+.good {
+  color: var(--up);
+}
+.bad {
+  color: var(--down);
+}
+.hc-tick {
+  fill: var(--muted);
+  font-size: var(--fs-10);
+}
+.hc-axis {
+  fill: var(--muted);
+  font-size: var(--fs-11);
+}
+.hc-tag {
+  fill: var(--text);
+  font-size: var(--fs-11);
+  font-weight: 700;
+}
+.hc-res {
+  stroke: var(--danger);
+}
+.hc-legend {
+  font-size: var(--fs-12);
+  color: var(--muted);
+}
+.hc-legend i {
+  border-radius: var(--radius-4);
+}
+.hc-legend i.dash {
+  background: repeating-linear-gradient(90deg, var(--text) 0 5px, transparent 5px 9px);
+}
+.hc-bar {
+  font-size: var(--fs-13);
+}
+.hc-bt {
+  background: var(--surface-2);
+  border-radius: var(--radius-pill);
+}
+.hc-bt i {
+  border-radius: var(--radius-pill);
+}
+.hc-stack {
+  border-radius: var(--radius-8);
+  color: var(--on-solid);
+  font-size: var(--fs-11);
+  font-weight: 700;
+} /* quiz */
+.hq {
+  border: 2px solid var(--accent-soft);
+  border-radius: var(--radius-16);
+}
+.hq-o {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-12);
+  background: var(--surface);
+  font: inherit;
+  color: var(--text);
+}
+.hq-o:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+.hq-o.good {
+  background: var(--ok-soft);
+  border-color: var(--ok);
+  color: var(--ok-ink);
+}
+.hq-o.bad {
+  background: var(--danger-soft);
+  border-color: var(--danger);
+  color: var(--danger-ink);
+}
+.hq-r {
+  font-size: var(--fs-13);
+  border-left: 3px solid var(--up);
+  background: var(--surface-2);
+  border-radius: var(--radius-8);
+}
+.hq-r.bad {
+  border-color: var(--down);
+}

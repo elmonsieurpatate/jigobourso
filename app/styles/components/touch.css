@@ -1,0 +1,22 @@
+/* Hauteur tactile et corps de texte des champs sur petit écran (au moins 16 px : pas de zoom automatique sur iOS). */
+@media (max-width: 760px) {
+  :is(
+      input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"], [type="hidden"]),
+      select,
+      textarea
+    ) {
+    font-size: var(--control-size-mobile);
+  }
+  :root {
+    --control-h: 40px;
+    --control-h-sm: 32px;
+  }
+  .ct .ct-strategy .sui-pick-btn {
+    height: auto;
+    min-height: 66px;
+  }
+  .ct .ct-group-operator select {
+    height: 32px;
+    min-height: 32px;
+  }
+}

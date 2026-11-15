@@ -1,0 +1,118 @@
+/* Messages, hero, fenêtres, menus. */
+.notice {
+  padding: var(--sp-10) var(--sp-12);
+  border: 1px solid var(--line);
+  border-radius: var(--control-radius);
+  background: var(--info-soft);
+  color: var(--info-ink);
+}
+.notice.warn {
+  border-color: var(--warn);
+  background: var(--warn-soft);
+  color: var(--warn-ink);
+}
+.notice.err {
+  border-color: var(--danger);
+  background: var(--danger-soft);
+  color: var(--danger-ink);
+}
+.toast,
+.ct-provisional,
+.ac-validation,
+.sr-preview {
+  border-radius: var(--control-radius);
+}
+.toast {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-pop);
+  max-width: 90vw;
+  margin: 0;
+  padding: var(--sp-10) var(--sp-20);
+  background: var(--text);
+  color: var(--bg);
+  box-shadow: var(--shadow);
+  font-size: var(--fs-13);
+}
+.toast:empty {
+  display: none;
+}
+.hero {
+  padding: var(--sp-20) var(--sp-20);
+  border: 1px solid var(--line);
+  border-radius: var(--panel-radius);
+  background: linear-gradient(140deg, var(--halo-highlight), var(--halo-hero-end) 62%);
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+.hero .muted {
+  color: var(--muted);
+}
+.hero a {
+  color: var(--accent);
+}
+.hero .up {
+  color: var(--up);
+}
+.hero .down {
+  color: var(--down);
+}
+dialog,
+.sui-pop,
+.sui-list,
+.ct-columns > div,
+.ct-multi-popup {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: var(--panel-radius);
+  box-shadow: var(--shadow-pop);
+}
+dialog {
+  padding: 0;
+  width: min(560px, calc(100vw - 24px));
+}
+dialog::backdrop {
+  background: var(--backdrop-color);
+}
+dialog .head {
+  padding: var(--sp-16) var(--sp-20);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+dialog .body {
+  padding: var(--sp-20);
+  display: grid;
+  gap: var(--sp-14);
+}
+dialog .foot {
+  padding: var(--sp-14) var(--sp-20);
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--sp-10);
+}
+dialog:has(.pc-box) {
+  width: min(900px, calc(100vw - 24px));
+}
+dialog .head,
+dialog .foot {
+  border-color: var(--line);
+}
+details,
+summary {
+  color: inherit;
+}
+.ct .ct-columns summary {
+  border: 1px solid var(--line);
+  border-radius: var(--control-radius);
+  background: var(--halo-control);
+}
+
+@keyframes pend {
+  50% {
+    box-shadow: 0 0 0 7px color-mix(in srgb, var(--accent) 12%, transparent);
+  }
+}

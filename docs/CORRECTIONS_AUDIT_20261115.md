@@ -8,8 +8,8 @@ corrections locales.
 - [x] A01 — Délai global du moteur, échanges non bloquants et nettoyage.
 - [x] A02 — Restaurations liées à leur manifeste, échec explicite si incohérentes.
 - [x] A03 — Aperçus automatiques : erreurs visibles et reprise possible.
-- [ ] A04 — Séparation effective structure / composants / mise en page métier.
-- [ ] A05 — Garde-fou CSS structurel et tests négatifs.
+- [x] A04 — Séparation effective structure / composants / mise en page métier.
+- [x] A05 — Garde-fou CSS structurel et tests négatifs.
 - [ ] A06 — Cas d'usage PHP hors des routes, contrats et garde-fous communs.
 - [ ] A07 — Contrôleurs JS séparés par responsabilité.
 - [ ] A08 — Validation commune PR/main sans secret de production côté PR.
@@ -35,3 +35,15 @@ pour les aperçus ; les demandes identiques sont dédupliquées et une réponse
 périmée après effacement ne peut pas relancer le rendu. Régressions exercées
 par le test Node du noyau, réussi. Le parcours navigateur avec panne simulée
 sera ajouté au runner commun de recette (A09).
+
+A04/A05 : sources CSS lisibles dans app/styles (thème, composants, apparences
+métier, mises en page), manifeste explicite, sorties publiques générées et
+vérifiées sans renommer les classes. 19 déclarations strictement identiques
+supprimées ; couleurs résiduelles nommées dans le thème. Compression des seuls
+espaces pour respecter le budget existant des assets, sans relever son plafond.
+Garde-fou syntaxique : couleurs, :is/:where, règles conditionnelles, animations
+et imports contrôlés. 31 tests ciblés réussis ; galerie inchangée dans 4 contextes.
+Comparaison des styles calculés avant/après sur le même DOM : 56 pages/contextes,
+zéro écart. Sonde de disposition : 120 pages/contextes, aucun défilement horizontal
+de page ; 22 contextes contiennent des éléments internes hors fenêtre (à distinguer
+d'une page débordante). Suite rapide : 736 réussites. Qualité Python/JS/CSS/PHP valide.
