@@ -143,7 +143,7 @@ if [ "$operation" = diagnostic ]; then
   remote_sh "cd $root && JIGO_EXPECTED_REQUIREMENTS=$(base64 -w0 requirements.txt) .venv/bin/python -" <<'PYDEPS'
 import sys
 import importlib.metadata as md
-import os, base64
+import os, base64, subprocess, re
 sys.path.insert(0, 'scripts')
 import check_env
 from pathlib import Path
@@ -160,6 +160,19 @@ for name, _ in check_env.parse(text):
         print('Erreur environnement :', name, ':', reason)
 if not found:
     print('site OK : dépendances conformes')
+probe = subprocess.run([sys.executable, 'scripts/check_env.py'], capture_output=True, text=True)
+if probe.returncode:
+    print('Erreur environnement : contrôle exécutable : échec')
+    for line in probe.stdout.splitlines():
+        if line.startswith('ÉCART '):
+            name = line.split()[1]
+            if name in {'PyMySQL', 'numpy', 'exchange_calendars', 'pandas', 'engine.cli'}:
+                reason = 'version incompatible' if 'hors des bornes' in line else 'paquet absent' if 'non installé' in line else 'import impossible'
+                print('Erreur environnement :', name, ':', reason)
+    for error in set(re.findall(r'\b([A-Za-z]+Error):', probe.stderr)):
+        print('Erreur environnement : contrôle exécutable :', error)
+else:
+    print('site OK : contrôle exécutable conforme')
 PYDEPS
   echo "Diagnostic terminé : rien modifié."; exit 0
 fi
