@@ -29,7 +29,7 @@ Seuls des fragments issus de constantes du code sont interpolés (jamais une val
 
 ## N+1
 
-Mesure (`tests/integ/test_query_counts.py`, base jetable) : liste de portefeuilles = 20 requêtes pour 3 portefeuilles, +2 par portefeuille supplémentaire (valorisation) ; détail d'un portefeuille = 38 requêtes à chaud, indépendant du nombre de transactions ; le premier appel d'une session coûte environ dix requêtes de plus. Aucun N+1 par transaction ; la croissance linéaire par portefeuille est connue et plafonnée par le test. Aucune correction nécessaire.
+Mesure (`tests/integ/test_query_counts.py`, base jetable, reprise du 15/11) : liste de portefeuilles = 17 commandes pour 3 portefeuilles, +2 par portefeuille supplémentaire ; détail à chaud = 32, indépendant du nombre de transactions. Le premier appel d'une session coûte davantage. La sonde lit `information_schema.USER_STATISTICS` pour un utilisateur temporaire réservé (SELECT/UPDATE/OTHER_COMMANDS) ; les anciens chiffres globaux 20/38 incluaient aussi les requêtes de mesure et ne sont pas directement comparables. Le test garantit que 20 requêtes d'un autre client n'affectent pas le compteur. Aucun N+1 par transaction ; croissance linéaire par portefeuille connue et plafonnée. Seuils conservés, aucune optimisation applicative introduite pour faire passer le test.
 
 ## Comportements financiers jamais dégradés en silence
 
