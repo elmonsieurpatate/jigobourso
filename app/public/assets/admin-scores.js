@@ -39,7 +39,10 @@
     simQ = "",
     useDraft = true,
     error = "";
-  const autoCache = {};
+  const autoCache = J.asyncMemo(
+    (args) => J.post(P() + "/preview", args).then((r) => r.weights),
+    () => paint(),
+  );
 
   const v4 = () => S.strategies.filter((s) => s.engine === "v4");
   const strat = () => S.strategies.find((s) => s.name === sel);
@@ -152,19 +155,21 @@
   }
 
   // Poids automatiques des périodes actives, calculés par le moteur (jamais recopiés ici).
+  const weightKey = (p) => draft.global.kappa + "|" + active(p).join(",");
+  const previewErrors = () => {
+    const current = new Set(
+      v4()
+        .map((s) => draft.profiles[s.name])
+        .filter(Boolean)
+        .map(weightKey),
+    );
+    return autoCache.errors().filter((e) => current.has(e.key));
+  };
   function autoWeights(p) {
     const ids = active(p),
-      key = draft.global.kappa + "|" + ids.join(",");
-    if (autoCache[key]) return autoCache[key];
-    if (!autoCache["?" + key]) {
-      autoCache["?" + key] = true;
-      J.post(P() + "/preview", { kappa: draft.global.kappa, periods: ids })
-        .then((r) => {
-          autoCache[key] = r.weights;
-          paint();
-        })
-        .catch(() => {});
-    }
+      key = weightKey(p);
+    const entry = autoCache.read(key, { kappa: draft.global.kappa, periods: ids });
+    if (entry.state === "ready") return entry.value;
     const st = strat();
     return st &&
       JSON.stringify(Object.keys(st.auto_weights).sort()) === JSON.stringify(ids.slice().sort()) &&
@@ -252,7 +257,12 @@
     $("#as-tabs").innerHTML = TABS.filter((t) => !(MINE && t[0] === "suivi"))
       .map(([k, t]) => `<button data-a="tab" data-v="${k}" class="${tab === k ? "on" : ""}">${t}</button>`)
       .join("");
-    $("#as-err").innerHTML = error ? `<div class="notice err mb-3">${E(error)}</div>` : "";
+    const failedPreviews = previewErrors();
+    $("#as-err").innerHTML =
+      (error ? `<div class="notice err mb-3">${E(error)}</div>` : "") +
+      (failedPreviews.length
+        ? `<div class="notice err mb-3" role="alert">Aperçu des pondérations indisponible : ${E(failedPreviews[0].error)} <button type="button" class="btn sm" data-a="retry-weights">Réessayer l’aperçu</button></div>`
+        : "");
     $("#as-body").innerHTML =
       tab === "config"
         ? configView(st, isV4)
@@ -714,7 +724,10 @@
     if (!t || t.tagName === "INPUT" || t.tagName === "SELECT") return;
     const a = t.dataset.a,
       v = t.dataset.v;
-    if (a === "tab") {
+    if (a === "retry-weights") {
+      previewErrors().forEach((e) => autoCache.retry(e.key));
+      paint();
+    } else if (a === "tab") {
       tab = v;
       error = "";
       paint();
@@ -807,7 +820,7 @@
           i === 0 && !MINE ? { global: draft.global, profile: payloadFor(n) } : { profile: payloadFor(n) },
         );
       reset();
-      Object.keys(autoCache).forEach((k) => delete autoCache[k]);
+      autoCache.clear();
       mon = null;
       sim = null;
       rank = null;
@@ -847,7 +860,7 @@
                   : { reset: scope },
               );
               reset();
-              Object.keys(autoCache).forEach((k) => delete autoCache[k]);
+              autoCache.clear();
               sim = null;
               rank = null;
               J.toast("Valeurs par défaut rétablies");

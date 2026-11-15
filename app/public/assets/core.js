@@ -73,6 +73,40 @@ J.latest = () => {
 };
 J.post = (route, body) => J.api(route, { method: "POST", body: body || {} });
 
+/* Mémo des lectures asynchrones : échec visible, nouvelle tentative explicite,
+   aucune boucle de requêtes au redessin ni réponse périmée après clear(). */
+J.asyncMemo = (load, changed = () => {}) => {
+  const entries = new Map();
+  const start = (key, args) => {
+    const entry = { key, args, state: "pending", value: null, error: null };
+    entries.set(key, entry);
+    Promise.resolve()
+      .then(() => load(args))
+      .then((value) => {
+        entry.state = "ready";
+        entry.value = value;
+      })
+      .catch((error) => {
+        entry.state = "error";
+        entry.error = error.message || "Lecture indisponible";
+      })
+      .finally(() => {
+        if (entries.get(key) === entry) changed(key);
+      });
+    return entry;
+  };
+  return {
+    read: (key, args) => entries.get(key) || start(key, args),
+    peek: (key) => entries.get(key),
+    errors: () => [...entries.values()].filter((e) => e.state === "error"),
+    retry: (key) => {
+      const e = entries.get(key);
+      return e?.state === "error" ? start(key, e.args) : e;
+    },
+    clear: () => entries.clear(),
+  };
+};
+
 /* ───── formats (français) ───── */
 const nf = (d, o = {}) => new Intl.NumberFormat("fr-FR", { minimumFractionDigits: d, maximumFractionDigits: d, ...o });
 J.num = (v, d = 2, dmax = d) =>

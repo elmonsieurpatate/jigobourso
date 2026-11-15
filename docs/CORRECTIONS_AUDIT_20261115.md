@@ -7,7 +7,7 @@ corrections locales.
 
 - [x] A01 — Délai global du moteur, échanges non bloquants et nettoyage.
 - [x] A02 — Restaurations liées à leur manifeste, échec explicite si incohérentes.
-- [ ] A03 — Aperçus automatiques : erreurs visibles et reprise possible.
+- [x] A03 — Aperçus automatiques : erreurs visibles et reprise possible.
 - [ ] A04 — Séparation effective structure / composants / mise en page métier.
 - [ ] A05 — Garde-fou CSS structurel et tests négatifs.
 - [ ] A06 — Cas d'usage PHP hors des routes, contrats et garde-fous communs.
@@ -29,3 +29,9 @@ A02 : snapshot d'environnement associé à chaque archive de code, manifeste,
 interpréteur et checksum vérifiés avant restauration. Refus des anciennes
 archives non associées. 18 tests d'environnement passent, dont choix explicite
 d'une ancienne archive et refus d'une archive corrompue sans toucher le venv actif.
+
+A03 : cache asynchrone à états explicites, erreur affichée et action de reprise
+pour les aperçus ; les demandes identiques sont dédupliquées et une réponse
+périmée après effacement ne peut pas relancer le rendu. Régressions exercées
+par le test Node du noyau, réussi. Le parcours navigateur avec panne simulée
+sera ajouté au runner commun de recette (A09).
