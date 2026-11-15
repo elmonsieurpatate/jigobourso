@@ -419,7 +419,138 @@ window.AdminScoresView = (ctx) => {
         <p class="as-hint">Moteur de notation version ${c.engine_version}. Poids réels des périodes : ${c.weights.map((w) => `${E(labels()[w.id])} <b>${fmt(100 * w.weight, 1)} %</b>`).join(" · ")} (κ = ${fmt(c.kappa, 2)}${c.weights.some((w) => w.custom) ? ", poids personnalisés" : ", automatiques"}).</p>`
       }</div>`;
   }
+  function simulationView(isV4) {
+    const { sim, simQ, simBusy, useDraft } = ctx;
+    if (!isV4)
+      return `<div class="notice warn">La simulation porte sur une stratégie V4. Choisissez-en une ci-dessous.<div class="mt-2">${stratPicker()}</div></div>`;
+    const cands =
+      sim && sim.candidates && sim.candidates.length > 1
+        ? `<div class="as-chips"><span class="muted">Autres correspondances :</span> ${sim.candidates.map((c) => `<button class="btn sm" data-a="sim-pick" data-id="${c.id}">${E(c.symbol)} <span class="muted">${E(c.name)}</span></button>`).join(" ")}</div>`
+        : "";
+    return `<div class="card"><div class="row gap-s u-flex-wrap-wrap u-margin-bottom-8px"><span class="muted">Stratégie :</span> ${stratPicker()}</div>
+        ${sim && sim.granularity ? `<p class="as-hint mb-2">${granText({ periods: sim.periods, sessions: sim.granularity })}</p>` : ""}
+        <div class="as-searchrow"><input id="as-q" class="as-search" type="search" enterkeyhint="search" placeholder="Symbole, nom ou ISIN d’un titre noté" value="${E(simQ)}"><button class="btn primary" data-a="sim-run">Décomposer</button></div>
+        <label class="row gap-s as-chk mt-2"><input type="checkbox" data-a="use-draft" ${useDraft ? "checked" : ""}> avec mes modifications non enregistrées</label>${cands}</div>
+      <div id="as-sim">${simBusy ? '<div class="empty"><span class="spinner"></span></div>' : simBody()}</div>`;
+  }
+
+  function simBody() {
+    const { sim } = ctx;
+    if (!sim)
+      return '<div class="empty">Cherchez un titre réel (symbole, nom ou ISIN) puis cliquez sur « Décomposer ».</div>';
+    if (sim.empty)
+      return `<div class="card"><div class="notice warn"><b>Aucune donnée à décomposer.</b> ${E(sim.reason)} Rien n’est remplacé par des exemples fictifs.</div></div>`;
+    if (sim.not_found)
+      return '<div class="card"><div class="notice warn">Aucun titre noté ne correspond à cette recherche.</div></div>';
+    if (!sim.result)
+      return '<div class="empty">Cherchez un titre réel (symbole, nom ou ISIN) puis cliquez sur « Décomposer ».</div>';
+    const r = sim.result,
+      ids = sim.periods.map((x) => x.id),
+      L = labels();
+    const rk = sim.ranks || {},
+      rkOf = (cls) => {
+        const x = rk[cls === "s" ? "simple" : "complex"];
+        return x && x.rank ? `rang <b>${x.rank}</b> sur ${J.num(x.of, 0)} · ` : "";
+      };
+    const sc = (o, cls) =>
+      `<div class="as-score ${cls}"><span>${cls === "s" ? "Score simple" : "Score complexe"}</span><b>${o.score === null ? "inconnu" : fmt(o.score, 1)}</b>${o.score === null ? "" : " / 100"}<small>${rkOf(cls)}${o.status === "ok" ? "données complètes" : o.status === "partiel" ? "données incomplètes" : E(o.why || "")} · couverture ${fmt(100 * (o.coverage || 0), 0)} %${o.score !== null && o.reliable === false ? " · peu fiable" : ""}</small></div>`;
+    const cell = (c, key, unit, d, pid) => {
+      if (!c) return '<td class="num muted">—</td>';
+      if (pid === "day" && key !== "growth")
+        return '<td class="num muted" title="Une seule séance : cette mesure n’existe pas">sans objet</td>';
+      const raw = c.raw || {};
+      const val = key === "growth" ? c.growth : raw[key];
+      const note =
+        c[
+          key === "growth"
+            ? "dynamics"
+            : {
+                r2: "r2",
+                up_fraction: "up_days",
+                spike_share: "concentration",
+                accel: "acceleration",
+                volatility: "volatility",
+                drawdown: "drawdown",
+              }[key]
+        ];
+      return `<td class="num">${val === null || val === undefined ? '<span class="muted">indisponible</span>' : fmt(unit === "%" ? val * (["up_fraction", "spike_share"].includes(key) ? 100 : 1) : val, d) + (unit ? " " + unit : "")}${note === null || note === undefined ? "" : `<br><small class="muted">note ${fmt(note, 0)}</small>`}</td>`;
+    };
+    const rows = [
+      ["Croissance (Dynamique)", "growth", "%", 2],
+      ["Régularité (R²)", "r2", "", 2],
+      ["Séances positives", "up_fraction", "%", 0],
+      ["Plus gros pic ÷ hausse nette", "spike_share", "%", 0],
+      ["Accélération (écart de pente)", "accel", "", 3],
+      ["Volatilité (par séance)", "volatility", "%", 2],
+      ["Drawdown", "drawdown", "%", 1],
+    ];
+    const s = r.simple,
+      c = r.complex,
+      liq = r.liquidity || {};
+    return `<div class="card"><div class="row between u-flex-wrap-wrap u-gap-12px"><div><h3 class="as-h m-0">${E(sim.title.name)}</h3><span class="muted">${E(sim.title.symbol)} · ${E(sim.title.mic)} · ${sim.title.kind === "etf" ? "ETF" : "Action"}</span></div><div class="as-scores">${sc(s, "s")}${sc(c, "c")}</div></div>
+      ${sim.tuning ? `<p class="as-hint">Normalisations utilisées par le calcul : saturation de dynamique <b>${fmt(sim.tuning.sat_a, 1)}</b> · référence d’accélération <b>${fmt(sim.tuning.accel_ref, 2)}</b> · volatilité <b>${E(VOLMODES[sim.tuning.vol_mode] || sim.tuning.vol_mode)}</b> · momentum <b>${E(HORIZONS[sim.tuning.momentum_horizon] || sim.tuning.momentum_horizon)}</b>.</p>` : ""}
+      ${chartCard()}
+      <div class="table-wrap"><table class="as-dec">${J.table.head(["Mesure", ...ids.map((i) => ({ label: `${E(L[i])}<br><small class="muted">poids réel ${fmt(100 * ((r.weights_effective || {})[i] || 0), 1)} %${r.periods[i] ? "" : " (période sans données)"}</small>`, num: true }))])}<tbody>
+        ${rows.map(([n, k, u, d]) => `<tr><td>${n}</td>${ids.map((i) => cell(r.periods[i], k, u, d, i)).join("")}</tr>`).join("")}</tbody></table></div>
+      <div class="as-two"><div><h4 class="as-h">Score simple (pente × R²)</h4>${
+        s.score === null
+          ? `<p class="muted">${E(s.why || "")}</p>`
+          : `<p>100 × Dynamique <b>${fmt(s.dynamics, 2)}</b> × Régularité <b>${fmt(s.quality, 2)}</b> = <b>${fmt(s.score, 1)}</b></p>
+          <table class="as-mini">${J.table.head(["Période", ["Poids réel", "num"], ["Pente", "num"], ["R²", "num"], ["Fiabilité R²", "num"]])}<tbody>${Object.entries(
+            s.parts || {},
+          )
+            .map(
+              ([k, v]) =>
+                `<tr><td>${E(L[k] || k)}</td><td class="num">${fmt(100 * v.weight, 1)} %</td><td class="num">${fmt(v.slope, 2)} %/s</td><td class="num">${v.r2 === null ? '<span class="muted">indisponible</span>' : fmt(v.r2, 2)}</td><td class="num">${v.r2_reliability === null ? "—" : fmt(100 * v.r2_reliability, 0) + " %"}</td></tr>`,
+            )
+            .join("")}</tbody></table>
+          <p class="as-hint">Complétude : couverture ${fmt(100 * (s.coverage || 0), 0)} % ${s.status === "ok" ? "(pente et R² mesurés sur toutes les périodes)" : "(une période n’a pas de R² ou de pente : elle sort du calcul, poids renormalisés)"}.</p>`
+      }</div>
+        <div><h4 class="as-h">Score complexe (somme pondérée)</h4>${
+          c.score === null
+            ? `<p class="muted">${E(c.why || "")}</p>`
+            : `<table class="as-mini"><tbody>${Object.entries(c.contributions)
+                .map(
+                  ([k, v]) =>
+                    `<tr><td>${E(CLABEL[k] || k)}</td><td class="num">${v.value === null ? '<span class="muted">indisponible — hors calcul</span>' : `poids ${fmt(100 * v.weight, 1)} %${Math.abs(v.weight_effective - v.weight) > 0.0005 ? " → réel " + fmt(100 * v.weight_effective, 1) + " %" : ""}`}</td><td class="num">${v.value === null ? "" : "note " + fmt(v.value, 0)}</td><td class="num">${v.points === null ? "" : "<b>+" + fmt(v.points_effective, 1) + "</b>"}</td></tr>`,
+                )
+                .join(
+                  "",
+                )}</tbody></table><p class="as-hint">Total ${fmt(c.raw_total, 1)} × ancrage récent ${fmt(c.anchor, 2)} (λ = ${fmt(c.anchor_lambda, 2)}, vigueur de la période courte ${fmt(100 * (c.anchor_gate ?? 0), 0)} %) = <b>${fmt(c.score, 1)}</b>. Complétude : couverture ${fmt(100 * (c.coverage || 0), 0)} %${c.status === "ok" ? "" : " — score partiel, composantes absentes hors calcul"}.</p>`
+        }</div></div>
+      <p class="as-hint">Liquidité : ${liq.turnover_eur != null ? fmt(liq.turnover_eur / 1e6, 1) + " M€/jour (" + (liq.source === "daily" ? "volumes quotidiens réels" : "estimée, moyenne trimestrielle") + ") · note " + fmt(liq.note, 0) : "indisponible"}. ${r.missing && (r.missing.secondary.length || r.missing.optional_periods.length || r.missing.required_periods.length) ? "<b>Qualité des données :</b> périodes sans historique : " + (E(r.missing.required_periods.concat(r.missing.optional_periods).join(", ")) || "aucune") + " · mesures indisponibles : " + (E(r.missing.secondary.join(", ")) || "aucune") + ". Elles sortent du calcul et les poids restants sont renormalisés (ni bonus ni pénalité)." : "<b>Qualité des données :</b> complète."}</p></div>`;
+  }
+
+  function monitorView() {
+    const { mon, monErr } = ctx;
+    if (monErr) return `<div class="notice err">${E(monErr)}</div>`;
+    if (!mon) return '<div class="empty"><span class="spinner"></span></div>';
+    const m = mon,
+      l = m.liquidity,
+      n = m.rated,
+      pct = (a, b) => (b ? fmt((100 * a) / b, 0) + " %" : "—");
+    const stat = (k) =>
+      `<div class="as-tile"><span>${k === "simple" ? "Score simple" : "Score complexe"}</span><b>${J.num(m.counts[k].ok + m.counts[k].partiel, 0)}</b><small>notés et classés · ${J.num(m.counts[k].ok, 0)} complets · ${J.num(m.counts[k].partiel, 0)} incomplets · ${J.num(m.counts[k].inconnu + Math.max(0, l.universe - n), 0)} indisponibles</small></div>`;
+    return `${n === 0 ? '<div class="notice warn mb-3"><b>Aucun titre noté.</b> Les mesures de score se remplissent au calcul nocturne ; cette base n’en contient pas encore. Aucune valeur d’exemple n’est affichée.</div>' : ""}
+      <div class="as-tiles"><div class="as-tile"><span>Titres notés</span><b>${J.num(n, 0)}</b><small>sur ${J.num(l.universe, 0)} titres recommandables</small></div>${stat("simple")}${stat("complex")}
+        <div class="as-tile"><span>Couverture des données</span><b>${m.coverage.median === null ? "—" : fmt(100 * m.coverage.median, 0) + " %"}</b><small>médiane · minimum ${m.coverage.min === null ? "—" : fmt(100 * m.coverage.min, 0) + " %"} · ${J.num(m.coverage.full, 0)} complets</small></div></div>
+      <div class="as-grid2"><div class="card"><h3 class="as-h">Fraîcheur des données</h3><table class="as-mini"><tbody>
+        <tr><td>Dernier cours connu</td><td class="num">${m.freshness.last_close ? E(m.freshness.last_close) : "—"}</td></tr>
+        <tr><td>Dernier calcul des indicateurs</td><td class="num">${m.freshness.computed_at ? E(J.dateTime(m.freshness.computed_at)) : "—"}</td></tr>
+        <tr><td>Dernier traitement réussi</td><td class="num">${m.last_success ? E(m.last_success.type) + " · " + E(J.dateTime(m.last_success.at)) : "aucun"}</td></tr>
+        <tr><td>Titres au dernier cours ancien (&gt; 5 jours)</td><td class="num">${J.num(m.freshness.stale_titles, 0)}</td></tr></tbody></table></div>
+        <div class="card"><h3 class="as-h">Liquidité : volumes réels ou estimés</h3><table class="as-mini"><tbody>
+        <tr><td>Volumes quotidiens réels</td><td class="num">${J.num(l.daily, 0)}</td><td class="num">${pct(l.daily, l.universe)}</td></tr>
+        <tr><td>Estimée (moyenne trimestrielle)</td><td class="num">${J.num(l.estimated, 0)}</td><td class="num">${pct(l.estimated, l.universe)}</td></tr>
+        <tr><td>Inconnue</td><td class="num">${J.num(l.unknown, 0)}</td><td class="num">${pct(l.unknown, l.universe)}</td></tr></tbody></table>
+        <p class="as-hint">Collecte des volumes quotidiens : <b>${m.volume_collection ? "activée" : "désactivée"}</b> · dernière vérification : ${l.volume_checked_at ? E(J.dateTime(l.volume_checked_at)) : "jamais"}. L’estimation surestime d’environ 12 % en médiane.</p></div></div>
+      <div class="card"><div class="row between"><h3 class="as-h m-0">Erreurs de calcul récentes</h3><button class="btn sm" data-a="mon-refresh">Actualiser</button></div>
+        ${m.problems.length ? `<table class="as-mini"><tbody>${m.problems.map((p) => `<tr><td>${E(J.dateTime(p.at))}</td><td>${E(p.type)}</td><td><span class="badge ${p.status === "failed" ? "ko" : "wait"}">${E(p.status)}</span></td><td>${p.errors ? J.num(p.errors, 0) + " erreur(s)" : ""} ${E(p.summary || "")}</td></tr>`).join("")}</tbody></table>` : '<p class="muted">Aucune erreur récente enregistrée.</p>'}</div>`;
+  }
+
   return {
+    simulationView,
+    monitorView,
     rankColumns,
     COMPLEX,
     TUNING,

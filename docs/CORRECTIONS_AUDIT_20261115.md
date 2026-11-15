@@ -61,3 +61,8 @@ sous Node. Le contrôleur reste chargé de l’orchestration. Le rendu des colon
 et cellules Scores est déplacé dans sa vue avec lecture explicite de l’état ;
 les chargements, tris et événements restent dans le contrôleur. Les contrôles JS,
 assets et sauvegardes passent ; les parcours actifs vérifient l’explorateur.
+
+Compléments A04/A07 : fondations CSS réparties par familles cohérentes au lieu
+d’un bloc hérité de 923 lignes ; sorties compilées strictement identiques.
+Les vues Simulation et Suivi des calculs sont également extraites du contrôleur
+Scores ; les appels réseau et les événements restent dans ce dernier.
