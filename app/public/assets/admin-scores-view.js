@@ -4,7 +4,50 @@ window.AdminScoresView = (ctx) => {
   const $ = J.$,
     E = J.esc,
     fmt = (v, d = 1) => J.num(v, d);
-  const { v4, strat, prof, labels, active, weightsOf, autoWeights, sum, rankTable } = ctx;
+  const { v4, strat, prof, labels, active, weightsOf, autoWeights, sum } = ctx;
+  const rankColumns = {
+    rank: { cell: (r) => (r.rank == null ? "—" : r.rank), cls: "as-c-rank", dir: "asc" },
+    name: {
+      cell: (r) => `<b>${E(r.symbol)}</b> <span class="muted">${E(r.name)}</span>`,
+      cls: "as-c-name",
+      dir: "asc",
+    },
+    status: { cell: (r) => statusBadge(r.status), dir: "asc" },
+    kind: { cell: (r) => (r.kind === "etf" ? "ETF" : "Action"), dir: "asc" },
+    market: { cell: (r) => E(r.mic), dir: "asc" },
+    change: {
+      cell: (r) =>
+        r.change == null
+          ? "—"
+          : `<span class="${r.change > 0 ? "up" : r.change < 0 ? "down" : ""}">${r.change > 0 ? "+" : ""}${J.num(r.change, 2)} %</span>`,
+      cls: "as-c-num",
+    },
+    trend: { cell: (r) => spark(r.curve), nosort: true },
+    simple: { cell: (r) => scoreCell(r.simple, r.simple_status, ctx.rkWhich === "simple"), cls: "as-c-num" },
+    complex: { cell: (r) => scoreCell(r.complex, r.complex_status, ctx.rkWhich === "complex"), cls: "as-c-num" },
+  };
+  function rankTable(rows) {
+    const l = ctx.layoutNow(),
+      cat = l.catalog || Object.keys(rankColumns).map((id) => ({ id, label: id }));
+    const label = (id) => (cat.find((c) => c.id === id) || {}).label || id;
+    const hint = (id) => (cat.find((c) => c.id === id) || {}).hint || "";
+    const cols = l.columns.filter((c) => rankColumns[c.id] && c.visible);
+    const prim = ctx.rkSorts[0] || { key: ctx.rkWhich, dir: "desc" };
+    const w = (c) => (c.width ? ` data-style="width:${c.width}px;min-width:${c.width}px"` : "");
+    return `<div class="as-rkwrap"><table class="dense as-rktable" id="as-rktable">${J.table.head(
+      cols.map((c) => ({
+        label: E(label(c.id)),
+        cls: rankColumns[c.id].cls || "",
+        scope: "col",
+        title: hint(c.id) || "",
+        width: c.width,
+        sort: rankColumns[c.id].nosort ? "" : c.id,
+      })),
+      prim,
+    )}
+      <tbody>${rows.map((r) => `<tr>${cols.map((c) => `<td class="${rankColumns[c.id].cls || ""}"${w(c)} data-label="${E(label(c.id))}">${rankColumns[c.id].cell(r)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+  }
+
   const COMPLEX = [
     ["dynamics", "Dynamique", "Croissance lissée de la période, ramenée à l’échelle de saturation."],
     ["r2", "Régularité (R²)", "Part de la trajectoire expliquée par une tendance régulière."],
@@ -377,6 +420,7 @@ window.AdminScoresView = (ctx) => {
       }</div>`;
   }
   return {
+    rankColumns,
     COMPLEX,
     TUNING,
     VOLMODES,

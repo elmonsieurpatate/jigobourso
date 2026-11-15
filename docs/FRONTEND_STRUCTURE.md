@@ -74,7 +74,7 @@ Règle : un script de page ne redéfinit ni `$`, ni `esc`, ni un formateur de no
 
 | Page | Modèle (sans DOM) | Vue | État et câblage | Persistance / réseau |
 |---|---|---|---|---|
-| Classement | `explorer-model.js`, `explorer-filters.js` | `explorer-view.js` | `explorer.js` | `explorer-storage.js` (seul fichier qui connaît les clés `localStorage`) ; API via `J.api` |
+| Classement | `explorer-model.js`, `explorer-filters.js`, `explorer-session.js` (restauration et migrations pures) | `explorer-view.js` | `explorer.js` | `explorer-storage.js` (seul fichier qui connaît les clés `localStorage`) ; API via `J.api` |
 | Scores admin | — | `admin-scores-view.js` | `admin-scores.js` | `J.api` |
 | Colonnes | `table-layout.js` (partagé Classement/Scores) | `admin-columns.js` | `admin-columns.js` | `J.api` |
 | Catégories | `admin-categories-model.js` | `filtres.js` | `filtres.js` | `secondary-filter-store.js` |
@@ -93,3 +93,15 @@ Règle : un script de page ne redéfinit ni `$`, ni `esc`, ni un formateur de no
 - Un élément que le script masque puis réaffiche utilise `.is-off` (`classList.add/remove("is-off")`), jamais `style.display`.
 - `tests/fast/test_frontend_policy.py` interdit tout `data-style` fixe et vérifie que chaque classe `u-…` utilisée est définie et inversement.
 - `scripts/probe_utilities.cjs` (navigateur, base jetable) vérifie que chaque classe rencontrée donne le même style calculé que l'ancien style en ligne : 2026-11-15, 347 vérifications sur 45 des 66 classes (onglets d'administration, chapitres d'aide, fiches titre, stratégies), 0 écart. Les 21 autres classes n'apparaissent que dans des états non atteints par la sonde.
+
+## Clarification des contrôleurs après audit
+
+`explorer-session.js` reconstruit l’état et migre les sauvegardes sans DOM, réseau
+ni accès au stockage. Le contrôleur lit les entrées, persiste seulement si nécessaire
+et branche les événements. La restauration copie ses entrées et conserve le
+cloisonnement des choix par compte (régressions Node dans explorer-model.cjs).
+Les colonnes et le rendu du tableau Scores sont dans admin-scores-view.js ; le
+contrôleur garde sélection, chargements et événements. Les demandes d’aperçu passent
+par le cache asynchrone commun à états pending/ready/error, avec reprise explicite.
+Cela ne transforme pas les contrôleurs en fichiers vides : ils coordonnent encore
+les parcours et leur état, ce qui reste leur rôle.

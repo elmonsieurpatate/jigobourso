@@ -67,3 +67,17 @@ assert.strictEqual(REG.rank.val({ rankSimple: 9 }), 9); assert.strictEqual(REG.s
 assert.ok(REG.trend.nosort); assert.strictEqual(REG.slope_quarter.val({ periods: { 63: { slope: .4 } } }), .4);
 assert.strictEqual(REG.status.val({ status: 'excluded' }), 2);
 console.log('explorer-model.js : OK');
+
+// Restauration isolée du DOM : chaque compte conserve ses choix, les catégories
+// nouvelles suivent les défauts et la migration ne modifie pas les entrées.
+for (const name of ['explorer-filters.js', 'explorer-session.js']) vm.runInContext(fs.readFileSync(path.join(__dirname, '../../app/public/assets', name), 'utf8'), ctx);
+const local = { secondaryOverridesByUser: { '7': { vol: { selected: ['a'], known: ['a', 'b'] } }, '8': { vol: { selected: ['b'], known: ['a', 'b'] } } } };
+const localJSON = JSON.stringify(local);
+const restore = userId => win.ExplorerSession.restore({ user: { id: userId }, profiles: full, categories: cats, categoryPayload: { schema: 1 }, saved: null, rawLocal: local });
+eq(restore(7).state.filters.vol, ['a', 'c']);
+eq(restore(8).state.filters.vol, ['b', 'c']);
+assert.strictEqual(JSON.stringify(local), localJSON, 'la restauration ne modifie pas les données fournies');
+assert.strictEqual(restore(7).writeBack, false, 'pas de réécriture quand aucune migration ne la nécessite');
+const malformed = win.ExplorerSession.restore({ user: { id: 7 }, profiles: full, categories: cats, categoryPayload: { schema: 1 }, saved: { profiles: {} }, rawLocal: null });
+assert.strictEqual(malformed.state.strategy, 'fast');
+eq(malformed.state.filters.vol, ['a', 'b', 'c']);

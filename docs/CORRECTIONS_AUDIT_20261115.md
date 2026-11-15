@@ -11,7 +11,7 @@ corrections locales.
 - [x] A04 — Séparation effective structure / composants / mise en page métier.
 - [x] A05 — Garde-fou CSS structurel et tests négatifs.
 - [x] A06 — Cas d'usage PHP hors des routes, contrats et garde-fous communs.
-- [ ] A07 — Contrôleurs JS séparés par responsabilité.
+- [x] A07 — Contrôleurs JS séparés par responsabilité.
 - [ ] A08 — Validation commune PR/main sans secret de production côté PR.
 - [ ] A09 — Runner des parcours actifs, scénarios historiques classés.
 - [ ] A10 — Mesure reproductible et représentative, sans optimisation supposée.
@@ -54,3 +54,10 @@ gardent authentification, méthode et sortie HTTP (dont mails après réponse et
 Le contrôle de propriété reste dans les services ; aucune règle financière modifiée.
 Les routes de ces six domaines ne contiennent plus de SQL ; tests de frontière
 et de dépendances ajoutés. Après extraction : 351 tests d’intégration réussis.
+
+A07 : restauration/migrations des préférences extraites dans explorer-session.js,
+sans DOM, réseau ni stockage ; copies des entrées et choix par compte vérifiés
+sous Node. Le contrôleur reste chargé de l’orchestration. Le rendu des colonnes
+et cellules Scores est déplacé dans sa vue avec lecture explicite de l’état ;
+les chargements, tris et événements restent dans le contrôleur. Les contrôles JS,
+assets et sauvegardes passent ; les parcours actifs vérifient l’explorateur.
