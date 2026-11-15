@@ -102,3 +102,8 @@ Complément A05 : contournements reproduits par @starting-style et @-moz-documen
 fermés. Les directives non reconnues sont refusées dans les mises en page au lieu
 d’être ignorées ; trois régressions supplémentaires passent. Suite rapide finale :
 744 réussites. Les feuilles compilées et leur rendu ne changent pas.
+
+Complément CI : première exécution GitHub, qualité + 741 rapides + 351 intégrations
+réussies sous Python 3.9 ; démarrage navigateur arrêté car le dossier de courriels
+fourni par le workflow n’existait pas. Le runner le crée désormais avant les seeds,
+avec mode 700. Régression isolée sans base ajoutée ; 745 tests rapides locaux réussis.

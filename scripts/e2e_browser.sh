@@ -6,7 +6,7 @@ cd "$(dirname "$0")/.."
 export PATH="$PWD/.venv/bin:$PATH" JIGO_TEST_DATABASE=1 JIGO_DB_HOST=127.0.0.1 JIGO_DB_PORT="${JIGO_DB_PORT:-33307}" JIGO_DB_NAME=jigobourso_it JIGO_DB_USER=root JIGO_DB_PASSWORD=local-test-only
 export JIGO_PYTHON="$(command -v python)" JIGO_ENGINE_ROOT="$PWD" PYTHONPATH="$PWD"
 : "${PLAYWRIGHT_MODULE:?chemin de playwright-core}" "${JIGO_CHROMIUM:?chemin de Chromium}"
-export JIGO_TEST_MAIL_DIR="${JIGO_TEST_MAIL_DIR:-$(mktemp -d)}"; chmod 700 "$JIGO_TEST_MAIL_DIR"
+export JIGO_TEST_MAIL_DIR="${JIGO_TEST_MAIL_DIR:-$(mktemp -d)}"; install -d -m 700 "$JIGO_TEST_MAIL_DIR"
 python tests/seeds/account_seed.py > /dev/null
 php scripts/create_user.php review_user review-local-password --admin --email=review@example.test > /dev/null
 php scripts/create_user.php plain_user plain-local-password --email=plain@example.test > /dev/null
