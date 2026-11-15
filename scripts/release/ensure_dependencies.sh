@@ -33,8 +33,13 @@ elif [ -z "$have" ] && check_runtime; then
   .venv/bin/python -c "import pymysql" || { echo "dépendances Python inutilisables" >&2; exit 1; }
   printf '%s\n' "$want" > .requirements.sha; echo "dépendances Python existantes validées (première exécution)"
 else
-  backup="site-packages-$(date -u +%Y%m%d%H%M%S).tgz"
-  tar czf "$BACKUPS/$backup" -C "$site" . || { echo "sauvegarde du venv impossible : mise à jour refusée" >&2; exit 1; }
+  if [ -n "${CODE_BACKUP:-}" ] && [ -f "$BACKUPS/$CODE_BACKUP.venv" ]; then
+    backup=$(cat "$BACKUPS/$CODE_BACKUP.venv")
+    test -f "$BACKUPS/$backup" || { echo "Erreur : environnement de retour arrière absent" >&2; exit 1; }
+  else
+    backup="site-packages-$(date -u +%Y%m%d%H%M%S).tgz"
+    tar czf "$BACKUPS/$backup" -C "$site" . || { echo "sauvegarde du venv impossible : mise à jour refusée" >&2; exit 1; }
+  fi
   printf '%s\n' "$backup" > .deployment-venv-backup
   echo "sauvegarde du venv faite"
   ls -1t "$BACKUPS"/site-packages-*.tgz | tail -n +4 | xargs -r rm -f

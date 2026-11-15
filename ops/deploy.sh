@@ -61,28 +61,37 @@ restore_code() {                                  # restaure le code depuis une 
   remote_sh "ROOT=$root BACKUPS=$backups FILE=$1 bash -s" <<'REMOTE'
 set -euo pipefail
 test -f "$BACKUPS/$FILE"
+# Refus avant toute copie si cette sauvegarde n'a pas son propre environnement.
+test -f "$BACKUPS/$FILE.venv" && test -f "$BACKUPS/$FILE.requirements" && test -f "$BACKUPS/$FILE.python" || { echo "Erreur : sauvegarde historique sans environnement associé ; restauration refusée" >&2; exit 1; }
+pkg_name=$(cat "$BACKUPS/$FILE.venv")
+case "$pkg_name" in environment-*.tgz) ;; *) echo "Erreur : référence de sauvegarde de dépendances invalide" >&2; exit 1;; esac
+test -f "$BACKUPS/$pkg_name" && test -f "$BACKUPS/$pkg_name.sha256" || { echo "Erreur : environnement associé absent" >&2; exit 1; }
+test "$(sha256sum "$BACKUPS/$pkg_name" | cut -d' ' -f1)" = "$(cat "$BACKUPS/$pkg_name.sha256")" || { echo "Erreur : archive de dépendances corrompue" >&2; exit 1; }
+test "$("$ROOT/.venv/bin/python" -c 'import sys; print("%d.%d" % sys.version_info[:2])')" = "$(cat "$BACKUPS/$FILE.python")" || { echo "Erreur : interpréteur incompatible avec la sauvegarde" >&2; exit 1; }
 tmp=$(mktemp -d "$BACKUPS/restore.XXXXXX")
 trap 'rm -rf "$tmp"' EXIT
 tar xzf "$BACKUPS/$FILE" -C "$tmp"
 cd "$tmp/jigobourso-v2"
+test "$(sha256sum requirements.txt | cut -d' ' -f1)" = "$(cat "$BACKUPS/$FILE.requirements")" || { echo "Erreur : manifeste de sauvegarde incohérent" >&2; exit 1; }
 rsync -rlt --delete-delay --delay-updates --exclude=__pycache__ app engine db docs scripts README.md requirements.txt "$ROOT/"
-# Code ET dépendances : si les dépendances installées ne correspondent plus au requirements.txt restauré, on remet le venv sauvegardé avant la mise à jour.
+# Code ET dépendances : l'archive est liée à la sauvegarde de code choisie, jamais « la plus récente ».
 want=$(sha256sum "$ROOT/requirements.txt" | cut -d' ' -f1)
 marker="$ROOT/.deployment-venv-backup"
-if [ -f "$marker" ] || { [ -f "$ROOT/.requirements.sha" ] && [ "$want" != "$(cat "$ROOT/.requirements.sha")" ]; }; then
-  if [ -f "$marker" ]; then pkg="$BACKUPS/$(cat "$marker")"; else pkg=$(ls -1t "$BACKUPS"/site-packages-*.tgz 2>/dev/null | head -1 || true); fi
-  if [ -n "$pkg" ] && [ -f "$pkg" ]; then
-    site=$("$ROOT/.venv/bin/python" -c "import sysconfig; print(sysconfig.get_paths()['purelib'])")
-    tar tzf "$pkg" > /dev/null
-    find "$site" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
-    tar xzf "$pkg" -C "$site"
-    printf '%s\n' "$want" > "$ROOT/.requirements.sha"
-    rm -f "$marker"
-    echo "dépendances Python restaurées depuis $(basename "$pkg")"
-  else
-    echo "dépendances différentes mais aucune sauvegarde du venv : vérification manuelle requise" >&2
-  fi
-fi
+pkg_name=$(cat "$BACKUPS/$FILE.venv" 2>/dev/null) || { echo "Erreur : environnement associé absent" >&2; exit 1; }
+case "$pkg_name" in environment-*.tgz) ;; *) echo "Erreur : référence de dépendances invalide" >&2; exit 1;; esac
+pkg="$BACKUPS/$pkg_name"
+test -f "$pkg" && test -f "$pkg.sha256" || { echo "Erreur : sauvegarde du venv absente ; restauration incomplète" >&2; exit 1; }
+test "$(sha256sum "$pkg" | cut -d' ' -f1)" = "$(cat "$pkg.sha256")" || { echo "Erreur : sauvegarde du venv corrompue" >&2; exit 1; }
+test "$want" = "$(cat "$BACKUPS/$FILE.requirements")" || { echo "Erreur : manifeste différent de l'environnement sauvegardé" >&2; exit 1; }
+site=$("$ROOT/.venv/bin/python" -c "import sysconfig; print(sysconfig.get_paths()['purelib'])")
+tar tzf "$pkg" > /dev/null
+find "$site" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+tar xzf "$pkg" -C "$site"
+# Le moteur doit initialiser BLAS avant le contrôleur d'une ancienne version.
+(cd "$ROOT" && .venv/bin/python -c 'import engine, runpy; runpy.run_path("scripts/check_env.py", run_name="__main__")') > /dev/null || { echo "Erreur : environnement restauré non conforme" >&2; exit 1; }
+printf '%s\n' "$want" > "$ROOT/.requirements.sha"
+rm -f "$marker"
+echo "dépendances Python restaurées depuis $(basename "$pkg")"
 "$ROOT/.venv/bin/python" -c "import sys; sys.path.insert(0, '$ROOT'); import engine.cli, pymysql, numpy, pandas, exchange_calendars" || { echo "moteur ou dépendances non importables après restauration" >&2; exit 1; }
 echo "moteur et dépendances importables après restauration"
 printf 'restored_from=%s\ndate=%s\n' "$FILE" "$(date -u +%FT%TZ)" > "$ROOT/.deployed"
@@ -262,7 +271,19 @@ cd "$DOMAIN"
 name="code-$(date -u +%Y%m%d%H%M%S)-${SHA:0:8}.tgz"
 tar czf "$BACKUPS/$name" --exclude=.venv --exclude=data --exclude=logs --exclude=private jigobourso-v2
 tar tzf "$BACKUPS/$name" > /dev/null
-ls -1t "$BACKUPS"/code-*.tgz | tail -n +6 | xargs -r rm -f
+pkg="environment-${name#code-}"
+site=$("$ROOT/.venv/bin/python" -c "import sysconfig; print(sysconfig.get_paths()['purelib'])")
+tar czf "$BACKUPS/$pkg" -C "$site" .
+tar tzf "$BACKUPS/$pkg" > /dev/null
+sha256sum "$BACKUPS/$pkg" | cut -d' ' -f1 > "$BACKUPS/$pkg.sha256"
+sha256sum "$ROOT/requirements.txt" | cut -d' ' -f1 > "$BACKUPS/$name.requirements"
+"$ROOT/.venv/bin/python" -c 'import sys; print("%d.%d" % sys.version_info[:2])' > "$BACKUPS/$name.python"
+printf '%s\n' "$pkg" > "$BACKUPS/$name.venv"
+for old in $(ls -1t "$BACKUPS"/code-*.tgz | tail -n +6); do
+  paired=$(cat "$old.venv" 2>/dev/null || true)
+  case "$paired" in environment-*.tgz) rm -f "$BACKUPS/$paired" "$BACKUPS/$paired.sha256";; esac
+  rm -f "$old" "$old.venv" "$old.requirements" "$old.python"
+done
 echo "$name"
 REMOTE
 )
@@ -283,7 +304,7 @@ set +e
 
   phase="dépendances Python et migration du schéma"
   echo "== Dépendances Python, migrations de schéma, contrôles"
-  remote_sh "ROOT=$root BACKUPS=$backups SHA=$sha VERSION=$version bash -s" <<'REMOTE'
+  remote_sh "ROOT=$root BACKUPS=$backups SHA=$sha VERSION=$version CODE_BACKUP=$backup bash -s" <<'REMOTE'
 set -euo pipefail
 cd "$ROOT"
 bash scripts/release/ensure_dependencies.sh "$ROOT" "$BACKUPS"
