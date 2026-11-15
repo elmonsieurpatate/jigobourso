@@ -430,7 +430,7 @@ score complexe = 100 × base × [1 − λ · (1 − porte de la durée la plus c
             .sort((a, b) => (rk[a[0]] || 99) - (rk[b[0]] || 99))
             .map(
               ([n, e]) =>
-                `<tr><th scope="row"><span data-style="color:${COLORS[n]}">●</span> ${n}</th><td class="n">${e.simple.score == null ? "—" : f(e.simple.score, 0)}</td><td class="n"><b>${e.complex.score == null ? "—" : f(e.complex.score, 0)}</b></td><td class="n">${rk[n] || "—"}</td><td data-style="width:35%">${HC.bars([{ label: "", value: e.complex.score || 0, color: COLORS[n] }], { max: 100, fmt: () => "" })}</td></tr>`,
+                `<tr><th scope="row"><span data-style="color:${COLORS[n]}">●</span> ${n}</th><td class="n">${e.simple.score == null ? "—" : f(e.simple.score, 0)}</td><td class="n"><b>${e.complex.score == null ? "—" : f(e.complex.score, 0)}</b></td><td class="n">${rk[n] || "—"}</td><td class="u-width-35pct">${HC.bars([{ label: "", value: e.complex.score || 0, color: COLORS[n] }], { max: 100, fmt: () => "" })}</td></tr>`,
             )
             .join("")}</tbody></table></div>
         <p class="small muted">Poids des durées : ${st.ids.map((i) => HM.LABELS[i] + " " + f(100 * w[i], 0) + " %").join(" · ")}</p>`;
@@ -440,12 +440,12 @@ score complexe = 100 × base × [1 − λ · (1 − porte de la durée la plus c
         <div class="two">${Object.keys(base)
           .map(
             (k) =>
-              `<label class="small"><b>${COMP[k]}</b> : <span id="sv-${k}"></span><input type="range" min="0" max="100" value="${base[k]}" data-k="${k}" data-style="width:100%"></label>`,
+              `<label class="small"><b>${COMP[k]}</b> : <span id="sv-${k}"></span><input class="u-width-100pct" type="range" min="0" max="100" value="${base[k]}" data-k="${k}"></label>`,
           )
           .join("")}</div>
         <div class="ctl"><label>κ (poids des longues durées) : <b id="sv-kappa">${f(st.kappa, 2)}</b><input type="range" id="sim-kappa" min="0" max="95" value="${Math.round(st.kappa * 100)}"></label>
         <label>Ancrage récent : <b id="sv-anchor">${f(st.anchor, 2)}</b><input type="range" id="sim-anchor" min="0" max="100" value="${Math.round(st.anchor * 100)}"></label></div>
-        <div class="ctl">${["week", "month", "quarter", "half", "year"].map((k) => `<label data-style="display:flex;gap:4px;flex-direction:row;align-items:center"><input type="checkbox" data-id="${k}" ${st.ids.includes(k) ? "checked" : ""}> ${HM.LABELS[k]}</label>`).join("")}<button class="btn sm" id="sim-reset">Réinitialiser</button></div>
+        <div class="ctl">${["week", "month", "quarter", "half", "year"].map((k) => `<label class="u-display-flex u-gap-4px u-flex-direction-row u-align-items-center"><input type="checkbox" data-id="${k}" ${st.ids.includes(k) ? "checked" : ""}> ${HM.LABELS[k]}</label>`).join("")}<button class="btn sm" id="sim-reset">Réinitialiser</button></div>
         <div id="sim-out"></div>`;
       const labels = () =>
         Object.keys(base).forEach((k) => {
@@ -543,7 +543,7 @@ score complexe = 100 × base × [1 − λ · (1 − porte de la durée la plus c
       let hide = new Set();
       const draw = () => {
         const shown = all.filter(([n]) => !hide.has(n));
-        d.innerHTML = `<span class="fic">Titres fictifs</span><div class="ctl">${all.map(([n]) => `<label data-style="flex-direction:row;display:flex;gap:4px;align-items:center"><input type="checkbox" data-n="${n}" ${hide.has(n) ? "" : "checked"}> ${n}</label>`).join("")}</div>
+        d.innerHTML = `<span class="fic">Titres fictifs</span><div class="ctl">${all.map(([n]) => `<label class="u-flex-direction-row u-display-flex u-gap-4px u-align-items-center"><input type="checkbox" data-n="${n}" ${hide.has(n) ? "" : "checked"}> ${n}</label>`).join("")}</div>
         <div class="h-table-scroll"><table><thead><tr><th class="n">Ligne affichée</th><th class="n">Rang (stratégie)</th><th>Titre</th><th class="n">Score complexe</th></tr></thead><tbody>${shown.map(([n, s], i) => `<tr><td class="n">${i + 1}</td><td class="n"><b>${rk[n]}</b></td><th scope="row">${n}</th><td class="n">${f(s, 0)}</td></tr>`).join("")}</tbody></table></div><p class="small muted">Décochez des titres : la colonne « Rang » ne bouge pas.</p>`;
         d.querySelectorAll("input[data-n]").forEach(
           (i) =>

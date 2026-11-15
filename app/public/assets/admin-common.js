@@ -82,7 +82,7 @@
     polling = true;
     let bar = J.$("#runbar");
     if (!bar) {
-      AC.page.insertAdjacentHTML("afterbegin", '<div id="runbar" class="notice" data-style="display:none"></div>');
+      AC.page.insertAdjacentHTML("afterbegin", '<div id="runbar" class="notice is-off"></div>');
       bar = J.$("#runbar");
     }
     let seen = false;
@@ -102,7 +102,7 @@
       if (list.length) {
         seen = true;
         bar = J.$("#runbar") || bar;
-        bar.style.display = "";
+        bar.classList.remove("is-off");
         bar.innerHTML =
           '<span class="spinner"></span> <b>' +
           list.map((j) => J.esc(jobName(j.job_type))).join(", ") +
@@ -110,7 +110,7 @@
           J.esc(list[0].summary || "démarrage…") +
           ' <a href="#logs">Journaux</a>';
       } else {
-        if (bar) bar.style.display = "none";
+        if (bar) bar.classList.add("is-off");
         if (seen) return done();
         if (launchedAt) {
           const r2 = await J.api("admin/jobs", { params: { since: launchedAt } }).catch(() => ({ jobs: [] }));
@@ -122,7 +122,7 @@
     }
     polling = false;
   }
-  const runBar = () => '<div id="runbar" class="notice" data-style="display:none"></div>';
+  const runBar = () => '<div id="runbar" class="notice is-off"></div>';
   const when = (v) => (v ? J.dateTime(v) : "jamais");
   const jobLine = (j) =>
     j
@@ -150,10 +150,10 @@
           )
           .join(" ");
       else if (r.key)
-        ctl = `<span class="row gap-s"><input type="number" aria-label="${J.esc(r.label)}" data-rule="${r.id}" data-f="${r.key}" step="${r.step}" min="0" max="${r.max}" value="${c[r.key]}" data-style="width:130px"> <span class="small muted">${J.esc(r.unit)}</span></span>`;
-      return `<div class="frow"><label class="row gap-s" data-style="align-items:flex-start"><input type="checkbox" data-rule="${r.id}" data-f="enabled" ${c.enabled ? "checked" : ""}><span><b>${J.esc(r.label)}</b>${r.is_default ? "" : ' <span class="badge warn">modifié</span>'}<span class="small muted" data-style="display:block">${J.esc(r.role)}</span></span></label>
-        ${ctl ? `<div data-style="margin:4px 0 0 26px">${ctl}</div>` : ""}${r.id === "markets" ? placePicker(r, places) : r.id === "categories" ? catPicker(r, categories) : ""}
-        <details data-style="margin-left:26px"><summary class="small muted pointer">Pourquoi ce filtre ?</summary><p class="small">${J.esc(r.help)}</p></details></div>`;
+        ctl = `<span class="row gap-s"><input class="u-width-130px" type="number" aria-label="${J.esc(r.label)}" data-rule="${r.id}" data-f="${r.key}" step="${r.step}" min="0" max="${r.max}" value="${c[r.key]}"> <span class="small muted">${J.esc(r.unit)}</span></span>`;
+      return `<div class="frow"><label class="row gap-s u-align-items-flex-start"><input type="checkbox" data-rule="${r.id}" data-f="enabled" ${c.enabled ? "checked" : ""}><span><b>${J.esc(r.label)}</b>${r.is_default ? "" : ' <span class="badge warn">modifié</span>'}<span class="small muted u-display-block">${J.esc(r.role)}</span></span></label>
+        ${ctl ? `<div class="u-margin-4px-0-0-26px">${ctl}</div>` : ""}${r.id === "markets" ? placePicker(r, places) : r.id === "categories" ? catPicker(r, categories) : ""}
+        <details class="u-margin-left-26px"><summary class="small muted pointer">Pourquoi ce filtre ?</summary><p class="small">${J.esc(r.help)}</p></details></div>`;
     };
     const groups = {};
     lv.rules.forEach((r) => (groups[r.group] = groups[r.group] || []).push(r));
@@ -175,7 +175,7 @@
   }
   function catPicker(r, cats) {
     const sel = new Set(r.current.values);
-    return `<details data-style="margin:6px 0 0 26px"><summary class="small pointer">Choisir les catégories à exclure (${r.current.values.length} cochées)</summary><div data-style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:2px 12px;max-height:200px;overflow:auto;margin-top:6px">
+    return `<details class="u-margin-6px-0-0-26px"><summary class="small pointer">Choisir les catégories à exclure (${r.current.values.length} cochées)</summary><div class="u-display-grid u-grid-template-columns-v1 u-gap-2px-12px u-max-height-200px u-overflow-auto u-margin-top-6px">
       ${(cats || []).map((c) => `<label class="small"><input type="checkbox" data-cat="${J.esc(c.category)}" ${sel.has(c.category) ? "checked" : ""}> ${J.esc(c.category)} <span class="muted">${nf(c.n)}</span></label>`).join("") || '<span class="muted small">Aucune catégorie : importez FinanceDatabase.</span>'}</div></details>`;
   }
   function bindForm() {
@@ -286,7 +286,7 @@
       if (!itemsLatest.isCurrent(ticket)) return;
       const cat = stage === "catalogue";
       host.innerHTML = `<div class="card flush mt-4"><div class="row between card-bar"><h3 class="m-0">Titres · ${J.esc(label)}</h3><button class="btn sm" id="ip-close">Fermer</button></div>
-        <div class="row card-bar card-bar-sub"><input id="ip-q" type="search" placeholder="Nom, symbole ou ISIN" value="${J.esc(st.q)}" data-style="flex:1;min-width:160px"><select id="ip-k"><option value="">Actions et ETF</option><option value="equity" ${st.kind === "equity" ? "selected" : ""}>Actions</option><option value="etf" ${st.kind === "etf" ? "selected" : ""}>ETF</option></select><input id="ip-m" placeholder="Place (ex. XETR)" value="${J.esc(st.mic)}" data-style="width:130px"></div>
+        <div class="row card-bar card-bar-sub"><input class="u-flex-1 u-min-width-160px" id="ip-q" type="search" placeholder="Nom, symbole ou ISIN" value="${J.esc(st.q)}"><select id="ip-k"><option value="">Actions et ETF</option><option value="equity" ${st.kind === "equity" ? "selected" : ""}>Actions</option><option value="etf" ${st.kind === "etf" ? "selected" : ""}>ETF</option></select><input class="u-width-130px" id="ip-m" placeholder="Place (ex. XETR)" value="${J.esc(st.mic)}"></div>
         <div class="table-wrap"><table>${J.table.head([
           "Titre",
           "Place",
@@ -341,7 +341,7 @@
     await load();
   }
   function explainBox(host) {
-    host.innerHTML = `<div class="card"><h2>Pourquoi ce titre a-t-il disparu ?</h2><div class="row" data-style="gap:10px"><input id="ex-q" placeholder="Nom, symbole ou ISIN (ex. DVDG.DE)" data-style="flex:1"><button class="btn primary" id="ex-go">Expliquer</button></div><div id="ex-out" class="mt-3"></div></div>`;
+    host.innerHTML = `<div class="card"><h2>Pourquoi ce titre a-t-il disparu ?</h2><div class="row u-gap-10px"><input class="u-flex-1" id="ex-q" placeholder="Nom, symbole ou ISIN (ex. DVDG.DE)"><button class="btn primary" id="ex-go">Expliquer</button></div><div id="ex-out" class="mt-3"></div></div>`;
     const latest = J.latest();
     const go = async () => {
       const out = J.$("#ex-out", host);

@@ -2154,3 +2154,206 @@ dialog .ps-rule-top {
 .sr-card summary {
   cursor: pointer;
 }
+
+/* ---------- Présentation fixe : une classe par déclaration (remplace les data-style statiques, F08) ----------
+ Les valeurs calculées (largeurs, couleurs de données) restent en data-style, appliqué en CSSOM par core.js.
+ !important : un style en ligne l'emportait sur toute règle ; la classe garde exactement cette priorité.
+ .is-off : masquage d'un élément que le script réaffiche (classList.remove("is-off")). */
+.is-off {
+  display: none !important;
+}
+.u-align-items-center {
+  align-items: center !important;
+}
+.u-align-items-flex-start {
+  align-items: flex-start !important;
+}
+.u-align-items-start {
+  align-items: start !important;
+}
+.u-border-0 {
+  border: 0 !important;
+}
+.u-border-top-1px-solid-var-line {
+  border-top: 1px solid var(--line) !important;
+}
+.u-display-block {
+  display: block !important;
+}
+.u-display-flex {
+  display: flex !important;
+}
+.u-display-grid {
+  display: grid !important;
+}
+.u-flex-1 {
+  flex: 1 !important;
+}
+.u-flex-direction-row {
+  flex-direction: row !important;
+}
+.u-flex-wrap-nowrap {
+  flex-wrap: nowrap !important;
+}
+.u-flex-wrap-wrap {
+  flex-wrap: wrap !important;
+}
+.u-font-weight-700 {
+  font-weight: 700 !important;
+}
+.u-gap-10px {
+  gap: 10px !important;
+}
+.u-gap-12px {
+  gap: 12px !important;
+}
+.u-gap-14px {
+  gap: 14px !important;
+}
+.u-gap-2px-12px {
+  gap: 2px 12px !important;
+}
+.u-gap-4px {
+  gap: 4px !important;
+}
+.u-gap-6px {
+  gap: 6px !important;
+}
+.u-gap-8px {
+  gap: 8px !important;
+}
+.u-gap-8px-16px {
+  gap: 8px 16px !important;
+}
+.u-grid-column-1-n1 {
+  grid-column: 1/-1 !important;
+}
+.u-grid-template-columns-1fr-1fr {
+  grid-template-columns: 1fr 1fr !important;
+}
+.u-grid-template-columns-v1 {
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)) !important;
+}
+.u-grid-template-columns-v2 {
+  grid-template-columns: minmax(0, 210px) minmax(0, 1fr) !important;
+}
+.u-grid-template-columns-v3 {
+  grid-template-columns: minmax(0, 2.3fr) minmax(270px, 1fr) !important;
+}
+.u-height-200px {
+  height: 200px !important;
+}
+.u-margin-0 {
+  margin: 0 !important;
+}
+.u-margin-0-18px-12px {
+  margin: 0 18px 12px !important;
+}
+.u-margin-10px-0 {
+  margin: 10px 0 !important;
+}
+.u-margin-4px-0-0-26px {
+  margin: 4px 0 0 26px !important;
+}
+.u-margin-6px-0-0-18px {
+  margin: 6px 0 0 18px !important;
+}
+.u-margin-6px-0-0-26px {
+  margin: 6px 0 0 26px !important;
+}
+.u-margin-8px-0 {
+  margin: 8px 0 !important;
+}
+.u-margin-bottom-14px {
+  margin-bottom: 14px !important;
+}
+.u-margin-bottom-8px {
+  margin-bottom: 8px !important;
+}
+.u-margin-left-26px {
+  margin-left: 26px !important;
+}
+.u-margin-left-auto {
+  margin-left: auto !important;
+}
+.u-margin-top-12px {
+  margin-top: 12px !important;
+}
+.u-margin-top-6px {
+  margin-top: 6px !important;
+}
+.u-margin-top-8px {
+  margin-top: 8px !important;
+}
+.u-margin-top-n6px {
+  margin-top: -6px !important;
+}
+.u-max-height-160px {
+  max-height: 160px !important;
+}
+.u-max-height-200px {
+  max-height: 200px !important;
+}
+.u-max-height-260px {
+  max-height: 260px !important;
+}
+.u-max-width-100pct {
+  max-width: 100% !important;
+}
+.u-max-width-70ch {
+  max-width: 70ch !important;
+}
+.u-min-height-1-4em {
+  min-height: 1.4em !important;
+}
+.u-min-width-0 {
+  min-width: 0 !important;
+}
+.u-min-width-160px {
+  min-width: 160px !important;
+}
+.u-min-width-180px {
+  min-width: 180px !important;
+}
+.u-opacity-0 {
+  opacity: 0 !important;
+}
+.u-overflow-auto {
+  overflow: auto !important;
+}
+.u-position-absolute {
+  position: absolute !important;
+}
+.u-text-align-right {
+  text-align: right !important;
+}
+.u-user-select-all {
+  user-select: all !important;
+}
+.u-white-space-normal {
+  white-space: normal !important;
+}
+.u-white-space-pre-line {
+  white-space: pre-line !important;
+}
+.u-white-space-pre-wrap {
+  white-space: pre-wrap !important;
+}
+.u-width-100pct {
+  width: 100% !important;
+}
+.u-width-130px {
+  width: 130px !important;
+}
+.u-width-34pct {
+  width: 34% !important;
+}
+.u-width-35pct {
+  width: 35% !important;
+}
+.u-width-56px {
+  width: 56px !important;
+}
+.u-width-64px {
+  width: 64px !important;
+}

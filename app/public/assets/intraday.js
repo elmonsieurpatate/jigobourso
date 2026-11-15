@@ -243,7 +243,7 @@
         sOpen = first[1] ?? first[4];
       tip.innerHTML = !b
         ? `${head}<div class="muted">${best.ms + SLOT > nowMs ? "Créneau à venir." : "Aucune donnée pour ce créneau (trou de source, journée écourtée ou suspension)."}</div>`
-        : `${head}<div class="tip-grid">${b[1] !== null && b[2] !== null && b[3] !== null ? `<span>Ouv.</span><b>${fp(b[1])}</b><span>Haut</span><b>${fp(b[2])}</b><span>Bas</span><b>${fp(b[3])}</b>` : '<span class="muted" data-style="grid-column:1/-1">Bougie complète non disponible : cours de clôture du créneau seulement.</span>'}<span>Clôt.</span><b>${fp(b[4])} ${J.esc(d.currency || "")}</b><span>Volume</span><b>${b[5] === null ? "absent" : J.num(b[5], 0)}</b><span>Vs ouverture de séance</span><b class="${J.cls(b[4] - sOpen)}">${J.pct(100 * (b[4] / sOpen - 1), 2)}</b></div>${b[6] ? "" : '<div class="small warn">Barre provisoire : le créneau n’est pas terminé.</div>'}`;
+        : `${head}<div class="tip-grid">${b[1] !== null && b[2] !== null && b[3] !== null ? `<span>Ouv.</span><b>${fp(b[1])}</b><span>Haut</span><b>${fp(b[2])}</b><span>Bas</span><b>${fp(b[3])}</b>` : '<span class="muted u-grid-column-1-n1">Bougie complète non disponible : cours de clôture du créneau seulement.</span>'}<span>Clôt.</span><b>${fp(b[4])} ${J.esc(d.currency || "")}</b><span>Volume</span><b>${b[5] === null ? "absent" : J.num(b[5], 0)}</b><span>Vs ouverture de séance</span><b class="${J.cls(b[4] - sOpen)}">${J.pct(100 * (b[4] / sOpen - 1), 2)}</b></div>${b[6] ? "" : '<div class="small warn">Barre provisoire : le créneau n’est pas terminé.</div>'}`;
       tip.hidden = false;
       const wr = svg.parentElement.getBoundingClientRect(),
         left = (best.x * r.width) / W + (r.left - wr.left);

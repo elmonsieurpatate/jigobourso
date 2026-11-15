@@ -74,3 +74,20 @@ def test_free_text_fields_are_escaped_in_templates():
             found.add((name, '${' + m.group(1) + '}'))
     unknown = found - REVIEWED_FREE_TEXT
     assert not unknown, f'texte libre non échappé dans un gabarit (passer par J.esc) : {sorted(unknown)}'
+
+
+def test_data_style_is_reserved_to_computed_values_and_every_utility_class_exists():
+    """F08 : data-style ne porte que des valeurs calculées (interpolation `${…}` ou concaténation) ; toute présentation fixe est une classe `u-…` définie dans base.css."""
+    files = [os.path.join(PUBLIC, 'assets', n) for n in os.listdir(os.path.join(PUBLIC, 'assets')) if n.endswith('.js')]
+    files += [os.path.join(PUBLIC, n) for n in os.listdir(PUBLIC) if n.endswith('.html')]
+    css = open(os.path.join(PUBLIC, 'assets', 'base.css'), encoding='utf-8').read()
+    used = set()
+    for f in sorted(files):
+        source = open(f, encoding='utf-8').read()
+        if os.path.basename(f) != 'core.js':  # core.js documente l'attribut dans un commentaire
+            static = [m for m in re.findall(r'data-style="([^"]*)"', source) if '$' not in m and "'" not in m and '+' not in m]
+            assert static == [], f'{os.path.basename(f)} : présentation fixe en data-style {static[:3]} (utiliser une classe u-…)'
+        used |= set(re.findall(r'(?<![\w-])(u-[a-z0-9-]+|is-off)(?![\w-])', source))
+    defined = set(re.findall(r'\.(u-[a-z0-9-]+|is-off)\s*\{', css))
+    assert used <= defined, sorted(used - defined)
+    assert defined <= used, f'classes définies mais inutilisées : {sorted(defined - used)}'

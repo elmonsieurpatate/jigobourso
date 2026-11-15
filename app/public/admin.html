@@ -3,7 +3,7 @@
 <body><main class="wrap admin-page"><header class="page-head"><div><span class="page-kicker">ESPACE TECHNIQUE</span><h1>Administration</h1><p>Gérez les sources, les filtres, les traitements et les comptes depuis un même espace.</p></div></header>
 <div id="page"><div class="empty"><span class="spinner"></span></div></div></main>
 <template id="admin-fdb-template">
-  <div id="runbar" class="notice" data-style="display:none"></div>
+  <div id="runbar" class="notice is-off"></div>
   <div class="admin-flow-intro"><div><span class="page-kicker">SOURCE DE DONNÉES</span><h2>FinanceDatabase</h2><p>Importez le catalogue, choisissez les titres à conserver, puis transmettez le résultat à Yahoo Finance.</p></div><div class="admin-flow-steps"><span>01 · Importer</span><span>02 · Filtrer</span><span>03 · Vérifier</span></div></div>
   <div class="admin-flow">
     <section class="card admin-stage admin-import" aria-labelledby="fdb-import-title"><header class="admin-stage-head"><span class="admin-stage-number">01</span><div><h2 id="fdb-import-title">Importer le catalogue</h2><p>Les données brutes sont conservées pour pouvoir changer les filtres sans nouveau téléchargement.</p></div></header><div class="admin-stage-body admin-import-grid"><div id="fdb-import-info"></div><div class="admin-action-panel"><div id="fdb-import-job"></div><button class="btn primary" id="go-import">Importer FinanceDatabase</button></div></div></section>

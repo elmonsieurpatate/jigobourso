@@ -300,12 +300,14 @@
     cur.setAttribute("x2", x);
     dot.setAttribute("cx", x);
     dot.setAttribute("cy", y);
-    cur.style.display = dot.style.display = "";
+    cur.classList.remove("is-off");
+    dot.classList.remove("is-off");
     $("#as-read").innerHTML = readout(i);
   }
   function chartLeave() {
     if (!chart || !$("#as-cur")) return;
-    $("#as-cur").style.display = $("#as-dot").style.display = "none";
+    $("#as-cur").classList.add("is-off");
+    $("#as-dot").classList.add("is-off");
     $("#as-read").innerHTML = readout(chart.pts.length - 1);
   }
 
@@ -418,7 +420,7 @@
       sim && sim.candidates && sim.candidates.length > 1
         ? `<div class="as-chips"><span class="muted">Autres correspondances :</span> ${sim.candidates.map((c) => `<button class="btn sm" data-a="sim-pick" data-id="${c.id}">${E(c.symbol)} <span class="muted">${E(c.name)}</span></button>`).join(" ")}</div>`
         : "";
-    return `<div class="card"><div class="row gap-s" data-style="flex-wrap:wrap;margin-bottom:8px"><span class="muted">Stratégie :</span> ${stratPicker()}</div>
+    return `<div class="card"><div class="row gap-s u-flex-wrap-wrap u-margin-bottom-8px"><span class="muted">Stratégie :</span> ${stratPicker()}</div>
         ${sim && sim.granularity ? `<p class="as-hint mb-2">${granText({ periods: sim.periods, sessions: sim.granularity })}</p>` : ""}
         <div class="as-searchrow"><input id="as-q" class="as-search" type="search" enterkeyhint="search" placeholder="Symbole, nom ou ISIN d’un titre noté" value="${E(simQ)}"><button class="btn primary" data-a="sim-run">Décomposer</button></div>
         <label class="row gap-s as-chk mt-2"><input type="checkbox" data-a="use-draft" ${useDraft ? "checked" : ""}> avec mes modifications non enregistrées</label>${cands}</div>
@@ -477,7 +479,7 @@
     const s = r.simple,
       c = r.complex,
       liq = r.liquidity || {};
-    return `<div class="card"><div class="row between" data-style="flex-wrap:wrap;gap:12px"><div><h3 class="as-h m-0">${E(sim.title.name)}</h3><span class="muted">${E(sim.title.symbol)} · ${E(sim.title.mic)} · ${sim.title.kind === "etf" ? "ETF" : "Action"}</span></div><div class="as-scores">${sc(s, "s")}${sc(c, "c")}</div></div>
+    return `<div class="card"><div class="row between u-flex-wrap-wrap u-gap-12px"><div><h3 class="as-h m-0">${E(sim.title.name)}</h3><span class="muted">${E(sim.title.symbol)} · ${E(sim.title.mic)} · ${sim.title.kind === "etf" ? "ETF" : "Action"}</span></div><div class="as-scores">${sc(s, "s")}${sc(c, "c")}</div></div>
       ${sim.tuning ? `<p class="as-hint">Normalisations utilisées par le calcul : saturation de dynamique <b>${fmt(sim.tuning.sat_a, 1)}</b> · référence d’accélération <b>${fmt(sim.tuning.accel_ref, 2)}</b> · volatilité <b>${E(VOLMODES[sim.tuning.vol_mode] || sim.tuning.vol_mode)}</b> · momentum <b>${E(HORIZONS[sim.tuning.momentum_horizon] || sim.tuning.momentum_horizon)}</b>.</p>` : ""}
       ${chartCard()}
       <div class="table-wrap"><table class="as-dec">${J.table.head(["Mesure", ...ids.map((i) => ({ label: `${E(L[i])}<br><small class="muted">poids réel ${fmt(100 * ((r.weights_effective || {})[i] || 0), 1)} %${r.periods[i] ? "" : " (période sans données)"}</small>`, num: true }))])}<tbody>

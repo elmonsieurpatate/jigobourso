@@ -104,7 +104,7 @@ J.lineChart = function (el, series, { ma = [], unit = "", time = false } = {}) {
   const off = series.length - ma.length;
   const maPath =
     ma.length > 1 ? ma.map((p, i) => (i ? "L" : "M") + X(i + off).toFixed(1) + " " + Y(p[1]).toFixed(1)).join("") : "";
-  el.innerHTML = `<svg class="chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Évolution du cours">${grid}${xl}<path class="area" d="${path}L${X(series.length - 1)} ${H - B}L${L} ${H - B}Z"/>${maPath ? `<path class="ma" d="${maPath}"/>` : ""}<path class="line" d="${path}"/><g id="hover"></g><rect x="${L}" y="${T}" width="${W - L - R}" height="${H - T - B}" fill="transparent" id="hit"/></svg><div class="small muted" id="readout" data-style="min-height:1.4em"></div>`;
+  el.innerHTML = `<svg class="chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Évolution du cours">${grid}${xl}<path class="area" d="${path}L${X(series.length - 1)} ${H - B}L${L} ${H - B}Z"/>${maPath ? `<path class="ma" d="${maPath}"/>` : ""}<path class="line" d="${path}"/><g id="hover"></g><rect x="${L}" y="${T}" width="${W - L - R}" height="${H - T - B}" fill="transparent" id="hit"/></svg><div class="small muted u-min-height-1-4em" id="readout"></div>`;
   const svg = el.querySelector("svg"),
     hit = el.querySelector("#hit"),
     ro = el.querySelector("#readout"),
@@ -136,7 +136,7 @@ J.barChart = function (el, data, { unit = "€" } = {}) {
     max = Math.max(...data.map((d) => Math.abs(d[1])), 1),
     bw = Math.min(70, (W - 20) / data.length - 12),
     mid = (H - B) / 2;
-  el.innerHTML = `<svg class="chart" viewBox="0 0 ${W} ${H}" data-style="height:200px"><line class="grid" x1="0" x2="${W}" y1="${mid}" y2="${mid}"/>${data
+  el.innerHTML = `<svg class="chart u-height-200px" viewBox="0 0 ${W} ${H}"><line class="grid" x1="0" x2="${W}" y1="${mid}" y2="${mid}"/>${data
     .map((d, i) => {
       const x = 20 + i * ((W - 20) / data.length),
         h = (Math.abs(d[1]) / max) * (mid - 18);
@@ -594,7 +594,7 @@ J.accountDialog = function () {
     title: "Mon compte",
     body: `<div class="row between"><span>Affichage</span><span class="seg" id="mode"><button type="button" data-v="simple">Simple</button><button type="button" data-v="advanced">Avancé</button></span></div>
     <div class="row between"><span>Thème</span><span class="seg" id="theme"><button type="button" data-v="auto">Auto</button><button type="button" data-v="light">Clair</button><button type="button" data-v="dark">Sombre</button></span></div>
-    <hr data-style="border:0;border-top:1px solid var(--line);width:100%"><h3>Mes coordonnées</h3>${J.field("Pseudo", `<input id="account-name" autocomplete="username" value="${J.esc(J.user.username)}" maxlength="30">`)}${J.field("E-mail", `<input id="account-email" type="email" autocomplete="email" value="${J.esc(J.user.email || "")}" maxlength="190">`)}<p class="account-note">Une nouvelle adresse doit être confirmée par e-mail. L’adresse actuelle reste utilisable jusque-là.</p><h3>Confirmer mes modifications</h3>${J.field("Mot de passe actuel", '<input type="password" id="pw0" autocomplete="current-password">')}${J.field("Nouveau (10 caractères minimum)", '<input type="password" id="pw1" autocomplete="new-password">')}`,
+    <hr class="u-border-0 u-border-top-1px-solid-var-line u-width-100pct"><h3>Mes coordonnées</h3>${J.field("Pseudo", `<input id="account-name" autocomplete="username" value="${J.esc(J.user.username)}" maxlength="30">`)}${J.field("E-mail", `<input id="account-email" type="email" autocomplete="email" value="${J.esc(J.user.email || "")}" maxlength="190">`)}<p class="account-note">Une nouvelle adresse doit être confirmée par e-mail. L’adresse actuelle reste utilisable jusque-là.</p><h3>Confirmer mes modifications</h3>${J.field("Mot de passe actuel", '<input type="password" id="pw0" autocomplete="current-password">')}${J.field("Nouveau (10 caractères minimum)", '<input type="password" id="pw1" autocomplete="new-password">')}`,
     actions: [
       {
         label: "Se déconnecter",

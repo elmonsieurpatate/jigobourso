@@ -106,7 +106,7 @@
     keywords: "glossaire définition mot lexique vocabulaire",
     lead: "Tous les mots, en une phrase.",
     beginner: () =>
-      `<dl class="help-dl" data-style="display:grid;grid-template-columns:minmax(0,210px) minmax(0,1fr);gap:8px 16px">${G.map(([t, d]) => `<dt data-style="font-weight:700">${t}</dt><dd class="m-0">${d}</dd>`).join("")}</dl>`,
+      `<dl class="help-dl u-display-grid u-grid-template-columns-v2 u-gap-8px-16px">${G.map(([t, d]) => `<dt class="u-font-weight-700">${t}</dt><dd class="m-0">${d}</dd>`).join("")}</dl>`,
     expert: null,
   });
 

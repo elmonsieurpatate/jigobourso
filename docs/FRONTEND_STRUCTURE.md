@@ -59,3 +59,11 @@ Règle : un script de page ne redéfinit ni `$`, ni `esc`, ni un formateur de no
 **Administration.** `admin-common.js` crée `window.AdminCore` (`tabs`, `page`, `tab()`, `render()` et les aides partagées) ; chaque fichier d'onglet s'y enregistre (`AdminCore.tabs.<nom>`) ; `admin.js`, chargé en dernier, fixe `page`, `tab()` et `render()` puis affiche l'onglet du hash. Ordre dans `admin.html` : `admin-common`, `admin-sources`, `admin-titres`, `admin-cron`, `admin-users`, `admin`.
 
 **Portefeuilles.** `pf-home.js` expose son état et ses aides à `pf-detail.js` par `window.PFHomeX` ; `pf-detail.js` (chargé après) expose `window.PfDetail { MAIN, openDetail, renderPlan }`.
+
+## Présentation fixe et valeurs calculées (F08)
+
+- Une présentation **fixe** (marge, largeur, grille, masquage…) est une classe utilitaire `u-<propriété>-<valeur>` définie dans `base.css` (une déclaration par classe, `!important` : le style en ligne qu'elle remplace l'emportait sur toute règle).
+- `data-style` ne porte plus que des valeurs **calculées** (largeur d'une barre de données, couleur d'une série), appliquées en CSSOM par `core.js` (la CSP interdit `style=`).
+- Un élément que le script masque puis réaffiche utilise `.is-off` (`classList.add/remove("is-off")`), jamais `style.display`.
+- `tests/fast/test_frontend_policy.py` interdit tout `data-style` fixe et vérifie que chaque classe `u-…` utilisée est définie et inversement.
+- `scripts/probe_utilities.cjs` (navigateur, base jetable) vérifie que chaque classe rencontrée donne le même style calculé que l'ancien style en ligne : 2026-11-15, 347 vérifications sur 45 des 66 classes (onglets d'administration, chapitres d'aide, fiches titre, stratégies), 0 écart. Les 21 autres classes n'apparaissent que dans des états non atteints par la sonde.

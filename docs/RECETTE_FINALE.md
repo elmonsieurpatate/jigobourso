@@ -32,7 +32,7 @@
   - transfert différé mais non atomique, fenêtre non mesurée sur l'hébergement ; sous-dépendances Python libres par décision (voir `docs/DELIVERY.md`) ;
   - recette visuelle manuelle des pages réelles après le dernier changement de code (la galerie automatisée est verte) ;
   - revue case par case du plan par une personne, mise à jour des documents de design hors README ;
-  - F07 (états dynamiques) et F08 (53 valeurs fixes dans `data-style` : conversion en classes = changement de spécificité CSS, à juger lors de la recette visuelle humaine). F16 est résolu (formatage).
+  - F07 et F08 fermés après coup (2026-11-15) : F08 par conversion en classes et sonde de parité (45/66 classes rencontrées, 0 écart) ; la recette visuelle humaine précède cette conversion. F16 est résolu (formatage).
 
 ## Limites de couverture
 - Données : bases synthétiques et copie de développement ; mesures de performance à 9 600 titres × 400 séances synthétiques, pas la production.

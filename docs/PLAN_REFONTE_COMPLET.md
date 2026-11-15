@@ -98,7 +98,7 @@ pas présenté comme réalisé.
 - [x] Étape 9 — Données, migrations et accès SQL. Clôturée 2026-11-14 : lint, js-check, css-check, visual, fast (692), e2e, integ (349) verts ; docs/DATA_CONTRACT.md.
 - [x] Étape 10 — Performance et observabilité. Clôturée 2026-11-14 : lint, js-check, css-check, visual, fast (697), e2e, integ (350) verts ; docs/PERFORMANCE.md (données synthétiques, limites indiquées).
 - [x] Étape 11 — Installation, CI, livraison et restauration. Clôturée 2026-11-15 : voir docs/DELIVERY.md ; Hostinger réel non testé (répétition locale à la place).
-- [x] Étape 12 — Nettoyage final, documentation et recette. Clôturée 2026-11-15 ; F07 et F08 restent ouverts (voir docs/RECETTE_FINALE.md).
+- [x] Étape 12 — Nettoyage final, documentation et recette. Clôturée 2026-11-15 ; F07 et F08 fermés le 2026-11-15 (voir docs/RECETTE_FINALE.md).
 
 ---
 
@@ -597,8 +597,8 @@ Pour chaque résolution, indiquer commit et test/preuve.
 - [x] F04 — Réponse API invalide acceptée. Étape 5. Preuve : 2026-11-14 : J.api lève « Réponse illisible » sur 2xx non JSON ; tests/e2e/core.cjs.
 - [x] F05 — Échec lint PHP masqué. Étape 5. Preuve : 2026-11-14 : scripts/lint_php.sh (code 1 sur erreur, 2 sans php/fichier) utilisé par make et la CI ; reproduit avant, tests/fast/test_lint_php.py.
 - [x] F06 — Contrôle financier ignorant les splits. Étape 6. Preuve : 2026-11-14 : check_financial_integrity.php et validation partagent oversold_transactions ; parité split_log/corporate_events contrôlée ; test_financial_parity.py.
-- [ ] F07 — Composants surchargés par les pages. Étapes 1–3. Preuve partielle (reste ouvert : états dynamiques, recette étape 3) : 2026-11-13, règles de page retirées (components/base/explorer/filtres/pf/help/splits/strategies-ui/admin-*.css) ; styles calculés conformes à la référence Halo sur 14 pages connecté, clair/sombre, 1280/390 px ; limites ci-dessous.
-- [ ] F08 — Présentation fixe dans data-style. Étapes 1–3. Preuve :
+- [x] F07 — Composants surchargés par les pages. Étapes 1–3. Preuve : 2026-11-15 : recette visuelle des pages réelles validée par l'utilisateur (« Visuel ok »), galerie de référence verte ; 2026-11-13, règles de page retirées (components/base/explorer/filtres/pf/help/splits/strategies-ui/admin-*.css) ; styles calculés conformes à la référence Halo sur 14 pages connecté, clair/sombre, 1280/390 px ; limites ci-dessous.
+- [x] F08 — Présentation fixe dans data-style. Étapes 1–3. Preuve : 2026-11-15 : 65 valeurs fixes converties en 66 classes utilitaires (base.css), `.is-off` pour les éléments réaffichés par script ; test_frontend_policy.py ; scripts/probe_utilities.cjs : 347 vérifications de parité de style calculé sur 45/66 classes, 0 écart ; docs/FRONTEND_STRUCTURE.md. Limite : 21 classes non rencontrées par la sonde.
 - [x] F09 — Écouteurs accumulés. Étape 4. Preuve : 2026-11-14 : picker, openInfo, détail pf-home ; écouteurs retirés par AbortController.
 - [x] F10 — Routes/services PHP incomplets. Étape 7. Preuve : 2026-11-14 : services/portfolios.php (17 cas d'usage sans HTTP), routes minces, own_transaction/tx_carry_fx, tests/fast/test_php_structure.py, docs/ARCHITECTURE_PHP.md.
 - [x] F11 — Dépendances Python mal orientées. Étape 8. Preuve : 2026-11-14 : 6 cycles (imports différés compris) supprimés, 0 restant ; tests/fast/test_python_dependencies.py ; docs/ARCHITECTURE_PYTHON.md.
@@ -836,3 +836,9 @@ Formatage JS (Prettier, commit 4613946, `make js-format` / `make js-check`). Cyc
 - Transfert `rsync --delay-updates --delete-delay` ; `check_env.py` exécuté sur le serveur après installation ; répétition locale `ok` et `fail-deps` rejouée : verte.
 - `ruff format` appliqué (commit de formatage seul) ; fast 707, e2e, integ 350, visual verts avant et après.
 - F08 laissé ouvert : 53 valeurs fixes distinctes dans `data-style` ; les convertir en classes change la spécificité CSS (le style en ligne l'emporte toujours) et ne peut pas être jugé sans recette visuelle humaine des pages réelles.
+
+## Journal — F08 (2026-11-15)
+
+- 65 présentations fixes de `data-style` converties en classes atomiques `u-…` (`base.css`), `.is-off` pour `#runbar`, `#as-cur`, `#as-dot` (réaffichés par script : `classList` à la place de `style.display`).
+- Gardes : test_frontend_policy.py ; sonde de parité en navigateur (0 écart sur 347 vérifications).
+- La recette visuelle « Visuel ok » précède cette conversion : un nouveau coup d'œil sur admin, aide, fiche titre et stratégies est recommandé.

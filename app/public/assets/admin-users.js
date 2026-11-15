@@ -77,7 +77,7 @@
     const s = (await J.api("admin/system")).settings;
     AC.page.innerHTML = `<div class="notice">Les seuils du catalogue et du préfiltre Yahoo se règlent désormais dans <a href="#fdb">FinanceDatabase</a> et <a href="#yahoo">Yahoo Finance</a>.</div>
       <div class="grid cols-2 mt-4"><div class="card"><h2>Historique 15 minutes</h2>${J.field("Séances conservées (5 à 60)", `<input id="ret" type="number" min="5" max="60" value="${s.intraday_retention_sessions ?? 20}">`)}<button class="btn primary mt-3" id="sv-ret">Enregistrer</button></div>
-      <div class="card"><h2>Inscriptions</h2><p class="muted small">Un mot d’invitation permet aux personnes qui le connaissent de créer un compte. Vide = inscriptions fermées. ${s.invite_code ? `Mot actuel (masqué) : <b class="mono" id="inv-now" data-style="user-select:all">${J.esc(s.invite_code)}</b>` : "Aucun mot défini : les inscriptions sont fermées."}</p>${J.field("Nouveau mot d’invitation", '<input id="inv" autocomplete="off">')}<button class="btn primary mt-3" id="sv-inv">Enregistrer</button></div></div>
+      <div class="card"><h2>Inscriptions</h2><p class="muted small">Un mot d’invitation permet aux personnes qui le connaissent de créer un compte. Vide = inscriptions fermées. ${s.invite_code ? `Mot actuel (masqué) : <b class="mono u-user-select-all" id="inv-now">${J.esc(s.invite_code)}</b>` : "Aucun mot défini : les inscriptions sont fermées."}</p>${J.field("Nouveau mot d’invitation", '<input id="inv" autocomplete="off">')}<button class="btn primary mt-3" id="sv-inv">Enregistrer</button></div></div>
       <div class="card mt-4"><h2>Base de données</h2><div id="tb"><span class="spinner"></span></div></div>`;
     const save = async (name, value) => {
       await J.post("admin/settings", { name, value });
@@ -91,7 +91,7 @@
         .catch((e) => J.toast(e.message));
     const sys = await J.api("admin/system");
     J.$("#tb").innerHTML =
-      `<p class="small muted">${J.num(sys.total_mb, 0)} Mo utilisés (plafond hébergeur : 3 072 Mo)</p><div class="table-wrap" data-style="max-height:260px;overflow:auto"><table><tbody>${sys.tables.map((t) => `<tr><td>${J.esc(t.name)}</td><td class="num">${J.num(+t.rows, 0)} lignes</td><td class="num">${J.num(+t.mb, 1)} Mo</td></tr>`).join("")}</tbody></table></div>`;
+      `<p class="small muted">${J.num(sys.total_mb, 0)} Mo utilisés (plafond hébergeur : 3 072 Mo)</p><div class="table-wrap u-max-height-260px u-overflow-auto"><table><tbody>${sys.tables.map((t) => `<tr><td>${J.esc(t.name)}</td><td class="num">${J.num(+t.rows, 0)} lignes</td><td class="num">${J.num(+t.mb, 1)} Mo</td></tr>`).join("")}</tbody></table></div>`;
   }
   Object.assign(AC.tabs, { users, settings });
 })();

@@ -24,7 +24,7 @@
   const pct = (a, b) => (b ? J.num((100 * a) / b, 1) + " %" : "–");
   J.$("#data-status").textContent =
     `État consulté le ${J.dateTime(o.now_utc)} (heure locale) · ${J.num(tot.stale, 0)} titre${tot.stale === 1 ? "" : "s"} en retard selon sa place.`;
-  page.innerHTML = `  <div class="grid cols-2" data-style="gap:14px">
+  page.innerHTML = `  <div class="grid cols-2 u-gap-14px">
    <div class="card"><div class="row between"><h2 class="m-0">Catalogue · ${J.esc(c.source)}</h2><span class="badge ok">Source d’identité</span></div>
      <p class="small muted mt-2 mb-3">Qui est quoi : nom, type (action ou ETF), pays, secteur, ISIN, places de cotation. FinanceDatabase fournit la liste des titres ; elle ne fournit aucun cours.</p>
      <table class="dense"><tbody><tr><td class="muted">Dernier chargement</td><td>${J.dateTime(c.loaded_at)}</td></tr><tr><td class="muted">Version de la source</td><td>${J.esc(c.commit || "–")}</td></tr>
@@ -62,7 +62,7 @@
      <td class="num">${pct(x.ok, x.followed)}</td><td class="num ${x.incomplete ? "warn" : ""}">${x.incomplete}</td><td class="num ${x.calendar_unknown ? "warn" : ""}">${x.calendar_unknown}</td><td class="num">${pct(x.full_year, x.followed)}</td><td class="num">${x.insufficient}</td><td class="num ${x.broken ? "warn" : ""}">${x.broken}</td><td class="num ${x.stale ? "warn" : ""}">${x.stale}</td></tr>`,
      )
      .join("")}</tbody></table></div></div>
-  <div class="card mt-4"><h2>Ce que signifient ces indicateurs</h2><div class="grid cols-2" data-style="gap:10px">
+  <div class="card mt-4"><h2>Ce que signifient ces indicateurs</h2><div class="grid cols-2 u-gap-10px">
    <div class="metric"><div class="l">Retard</div><div class="s">La dernière clôture du titre est antérieure à celle de sa place : les mesures peuvent être décalées.</div></div>
    <div class="metric"><div class="l">Rupture de cours</div><div class="s">Saut de cours inhabituel (regroupement d’actions non ajusté, erreur de la source ou vrai mouvement) : les périodes qui le contiennent ne sont pas mesurées par prudence.</div></div>
    <div class="metric"><div class="l">Historique court</div><div class="s">Moins de séances que la période exigée : le titre est « non évaluable » plutôt que jugé sur trop peu de données.</div></div>

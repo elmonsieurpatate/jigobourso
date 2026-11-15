@@ -39,7 +39,7 @@
       "15 min",
       "Mise à jour / problème",
     ];
-    AC.page.innerHTML = `${runBar()}<div class="card flush"><div class="row card-bar"><input id="tq" type="search" placeholder="Nom, symbole ou ISIN" value="${J.esc(tf.q)}" data-style="flex:1;min-width:180px">
+    AC.page.innerHTML = `${runBar()}<div class="card flush"><div class="row card-bar"><input class="u-flex-1 u-min-width-180px" id="tq" type="search" placeholder="Nom, symbole ou ISIN" value="${J.esc(tf.q)}">
         <select id="tk">${opt(tf.kind, [
           ["", "Actions et ETF"],
           ["equity", "Actions"],
@@ -69,7 +69,7 @@
           ["partial", "Incomplet"],
           ["absent", "Absent"],
         ])}</select></div>
-      ${r.raw_total ? "" : '<div class="notice" data-style="margin:0 18px 12px">Aucun titre connu : importez et filtrez FinanceDatabase (page FinanceDatabase).</div>'}
+      ${r.raw_total ? "" : '<div class="notice u-margin-0-18px-12px">Aucun titre connu : importez et filtrez FinanceDatabase (page FinanceDatabase).</div>'}
       <div class="table-wrap"><table>${J.table.head(cols, { key: tf.sort, dir: tf.dir })}<tbody>
       ${
         r.rows
