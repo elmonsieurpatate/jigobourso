@@ -3,10 +3,11 @@
 // Usage : BASE=http://127.0.0.1:18089 USER_NAME=… PASS=… PLAYWRIGHT_MODULE=… JIGO_CHROMIUM=… node scripts/probe_utilities.cjs
 const fs = require('fs'), path = require('path');
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright-core');
+const galleryServer = require('../tests/visual/gallery-server.cjs');
 const BASE = process.env.BASE || 'http://127.0.0.1:18089';
 const css = fs.readFileSync(path.join(__dirname, '../app/public/assets/base.css'), 'utf8');
 const decl = {};
-for (const m of css.matchAll(/\.((?:u-[a-z0-9-]+|is-off))\s*\{\s*([a-z-]+):\s*([^;!]+?)\s*!important;/g)) decl[m[1]] = [m[2], m[3]];
+for (const m of css.matchAll(/\.((?:u-[a-z0-9-]+|is-off))\s*\{\s*([a-z-]+):\s*([^;!]+?)\s*!important\s*(?:;|(?=\}))/g)) decl[m[1]] = [m[2], m[3]];
 function parity(decl) {
   const out = { n: 0, seen: [], bad: [] };
   for (const el of document.querySelectorAll('[class*="u-"], .is-off')) {
@@ -36,6 +37,7 @@ const defined = new Set([...css.matchAll(/\.((?:u-[a-z0-9-]+|is-off))\s*\{/g)].m
 if (!defined.size || defined.size !== Object.keys(decl).length) throw new Error('Une classe utilitaire échappe au parseur de déclarations');
 
 (async () => {
+  const gallery = await galleryServer();
   const browser = await chromium.launch({ executablePath: process.env.JIGO_CHROMIUM });
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const page = await context.newPage();
@@ -44,7 +46,7 @@ if (!defined.size || defined.size !== Object.keys(decl).length) throw new Error(
   // de cascade. Ce contrat ne remplace pas les parcours des vraies pages ci-dessous.
   for (const width of [390, 1280]) for (const theme of ['light', 'dark']) {
     await page.setViewportSize({ width, height: 900 });
-    await page.goto(process.env.GALLERY_URL || 'file://' + path.resolve(__dirname, '../design/galerie.html'));
+    await page.goto(gallery.url);
     await page.evaluate(([names, theme]) => {
       document.documentElement.dataset.theme = theme;
       const host = document.createElement('section'); host.className = 'card';
@@ -60,7 +62,7 @@ if (!defined.size || defined.size !== Object.keys(decl).length) throw new Error(
     contracts += r.n;
   }
   console.log(`Contrats utilitaires : ${Object.keys(decl).length}/${Object.keys(decl).length} classes, ${contracts} comparaisons (2 thèmes × 2 largeurs × 3 contextes).`);
-  if (process.argv.includes('--contracts-only')) { await browser.close(); return; }
+  if (process.argv.includes('--contracts-only')) { await browser.close(); await gallery.close(); return; }
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto(BASE + '/login.html'); await page.fill('#u', process.env.USER_NAME); await page.fill('#p', process.env.PASS);
   await page.click('#auth-form button.primary'); await page.waitForURL('**/index.html');
@@ -81,7 +83,7 @@ if (!defined.size || defined.size !== Object.keys(decl).length) throw new Error(
   console.log('classes distinctes rencontrées :', seen.size, '/', Object.keys(decl).length, ' vérifications :', checked, ' écarts :', bad.length);
   console.log('Couvertes par contrat seulement :', Object.keys(decl).filter(c => !seen.has(c)).join(', '));
   bad.slice(0, 10).forEach(b => console.log('ÉCART', JSON.stringify(b)));
-  await browser.close(); process.exit(bad.length ? 1 : 0);
+  await browser.close(); await gallery.close(); process.exit(bad.length ? 1 : 0);
 })();
 
 process.on('unhandledRejection', e => { console.error(e.message); process.exit(1); });

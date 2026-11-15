@@ -12,8 +12,8 @@ corrections locales.
 - [x] A05 — Garde-fou CSS structurel et tests négatifs.
 - [x] A06 — Cas d'usage PHP hors des routes, contrats et garde-fous communs.
 - [x] A07 — Contrôleurs JS séparés par responsabilité.
-- [ ] A08 — Validation commune PR/main sans secret de production côté PR.
-- [ ] A09 — Runner des parcours actifs, scénarios historiques classés.
+- [x] A08 — Validation commune PR/main sans secret de production côté PR.
+- [x] A09 — Runner des parcours actifs, scénarios historiques classés.
 - [ ] A10 — Mesure reproductible et représentative, sans optimisation supposée.
 - [ ] A11 — Releases cohérentes et dépendances reproductibles.
 - [ ] A12 — Documentation courante, historique et preuves cohérents.
@@ -66,3 +66,21 @@ Compléments A04/A07 : fondations CSS réparties par familles cohérentes au lie
 d’un bloc hérité de 923 lignes ; sorties compilées strictement identiques.
 Les vues Simulation et Suivi des calculs sont également extraites du contrôleur
 Scores ; les appels réseau et les événements restent dans ce dernier.
+
+A08/A09 : qualité, pytest sans tests sautés et recette navigateur regroupés dans
+les mêmes trois scripts, appelés sur PR et main ; le workflow PR reste en lecture
+seule et sans secret de production. Le runner entier réussit sur la base jetable :
+galerie, contrastes, utilitaires, filtres personnels, aperçu en panne/reprise,
+parcours financier, clavier, fiche, stratégies, comptes, suivi, splits et portefeuille.
+Chaque groupe métier dispose d’un seed et de comptes explicites ; le README
+classe les sondes Node et les anciennes recettes au lieu de les compter comme
+couverture actuelle. Les sélecteurs historiques remplacés conservent les assertions
+métier (badge de stratégie). Suivi : 320/390/768/1440 px ; portefeuille :
+320/375/390/430/768/1024/1440 px ; splits : mobile/bureau, droits et idempotence.
+
+A11, partie dépendances : manifestes runtime et développement verrouillés avec
+leurs transitives, résolution Python 3.9 ; 739 tests rapides exécutés sous Python
+3.9 sans saut. Le pip système doit correspondre au majeur/mineur du venv ;
+20 tests d’environnement passent, dont refus avant installation si incompatible.
+La réparation sait réutiliser une paire sans ancienne archive générique.
+La publication atomique reste ouverte : voir RELEASE_ATOMICITY.md.

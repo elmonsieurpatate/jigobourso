@@ -2,7 +2,7 @@
 // Compare à tests/visual/galerie.json ; `node tests/visual/galerie.cjs --update` régénère la référence après un changement de design VOULU.
 // Captures PNG écrites dans tests/visual/out/ (ignorées par Git) pour la revue humaine.
 const fs = require('fs'), path = require('path');
-const http = require('http');
+const galleryServer = require('./gallery-server.cjs');
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE);
 const ROOT = path.resolve(__dirname, '../..'), REF = path.join(__dirname, 'galerie.json'), OUT = path.join(__dirname, 'out');
 const PROPS = ['fontSize', 'fontWeight', 'letterSpacing', 'lineHeight', 'color', 'backgroundColor', 'borderTopWidth', 'borderTopColor', 'borderTopLeftRadius', 'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'height', 'width', 'boxShadow'];
@@ -15,22 +15,8 @@ const TARGETS = {
   card: 'section.card', notice: '.notice:not(.warn):not(.err)', noticeWarn: '.notice.warn', noticeErr: '.notice.err', kpi: '.card.kpi', th: 'th', td: 'td',
 };
 (async () => {
-  // Servir la galerie en HTTP comme les pages réelles, y compris dans les
-  // navigateurs qui interdisent file:. Le serveur écoute seulement en local.
-  let server;
-  let url = process.env.GALLERY_URL;
-  if (!url) {
-    server = http.createServer((req, res) => {
-      const name = new URL(req.url, 'http://localhost').pathname;
-      if (name !== '/design/galerie.html' && !/^\/app\/public\/assets\/[\w./-]+$/.test(name)) { res.writeHead(404).end(); return; }
-      const file = path.resolve(ROOT, '.' + name);
-      if (!file.startsWith(ROOT + path.sep)) { res.writeHead(403).end(); return; }
-      const type = { '.css': 'text/css', '.js': 'application/javascript', '.html': 'text/html', '.ttf': 'font/ttf', '.svg': 'image/svg+xml' }[path.extname(file)] || 'application/octet-stream';
-      fs.readFile(file, (err, data) => { res.writeHead(err ? 404 : 200, { 'Content-Type': type }); res.end(err ? '' : data); });
-    });
-    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-    url = `http://127.0.0.1:${server.address().port}/design/galerie.html`;
-  }
+  const gallery = await galleryServer();
+  const url = gallery.url;
   const browser = await chromium.launch({ executablePath: process.env.JIGO_CHROMIUM });
   const snap = {}; fs.mkdirSync(OUT, { recursive: true });
   for (const [w, mode] of [[1280, 'light'], [1280, 'dark'], [390, 'light'], [390, 'dark']]) {
@@ -64,7 +50,7 @@ const TARGETS = {
     await ctx.close();
   }
   await browser.close();
-  if (server) await new Promise(resolve => server.close(resolve));
+  await gallery.close();
   if (process.argv.includes('--update')) { fs.writeFileSync(REF, JSON.stringify(snap, null, 1) + '\n'); console.log('Référence mise à jour :', REF); return; }
   const ref = JSON.parse(fs.readFileSync(REF, 'utf8')), diffs = [];
   for (const ctx of Object.keys(snap)) for (const k of Object.keys(snap[ctx])) if (snap[ctx][k] !== (ref[ctx] || {})[k]) diffs.push(`${ctx} ${k}\n  attendu ${(ref[ctx] || {})[k]}\n  obtenu  ${snap[ctx][k]}`);

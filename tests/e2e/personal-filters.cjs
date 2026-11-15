@@ -1,8 +1,8 @@
 /* API PHP réelle et base jetable : gestion personnelle des définitions, sans stratégie. */
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright'),assert=require('node:assert/strict');
 const BASE=process.env.BASE||'http://127.0.0.1:18193';assert.equal(new URL(BASE).hostname,'127.0.0.1');
-(async()=>{const b=await chromium.launch({executablePath:'/usr/bin/chromium',args:['--no-sandbox']});try{
- const owner=await b.newContext({viewport:{width:390,height:900}}),other=await b.newContext(),admin=await b.newContext();
+(async()=>{const b=await chromium.launch({executablePath:process.env.JIGO_CHROMIUM,args:['--no-sandbox']});try{
+ const owner=await b.newContext({extraHTTPHeaders:{Origin:BASE},viewport:{width:390,height:900}}),other=await b.newContext({extraHTTPHeaders:{Origin:BASE}}),admin=await b.newContext({extraHTTPHeaders:{Origin:BASE}});
  for(const [ctx,name] of [[owner,'filters-owner'],[other,'filters-other'],[admin,'filters-admin']])assert.equal((await ctx.request.post(BASE+'/api.php?r=auth/login',{data:{username:name,password:'personal-filters-local-only'}})).status(),200);
  const get=async(ctx,route='explorer/secondary-filters')=>{const r=await ctx.request.get(BASE+'/api.php?r='+route);assert.equal(r.status(),200);return r.json();};
  const canonical=await get(admin,'admin/secondary-filters'),find=(s,id)=>s.definitions.filters.find(f=>f.id===id);
