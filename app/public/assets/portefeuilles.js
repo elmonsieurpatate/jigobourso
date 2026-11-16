@@ -562,27 +562,31 @@
       body: `<p class="small muted">Prix dans la devise du titre (${J.esc(cur || "")}). Repères personnels : rien n’est vendu automatiquement. Cours : ${px(p.price, cur)} · prix de revient moyen : ${J.eur(p.avg_cost)}.</p>${J.field("Filet de sécurité (stop)", `<input id="lv-stop" inputmode="decimal" value="${L.stop ?? ""}">`)}${J.field("Objectif", `<input id="lv-target" inputmode="decimal" value="${L.target ?? ""}">`)}`,
       actions: [
         { label: "Annuler", run: () => {} },
-        {
-          label: "Enregistrer",
-          cls: "primary",
-          run: async (dlg) => {
-            const n = (i) => J.$(i, dlg).value.trim().replace(",", ".");
-            try {
-              await J.post("position/levels", {
+        saveAction("position/levels", (n) => ({
                 portfolio_id: current,
                 listing_id: p.listing_id,
                 stop: n("#lv-stop"),
                 target: n("#lv-target"),
-              });
-            } catch (e) {
-              J.formError(dlg, e.message);
-              return true;
-            }
-            render();
-          },
-        },
+        })),
       ],
     });
+  }
+  // Bouton « Enregistrer » d'une fenêtre : lit les champs (virgule décimale acceptée), envoie, affiche l'erreur dans la fenêtre ou rafraîchit.
+  function saveAction(route, payload) {
+    return {
+      label: "Enregistrer",
+      cls: "primary",
+      run: async (dlg) => {
+        const field = (i) => J.$(i, dlg).value.trim().replace(",", ".");
+        try {
+          await J.post(route, payload(field));
+        } catch (e) {
+          J.formError(dlg, e.message);
+          return true;
+        }
+        render();
+      },
+    };
   }
   function lotDialog(d, l) {
     const s = l.settings || {},
@@ -599,25 +603,12 @@
       ${J.field("Stratégie de cet achat", `<select id="lt-st">${opts}</select>`)}${J.field("Rappel après (jours de détention)", `<input id="lt-days" inputmode="numeric" value="${s.alert_days ?? ""}" placeholder="défaut de la stratégie">`)}${J.field("Alerte si recul depuis le plus haut (%)", `<input id="lt-drop" inputmode="decimal" value="${s.alert_drop_pct ?? ""}" placeholder="défaut de la stratégie">`)}`,
       actions: [
         { label: "Annuler", run: () => {} },
-        {
-          label: "Enregistrer",
-          cls: "primary",
-          run: async (dlg) => {
-            const v = (i) => J.$(i, dlg).value.trim().replace(",", ".");
-            try {
-              await J.post("lot/settings", {
+        saveAction("lot/settings", (v) => ({
                 tx_id: l.tx_id,
                 strategy: v("#lt-st"),
                 alert_days: v("#lt-days"),
                 alert_drop_pct: v("#lt-drop"),
-              });
-            } catch (e) {
-              J.formError(dlg, e.message);
-              return true;
-            }
-            render();
-          },
-        },
+        })),
       ],
     });
   }
@@ -628,23 +619,10 @@
       body: `<p class="small muted">Trois parts en %, total 100.</p>${J.field("États-Unis (%)", `<input id="al-us" inputmode="decimal" value="${t.us}">`)}${J.field("Europe (%)", `<input id="al-eu" inputmode="decimal" value="${t.eu}">`)}${J.field("Émergents (%)", `<input id="al-em" inputmode="decimal" value="${t.emerging}">`)}`,
       actions: [
         { label: "Annuler", run: () => {} },
-        {
-          label: "Enregistrer",
-          cls: "primary",
-          run: async (dlg) => {
-            const n = (i) => J.$(i, dlg).value.trim().replace(",", ".");
-            try {
-              await J.post("portfolio/target", {
+        saveAction("portfolio/target", (n) => ({
                 id: current,
                 target: { us: n("#al-us"), eu: n("#al-eu"), emerging: n("#al-em") },
-              });
-            } catch (e) {
-              J.formError(dlg, e.message);
-              return true;
-            }
-            render();
-          },
-        },
+        })),
       ],
     });
   }

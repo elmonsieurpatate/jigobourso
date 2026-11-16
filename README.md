@@ -14,7 +14,7 @@ Aucun framework. Dépendances directes : PyMySQL, NumPy, pandas et exchange_cale
 | `scripts/` | base locale, migrations, vérifications de version (voir `scripts/README.md`) |
 | `ops/` | déploiement et exploitation (`deploy.sh`, rapports, journaux) |
 | `tests/` | `fast/` (sans base), `integ/` (MariaDB jetable), `php/` (services PHP), `seeds/` (données), `e2e/` (navigateur, Node) ; voir `tests/e2e/README.md` |
-| `docs/` | architecture, méthode, sécurité, déploiement, structure du front |
+| `docs/` | architecture, méthode, sécurité, déploiement, structure du front ; **pour ajouter une fonctionnalité : `docs/AJOUTER_UNE_FONCTIONNALITE.md`** |
 
 ## Démarrage depuis zéro
 

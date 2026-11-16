@@ -1,6 +1,9 @@
 <?php
 // Journal des requêtes lentes : route, identifiant de requête et décomposition des durées (voir server_timing dans lib/http.php).
-register_shutdown_function(function () { if ((microtime(true) - (float)($_SERVER['REQUEST_TIME_FLOAT'] ?? microtime(true))) * 1000 >= (int)(getenv('JIGO_SLOW_MS') ?: SLOW_MS)) error_log('lent [' . request_id() . '] ' . ($_GET['r'] ?? '?') . ' ' . server_timing()); });
+register_shutdown_function(function () {
+    $elapsedMs = (microtime(true) - (float)($_SERVER['REQUEST_TIME_FLOAT'] ?? microtime(true))) * 1000;
+    if ($elapsedMs >= (int)(getenv('JIGO_SLOW_MS') ?: SLOW_MS)) error_log('lent [' . request_id() . '] ' . ($_GET['r'] ?? '?') . ' ' . server_timing());
+});
 // Point d'entrée unique de l'API : /api.php?r=<route>
 require_once __DIR__ . '/../lib/http.php';
 require_once __DIR__ . '/../lib/auth.php';
