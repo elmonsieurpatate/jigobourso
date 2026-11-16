@@ -5,6 +5,8 @@
   const { nf, runBar } = AC;
   // ───────── Actions / ETF ─────────
   const tf = { q: "", kind: "", mic: "", fdb: "", yahoo: "", final: "", daily: "", sort: "name", dir: "asc", page: 1 };
+  AC.titresFilter = (patch) =>
+    Object.assign(tf, { q: "", kind: "", mic: "", fdb: "", yahoo: "", final: "", daily: "", page: 1 }, patch); // utilisée par les tuiles de l'onglet Yahoo
   const titresLatest = J.latest();
   async function titres() {
     const ticket = titresLatest.next();
@@ -81,7 +83,7 @@
         <td>${x.in_final ? '<span class="badge ok">Oui</span>' : '<span class="badge danger">Non</span>'}${x.held ? ' <span class="badge accent">détenu</span>' : ""}</td>
         <td class="small">${x.reason ? `<b>${J.esc(x.reason.stage)}</b>${x.reason.rule ? " · " + J.esc(x.reason.rule) : ""}<div class="muted">${J.esc(x.reason.detail || "")}</div>` : "–"}</td>
         <td class="num small">${x.price != null ? J.num(x.price, 2) + " " + J.esc(x.pcur || "") + `<div class="muted">${x.price_time ? J.dateTime(x.price_time) : ""}</div>` : "–"}</td>
-        <td>${x.in_final ? badge(x.d_state) + `<div class="small muted">${x.closes_count != null ? x.closes_count + " séances" : ""}</div>` : "–"}</td><td>${x.in_final ? (x.intraday_state === "na" ? '<span class="small muted">non géré</span>' : badge(x.intraday_state)) : "–"}</td>
+        <td>${x.in_final ? badge(x.d_state) + `<div class="small muted">${x.closes_count != null ? x.closes_count + " séances" : ""}${x.last_close_date ? " · dernière " + J.date(x.last_close_date) : ""}</div>` : "–"}</td><td>${x.in_final ? (x.intraday_state === "na" ? '<span class="small muted">non géré</span>' : badge(x.intraday_state)) : "–"}</td>
         <td class="small">${x.issue ? `<span class="warn">${J.esc(x.issue)}</span>` : x.quote_at ? "Infos Yahoo " + J.ago(x.quote_at) : "–"}</td></tr>`,
           )
           .join("") || '<tr><td colspan="10" class="empty">Aucun titre.</td></tr>'

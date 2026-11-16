@@ -161,6 +161,61 @@
     };
     J.$$("tr[data-job]").forEach((tr) => (tr.onclick = () => jobDialog(tr.dataset.job)));
   }
+  // Traduit un message du journal en gravité, cause et action. Le texte brut reste affiché dessous.
+  const LOG_RULES = [
+    [
+      /RateLimited|429/,
+      [
+        "Sans gravité",
+        "ok",
+        "Yahoo a limité le nombre de requêtes.",
+        "Rien à faire : l’étape est rejouée automatiquement au passage suivant.",
+      ],
+    ],
+    [
+      /mariadb-dump|Sauvegarde/,
+      [
+        "Grave",
+        "danger",
+        "La sauvegarde des données utilisateur a échoué.",
+        "À corriger vite : aucune copie récente des comptes et transactions.",
+      ],
+    ],
+    [
+      /InterfaceError|OperationalError|MySQL|Lost connection|gone away/,
+      [
+        "À surveiller",
+        "warn",
+        "La connexion à la base a été coupée.",
+        "Sans suite si ça ne se répète pas ; sinon contactez l’hébergeur.",
+      ],
+    ],
+    [
+      /Timeout|timed out|ConnectionError|Max retries/,
+      [
+        "À surveiller",
+        "warn",
+        "Yahoo n’a pas répondu à temps.",
+        "Relancez le traitement plus tard ; les titres manquants seront redemandés.",
+      ],
+    ],
+  ];
+  function explainLog(l) {
+    const hit = LOG_RULES.find(([re]) => re.test(l.message));
+    const [sev, cls, what, action] = hit
+      ? hit[1]
+      : l.level === "error"
+        ? [
+            "À examiner",
+            "danger",
+            "Une étape a échoué.",
+            "Ouvrez le texte brut ci-dessous ; sans cause évidente, relancez le traitement.",
+          ]
+        : ["À surveiller", "warn", "Avertissement.", "Aucune action immédiate."];
+    const step = l.message.includes(" : ") ? l.message.split(" : ")[0] : "";
+    return `<div class="mb-3">${J.badge(sev, cls)} ${step ? `<b>${J.esc(step)}</b> · ` : ""}${what}<div class="small">${action}</div><div class="small muted">${J.dateTime(l.logged_at)} · ${J.esc(l.message)}</div></div>`;
+  }
+
   // Contenu du détail d'un traitement ; relu toutes les 3 s tant que le traitement tourne.
   function jobBody(d) {
     const j = d.job;
@@ -174,7 +229,7 @@
     return `<p class="small">Départ ${J.dateTime(j.started_at)} · fin ${j.finished_at ? J.dateTime(j.finished_at) : "–"} · ${j.items_ok ?? "–"} réussis · ${j.items_error} erreurs · <span class="badge ${STATE[j.status][0]}">${STATE[j.status][1]}</span><br>${J.esc(j.summary || "")}</p>
       ${d.steps.length ? `<h4>Étapes</h4><div class="table-wrap"><table>${J.table.head(["#", "Étape", ["Durée", "num"], "Détail"])}<tbody>${d.steps.map((s) => `<tr><td>${s.seq}</td><td>${J.esc(s.name)}</td><td class="num">${dur(s.duration_ms / 1000)}</td><td class="small">${J.esc(s.detail || "")}</td></tr>`).join("")}</tbody></table></div>` : '<p class="muted small">Ce traitement n’a pas enregistré d’étapes détaillées.</p>'}
       ${funnels}<p class="small muted">Pour consulter les titres exclus à chaque étape : <a href="#fdb">FinanceDatabase</a> · <a href="#yahoo">Yahoo Finance</a> (état de la dernière exécution).</p>
-      <h4>Messages</h4>${d.logs.map((l) => `<div class="reason ${l.level === "error" ? "fail" : "missing"} mb-2"><span class="mark">${l.level === "error" ? "✗" : "!"}</span><span class="small">${J.dateTime(l.logged_at)} · ${J.esc(l.message)}</span></div>`).join("") || '<p class="muted">Aucun message : traitement sans incident.</p>'}`;
+      <h4>Messages</h4>${d.logs.map(explainLog).join("") || '<p class="muted">Aucun message : traitement sans incident.</p>'}`;
   }
   async function jobDialog(id) {
     let d = await J.api("admin/job", { params: { id } });

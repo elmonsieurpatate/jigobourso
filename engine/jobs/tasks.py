@@ -161,7 +161,7 @@ def yahoo_info(conn, client, now, log):
     errors = stats.get('errors', 0)
     missing = err - errors
     save_stats(conn, 'yahoo_info', now, requested=len(rows), recovered=ok, missing=missing, errors=errors)
-    return ok, err, f'{ok} reçues · {missing} sans information · {errors} en erreur (sur {len(rows)} demandées)'
+    return ok, errors, f'{ok} reçues · {missing} sans information · {errors} en erreur (sur {len(rows)} demandées)'
 
 
 def yahoo_filter(conn, log, now=None):

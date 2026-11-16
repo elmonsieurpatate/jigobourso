@@ -45,6 +45,7 @@
     J.$("#fdb-next").innerHTML = none
       ? ""
       : `Résultat transmis à Yahoo : <b>${nf(f.steps[f.steps.length - 1].kept)} titres</b>. <a href="#yahoo">Continuer vers Yahoo Finance →</a>`;
+    J.$$("a[data-hist]").forEach((a) => (a.onclick = () => AC.titresFilter({ final: "1", daily: a.dataset.hist })));
     bindForm();
     bindJobLinks();
     poll();
@@ -98,8 +99,8 @@
       <div class="card card-accent mt-4"><h2>C · Mon catalogue final et ses historiques</h2>
         <div class="grid cols-4"><div class="kpi"><span class="l">Titres du catalogue</span><span class="v">${nf(fin.total)}</span><span class="small muted">${nf(fin.equity)} actions · ${nf(fin.etf)} ETF</span></div>
           <div class="kpi"><span class="l">Historique complet</span><span class="v">${nf(cov.complete)}</span><span class="small muted">${fin.full} séances ou plus</span></div>
-          <div class="kpi"><span class="l">Historique incomplet</span><span class="v ${cov.partial ? "warn" : ""}">${nf(cov.partial)}</span><span class="small muted">moins de ${fin.full} séances</span></div>
-          <div class="kpi"><span class="l">Sans historique</span><span class="v ${cov.absent ? "warn" : ""}">${nf(cov.absent)}</span></div></div>
+          <div class="kpi"><span class="l">Historique incomplet</span><span class="v ${cov.partial ? "warn" : ""}">${nf(cov.partial)}</span><span class="small muted">moins de ${fin.full} séances · <a href="#titres" data-hist="partial">voir les titres</a></span></div>
+          <div class="kpi"><span class="l">Sans historique</span><span class="v ${cov.absent ? "warn" : ""}">${nf(cov.absent)}</span>${cov.absent ? '<span class="small muted"><a href="#titres" data-hist="absent">voir les titres</a></span>' : ""}</div></div>
         <p class="small muted mt-2 mb-2">Cotations principales retenues : ${nf(fin.total)}${fin.held_extra ? ` · ${fin.held_extra} titre(s) détenu(s) hors catalogue, toujours valorisés` : ""}. Dernière séance en base : ${cov.last_day ? J.date(cov.last_day) : "–"}. Dernière mise à jour des historiques : <b>${hist ? J.dateTime(hist.finished_at || hist.started_at) : "jamais"}</b>.</p>
         <button class="btn primary lg" id="go-history" ${fin.total ? "" : 'disabled title="Le catalogue final est vide : filtrez d’abord Yahoo"'}>Importer / mettre à jour les historiques</button>
         <button class="btn ml-2" id="go-gaps" ${fin.total ? "" : "disabled"} title="Un appel Yahoo par titre dont l’année est incomplète">Combler les clôtures manquantes</button>
