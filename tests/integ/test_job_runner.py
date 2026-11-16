@@ -192,3 +192,28 @@ def test_housekeeping_purges_expired_attempts_and_sessions(conn):
 
     out = tasks.housekeeping(conn, now.replace(tzinfo=datetime.timezone.utc))
     assert out['login_attempts'] == 1 and out['sessions'] == 1
+
+
+def test_journal_hides_automatic_collections_by_default_and_housekeeping_prunes_them(conn):
+    from engine.analytics.admin import adminsvc
+    from engine.jobs import tasks
+
+    now = runner._now()
+    old = now - datetime.timedelta(days=10)
+    rows = [
+        ('intraday:XPAR', 'cron', 'completed', now),
+        ('intraday:XPAR', 'cron', 'failed', now),
+        ('daily:XETR', 'cron', 'completed', old),
+        ('fdb_import', 'admin', 'completed', now),
+        ('history', 'admin', 'running', now),
+    ]
+    with conn.cursor() as cur:
+        cur.executemany('INSERT INTO jobs(job_type,trigger_by,status,started_at) VALUES (%s,%s,%s,%s)', rows)
+    conn.commit()
+    shown = lambda req: sorted((j['job_type'], j['status']) for j in adminsvc.jobs_list(conn, req)['jobs'])  # noqa: E731
+    assert shown({}) == [('fdb_import', 'completed'), ('history', 'running'), ('intraday:XPAR', 'failed')]
+    assert len(shown({'all': '1'})) == 5
+    assert shown({'type': 'intraday'}) == [('intraday:XPAR', 'completed'), ('intraday:XPAR', 'failed')]
+    out = tasks.housekeeping(conn, now.replace(tzinfo=datetime.timezone.utc))
+    assert out['jobs'] == 1  # seule la collecte automatique réussie de plus de 7 jours part ; l'échec et les traitements manuels restent
+    assert len(shown({'all': '1'})) == 4

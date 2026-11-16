@@ -76,7 +76,7 @@ return [
     'admin/jobs' => function () {
         require_admin();
         return engine_call('jobs-list', ['type' => (string)($_GET['type'] ?? ''), 'status' => (string)($_GET['status'] ?? ''), 'trigger' => (string)($_GET['trigger'] ?? ''),
-                                         'since' => (string)($_GET['since'] ?? ''), 'page' => (int)($_GET['page'] ?? 1)]);
+                                         'since' => (string)($_GET['since'] ?? ''), 'all' => (string)($_GET['all'] ?? ''), 'page' => (int)($_GET['page'] ?? 1)]);
     },
     'admin/job' => function () { require_admin(); return engine_call('job-detail', ['id' => (int)($_GET['id'] ?? 0)]); },
     'admin/settings' => function () { need_post(); require_admin(); return admin_save_setting(body()); },

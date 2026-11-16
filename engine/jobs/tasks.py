@@ -330,6 +330,7 @@ def housekeeping(conn, now):
         ('account_tokens', 'expires_at < %s', week),
         ('job_steps', 'started_at < %s', quarter),
         ('jobs', "started_at < %s AND status NOT IN ('queued','running')", quarter),
+        ('jobs', "started_at < %s AND status = 'completed' AND (job_type LIKE 'intraday%%' OR job_type LIKE 'daily%%')", week),  # collectes automatiques réussies
     )
     out = {}
     for table, cond, arg in plan:

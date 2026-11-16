@@ -87,6 +87,9 @@ def jobs_list(conn, request):
     if request.get('since'):
         where.append('started_at >= %s')
         args.append(request['since'])
+    if not request.get('type') and not request.get('status') and not request.get('all'):
+        # Par défaut : sans les collectes automatiques réussies (une par bourse et par quart d'heure), qui noient le reste.
+        where.append("((job_type NOT LIKE 'intraday%%' AND job_type NOT LIKE 'daily%%' AND job_type NOT LIKE 'maintenance%%') OR status <> 'completed')")
     page = max(1, int(request.get('page') or 1))
     sql = ' WHERE ' + ' AND '.join(where) if where else ''
     with conn.cursor() as cur:

@@ -113,7 +113,7 @@
   }
 
   // ───────── journaux ─────────
-  const lf = { type: "", status: "", trigger: "", since: "", page: 1 };
+  const lf = { type: "", status: "", trigger: "", since: "", all: "", page: 1 };
   async function logs() {
     const r = await J.api("admin/jobs", { params: Object.fromEntries(Object.entries(lf).filter(([, v]) => v !== "")) });
     const opt = (cur, list) =>
@@ -137,7 +137,7 @@
       )}</select><select id="lf-g"><option value="">Manuel et auto</option>${opt(lf.trigger, [
         ["admin", "Manuel"],
         ["cron", "Automatique"],
-      ])}</select><input id="lf-d" type="date" value="${J.esc(lf.since)}"></div>
+      ])}</select><input id="lf-d" type="date" value="${J.esc(lf.since)}"><label class="small row gap-s"><input id="lf-a" type="checkbox" ${lf.all ? "checked" : ""}> Inclure les collectes automatiques réussies</label></div>
       <div class="table-wrap"><table>${J.table.head(["#", "Traitement", "Départ", "Durée", "Origine", "Statut", ["OK", "num"], ["Erreurs", "num"], "Résumé"])}<tbody>
       ${r.jobs.map((j) => `<tr data-job="${j.id}" class="pointer"><td>${j.id}</td><td>${J.esc(jobName(j.job_type))}</td><td>${J.dateTime(j.started_at)}</td><td>${dur(j.duration_s)}</td><td>${j.trigger_by === "admin" ? "Manuel" : "Auto"}</td><td><span class="badge ${STATE[j.status][0]}">${STATE[j.status][1]}</span></td><td class="num">${j.items_ok ?? "–"}</td><td class="num">${j.items_error}</td><td class="small muted">${J.esc(j.summary || "")}</td></tr>`).join("") || '<tr><td colspan="9" class="empty">Aucun traitement.</td></tr>'}</tbody></table></div>
       <div class="row between card-bar card-bar-sm"><span class="muted small">${nf(r.total)} traitements</span><span class="row gap-s"><button class="btn sm" id="lp" ${r.page <= 1 ? "disabled" : ""}>←</button><span class="small">Page ${r.page} / ${r.pages}</span><button class="btn sm" id="ln" ${r.page >= r.pages ? "disabled" : ""}>→</button></span></div></div>`;
@@ -146,10 +146,11 @@
       lf.status = J.$("#lf-s").value;
       lf.trigger = J.$("#lf-g").value;
       lf.since = J.$("#lf-d").value;
+      lf.all = J.$("#lf-a").checked ? "1" : "";
       lf.page = 1;
       logs();
     };
-    ["lf-t", "lf-s", "lf-g", "lf-d"].forEach((i) => (J.$("#" + i).onchange = go));
+    ["lf-t", "lf-s", "lf-g", "lf-d", "lf-a"].forEach((i) => (J.$("#" + i).onchange = go));
     J.$("#lp").onclick = () => {
       lf.page--;
       logs();
@@ -160,9 +161,9 @@
     };
     J.$$("tr[data-job]").forEach((tr) => (tr.onclick = () => jobDialog(tr.dataset.job)));
   }
-  async function jobDialog(id) {
-    const d = await J.api("admin/job", { params: { id } }),
-      j = d.job;
+  // Contenu du détail d'un traitement ; relu toutes les 3 s tant que le traitement tourne.
+  function jobBody(d) {
+    const j = d.job;
     const funnels = Object.entries(d.funnels)
       .filter(([, v]) => v.length)
       .map(
@@ -170,15 +171,30 @@
           `<h4>Entonnoir ${k === "catalogue" ? "FinanceDatabase" : "Yahoo Finance"} (figé à la fin du traitement)</h4>${funnelTable(v)}`,
       )
       .join("");
-    J.dialog({
-      title: "Traitement n° " + j.id + " · " + jobName(j.job_type),
-      wide: true,
-      body: `<p class="small">Départ ${J.dateTime(j.started_at)} · fin ${j.finished_at ? J.dateTime(j.finished_at) : "–"} · ${j.items_ok ?? "–"} réussis · ${j.items_error} erreurs · <span class="badge ${STATE[j.status][0]}">${STATE[j.status][1]}</span><br>${J.esc(j.summary || "")}</p>
+    return `<p class="small">Départ ${J.dateTime(j.started_at)} · fin ${j.finished_at ? J.dateTime(j.finished_at) : "–"} · ${j.items_ok ?? "–"} réussis · ${j.items_error} erreurs · <span class="badge ${STATE[j.status][0]}">${STATE[j.status][1]}</span><br>${J.esc(j.summary || "")}</p>
       ${d.steps.length ? `<h4>Étapes</h4><div class="table-wrap"><table>${J.table.head(["#", "Étape", ["Durée", "num"], "Détail"])}<tbody>${d.steps.map((s) => `<tr><td>${s.seq}</td><td>${J.esc(s.name)}</td><td class="num">${dur(s.duration_ms / 1000)}</td><td class="small">${J.esc(s.detail || "")}</td></tr>`).join("")}</tbody></table></div>` : '<p class="muted small">Ce traitement n’a pas enregistré d’étapes détaillées.</p>'}
       ${funnels}<p class="small muted">Pour consulter les titres exclus à chaque étape : <a href="#fdb">FinanceDatabase</a> · <a href="#yahoo">Yahoo Finance</a> (état de la dernière exécution).</p>
-      <h4>Messages</h4>${d.logs.map((l) => `<div class="reason ${l.level === "error" ? "fail" : "missing"} mb-2"><span class="mark">${l.level === "error" ? "✗" : "!"}</span><span class="small">${J.dateTime(l.logged_at)} · ${J.esc(l.message)}</span></div>`).join("") || '<p class="muted">Aucun message : traitement sans incident.</p>'}`,
+      <h4>Messages</h4>${d.logs.map((l) => `<div class="reason ${l.level === "error" ? "fail" : "missing"} mb-2"><span class="mark">${l.level === "error" ? "✗" : "!"}</span><span class="small">${J.dateTime(l.logged_at)} · ${J.esc(l.message)}</span></div>`).join("") || '<p class="muted">Aucun message : traitement sans incident.</p>'}`;
+  }
+  async function jobDialog(id) {
+    let d = await J.api("admin/job", { params: { id } });
+    const dlg = J.dialog({
+      title: "Traitement n° " + d.job.id + " · " + jobName(d.job.job_type),
+      wide: true,
+      body: `<div class="job-live">${jobBody(d)}</div>`,
       actions: [{ label: "Fermer", run: () => {} }],
     });
+    if (!["running", "queued"].includes(d.job.status)) return;
+    const timer = setInterval(async () => {
+      try {
+        d = await J.api("admin/job", { params: { id } });
+        dlg.querySelector(".job-live").innerHTML = jobBody(d);
+        if (!["running", "queued"].includes(d.job.status)) clearInterval(timer);
+      } catch (e) {
+        clearInterval(timer);
+      }
+    }, 3000);
+    dlg.addEventListener("close", () => clearInterval(timer));
   }
 
   Object.assign(AC.tabs, { cron, logs });
