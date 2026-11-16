@@ -563,10 +563,10 @@
       actions: [
         { label: "Annuler", run: () => {} },
         saveAction("position/levels", (n) => ({
-                portfolio_id: current,
-                listing_id: p.listing_id,
-                stop: n("#lv-stop"),
-                target: n("#lv-target"),
+          portfolio_id: current,
+          listing_id: p.listing_id,
+          stop: n("#lv-stop"),
+          target: n("#lv-target"),
         })),
       ],
     });
@@ -604,10 +604,10 @@
       actions: [
         { label: "Annuler", run: () => {} },
         saveAction("lot/settings", (v) => ({
-                tx_id: l.tx_id,
-                strategy: v("#lt-st"),
-                alert_days: v("#lt-days"),
-                alert_drop_pct: v("#lt-drop"),
+          tx_id: l.tx_id,
+          strategy: v("#lt-st"),
+          alert_days: v("#lt-days"),
+          alert_drop_pct: v("#lt-drop"),
         })),
       ],
     });
@@ -620,8 +620,8 @@
       actions: [
         { label: "Annuler", run: () => {} },
         saveAction("portfolio/target", (n) => ({
-                id: current,
-                target: { us: n("#al-us"), eu: n("#al-eu"), emerging: n("#al-em") },
+          id: current,
+          target: { us: n("#al-us"), eu: n("#al-eu"), emerging: n("#al-em") },
         })),
       ],
     });
