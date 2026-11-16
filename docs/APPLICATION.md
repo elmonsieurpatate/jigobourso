@@ -103,9 +103,9 @@ Valeur échangée = prix × volume moyen 3 mois × taux de change, avec les sous
 - `session_dates` donne les séances attendues d'une place ; `window_calendars` ancre les fenêtres de mesure sur ces séances ; `next_session_dates` donne les séances à venir.
 - Un MIC inconnu rend le titre non évaluable (motif `calendar`). Il n'existe aucun repli lundi-vendredi.
 
-Heures de marché (`engine/market/hours.py`) : table `HOURS` par MIC, `SETTLE_MINUTES` = 30 après la clôture, créneaux de `SLOT` = 15 minutes. `expected_last_close` donne la dernière clôture attendue d'une place à un instant donné ; `price_is_stale` juge un prix intraday périmé au-delà de 30 minutes.
+Heures de marché (`engine/market/hours.py`) : table `HOURS` par MIC, `SETTLE_MINUTES` = 30 après la clôture, créneaux de `SLOT_MINUTES` = 15 minutes. `expected_last_close` donne la dernière clôture attendue d'une place à un instant donné ; `price_is_stale` juge un prix intraday périmé au-delà de 30 minutes.
 
-Jour férié observé (`collect.py:observed_holiday`) : une place est jugée fériée un jour si moins de 5 % de ses titres ont une clôture alors qu'une collecte passée après la clôture a eu au plus 5 % d'erreurs. `effective_expected_close` remonte alors à la séance précédente (recherche sur 5 jours) ; `is_holiday` l'expose.
+Jour férié observé (`collect.py:observed_holiday`) : une place est jugée fériée un jour si moins de 5 % de ses titres ont une clôture alors qu'une collecte passée après la clôture a eu au plus 5 % d'erreurs. `effective_expected_close` remonte alors à la séance précédente (recherche sur 5 jours). `is_holiday` est un test distinct, utilisé par le rattrapage intraday : aucune barre ni clôture pour la place ce jour-là, après une collecte quotidienne passée.
 
 ### 2.6 Collecte quotidienne et intraday
 
@@ -136,7 +136,7 @@ Volumes quotidiens (`fill_volumes_batch`) : budget 90 s, relecture des 2 derniè
 
 ### 2.7 Taux de change
 
-- `collect.py:refresh_fx` : un taux du jour par devise du catalogue (paire `XXXEUR=X`), sous-unités ramenées à la devise principale.
+- `collect.py:refresh_fx` : un taux du jour par devise présente dans `latest_prices`, EUR exclue (paire `XXXEUR=X`), sous-unités ramenées à la devise principale.
 - `collect.py:backfill_fx` : complète l'historique (clôtures quotidiennes) des devises dont le premier taux est récent ; n'écrase jamais un taux existant ; une devise sans réponse n'est redemandée qu'une fois par semaine.
 - Une transaction antérieure au début de l'historique exige un taux saisi à la main (§8.5).
 
@@ -153,7 +153,7 @@ Un saut de cours est un split suspect ; la table `split_log` suit son statut.
 
 Revue manuelle (`split_review.py:decide`) : un administrateur peut appliquer un ratio (`applied`), refuser (`rejected`) ou remettre en attente (`pending`). Appliquer exige une source ou une explication, un ratio qui explique le saut observé (`|price_ratio × ratio − 1|` sous `RATIO_TOLERANCE`) et crée l'événement dans `corporate_events` ; la décision est tracée dans `split_reviews` et `split_review_history` avec une révision optimiste. Un split confirmé déclenche un recalcul des mesures (`split_metrics_pending`).
 
-### 2.9 Unités de prix (`engine/shared/units.py`, miroir PHP `app/lib/units.php`)
+### 2.9 Unités de prix (`engine/shared/units.py`, miroir PHP `app/lib/units.php` (`unit_split`) et `app/services/ledger.php` (`eur_factor`))
 
 Sous-unités : `GBp` / `GBX` (pence), `ZAc` / `ZAC` (cents), `ILA` (agorot), toutes divisées par 100 pour revenir à la devise principale (GBP, ZAR, ILS). `to_eur_factor` renvoie `None` si le taux manque : la valeur en euros est alors inconnue, jamais approximée.
 
@@ -162,7 +162,7 @@ Sous-unités : `GBp` / `GBX` (pence), `ZAc` / `ZAC` (cents), `ILA` (agorot), tou
 - Un cron appelle `tick` toutes les 5 minutes en production (`schedule.py:CRON_EXPECTED_MINUTES`).
 - `tick` lance : l'intraday des places ouvertes ou tout juste fermées (intervalle réglable, 15 minutes par défaut, 5 à 120) ; le quotidien d'une place quand `catchup.daily_due` le demande ; le recalcul `metrics` si un split est en attente ; la `maintenance` si `maintenance_pending` est posé (nouvel essai 30 minutes après un échec) ; le rattrapage.
 - Rattrapage (`engine/market/catchup.py`) : contrôle toutes les 10 minutes, nouvel essai quotidien (10, 360) minutes, abandon après 24 h, temps mort de 15 minutes, budget de 150 s, 3 confirmations.
-- Un traitement bloqué depuis plus de 90 minutes (`STUCK`) est considéré perdu.
+- Un traitement bloqué depuis plus de 90 minutes (`STUCK_MINUTES`) est considéré perdu.
 - `tasks.py:maintenance` enchaîne, dans l'ordre : sauvegarde des données utilisateur, cotations, change, historique de change, clôtures manquantes, volumes, détection / vérification / revérification des splits, `compute_all` (§3), profils et similarité ETF, suivi des classements, résultats du suivi, rétention, ménage.
 - Sauvegarde : `BACKUP_KEEP` = 14, tables listées dans `BACKUP_TABLES`.
 - Ménage (`housekeeping`) : `login_attempts` et `account_attempts` 1 jour, sessions expirées, `account_tokens` 7 jours, `job_steps` et `jobs` 90 jours, collectes automatiques réussies 7 jours.
@@ -193,7 +193,7 @@ Toutes les mesures se calculent sur ln(cours), sur une fenêtre de n séances (n
 | drawdown | plus forte baisse depuis un sommet de la fenêtre, en % |
 | ER (efficiency ratio) | `(ln fin − ln début) / Σ|Δln|` |
 
-Fenêtres de base (`compute.py:BASE_WINDOWS`) : 1, 5, 21, 63, 126, 252 séances ; les stratégies peuvent en demander d'autres (jusqu'à 504).
+Fenêtres de base (`compute.py:BASE_WINDOWS`) : 1, 5, 21, 63, 126, 252 séances ; les stratégies peuvent en demander d'autres (jusqu'à 252).
 
 Fenêtre trouée (`dated_window_metrics`) : acceptée si elle compte au moins `max(3, ceil(0,80 × clôtures attendues))` points. La performance exige les deux bornes. Volatilité, drawdown et ER sont indisponibles dès qu'une clôture manque, car un trou fausse les variations.
 
@@ -207,7 +207,7 @@ Fenêtre trouée (`dated_window_metrics`) : acceptée si elle compte au moins `m
 | variation du jour, écart à la MA20 | `daily_change`, `gap_to_ma20` | `technical_state` |
 | séances positives | part des variations > 0 de la fenêtre | `scoring/score_inputs.py:path_inputs` |
 | concentration (`spike_share`) | `ln(1 + plus forte hausse d'une séance) / ln(cours final / cours initial)` ; 1 si la fenêtre ne monte pas | `path_inputs` |
-| accélération | pente de la fenêtre moins pente de la fenêtre précédente de même durée (sans chevauchement) ; `r2_prev` = R² de la précédente | `score_inputs.py:window_inputs` |
+| accélération | pente de la fenêtre moins pente de la fenêtre précédente de même durée, contiguë (elles partagent une clôture, aucune variation commune) ; `r2_prev` = R² de la précédente | `score_inputs.py:window_inputs` |
 
 Une clôture absente rend ces mesures indisponibles : on ne comble jamais un trou.
 
@@ -215,9 +215,9 @@ Une clôture absente rend ces mesures indisponibles : on ne comble jamais un tro
 
 Fenêtre de `WINDOW` = 20 séances, `MIN_DAYS` = 15 séances au minimum.
 
-- Source `daily` : moyenne des volumes réels de `daily_prices` × cours, convertie en euros avec le taux daté.
-- Source `estimated` : volume moyen 3 mois de `latest_prices` × prix, si les volumes quotidiens manquent.
-- Un volume absent n'est jamais compté comme zéro. Résultat dans `liquidity_state` (valeur en euros et source).
+- Source `daily` : moyenne des volumes réels de `daily_prices` × cours, convertie en euros avec le dernier taux de change connu.
+- Source `estimated` : volume moyen 3 mois de `latest_prices` × prix, quand moins de 15 séances ont un volume valide (`MIN_DAYS`).
+- Un volume absent n'est jamais compté comme zéro. Résultat dans `liquidity_state` : valeur en euros, nombre de séances (source `daily` seulement) et source.
 
 ### 3.5 Calcul et stockage (`compute.py:compute_all`)
 
@@ -254,19 +254,19 @@ Deux notes sur 100 par stratégie : le score simple et le score complexe. Chaque
 
 ### 4.2 Poids des périodes
 
-Poids automatiques : `ω ∝ n^(1−κ) − n_prev^(1−κ)` pour une période de n séances qui suit une période de n_prev séances. Avec κ = 0,7, semaine puis mois donnent 41,6 % et 58,4 %. Des poids personnalisés (profil) remplacent le calcul automatique ; un poids nul met la période en contexte seulement.
+Poids automatiques : `ω ∝ n^(1−κ) − n_prev^(1−κ)` pour une période de n séances qui suit une période de n_prev séances (n_prev = 1 pour la première période). Avec κ = 0,7, semaine puis mois donnent 41,6 % et 58,4 %. Des poids personnalisés (profil) remplacent le calcul automatique ; un poids nul met la période en contexte seulement.
 
 ### 4.3 Dynamique d'une période
 
-`saturation = SAT_A · (n/5)^SAT_B`. La pente de la période, rapportée à cette saturation, donne la dynamique de 0 à 1 (plafonnée). Plus la période est longue, plus la pente exigée pour saturer est élevée.
+`saturation = SAT_A · (n/5)^SAT_B`. La pente de la période, rapportée à cette saturation, donne la dynamique de 0 à 1 (plafonnée). La pente est d'abord convertie en croissance composée sur n séances, puis rapportée à la saturation : la croissance cumulée exigée augmente avec n, mais la pente par séance exigée diminue.
 
 ### 4.4 Score simple
 
-`score simple = min(100, 100 · D · Q)` où D est la dynamique pondérée par les poids de périodes et Q la moyenne des R² des périodes, pondérée par `min(1, n / 21)`.
+`score simple = min(100, 100 · D · Q)` où D est la dynamique pondérée par les poids de périodes et Q la moyenne des R² (négatifs ramenés à 0, périodes sans R² écartées), pondérée par le poids effectif de la période × `min(1, n / 21)`.
 
 ### 4.5 Score complexe
 
-Moyenne pondérée de notes de composantes, divisée par la somme des poids des composantes disponibles (version 5 : une composante indisponible ne compte pas comme zéro, son poids sort du dénominateur), puis multipliée par `1 − λ·(1 − porte)` où la porte est celle de la période la plus courte hors Jour.
+Moyenne pondérée de notes de composantes, divisée par la somme des poids des composantes disponibles (version 5 : une composante indisponible ne compte pas comme zéro, son poids sort du dénominateur), puis multipliée par `1 − λ·(1 − porte)` où la porte est celle de la période la plus courte hors Jour. Avant l'agrégation, la porte de chaque période (dynamique / 32, plafonnée à 1) amortit aussi R², séances positives, concentration, volatilité et drawdown ; dynamique et accélération n'en ont pas.
 
 Dix composantes (`scores.py:COMPLEX_WEIGHTS`, poids par défaut) :
 
@@ -287,13 +287,13 @@ Les bornes de chaque note sont écrêtées entre 0 et 100. Les stratégies donne
 
 ### 4.6 Statut et rang
 
-Statut d'une note : `ok` (toutes les périodes), `partiel` (couverture ou séances insuffisantes sur une partie des périodes), `inconnu` (aucune période exploitable). Une note partielle reste numérique et classée. `rank_order` et `rank_positions` ordonnent les titres ; le rang est pris parmi tous les titres notés du même groupe (`score_service.py:attach`).
+Statut d'une note : `ok` (toutes les périodes), `partiel` (couverture ou séances insuffisantes sur une partie des périodes), `inconnu` (aucune période exploitable, ou aucune régularité ou composante mesurable). Une note partielle reste numérique et classée. `rank_order` et `rank_positions` ordonnent les titres ; le rang du tableau (`ranking_table.py`, via `ranking_support.ordered`) est commun à toutes les cotations notées, actions et ETF confondus ; le rang par groupe (actions / ETF) est celui de `score_service.py:attach`.
 
 ### 4.7 Profils et réglages (`scores_profiles.py`)
 
 - `TUNING_DEFAULTS` : `sat_a`, `accel_ref`, `vol_mode` (`absolute` ou `relative`), `momentum_horizon`.
 - Les poids des composantes d'un profil totalisent 100 (tolérance 0,05).
-- Profils enregistrés dans `settings.scores_profiles` (officiel) et `scores_profiles_u<uid>` (personnel). Aucun repli global des poids : un profil incomplet est refusé.
+- Profils enregistrés dans `settings.scores_profiles` (officiel) et `scores_profiles_u<uid>` (personnel). Aucun repli global des poids : un profil incomplet est refusé, sauf `momentum` et `recovery` qui valent 0 par défaut.
 - Paramètres globaux κ, seuil de couverture, ancrage : `settings.scores_v4` (validation `explorer/explorer_config.py:validate_scoring` : κ de 0 à 0,95, seuil de 0,1 à 1, ancrage de 0 à 1).
 - `apply_profile`, `neutral`, `clean_profile` normalisent les profils.
 
@@ -331,7 +331,7 @@ Les niveaux de pente viennent de `strategy.py:SLOPE_LEVELS` = `100·expm1(ln 2 /
 |---|---|---|
 | doux | 8 ans | 0,0344 |
 | modéré | 4 ans | 0,0688 |
-| fort | 2 ans | 0,1375 |
+| fort | 2 ans | 0,1376 |
 | très fort | 1 an | 0,2754 |
 
 | Niveau de R² | Seuil |
@@ -358,7 +358,7 @@ Règles de lecture :
 - La période Jour n'évalue que la performance (critère « return »).
 - Volatilité et repli (drawdown) sont lus sur `REFERENCE` = 21 séances.
 - Mode Expert : arbre de règles (profondeur 6 au plus), les critères facultatifs sont joints en ET ou en OU.
-- Le critère évalue la fenêtre calendaire de la place du titre ; aucune fenêtre n'est reconstituée d'un autre calendrier.
+- Le critère lit les mesures de fenêtres de séances de la cotation (`strategy_metrics`), calculées sur le calendrier de sa place ; il ne reconstitue aucune fenêtre.
 
 ### 5.5 Moteur historique (`explorer/strategy.py`, `VERSION = 3`)
 
@@ -376,8 +376,8 @@ Conservé pour le suivi, les alertes et les profils ETF. `preset` définit sept 
 
 - Toutes les cotations évaluables sont renvoyées avec leurs deux notes, leurs rangs et leur statut de stratégie. Aucune ligne n'est écartée par les critères.
 - Tri par défaut : score complexe. Valeurs de référence lues sur 21 séances (`REFERENCE`).
-- Rang : parmi tous les titres notés du même groupe (actions, ETF), indépendamment des filtres d'affichage.
-- `default_norm`, `norm_of` normalisent les valeurs affichées ; `verdicts` produit les statuts ; `curves` renvoie les courbes (100 identifiants au plus, route `ranking/curves`).
+- Rang : parmi toutes les cotations notées (actions et ETF confondus), indépendamment des filtres d'affichage.
+- `default_norm` et `norm_of` fournissent les critères normalisés (`criteria.normalize`) appliqués par `verdicts` et `table` ; `verdicts` produit les statuts ; `curves` renvoie les courbes (100 identifiants au plus, route `ranking/curves`).
 - Regroupements de métadonnées (pays, place, secteur, type) : `secondary_metadata_groups.json`.
 - `ranking_support.py` : `ordered`, `series`, `closes`.
 
@@ -454,7 +454,7 @@ Négociabilité : fondée sur volume moyen 3 mois × prix (valeur du préfiltre)
 
 ### 7.2 Appréciation (`signals.py:assessment`)
 
-Cinq niveaux : Très favorable, Favorable, Mitigé, Défavorable, Indéterminé. Hausse extrême : `EXTREME_RISE` = 100 % (avertissement). Contradiction entre indicateurs détectée avec des écarts de ±5, ±10 et un seuil de 10.
+Cinq niveaux : Très favorable, Favorable, Mitigé, Défavorable, Indéterminé. Hausse extrême : `EXTREME_RISE` = 100 % (avertissement). Contradiction : repli récent ≤ −5 % (sur 21 ou 5 séances) alors que la tendance de fond est ≥ +10 %, ou rebond récent ≥ +10 % dans une baisse de fond ≤ −10 % (`BACKGROUND_MOVE`, `RECENT_DROP`, `RECENT_RISE`).
 
 ### 7.3 Qualité des données et risques
 
@@ -482,7 +482,7 @@ Valorisation (`ledger.php:portfolio_valuation`) :
 - correction manuelle d'un split : un achat à prix nul à partir du jour du split (`free_buy_dates`, `pending_split_ratio`) ;
 - prix = le plus récent entre cotation et clôture, converti avec `eur_factor` ;
 - position « incertaine » si le change manque ou si les ventes dépassent les achats : elle est exclue des totaux et nommée ;
-- total `null` si une position n'est pas valorisable (`unpriced`) ;
+- valeur, plus-value latente (montant et %) et gain total `null` si une position n'est pas valorisable (`unpriced`) ; coût, réalisé, frais et montants investis restent calculés ;
 - `held_listing_ids` : cotations détenues, ajoutées au jeu de collecte.
 
 ### 8.2 Écriture d'une transaction (`transactions.php`)
@@ -494,7 +494,7 @@ Valorisation (`ledger.php:portfolio_valuation`) :
 
 ### 8.3 Change historique (`transactions.php:historical_fx`)
 
-Taux de la date de l'opération, ou le dernier taux antérieur à moins de 7 jours ; au-delà, erreur 422 et saisie manuelle du taux.
+Taux de la date de l'opération, ou le dernier taux antérieur ou égal à la date, à 7 jours au plus ; au-delà, erreur 422 et saisie manuelle du taux.
 
 ### 8.4 Lots FIFO (`transactions.php:open_lots`)
 
@@ -512,7 +512,7 @@ Modèle courant de décision par position.
 | Constante | Valeur |
 |---|---|
 | `SIGMA_WINDOW` | 63 séances |
-| `M6_LONG` / `SKIP` | 126 / 21 séances |
+| `M6_LONG` / `M6_SKIP` | 126 / 21 séances |
 | bornes de bande σ63 | 1 ; 1,5 ; 2 ; 3 ; 4 ; 6 ; ∞ |
 | niveaux de bande | `low`, `moderate`, `high`, `very_high` |
 | repli p90 sur 21 séances par bande | 6,1 / 11,0 / 14,9 / 19,8 / 25,6 / 30,3 / 40,1 |
@@ -536,18 +536,18 @@ Stratégie « prudent » : durée 365 jours, pas de seuil de chute, action « r�
 
 ### 8.8 Barre de risque (`engine/analytics/portfolio/risk.py`)
 
-Utilisée par `alerts.lot_alerts`. Horizons (jours de tendance / de recul / de stabilité) : `fast` 21/63/10 ; `regular`, `low_volatility`, `recovery`, personnalisé 63/126/21 ; stratégies momentum 126/252/63. `K` = 2, recul de 6 à 30 %, extension au-dessus de la MA50 de 25 %.
+Utilisée par `alerts.lot_alerts`. Horizons (séances : fenêtre récente / fenêtre longue / horizon du seuil de recul) : `fast` 21/63/10 ; `regular`, `low_volatility`, `recovery`, personnalisé 63/126/21 ; stratégies momentum 126/252/63. `K` = 2, recul de 6 à 30 %, extension au-dessus de la MA50 de 25 %.
 
 Trois signaux (tendance, recul, stabilité) valent 0 à 2 chacun. Niveaux : `ok` (0 à 1), `watch` (2 à 3), `act` (4 ou plus, ou recul au moins égal au seuil) ; `na` si rupture ×1,6 ou historique trop court.
 
 ### 8.9 Suivi des classements (`engine/analytics/portfolio/tracking.py`, routes `tracking/*`)
 
-- Chaque jour, `record_snapshot` enregistre les `TOP_N` = 20 meilleurs titres de chacune des 7 stratégies historiques (`strategy.PRESETS`) dans `ranking_snapshots`.
+- Chaque jour, `record_snapshot` enregistre les `TOP_N` = 20 meilleurs titres de chaque groupe (actions, ETF) pour chacune des 7 stratégies historiques (`strategy.PRESETS`) dans `ranking_snapshots`.
 - Les rendements à `HORIZONS` = 1, 3, 5, 21, 63 séances sont calculés dans `ranking_outcomes`, comparés à la médiane et à la moyenne de l'univers (`universe_outcomes`). Une donnée de plus de `MAX_STALE_DAYS` = 5 jours n'est pas utilisée.
 - `summarize` : nombre, moyenne, médiane, part de gagnants, écart à la moyenne de l'univers (`edge`), écart médian (`edge_median`), part qui bat la médiane (`beat_pct`). Les observations d'un même jour ou de jours voisins se chevauchent : `n` ne compte pas autant de cas indépendants que `days`.
 - Une règle d'alerte de suivi se règle via `tracking/rules` ; `tracking/strategy` donne les statistiques par stratégie.
 
-### 8.10 ETF (`engine/analytics/market_views/etf.py`, profils `engine/market/etf_profile.py`, `VERSION` = 4)
+### 8.10 ETF (`engine/analytics/market_views/etf.py`, profils `engine/market/etf_profile.py`, `VERSION` = 4 ; analyse de similarité `etf.py`, `VERSION` = 2)
 
 Profil d'un ETF (frais, actifs, composition, secteurs) lu chez Yahoo et mis en cache (`etf_profiles`) ; frais et actifs de repli viennent de la cotation. Profil frais jusqu'à `MAX_PROFILE_DAYS` = 90 jours ; rafraîchissement de `WARM_LIMIT` = 120 fonds par passage, budget `WARM_BUDGET_S` = 60 s, profil rechargé après `PROFILE_FRESH_DAYS` = 30 jours.
 
@@ -566,7 +566,7 @@ Similarité entre ETF (`build`, `correlate`) :
 | Cas | Comportement | Code |
 |---|---|---|
 | Calendrier de la place inconnu | titre non évaluable (`calendar`), pas de repli lundi-vendredi | `calendar.py`, `series.py:analyze_series` |
-| Clôture manquante dans une fenêtre | volatilité, drawdown, ER, séances positives, accélération indisponibles ; couverture < seuil donne une note partielle ou inconnue | `measures.py`, `score_inputs.py` |
+| Clôture manquante dans une fenêtre | volatilité, drawdown, ER, séances positives, accélération indisponibles ; une couverture incomplète (< 0,999) donne une note partielle, aucune mesure exploitable une note inconnue | `measures.py`, `score_inputs.py` |
 | Rupture de série (×1,6) | fenêtre non évaluable (`break`), qualité `break` | `series.py`, `compute.py` |
 | Clôture isolée aberrante | retirée de la série | `series.py:drop_isolated_spikes` |
 | Split non confirmé | saut tracé (`detected`), non appliqué au registre ; revue manuelle possible | `splits.py`, `split_review.py` |
@@ -574,7 +574,7 @@ Similarité entre ETF (`build`, `correlate`) :
 | Devise sans taux | `to_eur_factor` renvoie `None` ; valeur en euros inconnue ; préfiltre : `candidate` | `units.py`, `prefilter.py` |
 | Taux historique absent (> 7 jours) | saisie refusée (422) tant qu'un taux n'est pas fourni | `transactions.php:historical_fx` |
 | Vente supérieure aux achats | position incertaine, exclue des totaux et nommée ; la saisie qui créerait cette situation est refusée | `ledger.php`, `transactions.php` |
-| Position non valorisable | totaux du portefeuille `null` (jamais une somme partielle présentée comme complète) | `ledger.php:portfolio_valuation` |
+| Position non valorisable | totaux dépendant de la valeur (valeur, latente, gain total) `null` (jamais une somme partielle présentée comme complète) | `ledger.php:portfolio_valuation` |
 | Volume absent | liquidité estimée ou inconnue, jamais zéro ; préfiltre exclut un volume inconnu | `liquidity.py`, `prefilter.py` |
 | Donnée de critère manquante | verdict `undetermined`, jamais `excluded` | `criteria.py` |
 | Note sans toutes ses périodes | statut `partiel`, note conservée et marquée | `scores.py` |
@@ -604,7 +604,7 @@ Vues : `v_collect_set` (cotations sélectionnées principales non détenues, plu
 
 ### 10.2 Conventions
 
-- Le schéma est rejouable : tout est en `CREATE TABLE IF NOT EXISTS` ; toute évolution passe par une migration dans `db/migrations/` (appliquée par `scripts/migrate.py`).
+- Le schéma est rejouable : toutes les tables sont en `CREATE TABLE IF NOT EXISTS` (les deux vues en `CREATE VIEW`) ; toute évolution passe par une migration dans `db/migrations/` (appliquée par `scripts/migrate.py`).
 - `daily_prices` : table compressée, clé (cotation, date), `close_px` DECIMAL(16,6), `volume` nul si inconnu.
 - Heure en base : UTC (`SET time_zone = '+00:00'` à l'ouverture de connexion PHP).
 - Quantités de transaction : DECIMAL(24,8) ; taux de change : DECIMAL(20,10).
