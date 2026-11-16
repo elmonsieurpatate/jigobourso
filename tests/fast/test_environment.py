@@ -346,3 +346,40 @@ def test_system_pip_is_refused_when_its_python_differs_from_the_venv(tmp_path):
     )
     assert result.returncode != 0 and 'Python système incompatible' in result.stderr
     assert (site / 'paquet.txt').read_text() == 'ancienne'
+
+
+def prune_module():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location('prune_stale_metadata', ROOT / 'scripts/release/prune_stale_metadata.py')
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def make_site(tmp_path, *names):
+    site = tmp_path / 'site-packages'
+    site.mkdir()
+    for name in names:
+        (site / name).mkdir()
+    return site
+
+
+def test_prune_removes_the_stale_metadata_left_by_pip_target(tmp_path):
+    """Cas réel : pymysql-1.2.3.dist-info reste à côté de pymysql-1.2.4.dist-info, le contrôle lit 1.2.3 et refuse le venv."""
+    site = make_site(tmp_path, 'pymysql-1.2.3.dist-info', 'pymysql-1.2.4.dist-info', 'numpy-1.26.4.dist-info')
+    removed = prune_module().prune(site, 'PyMySQL==1.2.4\nnumpy==1.26.4\n')
+    assert removed == ['pymysql-1.2.3.dist-info']
+    assert sorted(p.name for p in site.iterdir()) == ['numpy-1.26.4.dist-info', 'pymysql-1.2.4.dist-info']
+
+
+def test_prune_matches_normalized_names(tmp_path):
+    site = make_site(tmp_path, 'exchange_calendars-4.2.dist-info', 'exchange_calendars-4.3.dist-info')
+    assert prune_module().prune(site, 'exchange-calendars==4.3\n') == ['exchange_calendars-4.2.dist-info']
+
+
+def test_prune_never_deletes_without_an_exact_match_or_a_duplicate(tmp_path):
+    module = prune_module()
+    site = make_site(tmp_path, 'pymysql-1.2.3.dist-info', 'pymysql-1.2.2.dist-info', 'six-1.17.0.dist-info', 'toolz-9.dist-info')
+    assert module.prune(site, 'PyMySQL==1.2.4\nsix==1.17.0\n') == []  # doublons mais aucune fiche à la version figée
+    assert len(list(site.iterdir())) == 4  # fiche unique ou paquet non figé : intacts

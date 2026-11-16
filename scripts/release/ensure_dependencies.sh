@@ -4,6 +4,7 @@
 set -euo pipefail
 ROOT=${1:?racine du site}
 BACKUPS=${2:?dossier de sauvegarde}
+HERE=$(cd "$(dirname "$0")" && pwd)
 cd "$ROOT"
 check_runtime() {
   local report status
@@ -53,6 +54,8 @@ else
     test "$venv_minor" = "$system_minor" || { echo "Erreur : Python système incompatible avec le venv" >&2; exit 1; }
     python3 -m pip install --quiet --upgrade --target "$site" -r requirements.txt
   fi
+  # `pip --target` laisse la fiche de l'ancienne version à côté de la nouvelle : on retire les fiches obsolètes avant le contrôle
+  python3 "$HERE/prune_stale_metadata.py" "$site" requirements.txt
   .venv/bin/python -c "import pymysql" || { echo "dépendances Python inutilisables après mise à jour" >&2; exit 1; }
   check_runtime || { echo "Erreur : dépendances toujours non conformes après installation" >&2; exit 1; }
   printf '%s\n' "$want" > .requirements.sha; echo "dépendances Python mises à jour"
