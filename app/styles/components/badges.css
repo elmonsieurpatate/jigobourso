@@ -8,6 +8,7 @@
   background: var(--thead);
   color: var(--muted);
   font: 800 var(--badge-size) / 1.45 var(--font);
+  font-variant-numeric: tabular-nums;
   letter-spacing: 0;
   white-space: nowrap;
 }

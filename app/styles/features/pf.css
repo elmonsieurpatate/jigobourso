@@ -22,6 +22,7 @@
   background: none;
   color: var(--accent);
   font: 600 0.86rem system-ui;
+  font-variant-numeric: tabular-nums;
   text-decoration: none;
 } /* synthèse */
 .px-val strong {
@@ -140,6 +141,7 @@ a.px-sum:hover {
 .px-t .c-act .px-w {
   border-radius: var(--radius-pill);
   font: 600 0.72rem system-ui;
+  font-variant-numeric: tabular-nums;
   border: 1px solid var(--line);
   background: var(--surface-2, var(--bg));
   color: var(--text);
@@ -281,6 +283,7 @@ a.px-sum:hover {
 }
 .fc-buy-label {
   font: 600 var(--fs-10) system-ui;
+  font-variant-numeric: tabular-nums;
   border: 1px solid;
   border-radius: var(--radius-4);
 }
@@ -300,6 +303,7 @@ a.px-sum:hover {
 }
 .fc-svg {
   font: var(--fs-10) system-ui;
+  font-variant-numeric: tabular-nums;
   fill: var(--muted);
 }
 .fc-trade-line {

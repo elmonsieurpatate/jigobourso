@@ -376,7 +376,7 @@
     };
     J.$("#ex-go", host).onclick = go;
     J.$("#ex-q", host).onkeydown = (e) => {
-      if (e.key === "Enter") go();
+      if (e.key === "Enter" && !e.isComposing) go();
     };
   }
 

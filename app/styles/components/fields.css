@@ -11,6 +11,7 @@
   background-color: var(--halo-control);
   color: var(--text);
   font: 500 var(--control-size) / 1.45 var(--font);
+  font-variant-numeric: tabular-nums;
   box-shadow: none;
 }
 :is(
@@ -64,7 +65,6 @@ input[type="color"] {
   padding: var(--sp-4);
 }
 select:not([multiple], [size]) {
-  -webkit-appearance: none;
   appearance: none;
   cursor: pointer;
   padding-right: var(--sp-32);

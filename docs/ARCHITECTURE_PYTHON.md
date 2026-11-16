@@ -31,7 +31,7 @@ Les anciens chemins et réexports ne sont pas conservés : les appelants (CLI, t
 
 ## Règles communes
 
-Les règles d'unités de prix sont uniques (`shared/units.py`, miroir PHP testé). Les règles de quantité et de split ont un équivalent PHP (`app/services/ledger.php`) dont la parité des données est contrôlée par le contrôle de release (voir `docs/FINANCIAL_INTEGRITY.md`).
+Les règles d'unités de prix sont uniques (`shared/units.py`, miroir PHP testé). Les règles de quantité et de split ont un équivalent PHP (`app/services/ledger.php`) dont la parité des données est contrôlée par le contrôle de release (voir `docs/APPLICATION.md`, § 9).
 
 ## Contrôles
 

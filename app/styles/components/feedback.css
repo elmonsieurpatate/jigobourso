@@ -76,6 +76,29 @@ dialog {
 }
 dialog::backdrop {
   background: var(--backdrop-color);
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+dialog:modal {
+  overscroll-behavior: contain;
+}
+/* Infobulle native (popover) ancrée à l'élément ; texte seul, jamais interactive. */
+.jtip {
+  margin: 0;
+  inset: auto;
+  position-area: block-end;
+  position-try-fallbacks: flip-block, flip-inline;
+  margin-block: var(--sp-6);
+  max-width: min(320px, calc(100vw - 24px));
+  padding: var(--sp-6) var(--sp-10);
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-8);
+  box-shadow: var(--shadow-pop);
+  font: var(--fs-12) / var(--lh-snug) var(--font);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
 }
 dialog .head {
   padding: var(--sp-16) var(--sp-20);

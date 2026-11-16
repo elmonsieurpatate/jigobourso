@@ -101,7 +101,7 @@
         const t = r.from + (n * k) / 2;
         html += `<text x="${x(t)}" y="${h - 9}" text-anchor="${k === 0 ? "start" : k === 2 ? "end" : "middle"}">${esc(fmtTime(t))}</text>`;
       }
-      const ordered = [...input.series].sort(
+      const ordered = input.series.toSorted(
         (a, b) => Number(config.selected?.has(a.id)) - Number(config.selected?.has(b.id)),
       );
       for (const s of ordered) {

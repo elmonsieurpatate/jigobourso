@@ -204,7 +204,7 @@
       };
       b.onclick = go2;
       b.onkeydown = (e) => {
-        if (e.key === "Enter") go2();
+        if (e.key === "Enter" && !e.isComposing) go2();
       };
     });
     $$("[data-quiz]", el).forEach((q) => {
@@ -284,7 +284,7 @@
     }
   };
   $("#h-q").onkeydown = (e) => {
-    if (e.key === "Enter") {
+    if (e.key === "Enter" && !e.isComposing) {
       const best = ranked(e.target.value)[0];
       if (best) go(best);
     }

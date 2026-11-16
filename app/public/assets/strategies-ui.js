@@ -115,47 +115,48 @@
   const desc = (id, kind) => (META[id] && META[id].description) || SHORT[kind === "personal" ? "personal" : id] || "";
   const badge = (st) => J.badge(STATUS[st] || st, { adapted: "info", personal: "ok" }[st] || "", { sm: true });
   let pop = null,
-    popAc = null; // AbortController : retire d'un coup tous les écouteurs de la fenêtre ouverte
+    closedAt = { btn: null, t: 0 }; // le clic qui ferme par clic extérieur ne doit pas rouvrir aussitôt
+  const anchored = typeof CSS !== "undefined" && CSS.supports("position-area", "block-end");
   function closePop() {
-    if (popAc) {
-      popAc.abort();
-      popAc = null;
-    }
-    if (pop) {
-      pop.remove();
-      pop = null;
-    }
+    if (!pop) return;
+    closedAt = { btn: pop._btn, t: performance.now() };
+    if (pop.matches(":popover-open")) pop.hidePopover();
+    pop.remove();
+    pop = null;
   }
-  /** Fenêtre d'information : ouverte au clic ou au clavier (pas seulement au survol), fermée par Échap ou clic extérieur. */
+  /** Fenêtre d'information : popover natif ouvert par le bouton (clic ou clavier). Fermeture, Échap, clic extérieur et retour du focus sont gérés par le navigateur. */
   function openInfo(btn, s) {
     closePop();
+    if (closedAt.btn === btn && performance.now() - closedAt.t < 400) return;
     const kind = s.kind || (s.builtin === false ? "personal" : "builtin");
-    pop = document.createElement("div");
-    pop.className = "sui-pop";
-    pop.setAttribute("role", "dialog");
-    pop.setAttribute("aria-label", "À propos de " + s.label);
-    pop.innerHTML = `<h4>${ico(s.id, kind)}<span>${E(s.label)}</span>${badge(s.status)}</h4><p>${E(desc(s.id, kind))}</p><a href="aide.html#strategie-${E(kind === "personal" ? "personnelles" : s.id)}">Lire la fiche complète dans l’aide</a>`;
-    document.body.appendChild(pop);
-    const r = btn.getBoundingClientRect(),
-      w = pop.offsetWidth;
-    pop.style.left = Math.max(12, Math.min(innerWidth - w - 12, r.left)) + "px";
-    pop.style.top = Math.min(innerHeight - pop.offsetHeight - 12, r.bottom + 6) + "px";
-    const ac = (popAc = new AbortController());
-    document.addEventListener("keydown", (e) => e.key === "Escape" && closePop(), { capture: true, signal: ac.signal });
-    // le clic qui ouvre la fenêtre ne doit pas la fermer : écouteur posé au tour suivant, sauf fermeture entre-temps
-    setTimeout(() => {
-      if (ac.signal.aborted) return;
-      document.addEventListener(
-        "click",
-        (e) => {
-          if (pop && !pop.contains(e.target) && e.target !== btn) closePop();
-        },
-        { signal: ac.signal },
-      );
-    }, 0);
+    const el = (pop = document.createElement("div"));
+    el._btn = btn;
+    el.className = "sui-pop";
+    el.setAttribute("popover", "auto");
+    el.setAttribute("aria-label", "À propos de " + s.label);
+    el.innerHTML = `<h4>${ico(s.id, kind)}<span>${E(s.label)}</span>${badge(s.status)}</h4><p>${E(desc(s.id, kind))}</p><a href="aide.html#strategie-${E(kind === "personal" ? "personnelles" : s.id)}">Lire la fiche complète dans l’aide</a>`;
+    document.body.appendChild(el);
+    el.addEventListener("toggle", (e) => {
+      if (e.newState === "closed") {
+        closedAt = { btn, t: performance.now() };
+        el.remove();
+        if (pop === el) pop = null;
+      }
+    });
+    if (anchored) {
+      btn.style.anchorName = "--sui-info-anchor";
+      el.style.positionAnchor = "--sui-info-anchor";
+    }
+    el.showPopover({ source: btn });
+    if (!anchored) {
+      // Navigateur sans ancrage CSS : position calculée une fois, comme avant.
+      const r = btn.getBoundingClientRect();
+      el.style.left = Math.max(12, Math.min(innerWidth - el.offsetWidth - 12, r.left)) + "px";
+      el.style.top = Math.min(innerHeight - el.offsetHeight - 12, r.bottom + 6) + "px";
+    }
   }
   const infoButton = (s) =>
-    `<button type="button" class="sui-info" data-sui-info="${E(s.id)}" aria-label="Informations sur ${E(s.label)}" aria-haspopup="dialog">${J.icon("info", "sui-ic")}</button>`;
+    `<button type="button" class="sui-info" data-sui-info="${E(s.id)}" aria-label="Informations sur ${E(s.label)}">${J.icon("info", "sui-ic")}</button>`;
   function bindInfo(root, list) {
     root.querySelectorAll("[data-sui-info]").forEach((b) => {
       b.onclick = (e) => {

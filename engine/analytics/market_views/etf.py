@@ -241,7 +241,7 @@ def page_groups(cached, ordered):
 
 
 def tier(coefficient):
-    """Libellé d'une corrélation (seuils fixes, voir docs/ETF_V1.md)."""
+    """Libellé d'une corrélation (seuils fixes, voir docs/APPLICATION.md, § 8)."""
     return 'quasi identiques' if coefficient >= NEAR_IDENTICAL else 'très proches' if coefficient >= STRONG else 'proches' if coefficient >= 0.75 else 'distincts'
 
 

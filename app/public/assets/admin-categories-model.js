@@ -90,7 +90,7 @@
             }
           }
         }
-      const sorted = [...valid].sort((a, b) => (a.min ?? -Infinity) - (b.min ?? -Infinity));
+      const sorted = valid.toSorted((a, b) => (a.min ?? -Infinity) - (b.min ?? -Infinity));
       if (!sorted.length) warnings.push("Aucune plage numérique.");
       else {
         if (sorted[0].min !== null)

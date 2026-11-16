@@ -175,7 +175,7 @@
     if (entry.state === "ready") return entry.value;
     const st = strat();
     return st &&
-      JSON.stringify(Object.keys(st.auto_weights).sort()) === JSON.stringify(ids.slice().sort()) &&
+      JSON.stringify(Object.keys(st.auto_weights).sort()) === JSON.stringify(ids.toSorted()) &&
       draft.global.kappa === S.global.kappa
       ? st.auto_weights
       : null;
@@ -206,7 +206,7 @@
       if (e.pointerType === "touch") setTimeout(chartLeave, 2500);
     };
     root.onkeydown = (e) => {
-      if (e.key === "Enter" && e.target.id === "as-q") {
+      if (e.key === "Enter" && !e.isComposing && e.target.id === "as-q") {
         simQ = e.target.value;
         runSim(null);
       }

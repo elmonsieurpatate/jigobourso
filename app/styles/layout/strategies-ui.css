@@ -26,8 +26,14 @@
   padding: var(--sp-2);
 }
 .sui-pop {
-  position: fixed;
-  z-index: var(--z-drawer);
+  margin: 0;
+  inset: auto;
+  position-area: block-end span-inline-end;
+  position-try-fallbacks:
+    flip-block,
+    flip-inline,
+    flip-block flip-inline;
+  margin-block: var(--sp-6);
   max-width: min(360px, calc(100vw - 24px));
   padding: var(--sp-12) var(--sp-14);
 }

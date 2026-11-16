@@ -135,7 +135,6 @@
       ),
       trades = (X.C().H.trades || [])
         .filter((t) => t.key === key && !t.note)
-        .slice()
         .sort((a, b) => String(b.trade_at).localeCompare(String(a.trade_at)));
     const sales = (X.C().D.sales || []).filter((s) =>
         p.listing_id ? s.listing_id === p.listing_id : s.symbol === p.symbol,

@@ -936,7 +936,6 @@
     max-height: 65vh;
     max-width: 100%;
     overscroll-behavior-x: contain;
-    -webkit-overflow-scrolling: touch;
   }
   .ct-ranking table {
     display: table;

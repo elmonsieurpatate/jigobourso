@@ -505,3 +505,64 @@ J.table = (() => {
   });
   scan(document.documentElement);
 })();
+
+/* Infobulles natives : un attribut `title` (ou `data-tip`) devient un popover unique, ancré à l'élément, au survol de la souris
+   ou au focus clavier. Sans popover ni ancrage CSS, l'attribut `title` natif reste en place. */
+(() => {
+  if (typeof document === "undefined" || typeof CSS === "undefined" || !CSS.supports("position-area", "block-end"))
+    return;
+  if (!("popover" in HTMLElement.prototype)) return;
+  let tip = null,
+    anchor = null,
+    timer = 0;
+  const hide = () => {
+    clearTimeout(timer);
+    if (tip && tip.matches(":popover-open")) tip.hidePopover();
+    if (anchor) anchor.style.removeProperty("anchor-name");
+    anchor = null;
+  };
+  const show = (el) => {
+    let text = el.getAttribute("title") || el.dataset.tip;
+    if (!text) return;
+    if (el.hasAttribute("title")) {
+      // le texte passe dans data-tip ; un contrôle sans autre nom accessible garde le texte comme nom
+      if (!el.textContent.trim() && !el.hasAttribute("aria-label") && !el.hasAttribute("aria-labelledby"))
+        el.setAttribute("aria-label", text);
+      el.dataset.tip = text;
+      el.removeAttribute("title");
+    }
+    hide();
+    if (!tip) {
+      tip = document.createElement("div");
+      tip.className = "jtip";
+      tip.id = "jtip";
+      tip.setAttribute("popover", "manual");
+      tip.setAttribute("role", "tooltip");
+      tip.style.positionAnchor = "--jtip-anchor";
+      document.body.appendChild(tip);
+    }
+    tip.textContent = text;
+    el.style.anchorName = "--jtip-anchor";
+    anchor = el;
+    tip.showPopover();
+  };
+  const target = (e) => (e.target instanceof Element ? e.target.closest("[title], [data-tip]") : null);
+  document.addEventListener("pointerover", (e) => {
+    const el = e.pointerType === "mouse" ? target(e) : null;
+    if (!el || el === anchor) return;
+    clearTimeout(timer);
+    timer = setTimeout(() => show(el), 350);
+  });
+  document.addEventListener("pointerout", (e) => {
+    const el = target(e);
+    if (el && !el.contains(e.relatedTarget)) hide();
+  });
+  document.addEventListener("focusin", (e) => {
+    const el = target(e);
+    if (el && el.matches(":focus-visible")) show(el);
+  });
+  document.addEventListener("focusout", hide);
+  document.addEventListener("keydown", (e) => e.key === "Escape" && hide(), true);
+  document.addEventListener("pointerdown", hide, true);
+  addEventListener("scroll", hide, { capture: true, passive: true });
+})();

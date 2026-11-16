@@ -1,6 +1,6 @@
 """Scores V4 : score simple et score complexe, de 0 à 100, calculés titre par titre.
 
-Principes (validés le 2026-11-06, voir docs/SCORES_V4.md) :
+Principes (validés le 2026-11-06, voir docs/APPLICATION.md, § 4) :
   * Les scores ne dépendent QUE des mesures du titre, des granularités actives et de leurs poids. Ils ne dépendent ni des filtres de
     conformité, ni des seuils de la stratégie, ni des autres titres de l'univers (aucun percentile) : changer un critère ne change aucune note.
   * Chaque mesure est calculée par granularité (fenêtres cumulées de n séances), notée sur une échelle absolue, puis agrégée avec des poids

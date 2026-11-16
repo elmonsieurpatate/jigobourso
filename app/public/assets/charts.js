@@ -63,8 +63,8 @@
       });
       if (opts.zeroLine && y0 < 0 && y1 > 0)
         svg.append(el("line", { x1: L, x2: W - R, y1: Y(0), y2: Y(0), class: "lc-zero" }));
-      [...vis]
-        .sort((a, b) => (a.id === opts.selected) - (b.id === opts.selected))
+      vis
+        .toSorted((a, b) => (a.id === opts.selected) - (b.id === opts.selected))
         .forEach((s, k) => {
           let d = "",
             pen = false;

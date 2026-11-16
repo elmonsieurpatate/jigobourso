@@ -19,6 +19,7 @@
   background: var(--surface);
   color: var(--text);
   font: 700 var(--btn-size) / 1.45 var(--font);
+  font-variant-numeric: tabular-nums;
   box-shadow: none;
   text-decoration: none;
   transition:

@@ -84,7 +84,7 @@ Reprise seulement par **réécriture propre**, sans l'architecture ni les dépen
 - Parité : pour chaque profil × période × mode de tri, statuts et rangs du nouveau moteur égaux à ceux de l'ancien sur le jeu de référence (P0).
 - Parcours de bout en bout : connexion → Explorer → fiche → achat dans un portefeuille → bilan → administration.
 
-## 8. Volumes (voir `docs/VOLUMETRIE.md`, rempli après mesure)
+## 8. Volumes (voir `docs/PERFORMANCE.md`)
 
 Estimation avant mesure : `daily_prices` ≈ 60–110 Mo, `intraday_prices` 15 min × 20 séances ≈ 150–250 Mo, reste < 60 Mo. Objectif < 450 Mo contre 2 320 Mo aujourd'hui.
 

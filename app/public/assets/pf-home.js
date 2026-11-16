@@ -633,7 +633,6 @@
   function viewTx() {
     const tr = (C.H.trades || [])
       .filter((t) => !t.note)
-      .slice()
       .sort((a, b) => String(b.trade_at).localeCompare(String(a.trade_at)))
       .slice(0, 12);
     return `<section class="px-card"><div class="px-ph"><h2>Transactions</h2><div class="px-ha"><button type="button" class="btn primary" data-add>Ajouter une opération</button><button type="button" class="btn" data-hist>Historique complet, lots et ventes</button></div></div>

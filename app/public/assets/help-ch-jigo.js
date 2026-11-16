@@ -426,8 +426,7 @@ score complexe = 100 × base × [1 − λ · (1 − porte de la durée la plus c
         const w = ev[0][1].weights;
         d.querySelector("#sim-out").innerHTML =
           `<div class="h-table-scroll"><table><thead><tr><th>Titre</th><th class="n">Simple</th><th class="n">Complexe</th><th class="n">Rang</th><th></th></tr></thead><tbody>${ev
-            .slice()
-            .sort((a, b) => (rk[a[0]] || 99) - (rk[b[0]] || 99))
+            .toSorted((a, b) => (rk[a[0]] || 99) - (rk[b[0]] || 99))
             .map(
               ([n, e]) =>
                 `<tr><th scope="row"><span data-style="color:${COLORS[n]}">●</span> ${n}</th><td class="n">${e.simple.score == null ? "—" : f(e.simple.score, 0)}</td><td class="n"><b>${e.complex.score == null ? "—" : f(e.complex.score, 0)}</b></td><td class="n">${rk[n] || "—"}</td><td class="u-width-35pct">${HC.bars([{ label: "", value: e.complex.score || 0, color: COLORS[n] }], { max: 100, fmt: () => "" })}</td></tr>`,
@@ -539,7 +538,7 @@ score complexe = 100 × base × [1 − λ · (1 − porte de la durée la plus c
           HM.evaluate(t, ["week", "month", "quarter", "half"]).complex.score,
         ]),
         rk = HM.ranks(Object.fromEntries(ev));
-      const all = ev.slice().sort((a, b) => b[1] - a[1]);
+      const all = ev.toSorted((a, b) => b[1] - a[1]);
       let hide = new Set();
       const draw = () => {
         const shown = all.filter(([n]) => !hide.has(n));

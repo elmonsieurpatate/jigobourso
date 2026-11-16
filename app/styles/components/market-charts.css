@@ -7,10 +7,12 @@
 .price-svg .axis {
   fill: var(--muted);
   font: var(--fs-11) var(--font);
+  font-variant-numeric: tabular-nums;
 }
 .intraday-svg .sess-title {
   fill: var(--text);
   font: 700 var(--fs-13) var(--font);
+  font-variant-numeric: tabular-nums;
 }
 .intraday-svg .band {
   fill: var(--surface-2);
@@ -53,6 +55,7 @@
 .intraday-svg .prevclose-label {
   fill: var(--muted);
   font: var(--fs-10) var(--font);
+  font-variant-numeric: tabular-nums;
 }
 .intraday-svg .lastline {
   stroke: var(--accent);
@@ -63,6 +66,7 @@
 .intraday-svg .lasttext {
   fill: var(--accent-ink);
   font: 700 var(--fs-11) var(--font);
+  font-variant-numeric: tabular-nums;
 }
 .intraday-svg .cross {
   stroke: var(--text);
@@ -151,6 +155,7 @@
 .price-svg .lasttext {
   fill: var(--bg);
   font: 700 var(--fs-11) var(--font);
+  font-variant-numeric: tabular-nums;
 }
 .price-svg .cross {
   stroke: var(--text);

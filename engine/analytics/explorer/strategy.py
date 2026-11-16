@@ -55,7 +55,7 @@ def _period(pid, enabled=False, **thresholds):
 
 def preset(name):
     """Les quatre profils de départ. Ce sont des propositions de réglage, pas des vérités : tout est modifiable.
-    Calibrés le 28/10/2026 sur ~9 700 titres réels (voir docs/METHODE.md) : « regular » retient environ 4 % de l'univers (191 actions, 67 ETF), « fast » environ 8 % (389 actions, 11 ETF),
+    Calibrés le 28/10/2026 sur ~9 700 titres réels (voir docs/APPLICATION.md, § 5) : « regular » retient environ 4 % de l'univers (191 actions, 67 ETF), « fast » environ 8 % (389 actions, 11 ETF),
     « recovery » environ 7 % (196 actions, 497 ETF) ; « low_volatility » (Hausse calme) est volontairement très sélective, environ 1 % (38 actions, 45 ETF), car son plafond de volatilité
     (1,5 %/séance) n'est respecté que par une minorité de titres, surtout quand le marché est agité. Les deux Momentum n'ont aucun seuil : ils retiennent presque tout l'univers."""
     slope, reg = SLOPE_LEVELS['moderate'], R2_LEVELS['flexible']

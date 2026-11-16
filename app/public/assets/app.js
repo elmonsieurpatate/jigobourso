@@ -203,9 +203,12 @@ J.riskDetail = (r) =>
       ? `<p class="small muted">${J.esc(r.message || "Non évaluée.")}</p>`
       : `<ul class="rbar-why">${(r.signals || []).map((x) => `<li class="p${x.points}"><b>${J.esc(x.label)}</b> ${J.esc(x.message)}</li>`).join("")}${r.info ? `<li class="info">${J.esc(r.info)}</li>` : ""}</ul>`;
 
-J.dialog = function ({ title, body, actions = [], onopen }) {
+let dialogSeq = 0;
+J.dialog = function ({ title, body, actions = [], onopen, closedby }) {
   const d = J.dom.h("dialog");
-  d.innerHTML = `<form method="dialog"><div class="head"><h2 class="m-0">${J.esc(title)}</h2><button class="btn sm" value="x" aria-label="Fermer">✕</button></div><div class="body">${body}</div><div class="foot"></div></form>`;
+  const titleId = `dlg-title-${++dialogSeq}`;
+  d.setAttribute("aria-labelledby", titleId);
+  d.innerHTML = `<form method="dialog"><div class="head"><h2 class="m-0" id="${titleId}">${J.esc(title)}</h2><button class="btn sm" value="x" aria-label="Fermer">✕</button></div><div class="body">${body}</div><div class="foot"></div></form>`;
   const foot = d.querySelector(".foot");
   actions.forEach((a) => {
     const b = J.dom.h("button.btn", {
@@ -230,6 +233,17 @@ J.dialog = function ({ title, body, actions = [], onopen }) {
   });
   document.body.appendChild(d);
   d.addEventListener("close", () => d.remove());
+  // Clic sur le fond : seulement si le dialogue ne contient aucun champ (une saisie ne se perd pas sur un clic de travers).
+  d.setAttribute("closedby", closedby || (d.querySelector("input, textarea, select") ? "closerequest" : "any"));
+  if (!("closedBy" in HTMLDialogElement.prototype) && d.getAttribute("closedby") === "any") {
+    const outside = (e) => {
+      const r = d.getBoundingClientRect();
+      return e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom;
+    };
+    let pressed = false;
+    d.addEventListener("pointerdown", (e) => (pressed = outside(e)));
+    d.addEventListener("pointerup", (e) => pressed && outside(e) && d.close());
+  }
   d.showModal();
   if (onopen) onopen(d);
   return d;
@@ -586,6 +600,8 @@ J.buildShell = function (page, user) {
 J.applyTheme = (t) => {
   const dark = t === "dark" || (t === "auto" && matchMedia("(prefers-color-scheme: dark)").matches);
   document.documentElement.dataset.theme = dark ? "dark" : "light";
+  const meta = document.querySelector('meta[name="color-scheme"]');
+  if (meta) meta.content = t === "dark" || t === "light" ? t : "light dark";
   J.store.text.set("jigo_theme", t);
 };
 J.accountDialog = function () {

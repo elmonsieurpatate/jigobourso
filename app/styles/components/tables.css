@@ -12,6 +12,7 @@ th {
   background: var(--thead);
   color: var(--muted);
   font: 800 var(--th-size) / var(--lh-normal) var(--font);
+  font-variant-numeric: tabular-nums;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   text-align: left;
@@ -31,6 +32,7 @@ td {
   border-bottom: 1px solid var(--line);
   color: var(--text);
   font: 400 var(--td-size) / 1.45 var(--font);
+  font-variant-numeric: tabular-nums;
 }
 th.num,
 th.n {

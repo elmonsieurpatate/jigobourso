@@ -178,7 +178,7 @@
     }
     if (availW <= 1e-12) return { score: null };
     const base = total / availW,
-      shortest = avail.slice().sort((a, b) => SESSIONS[a.id] - SESSIONS[b.id])[0],
+      shortest = avail.toSorted((a, b) => SESSIONS[a.id] - SESSIONS[b.id])[0],
       mult = 1 - anchor * (1 - shortest.comp.gate);
     Object.values(contrib).forEach((c) => {
       c.share = c.weight / availW;

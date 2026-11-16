@@ -20,6 +20,7 @@ body {
     var(--bg);
   color: var(--text);
   font: var(--fs-14) / 1.5 var(--font);
+  font-variant-numeric: tabular-nums;
 }
 a {
   color: var(--accent);

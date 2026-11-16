@@ -112,6 +112,7 @@
 .ps-risk {
   border-radius: var(--radius-pill);
   font: 700 0.9rem system-ui;
+  font-variant-numeric: tabular-nums;
 }
 .ps-risk.r-mod {
   background: var(--info-soft);
@@ -172,6 +173,7 @@
 .ps-state {
   border-radius: var(--radius-8);
   font: 800 0.72rem system-ui;
+  font-variant-numeric: tabular-nums;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   background: var(--muted);
@@ -212,6 +214,7 @@
 .ps-os {
   border-radius: var(--radius-4);
   font: 700 0.68rem system-ui;
+  font-variant-numeric: tabular-nums;
   text-transform: uppercase;
   background: var(--surface);
   border: 1px solid var(--line);
@@ -310,6 +313,7 @@ dialog .ps-rule legend {
 .ps-tag {
   border-radius: var(--radius-pill);
   font: 700 0.72rem system-ui;
+  font-variant-numeric: tabular-nums;
   background: var(--info-soft);
   color: var(--info);
 } /* Suivi des positions : grille type tableau, une ligne compacte par position */

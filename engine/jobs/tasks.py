@@ -337,7 +337,7 @@ def housekeeping(conn, now):
         try:
             with conn.cursor() as cur:
                 cur.execute(f'DELETE FROM {table} WHERE {cond}', (arg,))
-                out[table] = cur.rowcount
+                out[table] = (out.get(table) or 0) + cur.rowcount  # deux règles sur `jobs` : on additionne
             conn.commit()
         except Exception:  # noqa: BLE001 : table absente (base pas encore migrée) ou verrou : on passe à la suivante
             conn.rollback()

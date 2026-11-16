@@ -139,7 +139,7 @@
     const lowest = prot.length ? Math.min(...prot) : Math.max(0, xp - 25),
       mid = (lowest + xp) / 2;
     const grad = `linear-gradient(90deg,var(--gauge-exit) 0%,var(--gauge-exit) ${Math.max(lowest - 4, 0).toFixed(1)}%,var(--gauge-danger) ${lowest.toFixed(1)}%,var(--gauge-watch) ${mid.toFixed(1)}%,var(--gauge-neutral) ${xp.toFixed(1)}%,var(--gauge-hold) ${Math.min(xp + (100 - xp) * 0.35, 100).toFixed(1)}%,var(--gauge-good) ${Math.min(xp + (100 - xp) * 0.75, 100).toFixed(1)}%,var(--gauge-strong) 100%)`;
-    const sorted = m.slice().sort((a, b) => sc.at(a.value) - sc.at(b.value)),
+    const sorted = m.toSorted((a, b) => sc.at(a.value) - sc.at(b.value)),
       labelled = sorted;
     // alternance de niveaux d'étiquettes pour éviter les chevauchements (repères très proches ou superposés)
     const tier = {};

@@ -1,5 +1,5 @@
 """Étape 9 : mesure des requêtes SQL par appel d'API (recherche de N+1). Les plafonds ci-dessous sont les mesures du 14/11 avec une marge ; ils
-décrivent le contrat actuel (docs/DATA_CONTRACT.md) et signalent toute dérive."""
+décrivent le contrat actuel (docs/APPLICATION.md, § 10) et signalent toute dérive."""
 
 import os
 
