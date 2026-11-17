@@ -1,2 +1,16 @@
 == Validation du déploiement : full
 == Contrôles du serveur (lecture seule)
+== Contrôle des classements (lecture seule)
+diagnostic Explorer regular: 265 retenus, 113 non évaluables sur 9609
+diagnostic Explorer momentum_risk: 3173 retenus, 1333 non évaluables sur 9609
+== Contrôle des fichiers SQL : ajouts seulement
+== Essai isolé Hostinger (copie + base sandbox)
+== Version des pages : ?v=202611171710
+== Transfert du code
+== Dépendances Python, migrations de schéma, contrôles
+moteur importable
+== Contrôle d'intégrité financière
+PHP valide
+== Vérification des calculs financiers avec les calendriers de séance
+Erreur contrôle financier : UBU5.DE / fenêtre 252 / volatility
+== Actualisation des indicateurs dérivés par le traitement existant
