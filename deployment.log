@@ -14,3 +14,12 @@ PHP valide
 == Vérification des calculs financiers avec les calendriers de séance
 Erreur contrôle financier : UBU5.DE / fenêtre 252 / volatility
 == Actualisation des indicateurs dérivés par le traitement existant
+== Contrôle financier strict validé après actualisation
+== Vérification ETF
+== Vérification publique
+site OK : menus de test 200, versions vérifiées, API filtres protégées (401)
+site OK : accueil 200, version 202611171710 servie, API répond (200)
+== Vérification des métadonnées du classement test (lecture seule)
+site OK : catalogue : 31870 instruments, 40813 cotations ; affectations exhaustives
+site OK : correspondances de repli : pays 2, secteurs/ETF 9281, MIC 0
+Déploiement terminé : c6582bd805fffa92ce3c3f621b8bd8f8f21262c0
