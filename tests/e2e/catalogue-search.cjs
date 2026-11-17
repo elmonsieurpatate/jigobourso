@@ -15,7 +15,14 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright-core')
         J.api = async (_, { params }) => {
           window.requests.push(params.q || '');
           await new Promise(r => setTimeout(r, 160));
-          return { places: ['XPAR'], raw_total: 1, rows: [], total: 0, page: 1, pages: 1 };
+          if (params.q === 'ERROR') throw new Error('Serveur temporairement indisponible');
+          const symbols = ['SELD.DE', 'SEL.PA', 'SEL.MI', 'LYSEL.SW', 'SELD.BE', 'SELD.DU', 'SELD.F', 'SELD.MU'];
+          const rows = params.q === 'LU1812092168' ? symbols.map((symbol, i) => ({
+            symbol, mic: i === 0 ? 'XETR' : 'XPAR', isin: 'LU1812092168', name: 'Produit de test', kind: 'etf',
+            lid: i + 1, in_final: i === 0, fdb_state: 'kept', y_state: i === 0 ? 'kept' : 'secondary',
+            d_state: 'absent', intraday_state: 'na', primary: { id: 1, symbol: 'SELD.DE', mic: 'XETR', in_catalogue: true },
+          })) : [];
+          return { places: ['XPAR'], raw_total: 8, rows, total: rows.length, page: 1, pages: 1 };
         };
       });
       await page.addScriptTag({ path: path.resolve('app/public/assets/admin-titres.js') });
@@ -25,6 +32,19 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright-core')
       await page.waitForTimeout(650);
       assert.equal(await page.locator('#tq').inputValue(), 'LU1812092168', 'la recherche coupe la saisie après la première réponse');
       assert(await page.locator('#tq').evaluate(e => e === document.activeElement), 'le champ doit garder le focus');
+      assert.match(await page.locator('#titles-results').innerText(), /1 produit · 8 cotations du même ISIN/);
+      assert(await page.locator('#titles-results a[href="titre.html?id=1"]').first().isVisible(), 'la principale doit être accessible avant les autres cotations');
+      assert.equal(await page.locator('#titles-results details').getAttribute('open'), null);
+      assert.equal(await page.locator('#titles-results tbody tr').count(), 8);
+      await page.locator('#titles-results summary').click();
+      assert(await page.locator('#titles-results table').isVisible());
+      await page.locator('#tq').fill('ERROR');
+      assert.equal(await page.locator('#titles-results table').count(), 0, 'les anciens résultats ne doivent pas rester pendant la nouvelle recherche');
+      await page.waitForTimeout(650);
+      assert.match(await page.locator('#titles-results [role=alert]').innerText(), /Recherche non actualisée/);
+      assert.equal(await page.locator('#titles-results table').count(), 0, 'un échec ne doit pas montrer les anciens résultats comme valides');
+      assert(await page.locator('#tq').evaluate(e => e === document.activeElement));
+
       await page.locator('#tq').fill('SM');
       await page.waitForTimeout(450); // une requête est en vol
       await page.keyboard.type('CRT');

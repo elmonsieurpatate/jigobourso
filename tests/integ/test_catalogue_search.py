@@ -144,3 +144,15 @@ def test_lu1812092168_secondary_candidates_and_filtered_venues(catalogue):
     row = adminsvc.titles(conn, {'q': 'SEL.PA'})['rows'][0]
     assert row['fdb_state'] == 'kept' and row['y_state'] == 'secondary'
     assert row['in_final'] is False and row['primary']['in_catalogue'] is True
+
+
+def test_actions_etf_http_search_does_not_keep_unrelated_rows(catalogue):
+    _, client = catalogue
+    status, data = client.call('admin/titles', params='&q=LU1812092168')
+    assert status == 200, data
+    assert data['total'] == 3
+    assert {r['symbol'] for r in data['rows']} == {'TEST.PA', 'TEST.DE', 'TEST.L'}
+    assert all(r['isin'] == 'LU1812092168' for r in data['rows'])
+    status, data = client.call('admin/titles', params='&q=LU9999999999')
+    assert status == 200, data
+    assert data['total'] == 0 and data['rows'] == []

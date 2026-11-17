@@ -11,9 +11,22 @@
   let searchTimer;
   async function titres() {
     const ticket = titresLatest.next();
-    const r = await J.api("admin/titles", {
-      params: Object.fromEntries(Object.entries(tf).filter(([, v]) => v !== "")),
-    });
+    const results = J.$("#titles-results", AC.page);
+    const pending = () =>
+      `<div class="empty" role="status"><span class="spinner"></span> ${tf.q.trim() ? `Recherche de « ${J.esc(tf.q.trim())} »…` : "Chargement des cotations…"}</div>`;
+    if (results) results.innerHTML = pending();
+    let r;
+    try {
+      r = await J.api("admin/titles", {
+        params: Object.fromEntries(Object.entries(tf).filter(([, v]) => v !== "")),
+      });
+    } catch (e) {
+      if (!titresLatest.isCurrent(ticket) || AC.tab() !== "titres") return;
+      if (!results) throw e;
+      results.innerHTML = `<div class="notice err" role="alert">Recherche non actualisée : ${J.esc(e.message)}. <button class="btn sm" type="button" id="titles-retry">Réessayer</button></div>`;
+      J.$("#titles-retry", results).onclick = () => titres();
+      return;
+    }
     if (!titresLatest.isCurrent(ticket) || AC.tab() !== "titres") return; // réponse périmée ou onglet quitté
     const opt = (cur, list) =>
       list
@@ -34,6 +47,13 @@
       absent: ["danger", "Aucun cours"],
     };
     const badge = (k, label) => J.badge(label || B[k][1], B[k][0]);
+    const query = tf.q.trim().toUpperCase();
+    const product = /^[A-Z]{2}[A-Z0-9]{10}$/.test(query)
+      ? r.rows.find((x) => x.isin?.toUpperCase() === query && x.primary?.in_catalogue)
+      : null;
+    const productSummary = product
+      ? `<div class="card-bar" role="status"><div><b>1 produit · ${nf(r.total)} cotations du même ISIN</b><p>${J.esc(product.name)}</p><p>${J.badge("Produit conservé", "ok")} <a href="titre.html?id=${product.primary.id}"><b>${J.esc(product.primary.symbol)} · ${J.esc(product.primary.mic)}</b></a></p><p class="small muted">Une seule cotation principale est retenue. Les autres lignes sont des cotations alternatives du même produit.</p></div></div>`
+      : "";
     const cols = [
       { label: "Titre", sort: "name" },
       { label: "Place · type", sort: "mic" },
@@ -85,13 +105,14 @@
       AC.page.innerHTML = `${runBar()}<div class="card flush">${controls}<div id="titles-results"></div></div>`;
     J.$("#titles-results", AC.page).innerHTML = `
       ${r.raw_total ? "" : '<div class="notice u-margin-0-18px-12px">Aucun titre connu : importez et filtrez FinanceDatabase (page FinanceDatabase).</div>'}
+      ${productSummary}${product ? `<details><summary class="card-bar">Voir les ${nf(r.total)} cotations de ce produit</summary>` : ""}
       <div class="table-wrap"><table>${J.table.head(cols, { key: tf.sort, dir: tf.dir })}<tbody>
       ${
         r.rows
           .map(
             (
               x,
-            ) => `<tr ${x.in_final && x.lid ? `data-id="${x.lid}"` : ""} class="pointer"><td><b>${J.esc(x.name)}</b><div class="small muted">${J.esc(x.symbol)} · ${J.esc(x.isin || "")} · ${J.esc(x.country || "")}${x.category ? " · " + J.esc(x.category) : ""}</div></td>
+            ) => `<tr ${x.in_final && x.lid ? `data-id="${x.lid}"` : ""} class="pointer"><td><b>${J.esc(x.name)}</b>${x.in_final ? " " + J.badge("Principale retenue", "ok") : x.primary?.in_catalogue ? " " + J.badge("Autre cotation", "") : ""}<div class="small muted">${J.esc(x.symbol)} · ${J.esc(x.mic)} · ${J.esc(x.isin || "")} · ${J.esc(x.country || "")}${x.category ? " · " + J.esc(x.category) : ""}</div></td>
         <td>${J.esc(x.mic)}<div class="small muted">${x.kind === "etf" ? "ETF" : "Action"}</div></td><td>${badge(x.fdb_state, x.fdb_state === "kept" ? "Admis FDB" : "")}</td><td>${badge(x.y_state, x.y_state === "kept" ? "Retenu Yahoo" : "")}</td>
         <td>${x.in_final ? '<span class="badge ok">Oui</span>' : '<span class="badge danger">Non</span>'}${x.held ? ' <span class="badge accent">lié à un portefeuille · suivi séparément</span>' : ""}${x.primary?.in_catalogue && x.primary.id !== x.lid ? `<div class="small">Produit conservé : <a href="titre.html?id=${x.primary.id}">${J.esc(x.primary.symbol)} · ${J.esc(x.primary.mic)}</a><div class="muted">Cette cotation n’est pas la principale retenue.</div></div>` : ""}</td>
         <td class="small">${x.reason ? `<b>${J.esc(x.reason.stage)}</b>${x.reason.rule ? " · " + J.esc(x.reason.rule) : ""}<div class="muted">${J.esc(x.reason.detail || "")}</div>` : "–"}</td>
@@ -100,8 +121,8 @@
         <td class="small">${x.issue ? `<span class="warn">${J.esc(x.issue)}</span>` : x.quote_at ? "Infos Yahoo " + J.ago(x.quote_at) : "–"}</td></tr>`,
           )
           .join("") || '<tr><td colspan="10" class="empty">Aucun titre.</td></tr>'
-      }</tbody></table></div>
-      <div class="row between card-bar card-bar-sm"><span class="muted small">${nf(r.total)} titres sur ${nf(r.raw_total)} connus</span><span class="row gap-s"><button class="btn sm" id="tp" ${r.page <= 1 ? "disabled" : ""}>←</button><span class="small">Page ${r.page} / ${r.pages}</span><button class="btn sm" id="tn" ${r.page >= r.pages ? "disabled" : ""}>→</button></span></div>`;
+      }</tbody></table></div>${product ? "</details>" : ""}
+      <div class="row between card-bar card-bar-sm"><span class="muted small">${nf(r.total)} cotations sur ${nf(r.raw_total)} connues</span><span class="row gap-s"><button class="btn sm" id="tp" ${r.page <= 1 ? "disabled" : ""}>←</button><span class="small">Page ${r.page} / ${r.pages}</span><button class="btn sm" id="tn" ${r.page >= r.pages ? "disabled" : ""}>→</button></span></div>`;
     const go = () => {
       clearTimeout(searchTimer);
       tf.q = J.$("#tq").value.trim();
@@ -119,7 +140,15 @@
       titresLatest.cancel(); // invalider dès la frappe, avant la prochaine requête
       tf.q = J.$("#tq").value;
       tf.page = 1;
+      J.$("#titles-results", AC.page).innerHTML =
+        `<div class="empty" role="status"><span class="spinner"></span> Recherche de « ${J.esc(tf.q.trim())} »…</div>`;
       searchTimer = setTimeout(titres, 400);
+    };
+    J.$("#tq").onkeydown = (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        go();
+      }
     };
     ["tk", "tm", "tfdb", "ty", "tfin", "td"].forEach((i) => (J.$("#" + i).onchange = go));
     J.$("#tp").onclick = () => {
