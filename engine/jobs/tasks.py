@@ -452,12 +452,6 @@ def maintenance(conn, client, now, log):
     # 3. Calculs dérivés : les indicateurs, puis les ETF (indépendants l'un de l'autre).
     def recalculate_indicators():
         result = compute.compute_all(conn, now)
-        stats = compute.LAST
-        if stats:
-            log(
-                'info',
-                f'Calcul {stats["mode"]} : {stats["recomputed"]} titres recalculés sur {stats["total"]}' + (f' ({stats["reason"]})' if stats.get('reason') else '') + f', {stats.get("seconds", 0)} s',
-            )
         if hasattr(log, 'step'):
             with conn.cursor() as cur:
                 cur.execute('SELECT COUNT(*) n, SUM(ma200 IS NOT NULL AND ma200_prev IS NOT NULL) ready FROM series_state')
@@ -465,7 +459,16 @@ def maintenance(conn, client, now, log):
             log.progress(f'Moyennes mobiles 200 séances disponibles : {int(ma["ready"] or 0)} sur {int(ma["n"] or 0)} séries')
         return result
 
-    computed = attempt('Indicateurs et classements', recalculate_indicators, lambda r: f'{r[0]} séries, {r[1]} lignes de mesures')
+    def compute_detail(r):
+        stats = compute.LAST
+        if not stats:
+            return f'{r[0]} séries, {r[1]} lignes de mesures'
+        mode = {'full': 'complet', 'incremental': 'incrémental', 'liquidity': 'liquidité seule', 'unchanged': 'rien à recalculer'}.get(stats['mode'], stats['mode'])
+        return f'{r[0]} séries, {r[1]} lignes de mesures · calcul {mode} : {stats["recomputed"]} titres recalculés sur {stats["total"]}, liquidité actualisée pour {stats.get("liquidity", 0)}' + (
+            f' ({stats["reason"]})' if stats.get('reason') else ''
+        )
+
+    computed = attempt('Indicateurs et classements', recalculate_indicators, compute_detail)
     attempt(
         'Profils des ETF suivis',
         lambda: etf.warm_profiles(conn, client, now),

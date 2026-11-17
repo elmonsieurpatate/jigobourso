@@ -234,3 +234,48 @@ def test_an_unavailable_etf_profile_is_not_requested_again_at_every_maintenance(
     finally:
         etf.fetch_profile = original
     assert first['unavailable'] == 1 and second['to_refresh'] == 0 and len(calls) == 1 + (third['unavailable'])  # redemandé le surlendemain seulement
+
+
+def test_a_currency_change_refreshes_only_the_liquidity_in_euros_and_matches_the_full_result(conn):
+    with conn.cursor() as cur:
+        cur.execute("UPDATE listings SET currency='USD' WHERE id IN (2,3)")
+        cur.execute("INSERT INTO fx_rates(currency,rate_date,to_eur) VALUES ('USD',%s,0.9)", (NOW.date(),))
+    conn.commit()
+    compute.compute_all(conn, NOW, full=True)
+    with conn.cursor() as cur:
+        cur.execute('SELECT listing_id, turnover_eur FROM liquidity_state WHERE listing_id IN (1,2) ORDER BY listing_id')
+        before = {r['listing_id']: r['turnover_eur'] for r in cur.fetchall()}
+        cur.execute('SELECT sessions, turnover_eur FROM score_inputs WHERE listing_id=2 ORDER BY sessions')
+        score_before = cur.fetchall()
+        cur.execute('SELECT * FROM strategy_metrics ORDER BY listing_id, sessions')
+        metrics_before = cur.fetchall()
+        cur.execute("UPDATE fx_rates SET to_eur=0.99 WHERE currency='USD'")  # la maintenance réécrit le taux du jour à chaque passage
+    conn.commit()
+    compute.compute_all(conn, NOW)
+    assert compute.LAST['mode'] == 'liquidity' and compute.LAST['recomputed'] == 0 and compute.LAST['liquidity'] == 2  # les deux titres en dollars, aucun autre
+    with conn.cursor() as cur:
+        cur.execute('SELECT listing_id, turnover_eur FROM liquidity_state WHERE listing_id IN (1,2) ORDER BY listing_id')
+        after = {r['listing_id']: r['turnover_eur'] for r in cur.fetchall()}
+        cur.execute('SELECT sessions, turnover_eur FROM score_inputs WHERE listing_id=2 ORDER BY sessions')
+        score_after = cur.fetchall()
+        cur.execute('SELECT * FROM strategy_metrics ORDER BY listing_id, sessions')
+        metrics_after = cur.fetchall()
+    assert after[1] == before[1] and after[2] != before[2]  # le titre en euros est intact, celui en dollars suit le nouveau taux
+    assert score_after != score_before and metrics_after == metrics_before  # chiffre d'affaires des fenêtres mis à jour ; mesures de cours inchangées
+    incremental = snap(conn)
+    assert incremental == full_after(conn, 'taux modifié')
+    compute.compute_all(conn, NOW)
+    assert compute.LAST['mode'] == 'unchanged'
+
+
+def test_empty_liquidity_signatures_after_the_migration_refresh_the_liquidity_without_recomputing_prices(conn):
+    compute.compute_all(conn, NOW)
+    first = snap(conn)
+    with conn.cursor() as cur:
+        cur.execute('UPDATE compute_signatures SET liquidity_signature=NULL')
+    conn.commit()
+    compute.compute_all(conn, NOW)
+    assert compute.LAST['mode'] == 'liquidity' and compute.LAST['recomputed'] == 0 and compute.LAST['liquidity'] == 4
+    assert snap(conn) == first
+    compute.compute_all(conn, NOW)
+    assert compute.LAST['mode'] == 'unchanged'

@@ -178,6 +178,7 @@ CREATE TABLE IF NOT EXISTS score_inputs (
 CREATE TABLE IF NOT EXISTS compute_signatures (
   listing_id  INT UNSIGNED NOT NULL,
   signature   CHAR(32) CHARACTER SET ascii NOT NULL,
+  liquidity_signature CHAR(32) CHARACTER SET ascii NULL,
   computed_at DATETIME NOT NULL,
   PRIMARY KEY (listing_id),
   CONSTRAINT fk_compute_signature_listing FOREIGN KEY (listing_id) REFERENCES listings(id)

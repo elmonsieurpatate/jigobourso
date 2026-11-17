@@ -587,6 +587,7 @@ def warm_profiles(conn, client, now, limit=WARM_LIMIT, budget_s=WARM_BUDGET_S):
             tried.pop(str(r['id']), None)
         else:
             tried[str(r['id'])] = stamp.date().isoformat()  # y compris quand un ancien profil est conservé : sans cette trace il serait redemandé à chaque passage
+    ensure(conn)  # l'hébergement ferme une connexion inactive depuis 20 s : les appels Yahoo ci-dessus peuvent durer plus longtemps
     settings.put(conn, PROFILE_TRIED, tried)
     conn.commit()
     return {'wanted': len(seen), 'to_refresh': len(todo), 'fetched': done, 'unavailable': unavailable, 'limit': limit, 'remaining': max(0, len(todo) - done - unavailable)}
