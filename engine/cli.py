@@ -349,11 +349,11 @@ def _main(argv=None):
         elif args.cmd == 'metrics':
             from engine.analytics.series import compute
 
-            print(compute.compute_all(conn, now))
+            print(compute.compute_all(conn, now, full=True))  # commande explicite : tout recalculer
         elif args.cmd == 'etf':
             from engine.analytics.market_views import etf
 
-            print(etf.build(conn, now))
+            print(etf.build(conn, now, force=True))
     return 0
 
 

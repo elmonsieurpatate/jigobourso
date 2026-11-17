@@ -115,7 +115,9 @@ def test_migrations_add_both_columns_without_touching_data():
             cur.execute(f'SELECT {column} FROM series_state LIMIT 1')
             assert cur.fetchone()[column] is None  # NULL jusqu'au prochain calcul : l'inconnu reste inconnu
         conn.commit()
-    compute.compute_all(conn, NOW)
+    compute.compute_all(
+        conn, NOW, full=True
+    )  # colonnes ajoutées à la main sur une table dérivée : recalcul complet explicite (en production, un déploiement change le code de calcul, donc l'empreinte de méthode, et tout est recalculé)
     with conn.cursor() as cur:
         cur.execute('SELECT COUNT(*) n FROM series_state WHERE momentum_6m IS NOT NULL')
         assert cur.fetchone()['n'] >= 5

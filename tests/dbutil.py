@@ -30,6 +30,7 @@ TABLES = (
     'strategy_metrics',
     'score_inputs',
     'liquidity_state',
+    'compute_signatures',
     'series_state',
     'corporate_events',
     'etf_profiles',

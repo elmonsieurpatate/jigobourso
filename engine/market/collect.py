@@ -206,9 +206,10 @@ def store_gap_bars(conn, r, data, now):
         cur.execute('SELECT price_date FROM daily_prices WHERE listing_id=%s', (r['listing_id'],))
         have = {x['price_date'] for x in cur.fetchall()}
         out = {}
+        oldest = naive_utc(now).date() - datetime.timedelta(days=DAILY_KEEP_DAYS)  # jamais plus ancien que la rétention (sinon ajouté puis purgé à chaque passage)
         for ts, _o, _h, _l, close, volume in data['bars']:
             day = local_date(ts, data['timezone'])
-            if day not in have and hours.is_settled(r['mic'], day, now):
+            if day >= oldest and day not in have and hours.is_settled(r['mic'], day, now):
                 out[day] = (close, volume)  # le volume de la même barre est conservé (None si Yahoo n'en donne pas : jamais zéro inventé)
         if out:
             cur.executemany('INSERT IGNORE INTO daily_prices(listing_id,price_date,close_px,volume) VALUES (%s,%s,%s,%s)', [(r['listing_id'], d, c, v) for d, (c, v) in out.items()])
@@ -481,12 +482,13 @@ def collect_daily(conn, client, rows, now, range_='2y', progress=None):
             err += len(part)
             continue
         out = []
+        oldest = naive_utc(now).date() - datetime.timedelta(days=DAILY_KEEP_DAYS)  # jamais une clôture que la rétention supprimerait aussitôt : elle serait « ajoutée » puis purgée à chaque passage
         for symbol, series in data.items():
             row = by_symbol[symbol]
             seen = {}
             for ts, close in series['bars']:
                 day = local_date(ts, series['timezone'])
-                if hours.is_settled(row['mic'], day, now):
+                if day >= oldest and hours.is_settled(row['mic'], day, now):
                     seen[day] = close
             out += [(row['listing_id'], d, c) for d, c in seen.items()]
             ok += bool(seen)

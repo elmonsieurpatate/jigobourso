@@ -174,6 +174,14 @@ CREATE TABLE IF NOT EXISTS score_inputs (
 ) ENGINE=InnoDB;
 -- liquidity_state : valeur échangée moyenne par séance, en euros. source 'daily' = volumes quotidiens réels (daily_prices.volume) ;
 -- 'estimated' = volume moyen 3 mois × cours (estimation, signalée partout) ; jamais mélangées.
+-- compute_signatures : empreinte des données d'entrée de chaque titre au dernier calcul des indicateurs (calcul incrémental : seuls les titres modifiés sont recalculés).
+CREATE TABLE IF NOT EXISTS compute_signatures (
+  listing_id  INT UNSIGNED NOT NULL,
+  signature   CHAR(32) CHARACTER SET ascii NOT NULL,
+  computed_at DATETIME NOT NULL,
+  PRIMARY KEY (listing_id),
+  CONSTRAINT fk_compute_signature_listing FOREIGN KEY (listing_id) REFERENCES listings(id)
+) ENGINE=InnoDB;
 CREATE TABLE IF NOT EXISTS liquidity_state (
   listing_id    INT UNSIGNED NOT NULL,
   turnover_eur  DECIMAL(20,2) NULL,

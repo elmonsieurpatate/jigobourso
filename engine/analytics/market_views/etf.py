@@ -16,6 +16,7 @@ from engine.shared.units import split_unit
 from collections import defaultdict
 
 from ..series.series import prepare_series
+from ...shared import settings
 from ...shared.db import ensure
 
 WEEKS = 52  # fenêtre : 52 semaines calendaires
@@ -322,7 +323,40 @@ def coverage(conn):
     }
 
 
-def build(conn, now):
+BUILD_STATE = 'etf_build_state'  # empreinte des données d'entrée de la dernière construction et son résultat
+
+
+def _build_signature(conn, now, day, start, meta, fx, splits, profiles, quote_fee, quote_assets):
+    """Empreinte de tout ce dont dépend la similarité : date, code, ETF suivis, clôtures de la fenêtre (nombre, dernière date, sommes exactes), change, splits, profils (contenu et fraîcheur),
+    frais de cotation. Identique : la construction précédente est encore exacte et n'est pas refaite."""
+    import hashlib
+
+    h = hashlib.md5(repr((day.isoformat(), VERSION)).encode())
+    with open(__file__, 'rb') as f:
+        h.update(f.read())
+    h.update(repr([tuple(sorted(m.items())) for m in meta]).encode())
+    ids = [m['id'] for m in meta]
+    for offset in range(0, len(ids), 2000):
+        part = ids[offset : offset + 2000]
+        with conn.cursor() as c:
+            c.execute(
+                'SELECT listing_id, COUNT(*) n, MAX(price_date) b, SUM(close_px) s, SUM(COALESCE(adj_close_px,0)) sa FROM daily_prices WHERE listing_id IN ('
+                + ','.join(['%s'] * len(part))
+                + ') AND price_date >= %s AND price_date <= %s GROUP BY listing_id ORDER BY listing_id',
+                part + [start - dt.timedelta(days=10), day],
+            )
+            h.update(repr([(r['listing_id'], r['n'], r['b'], str(r['s']), str(r['sa'])) for r in c.fetchall()]).encode())
+    h.update(repr({cur: (len(v), max(v) if v else None, round(sum(v.values()), 10)) for cur, v in sorted(fx.items())}).encode())
+    h.update(repr(sorted((k, sorted(v, key=str)) for k, v in splits.items())).encode())
+    for lid in sorted(profiles):
+        p = profiles[lid]
+        fresh = p['state'] == 'ok' and (now.replace(tzinfo=None) - p['fetched_at']).days <= MAX_PROFILE_DAYS
+        h.update(repr((lid, p['fetched_at'], p['version'], p['state'], fresh, hashlib.md5((p['data_json'] or '').encode()).hexdigest())).encode())
+    h.update(repr((sorted(quote_fee.items()), sorted(quote_assets.items()))).encode())
+    return h.hexdigest()
+
+
+def build(conn, now, force=False):
     """Prétraitement borné en mémoire, jamais exécuté par Explorer ou une fiche."""
     import numpy as np
 
@@ -348,6 +382,14 @@ def build(conn, now):
         quote_row = c.fetchall()
         quote_fee = {r['listing_id']: float(r['expense_ratio']) for r in quote_row if r['expense_ratio'] is not None}
         quote_assets = {r['listing_id']: float(r['net_assets']) for r in quote_row if r['net_assets']}  # frais de la réponse de cotation : repli quand le profil du fonds n'est pas en cache
+    signature = _build_signature(conn, now, day, start, meta, fx, splits, profiles, quote_fee, quote_assets)
+    previous = settings.get(conn, BUILD_STATE, None) or {}
+    if not force and previous.get('signature') == signature and previous.get('result'):
+        with conn.cursor() as c:
+            c.execute('SELECT COUNT(*) n FROM etf_analysis WHERE listing_id IN (' + ','.join(['%s'] * len(meta)) + ')', [m['id'] for m in meta]) if meta else None
+            complete = not meta or c.fetchone()['n'] == len(meta)
+        if complete:
+            return dict(previous['result'], skipped=True)  # aucune donnée d'entrée n'a changé : l'analyse en base est déjà exacte
     vectors, payloads = [], []
     for offset in range(0, len(meta), 200):
         part = meta[offset : offset + 200]
@@ -446,8 +488,10 @@ def build(conn, now):
             'INSERT INTO etf_analysis(listing_id,built_at,payload,returns_json) VALUES (%s,%s,%s,%s) ON DUPLICATE KEY UPDATE built_at=VALUES(built_at),payload=VALUES(payload),returns_json=VALUES(returns_json)',
             [(m['id'], stamp, json.dumps(p, default=str, allow_nan=False), json.dumps({k: round(x_, 6) for k, x_ in v.items()}, allow_nan=False)) for m, p, v in zip(meta, payloads, vectors)],
         )
+    result = {'etfs': n, 'with_minimum_history': sum(len(v) >= MIN_WEEKS * MIN_PARTITIONS for v in vectors), 'built_at': str(stamp)}
+    settings.put(conn, BUILD_STATE, {'signature': signature, 'result': result})
     conn.commit()
-    return {'etfs': n, 'with_minimum_history': sum(len(v) >= MIN_WEEKS * MIN_PARTITIONS for v in vectors), 'built_at': str(stamp)}
+    return result
 
 
 def load(conn, ids, with_returns=False):
@@ -469,6 +513,7 @@ def load(conn, ids, with_returns=False):
 
 WARM_LIMIT = 120  # profils Yahoo récupérés au plus par passage de maintenance
 WARM_BUDGET_S = 60  # ...et au plus ce temps (secondes) : les petits lots restent compatibles avec l'hébergement mutualisé ; un 429 de Yahoo arrête le passage
+PROFILE_TRIED = 'etf_profile_tried'  # {listing_id: date de la dernière tentative restée sans profil exploitable}
 PROFILE_FRESH_DAYS = 30
 RANKED_DEPTH = 300  # les ETF des 300 premières places du dernier classement passent avant le reste du catalogue
 
@@ -500,6 +545,7 @@ def warm_profiles(conn, client, now, limit=WARM_LIMIT, budget_s=WARM_BUDGET_S):
     ensure(conn)
     profiles = read_profiles(conn)
     stamp = now.replace(tzinfo=None, microsecond=0)
+    tried = settings.get(conn, PROFILE_TRIED, None) or {}  # dernière tentative sans profil exploitable, par ETF : un échec n'est pas redemandé à chaque maintenance
     for r in wanted:
         if r['id'] in seen:
             continue
@@ -507,6 +553,10 @@ def warm_profiles(conn, client, now, limit=WARM_LIMIT, budget_s=WARM_BUDGET_S):
         p = profiles.get(r['id'])
         age = (stamp - p['fetched_at']).days if p else None
         retry = 1 if r['tier'] < 3 else PROFILE_FRESH_DAYS
+        last_try = tried.get(str(r['id']))
+        recently_tried = last_try is not None and (stamp.date() - dt.date.fromisoformat(last_try)).days < retry
+        if recently_tried:
+            continue
         if p is None or p['version'] < etf_profile.VERSION or (p['state'] == 'ok' and age >= PROFILE_FRESH_DAYS) or (p['state'] != 'ok' and age >= retry):
             todo.append(r)
     done = unavailable = 0
@@ -533,6 +583,12 @@ def warm_profiles(conn, client, now, limit=WARM_LIMIT, budget_s=WARM_BUDGET_S):
             conn.commit()
         done += state == 'ok'
         unavailable += state != 'ok'
+        if state == 'ok':
+            tried.pop(str(r['id']), None)
+        else:
+            tried[str(r['id'])] = stamp.date().isoformat()  # y compris quand un ancien profil est conservé : sans cette trace il serait redemandé à chaque passage
+    settings.put(conn, PROFILE_TRIED, tried)
+    conn.commit()
     return {'wanted': len(seen), 'to_refresh': len(todo), 'fetched': done, 'unavailable': unavailable, 'limit': limit, 'remaining': max(0, len(todo) - done - unavailable)}
 
 

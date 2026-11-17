@@ -452,6 +452,12 @@ def maintenance(conn, client, now, log):
     # 3. Calculs dérivés : les indicateurs, puis les ETF (indépendants l'un de l'autre).
     def recalculate_indicators():
         result = compute.compute_all(conn, now)
+        stats = compute.LAST
+        if stats:
+            log(
+                'info',
+                f'Calcul {stats["mode"]} : {stats["recomputed"]} titres recalculés sur {stats["total"]}' + (f' ({stats["reason"]})' if stats.get('reason') else '') + f', {stats.get("seconds", 0)} s',
+            )
         if hasattr(log, 'step'):
             with conn.cursor() as cur:
                 cur.execute('SELECT COUNT(*) n, SUM(ma200 IS NOT NULL AND ma200_prev IS NOT NULL) ready FROM series_state')
@@ -465,7 +471,11 @@ def maintenance(conn, client, now, log):
         lambda: etf.warm_profiles(conn, client, now),
         lambda r: f'{r["fetched"]} récupérés, {r["unavailable"]} indisponibles, {r["to_refresh"]} à rafraîchir sur {r["wanted"]} suivis (au plus {r["limit"]} par passage)',
     )
-    attempt('Similarité des ETF', lambda: etf.build(conn, now), lambda r: f'{r["etfs"]} ETF, {r["with_minimum_history"]} avec un historique suffisant')
+    attempt(
+        'Similarité des ETF',
+        lambda: etf.build(conn, now),
+        lambda r: f'{r["etfs"]} ETF, {r["with_minimum_history"]} avec un historique suffisant' + (' (données d’entrée inchangées : non reconstruite)' if r.get('skipped') else ''),
+    )
     # 4. Suivi et entretien.
     snap = attempt('Suivi des classements', lambda: tracking.record_snapshot(conn), lambda r: f'{r[0]} ({r[1]} titres)') if computed else None
     if not computed:
@@ -625,11 +635,13 @@ def precheck(conn, name):
 def _recompute(conn, now, log, which):
     """Demande explicite d'un seul calcul dérivé (relance après un échec) : même code que l'étape de la maintenance, mêmes verrous."""
     if which == 'metrics':
-        n_series, n_metrics = _step(log, 'Indicateurs et classements', lambda: compute.compute_all(conn, now), lambda r: f'{r[0]} séries, {r[1]} lignes de mesures')
+        n_series, n_metrics = _step(
+            log, 'Indicateurs et classements', lambda: compute.compute_all(conn, now, full=True), lambda r: f'{r[0]} séries, {r[1]} lignes de mesures'
+        )  # relance explicite : tout recalculer
         if settings.get(conn, 'split_metrics_pending', False):
             settings.put(conn, 'split_metrics_pending', False)
         return n_series, 0, f'séries {n_series}, mesures {n_metrics}'
-    r = _step(log, 'Similarité des ETF', lambda: etf.build(conn, now), lambda r: f'{r["etfs"]} ETF, {r["with_minimum_history"]} avec un historique suffisant')
+    r = _step(log, 'Similarité des ETF', lambda: etf.build(conn, now, force=True), lambda r: f'{r["etfs"]} ETF, {r["with_minimum_history"]} avec un historique suffisant')
     return r['etfs'], 0, f'{r["etfs"]} ETF, {r["with_minimum_history"]} avec un historique suffisant'
 
 

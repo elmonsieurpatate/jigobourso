@@ -157,7 +157,7 @@ def test_successful_recomputation_clears_the_persistent_request(conn, monkeypatc
 
     action(conn)
     assert settings.get(conn, 'split_metrics_pending') is True
-    monkeypatch.setattr(tasks.compute, 'compute_all', lambda c, now: (2, 10))
+    monkeypatch.setattr(tasks.compute, 'compute_all', lambda c, now, **kw: (2, 10))
     tasks._recompute(conn, NOW, lambda *a: None, 'metrics')
     assert settings.get(conn, 'split_metrics_pending') is False
 

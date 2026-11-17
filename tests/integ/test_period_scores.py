@@ -95,7 +95,7 @@ def test_risk_adjusted_return_is_stored_per_long_window_and_weight_zero_changes_
     after = score_service.details(conn, cfg, [1])[1]
     assert (before['simple']['score'], before['complex']['score']) == (after['simple']['score'], after['complex']['score'])  # poids 0 : aucune note ne bouge, mesure présente ou non
 
-    compute.compute_all(conn, datetime.datetime(2026, 10, 28, 2, 10, tzinfo=datetime.timezone.utc))
+    compute.compute_all(conn, datetime.datetime(2026, 10, 28, 2, 10, tzinfo=datetime.timezone.utc), full=True)  # `score_inputs.mrar` vidé à la main ci-dessus : recalcul complet explicite
     weighted = scores_profiles.profile_of(scores_profiles.base_config('growth_v4'))
     weighted.update(profile)
     weighted['complex_weights'] = dict(SC.COMPLEX_WEIGHTS, dynamics=30, risk_adjusted=10)  # total 100 : 30 + 10 + 60 de base

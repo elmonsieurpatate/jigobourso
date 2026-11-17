@@ -11,6 +11,7 @@ from ..scoring.scores import MIN_SESSIONS
 from ...market import collect
 from ...market.calendar import session_dates, window_calendars
 from ...market.hours import expected_last_close  # noqa: F401 (conservé pour compatibilité)
+from ...shared import settings
 from ...shared.db import ensure
 
 BASE_WINDOWS = (1, 21, 252)
@@ -49,10 +50,80 @@ def _dec(v, places=6):
     return None if v is None else round(v, places)
 
 
-def compute_all(conn, now, batch=400):
-    """Recalcule les tables d'analyse pour le jeu de collecte. Renvoie (cotations, lignes de mesures).
+CODE_MODULES = (
+    'engine.analytics.series.compute',
+    'engine.analytics.series.series',
+    'engine.analytics.series.measures',
+    'engine.analytics.series.liquidity',
+    'engine.analytics.series.loader',
+    'engine.analytics.scoring.score_inputs',
+    'engine.analytics.scoring.scores',
+    'engine.shared.units',
+    'engine.market.calendar',
+)  # code dont dépendent les mesures stockées : un changement de méthode (déploiement) impose un recalcul complet
+FINGERPRINT_SETTING = 'compute_fingerprint'
+LAST = {}  # statistiques du dernier passage : mode (full / incremental / unchanged), titres recalculés, raison d'un recalcul complet
+
+
+def method_fingerprint(windows):
+    """Empreinte de la méthode : fenêtres demandées par les stratégies et code des calculs. Elle change quand une stratégie ajoute ou retire une période, ou quand le code des mesures change."""
+    import hashlib
+    import importlib
+    import json
+
+    h = hashlib.md5(json.dumps(sorted(windows)).encode())
+    for name in CODE_MODULES:
+        with open(importlib.import_module(name).__file__, 'rb') as f:
+            h.update(f.read())
+    return h.hexdigest()
+
+
+def _signature_since(since):
+    """Début de la plage couverte par l'empreinte : le 1er du mois, pour que le glissement quotidien de la plage lue ne rende pas tous les titres « modifiés » chaque jour."""
+    return since.replace(day=1)
+
+
+def input_signatures(conn, ids, since, group_of, group_state, splits, factors, quotes):
+    """{listing_id: (empreinte des données, empreinte de la cotation)} : les données qui déterminent les résultats d'un titre sont ses clôtures (nombre, bornes, sommes exactes), ses splits, l'état de
+    sa place (dernière séance attendue et dernière date de marché) et son facteur de change ; sa cotation (cours, volume moyen) ne compte que tant que sa liquidité est estimée
+    (voir `final_signature`). Une clôture ajoutée, corrigée ou disparue change l'empreinte."""
+    import hashlib
+
+    agg = {}
+    with conn.cursor() as cur:
+        cur.execute(
+            """SELECT listing_id, COUNT(*) n, MIN(price_date) a, MAX(price_date) b, SUM(close_px) s, SUM(COALESCE(adj_close_px,0)) sa, SUM(COALESCE(volume,0)) sv, COUNT(volume) cv
+               FROM daily_prices WHERE price_date >= %s GROUP BY listing_id""",
+            (_signature_since(since),),
+        )
+        for r in cur.fetchall():
+            agg[r['listing_id']] = (r['n'], r['a'], r['b'], str(r['s']), str(r['sa']), str(r['sv']), r['cv'])
+    out = {}
+    for lid in ids:
+        q = quotes.get(lid) or {}
+        base = repr((agg.get(lid), splits.get(lid, ()), group_state.get(group_of[lid]), factors.get(lid)))
+        out[lid] = (hashlib.md5(base.encode()).hexdigest(), repr((str(q.get('price')), str(q.get('avg_volume_3m')))))
+    return out
+
+
+def final_signature(parts, liquidity_source):
+    """Empreinte stockée : données du titre, plus sa cotation tant que sa liquidité n'est pas établie sur des volumes quotidiens réels (la cotation sert alors à l'estimer)."""
+    import hashlib
+
+    return parts[0] if liquidity_source == 'daily' else hashlib.md5((parts[0] + parts[1]).encode()).hexdigest()
+
+
+def compute_all(conn, now, batch=400, full=False):
+    """Recalcule les tables d'analyse du jeu de collecte. Renvoie (cotations, lignes de mesures) de l'ensemble des tables après le passage.
+
+    Incrémental : chaque titre porte une empreinte de ses données d'entrée (`compute_signatures`) ; seuls les titres dont l'empreinte a changé (clôture ajoutée ou corrigée, nouvelle séance
+    attendue sur leur place, split, change, cotation tant que la liquidité est estimée, nouveau titre) sont recalculés. Tout est recalculé quand la méthode change (fenêtres demandées ou code
+    des calculs, voir `method_fingerprint`), sur demande (`full=True`) ou si les empreintes manquent. Résultat identique à un calcul complet (testé).
 
     Les clôtures sont lues par lots de `batch` cotations : la mémoire reste de l'ordre de la centaine de Mo (hébergement mutualisé)."""
+    import time
+
+    started = time.monotonic()
     windows = wanted_windows(conn)
     since = history_since(windows, now)
     splits = load_splits(conn)
@@ -65,23 +136,39 @@ def compute_all(conn, now, batch=400):
         for r in cur.fetchall():
             m = mics[r['listing_id']]
             market_latest[m] = max(market_latest.get(m, ''), r['last_date'].isoformat())
-    metric_rows, state_rows = [], []
     stamp = now.astimezone(datetime.timezone.utc).replace(tzinfo=None, microsecond=0)
     expected_by_mic = {m: collect.effective_expected_close(conn, m, now) for m in sorted(set(mics.values()))}  # jours fériés déduits des données
     cutoff_by_mic = {m: max(expected_by_mic.get(m) or '', market_latest.get(m) or '') for m in set(mics.values())}
     calendars_by_mic = {m: window_calendars(m, cutoff_by_mic.get(m), windows) for m in set(mics.values())}
     technical_by_mic = {m: session_dates(m, cutoff_by_mic.get(m), 205) for m in set(mics.values())}
-    # Fenêtre précédente de même durée (2n+1 séances, dont les n+1 premières) : sert à l'accélération des scores.
     rates = collect.latest_rates(conn)
     with conn.cursor() as cur:
         cur.execute('SELECT listing_id, price, currency, avg_volume_3m FROM latest_prices')
         quotes = {r['listing_id']: r for r in cur.fetchall()}
         cur.execute('SELECT id, currency FROM listings')
         listing_currency = {r['id']: r['currency'] for r in cur.fetchall()}
-    score_rows, liquidity_rows = [], []
+        cur.execute('SELECT listing_id, source FROM liquidity_state')
+        daily_source = {r['listing_id']: r['source'] for r in cur.fetchall()}
+    factors = {lid: units.to_eur_factor((quotes.get(lid) or {}).get('currency') or listing_currency.get(lid), rates) for lid in mics}
     ids = sorted(mics)
-    for start in range(0, len(ids), batch):
-        part = ids[start : start + batch]
+    parts = input_signatures(conn, ids, since, mics, {m: (expected_by_mic.get(m), market_latest.get(m)) for m in set(mics.values())}, splits, factors, quotes)
+    signatures = {lid: final_signature(parts[lid], daily_source.get(lid)) for lid in ids}
+    fingerprint = method_fingerprint(windows)
+    with conn.cursor() as cur:
+        cur.execute('SELECT listing_id, signature FROM compute_signatures')
+        stored = {r['listing_id']: r['signature'] for r in cur.fetchall()}
+        cur.execute('SELECT listing_id FROM series_state')
+        present = {r['listing_id'] for r in cur.fetchall()}
+    reason = 'sur demande' if full else None
+    if reason is None and settings.get(conn, FINGERPRINT_SETTING, None) != fingerprint:
+        reason = 'méthode modifiée (fenêtres des stratégies ou code des calculs)'
+    dirty = ids if reason else [lid for lid in ids if stored.get(lid) != signatures[lid] or lid not in present]  # nouveau titre, données modifiées, ou ligne d'état manquante
+    removed = sorted(present - set(ids))
+    LAST.clear()
+    LAST.update(mode='full' if reason else ('incremental' if dirty else 'unchanged'), reason=reason, recomputed=len(dirty), total=len(ids), removed=len(removed))
+    metric_rows, state_rows, score_rows, liquidity_rows = [], [], [], []
+    for start in range(0, len(dirty), batch):
+        part = dirty[start : start + batch]
         bars = {}
         with conn.cursor() as cur:
             cur.execute(
@@ -109,19 +196,21 @@ def compute_all(conn, now, batch=400):
                 technical_by_mic.get(mics[lid]),
                 score_rows=score_rows,
                 volume_bars=volumes.get(lid, []),
-                eur_factor=units.to_eur_factor((quotes.get(lid) or {}).get('currency') or listing_currency.get(lid), rates),
+                eur_factor=factors[lid],
             )
             q = quotes.get(lid) or {}
-            cur_code = q.get('currency') or listing_currency.get(lid)
-            factor = units.to_eur_factor(cur_code, rates)
             last20 = [(c, v) for _d, c, v in volumes.get(lid, [])][-liq.WINDOW :]
-            info = liq.liquidity(last20, float(q['price']) if q.get('price') is not None else None, q.get('avg_volume_3m'), factor)
+            info = liq.liquidity(last20, float(q['price']) if q.get('price') is not None else None, q.get('avg_volume_3m'), factors[lid])
             liquidity_rows.append((lid, None if info['turnover_eur'] is None else round(info['turnover_eur'], 2), info['days'] if info['source'] == 'daily' else None, info['source'], stamp))
+    sources = {row[0]: row[3] for row in liquidity_rows}  # source de liquidité établie par ce calcul : elle décide si la cotation compte dans l'empreinte stockée
     ensure(conn)  # le calcul ci-dessus n'interroge pas la base : la connexion a pu être fermée ; rien n'est encore écrit
+    stale = sorted(set(dirty) | set(removed))
     with conn.cursor() as cur:
-        cur.execute('DELETE FROM strategy_metrics')
-        cur.execute('DELETE FROM series_state')
-        cur.execute('DELETE FROM score_inputs')
+        for i in range(0, len(stale), 1000):
+            marks = ','.join(['%s'] * len(stale[i : i + 1000]))
+            for table in ('strategy_metrics', 'series_state', 'score_inputs'):
+                cur.execute(f'DELETE FROM {table} WHERE listing_id IN ({marks})', stale[i : i + 1000])
+            cur.execute(f'DELETE FROM compute_signatures WHERE listing_id IN ({marks})', stale[i : i + 1000])
         for i in range(0, len(metric_rows), 5000):
             cur.executemany(
                 '''INSERT INTO strategy_metrics(listing_id,sessions,slope,slope_log,r2,perf,volatility,drawdown,er,acceleration,observations,expected_closes,coverage)
@@ -140,13 +229,23 @@ def compute_all(conn, now, batch=400):
                                ON DUPLICATE KEY UPDATE turnover_eur=VALUES(turnover_eur), days=VALUES(days), source=VALUES(source), computed_at=VALUES(computed_at)''',
                 liquidity_rows[i : i + 5000],
             )
-        cur.executemany(
-            '''INSERT INTO series_state(listing_id,computed_at,last_close_date,closes_count,close_px,ma20,ma50,ma50_prev,ma200,ma200_prev,daily_change,gap_to_ma20,break_age,break_dates,coverage_252,observed_252,expected_252,momentum_6m,momentum_12m,quality)
+        if state_rows:
+            cur.executemany(
+                '''INSERT INTO series_state(listing_id,computed_at,last_close_date,closes_count,close_px,ma20,ma50,ma50_prev,ma200,ma200_prev,daily_change,gap_to_ma20,break_age,break_dates,coverage_252,observed_252,expected_252,momentum_6m,momentum_12m,quality)
                            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)''',
-            state_rows,
-        )
+                state_rows,
+            )
+        cur.executemany('INSERT INTO compute_signatures(listing_id,signature,computed_at) VALUES (%s,%s,%s)', [(lid, final_signature(parts[lid], sources[lid]), stamp) for lid in dirty])
+        cur.execute('UPDATE series_state SET computed_at=%s', (stamp,))  # « dernier calcul » = dernière vérification : les titres inchangés ont été contrôlés à cet instant
+        cur.execute('UPDATE liquidity_state SET computed_at=%s', (stamp,))
+        cur.execute('SELECT COUNT(*) n FROM series_state')
+        n_series = cur.fetchone()['n']
+        cur.execute('SELECT COUNT(*) n FROM strategy_metrics')
+        n_metrics = cur.fetchone()['n']
+    settings.put(conn, FINGERPRINT_SETTING, fingerprint)
     conn.commit()
-    return len(state_rows), len(metric_rows)
+    LAST['seconds'] = round(time.monotonic() - started, 1)
+    return n_series, n_metrics
 
 
 def _compute_one(
