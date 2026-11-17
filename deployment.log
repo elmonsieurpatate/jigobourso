@@ -8,3 +8,9 @@ diagnostic Explorer momentum_risk: 2290 retenus, 2306 non évaluables sur 9609
 == Version des pages : ?v=202611171701
 == Transfert du code
 == Dépendances Python, migrations de schéma, contrôles
+moteur importable
+== Contrôle d'intégrité financière
+PHP valide
+== Vérification des calculs financiers avec les calendriers de séance
+Erreur contrôle financier : UBU5.DE / fenêtre 1 / slope
+== Actualisation des indicateurs dérivés par le traitement existant
