@@ -114,6 +114,7 @@
   let vis = personal();
   const shownColumns = () =>
     layout.columns.filter((c) => REG[c.id] && (c.id === "name" || (c.id in vis ? vis[c.id] : c.visible)));
+  let showHidden = false;
   let intrinsicRows = [],
     loadError = null,
     scoreLabel = "",
@@ -618,10 +619,14 @@
           (r) => ids.has(r.id) || J.fold(r.symbol + " " + r.name + " " + (r.isin || "")).includes(needle),
         )
       : intrinsicRows;
-    const scoped = applySecondary(base);
+    const scoped = showHidden ? base : applySecondary(base);
     const counts = { retained: 0, excluded: 0, undetermined: 0, all: scoped.length };
     for (const r of scoped) counts[r.status in counts ? r.status : "undetermined"]++;
-    const rows = tableState.verdict === "all" ? scoped : scoped.filter((r) => r.status === tableState.verdict);
+    const rows = showHidden
+      ? base
+      : tableState.verdict === "all"
+        ? scoped
+        : scoped.filter((r) => r.status === tableState.verdict);
     return { base, scoped, counts, rows };
   }
   const spark = V.spark;
@@ -780,8 +785,10 @@
       unevaluated = Math.max(0, universe - intrinsicRows.length);
     $("#ct-strategy-count").textContent = loadError
       ? ""
-      : `${num0(intrinsicRows.length)} titres évalués · ${num0(unevaluated)} non évaluables (données insuffisantes) · ${num0(counts.excluded)} exclus par la stratégie · ${counts.undetermined ? num0(counts.undetermined) + " indéterminés (données manquantes) · " : ""}${num0(masked)} masqués par vos filtres · ${num0(filtered.length)} affichés${searched ? ` (recherche : ${num0(base.length)} correspondances)` : ""}. Critères et filtres n’agissent que sur l’affichage : notes et rangs ne changent pas.${scoreLabel ? ` Stratégie : ${scoreLabel}.` : ""}`;
-    $("#ct-masked-count").textContent = `${num0(masked)} titre${masked > 1 ? "s" : ""} masqué${masked > 1 ? "s" : ""}`;
+      : `${num0(intrinsicRows.length)} titres évalués · ${num0(unevaluated)} non évaluables (données insuffisantes) · ${num0(counts.excluded)} exclus par la stratégie · ${counts.undetermined ? num0(counts.undetermined) + " indéterminés (données manquantes) · " : ""}${showHidden ? "masquage désactivé" : num0(masked) + " masqués par vos filtres"} · ${num0(filtered.length)} affichés${searched ? ` (recherche : ${num0(base.length)} correspondances)` : ""}. Critères et filtres n’agissent que sur l’affichage : notes et rangs ne changent pas.${scoreLabel ? ` Stratégie : ${scoreLabel}.` : ""}`;
+    $("#ct-masked-count").textContent = showHidden
+      ? "Masquage désactivé"
+      : `${num0(masked)} titre${masked > 1 ? "s" : ""} masqué${masked > 1 ? "s" : ""}`;
     $("#ct-masked-count").classList.toggle("has-hidden", masked > 0);
     document.querySelectorAll("#ct-verdict [data-verdict]").forEach((b) => {
       const k = b.dataset.verdict;
@@ -1224,17 +1231,15 @@
     tableState.page = 1;
     renderRanking();
   };
-  $("#ct-show-demo-all").onclick = () => {
-    tableState.verdict = "all";
-    tableState.query = "";
-    searchCatalogue();
-    const q = $("#ct-search");
-    if (q) q.value = "";
+  function revealHidden(value) {
+    showHidden = value;
+    $("#ct-show-hidden").checked = value;
+    $("#ct-hidden-note").hidden = !value;
     tableState.page = 1;
-    state.filters = secondary.all(categories);
-    for (const k of Object.keys(categories)) saveLocalSelection(k);
-    renderFilters();
-  };
+    renderRanking();
+  }
+  $("#ct-show-hidden").onchange = (e) => revealHidden(e.target.checked);
+  $("#ct-show-demo-all").onclick = () => revealHidden(true);
   $("#ct-apply").onclick = () => loadRows();
   // Un instantané au clic : les modifications du formulaire restent en attente.
   const specNow = () => {
