@@ -66,14 +66,34 @@ function explorer_sheet(array $u, array $b, array $query): array {
 
 function listings_search(array $query): array {
     $term = mb_strtolower(trim((string)($query['q'] ?? '')));
-         if (mb_strlen($term) < 2) return ['results' => []];
-         $like = '%' . str_replace(['%', '_'], '', $term) . '%';
-         $rows = q("SELECT l.id, l.symbol, l.mic, l.currency, l.status, l.excluded_reason, l.is_primary, i.name, i.isin, i.kind, p.price, p.currency AS price_currency
-    " .
-             "                FROM listings l JOIN instruments i ON i.id = l.instrument_id LEFT JOIN latest_prices p ON p.listing_id = l.id
-                    " .
-             "WHERE LOWER(l.symbol) LIKE ? OR LOWER(i.name) LIKE ? OR LOWER(i.isin) LIKE ?
-                    ORDER BY (LOWER(l.symbol) = ?) DESC, l.is_primary " .
-             "DESC, l.status = 'excluded', i.name LIMIT 20", [$like, $like, $like, $term])->fetchAll();
-         return ['results' => $rows];
+    if (mb_strlen($term) < 2) return ['results' => []];
+    $like = '%' . str_replace(['%', '_'], '', mb_substr($term, 0, 100)) . '%';
+    // L'identité du produit vient du catalogue existant, jamais d'une ressemblance de nom.
+    // Les symboles bruts restent recherchables même si leur place n'a pas été importée.
+    $rows = q("SELECT l.id, l.symbol, l.mic, l.currency, l.status, l.excluded_reason, l.is_primary,
+                      i.name, i.isin, i.kind, p.price, p.currency AS price_currency,
+                      main.id AS primary_id, main.symbol AS primary_symbol, main.mic AS primary_mic,
+                      main.status AS primary_status, main.primary_reason,
+                      matches.matched_symbols
+               FROM listings l JOIN instruments i ON i.id=l.instrument_id
+               LEFT JOIN latest_prices p ON p.listing_id=l.id
+               LEFT JOIN listings main ON main.instrument_id=i.id AND main.is_primary=1
+               LEFT JOIN (SELECT group_key, GROUP_CONCAT(DISTINCT symbol ORDER BY symbol SEPARATOR ', ') AS matched_symbols
+                          FROM catalogue_raw WHERE LOWER(symbol) LIKE ? GROUP BY group_key) matches ON matches.group_key=i.group_key
+               WHERE LOWER(l.symbol) LIKE ? OR LOWER(i.name) LIKE ? OR LOWER(i.isin) LIKE ?
+                  OR matches.group_key IS NOT NULL
+                  OR i.id IN (SELECT instrument_id FROM listings WHERE LOWER(symbol) LIKE ?)
+               ORDER BY (LOWER(l.symbol)=?) DESC, (l.status='selected' AND l.is_primary=1) DESC,
+                        l.is_primary DESC, l.status='excluded', i.name, l.id LIMIT 20",
+        [$like, $like, $like, $like, $like, $term])->fetchAll();
+    foreach ($rows as &$row) {
+        $row['in_catalogue'] = $row['status'] === 'selected' && (bool)$row['is_primary'];
+        $row['primary'] = $row['primary_id'] === null ? null : [
+            'id' => (int)$row['primary_id'], 'symbol' => $row['primary_symbol'], 'mic' => $row['primary_mic'],
+            'in_catalogue' => $row['primary_status'] === 'selected', 'reason' => $row['primary_reason'],
+        ];
+        unset($row['primary_id'], $row['primary_symbol'], $row['primary_mic'], $row['primary_status'], $row['primary_reason']);
+    }
+    unset($row);
+    return ['results' => $rows];
 }

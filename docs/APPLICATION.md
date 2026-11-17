@@ -57,6 +57,8 @@ Le moteur V4 note tous les titres évaluables ; les critères ne donnent qu'un s
 4. Préfiltre Yahoo (`yahoo_filter` → `engine/market/prefilter.py`) puis choix de la cotation principale (`loader.assign_primaries`).
 5. Résultat : cotations `status='selected'` et `is_primary=1`. La vue `v_recommendable` expose ces cotations ; `v_collect_set` ajoute les cotations détenues en portefeuille (même hors sélection).
 
+Dans Actions/ETF, « Admis FDB » signifie seulement que la ligne passe les règles FinanceDatabase ; « Retenu Yahoo » décrit le filtre Yahoo. Le catalogue final désigne exclusivement les cotations sélectionnées principales (`v_recommendable`). Une cotation liée à un portefeuille peut rester suivie hors de ce catalogue. La recherche par symbole secondaire utilise le regroupement produit existant (`instrument_id` / `group_key`), y compris les symboles bruts des places écartées, pour proposer la principale sans réadmettre la cotation demandée. L’absence de note ne signifie pas l’absence du catalogue.
+
 Chaque étape fige un entonnoir (`engine/analytics/explorer/funnel.py`, table `funnel_steps`) : nombre de lignes avant, écartées, conservées.
 
 ### 2.2 Règles FinanceDatabase (`engine/catalogue/rules.py`)

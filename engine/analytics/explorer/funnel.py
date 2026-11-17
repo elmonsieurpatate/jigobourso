@@ -316,7 +316,18 @@ def explain(conn, q):
                 else:
                     on = ccfg[rule['id']]['enabled'] or rule.get('locked')
                     trace.append({'key': rule['id'], 'label': rule['label'], 'result': 'passed', 'detail': 'passe' if on else 'règle désactivée', 'rule': crules.rule_text(rule['id'], ccfg)})
-            item = {'raw': {k: r[k] for k in ('kind', 'mic', 'symbol', 'isin', 'name', 'country', 'category')}, 'catalogue': trace, 'listing': None, 'yahoo': []}
+            cur.execute(
+                "SELECT l.id, l.symbol, l.mic, l.status FROM listings l JOIN instruments i ON i.id=l.instrument_id WHERE i.group_key=(SELECT group_key FROM catalogue_raw WHERE id=%s) AND l.is_primary=1 LIMIT 1",
+                (r['id'],),
+            )
+            primary = cur.fetchone()
+            item = {
+                'raw': {k: r[k] for k in ('kind', 'mic', 'symbol', 'isin', 'name', 'country', 'category')},
+                'catalogue': trace,
+                'listing': None,
+                'yahoo': [],
+                'primary': None if primary is None else {'id': primary['id'], 'symbol': primary['symbol'], 'mic': primary['mic'], 'in_catalogue': primary['status'] == 'selected'},
+            }
             cur.execute(
                 """SELECT l.id, l.status, l.excluded_reason, l.is_primary, l.primary_reason, l.currency, p.price, p.currency price_currency, p.avg_volume_3m, p.quote_at, p.price_time,
                                   (SELECT COUNT(*) FROM portfolio_transactions t WHERE t.listing_id=l.id) held

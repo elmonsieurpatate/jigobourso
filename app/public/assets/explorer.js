@@ -540,10 +540,83 @@
   // Il ne change ni note ni rang. Une donnée manquante donne « indéterminée », jamais « exclue » ; « Toutes » les montre toutes.
   const statusBadge = V.statusBadge;
   // base = titres notés (recherche texte comprise) ; scoped = base moins les filtres secondaires (c'est le périmètre des compteurs) ; rows = scoped selon Retenues / Exclues / Toutes.
+  let catalogueResults = [],
+    catalogueResolved = false,
+    catalogueError = "",
+    catalogueTimer;
+  const catalogueLatest = J.latest();
+  function catalogueIds() {
+    return new Set(catalogueResults.map((r) => Number(r.primary?.in_catalogue ? r.primary.id : r.id)));
+  }
+  function renderCatalogueMatches() {
+    const host = $("#ct-catalogue-matches");
+    const query = tableState.query.trim();
+    host.hidden = query.length < 2;
+    if (host.hidden) return;
+    if (!catalogueResolved) {
+      host.textContent = catalogueError || "Recherche dans le catalogue…";
+      return;
+    }
+    const products = new Map();
+    for (const r of catalogueResults) {
+      const p = r.primary?.in_catalogue ? r.primary : null;
+      const id = p?.id || r.id;
+      if (!products.has(id)) products.set(id, { r, p });
+    }
+    host.innerHTML =
+      [...products.values()]
+        .map(({ r, p }) => {
+          const id = p?.id || r.id,
+            symbol = p?.symbol || r.symbol,
+            mic = p?.mic || r.mic;
+          const aliases = r.matched_symbols || (r.symbol.toLowerCase() === query.toLowerCase() ? r.symbol : "");
+          const redirected = p && aliases && !aliases.split(", ").includes(p.symbol);
+          const status =
+            p || r.in_catalogue
+              ? "Produit dans le catalogue final"
+              : r.status === "candidate"
+                ? "Cotation en attente d’analyse Yahoo"
+                : "Cotation hors catalogue final";
+          const reason = redirected
+            ? `Recherche « ${esc(aliases)} » : cotation principale retenue ${esc(symbol)} · ${esc(mic)} (une cotation par produit).`
+            : `${esc(symbol)} · ${esc(mic)}`;
+          const scored = intrinsicRows.some((row) => row.id === Number(id));
+          return `<p><a href="titre.html?id=${Number(id)}">${esc(r.name)}</a> — ${status}. ${reason}${!scored && (p || r.in_catalogue) ? (applied ? " · Non évalué dans le classement chargé ; le produit reste dans le catalogue." : " · Appliquez les réglages pour charger les notes.") : ""}${!p && r.excluded_reason ? ` · ${esc(r.excluded_reason)}` : ""}</p>`;
+        })
+        .join("") || "Aucune correspondance dans les cotations connues du catalogue.";
+  }
+  function searchCatalogue() {
+    clearTimeout(catalogueTimer);
+    catalogueLatest.cancel();
+    catalogueResults = [];
+    catalogueResolved = false;
+    catalogueError = "";
+    renderCatalogueMatches();
+    const query = tableState.query.trim();
+    if (query.length < 2) return;
+    catalogueTimer = setTimeout(async () => {
+      const ticket = catalogueLatest.next();
+      try {
+        const data = await J.api("listings/search", { params: { q: query } });
+        if (!catalogueLatest.isCurrent(ticket)) return;
+        catalogueResults = data.results || [];
+        catalogueResolved = true;
+        renderRanking();
+        renderCatalogueMatches();
+      } catch (e) {
+        if (!catalogueLatest.isCurrent(ticket)) return;
+        catalogueError = "Catalogue non vérifié : " + e.message;
+        renderCatalogueMatches();
+      }
+    }, 350);
+  }
   function visibleRows() {
+    const ids = catalogueIds();
     const needle = J.fold(tableState.query.trim());
     const base = needle
-      ? intrinsicRows.filter((r) => J.fold(r.symbol + " " + r.name + " " + (r.isin || "")).includes(needle))
+      ? intrinsicRows.filter(
+          (r) => ids.has(r.id) || J.fold(r.symbol + " " + r.name + " " + (r.isin || "")).includes(needle),
+        )
       : intrinsicRows;
     const scoped = applySecondary(base);
     const counts = { retained: 0, excluded: 0, undetermined: 0, all: scoped.length };
@@ -647,6 +720,7 @@
         : String(r);
   };
   function renderRanking() {
+    renderCatalogueMatches();
     if (!loading && !applied && !loadError) {
       $("#ct-table-body").innerHTML =
         '<tr class="ct-loading"><td colspan="20">Cliquez sur « Appliquer les réglages » pour rechercher des titres.</td></tr>';
@@ -1105,9 +1179,11 @@
       feedback(`Stratégie « ${label} » supprimée.`);
     });
   $("#ct-search").value = tableState.query;
+  if (tableState.query.trim().length >= 2) searchCatalogue();
   $("#ct-search").oninput = (e) => {
     tableState.query = e.target.value;
     tableState.page = 1;
+    searchCatalogue();
     renderRanking();
   };
   // Choix de tri : même ordre que les colonnes du tableau (réglage personnel), pas l'ordre du catalogue.
@@ -1151,6 +1227,7 @@
   $("#ct-show-demo-all").onclick = () => {
     tableState.verdict = "all";
     tableState.query = "";
+    searchCatalogue();
     const q = $("#ct-search");
     if (q) q.value = "";
     tableState.page = 1;

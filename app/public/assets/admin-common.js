@@ -273,6 +273,7 @@
   const itemsLatest = J.latest(); // une réponse tardive d'un ancien panneau ou d'une ancienne frappe n'écrase pas le panneau courant
   async function itemsPanel(stage, step, label, host) {
     const st = { q: "", kind: "", mic: "", page: 1 };
+    let searchTimer;
     host.innerHTML = "";
     async function load() {
       const ticket = itemsLatest.next();
@@ -287,20 +288,21 @@
       }
       if (!itemsLatest.isCurrent(ticket)) return;
       const cat = stage === "catalogue";
-      host.innerHTML = `<div class="card flush mt-4"><div class="row between card-bar"><h3 class="m-0">Titres · ${J.esc(label)}</h3><button class="btn sm" id="ip-close">Fermer</button></div>
-        <div class="row card-bar card-bar-sub"><input class="u-flex-1 u-min-width-160px" id="ip-q" type="search" placeholder="Nom, symbole ou ISIN" value="${J.esc(st.q)}"><select id="ip-k"><option value="">Actions et ETF</option><option value="equity" ${st.kind === "equity" ? "selected" : ""}>Actions</option><option value="etf" ${st.kind === "etf" ? "selected" : ""}>ETF</option></select><input class="u-width-130px" id="ip-m" placeholder="Place (ex. XETR)" value="${J.esc(st.mic)}"></div>
-        <div class="table-wrap"><table>${J.table.head([
-          "Titre",
-          "Place",
-          "Type",
-          cat ? "Motif" : "Statut / motif",
-          ...(cat
-            ? []
-            : [
-                ["Cours (€)", "num"],
-                ["Liquidité (€/jour)", "num"],
-              ]),
-        ])}<tbody>
+      if (!J.$("#ip-results", host))
+        host.innerHTML = `<div class="card flush mt-4"><div class="row between card-bar"><h3 class="m-0">Titres · ${J.esc(label)}</h3><button class="btn sm" id="ip-close">Fermer</button></div>
+        <div class="row card-bar card-bar-sub"><input class="u-flex-1 u-min-width-160px" id="ip-q" type="search" placeholder="Nom, symbole ou ISIN" value="${J.esc(st.q)}"><select id="ip-k"><option value="">Actions et ETF</option><option value="equity" ${st.kind === "equity" ? "selected" : ""}>Actions</option><option value="etf" ${st.kind === "etf" ? "selected" : ""}>ETF</option></select><input class="u-width-130px" id="ip-m" placeholder="Place (ex. XETR)" value="${J.esc(st.mic)}"></div><div id="ip-results"></div></div>`;
+      J.$("#ip-results", host).innerHTML = `<div class="table-wrap"><table>${J.table.head([
+        "Titre",
+        "Place",
+        "Type",
+        cat ? "Motif" : "Statut / motif",
+        ...(cat
+          ? []
+          : [
+              ["Cours (€)", "num"],
+              ["Liquidité (€/jour)", "num"],
+            ]),
+      ])}<tbody>
         ${
           r.rows
             .map(
@@ -311,18 +313,21 @@
             )
             .join("") || `<tr><td colspan="6" class="empty">Aucun titre.</td></tr>`
         }</tbody></table></div>
-        <div class="row between card-bar card-bar-sm"><span class="muted small">${nf(r.total)} titres</span><span class="row gap-s"><button class="btn sm" id="ip-p" ${r.page <= 1 ? "disabled" : ""}>←</button><span class="small">Page ${r.page} / ${r.pages}</span><button class="btn sm" id="ip-n" ${r.page >= r.pages ? "disabled" : ""}>→</button></span></div></div>`;
+        <div class="row between card-bar card-bar-sm"><span class="muted small">${nf(r.total)} titres</span><span class="row gap-s"><button class="btn sm" id="ip-p" ${r.page <= 1 ? "disabled" : ""}>←</button><span class="small">Page ${r.page} / ${r.pages}</span><button class="btn sm" id="ip-n" ${r.page >= r.pages ? "disabled" : ""}>→</button></span></div>`;
       const go = () => {
+        clearTimeout(searchTimer);
         st.q = J.$("#ip-q").value.trim();
         st.kind = J.$("#ip-k").value;
         st.mic = J.$("#ip-m").value.trim().toUpperCase();
         st.page = 1;
         load();
       };
-      let t;
       J.$("#ip-q").oninput = () => {
-        clearTimeout(t);
-        t = setTimeout(go, 350);
+        clearTimeout(searchTimer);
+        itemsLatest.cancel();
+        st.q = J.$("#ip-q").value;
+        st.page = 1;
+        searchTimer = setTimeout(load, 350);
       };
       J.$("#ip-k").onchange = go;
       J.$("#ip-m").onchange = go;
@@ -334,7 +339,11 @@
         st.page++;
         load();
       };
-      J.$("#ip-close").onclick = () => (host.innerHTML = "");
+      J.$("#ip-close").onclick = () => {
+        clearTimeout(searchTimer);
+        itemsLatest.cancel();
+        host.innerHTML = "";
+      };
       J.$$("tr[data-id]", host).forEach(
         (tr) => (tr.onclick = () => (location.href = "titre.html?id=" + tr.dataset.id)),
       );
@@ -366,6 +375,7 @@
               (
                 x,
               ) => `<div class="mb-4"><b>${J.esc(x.raw.name)}</b> <span class="muted small">${J.esc(x.raw.symbol)} · ${J.esc(x.raw.mic)} · ${J.esc(x.raw.isin || "")}</span>
+          ${x.primary?.in_catalogue ? `<p class="small">Produit conservé dans le catalogue final : <a href="titre.html?id=${x.primary.id}">${J.esc(x.primary.symbol)} · ${J.esc(x.primary.mic)}</a>${x.raw.symbol !== x.primary.symbol || x.raw.mic !== x.primary.mic ? " · La cotation recherchée n’est pas la principale retenue (une cotation par produit)." : ""}</p>` : ""}
           <h4 class="mt-2 mb-1">Catalogue FinanceDatabase</h4>${x.catalogue.map(line).join("")}${x.yahoo.length ? '<h4 class="mt-2 mb-1">Yahoo Finance</h4>' + x.yahoo.map(line).join("") : ""}
           ${x.listing && x.listing.held ? '<p class="small">Titre détenu : toujours suivi et valorisé, même s’il est exclu.</p>' : ""}</div>`,
             )

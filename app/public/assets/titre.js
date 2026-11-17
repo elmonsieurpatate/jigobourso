@@ -447,7 +447,8 @@
                   })()
                 : "",
         )}
-        ${row("Statut dans le catalogue", { selected: "Sélectionné", excluded: "Exclu", candidate: "Candidat (pas encore analysé)" }[s.catalogue_status] || s.catalogue_status, s.excluded_reason ? J.esc(s.excluded_reason) : s.is_primary ? "cotation principale du produit" : "cotation secondaire")}
+        ${row("Catalogue final", s.catalogue_status === "selected" && s.is_primary ? "Oui · cotation principale retenue" : "Non · cotation hors catalogue final")}
+        ${row("État de la cotation", { selected: "Sélectionné", excluded: "Exclu", candidate: "Candidat (pas encore analysé)" }[s.catalogue_status] || s.catalogue_status, s.excluded_reason ? J.esc(s.excluded_reason) : s.is_primary ? "cotation principale du produit" : "cotation secondaire")}
         ${row("Place et devise", `${J.esc(s.market)} (${J.esc(s.mic)}) · ${J.esc(s.currency || "")}`, "")}
         ${row("Capitalisation", s.market_cap ? J.num(s.market_cap / 1e6, 0) + " M" : "–", s.market_cap_class ? J.esc(s.market_cap_class) + " · donnée Yahoo Finance" : "donnée Yahoo Finance")}
         ${s.kind === "equity" ? row("Analystes", s.analyst ? J.esc(s.analyst.text) : "—", s.analyst ? "consensus des analystes financiers relevé par Yahoo, pas une recommandation de Jigobourso ; aucun effet sur les scores, filtres ou classements" : "information indisponible : cela n’est pas un défaut du titre") : ""}

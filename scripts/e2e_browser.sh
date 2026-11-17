@@ -25,6 +25,7 @@ export BASE=http://127.0.0.1:18089
 run personal-filters timeout 120s node tests/e2e/personal-filters.cjs
 run scores-preview timeout 120s node tests/e2e/scores-preview.cjs
 run financial timeout 180s node tests/e2e/financial.cjs
+run catalogue-search node tests/e2e/catalogue-search.cjs
 run keyboard node tests/e2e/keyboard.cjs
 run title-layout node tests/e2e/title-layout.cjs
 run strategies-ui timeout 240s node tests/e2e/strategies-ui.cjs      # avant account-navigation : celui-ci provoque des échecs de connexion volontaires

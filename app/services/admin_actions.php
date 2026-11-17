@@ -52,7 +52,11 @@ function admin_system_state(): array {
 function admin_catalogue_search(array $query): array {
     $term = mb_strtolower(trim((string)($query['q'] ?? '')));
     $where = []; $args = [];
-    if ($term !== '') { $like = '%' . str_replace(['%', '_'], '', $term) . '%'; $where[] = '(LOWER(l.symbol) LIKE ? OR LOWER(i.name) LIKE ? OR LOWER(i.isin) LIKE ?)'; array_push($args, $like, $like, $like); }
+    if ($term !== '') {
+        $like = '%' . str_replace(['%', '_'], '', mb_substr($term, 0, 100)) . '%';
+        $where[] = '(LOWER(l.symbol) LIKE ? OR LOWER(i.name) LIKE ? OR LOWER(i.isin) LIKE ? OR i.group_key IN (SELECT group_key FROM catalogue_raw WHERE LOWER(symbol) LIKE ?) OR i.id IN (SELECT instrument_id FROM listings WHERE LOWER(symbol) LIKE ?))';
+        array_push($args, $like, $like, $like, $like, $like);
+    }
     foreach (['kind' => 'i.kind', 'mic' => 'l.mic', 'status' => 'l.status'] as $k => $col) if (($query[$k] ?? '') !== '') { $where[] = "$col = ?"; $args[] = (string)$query[$k]; }
     if (($query['primary'] ?? '') === '1') $where[] = 'l.is_primary = 1';
     $w = $where ? ' WHERE ' . implode(' AND ', $where) : '';

@@ -12,4 +12,12 @@ $rows = q("SELECT r.symbol, r.mic, r.isin, r.name, r.group_key, r.removed_step, 
            LEFT JOIN listings p ON p.instrument_id = i.id AND p.is_primary = 1
            WHERE r.group_key IN (SELECT group_key FROM catalogue_raw WHERE isin = ? OR symbol = ?)
            ORDER BY r.group_key, r.mic, r.symbol LIMIT 100", [$term, $term])->fetchAll();
-echo json_encode(['catalogue_query' => $term, 'rows' => $rows], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT) . "\n";
+require_once getcwd() . '/app/services/explore_actions.php';
+$lookups = [];
+foreach (array_slice(array_unique(array_merge([$term], array_column($rows, 'symbol'))), 0, 12) as $symbol) {
+    $lookups[$symbol] = array_map(function ($r) {
+        return ['id' => $r['id'], 'symbol' => $r['symbol'], 'status' => $r['status'],
+                'in_catalogue' => $r['in_catalogue'] ?? null, 'primary' => $r['primary'] ?? null];
+    }, listings_search(['q' => $symbol])['results']);
+}
+echo json_encode(['catalogue_query' => $term, 'rows' => $rows, 'lookups' => $lookups], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT) . "\n";

@@ -204,9 +204,11 @@ Y_EXPR = (
     "CASE WHEN r.removed_step IS NOT NULL OR l.id IS NULL THEN 'na' WHEN l.status='excluded' THEN 'removed' WHEN l.is_primary=0 THEN 'secondary' "
     "WHEN l.status='selected' THEN 'kept' ELSE 'pending' END"
 )
-FINAL_EXPR = "((r.removed_step IS NULL AND l.status='selected' AND l.is_primary=1) OR h.listing_id IS NOT NULL)"
+FINAL_EXPR = "COALESCE(l.status='selected' AND l.is_primary=1,0)"
 D_STATES = ('complete', 'recent', 'incomplete', 'unavailable', 'error', 'pending', 'absent')  # profondeur de cinq ans : mêmes états que le registre history_state (job `history_deep`)
-D_EXPR = f"CASE WHEN NOT {FINAL_EXPR} THEN 'na' WHEN hs.status IS NOT NULL THEN hs.status WHEN s.closes_count IS NULL OR s.closes_count=0 THEN 'absent' ELSE 'pending' END"
+D_EXPR = (
+    f"CASE WHEN NOT ({FINAL_EXPR} OR h.listing_id IS NOT NULL) THEN 'na' WHEN hs.status IS NOT NULL THEN hs.status WHEN s.closes_count IS NULL OR s.closes_count=0 THEN 'absent' ELSE 'pending' END"
+)
 
 
 def _intraday_statuses(conn, rows, now):
@@ -215,7 +217,7 @@ def _intraday_statuses(conn, rows, now):
 
     out, by_mic = {}, {}
     for r in rows:
-        if not (r['in_final'] and r['lid']):
+        if not ((r['in_final'] or r['held']) and r['lid']):
             continue
         if not hours.known(r['mic']):
             out[r['lid']] = 'na'
@@ -267,7 +269,9 @@ def titles(conn, req):
     sql_where = ' WHERE ' + ' AND '.join(where) if where else ''
     order = SORTS.get(req.get('sort'), 'r.name') + (' DESC' if req.get('dir') == 'desc' else ' ASC')
     page = max(1, int(req.get('page') or 1))
-    frm = """FROM catalogue_raw r LEFT JOIN listings l ON l.mic=r.mic AND l.symbol=LEFT(r.symbol,24) LEFT JOIN latest_prices p ON p.listing_id=l.id
+    frm = """FROM catalogue_raw r LEFT JOIN instruments i ON i.group_key=r.group_key
+             LEFT JOIN listings l ON l.instrument_id=i.id AND l.mic=r.mic AND l.symbol=LEFT(r.symbol,24)
+             LEFT JOIN listings main ON main.instrument_id=i.id AND main.is_primary=1 LEFT JOIN latest_prices p ON p.listing_id=l.id
              LEFT JOIN series_state s ON s.listing_id=l.id LEFT JOIN history_state hs ON hs.listing_id=l.id LEFT JOIN (SELECT DISTINCT listing_id FROM portfolio_transactions WHERE listing_id IS NOT NULL) h ON h.listing_id=l.id"""
     with conn.cursor() as cur:
         cur.execute('SELECT COUNT(*) n FROM catalogue_raw')
@@ -275,7 +279,7 @@ def titles(conn, req):
         cur.execute(f'SELECT COUNT(*) n {frm}{sql_where}', args)
         total = cur.fetchone()['n']
         cur.execute(
-            f"""SELECT r.kind, r.mic, r.symbol, r.isin, r.name, r.country, r.category, r.removed_step, r.removed_reason, l.id lid, l.status, l.excluded_reason, l.is_primary,
+            f"""SELECT r.kind, r.mic, r.symbol, r.isin, r.name, r.country, r.category, r.removed_step, r.removed_reason, l.id lid, l.status, l.excluded_reason, l.is_primary, main.id primary_id, main.symbol primary_symbol, main.mic primary_mic, main.status primary_status,
                                p.price, p.currency pcur, p.price_time, p.quote_at, p.avg_volume_3m, s.closes_count, s.last_close_date, {Y_EXPR} y_state, {FINAL_EXPR} in_final,
                                h.listing_id IS NOT NULL held, {D_EXPR} d_state
                         {frm}{sql_where} ORDER BY {order}, r.id LIMIT 50 OFFSET %s""",
@@ -285,6 +289,7 @@ def titles(conn, req):
         info_done = bool(settings.get(conn, 'last_stats', {}).get('yahoo_info'))
     for r in rows:
         r['in_final'] = bool(r['in_final'])
+        r['primary'] = None if r['primary_id'] is None else {'id': r['primary_id'], 'symbol': r['primary_symbol'], 'mic': r['primary_mic'], 'in_catalogue': r['primary_status'] == 'selected'}
     intraday = _intraday_statuses(conn, rows, now)
     for r in rows:
         r['fdb_state'] = 'kept' if r['removed_step'] is None else 'removed'
@@ -299,7 +304,7 @@ def titles(conn, req):
             reason = {'stage': 'En attente', 'rule': None, 'detail': 'informations Yahoo non reçues' if r['quote_at'] is None else 'filtrage Yahoo à lancer'}
         r['reason'] = reason
         r['in_final'], r['held'] = bool(r['in_final']), bool(r['held'])
-        r['intraday_state'] = intraday.get(r['lid'], 'na') if r['in_final'] and r['lid'] else 'na'
+        r['intraday_state'] = intraday.get(r['lid'], 'na') if (r['in_final'] or r['held']) and r['lid'] else 'na'
         r['issue'] = None
         if r['y_state'] == 'pending' and r['quote_at'] is None and info_done:
             r['issue'] = 'Yahoo n’a renvoyé aucune information lors du dernier import'
