@@ -14,3 +14,8 @@ PHP valide
 == Vérification des calculs financiers avec les calendriers de séance
 Erreur contrôle financier : UBU5.DE / fenêtre 1 / slope
 == Actualisation des indicateurs dérivés par le traitement existant
+    raise RuntimeError('Erreur préparation financière : calcul dérivé déjà occupé')
+RuntimeError: Erreur préparation financière : calcul dérivé déjà occupé
+Échec déploiement : étape vérification des calculs financiers (code 1)
+site OK : accueil 200, API répond (200)
+Code restauré ; les données et la base n'ont pas été touchées (les migrations déjà appliquées sont additives).
