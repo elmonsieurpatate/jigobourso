@@ -160,9 +160,6 @@
 .as-tune-head {
   font-size: var(--fs-13);
 }
-.as-tune .as-num {
-  font-size: var(--fs-14);
-}
 .as-tune .as-unit {
   font-size: var(--fs-12);
 } /* Notes : colonne d'alignement fixe ; « * » = note calculée sur des données incomplètes (plus de pastille qui décale les colonnes) */

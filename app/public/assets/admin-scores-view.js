@@ -164,7 +164,7 @@ window.AdminScoresView = (ctx) => {
           .map((id) => {
             const x = p.periods[id],
               on = x.enabled;
-            return `<div class="as-period"><label><input type="checkbox" data-a="active" data-p="${id}" ${on ? "checked" : ""}> ${E(labels()[id] || `${x.sessions} séances`)} <span class="muted">(${x.sessions} séance${x.sessions > 1 ? "s" : ""})</span></label>${id.startsWith("custom_") && !ctx.sel.startsWith("ct:") ? `<button type="button" data-a="remove-custom" data-p="${id}" aria-label="Supprimer cette période">×</button>` : ""}
+            return `<div class="as-period"><label><input type="checkbox" data-a="active" data-p="${id}" ${on ? "checked" : ""}> ${E(labels()[id] || `${x.sessions} séances`)} <span class="muted">(${x.sessions} séance${x.sessions > 1 ? "s" : ""})</span></label>${id.startsWith("custom_") && !ctx.sel.startsWith("ct:") ? `<button type="button" class="btn icon sm ghost" data-a="remove-custom" data-p="${id}" aria-label="Supprimer cette période">×</button>` : ""}
             ${!on ? '<span class="as-w muted">—</span>' : custom ? `<span class="as-w"><input type="number" class="as-num" data-a="pw" data-p="${id}" min="0" max="100" step="0.1" value="${p.weights[id] ?? 0}"> %</span>` : `<span class="as-w as-pill">${w && w[id] !== undefined ? fmt(w[id], 1) + " %" : "…"}</span>`}</div>`;
           })
           .join("")}
@@ -175,7 +175,7 @@ window.AdminScoresView = (ctx) => {
               `<label><input type="checkbox" data-a="active" data-p="${id}"> ${E(labels()[id])} (${p.periods[id].sessions} séances)</label>`,
           )
           .join(" ")}</details>
-        ${ctx.sel.startsWith("ct:") ? '<p class="as-hint">Ajoutez les périodes de cette stratégie depuis le Classement ; réglez leurs poids et seuils ici.</p>' : '<div class="as-period"><input id="as-custom-sessions" type="number" min="3" max="1260" step="1" placeholder="Séances personnalisées" aria-label="Nombre de séances"><button type="button" data-a="add-custom">Créer</button></div>'}
+        ${ctx.sel.startsWith("ct:") ? '<p class="as-hint">Ajoutez les périodes de cette stratégie depuis le Classement ; réglez leurs poids et seuils ici.</p>' : '<div class="as-period"><input id="as-custom-sessions" class="u-flex-1" type="number" min="3" max="1260" step="1" placeholder="Séances personnalisées" aria-label="Nombre de séances"><button type="button" class="btn sm" data-a="add-custom">Créer</button></div>'}
         <div class="as-total ${Math.abs(total - 100) <= 0.05 ? "ok" : "ko"}" id="pw-total">Pondération totale : <b>${fmt(total, 1)} %</b>${Math.abs(total - 100) > 0.05 && ids.length ? " — doit faire 100 %" : ""}</div>
         ${custom ? '<button class="btn sm" data-a="pw-auto">Répartir automatiquement</button>' : ""}
         <p class="as-hint">${ids.length} période${ids.length > 1 ? "s" : ""} active${ids.length > 1 ? "s" : ""} sur ${ctx.S.scoring_periods.length}. <b>Jour</b> (1 séance) est facultatif : désactivé et à 0 % par défaut, il n’a jamais de poids automatique. Pour l’utiliser, passez en mode Personnalisé et donnez-lui un poids ; seule la variation d’une séance est notée (ni R², ni volatilité, ni repli sur une séance : il faut au moins ${ctx.S.formula.min_sessions} séances pour les mesurer). Tant qu’il reste à 0 %, les notes ne changent pas.</p></div>

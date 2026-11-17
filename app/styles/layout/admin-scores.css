@@ -393,7 +393,6 @@
   width: 100%;
   max-width: 480px;
   height: auto;
-  min-height: 40px;
   white-space: normal;
   text-overflow: clip;
 }
@@ -407,7 +406,6 @@
   .as-tune .as-num {
     width: 100%;
     max-width: 160px;
-    min-height: 44px;
   }
 }
 @media (max-width: 760px) {
