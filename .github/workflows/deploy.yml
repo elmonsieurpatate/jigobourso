@@ -14,6 +14,10 @@ on:
         type: choice
         options: [full, quick]
         default: full
+      catalogue_query:
+        description: 'Diagnostic seulement : ISIN ou symbole à examiner (lecture seule)'
+        type: string
+        default: ''
 permissions:
   contents: read
 concurrency:
@@ -141,6 +145,7 @@ jobs:
           ssh-keygen -lf "$RUNNER_TEMP/jigobourso-ssh/known_hosts" | grep -F 'SHA256:fh14KGbEYreksPS6ughPoyn+M4caidDfVZrVAHG1OzM'
       - name: Diagnostic ou déploiement
         env:
+          JIGO_CATALOGUE_QUERY: ${{ inputs.catalogue_query || '' }}
           OPERATION: ${{ inputs.operation || 'deploy' }}
           JIGO_DEPLOY_VALIDATION: ${{ (github.event_name == 'push' && contains(github.event.head_commit.message, '[deploy quick]')) && 'quick' || inputs.validation || 'full' }}
           GH_TOKEN: ${{ github.token }}
