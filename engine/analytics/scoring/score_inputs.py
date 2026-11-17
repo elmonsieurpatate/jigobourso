@@ -2,14 +2,57 @@
 
   up_fraction  part des séances de la fenêtre qui ont monté
   spike_share  concentration V1 : ln(1 + plus forte hausse d'une séance) / ln(cours final / cours initial) ; 1 si la fenêtre ne monte pas
-  accel        pente de la fenêtre moins pente de la fenêtre précédente de même durée (deux fenêtres consécutives sans chevauchement de rendements)
-  r2_prev      R² de la fenêtre précédente (une accélération entre deux fenêtres irrégulières n'est pas fiable)
+  accel        différence de pente par séance entre les deux moitiés successives de la période
+  r2_prev      minimum des R² des deux moitiés, pour la fiabilité de l'accélération
 
 Une clôture absente rend ces mesures indisponibles (None) : on ne comble jamais un trou.
 """
 
 import math
 from ..series.measures import window_metrics
+
+
+def recent_exclusion(sessions):
+    """Séances écartées du momentum ; les demis sont arrondis vers le haut."""
+    return max(1, min(21, (sessions + 6) // 12))
+
+
+def recovery_input(closes):
+    """Plus grand recul sommet-creux, premier couple en cas d'égalité, puis reprise à la clôture."""
+    if not closes or len(closes) < 4:
+        return None
+    peak = closes[0]
+    best_depth = 0.0
+    best_peak = best_trough = None
+    for trough in closes[1:-1]:
+        depth = 1 - trough / peak
+        if depth > best_depth:
+            best_depth, best_peak, best_trough = depth, peak, trough
+        if trough > peak:
+            peak = trough
+    if best_peak is None:
+        return 0.0
+    recovered = max(0.0, min(1.0, (closes[-1] - best_trough) / (best_peak - best_trough)))
+    return 100 * recovered * min(1.0, best_depth / 0.10)
+
+
+def period_path_inputs(closes):
+    """Mesures de trajectoire internes à une période complète de n séances."""
+    out = {'accel': None, 'r2_prev': None, 'momentum_perf': None, 'recovery': None}
+    if not closes or len(closes) < 4:
+        return out
+    n = len(closes) - 1
+    cut = n // 2
+    if cut >= 3 and n - cut >= 3:
+        first, second = window_metrics(closes[: cut + 1]), window_metrics(closes[cut:])
+        if first and second:
+            out['accel'] = second['slope'] - first['slope']
+            out['r2_prev'] = min(first['r2'], second['r2'])
+    measured = n - recent_exclusion(n)
+    if measured >= 1:
+        out['momentum_perf'] = 100 * (closes[measured] / closes[0] - 1)
+    out['recovery'] = recovery_input(closes)
+    return out
 
 
 def _values(dates, observations):
@@ -29,15 +72,11 @@ def path_inputs(closes):
 
 
 def window_inputs(current_dates, previous_dates, observations):
-    """Mesures de score d'une fenêtre. current_dates / previous_dates : séances attendues (n+1 chacune) ; observations : {date: clôture}."""
+    """Mesures de score internes à la fenêtre courante ; previous_dates reste accepté par l'ancienne interface."""
     cur = _values(current_dates, observations)
-    out = {'up_fraction': None, 'spike_share': None, 'accel': None, 'r2_prev': None}
+    out = {'up_fraction': None, 'spike_share': None, 'accel': None, 'r2_prev': None, 'momentum_perf': None, 'recovery': None}
     if cur is None:
         return out
     out.update(path_inputs(cur))
-    prev = _values(previous_dates, observations)
-    if prev is not None:
-        a, b = window_metrics(cur), window_metrics(prev)
-        if a and b and a['slope'] is not None and b['slope'] is not None:
-            out['accel'], out['r2_prev'] = a['slope'] - b['slope'], b['r2']
+    out.update(period_path_inputs(cur))
     return out

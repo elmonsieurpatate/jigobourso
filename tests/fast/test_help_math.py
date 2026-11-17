@@ -34,6 +34,7 @@ def python_eval(closes, ids, liquidity, anchor=0.5):
         m = M.window_metrics(w)
         m.update(SI.path_inputs(w))
         m.update(accel=None, r2_prev=None)
+        m['turnover_eur'] = liquidity
         inputs[n] = m
     periods = [{'id': i, 'sessions': SESS[i]} for i in ids]
     r = S.score_title(inputs, {'turnover_eur': liquidity, 'source': 'daily'}, periods, kappa=0.7, anchor=anchor)

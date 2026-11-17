@@ -152,7 +152,7 @@ def instrument_sheet(conn, request):
         'periods': [
             {
                 'id': p['id'],
-                'label': strategy.LABELS[p['id']],
+                'label': _period_label(p),
                 'sessions': p['sessions'],
                 'criteria': {f: p.get(f) for f, _, _ in (explorer_config.CRITERIA if config.get('version') == 4 else strategy.CRITERIA) if p.get(f) is not None},
             }
@@ -160,11 +160,18 @@ def instrument_sheet(conn, request):
             if p['enabled']
         ],
     }
-    sheet['config_periods'] = [{'id': p['id'], 'label': strategy.LABELS[p['id']], 'sessions': p['sessions'], 'enabled': p['enabled']} for p in config['periods']]
+    sheet['config_periods'] = [{'id': p['id'], 'label': _period_label(p), 'sessions': p['sessions'], 'enabled': p['enabled']} for p in config['periods']]
     ct = request.get('ct') or {}
     sheet['scores_v4'] = _scores_v4(conn, lid, ct)
     sheet['v4'] = _v4_strategy(conn, lid, ct)
     return sheet
+
+
+def _period_label(p):
+    """Libellé d'une période : prédéfinie (fiche historique, puis ans), sinon durée d'une période personnalisée."""
+    from ..scoring import scores_profiles
+
+    return strategy.LABELS.get(p['id']) or scores_profiles.PERIOD_LABELS.get(p['id']) or f"{p['sessions']} séances"
 
 
 LEVERAGE = re.compile(r'\b(bull|[235]x|x[235]|-[123]x)\b|levier|effet de levier', re.I)  # compléments de rules.is_leveraged_name pour l'avertissement de la fiche

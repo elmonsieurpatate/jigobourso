@@ -123,7 +123,7 @@ CREATE TABLE IF NOT EXISTS price_gaps (                                       --
 -- Les mesures sont donc stockées PAR TITRE ET PAR NOMBRE DE SÉANCES (fenêtre), pas en colonnes fixes.
 CREATE TABLE IF NOT EXISTS strategy_metrics (
   listing_id   INT UNSIGNED NOT NULL,
-  sessions     SMALLINT UNSIGNED NOT NULL,                      -- longueur de la fenêtre (1..252)
+  sessions     SMALLINT UNSIGNED NOT NULL,                      -- longueur de la fenêtre (1..1260)
   slope        DECIMAL(12,6) NULL,                              -- % par séance = 100·expm1(pente log)
   slope_log    DECIMAL(14,10) NULL,
   r2           DECIMAL(8,6) NULL,
@@ -148,6 +148,10 @@ CREATE TABLE IF NOT EXISTS score_inputs (
   spike_share  DECIMAL(10,6) NULL,
   accel        DECIMAL(12,6) NULL,
   r2_prev      DECIMAL(8,6) NULL,
+  momentum_perf DECIMAL(12,4) NULL,
+  recovery     DECIMAL(8,4) NULL,
+  turnover_eur DECIMAL(20,4) NULL,
+  volume_days  SMALLINT UNSIGNED NULL,
   PRIMARY KEY (listing_id, sessions),
   CONSTRAINT fk_score_inputs_listing FOREIGN KEY (listing_id) REFERENCES listings(id)
 ) ENGINE=InnoDB;

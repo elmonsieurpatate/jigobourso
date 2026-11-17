@@ -70,7 +70,7 @@ def test_historic_strategies_have_distinct_real_settings():
     assert built['growth_v4']['sat_a'] == 17.0 and built['growth_v4']['accel_ref'] == 0.4 and built['growth_v4']['complex_weights'] == {}  # Croissance rapide inchangée
     assert built['rebound']['accel_ref'] < 0.4 and built['rebound']['complex_weights']['acceleration'] == 20 and built['rebound']['complex_weights']['recovery'] == 25
     assert built['calm_rise']['complex_weights']['volatility'] == 35 and built['growth_regular']['complex_weights']['r2'] == 35
-    assert built['momentum_6m']['momentum_horizon'] == '6m' and built['momentum_12m']['momentum_horizon'] == '12m' and built['momentum_risk']['momentum_horizon'] == 'blend'
+    assert all('momentum_horizon' not in c for c in built.values())
     for n, c in built.items():
         if n != 'growth_v4':
             assert abs(sum(c['complex_weights'].values()) - 100) < 1e-9, n
@@ -335,7 +335,6 @@ KEYS = ('dynamics', 'r2', 'up_days', 'concentration', 'volatility', 'drawdown', 
 def test_the_seven_strategies_keep_their_scoring_part_and_have_search_criteria_apart():
     """Deux parties séparées : SCORES (barème, poids, saturation, score par défaut) et STRATÉGIE (granularités, pente, R²). Aucun rendement, volatilité ni drawdown n'est un seuil."""
     from engine.analytics.scoring import score_service as SS
-    from engine.analytics.scoring import scores as SC
 
     for name, (cw, weights, sat, accel, sort) in SPEC_SCORES.items():
         cfg = scores_specs.V4_STRATEGIES[name]['build']()
@@ -352,12 +351,13 @@ def test_the_seven_strategies_keep_their_scoring_part_and_have_search_criteria_a
 def test_rebound_keeps_the_half_year_loaded_as_context_so_the_rebound_note_works():
     """Le semestre n'a ni pente ni R² (poids 0), mais il doit rester une période chargée : la note « contexte de rebond » lit son rendement."""
     from engine.analytics.scoring import score_service as SS
-    from engine.analytics.scoring import scores as SC
 
     cfg = scores_specs.V4_STRATEGIES['rebound']['build']()
     half = next(p for p in cfg['periods'] if p['id'] == 'half')
     assert half['enabled'] and half['min_slope'] is None and half['min_r2'] is None and half['max_return'] is None
     assert 126 in {p['sessions'] for p in SS.params_for(cfg, 'equity')['periods']}  # sa mesure est chargée pour la note de rebond
     # la note distingue une reprise après baisse d'une croissance continue (même hausse récente)
-    after_fall, continuous = SC.recovery_note(-10.0), SC.recovery_note(30.0)
+    from engine.analytics.scoring.score_inputs import recovery_input
+
+    after_fall, continuous = recovery_input([100, 90, 80, 90, 100]), recovery_input([100, 105, 110, 115, 120])
     assert after_fall == 100 and continuous == 0

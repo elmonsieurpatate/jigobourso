@@ -78,11 +78,15 @@ def simulate(conn, request):
         'tuning': {k: params[k] for k in TUNING_DEFAULTS},
         'suggestions': _suggestions(conn, book, sessions=gran),
         'curve': dated_series(conn, lid, max(CURVE_SESSIONS, _granularity(params))),
-        'windows': [
-            dict(id=x, sessions=C.SESSIONS[x], active=any(q['id'] == x for q in params['periods']))
-            for x in SCORING_PERIODS
-            if x != 'day' and C.SESSIONS[x] <= max(CURVE_SESSIONS, _granularity(params))
-        ],
+        'windows': sorted(
+            [
+                dict(id=x, sessions=C.SESSIONS[x], active=any(q['id'] == x for q in params['periods']))
+                for x in SCORING_PERIODS
+                if x != 'day' and C.SESSIONS[x] <= max(CURVE_SESSIONS, _granularity(params))
+            ]
+            + [dict(id=p['id'], sessions=p['sessions'], active=True) for p in params['periods'] if p['id'].startswith('custom_')],
+            key=lambda p: p['sessions'],
+        ),
         'granularity': _granularity(params),
         'ranks': _rank_of(book, lid),
     }

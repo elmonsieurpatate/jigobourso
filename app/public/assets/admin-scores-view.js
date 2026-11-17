@@ -59,21 +59,21 @@ window.AdminScoresView = (ctx) => {
     ],
     ["volatility", "Volatilité", "Amplitude des variations quotidiennes (plus c’est calme, mieux c’est)."],
     ["drawdown", "Drawdown (recul max)", "Pire recul depuis un sommet sur la période."],
-    ["liquidity", "Liquidité", "Valeur échangée par jour, comptée une seule fois pour tout le titre."],
+    ["liquidity", "Liquidité", "Valeur échangée réelle moyenne par jour sur chaque période active."],
     [
       "acceleration",
       "Accélération",
-      "Variation de pente par rapport à la fenêtre précédente (0 dans le profil de référence).",
+      "Écart des pentes par séance entre les deux moitiés de chaque période (0 dans le profil de référence).",
     ],
     [
       "momentum",
-      "Momentum (6/12 mois)",
-      "Variation du cours hors dernier mois (J−126 ou J−252 → J−21), comptée une seule fois pour le titre (0 dans le profil de référence).",
+      "Momentum par période",
+      "Rendement de chaque période hors les max(1, min(21, arrondi(séances/12))) dernières séances, saturé comme la dynamique sur la durée mesurée (0 dans le profil de référence).",
     ],
     [
       "recovery",
-      "Contexte de rebond",
-      "Le semestre n’a presque pas progressé : 100 si le rendement 6 mois est ≤ −10 %, 0 s’il est ≥ +20 % (0 dans le profil de référence).",
+      "Rebond par période",
+      "Fraction récupérée du plus grand recul interne à chaque période, modulée par sa profondeur (saturation à 10 %). Une hausse continue vaut 0.",
     ],
   ];
   const TUNING = [
@@ -87,7 +87,7 @@ window.AdminScoresView = (ctx) => {
       "accel_ref",
       "Référence d’accélération",
       "coefficient",
-      "Écart de pente (par séance) pour lequel la note d’accélération vaut 100 : saturation(n) ÷ n × ce coefficient. Plus il est haut, plus il faut une accélération forte pour saturer. Le garde-fou de régularité reste actif : la note est multipliée par min(R², R² précédent) ÷ 0,6 (plafonné à 1).",
+      "Écart de pente (par séance) pour lequel la note d’accélération vaut 100 : saturation(demi-période) ÷ demi-période × ce coefficient. Le garde-fou utilise les R² des deux moitiés.",
     ],
     [
       "vol_mode",
@@ -95,15 +95,8 @@ window.AdminScoresView = (ctx) => {
       "méthode",
       "Absolue : 100 à 1 %/séance, 0 à 5 %/séance. Relative à la pente : rapport volatilité ÷ pente (plancher de pente 0,3 %), 100 à 1 et 0 à 4 : une forte hausse peu heurtée n’est plus écrasée, une pente nulle ou négative reste à 0. Le drawdown et la liquidité restent notés à part.",
     ],
-    [
-      "momentum_horizon",
-      "Horizon du momentum",
-      "horizon",
-      "Variation du cours hors dernier mois : 6 mois (100 à +60 %), 12 mois (100 à +100 %) ou moyenne des deux. Sans effet tant que le poids « Momentum » est à 0.",
-    ],
   ];
   const VOLMODES = { absolute: "Absolue (1 % → 5 %/séance)", relative: "Relative à la pente" };
-  const HORIZONS = { "6m": "6 mois", "12m": "12 mois", blend: "Moyenne 6 et 12 mois" };
   const CLABEL = Object.fromEntries(COMPLEX.map((c) => [c[0], c[1]]));
   const SIMPLE = [
     [
@@ -140,14 +133,23 @@ window.AdminScoresView = (ctx) => {
         <div class="seg as-seg"><button data-a="mode" data-v="auto" class="${custom ? "" : "on"}">Automatique</button><button data-a="mode" data-v="custom" class="${custom ? "on" : ""}">Personnalisé</button></div>
         <p class="as-hint">${custom ? "Vous fixez vous-même le poids de chaque période (total 100 %)." : "Les poids des périodes sont calculés automatiquement : les périodes courtes comptent davantage (réglable plus bas)."}</p>
         <h3 class="as-h">Périodes (granularités) actives</h3>
-        ${ctx.S.scoring_periods
+        ${Object.keys(p.periods)
+          .filter((id) => p.periods[id].enabled || id.startsWith("custom_"))
           .map((id) => {
             const x = p.periods[id],
               on = x.enabled;
-            return `<div class="as-period"><label><input type="checkbox" data-a="active" data-p="${id}" ${on ? "checked" : ""}> ${E(labels()[id])} <span class="muted">(${x.sessions} séance${x.sessions > 1 ? "s" : ""})</span></label>
+            return `<div class="as-period"><label><input type="checkbox" data-a="active" data-p="${id}" ${on ? "checked" : ""}> ${E(labels()[id] || `${x.sessions} séances`)} <span class="muted">(${x.sessions} séance${x.sessions > 1 ? "s" : ""})</span></label>${id.startsWith("custom_") && !ctx.sel.startsWith("ct:") ? `<button type="button" data-a="remove-custom" data-p="${id}" aria-label="Supprimer cette période">×</button>` : ""}
             ${!on ? '<span class="as-w muted">—</span>' : custom ? `<span class="as-w"><input type="number" class="as-num" data-a="pw" data-p="${id}" min="0" max="100" step="0.1" value="${p.weights[id] ?? 0}"> %</span>` : `<span class="as-w as-pill">${w && w[id] !== undefined ? fmt(w[id], 1) + " %" : "…"}</span>`}</div>`;
           })
           .join("")}
+        <details><summary>Ajouter une période prédéfinie</summary>${ctx.S.scoring_periods
+          .filter((id) => !p.periods[id].enabled)
+          .map(
+            (id) =>
+              `<label><input type="checkbox" data-a="active" data-p="${id}"> ${E(labels()[id])} (${p.periods[id].sessions} séances)</label>`,
+          )
+          .join(" ")}</details>
+        ${ctx.sel.startsWith("ct:") ? '<p class="as-hint">Ajoutez les périodes de cette stratégie depuis le Classement ; réglez leurs poids et seuils ici.</p>' : '<div class="as-period"><input id="as-custom-sessions" type="number" min="3" max="1260" step="1" placeholder="Séances personnalisées" aria-label="Nombre de séances"><button type="button" data-a="add-custom">Créer</button></div>'}
         <div class="as-total ${Math.abs(total - 100) <= 0.05 ? "ok" : "ko"}" id="pw-total">Pondération totale : <b>${fmt(total, 1)} %</b>${Math.abs(total - 100) > 0.05 && ids.length ? " — doit faire 100 %" : ""}</div>
         ${custom ? '<button class="btn sm" data-a="pw-auto">Répartir automatiquement</button>' : ""}
         <p class="as-hint">${ids.length} période${ids.length > 1 ? "s" : ""} active${ids.length > 1 ? "s" : ""} sur ${ctx.S.scoring_periods.length}. <b>Jour</b> (1 séance) est facultatif : désactivé et à 0 % par défaut, il n’a jamais de poids automatique. Pour l’utiliser, passez en mode Personnalisé et donnez-lui un poids ; seule la variation d’une séance est notée (ni R², ni volatilité, ni repli sur une séance : il faut au moins ${ctx.S.formula.min_sessions} séances pour les mesurer). Tant qu’il reste à 0 %, les notes ne changent pas.</p></div>
@@ -184,7 +186,7 @@ window.AdminScoresView = (ctx) => {
       <div class="as-formula">Note finale = somme pondérée × <b>(1 − λ × (1 − g))</b>, où g = min(1, dynamique de la période la plus courte ÷ 32), entre 0 et 1.</div>
       <p class="as-hint">Si la période courte (la semaine) garde une dynamique d’au moins 32 sur 100, g = 1 et rien n’est retiré. Plus elle faiblit, plus la note baisse, jusqu’à −λ (−50 % à λ = 0,5) pour une semaine plate ou négative. <b>λ = 0 neutralise l’ancrage.</b> Réglage commun à toutes les stratégies (onglet « Configuration du moteur »). Il ne concerne pas le score simple.</p>
       <p class="as-hint">Sur la base actuelle, la semaine faible pèse déjà dans la dynamique et dans les composantes amorties par g : l’ancrage s’y ajoute. Pour un titre à semaine plate, les deux premiers canaux retirent environ 35 % de la note et l’ancrage 0,5 porte la perte totale à environ 68 %. Le classement reste stable (corrélation de rang 0,996 entre λ = 0 et λ = 0,5, 93 titres communs sur le top 100) : l’ancrage sert surtout à départager les titres encore actifs de ceux qui ont calé.</p>
-      <p class="as-hint">La liquidité est comptée une seule fois pour le titre, jamais par période. Le profil de référence (Dynamique 40, R² 15, séances positives 5, concentration 7, volatilité 15, drawdown 8, liquidité 10) est celui de Croissance rapide, pas forcément celui des autres stratégies.</p>`;
+      <p class="as-hint">La liquidité est mesurée dans chaque période active avec les seuls volumes réels disponibles, puis combinée selon les poids de la stratégie. Le profil de référence (Dynamique 40, R² 15, séances positives 5, concentration 7, volatilité 15, drawdown 8, liquidité 10) est celui de Croissance rapide.</p>`;
   }
 
   function tuningCard(p) {
@@ -198,10 +200,8 @@ window.AdminScoresView = (ctx) => {
       const input =
         k === "vol_mode"
           ? `<select class="as-select as-tsel" data-a="tune" data-k="${k}">${ctx.S.design.vol_modes.map((v) => `<option value="${v}" ${v === cur ? "selected" : ""}>${E(VOLMODES[v])}</option>`).join("")}</select>`
-          : k === "momentum_horizon"
-            ? `<select class="as-select as-tsel" data-a="tune" data-k="${k}">${ctx.S.design.momentum_horizons.map((v) => `<option value="${v}" ${v === cur ? "selected" : ""}>${E(HORIZONS[v])}</option>`).join("")}</select>`
-            : `<input type="number" class="as-num" data-a="tune" data-k="${k}" min="${R[k][0]}" max="${R[k][1]}" step="${k === "sat_a" ? 1 : 0.05}" value="${cur}"> <span class="muted as-unit">${unit}</span>`;
-      const shown = k === "vol_mode" ? VOLMODES[dflt] : k === "momentum_horizon" ? HORIZONS[dflt] : dflt;
+          : `<input type="number" class="as-num" data-a="tune" data-k="${k}" min="${R[k][0]}" max="${R[k][1]}" step="${k === "sat_a" ? 1 : 0.05}" value="${cur}"> <span class="muted as-unit">${unit}</span>`;
+      const shown = k === "vol_mode" ? VOLMODES[dflt] : dflt;
       return `<div class="as-tune"><div class="as-tune-head"><b>${n}</b> <span class="as-i" title="${E(help)}">ⓘ</span></div><div class="as-tune-ctl">${input}</div>
         <p class="as-hint">${E(help)}</p><p class="as-hint as-tune-def">Valeur par défaut : <b>${E(shown)}</b>${k in R ? ` · bornes ${R[k][0]} à ${R[k][1]}` : ""} ${same ? "" : `<button class="btn sm" data-a="tune-reset" data-k="${k}">Valeur par défaut</button>`}</p></div>`;
     };
@@ -221,7 +221,7 @@ window.AdminScoresView = (ctx) => {
         const p = ctx.draft.profiles[s.name],
           ids = active(p),
           w = p.weights_mode === "custom" ? p.weights : s.name === ctx.sel ? autoWeights(p) : s.auto_weights;
-        return `<tr><td><b>${E(s.label)}</b><br><small class="muted">${E(s.note)}</small></td><td><span class="badge ok">Moteur commun V4</span></td><td>${ids.map((i) => `${E(labels()[i])}${w && w[i] !== undefined ? " <b>" + fmt(w[i], 1) + " %</b>" : ""}`).join("<br>") || "—"}</td><td>${p.weights_mode === "custom" ? "Personnalisée" : "Automatique"}</td><td>${s.customised ? '<span class="badge warn">Modifié</span>' : "Valeurs initiales"}</td><td class="num"><button class="btn sm" data-a="open" data-v="${E(s.name)}">Configurer</button></td></tr>`;
+        return `<tr><td><b>${E(s.label)}</b><br><small class="muted">${E(s.note)}</small></td><td><span class="badge ok">Moteur commun V4</span></td><td>${ids.map((i) => `${E(labels()[i] || `${p.periods[i].sessions} séances`)}${w && w[i] !== undefined ? " <b>" + fmt(w[i], 1) + " %</b>" : ""}`).join("<br>") || "—"}</td><td>${p.weights_mode === "custom" ? "Personnalisée" : "Automatique"}</td><td>${s.customised ? '<span class="badge warn">Modifié</span>' : "Valeurs initiales"}</td><td class="num"><button class="btn sm" data-a="open" data-v="${E(s.name)}">Configurer</button></td></tr>`;
       }
       return `<tr class="as-legacy"><td>${E(s.label)}</td><td><span class="badge">Ancien moteur</span></td><td>${s.periods.map((i) => E(labels()[i] || i)).join("<br>") || "—"}</td><td>Percentiles</td><td>Préservé</td><td></td></tr>`;
     };
@@ -237,12 +237,34 @@ window.AdminScoresView = (ctx) => {
   }
 
   function technicalCard(p) {
+    const thresholdFields = [
+      ["min_slope", "Pente min."],
+      ["min_r2", "R² min."],
+      ["min_return", "Rendement min."],
+      ["max_return", "Rendement max."],
+      ["max_spike_share", "Concentration max."],
+      ["max_volatility", "Volatilité max."],
+      ["min_up_fraction", "Séances positives min."],
+      ["max_drawdown", "Repli max."],
+    ];
     return `<div class="card"><h3 class="as-h">Données et exclusions techniques</h3>
       <p class="as-hint">Politique des données manquantes (moteur V4.2), sans effet de seuil :</p>
       <ul class="as-hint as-list"><li><b>Historique suffisant</b> : note normale.</li>
         <li><b>Données incomplètes ou historique réduit</b> (une période, une mesure ou la liquidité manque) : la note est calculée sur les composantes disponibles, dont les poids sont renormalisés — sans bonus ni pénalité. Le titre est classé et marqué « incomplet » avec sa couverture.</li>
         <li><b>Calcul impossible</b> (aucune période mesurable, ou aucune régularité mesurable) : note « indisponible » avec la raison ; jamais un zéro ni une note favorable inventés.</li></ul>
       <label class="row gap-s mt-2"><input type="checkbox" data-a="fresh" ${p.technical.require_fresh ? "checked" : ""}> Exiger des cours récents (contrôle technique : un cours périmé rend le titre non évaluable)</label>
+      <h3 class="as-h mt-3">Seuils des périodes actives</h3>${active(p)
+        .map(
+          (id) =>
+            `<details><summary>${E(labels()[id] || `${p.periods[id].sessions} séances`)}</summary><label><input type="checkbox" data-a="req" data-p="${id}" ${p.periods[id].require_history ? "checked" : ""}> Historique requis</label>${thresholdFields
+              .filter(([key]) => id !== "day" || ["min_return", "max_return"].includes(key))
+              .map(
+                ([key, label]) =>
+                  `<label class="as-field">${label}<input type="number" step="any" class="as-num" data-a="thr-p" data-p="${id}" data-f="${key}" value="${p.periods[id][key] ?? ""}"></label>`,
+              )
+              .join("")}</details>`,
+        )
+        .join("")}
       <p class="as-hint">Seuil de fiabilité : <b>${fmt(100 * ctx.draft.global.threshold, 0)} %</b> de couverture (réglage commun, onglet « Configuration du moteur »). En dessous, la note est calculée mais signalée « peu fiable » ; aucun titre n’est supprimé.</p></div>`;
   }
 
@@ -416,7 +438,7 @@ window.AdminScoresView = (ctx) => {
         ${c.listing.rows.length < c.listing.total ? `<div class="mt-2"><button class="btn sm" data-a="rk-more" ${ctx.rkMore ? "disabled" : ""}>${ctx.rkMore ? "Chargement…" : `Afficher la suite (${c.listing.rows.length} sur ${J.num(c.listing.total, 0)})`}</button></div>` : `<p class="as-hint">${J.num(c.listing.total, 0)} titre${c.listing.total > 1 ? "s" : ""}.</p>`}
         <div class="as-ranks mt-4">${block("simple", "Score simple")}${block("complex", "Score complexe")}</div>
         ${s.unavailable_reasons.length ? `<p class="as-hint"><b>Pourquoi une note est indisponible :</b> ${s.unavailable_reasons.map((r) => `${E(r.reason)} (${J.num(r.count, 0)})`).join(" · ")}${s.no_inputs ? ` · ${J.num(s.no_inputs, 0)} titres sans mesures de score calculées` : ""}.</p>` : s.no_inputs ? `<p class="as-hint">${J.num(s.no_inputs, 0)} titres sans mesures de score calculées.</p>` : ""}
-        <p class="as-hint">Moteur de notation version ${c.engine_version}. Poids réels des périodes : ${c.weights.map((w) => `${E(labels()[w.id])} <b>${fmt(100 * w.weight, 1)} %</b>`).join(" · ")} (κ = ${fmt(c.kappa, 2)}${c.weights.some((w) => w.custom) ? ", poids personnalisés" : ", automatiques"}).</p>`
+        <p class="as-hint">Moteur de notation version ${c.engine_version}. Poids réels des périodes : ${c.weights.map((w) => `${E(labels()[w.id] || `${w.sessions} séances`)} <b>${fmt(100 * w.weight, 1)} %</b>`).join(" · ")} (κ = ${fmt(c.kappa, 2)}${c.weights.some((w) => w.custom) ? ", poids personnalisés" : ", automatiques"}).</p>`
       }</div>`;
   }
   function simulationView(isV4) {
@@ -488,7 +510,7 @@ window.AdminScoresView = (ctx) => {
       c = r.complex,
       liq = r.liquidity || {};
     return `<div class="card"><div class="row between u-flex-wrap-wrap u-gap-12px"><div><h3 class="as-h m-0">${E(sim.title.name)}</h3><span class="muted">${E(sim.title.symbol)} · ${E(sim.title.mic)} · ${sim.title.kind === "etf" ? "ETF" : "Action"}</span></div><div class="as-scores">${sc(s, "s")}${sc(c, "c")}</div></div>
-      ${sim.tuning ? `<p class="as-hint">Normalisations utilisées par le calcul : saturation de dynamique <b>${fmt(sim.tuning.sat_a, 1)}</b> · référence d’accélération <b>${fmt(sim.tuning.accel_ref, 2)}</b> · volatilité <b>${E(VOLMODES[sim.tuning.vol_mode] || sim.tuning.vol_mode)}</b> · momentum <b>${E(HORIZONS[sim.tuning.momentum_horizon] || sim.tuning.momentum_horizon)}</b>.</p>` : ""}
+      ${sim.tuning ? `<p class="as-hint">Normalisations utilisées par le calcul : saturation de dynamique <b>${fmt(sim.tuning.sat_a, 1)}</b> · référence d’accélération <b>${fmt(sim.tuning.accel_ref, 2)}</b> · volatilité <b>${E(VOLMODES[sim.tuning.vol_mode] || sim.tuning.vol_mode)}</b>.</p>` : ""}
       ${chartCard()}
       <div class="table-wrap"><table class="as-dec">${J.table.head(["Mesure", ...ids.map((i) => ({ label: `${E(L[i])}<br><small class="muted">poids réel ${fmt(100 * ((r.weights_effective || {})[i] || 0), 1)} %${r.periods[i] ? "" : " (période sans données)"}</small>`, num: true }))])}<tbody>
         ${rows.map(([n, k, u, d]) => `<tr><td>${n}</td>${ids.map((i) => cell(r.periods[i], k, u, d, i)).join("")}</tr>`).join("")}</tbody></table></div>
@@ -555,7 +577,6 @@ window.AdminScoresView = (ctx) => {
     COMPLEX,
     TUNING,
     VOLMODES,
-    HORIZONS,
     CLABEL,
     SIMPLE,
     LASTDAY,

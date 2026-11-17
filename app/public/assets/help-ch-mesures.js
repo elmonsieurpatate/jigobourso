@@ -376,22 +376,20 @@ drawdown = 100 × clamp((15 − repli) / 15)                  0 % → 100, 15 % 
     beginner: ({ H }) => `
       <h2>Une balle lancée</h2>
       <p>Une balle lancée vers le haut continue de monter un moment avant de retomber. En bourse, on appelle <b>momentum</b> l’« élan » d’un titre qui a déjà beaucoup monté. Les chercheurs ont observé que, en moyenne, ces titres continuent parfois à surperformer à court terme. <b>Parfois</b>. Ce n’est pas une loi.</p>
-      <h2>Le dernier mois est mis de côté</h2>
-      <p>Jigobourso mesure la hausse sur 6 mois ou 12 mois <b>en ignorant le dernier mois</b>. Pourquoi ? Parce que juste après une grosse hausse, les titres ont l’habitude de reprendre un peu leur souffle. On laisse ce dernier mois de côté pour ne pas se laisser tromper.</p>
+      <h2>La fin de chaque période est mise de côté</h2>
+      <p>Jigobourso mesure le momentum dans chaque période de la stratégie en écartant les max(1, min(21, arrondi(séances/12))) dernières séances.</p>
       <div class="hdemo" data-demo="mom"></div>
       ${H.warn("<p>Un titre à fort momentum peut aussi s’effondrer d’un coup quand la mode passe. C’est un des risques de faux signal.</p>")}
-      ${H.quiz("q-mom", [{ q: "Dans le momentum 6 mois de Jigobourso, quelle période est mise de côté ?", o: ["Le premier mois", "Le dernier mois", "Aucune"], a: 1, why: "On mesure de J−126 à J−21 : le dernier mois est écarté." }])}`,
+      ${H.quiz("q-mom", [{ q: "Dans le momentum de Jigobourso, quelle partie est mise de côté ?", o: ["Le début", "La fin de la période", "Aucune"], a: 1, why: "Le nombre de séances récentes exclues dépend de la durée de la période." }])}`,
     expert: ({ H, facts }) => {
-      const m = facts && facts.common.momentum;
       return `
       <h2>Définition</h2>
-      <div class="formula">momentum 6 m  = 100 × (c_{J−21} / c_{J−126} − 1)
-momentum 12 m = 100 × (c_{J−21} / c_{J−252} − 1)
-note = 100 × clamp(momentum / saturation)      saturation : 6 m → ${m ? m.saturation["6m"] : 60} %, 12 m → ${m ? m.saturation["12m"] : 100} %
-momentum négatif → note 0 ; horizon « mixte » = moyenne des deux notes</div>
-      <p>Le momentum est une <b>composante du titre</b> (une seule valeur, pas par durée) du score complexe. Poids 0 par défaut, activé par les stratégies Momentum.</p>
+      <div class="formula">e(n) = max(1, min(21, arrondi(n/12)))
+momentum(n) = 100 × (cours à n−e(n) séances / cours initial − 1)
+note(n) = 100 × clamp(momentum(n) / (SAT_A × ((n−e(n))/5)^SAT_B))</div>
+      <p>Le momentum est calculé sur <b>chaque période active</b>, puis combiné selon ses poids. Poids 0 par défaut, activé par les stratégies Momentum.</p>
       <div class="hdemo" data-demo="mom"></div>
-      ${H.warn("<p>Limites : fenêtre longue (126 ou 252 séances) exigeant un historique suffisant, sinon la composante est absente ; sensible aux retournements brutaux de marché (momentum crashes).</p>")}`;
+      ${H.warn("<p>Limites : chaque période exige ses propres clôtures ; une mesure absente rend la note partielle. Le momentum reste sensible aux retournements brutaux de marché.</p>")}`;
     },
     mount: (el, { HM, HC }) => {
       const d = el.querySelector("[data-demo=mom]");

@@ -192,7 +192,7 @@
     expert: ({ H }) => `
       <h2>Modèle</h2>
       <ul><li><b>Critères de recherche</b> par durée (pente min, R² min, parfois rendement min/max) : verdict <code>retenu / exclu / indéterminé</code> (voir « Critères »).</li>
-      <li><b>Profil de scores</b> par stratégie : durées actives et leurs poids (auto ou personnalisés), poids des 10 composantes du score complexe, réglages (A de saturation, k d’accélération, mode de volatilité, horizon de momentum).</li>
+      <li><b>Profil de scores</b> par stratégie : durées actives et leurs poids (auto ou personnalisés), poids des 10 composantes du score complexe, réglages (A de saturation, k d’accélération, mode de volatilité).</li>
       <li>Les deux couches sont <b>indépendantes</b> : adapter les scores ne change pas qui est retenu, et inversement.</li>
       <li>Stockage par compte : <code>ct_strategies:&lt;uid&gt;</code> (critères), <code>scores_profiles_u&lt;uid&gt;</code> (scores). Revenir exactement aux valeurs officielles supprime l’entrée.</li></ul>`,
   });

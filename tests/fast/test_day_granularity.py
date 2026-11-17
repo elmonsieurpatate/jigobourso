@@ -41,7 +41,7 @@ def DAY(ret):
     return dict(slope=ret, r2=None, perf=ret, volatility=None, drawdown=0.0, up_fraction=None, spike_share=None, accel=None, r2_prev=None)
 
 
-INPUTS = {5: M(1.1, 0.82, 0.7, 0.35, 2.4, 3.0, 0.6, 0.5), 21: M(0.75, 0.9, 0.62, 0.28, 2.1, 6.0, 0.3, 0.7)}
+INPUTS = {5: dict(M(1.1, 0.82, 0.7, 0.35, 2.4, 3.0, 0.6, 0.5), turnover_eur=20e6), 21: dict(M(0.75, 0.9, 0.62, 0.28, 2.1, 6.0, 0.3, 0.7), turnover_eur=20e6)}
 LIQ = {'turnover_eur': 20e6, 'source': 'daily'}
 
 

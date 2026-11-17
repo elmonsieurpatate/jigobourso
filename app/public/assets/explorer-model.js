@@ -2,7 +2,7 @@
    Chargé avant explorer.js ; testé sous Node par tests/e2e/explorer-model.cjs. L'état de la page reste dans explorer.js. */
 window.ExplorerModel = (() => {
   "use strict";
-  const periods = [
+  const BASE_PERIODS = [
     ["day", "Jour", 1],
     ["week", "Semaine", 5],
     ["month", "Mois", 21],
@@ -10,7 +10,10 @@ window.ExplorerModel = (() => {
     ["half", "6 mois", 126],
     ["year", "1 an", 252],
     ["two_year", "2 ans", 504],
+    ["three_year", "3 ans", 756],
+    ["five_year", "5 ans", 1260],
   ];
+  const periods = [...BASE_PERIODS];
   const metrics = {
     slope: ["Pente (% / séance)", "% / séance"],
     r2: ["R² (régression)", ""],
@@ -37,7 +40,24 @@ window.ExplorerModel = (() => {
     mom12: ["half", "year"],
     momrisk: ["half", "year"],
   };
-  const SESS = { week: "5", month: "21", quarter: "63", half: "126", year: "252" };
+  const SESS = {
+    week: "5",
+    month: "21",
+    quarter: "63",
+    half: "126",
+    year: "252",
+    two_year: "504",
+    three_year: "756",
+    five_year: "1260",
+  };
+  const syncPeriods = (c) => {
+    periods.splice(0, periods.length, ...BASE_PERIODS);
+    for (const [id, p] of Object.entries(c?.periods || {}))
+      if (id.startsWith("custom_") && Number.isInteger(p.sessions) && p.sessions >= 3 && p.sessions <= 1260) {
+        periods.push([id, `${p.sessions} séances`, p.sessions]);
+        SESS[id] = String(p.sessions);
+      }
+  };
   const cloneJSON = (x) => JSON.parse(JSON.stringify(x));
 
   // ───── Profils : critères de RECHERCHE de chaque stratégie intégrée, lus dans le moteur (ranking/criteria) ─────
@@ -66,6 +86,8 @@ window.ExplorerModel = (() => {
     if (c && c.periods) {
       if (!c.periods.day) c.periods.day = { ...DAY_OFF };
       if (c.periods.day.return == null) c.periods.day.return = 0;
+      for (const [id] of BASE_PERIODS)
+        if (id !== "day" && !c.periods[id]) c.periods[id] = { enabled: false, slope: 0.1, r2: 0.75 };
     }
     return c;
   };
@@ -398,6 +420,7 @@ window.ExplorerModel = (() => {
 
   return {
     periods,
+    syncPeriods,
     metrics,
     builtinNames,
     SESS,

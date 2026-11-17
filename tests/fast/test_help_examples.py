@@ -16,6 +16,8 @@ def meas(total, n, r2, vol, dd, up, spike):
 
 def test_zebulon_example_matches_the_engine():
     inputs = {5: meas(8, 5, 0.92, 1.8, 4, 0.70, 0.25), 21: meas(20, 21, 0.90, 1.8, 6, 0.62, 0.30)}
+    for period in inputs.values():
+        period['turnover_eur'] = 20e6
     r = S.score_title(inputs, {'turnover_eur': 20e6, 'source': 'daily'}, [{'id': 'week', 'sessions': 5}, {'id': 'month', 'sessions': 21}], kappa=0.7)
     assert round(r['periods']['week']['dynamics']) == 47 and round(r['periods']['month']['dynamics']) == 56
     assert r['weights']['week'] == pytest.approx(0.42, abs=0.01) and r['weights']['month'] == pytest.approx(0.58, abs=0.01)
@@ -46,5 +48,7 @@ def test_note_scales_quoted_in_help():
     assert note(volatility=1.0)['volatility'] == ap(100) and note(volatility=5.0)['volatility'] == ap(0)
     assert note(drawdown=0)['drawdown'] == ap(100) and note(drawdown=15)['drawdown'] == ap(0)
     assert S.liquidity_note(2e6) == ap(0) and S.liquidity_note(50e6) == ap(100)
-    assert S.recovery_note(-10) == ap(100) and S.recovery_note(20) == ap(0)
-    assert S.momentum_note({'6m': 60.0}, '6m') == ap(100) and S.momentum_note({'12m': 100.0}, '12m') == ap(100)
+    from engine.analytics.scoring.score_inputs import recovery_input
+
+    assert recovery_input([100, 90, 80, 90, 100]) == ap(100) and recovery_input([100, 105, 110, 115, 120]) == ap(0)
+    assert S.period_momentum_note(S.saturation(100), 100) == ap(100)

@@ -13,6 +13,21 @@ MIN_DAYS = 15  # séances renseignées minimales pour parler de volumes réels
 MAX_PLAUSIBLE_VOLUME = 1e13
 
 
+def period_turnover(bars, factor):
+    """Moyenne réelle sur les n séances de la période ; aucune estimation extérieure."""
+    n = len(bars)
+    if n < 3:
+        return None, 0
+    values = []
+    for close, volume in bars:
+        v = valid_volume(volume)
+        if v is not None and close is not None and close > 0 and factor is not None and factor > 0:
+            values.append(close * v * factor)
+    if len(values) < max(3, math.ceil(0.75 * n)):
+        return None, len(values)
+    return sum(values) / len(values), len(values)
+
+
 def valid_volume(v):
     """Volume exploitable : entier ou flottant fini, positif ou nul, d'un ordre de grandeur plausible. Sinon None (inconnu, pas zéro)."""
     if v is None or isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v):

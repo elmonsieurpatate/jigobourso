@@ -16,7 +16,7 @@ from ..explorer import legacy_upgrade
 from . import scores as SC
 from .score_cache import packed, unpacked
 
-CACHE_FORMAT = 1
+CACHE_FORMAT = 2
 FIELDS = ('id', 'simple', 'simple_status', 'simple_coverage', 'complex', 'complex_status', 'complex_coverage', 'why')
 
 
@@ -51,7 +51,6 @@ def params_for(config, kind):
         'sat_a': float(sc.get('sat_a', SC.SAT_A)),
         'accel_ref': float(sc.get('accel_ref', SC.ACCEL_REF)),
         'vol_mode': sc.get('vol_mode', 'absolute'),
-        'momentum_horizon': sc.get('momentum_horizon', '6m'),
     }
 
 
@@ -69,8 +68,8 @@ def load_inputs(conn, sessions, ids=None):
     out = {}
     with conn.cursor() as cur:
         cur.execute(
-            f"""SELECT r.listing_id, i.kind, l.mic, ls.turnover_eur, ls.source, ls.days, ss.momentum_6m, ss.momentum_12m FROM v_recommendable r JOIN listings l ON l.id=r.listing_id
-                        JOIN instruments i ON i.id=l.instrument_id LEFT JOIN liquidity_state ls ON ls.listing_id=r.listing_id LEFT JOIN series_state ss ON ss.listing_id=r.listing_id WHERE 1=1{scope}""",
+            f"""SELECT r.listing_id, i.kind, l.mic FROM v_recommendable r JOIN listings l ON l.id=r.listing_id
+                        JOIN instruments i ON i.id=l.instrument_id WHERE 1=1{scope}""",
             args,
         )
         for r in cur.fetchall():
@@ -78,13 +77,12 @@ def load_inputs(conn, sessions, ids=None):
                 'kind': 'etf' if r['kind'] == 'etf' else 'equity',
                 'mic': r['mic'],
                 'inputs': {},
-                'liquidity': {'turnover_eur': _f(r['turnover_eur']), 'source': r['source'], 'days': r['days']},
-                'momentum': {'6m': _f(r['momentum_6m']), '12m': _f(r['momentum_12m'])},
+                'liquidity': {},
             }
         if sessions:
             marks = ','.join(['%s'] * len(sessions))
             cur.execute(
-                f"""SELECT m.listing_id, m.sessions, m.slope, m.r2, m.perf, m.volatility, m.drawdown, m.coverage, x.up_fraction, x.spike_share, x.accel, x.r2_prev
+                f"""SELECT m.listing_id, m.sessions, m.slope, m.r2, m.perf, m.volatility, m.drawdown, m.coverage, x.up_fraction, x.spike_share, x.accel, x.r2_prev, x.momentum_perf, x.recovery, x.turnover_eur, x.volume_days
                             FROM strategy_metrics m JOIN v_recommendable r ON r.listing_id=m.listing_id LEFT JOIN score_inputs x ON x.listing_id=m.listing_id AND x.sessions=m.sessions
                             WHERE m.sessions IN ({marks}){scope}""",
                 list(sessions) + args,
@@ -92,7 +90,23 @@ def load_inputs(conn, sessions, ids=None):
             for r in cur.fetchall():
                 if r['listing_id'] in out:
                     out[r['listing_id']]['inputs'][r['sessions']] = {
-                        k: _f(r[k]) for k in ('slope', 'r2', 'perf', 'volatility', 'drawdown', 'coverage', 'up_fraction', 'spike_share', 'accel', 'r2_prev')
+                        k: _f(r[k])
+                        for k in (
+                            'slope',
+                            'r2',
+                            'perf',
+                            'volatility',
+                            'drawdown',
+                            'coverage',
+                            'up_fraction',
+                            'spike_share',
+                            'accel',
+                            'r2_prev',
+                            'momentum_perf',
+                            'recovery',
+                            'turnover_eur',
+                            'volume_days',
+                        )
                     }
     return out
 
@@ -114,9 +128,6 @@ def _score_all(data, config):
             sat_a=p['sat_a'],
             accel_ref=p['accel_ref'],
             vol_mode=p['vol_mode'],
-            momentum=d.get('momentum'),
-            momentum_horizon=p['momentum_horizon'],
-            recovery_perf=(d['inputs'].get(126) or {}).get('perf'),
         )
     return result
 

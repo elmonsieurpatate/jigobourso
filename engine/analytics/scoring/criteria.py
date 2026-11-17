@@ -15,8 +15,8 @@ import operator
 from ..shared.numbers import finite
 
 RETAINED, EXCLUDED, UNDETERMINED = 'retained', 'excluded', 'undetermined'
-PERIODS = {'day': 1, 'week': 5, 'month': 21, 'quarter': 63, 'half': 126, 'year': 252, 'two_year': 504}
-PERIOD_LABELS = {'day': 'Jour', 'week': 'Semaine', 'month': 'Mois', 'quarter': 'Trimestre', 'half': '6 mois', 'year': '1 an', 'two_year': '2 ans'}
+PERIODS = {'day': 1, 'week': 5, 'month': 21, 'quarter': 63, 'half': 126, 'year': 252, 'two_year': 504, 'three_year': 756, 'five_year': 1260}
+PERIOD_LABELS = {'day': 'Jour', 'week': 'Semaine', 'month': 'Mois', 'quarter': 'Trimestre', 'half': '6 mois', 'year': '1 an', 'two_year': '2 ans', 'three_year': '3 ans', 'five_year': '5 ans'}
 METRIC_LABELS = {'slope': 'Pente', 'r2': 'R²', 'volatility': 'Volatilité', 'drawdown': 'Repli maximal', 'return': 'Performance', 'volume': 'Volume moyen'}
 UNITS = {'slope': '% par séance', 'r2': '', 'volatility': '%', 'drawdown': '%', 'return': '%', 'volume': 'titres/jour'}
 OPS = {'>=': operator.ge, '<=': operator.le, '>': operator.gt, '<': operator.lt, '=': operator.eq}
@@ -38,24 +38,25 @@ def normalize(spec):
         return None
     primary, extra = [], []
     for k, v in periods.items():
-        if k not in PERIODS or not isinstance(v, dict) or v.get('enabled') is False:
+        if not isinstance(v, dict) or v.get('enabled') is False or (k not in PERIODS and not (k.startswith('custom_') and type(v.get('sessions')) is int and 3 <= v['sessions'] <= 1260)):
             continue
+        sessions = PERIODS.get(k, v.get('sessions'))
         if k == 'day':  # Jour (1 séance) : seule la variation sert de critère ; ni pente ni R² sur une séance. Activée sans seuil : aucun critère.
             val = finite(v.get('return'))
             if v.get('enabled') is True and val is not None and not isinstance(spec.get('tree'), dict):  # avec un arbre de règles, la règle Jour de l'arbre fait foi
-                primary.append({'metric': 'return', 'period': 'day', 'op': '>=', 'value': val})
+                primary.append({'metric': 'return', 'period': 'day', 'op': '>=', 'value': val, 'sessions': 1})
             continue
         for metric in ('slope', 'r2'):
             val = finite(v.get(metric))
             if val is not None and val > 0:
-                primary.append({'metric': metric, 'period': k, 'op': '>=', 'value': val})
+                primary.append({'metric': metric, 'period': k, 'op': '>=', 'value': val, 'sessions': sessions})
     tree = spec.get('tree')
     leaves = _leaves(tree) if isinstance(tree, dict) else None
     if leaves is not None:  # règles « variation 1J » de l'arbre : critères principaux (ET), comme pente et R², pas des seuils facultatifs
         for x in leaves:
             val = finite(x.get('value'))
             if x.get('metric') == 'return' and x.get('period') == 'day' and x.get('op') in OPS and val is not None:
-                primary.append({'metric': 'return', 'period': 'day', 'op': x['op'], 'value': val})
+                primary.append({'metric': 'return', 'period': 'day', 'op': x['op'], 'value': val, 'sessions': 1})
         leaves = [x for x in leaves if not (x.get('metric') == 'return' and x.get('period') == 'day')]
     source = [x for x in leaves if x['metric'] not in ('slope', 'r2')] if leaves is not None else (spec.get('extra') or [])
     for x in source:
@@ -64,8 +65,9 @@ def normalize(spec):
         val = finite(x.get('value'))
         if val is None:
             continue
-        period = x.get('period') if x.get('period') in PERIODS else 'month'
-        extra.append({'metric': x['metric'], 'period': period, 'op': x['op'], 'value': val})
+        period = x.get('period') if x.get('period') in PERIODS or x.get('period') in periods else 'month'
+        detail = periods.get(period) or {}
+        extra.append({'metric': x['metric'], 'period': period, 'op': x['op'], 'value': val, 'sessions': PERIODS.get(period, detail.get('sessions', 21))})
     join = 'or' if spec.get('join') == 'or' else 'and'
     return {'primary': primary, 'extra': extra, 'join': join}
 
@@ -78,30 +80,30 @@ def _leaves(n, depth=0):
     return [x for c in (n.get('children') or []) for x in _leaves(c, depth + 1)]
 
 
-def measure(metrics, metric, period):
+def measure(metrics, metric, period, sessions=None):
     """Valeur mesurée d'un titre pour un critère, ou None. `metrics` = {'m': {séances: {...}}, 'avg_volume': ...}."""
     m = metrics.get('m') or {}
     if metric in ('slope', 'r2'):
         if period == 'day':
             return None  # pente et R² n'existent pas sur une séance : jamais inventés
-        return finite((m.get(PERIODS[period]) or {}).get(metric))
+        return finite((m.get(sessions or PERIODS[period]) or {}).get(metric))
     if metric in ('volatility', 'drawdown'):
-        return finite((m.get(REFERENCE) or {}).get(metric))
+        return finite((m.get(sessions or PERIODS[period]) or {}).get(metric))
     if metric == 'return':
-        return finite((m.get(PERIODS[period]) or {}).get('perf'))
+        return finite((m.get(sessions or PERIODS[period]) or {}).get('perf'))
     if metric == 'volume':
         return finite(metrics.get('avg_volume'))
     return None
 
 
 def _check(metrics, c):
-    value = measure(metrics, c['metric'], c['period'])
+    value = measure(metrics, c['metric'], c['period'], c.get('sessions'))
     ok = None if value is None else bool(OPS[c['op']](value, c['value']))
     label = 'Variation 1J' if c['metric'] == 'return' and c['period'] == 'day' else METRIC_LABELS[c['metric']]
     return {
         'metric': c['metric'],
         'period': c['period'],
-        'period_label': PERIOD_LABELS[c['period']],
+        'period_label': PERIOD_LABELS.get(c['period'], f"{c.get('sessions')} séances"),
         'op': c['op'],
         'threshold': c['value'],
         'value': value,

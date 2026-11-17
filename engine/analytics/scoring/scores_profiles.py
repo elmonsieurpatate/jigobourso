@@ -1,13 +1,14 @@
 """Profils de score : réglages officiels et personnels, application, nettoyage et construction de la configuration d'une stratégie."""
 
 import copy
+import re
 from engine.shared import settings
 from ..explorer import explorer_config as C
 from . import score_service
 from . import scores as SC
 from .scores_specs import DAY_THRESHOLDS, LIQUIDITY, PROFILES, SCORING_PERIODS, THRESHOLDS, TOLERANCE, USER, known, spec, user_key
 
-PERIOD_LABELS = {'day': 'Jour', 'week': 'Semaine', 'month': 'Mois', 'quarter': 'Trimestre', 'half': 'Semestre', 'year': 'Année'}
+PERIOD_LABELS = {'day': 'Jour', 'week': 'Semaine', 'month': 'Mois', 'quarter': 'Trimestre', 'half': 'Semestre', 'year': 'Année', 'two_year': '2 ans', 'three_year': '3 ans', 'five_year': '5 ans'}
 
 
 def design():
@@ -19,7 +20,6 @@ def design():
         'tuning': dict(TUNING_DEFAULTS),
         'tuning_ranges': {'sat_a': list(SC.SAT_A_RANGE), 'accel_ref': list(SC.ACCEL_REF_RANGE)},
         'vol_modes': list(SC.VOL_MODES),
-        'momentum_horizons': list(SC.MOMENTUM_HORIZONS),
     }
 
 
@@ -44,9 +44,7 @@ def profile_of(config):
     liq = config.get('liquidity') or {}
     day = by['day']
     return {
-        'periods': {
-            pid: dict({'sessions': by[pid]['sessions'], 'enabled': by[pid]['enabled'], 'require_history': by[pid]['require_history']}, **{f: by[pid][f] for f in THRESHOLDS}) for pid in SCORING_PERIODS
-        },
+        'periods': {pid: dict({'sessions': by[pid]['sessions'], 'enabled': by[pid]['enabled'], 'require_history': by[pid]['require_history']}, **{f: by[pid][f] for f in THRESHOLDS}) for pid in by},
         'day_filter': {'enabled': bool(day['enabled']), 'min_return': day['min_return'] if day['min_return'] is not None else 0.0},
         'liquidity': {f: liq.get(f) for f in LIQUIDITY},
         'technical': {'require_fresh': bool((config.get('selection') or {}).get('require_fresh'))},
@@ -58,7 +56,7 @@ def profile_of(config):
     }
 
 
-TUNING_DEFAULTS = {'sat_a': SC.SAT_A, 'accel_ref': SC.ACCEL_REF, 'vol_mode': 'absolute', 'momentum_horizon': '6m'}
+TUNING_DEFAULTS = {'sat_a': SC.SAT_A, 'accel_ref': SC.ACCEL_REF, 'vol_mode': 'absolute'}
 
 
 def tuning_of(sc):
@@ -70,9 +68,12 @@ def apply_profile(config, profile):
     """Superpose un profil enregistré à la configuration de base de la stratégie ; le résultat est revalidé.
     Les seuils filtrent (conformité) ; seuls granularités actives, poids et κ/couverture touchent aux notes."""
     c = copy.deepcopy(config)
+    for pid, pp in (profile.get('periods') or {}).items():
+        if not c['name'].startswith('ct:') and pid.startswith('custom_') and not any(p['id'] == pid for p in c['periods']):
+            c['periods'].append(dict(id=pid, sessions=pp['sessions'], enabled=False, require_history=False, **{f: None for f in C.BOUNDS}))
     for p in c['periods']:
         pp = (profile.get('periods') or {}).get(p['id'])
-        if pp is not None and p['id'] in SCORING_PERIODS:
+        if pp is not None:
             for f in ('enabled', 'require_history'):
                 if f in pp:
                     p[f] = bool(pp[f])
@@ -87,7 +88,8 @@ def apply_profile(config, profile):
     if isinstance(profile.get('technical'), dict):
         c['selection'] = dict(c.get('selection') or {}, require_fresh=bool(profile['technical'].get('require_fresh')))
     sc = dict(c.get('scoring') or {})
-    sc['weights'] = dict(profile.get('weights') or {}) if profile.get('weights_mode') == 'custom' else {}
+    ids = {p['id'] for p in c['periods']}
+    sc['weights'] = {pid: weight for pid, weight in (profile.get('weights') or {}).items() if pid in ids} if profile.get('weights_mode') == 'custom' else {}
     if profile.get('complex_weights'):
         sc['complex_weights'] = dict(profile['complex_weights'])
     if isinstance(profile.get('tuning'), dict):
@@ -104,7 +106,7 @@ def neutral(config):
     Reste seul le contrôle technique (fraîcheur) du profil."""
     c = copy.deepcopy(config)
     for p in c['periods']:
-        if p['id'] in SCORING_PERIODS:
+        if p['id'] in SCORING_PERIODS or p['id'].startswith('custom_'):
             p['require_history'] = False
             for f in THRESHOLDS:
                 p[f] = None
@@ -120,18 +122,24 @@ def clean_profile(raw):
         raise ValueError('Profil invalide')
     periods = raw.get('periods') or {}
     out = {'periods': {}}
-    for pid in SCORING_PERIODS:
+    for pid in (*SCORING_PERIODS, *(pid for pid in periods if pid.startswith('custom_'))):
         pp = periods.get(pid)
         if pid == 'day' and not isinstance(pp, dict):  # profil enregistré avant l'ajout de Jour : Jour désactivé (ou ancien filtre « dernier jour » repris tel quel)
             old = raw.get('day_filter') if isinstance(raw.get('day_filter'), dict) else {}
             pp = {'enabled': bool(old.get('enabled')), 'require_history': False, 'min_return': old.get('min_return') if old.get('enabled') else None}
         if not isinstance(pp, dict):
-            raise ValueError(f'Granularité manquante : {PERIOD_LABELS[pid]}')
+            pp = {'enabled': False} if pid in SCORING_PERIODS else None
+        if pp is None:
+            raise ValueError(f'Granularité manquante : {pid}')
+        if pid.startswith('custom_') and (not re.fullmatch(r'custom_[a-z0-9_]{1,41}', pid) or type(pp.get('sessions')) is not int or not 3 <= pp['sessions'] <= 1260):
+            raise ValueError('Durée personnalisée invalide')
         item = {'enabled': bool(pp.get('enabled')), 'require_history': bool(pp.get('require_history'))}
+        if pid.startswith('custom_'):
+            item['sessions'] = pp['sessions']
         for f, (lo, hi) in THRESHOLDS.items():
-            item[f] = None if pid == 'day' and f not in DAY_THRESHOLDS else C.number(pp.get(f), lo, hi, f'{PERIOD_LABELS[pid]} : {f}')
+            item[f] = None if pid == 'day' and f not in DAY_THRESHOLDS else C.number(pp.get(f), lo, hi, f'{PERIOD_LABELS.get(pid, pid)} : {f}')
         out['periods'][pid] = item
-    active = [pid for pid in SCORING_PERIODS if out['periods'][pid]['enabled']]
+    active = [pid for pid, pp in out['periods'].items() if pp['enabled']]
     if not active:
         raise ValueError('Au moins une granularité doit rester active')
     d = out['periods']['day']  # champ conservé pour les anciens lecteurs : reflet de la granularité Jour
@@ -147,7 +155,7 @@ def clean_profile(raw):
     out['weights'] = {}
     if mode == 'custom':
         weights = raw.get('weights') or {}
-        vals = {pid: C.number(weights.get(pid, 0 if pid == 'day' else None), 0, 100, f'Poids {PERIOD_LABELS[pid]}') for pid in active}  # Jour sans poids saisi : 0 %
+        vals = {pid: C.number(weights.get(pid, 0 if pid == 'day' else None), 0, 100, f'Poids {PERIOD_LABELS.get(pid, pid)}') for pid in active}  # Jour sans poids saisi : 0 %
         if any(v is None for v in vals.values()):
             raise ValueError('Chaque granularité active doit avoir un poids')
         if abs(sum(vals.values()) - 100) > TOLERANCE:

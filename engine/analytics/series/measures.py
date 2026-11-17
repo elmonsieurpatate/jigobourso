@@ -18,7 +18,7 @@ volatilité à partir de 3 séances.
 
 import math
 
-MIN_SESSIONS, MAX_SESSIONS = 1, 252
+MIN_SESSIONS, MAX_SESSIONS = 1, 1260
 
 
 def window_metrics(closes):

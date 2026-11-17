@@ -2,11 +2,9 @@
 
 import datetime
 from engine.shared import units
-import json
 
 from .loader import load_splits
 from .series import analyze_series, momentum_6_1, momentum_12_1, MOMENTUM_LONG, MOMENTUM_LONG_12
-from ..explorer import strategy
 from . import liquidity as liq
 from ..scoring.score_inputs import window_inputs
 from ..scoring.scores import MIN_SESSIONS
@@ -15,22 +13,20 @@ from ...market.calendar import session_dates, window_calendars
 from ...market.hours import expected_last_close  # noqa: F401 (conservé pour compatibilité)
 from ...shared.db import ensure
 
-BASE_WINDOWS = (1, 5, 21, 63, 126, 252)
+BASE_WINDOWS = (1, 21, 252)
 
 
 def wanted_windows(conn):
-    """Fenêtres de base + toutes celles demandées par une stratégie enregistrée dans un portefeuille."""
+    """Fenêtres techniques et périodes actives effectivement demandées par les stratégies."""
     windows = set(BASE_WINDOWS)
-    with conn.cursor() as cur:
-        cur.execute('SELECT strategy_config FROM portfolios WHERE strategy_config IS NOT NULL')
-        for row in cur.fetchall():
-            try:
-                cfg = json.loads(row['strategy_config'])
-                if cfg.get('version') == strategy.VERSION:
-                    windows |= set(strategy.required_sessions(cfg))
-            except (TypeError, ValueError, KeyError):
-                continue
-    return sorted(w for w in windows if 1 <= w <= 252)
+    from ..scoring import scores_specs
+    from engine.shared.period_requests import requested_sessions
+
+    for item in scores_specs.V4_STRATEGIES.values():
+        cfg = item['build']()
+        windows.update(p['sessions'] for p in cfg['periods'] if p['enabled'])
+    windows.update(requested_sessions(conn))
+    return sorted(w for w in windows if type(w) is int and 1 <= w <= 1260)
 
 
 def _dec(v, places=6):
@@ -59,7 +55,6 @@ def compute_all(conn, now, batch=400):
     calendars_by_mic = {m: window_calendars(m, cutoff_by_mic.get(m), windows) for m in set(mics.values())}
     technical_by_mic = {m: session_dates(m, cutoff_by_mic.get(m), 205) for m in set(mics.values())}
     # Fenêtre précédente de même durée (2n+1 séances, dont les n+1 premières) : sert à l'accélération des scores.
-    prev_by_mic = {m: {n: (session_dates(m, cutoff_by_mic.get(m), 2 * n + 1) or [])[: n + 1] for n in windows if n >= MIN_SESSIONS} for m in set(mics.values())}
     rates = collect.latest_rates(conn)
     with conn.cursor() as cur:
         cur.execute('SELECT listing_id, price, currency, avg_volume_3m FROM latest_prices')
@@ -96,7 +91,8 @@ def compute_all(conn, now, batch=400):
                 calendars_by_mic.get(mics[lid]),
                 technical_by_mic.get(mics[lid]),
                 score_rows=score_rows,
-                previous_windows=prev_by_mic.get(mics[lid]),
+                volume_bars=volumes.get(lid, []),
+                eur_factor=units.to_eur_factor((quotes.get(lid) or {}).get('currency') or listing_currency.get(lid), rates),
             )
             q = quotes.get(lid) or {}
             cur_code = q.get('currency') or listing_currency.get(lid)
@@ -116,7 +112,10 @@ def compute_all(conn, now, batch=400):
                 metric_rows[i : i + 5000],
             )
         for i in range(0, len(score_rows), 5000):
-            cur.executemany('''INSERT INTO score_inputs(listing_id,sessions,up_fraction,spike_share,accel,r2_prev) VALUES (%s,%s,%s,%s,%s,%s)''', score_rows[i : i + 5000])
+            cur.executemany(
+                '''INSERT INTO score_inputs(listing_id,sessions,up_fraction,spike_share,accel,r2_prev,momentum_perf,recovery,turnover_eur,volume_days) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)''',
+                score_rows[i : i + 5000],
+            )
         # volume_checked_at (passage du collecteur de volumes) est conservé : mise à jour des seuls champs calculés.
         for i in range(0, len(liquidity_rows), 5000):
             cur.executemany(
@@ -134,21 +133,39 @@ def compute_all(conn, now, batch=400):
 
 
 def _compute_one(
-    lid, mic, rows, splits, windows, market_latest, stamp, metric_rows, state_rows, expected_close=None, session_windows=None, technical_sessions=None, score_rows=None, previous_windows=None
+    lid,
+    mic,
+    rows,
+    splits,
+    windows,
+    market_latest,
+    stamp,
+    metric_rows,
+    state_rows,
+    expected_close=None,
+    session_windows=None,
+    technical_sessions=None,
+    score_rows=None,
+    previous_windows=None,
+    volume_bars=None,
+    eur_factor=None,
 ):
     dates, closes, basis, breaks, measures, missing, t = analyze_series(rows, windows, splits, session_windows, technical_sessions)
     if score_rows is not None and session_windows:
         observations = dict(zip(dates, closes))
+        volumes_by_date = {d: (c, v) for d, c, v in (volume_bars or [])}
         for n in windows:
             if n < MIN_SESSIONS or not session_windows.get(n):
                 continue
-            cur_dates, prev_dates = session_windows[n], (previous_windows or {}).get(n) or []
+            cur_dates = session_windows[n]
             if any(cur_dates[0] < dates[i] <= cur_dates[-1] for i in breaks):
                 continue  # saut de cours dans la fenêtre : aucune mesure de score
-            if prev_dates and any(prev_dates[0] < dates[i] <= prev_dates[-1] for i in breaks):
-                prev_dates = []
-            m = window_inputs(cur_dates, prev_dates, observations)
-            score_rows.append((lid, n, _dec(m['up_fraction'], 6), _dec(m['spike_share'], 6), _dec(m['accel']), _dec(m['r2_prev'], 6)))
+            m = window_inputs(cur_dates, [], observations)
+            period_bars = [volumes_by_date.get(d, (None, None)) for d in cur_dates[1:]]
+            turnover, days = liq.period_turnover(period_bars, eur_factor)
+            score_rows.append(
+                (lid, n, _dec(m['up_fraction'], 6), _dec(m['spike_share'], 6), _dec(m['accel']), _dec(m['r2_prev'], 6), _dec(m['momentum_perf'], 4), _dec(m['recovery'], 4), _dec(turnover, 4), days)
+            )
     for n, m in measures.items():
         metric_rows.append(
             (

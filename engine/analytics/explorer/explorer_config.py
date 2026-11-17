@@ -2,10 +2,11 @@
 
 import copy
 import math
+import re
 
 VERSION = 4
-PERIODS = ('day', 'week', 'month', 'quarter', 'half', 'year')
-SESSIONS = dict(zip(PERIODS, (1, 5, 21, 63, 126, 252)))
+PERIODS = ('day', 'week', 'month', 'quarter', 'half', 'year', 'two_year', 'three_year', 'five_year')
+SESSIONS = dict(zip(PERIODS, (1, 5, 21, 63, 126, 252, 504, 756, 1260)))
 BOUNDS = {
     'min_slope': (-100, 100),
     'max_slope': (-100, 100),
@@ -111,12 +112,20 @@ def validate(raw):
         raise ValueError('Unité interne de pente incorrecte')
     c['slope_unit'] = 'percent_per_session'
     ps = c.get('periods')
-    if not isinstance(ps, list) or [p.get('id') for p in ps if isinstance(p, dict)] != list(PERIODS):
-        raise ValueError('Les six granularités doivent être présentes dans leur ordre canonique')
+    if not isinstance(ps, list) or not all(isinstance(p, dict) for p in ps):
+        raise ValueError('Liste de périodes invalide')
+    for pid in PERIODS:
+        if pid not in {p.get('id') for p in ps}:
+            ps.append(dict(id=pid, sessions=SESSIONS[pid], enabled=False, require_history=False, **{f: None for f in BOUNDS}))
+    ids = [p.get('id') for p in ps]
+    if len(ids) != len(set(ids)) or any(pid not in PERIODS and not (isinstance(pid, str) and re.fullmatch(r'custom_[a-z0-9_]{1,41}', pid)) for pid in ids):
+        raise ValueError('Identifiants de périodes invalides')
+    if any(pid not in ids for pid in PERIODS):
+        raise ValueError('Période prédéfinie manquante')
     for p in ps:
         n = p.get('sessions')
         pid = p['id']
-        if not isinstance(p.get('enabled'), bool) or type(n) is not int or not 1 <= n <= 252 or (pid == 'day' and n != 1) or (pid != 'day' and n < 2):
+        if not isinstance(p.get('enabled'), bool) or type(n) is not int or not 1 <= n <= 1260 or (pid in SESSIONS and n != SESSIONS[pid]) or (pid != 'day' and n < 3):
             raise ValueError('Activation ou nombre de séances invalide')
         if not isinstance(p.get('require_history', False), bool):
             raise ValueError('Exigence d’historique invalide')
@@ -128,6 +137,9 @@ def validate(raw):
                 raise ValueError(f'{pid} : minimum supérieur au maximum ({lo})')
         if n < 3 and any(p[k] is not None for k in ('min_r2', 'max_r2', 'min_er', 'max_er', 'min_volatility', 'max_volatility')):
             raise ValueError(f'{pid} : R², ER et volatilité non applicables sur moins de trois séances')
+    active_sessions = [p['sessions'] for p in ps if p['enabled']]
+    if len(active_sessions) != len(set(active_sessions)):
+        raise ValueError('Deux périodes actives ne peuvent pas avoir la même durée')
     t = object_field(c, 'technical')
     if not isinstance(t, dict):
         raise ValueError('Filtres techniques invalides')
@@ -158,7 +170,7 @@ def validate(raw):
                 raise ValueError('Indicateur de score inconnu ou indisponible')
             p = part.get('period', 'month')
             metric = part['metric']
-            if p not in PERIODS:
+            if p not in ids:
                 raise ValueError('Période de score invalide')
             if metric in ('r2', 'er', 'volatility') and next(x for x in ps if x['id'] == p)['sessions'] < 3:
                 raise ValueError('Contribution non applicable à cette période')
@@ -278,9 +290,6 @@ def validate_scoring(raw, periods):
     vol_mode = raw.get('vol_mode', 'absolute') or 'absolute'
     if vol_mode not in SC.VOL_MODES:
         raise ValueError('Méthode de volatilité inconnue')
-    horizon = raw.get('momentum_horizon', '6m') or '6m'
-    if horizon not in SC.MOMENTUM_HORIZONS:
-        raise ValueError('Horizon de momentum inconnu')
     return {
         'kappa': kappa,
         'weights': weights,
@@ -290,7 +299,6 @@ def validate_scoring(raw, periods):
         'sat_a': sat_a,
         'accel_ref': accel_ref,
         'vol_mode': vol_mode,
-        'momentum_horizon': horizon,
     }
 
 

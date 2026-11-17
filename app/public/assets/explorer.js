@@ -146,7 +146,11 @@
   };
   let activeFilter = null,
     filterQuery = "";
-  const config = () => state.profiles[state.strategy];
+  const config = () => {
+    const c = state.profiles[state.strategy];
+    M.syncPeriods(c);
+    return c;
+  };
   const tree = () => M.ensureTree(config()),
     leaves = () => M.leaves(tree()),
     at = (path) => M.at(tree(), path);
@@ -814,6 +818,39 @@
     } else if (b.dataset.period) {
       state.selected = b.dataset.period;
       renderSimple();
+    } else if (b.dataset.addPeriod) {
+      const id = $("#ct-add-period").value;
+      if (id && config().periods[id]) {
+        activatePeriod(id, true);
+        state.selected = id;
+        renderSimple();
+        renderExpert();
+      }
+    } else if (b.dataset.addCustom) {
+      const n = Number($("#ct-custom-sessions").value);
+      if (!Number.isInteger(n) || n < 3 || n > 1260) {
+        feedback("Saisissez une durée de 3 à 1 260 séances.");
+      } else if (periods.some(([id, , sessions]) => sessions === n && config().periods[id]?.enabled)) {
+        feedback("Cette durée est déjà active dans la stratégie.");
+      } else {
+        const id = "custom_" + crypto.randomUUID().replaceAll("-", "").slice(0, 16);
+        config().periods[id] = { sessions: n, enabled: false, slope: 0.1, r2: 0.75 };
+        M.syncPeriods(config());
+        activatePeriod(id, true);
+        state.selected = id;
+        renderSimple();
+        renderExpert();
+      }
+    } else if (b.dataset.removeCustom) {
+      const id = b.dataset.removeCustom;
+      if (id.startsWith("custom_") && config().periods[id]) {
+        activatePeriod(id, false);
+        delete config().periods[id];
+        M.syncPeriods(config());
+        state.selected = periods.find(([k]) => config().periods[k]?.enabled)?.[0] || "week";
+        renderSimple();
+        renderExpert();
+      }
     } else if (b.dataset.step) {
       const f = b.dataset.step,
         p = config().periods[state.selected];

@@ -123,7 +123,10 @@
       ],
       noise: 0.004,
       behaviour: "Une longue période de baisse ou de stagnation, puis un redémarrage récent.",
-      pros: ["Cherche l’inverse du « déjà beaucoup monté ».", "Le contexte du semestre entre dans la note de rebond."],
+      pros: [
+        "Cherche l’inverse du « déjà beaucoup monté ».",
+        "La reprise interne à chaque période pondérée entre dans la note de rebond.",
+      ],
       cons: ["Un rebond peut être éphémère.", "Les titres sont souvent en phase de redressement fragile."],
       fake: [
         "Un « rebond » de quelques jours dans une baisse qui continue.",
@@ -135,7 +138,7 @@
       icon: "hourglass",
       color: "#7c3aed",
       lead: "Pour miser sur l’élan des six derniers mois.",
-      goal: "Classer les titres selon leur hausse de J−126 à J−21, dernier mois écarté.",
+      goal: "Classer les titres selon le momentum de leurs périodes, avec une fin de fenêtre écartée.",
       path: [
         [0, 100],
         [105, 140],
@@ -159,7 +162,7 @@
       icon: "calendar-days",
       color: "#4f46e5",
       lead: "Pour miser sur la tendance de l’année écoulée.",
-      goal: "Classer les titres selon leur hausse de J−252 à J−21, dernier mois écarté.",
+      goal: "Classer les titres selon le momentum de leurs périodes, avec une fin de fenêtre écartée.",
       path: [
         [0, 100],
         [200, 150],
@@ -241,7 +244,6 @@
     return [
       t.sat_a != null ? `saturation A = ${f(t.sat_a, 2)} %` : "",
       t.accel_ref != null ? `accélération k = ${f(t.accel_ref, 2)}` : "",
-      t.momentum_horizon ? `horizon de momentum « ${t.momentum_horizon} »` : "",
       t.vol_mode ? `volatilité en mode ${t.vol_mode === "relative" ? "relatif (rapportée à la pente)" : "absolu"}` : "",
     ]
       .filter(Boolean)
@@ -386,8 +388,8 @@
         <h3>Comment lire ces chiffres</h3>
         <ul><li>« ≈ hausse régulière équivalente » = <code>(1 + pente/100)^n − 1</code> : ce que donnerait la pente minimale sur n séances si la courbe était une exponentielle parfaite.</li>
         ${id === "fast" ? "<li>Pas de seuil de R² dans les critères de recherche (pente seule) ; le R² compte dans le score complexe.</li>" : ""}
-        ${id === "rebound" ? "<li>Le semestre est activé sans critère : il fournit le contexte de rebond. Note de rebond = <code>100 × clamp((20 − perf_semestre) / 30)</code> (≤ −10 % → 100, ≥ +20 % → 0).</li>" : ""}
-        ${id.startsWith("mom") ? `<li>Momentum : <code>100 × (c<sub>J−21</sub> / c<sub>J−126 ou J−252</sub> − 1)</code>, note = <code>100 × clamp(m / saturation)</code> avec saturation ${c.momentum.saturation["6m"]} % (6 mois) et ${c.momentum.saturation["12m"]} % (12 mois) ; négatif → 0.</li>` : ""}
+        ${id === "rebound" ? "<li>Rebond : dans chaque période pondérée, la note mesure la fraction récupérée du plus grand recul interne, modulée par la profondeur de la baisse (saturation à 10 %). Une hausse continue vaut 0.</li>" : ""}
+        ${id.startsWith("mom") ? `<li>Momentum : dans chaque période pondérée, le rendement exclut les max(1, min(21, arrondi(séances/12))) dernières séances ; la saturation est ${c.saturation.a} × ((durée mesurée)/5)^${c.saturation.b} %.</li>` : ""}
         ${id === "calm" ? "<li>Volatilité et repli ne sont pas des critères de recherche : ils pèsent seulement dans le score complexe.</li>" : ""}</ul>
         ${H.warn("<p>Limites statistiques communes : mesures sur des fenêtres courtes, clôtures quotidiennes, aucune validation hors échantillon. Ne pas interpréter une note comme une probabilité de hausse.</p>")}`;
       },

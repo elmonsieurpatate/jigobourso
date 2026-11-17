@@ -4,11 +4,11 @@ Principes (validés le 2026-11-06, voir docs/APPLICATION.md, § 4) :
   * Les scores ne dépendent QUE des mesures du titre, des granularités actives et de leurs poids. Ils ne dépendent ni des filtres de
     conformité, ni des seuils de la stratégie, ni des autres titres de l'univers (aucun percentile) : changer un critère ne change aucune note.
   * Chaque mesure est calculée par granularité (fenêtres cumulées de n séances), notée sur une échelle absolue, puis agrégée avec des poids
-    qui somment à 1 sur les seules granularités actives. De 1 à 6 granularités : rien n'est codé pour deux ou trois périodes.
+    qui somment à 1 sur les seules granularités actives, quel que soit leur nombre.
   * Donnée absente : jamais zéro « mesuré » ni note favorable. La composante manquante sort du calcul et les poids restants sont renormalisés
     (V4.2). Trois cas : historique suffisant (« ok »), historique réduit (note calculée, « partiel », couverture et fiabilité indiquées),
     calcul impossible (« inconnu », raison explicite). Le seuil de couverture n'élimine plus aucun titre.
-  * Une mesure globale (liquidité) est comptée une seule fois, pas par granularité.
+  * La liquidité, comme les autres composantes, est mesurée dans chaque période active puis pondérée.
   * Les événements externes (résultats, rachat) n'entrent jamais dans les scores.
 
 Le module ne connaît ni la base ni le réseau.
@@ -16,7 +16,7 @@ Le module ne connaît ni la base ni le réseau.
 
 import math
 
-VERSION = 5  # 5 : dénominateur du score complexe aligné sur son numérateur (composantes mesurables sur une partie seulement des périodes)
+VERSION = 6  # mesures de toutes les composantes confinées à chaque période active
 KAPPA = 0.7  # poids automatiques : ω_p ∝ n_p^(1−κ) − n_{p−1}^(1−κ) ; κ = 0,7 redonne les 41,6 % / 58,4 % semaine / mois de V1
 COVERAGE_THRESHOLD = 0.75  # seuil de FIABILITÉ (information) : ne supprime plus aucune note
 MIN_SESSIONS = 3  # R² et volatilité n'existent pas sous 3 séances
@@ -27,13 +27,10 @@ SAT_A, SAT_B = (
 )  # croissance lissée qui sature la note de dynamique : A·(n/5)^0,52 %. A = 17 par défaut (90e percentile observé, titres admis V1) ; A est réglable par stratégie (SAT_A_RANGE)
 SAT_A_RANGE = (5.0, 200.0)  # bornes de A (croissance, en %, sur 5 séances à laquelle la dynamique vaut 100)
 ACCEL_REF, ACCEL_REF_RANGE = 0.4, (0.05, 5.0)  # coefficient k de la référence d'accélération : ref = saturation(n)/n × k (écart de pente par séance, en %, pour lequel la note d'accélération vaut 100)
-ACCEL_R2 = 0.6  # garde-fou de régularité de l'accélération : facteur clamp(min(R², R²_préc)/0,6)
+ACCEL_R2 = 0.6  # fiabilité de l'accélération : facteur clamp(min(R² des deux moitiés)/0,6)
 VOL_MODES = ('absolute', 'relative')  # volatilité : seuils absolus (1 % → 5 %/séance) ou rapportée à la pente (rapport volatilité/pente, plancher de pente VOL_SLOPE_FLOOR)
 VOL_SLOPE_FLOOR = 0.3  # %/séance : pente minimale retenue au dénominateur du mode « relative » (évite les divisions instables)
 VOL_RATIO_BEST, VOL_RATIO_WORST = 1.0, 4.0  # mode « relative » : rapport volatilité/pente ≤ 1 → 100, ≥ 4 → 0
-MOMENTUM_HORIZONS = ('6m', '12m', 'blend')
-RECOVERY_BEST, RECOVERY_WORST = -10.0, 20.0  # contexte de rebond : rendement du semestre (%) ≤ −10 → 100, ≥ +20 → 0 (le titre n'a pas déjà progressé)
-MOMENTUM_SAT = {'6m': 60.0, '12m': 100.0}  # variation (%) J−126→J−21 / J−252→J−21 pour laquelle la note de momentum vaut 100
 GATE_FLOOR = 32.0  # note de dynamique (0-100) en dessous de laquelle régularité et risque d'une période sont amortis
 RELIABILITY_SESSIONS = 21  # le R² d'une fenêtre plus courte est bruité : poids min(1, n/21) dans la moyenne des R²
 ANCHOR_LAMBDA = 0.5  # ancrage récent du score complexe : × (1 − λ(1 − g_court)) ; λ réglable dans l'administration (0 = neutralisé, 1 = maximal)
@@ -49,8 +46,8 @@ COMPLEX_LABELS = {
     'drawdown': 'Drawdown',
     'liquidity': 'Liquidité',
     'acceleration': 'Accélération',
-    'momentum': 'Momentum (6/12 mois)',
-    'recovery': 'Contexte de rebond',
+    'momentum': 'Momentum par période',
+    'recovery': 'Récupération après baisse',
 }
 PER_PERIOD = ('dynamics', 'r2', 'up_days', 'concentration', 'volatility', 'drawdown', 'acceleration')
 GATED = ('r2', 'up_days', 'concentration', 'volatility', 'drawdown')
@@ -70,6 +67,13 @@ def saturation(n, sat_a=SAT_A):
     return sat_a * (n / 5.0) ** SAT_B
 
 
+def period_momentum_note(perf, measured_sessions, sat_a=SAT_A):
+    """Momentum par fenêtre, saturé comme la dynamique sur sa durée effectivement mesurée."""
+    if perf is None or measured_sessions < 1:
+        return None
+    return 100 * clamp(perf / saturation(measured_sessions, sat_a))
+
+
 def vol_note(vol, slope, mode='absolute'):
     """Note 0-100 de volatilité. absolute : (5 − vol)/4 ; relative : rapport vol/max(pente, plancher), 1 → 100 et 4 → 0 (une forte hausse à forte volatilité n'est plus écrasée, une pente nulle ou négative l'est)."""
     if vol is None:
@@ -80,21 +84,6 @@ def vol_note(vol, slope, mode='absolute'):
         ratio = vol / max(slope, VOL_SLOPE_FLOOR)
         return 100 * clamp((VOL_RATIO_WORST - ratio) / (VOL_RATIO_WORST - VOL_RATIO_BEST))
     return 100 * clamp((5 - vol) / 4)
-
-
-def recovery_note(perf_half):
-    """Note 0-100 du contexte de rebond : un titre dont le semestre n'a presque pas progressé (ou a reculé) et qui repart. Rendement absent : None."""
-    if perf_half is None:
-        return None
-    return 100 * clamp((RECOVERY_WORST - perf_half) / (RECOVERY_WORST - RECOVERY_BEST))
-
-
-def momentum_note(momentum, horizon='6m'):
-    """Note 0-100 du momentum (variation en % hors dernier mois). Absent : None ; négatif : 0."""
-    m = momentum or {}
-    keys = ('6m', '12m') if horizon == 'blend' else (horizon,)
-    vals = [100 * clamp(m[k] / MOMENTUM_SAT[k]) for k in keys if m.get(k) is not None]
-    return sum(vals) / len(vals) if vals else None
 
 
 def period_growth(slope, n):
@@ -158,7 +147,7 @@ def period_components(m, n, sat_a=SAT_A, accel_ref=ACCEL_REF, vol_mode='absolute
             'gate': clamp(dyn / GATE_FLOOR),
             'raw': {k: (m.get(k) if k == 'slope' else None) for k in ('slope', 'r2', 'volatility', 'drawdown', 'up_fraction', 'spike_share', 'accel')},
         }
-        c.update(r2=None, up_days=None, concentration=None, volatility=None, drawdown=None, acceleration=None, spike_factor=None, up_factor=None)
+        c.update(r2=None, up_days=None, concentration=None, volatility=None, drawdown=None, acceleration=None, momentum=None, recovery=None, liquidity=None, spike_factor=None, up_factor=None)
         return c
     growth = period_growth(m['slope'], n)
     dyn = 100 * clamp(growth / saturation(n, sat_a))
@@ -170,13 +159,19 @@ def period_components(m, n, sat_a=SAT_A, accel_ref=ACCEL_REF, vol_mode='absolute
     c['volatility'] = vol_note(vol, m.get('slope'), vol_mode)
     c['drawdown'] = None if dd is None else 100 * clamp((15 - dd) / 15)
     accel, r2p = m.get('accel'), m.get('r2_prev')
-    if accel is None or r2p is None or r2 is None:
+    if accel is None or r2p is None:
         c['acceleration'] = None
     else:
-        ref = saturation(n, sat_a) / n * accel_ref
+        half = n // 2
+        ref = saturation(half, sat_a) / half * accel_ref
         c['accel_ref'] = ref
-        c['accel_reliability'] = clamp(min(r2, r2p) / ACCEL_R2)  # garde-fou : une accélération entre deux fenêtres irrégulières compte moins
+        c['accel_reliability'] = clamp(r2p / ACCEL_R2)  # r2p contient le plus faible R² des deux moitiés
         c['acceleration'] = 50 + 50 * clamp(accel / ref, -1, 1) * c['accel_reliability']
+    from .score_inputs import recent_exclusion
+
+    c['momentum'] = period_momentum_note(m.get('momentum_perf'), n - recent_exclusion(n), sat_a)
+    c['recovery'] = m.get('recovery')
+    c['liquidity'] = liquidity_note(m.get('turnover_eur'))
     # Qualité de trajectoire de la période (forme V1) : R² × (1 − ½ pic) × (½ + ½ séances positives)
     c['spike_factor'] = None if spike is None else 1 - 0.5 * clamp(spike)
     c['up_factor'] = None if up is None else 0.5 + 0.5 * up
@@ -191,7 +186,7 @@ def _missing_taxonomy(periods, comps, required):
         if c is None:
             out['required_periods' if p['id'] in required else 'optional_periods'].append(p['id'])
         elif p['sessions'] != DAY_SESSIONS:
-            for k in ('r2', 'up_days', 'concentration', 'volatility', 'drawdown', 'acceleration'):
+            for k in ('r2', 'up_days', 'concentration', 'volatility', 'drawdown', 'acceleration', 'momentum', 'recovery', 'liquidity'):
                 if c.get(k) is None:
                     out['secondary'].append(f"{p['id']}:{k}")
     return out
@@ -210,14 +205,11 @@ def score_title(
     sat_a=SAT_A,
     accel_ref=ACCEL_REF,
     vol_mode='absolute',
-    momentum=None,
-    momentum_horizon='6m',
-    recovery_perf=None,
 ):
     """Calcule les deux scores d'un titre.
 
     inputs     {sessions: mesures brutes de la fenêtre | None}
-    liquidity  {'turnover_eur': float|None, 'source': 'daily'|'estimated'|None}
+    liquidity  argument conservé pour l'interface des appelants ; la note utilise uniquement `inputs` par période
     periods    granularités ACTIVES : [{'id','sessions','weight'?}], de la plus courte à la plus longue (trié ici)
     required   conservé pour compatibilité et pour l'information (`missing`) : une période obligatoire manquante n'annule plus la note
     threshold  seuil de FIABILITÉ (information) : en dessous, la note est calculée mais marquée « peu fiable »
@@ -241,12 +233,20 @@ def score_title(
         'missing': miss,
         'version': VERSION,
         'periods': {p['id']: None if comps[p['id']] is None else {k: v for k, v in comps[p['id']].items()} for p in periods},
-        'liquidity': {'turnover_eur': (liquidity or {}).get('turnover_eur'), 'source': (liquidity or {}).get('source'), 'note': liquidity_note((liquidity or {}).get('turnover_eur'))},
+        'liquidity': {'turnover_eur': None, 'source': None, 'note': None},
     }
     if not avail:
         dead = {'score': None, 'status': 'inconnu', 'coverage': 0.0, 'reliable': False, 'why': 'calcul impossible : aucune période active mesurable' if periods else 'aucune période active'}
         res.update(simple=dead, complex=dict(dead))
         return res
+    liquid = [(eff[p['id']], comps[p['id']]['liquidity'], inputs[p['sessions']].get('turnover_eur')) for p in avail if comps[p['id']]['liquidity'] is not None]
+    if liquid:
+        total_liquid_weight = sum(w for w, _, _ in liquid)
+        res['liquidity'] = {
+            'turnover_eur': sum(w * amount for w, _, amount in liquid) / total_liquid_weight,
+            'source': 'daily',
+            'note': sum(w * note for w, note, _ in liquid) / total_liquid_weight,
+        }
     res['simple'] = _simple(periods, comps, weights, eff, threshold)
     period_cover = wtot / (sum(weights.get(p['id'], 0.0) for p in periods) or 1.0)
     res['complex'] = _complex(
@@ -259,9 +259,9 @@ def score_title(
         threshold,
         dict(COMPLEX_WEIGHTS, **(complex_weights or {})),
         anchor,
-        {'momentum': momentum_note(momentum, momentum_horizon), 'recovery': recovery_note(recovery_perf)},
+        {},
     )
-    res['tuning'] = {'sat_a': sat_a, 'accel_ref': accel_ref, 'vol_mode': vol_mode, 'momentum_horizon': momentum_horizon}
+    res['tuning'] = {'sat_a': sat_a, 'accel_ref': accel_ref, 'vol_mode': vol_mode}
     return res
 
 
@@ -313,22 +313,12 @@ def _complex(avail, comps, weights, eff, period_cover, liquidity_score, threshol
         if weight <= 0:
             continue
         w = weight / wsum
-        if key in ('liquidity', 'momentum', 'recovery'):  # composantes du titre (pas par période)
-            score = liquidity_score if key == 'liquidity' else (extras or {}).get(key)
-            if score is not None:
-                total += w * score / 100
-                coverage += w
-                avail_w += w
-                contributions[key] = {'weight': w, 'value': score, 'points': w * score}
-            else:
-                contributions[key] = {'weight': w, 'value': None, 'points': None, 'unavailable': True}
-            continue
         s = cv = 0.0
         for p in avail:
             c, pw = comps[p['id']], eff.get(p['id'], 0.0)
             if c.get(key) is None or pw <= 0:
                 continue
-            gate = 1.0 if key in ('dynamics', 'acceleration') else c['gate']
+            gate = 1.0 if key in ('dynamics', 'acceleration', 'momentum', 'recovery', 'liquidity') else c['gate']
             s += pw * gate * c[key]
             cv += pw
         if cv <= 0:

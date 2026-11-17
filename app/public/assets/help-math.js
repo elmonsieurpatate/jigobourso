@@ -101,6 +101,7 @@
       concentration: 100 * clamp((0.6 - m.spike_share) / 0.5),
       volatility: 100 * clamp((5 - m.volatility) / 4),
       drawdown: 100 * clamp((15 - m.drawdown) / 15),
+      liquidity: liquidityNote(m.turnover_eur),
       raw: m,
     };
   }
@@ -137,7 +138,7 @@
     const Q = num / den;
     return { score: Math.min(100, 100 * D * Q), dynamics: D, quality: Q };
   }
-  /** Score complexe (scores._complex) : moyenne pondérée des notes, composantes liquidité par titre, ancrage récent. */
+  /** Score complexe (scores._complex) : moyenne pondérée des notes de chaque période active. */
   function complex(periods, weights, cw, liquidity, anchor = 0.5) {
     const avail = periods.filter((p) => p.comp && (weights[p.id] || 0) > 0),
       wtot = avail.reduce((a, p) => a + weights[p.id], 0);
@@ -153,20 +154,12 @@
     for (const [key, weight] of Object.entries(cw)) {
       if (!(weight > 0)) continue;
       const w = weight / wsum;
-      if (key === "liquidity") {
-        if (liquidity != null) {
-          total += (w * liquidity) / 100;
-          availW += w;
-          contrib[key] = { weight: w, value: liquidity };
-        }
-        continue;
-      }
       let s = 0,
         cv = 0;
       for (const p of avail) {
         const v = p.comp[key];
         if (v == null) continue;
-        const gate = key === "dynamics" ? 1 : p.comp.gate;
+        const gate = key === "dynamics" || key === "liquidity" ? 1 : p.comp.gate;
         s += eff[p.id] * gate * v;
         cv += eff[p.id];
       }
@@ -191,6 +184,7 @@
     const weights = o.weights || autoWeights(ids, o.kappa);
     const periods = ids.map((id) => {
       const m = windowOf(title.closes, SESSIONS[id]);
+      if (m) m.turnover_eur = title.liquidity;
       return { id, m, comp: components(m, SESSIONS[id], o.satA) };
     });
     const liq = liquidityNote(title.liquidity);

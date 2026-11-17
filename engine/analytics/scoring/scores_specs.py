@@ -83,7 +83,7 @@ def _regular():
 
 
 def _rebound():
-    """Critères de recherche : semaine et mois. Le semestre n'a ni pente ni R² : il reste une période de CONTEXTE (poids 0) car la note « contexte de rebond » lit son rendement."""
+    """Critères de recherche : semaine et mois. Le semestre à poids nul reste un contexte affiché, sans contribution au score."""
     crit = dict(min_slope=SLOPE['gentle'], min_r2=R2['flexible'])
     return _historic(
         'rebound',
@@ -107,7 +107,7 @@ def _calm():
 
 
 def _momentum(name, horizon, periods, weights, cw):
-    return _historic(name, {pid: {} for pid in periods}, weights, cw, {'momentum_horizon': horizon})
+    return _historic(name, {pid: {} for pid in periods}, weights, cw)
 
 
 V4_STRATEGIES = {
@@ -120,7 +120,7 @@ V4_STRATEGIES = {
     'rebound': {
         'label': 'Rebond',
         'build': _rebound,
-        'note': 'Semaine et mois qui repartent à la hausse (critères de recherche : pente et R² minimaux « douce » / « souple » ; le semestre ne sert qu’au contexte, sans seuil). Contexte de rebond (semestre peu avancé) 25 % et accélération 20 % du score complexe, référence d’accélération abaissée (0,25) : un retournement net suffit.',
+        'note': 'Semaine et mois en reprise : leurs rebonds internes contribuent à 25 % du score complexe et leurs accélérations internes à 20 %. Le semestre à poids nul reste un contexte affiché sans contribution.',
     },
     'calm_rise': {
         'label': 'Hausse calme',
@@ -136,7 +136,7 @@ V4_STRATEGIES = {
             {'quarter': 30, 'half': 70},
             {'dynamics': 15, 'r2': 10, 'up_days': 0, 'concentration': 0, 'volatility': 5, 'drawdown': 10, 'liquidity': 10, 'acceleration': 0, 'momentum': 50},
         ),
-        'note': 'Variation du cours entre J−126 et J−21 séances (hors dernier mois), 50 % du score complexe ; le semestre porte la pente et la régularité. Aucun seuil.',
+        'note': 'Momentum propre au trimestre et au semestre (30 / 70), avec exclusion récente adaptée à chaque durée ; 50 % du score complexe. Aucun seuil.',
     },
     'momentum_12m': {
         'label': 'Momentum 12 mois (expérimental)',
@@ -147,7 +147,7 @@ V4_STRATEGIES = {
             {'half': 30, 'year': 70},
             {'dynamics': 15, 'r2': 10, 'up_days': 0, 'concentration': 0, 'volatility': 5, 'drawdown': 10, 'liquidity': 10, 'acceleration': 0, 'momentum': 50},
         ),
-        'note': 'Variation du cours entre J−252 et J−21 séances (hors dernier mois), 50 % du score complexe ; l’année porte la pente et la régularité. Aucun seuil.',
+        'note': 'Momentum propre au semestre et à l’année (30 / 70), avec exclusion récente adaptée à chaque durée ; 50 % du score complexe. Aucun seuil.',
     },
     'momentum_risk': {
         'label': 'Momentum ajusté du risque (expérimental)',
@@ -158,7 +158,7 @@ V4_STRATEGIES = {
             {'half': 40, 'year': 60},
             {'dynamics': 0, 'r2': 0, 'up_days': 0, 'concentration': 0, 'volatility': 10, 'drawdown': 10, 'liquidity': 0, 'acceleration': 0, 'momentum': 80},
         ),
-        'note': 'Momentum 6 et 12 mois (moyenne, 80 %) corrigé par la volatilité et le repli maximal des périodes semestre et année (10 % chacun), comme l’ancien profil. Le filtre « au-dessus de la moyenne 200 jours » n’est pas une notation : il reste un filtre d’affichage.',
+        'note': 'Momentum calculé sur semestre et année (40 / 60), 80 % du score complexe, avec volatilité et repli des mêmes périodes (10 % chacun). La moyenne 200 jours reste un filtre d’affichage.',
     },
 }
 
@@ -182,8 +182,11 @@ def _ct_builder(label, periods, thresholds=None):
     def build():
         c = growth_v4()
         c['name'] = label
+        for pid, detail in (thresholds or {}).items():
+            if pid.startswith('custom_') and isinstance(detail, dict):
+                c['periods'].append(dict(id=pid, sessions=detail['sessions'], enabled=False, require_history=False, **{f: None for f in C.BOUNDS}))
         by = {p['id']: p for p in c['periods']}
-        for pid in SCORING_PERIODS:
+        for pid in by:
             on = pid in periods
             by[pid]['enabled'] = on
             if on:
@@ -215,7 +218,7 @@ def refresh(conn):
                 if it.get('builtin') or not isinstance(it.get('config'), dict) or not it.get('id'):
                     continue
                 per = it['config'].get('periods') or {}
-                active = tuple(pid for pid in SCORING_PERIODS if (per.get(pid) or {}).get('enabled'))
+                active = tuple(pid for pid in per if (per.get(pid) or {}).get('enabled') and (pid in SCORING_PERIODS or pid.startswith('custom_')))
                 if not [pid for pid in active if pid != 'day']:  # Jour seul n'a aucun poids automatique : la stratégie garde alors les scores par défaut
                     continue
                 name = f'ct:{uid}:{it["id"]}'

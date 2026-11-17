@@ -10,7 +10,6 @@ from ..scoring.scores_specs import CT_BUILTIN, DYNAMIC, PROFILES, SCORING_PERIOD
 from ..scoring.scores_profiles import (
     PERIOD_LABELS,
     apply_profile,
-    auto_weights,
     base_config,
     build_config,
     clean_profile,
@@ -35,10 +34,25 @@ def strategies(conn):
         base = base_config(name)
         cfg = build_config(conn, name)
         current = clean_profile(stored[name]) if name in stored else profile_of(base)  # valeurs saisies (seuils conservés même si les filtres sont désactivés)
+        if name in DYNAMIC:
+            base_profile = profile_of(base)
+            valid_ids = {p['id'] for p in base['periods']}
+            current['periods'] = {pid: item for pid, item in current['periods'].items() if pid in valid_ids}
+            for pid, item in base_profile['periods'].items():
+                current['periods'].setdefault(pid, item)
+            current['weights'] = {pid: weight for pid, weight in current['weights'].items() if pid in valid_ids}
+            if current['weights_mode'] == 'custom' and any(pid not in current['weights'] for pid, item in current['periods'].items() if item['enabled'] and pid != 'day'):
+                current['weights_mode'], current['weights'] = 'auto', {}
+            if current['weights_mode'] == 'custom' and abs(sum(current['weights'].values()) - 100) > 0.05:
+                total = sum(current['weights'].values())
+                if total > 0:
+                    current['weights'] = {pid: 100 * weight / total for pid, weight in current['weights'].items()}
+                else:
+                    current['weights_mode'], current['weights'] = 'auto', {}
         current.setdefault('tuning', tuning_of(base.get('scoring')))  # profil enregistré avant les réglages de normalisation : valeurs de la stratégie
         for pid in SCORING_PERIODS:
             current['periods'][pid].setdefault('sessions', C.SESSIONS[pid])  # le profil enregistré ne garde pas la durée : l'affichage en a besoin
-        active = [p for p in SCORING_PERIODS if current['periods'][p]['enabled']]
+        active = [p for p in current['periods'] if current['periods'][p]['enabled']]
         out.append(
             {
                 'name': name,
@@ -51,7 +65,7 @@ def strategies(conn):
                 'customised': name in stored,
                 'official': official_clean(conn, name),
                 'modified': profile_diff(current, official_clean(conn, name)) if name in V4_STRATEGIES else [],
-                'auto_weights': auto_weights(glob['kappa'], active),
+                'auto_weights': {pid: 100 * w for pid, w in SC.resolve_weights([{'id': pid, 'sessions': current['periods'][pid]['sessions']} for pid in active], glob['kappa']).items()},
                 'saved_at': iso(settings.saved_at(conn, PROFILES)) if name in stored else None,
             }
         )
@@ -308,8 +322,16 @@ def save(conn, request):
 
 
 def preview(conn, request):
-    ids = [p for p in (request.get('periods') or []) if p in SCORING_PERIODS]
-    return {'weights': auto_weights(request.get('kappa', SC.KAPPA), ids)}
+    from ..scoring import scores as SC
+
+    periods = []
+    for item in request.get('periods') or []:
+        if isinstance(item, str) and item in SCORING_PERIODS:
+            periods.append({'id': item, 'sessions': C.SESSIONS[item]})
+        elif isinstance(item, dict) and isinstance(item.get('id'), str) and type(item.get('sessions')) is int and 1 <= item['sessions'] <= 1260:
+            periods.append({'id': item['id'], 'sessions': item['sessions']})
+    kappa = C.validate_scoring({'kappa': request.get('kappa', SC.KAPPA)}, [])['kappa']
+    return {'weights': {k: 100 * v for k, v in SC.resolve_weights(periods, kappa).items()}}
 
 
 def coverage(conn):

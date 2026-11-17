@@ -48,11 +48,13 @@
   const strat = () => S.strategies.find((s) => s.name === sel);
   const prof = () => draft.profiles[sel];
   const labels = () => S.period_labels;
-  const active = (p) => S.scoring_periods.filter((id) => p.periods[id].enabled);
+  const active = (p) => Object.keys(p.periods).filter((id) => p.periods[id].enabled);
   const dirty = () => JSON.stringify(draft) !== savedJson;
   const payloadFor = (name) => {
     const p = clone(draft.profiles[name]);
-    Object.values(p.periods).forEach((x) => delete x.sessions);
+    Object.entries(p.periods).forEach(([id, x]) => {
+      if (!id.startsWith("custom_")) delete x.sessions;
+    });
     return { name, ...p };
   };
   const payload = () => payloadFor(sel);
@@ -158,7 +160,12 @@
   }
 
   // Poids automatiques des périodes actives, calculés par le moteur (jamais recopiés ici).
-  const weightKey = (p) => draft.global.kappa + "|" + active(p).join(",");
+  const weightKey = (p) =>
+    draft.global.kappa +
+    "|" +
+    active(p)
+      .map((id) => `${id}:${p.periods[id].sessions}`)
+      .join(",");
   const previewErrors = () => {
     const current = new Set(
       v4()
@@ -171,7 +178,10 @@
   function autoWeights(p) {
     const ids = active(p),
       key = weightKey(p);
-    const entry = autoCache.read(key, { kappa: draft.global.kappa, periods: ids });
+    const entry = autoCache.read(key, {
+      kappa: draft.global.kappa,
+      periods: ids.map((id) => ({ id, sessions: p.periods[id].sessions })),
+    });
     if (entry.state === "ready") return entry.value;
     const st = strat();
     return st &&
@@ -562,6 +572,33 @@
     if (a === "retry-weights") {
       previewErrors().forEach((e) => autoCache.retry(e.key));
       paint();
+    } else if (a === "add-custom") {
+      const n = Number($("#as-custom-sessions")?.value);
+      if (!Number.isInteger(n) || n < 3 || n > 1260) return J.toast("Saisissez une durée de 3 à 1 260 séances.");
+      const id = "custom_" + crypto.randomUUID().replaceAll("-", "").slice(0, 16);
+      const q = prof();
+      if (active(q).some((key) => q.periods[key].sessions === n))
+        return J.toast("Cette durée est déjà active dans la stratégie.");
+      q.periods[id] = {
+        sessions: n,
+        enabled: true,
+        require_history: false,
+        ...Object.fromEntries(
+          Object.keys(q.periods.month)
+            .filter((k) => k.startsWith("min_") || k.startsWith("max_"))
+            .map((k) => [k, null]),
+        ),
+      };
+      if (q.weights_mode === "custom") q.weights[id] = 0;
+      paint();
+    } else if (a === "remove-custom") {
+      const id = t.dataset.p;
+      const q = prof();
+      if (id?.startsWith("custom_") && active(q).length > 1) {
+        delete q.periods[id];
+        delete q.weights[id];
+        paint();
+      }
     } else if (a === "tab") {
       tab = v;
       error = "";

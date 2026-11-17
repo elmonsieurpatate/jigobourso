@@ -111,8 +111,8 @@ Jour férié observé (`collect.py:observed_holiday`) : une place est jugée fé
 
 | Constante | Valeur | Rôle (`engine/market/collect.py`) |
 |---|---|---|
-| `DAILY_KEEP_DAYS` | 610 | jours calendaires d'historique quotidien conservés |
-| `FULL_SESSIONS` | 400 | séances visées par titre |
+| `DAILY_KEEP_DAYS` | 610 minimum | rétention étendue selon la plus longue fenêtre réellement demandée |
+| `FULL_SESSIONS` | 400 minimum | cible de rattrapage étendue selon les périodes actives, sans doublement pour l'accélération |
 | `SPARK_BATCH` | 20 | symboles par appel d'historique |
 | `QUOTE_BATCH` | 50 | symboles par appel de cotation |
 | `FX_HISTORY_DAYS` | 300 | profondeur visée de l'historique de change |
@@ -193,7 +193,7 @@ Toutes les mesures se calculent sur ln(cours), sur une fenêtre de n séances (n
 | drawdown | plus forte baisse depuis un sommet de la fenêtre, en % |
 | ER (efficiency ratio) | `(ln fin − ln début) / Σ|Δln|` |
 
-Fenêtres de base (`compute.py:BASE_WINDOWS`) : 1, 5, 21, 63, 126, 252 séances ; les stratégies peuvent en demander d'autres (jusqu'à 252).
+Fenêtres techniques de base (`compute.py:BASE_WINDOWS`) : 1, 21 et 252 séances. Les fenêtres de score sont l'union des périodes actives des stratégies, jusqu'à 1 260 séances ; une période personnalisée reste dans sa stratégie. Les périodes prédéfinies comprennent 1, 5, 21, 63, 126, 252, 504, 756 et 1 260 séances.
 
 Fenêtre trouée (`dated_window_metrics`) : acceptée si elle compte au moins `max(3, ceil(0,80 × clôtures attendues))` points. La performance exige les deux bornes. Volatilité, drawdown et ER sont indisponibles dès qu'une clôture manque, car un trou fausse les variations.
 
@@ -207,7 +207,9 @@ Fenêtre trouée (`dated_window_metrics`) : acceptée si elle compte au moins `m
 | variation du jour, écart à la MA20 | `daily_change`, `gap_to_ma20` | `technical_state` |
 | séances positives | part des variations > 0 de la fenêtre | `scoring/score_inputs.py:path_inputs` |
 | concentration (`spike_share`) | `ln(1 + plus forte hausse d'une séance) / ln(cours final / cours initial)` ; 1 si la fenêtre ne monte pas | `path_inputs` |
-| accélération | pente de la fenêtre moins pente de la fenêtre précédente de même durée, contiguë (elles partagent une clôture, aucune variation commune) ; `r2_prev` = R² de la précédente | `score_inputs.py:window_inputs` |
+| accélération V4 | pente par séance de la seconde moitié moins celle de la première moitié de la même période ; fiabilité fondée sur leurs R² | `score_inputs.py:window_inputs` |
+
+Pour le Score 2 V4, `score_inputs` utilise désormais deux moitiés successives **internes** à chaque période. L'ancien momentum 6-1/12-1 reste dans `series_state` pour les lecteurs historiques, mais ne contribue plus aux Scores V4.
 
 Une clôture absente rend ces mesures indisponibles : on ne comble jamais un trou.
 
@@ -218,6 +220,7 @@ Fenêtre de `WINDOW` = 20 séances, `MIN_DAYS` = 15 séances au minimum.
 - Source `daily` : moyenne des volumes réels de `daily_prices` × cours, convertie en euros avec le dernier taux de change connu.
 - Source `estimated` : volume moyen 3 mois de `latest_prices` × prix, quand moins de 15 séances ont un volume valide (`MIN_DAYS`).
 - Un volume absent n'est jamais compté comme zéro. Résultat dans `liquidity_state` : valeur en euros, nombre de séances (source `daily` seulement) et source.
+- La liquidité du Score 2 est distincte : moyenne des valeurs échangées réelles de chaque période active, dans `score_inputs`, disponible si au moins `max(3, ceil(0,75 × séances))` volumes sont valides ; aucune estimation Yahoo n'entre dans le score.
 
 ### 3.5 Calcul et stockage (`compute.py:compute_all`)
 
@@ -246,7 +249,7 @@ Deux notes sur 100 par stratégie : le score simple et le score complexe. Chaque
 | `ACCEL_REF` | 0,4 (plage 0,05 à 5) | accélération de référence |
 | `ACCEL_R2` | 0,6 | R² de pleine confiance de l'accélération |
 | `VOL_SLOPE_FLOOR` | 0,3 | plancher de pente pour la volatilité relative |
-| `MOMENTUM_SAT` | 6 mois 60, 12 mois 100 | saturation du momentum |
+| saturation du momentum | `SAT_A·((n−e(n))/5)^SAT_B` | même famille que la dynamique, sur la durée réellement mesurée |
 | `GATE_FLOOR` | 32 | plancher de la porte de fiabilité |
 | `RELIABILITY_SESSIONS` | 21 | séances d'une période pleinement fiable |
 | `ANCHOR_LAMBDA` | 0,5 (réglable 0 à 1) | poids de l'ancrage sur la période la plus courte |
@@ -266,7 +269,7 @@ Poids automatiques : `ω ∝ n^(1−κ) − n_prev^(1−κ)` pour une période d
 
 ### 4.5 Score complexe
 
-Moyenne pondérée de notes de composantes, divisée par la somme des poids des composantes disponibles (version 5 : une composante indisponible ne compte pas comme zéro, son poids sort du dénominateur), puis multipliée par `1 − λ·(1 − porte)` où la porte est celle de la période la plus courte hors Jour. Avant l'agrégation, la porte de chaque période (dynamique / 32, plafonnée à 1) amortit aussi R², séances positives, concentration, volatilité et drawdown ; dynamique et accélération n'en ont pas.
+Moyenne pondérée de notes de composantes, divisée par la somme des poids des composantes disponibles (une composante indisponible ne compte pas comme zéro, son poids sort du dénominateur), puis multipliée par `1 − λ·(1 − porte)` où la porte est celle de la période active la plus courte hors Jour. Avant l'agrégation, la porte de chaque période (dynamique / 32, plafonnée à 1) amortit aussi R², séances positives, concentration, volatilité et drawdown ; dynamique, accélération, momentum, récupération et liquidité n'en ont pas.
 
 Dix composantes (`scores.py:COMPLEX_WEIGHTS`, poids par défaut) :
 
@@ -278,10 +281,10 @@ Dix composantes (`scores.py:COMPLEX_WEIGHTS`, poids par défaut) :
 | `concentration` | 7 | `(0,60 − spike_share) / 0,5` |
 | `volatility` | 15 | mode absolu : `(5 − vol) / 4` ; mode relatif : rapport volatilité / pente, 1 donne 100 et 4 donne 0, avec plancher de pente `VOL_SLOPE_FLOOR` |
 | `drawdown` | 8 | `(15 − drawdown) / 15` |
-| `liquidity` | 10 | échelle logarithmique 2 M€ à 50 M€ |
-| `acceleration` | 0 | `50 + 50·clamp(accel / réf, −1, 1)·clamp(min(R², R²_prev) / 0,6)` |
-| `momentum` | 0 | momentum 6-1 ou 12-1 rapporté à `MOMENTUM_SAT` |
-| `recovery` | 0 | rebond : de −10 % (100) à +20 % (0) |
+| `liquidity` | 10 | par période : valeur échangée moyenne réelle, échelle logarithmique 2 M€ à 50 M€ par jour |
+| `acceleration` | 0 | écart des pentes des deux moitiés internes ; référence `saturation(floor(n/2))/floor(n/2) × accel_ref`, fiabilité par les R² |
+| `momentum` | 0 | par période : rendement du début à `n−e(n)` séances, `e(n)=max(1,min(21,arrondi(n/12)))`, saturé comme la dynamique sur `n−e(n)` |
+| `recovery` | 0 | par période : `100 × fraction du plus grand recul récupérée à la clôture × min(1, profondeur/10 %)`, premier sommet-creux en cas d'égalité ; hausse continue = 0 |
 
 Les bornes de chaque note sont écrêtées entre 0 et 100. Les stratégies donnent des poids différents (§5.2).
 
@@ -291,7 +294,7 @@ Statut d'une note : `ok` (toutes les périodes), `partiel` (couverture ou séanc
 
 ### 4.7 Profils et réglages (`scores_profiles.py`)
 
-- `TUNING_DEFAULTS` : `sat_a`, `accel_ref`, `vol_mode` (`absolute` ou `relative`), `momentum_horizon`.
+- `TUNING_DEFAULTS` : `sat_a`, `accel_ref`, `vol_mode` (`absolute` ou `relative`). Le momentum ne possède plus d'horizon fixe indépendant de la stratégie.
 - Les poids des composantes d'un profil totalisent 100 (tolérance 0,05).
 - Profils enregistrés dans `settings.scores_profiles` (officiel) et `scores_profiles_u<uid>` (personnel). Aucun repli global des poids : un profil incomplet est refusé, sauf `momentum` et `recovery` qui valent 0 par défaut.
 - Paramètres globaux κ, seuil de couverture, ancrage : `settings.scores_v4` (validation `explorer/explorer_config.py:validate_scoring` : κ de 0 à 0,95, seuil de 0,1 à 1, ancrage de 0 à 1).
@@ -318,8 +321,8 @@ Correspondance avec les anciens identifiants (`CT_BUILTIN`) : `fast` → `growth
 | `calm_rise` | mois, trimestre | `sat_a` 10 ; volatilité 35, drawdown 20, dynamique 10, R² 10, séances positives 10, concentration 5, liquidité 10 |
 | `rebound` | semaine, mois, semestre (50 / 50 / 0, semestre en contexte) | `accel_ref` 0,25 ; dynamique 15, R² 10, séances positives 5, concentration 5, volatilité 10, drawdown 5, liquidité 5, accélération 20, rebond 25 |
 | `momentum_6m` | trimestre, semestre (30 / 70) | momentum 50, dynamique 15, R² 10, volatilité 5, drawdown 10, liquidité 10 |
-| `momentum_12m` | semestre, année (30 / 70) | mêmes poids complexes que `momentum_6m`, horizon 12 mois |
-| `momentum_risk` | semestre, année (40 / 60) | horizon mixte ; momentum 80, volatilité 10, drawdown 10 |
+| `momentum_12m` | semestre, année (30 / 70) | mêmes poids complexes que `momentum_6m` ; momentum calculé sur chaque période |
+| `momentum_risk` | semestre, année (40 / 60) | momentum par période 80, volatilité 10, drawdown 10 |
 
 Stratégies personnelles : identifiant `ct:<uid>:<id>`, construites par `_ct_builder` à partir d'un profil de scores et d'un jeu de critères. Au plus 30 par utilisateur (`app/services/ct_strategies.php:CT_MAX_CUSTOM`), enregistrées dans `settings.ct_strategies:<uid>`.
 
@@ -353,7 +356,7 @@ Un critère compare une mesure d'une période à un seuil. Verdict d'un titre :
 Une donnée manquante donne « indéterminé », jamais « exclu ».
 
 Règles de lecture :
-- Périodes disponibles (`PERIODS`) : de la séance (1) à deux ans (504 séances).
+- Périodes prédéfinies disponibles (`PERIODS`) : de la séance (1) à cinq ans (1 260 séances), plus les périodes personnalisées propres à chaque stratégie.
 - Seuils de pente et de R² pris seulement s'ils sont > 0 ; un seuil à 0 est sans effet.
 - La période Jour n'évalue que la performance (critère « return »).
 - Volatilité et repli (drawdown) sont lus sur `REFERENCE` = 21 séances.

@@ -94,7 +94,7 @@ def _fetch(conn, ids):
         )
         for r in cur.fetchall():
             out[r['id']].update(r)
-        cur.execute(f"SELECT listing_id, sessions, slope, r2, perf, volatility, drawdown, coverage FROM strategy_metrics WHERE listing_id IN ({marks}) AND sessions IN (1,5,21,63,126,252)", ids)
+        cur.execute(f"SELECT listing_id, sessions, slope, r2, perf, volatility, drawdown, coverage FROM strategy_metrics WHERE listing_id IN ({marks})", ids)
         for r in cur.fetchall():
             out[r['listing_id']].setdefault('m', {})[r['sessions']] = r
         cur.execute(f"SELECT listing_id, up_fraction, spike_share FROM score_inputs WHERE listing_id IN ({marks}) AND sessions=%s", ids + [REFERENCE])

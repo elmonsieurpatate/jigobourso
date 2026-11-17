@@ -12,7 +12,7 @@ require_once __DIR__ . '/../lib/http.php';
 
 const CT_BUILTIN = ['fast' => 'Croissance rapide', 'regular' => 'Croissance régulière', 'calm' => 'Hausse calme', 'rebound' => 'Rebond', 'mom6' => 'Momentum 6 mois (expérimental)', 'mom12' => 'Momentum 12 mois (expérimental)',
     'momrisk' => 'Momentum ajusté du risque (expérimental)'];
-const CT_PERIODS = ['week', 'month', 'quarter', 'half', 'year', 'two_year'];   // granularités à pente et R²
+const CT_PERIODS = ['week', 'month', 'quarter', 'half', 'year', 'two_year', 'three_year', 'five_year'];
 const CT_DAY = 'day';                                                           // Jour (1 séance) : facultatif, seule la variation 1J sert de critère
 const CT_METRICS = ['slope', 'r2', 'volatility', 'drawdown', 'return', 'volume'];
 const CT_MAX_CUSTOM = 30;
@@ -50,13 +50,13 @@ function ct_decode(string $json): array {
     if (!is_array($d) || ($d['schema'] ?? null) !== 1 || !is_array($d['items'] ?? null)) throw new ApiError('Stratégies illisibles : aucun remplacement automatique.', 503);
     return $d;
 }
-function ct_tree(array $n, int $depth, int &$count): array {
+function ct_tree(array $n, int $depth, int &$count, array $allowed): array {
     if (++$count > 200 || $depth > 6) throw new ApiError('Arbre de règles trop grand.', 422);
     if (($n['kind'] ?? null) === 'group') {
         if (!in_array($n['join'] ?? null, ['and', 'or'], true) || !is_array($n['children'] ?? null) || !array_is_list($n['children']) || count($n['children']) > 50) throw new ApiError('Groupe de règles invalide.', 422);
-        return ['kind' => 'group', 'join' => $n['join'], 'children' => array_map(fn($c) => is_array($c) ? ct_tree($c, $depth + 1, $count) : throw new ApiError('Règle invalide.', 422), $n['children'])];
+        return ['kind' => 'group', 'join' => $n['join'], 'children' => array_map(fn($c) => is_array($c) ? ct_tree($c, $depth + 1, $count, $allowed) : throw new ApiError('Règle invalide.', 422), $n['children'])];
     }
-    if (($n['kind'] ?? null) !== 'rule' || !in_array($n['metric'] ?? null, CT_METRICS, true) || !in_array($n['period'] ?? null, [...CT_PERIODS, CT_DAY], true) || !in_array($n['op'] ?? null, ['>=', '<=',
+    if (($n['kind'] ?? null) !== 'rule' || !in_array($n['metric'] ?? null, CT_METRICS, true) || !in_array($n['period'] ?? null, $allowed, true) || !in_array($n['op'] ?? null, ['>=', '<=',
         '>', '<', '='], true)) throw new ApiError('Règle invalide.', 422);
     return ['kind' => 'rule', 'metric' => $n['metric'], 'period' => $n['period'], 'op' => $n['op'], 'value' => ct_num($n['value'] ?? null, -1e12, 1e12, 'Valeur de règle')];
 }
@@ -66,13 +66,26 @@ function ct_config($c): array {
     $periods = [];
     foreach (CT_PERIODS as $k) {
         $p = $c['periods'][$k] ?? null;
+        if ($p === null && in_array($k, ['three_year', 'five_year'], true)) $p = ['enabled' => false, 'slope' => 0, 'r2' => 0];
         if (!is_array($p) || !is_bool($p['enabled'] ?? null)) throw new ApiError('Période invalide : ' . $k . '.', 422);
         $periods[$k] = ['enabled' => $p['enabled'], 'slope' => ct_num($p['slope'] ?? null, -1e12, 1e12, 'Pente'), 'r2' => ct_num($p['r2'] ?? null, -1e12, 1e12, 'R²')];
+    }
+    foreach ($c['periods'] as $k => $p) {
+        if (in_array($k, CT_PERIODS, true) || $k === CT_DAY) continue;
+        if (!is_string($k) || !preg_match('/^custom_[a-z0-9_]{1,41}$/', $k) || !is_array($p) || !is_bool($p['enabled'] ?? null) || !is_int($p['sessions'] ?? null) || $p['sessions'] < 3 || $p['sessions'] > 1260) throw new ApiError('Période personnalisée invalide.', 422);
+        $periods[$k] = ['sessions' => $p['sessions'], 'enabled' => $p['enabled'], 'slope' => ct_num($p['slope'] ?? null, -1e12, 1e12, 'Pente'), 'r2' => ct_num($p['r2'] ?? null, -1e12, 1e12, 'R²')];
     }
     // Jour : absent des stratégies enregistrées avant son ajout (alors désactivé). Aucun seuil de pente ni de R² : une variation minimale facultative (en %).
     $d = $c['periods'][CT_DAY] ?? null;
     if ($d !== null && (!is_array($d) || !is_bool($d['enabled'] ?? null))) throw new ApiError('Période invalide : ' . CT_DAY . '.', 422);
     $periods = [CT_DAY => ['enabled' => (bool)($d['enabled'] ?? false), 'return' => ($d['return'] ?? null) === null ? null : ct_num($d['return'], -100, 10000, 'Variation 1J')]] + $periods;
+    $sessions = ['day' => 1, 'week' => 5, 'month' => 21, 'quarter' => 63, 'half' => 126, 'year' => 252, 'two_year' => 504, 'three_year' => 756, 'five_year' => 1260];
+    $activeLengths = [];
+    foreach ($periods as $id => $p) if ($p['enabled']) {
+        $n = $p['sessions'] ?? $sessions[$id];
+        if (in_array($n, $activeLengths, true)) throw new ApiError('Deux périodes actives ont la même durée.', 422);
+        $activeLengths[] = $n;
+    }
     $extra = [];
     if (!is_array($c['extra'] ?? []) || count($c['extra'] ?? []) > 20) throw new ApiError('Seuils facultatifs invalides.', 422);
     foreach ($c['extra'] ?? [] as $x) {
@@ -80,7 +93,7 @@ function ct_config($c): array {
         $extra[] = ['metric' => $x['metric'], 'op' => $x['op'], 'value' => ct_num($x['value'] ?? null, 0, 1e12, 'Seuil')];
     }
     $out = ['periods' => $periods, 'extra' => $extra, 'join' => in_array($c['join'] ?? 'and', ['and', 'or'], true) ? ($c['join'] ?? 'and') : throw new ApiError('Combinaison invalide.', 422)];
-    if (isset($c['tree'])) { $n = 0; $out['tree'] = ct_tree($c['tree'], 0, $n); }
+    if (isset($c['tree'])) { $n = 0; $out['tree'] = ct_tree($c['tree'], 0, $n, array_keys($periods)); }
     return $out;
 }
 /** Choix de filtres propres à la stratégie : sélection + catégories connues au moment du choix (même format que l'ancien stockage local). */

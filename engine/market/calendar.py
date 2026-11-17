@@ -88,9 +88,9 @@ def _sessions(mic, end_date, count):
         import exchange_calendars as xc
 
         end = datetime.date.fromisoformat(str(end_date)[:10])
-        # Au moins 2 années de marge pour compter les séances à partir du jour
-        # de référence même quand une place a de longues fermetures saisonnières.
-        start = end - datetime.timedelta(days=max(730, int(count) * 4))
+        # Marge de calendrier pour jours non ouvrés et fermetures saisonnières ;
+        # 1 261 séances ne demandent pas dix années de prix.
+        start = end - datetime.timedelta(days=max(730, int(count) * 1.7 + 60))
         cal = xc.get_calendar(calendar_name, start=start.isoformat(), end=end.isoformat())
         labels = cal.sessions
         result = [str(x.date()) for x in labels if x.date() <= end]
@@ -108,7 +108,11 @@ def session_dates(mic, end_date, count):
 
 def window_calendars(mic, end_date, windows):
     """Dictionnaire n -> n+1 séances (un rendement sur n séances)."""
-    return {int(n): session_dates(mic, end_date, int(n) + 1) for n in windows}
+    lengths = sorted({int(n) for n in windows})
+    if not lengths:
+        return {}
+    longest = session_dates(mic, end_date, lengths[-1] + 1)
+    return {n: (longest[-(n + 1) :] if longest else session_dates(mic, end_date, n + 1)) for n in lengths}
 
 
 @lru_cache(maxsize=128)

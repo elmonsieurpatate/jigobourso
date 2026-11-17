@@ -129,14 +129,14 @@ def test_per_strategy_normalisations_persist_change_only_their_strategy_and_the_
     p['tuning'] = dict(p['tuning'], sat_a=40.0, accel_ref=1.5, vol_mode='relative')
     A.save(conn, {'profile': dict(p, name='rebound')})
     st = {s['name']: s for s in A.state(conn)['strategies']}
-    assert st['rebound']['current']['tuning'] == {'sat_a': 40.0, 'accel_ref': 1.5, 'vol_mode': 'relative', 'momentum_horizon': '6m'}  # persisté et relu
+    assert st['rebound']['current']['tuning'] == {'sat_a': 40.0, 'accel_ref': 1.5, 'vol_mode': 'relative'}  # persisté et relu
     assert st['growth_v4']['current']['tuning']['sat_a'] == 17.0  # autre stratégie : inchangée
     assert S._key(scores_profiles.build_config(conn, 'rebound'), ver) != key_before  # les nouveaux paramètres font partie de la clé de cache
     assert S._key(scores_profiles.build_config(conn, 'growth_v4'), ver) == S._key(scores_profiles.base_config('growth_v4'), ver)
     after = {n: {e['id']: (e['simple'], e['complex']) for e in S.score_book(conn, scores_profiles.build_config(conn, n), ver).values()} for n in ('growth_v4', 'rebound')}
     assert after['growth_v4'] == before['growth_v4'] and after['rebound'] != before['rebound']
     sim = scores_ranking.simulate(conn, {'strategy': 'rebound', 'q': 'UP.DE'})
-    assert sim['tuning'] == {'sat_a': 40.0, 'accel_ref': 1.5, 'vol_mode': 'relative', 'momentum_horizon': '6m'}  # la simulation affiche ce que le calcul utilise
+    assert sim['tuning'] == {'sat_a': 40.0, 'accel_ref': 1.5, 'vol_mode': 'relative'}  # la simulation affiche ce que le calcul utilise
     A.save(conn, {'reset': 'profile', 'name': 'rebound'})
     assert (
         scores_profiles.build_config(conn, 'rebound')['scoring']['sat_a'] == 17.0 and scores_profiles.build_config(conn, 'rebound')['scoring']['accel_ref'] == 0.25
@@ -145,7 +145,7 @@ def test_per_strategy_normalisations_persist_change_only_their_strategy_and_the_
         A.save(conn, {'profile': dict(p, name='rebound', tuning=dict(p['tuning'], sat_a=1.0))})
 
 
-def test_stored_profile_without_new_fields_is_still_valid_and_momentum_strategies_use_series_state():
+def test_stored_profile_without_new_fields_is_valid_and_momentum_ignores_global_horizons():
     from engine.analytics.scoring import score_service as S
     from engine.analytics.explorer import universe_verdicts
 
@@ -158,6 +158,8 @@ def test_stored_profile_without_new_fields_is_still_valid_and_momentum_strategie
     A.save(conn, {'profile': dict(old, name='growth_v4')})
     cfg = scores_profiles.build_config(conn, 'growth_v4')
     assert cfg['scoring']['sat_a'] == 17.0 and S.params_for(cfg, 'equity')['complex_weights']['momentum'] == 0
+    momentum_config = scores_profiles.build_config(conn, 'momentum_6m')
+    before = S.details(conn, momentum_config, [1])[1]['complex']['contributions']['momentum']
     with conn.cursor() as cur:
         cur.execute('UPDATE series_state SET momentum_6m=45, momentum_12m=80 WHERE listing_id=1')
         cur.execute('UPDATE series_state SET momentum_6m=-10, momentum_12m=-20 WHERE listing_id=2')
@@ -165,8 +167,8 @@ def test_stored_profile_without_new_fields_is_still_valid_and_momentum_strategie
     ver = universe_verdicts.data_version(conn)
     book = S.score_book(conn, scores_profiles.build_config(conn, 'momentum_6m'), ver)
     assert book[1]['complex'] is not None and book[1]['complex'] > book[2]['complex']
-    det = S.details(conn, scores_profiles.build_config(conn, 'momentum_6m'), [1])[1]['complex']['contributions']['momentum']
-    assert det['value'] == pytest.approx(75.0) and det['weight'] == pytest.approx(0.5)  # 45 % / 60 % de saturation
+    det = S.details(conn, momentum_config, [1])[1]['complex']['contributions']['momentum']
+    assert det == before and det['weight'] == pytest.approx(0.5)
 
 
 def test_global_settings_never_override_profile_complex_weights():
