@@ -151,7 +151,7 @@ if [ "$operation" = diagnostic ]; then
   if [ -n "${JIGO_CATALOGUE_QUERY:-}" ]; then
     echo "== Diagnostic ciblé du catalogue (lecture seule)"
     query64=$(printf '%s' "$JIGO_CATALOGUE_QUERY" | base64 -w0)
-    remote_sh "cd $root && set -a && . ./private/env && set +a && JIGO_CATALOGUE_QUERY_B64=$query64 php" < scripts/release/inspect_catalogue.php
+    remote_sh "cd $root && set -a && . ./private/env && set +a && JIGO_CATALOGUE_QUERY_B64=$query64 php" < scripts/release/inspect_catalogue.php > "$RUNNER_TEMP/catalogue-inspection.json"
   fi
   echo "== Conformité des dépendances (lecture seule)"
   expected_requirements=$(base64 -w0 requirements.txt)

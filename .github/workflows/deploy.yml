@@ -170,6 +170,7 @@ jobs:
             ${{ runner.temp }}/etf-*.json
             ${{ runner.temp }}/financial-*.json
             ${{ runner.temp }}/account-*.json
+            ${{ runner.temp }}/catalogue-inspection.json
           retention-days: 1
       - name: Publier le résultat
         if: always()
