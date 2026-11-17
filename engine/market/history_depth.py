@@ -23,7 +23,9 @@ from engine.shared import settings
 from . import hours
 from .yahoo import RateLimited, YahooError, local_date
 
-HISTORY_SESSIONS = 1260  # profondeur de référence, en séances réelles
+HISTORY_SESSIONS = 1260  # profondeur de référence, en séances (la plus longue période de score)
+HISTORY_CLOSES = HISTORY_SESSIONS + 1  # clôtures nécessaires : une période de n séances mesure n variations entre n+1 clôtures (la première sert de base)
+CLOSES_SETTING = 'history_closes'  # profondeur en clôtures à laquelle le registre a été établi : un changement de définition fait réexaminer les titres « complets"
 KEEP_DAYS = 2000  # rétention des clôtures : 1 260 séances ≈ 1 830 à 1 920 jours calendaires selon les places, plus une marge
 FALLBACK_DAYS = 2000  # place sans calendrier connu : période calendaire large
 MARGIN_DAYS = 7  # marge avant la première séance manquante (fériés, décalages horaires)
@@ -57,12 +59,12 @@ class Calendars:
 
             try:
                 last = hours.latest_settled(mic, self.now)
-                days = session_dates(mic, last.isoformat(), HISTORY_SESSIONS)
+                days = session_dates(mic, last.isoformat(), HISTORY_CLOSES)
             except Exception:  # noqa: BLE001 - place inconnue : repli par dates calendaires
                 last, days = None, None
             if last is None:
                 last = self.now.date() - datetime.timedelta(days=1)
-            dates = [datetime.date.fromisoformat(d) for d in days] if days and len(days) == HISTORY_SESSIONS else None
+            dates = [datetime.date.fromisoformat(d) for d in days] if days and len(days) == HISTORY_CLOSES else None
             start = dates[0] if dates else last - datetime.timedelta(days=FALLBACK_DAYS)
             self.cache[mic] = {'last': last, 'dates': dates, 'set': set(dates) if dates else None, 'start': start}
         return self.cache[mic]
@@ -73,7 +75,7 @@ def classify(cal, have, closed, first_bar, first_trade):
     if cal['dates'] is not None:
         still = [d for d in cal['dates'] if d not in have and d not in closed]
     else:
-        still = [None] * max(0, HISTORY_SESSIONS - sum(1 for d in have if d >= cal['start']))
+        still = [None] * max(0, HISTORY_CLOSES - sum(1 for d in have if d >= cal['start']))
     if not still:
         return 'complete', 0, 0
     known = [x for x in (first_bar, first_trade) if x is not None]
@@ -138,6 +140,18 @@ def _save(conn, lid, now, status, first_bar=None, holes=0, missing=0, closed=0, 
         )
 
 
+def _align_registry(conn):
+    """Si la profondeur de référence (en clôtures) a changé depuis l'établissement du registre, les titres « complets » sont réexaminés : ils repassent « incomplets » avec une date de contrôle
+    ancienne (ils restent comptés dans le calcul des fermetures exceptionnelles), `_plan` les revoit sans appel réseau quand leurs clôtures sont déjà toutes là et n'interroge Yahoo
+    que pour la clôture de base manquante (fenêtre étroite, une requête par titre). Aucun cours, aucun volume n'est modifié ; les titres « récents » ne sont pas redemandés."""
+    if settings.get(conn, CLOSES_SETTING, None) == HISTORY_CLOSES:
+        return
+    with conn.cursor() as cur:
+        cur.execute("UPDATE history_state SET status='incomplete', checked_at='2000-01-01 00:00:00', detail='profondeur 1 261 clôtures' WHERE status='complete'")
+    settings.put(conn, CLOSES_SETTING, HISTORY_CLOSES)
+    conn.commit()
+
+
 def candidates(conn, rows, now):
     """Titres à traiter : sans ligne dans le registre (nouveau titre, ou première passe), ou dont l'état demande une nouvelle tentative. Les nouveaux d'abord."""
     ledger = {}
@@ -183,7 +197,7 @@ def _plan(conn, rows, now, closed):
                 missing = [d for d in cal['dates'] if d not in have[lid] and d not in shut]
                 nulls = {d for d in nullvol[lid] if d in cal['set']}
             else:
-                missing = [None] * max(0, HISTORY_SESSIONS - sum(1 for d in have[lid] if d >= cal['start']))
+                missing = [None] * max(0, HISTORY_CLOSES - sum(1 for d in have[lid] if d >= cal['start']))
                 nulls = {d for d in nullvol[lid] if d >= cal['start']}
             item = {'row': r, 'cal': cal, 'have': have[lid], 'nullvol': nulls, 'closed': shut}
             if not missing and not nulls:
@@ -237,6 +251,7 @@ def run(conn, client, rows, now, limit=DEEP_LIMIT, budget_s=DEEP_BUDGET_S, worke
     from engine.shared.db import ensure
 
     closed = closed_days(conn, now)
+    _align_registry(conn)
     todo = candidates(conn, rows, now)
     stats = Counter(candidates=len(todo))
     stats['rate_limited'] = False

@@ -28,10 +28,11 @@ def test_one_missing_weekly_close_does_not_compress_time_or_fake_path_indicators
     assert got['slope'] == pytest.approx(100 * math.expm1(0.01))
     assert got['r2'] == pytest.approx(1.0)
     assert got['perf'] == pytest.approx(100 * math.expm1(0.05))
-    assert got['volatility'] is None and got['drawdown'] is None and got['er'] is None
+    # Règle de tolérance commune : les mesures de chemin portent sur les clôtures observées et leur rang réel (aucun cours inventé)
+    assert got['volatility'] == pytest.approx(0.0, abs=1e-9) and got['drawdown'] == 0.0 and got['er'] == pytest.approx(1.0)
 
 
-def test_isolated_hole_can_still_pass_trend_but_not_fabricated_risk_metrics():
+def test_isolated_hole_is_tolerated_and_risk_metrics_use_the_observed_closes():
     dates = [f'd{i:03d}' for i in range(22)]
     prices = {d: 100 * math.exp(0.005 * i) for i, d in enumerate(dates) if i != 9}
     metrics, info = dated_window_metrics(dates, prices)
@@ -42,11 +43,11 @@ def test_isolated_hole_can_still_pass_trend_but_not_fabricated_risk_metrics():
     assert r['status'] == 'retained'
     assert any(x['criterion'] == 'coverage' and x['result'] == 'warning' for x in r['reasons'])
 
+    assert metrics['volatility'] == pytest.approx(0.0, abs=1e-9) and metrics['drawdown'] == 0.0  # une séance manquante ne rend plus les mesures de risque indisponibles
     low_vol = strategy.preset('low_volatility')
     low_vol['periods'] = [p for p in low_vol['periods'] if p['id'] == 'month']
     r = strategy.judge(low_vol, {21: metrics}, {}, {})
-    assert r['status'] == 'unknown'
-    assert any(x['criterion'] == 'max_volatility' and x['result'] == 'missing' for x in r['reasons'])
+    assert not any(x['criterion'] == 'max_volatility' and x['result'] == 'missing' for x in r['reasons'])
 
 
 def test_multiple_missing_sessions_below_sample_floor_are_not_evaluable():
@@ -57,30 +58,40 @@ def test_multiple_missing_sessions_below_sample_floor_are_not_evaluable():
     assert got['slope'] is None and got['r2'] is None and got['perf'] is None
 
 
-def test_missing_boundary_still_allows_supported_regression_but_not_endpoint_return():
+def test_missing_boundary_is_tolerated_and_the_return_uses_the_real_observed_endpoints():
     dates = [f'd{i:03d}' for i in range(22)]
     prices = {d: 100 * math.exp(0.005 * i) for i, d in enumerate(dates) if i != 0}
     got, info = dated_window_metrics(dates, prices)
-    assert info['coverage'] >= 0.80
+    assert info['coverage'] >= 0.80 and info['status'] == 'ok'
     assert got['slope'] == pytest.approx(100 * math.expm1(0.005))
     assert got['r2'] == pytest.approx(1.0)
-    assert got['perf'] is None
+    assert got['perf'] == pytest.approx(100 * math.expm1(0.005 * 20))  # de la première à la dernière clôture observées, sur leur durée réelle (20 séances)
 
 
-def test_long_gap_never_becomes_one_observed_daily_move():
+def test_a_gap_inside_the_tolerance_never_becomes_one_ordinary_daily_move():
     dates = [f'd{i:03d}' for i in range(64)]
-    # Reference dimensions of WHCA.AS: 52 observed closes in a 64-close window.
+    prices = {d: math.exp(i * 0.002) for i, d in enumerate(dates) if not 20 <= i < 28}  # 8 séances sans cotation : tolérées (MAX_GAP = 10)
+    got, info = dated_window_metrics(dates, prices)
+    assert info['status'] == 'ok' and info['observations'] == 56 and info['max_gap'] == 8
+    # hausse constante de 0,2 % par séance : l'intervalle de 9 séances compte pour 9 séances, la volatilité reste nulle (et non 8 séances de rendement en une seule)
+    assert got['volatility'] == pytest.approx(0.0, abs=1e-9) and got['slope'] == pytest.approx(100 * math.expm1(0.002))
+
+
+def test_a_long_interruption_is_flagged_and_excluded_instead_of_measured():
+    dates = [f'd{i:03d}' for i in range(64)]
+    # Dimensions de référence de WHCA.AS : 52 clôtures observées sur 64, dont 12 séances d'affilée sans cotation (interruption > MAX_GAP)
     prices = {d: math.exp(i * 0.002 + (0.14 if i % 2 else -0.14)) for i, d in enumerate(dates) if not 20 <= i < 32}
     got, info = dated_window_metrics(dates, prices)
-    assert info['observations'] == 52 and info['expected_closes'] == 64
-    assert info['coverage'] == pytest.approx(52 / 64)
-    assert got['r2'] is not None and got['r2'] < strategy.R2_LEVELS['flexible']
-    cfg = strategy.preset('regular')
-    cfg['periods'] = [p for p in cfg['periods'] if p['id'] == 'quarter']
-    # Exercise the actual existing R² gate: corrected time-indexed R² fails it.
-    verdict = strategy.judge(cfg, {63: got}, {}, {})
-    assert verdict['status'] == 'rejected'
-    assert got['volatility'] is None and got['drawdown'] is None and got['er'] is None
+    assert info['observations'] == 52 and info['expected_closes'] == 64 and info['coverage'] == pytest.approx(52 / 64)
+    assert info['status'] == 'gap' and info['max_gap'] == 12
+    assert all(got[k] is None for k in ('slope', 'r2', 'perf', 'volatility', 'drawdown', 'er'))
+
+
+def test_a_young_title_is_reported_as_too_short_history_not_as_a_gap():
+    dates = [f'd{i:03d}' for i in range(64)]
+    prices = {d: math.exp(i * 0.002) for i, d in enumerate(dates) if i >= 30}
+    got, info = dated_window_metrics(dates, prices)
+    assert info['status'] == 'history' and got['slope'] is None
 
 
 def test_analyze_series_uses_expected_sessions_and_does_not_fill_missing_prices():

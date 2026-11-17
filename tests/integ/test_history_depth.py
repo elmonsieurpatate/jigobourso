@@ -17,7 +17,7 @@ if not os.environ.get('JIGO_TEST_DATABASE'):
 UTC = datetime.timezone.utc
 NOW = datetime.datetime(2026, 11, 17, 5, 0, tzinfo=UTC)  # avant la clôture de la séance du jour : la dernière séance réglée est celle de la veille
 CAL = history_depth.Calendars(NOW).get('XETR')
-DAYS = CAL['dates']  # les 1 260 dernières séances XETR
+DAYS = CAL['dates']  # les 1 261 dernières clôtures XETR (1 260 séances = 1 260 variations)
 
 
 def ts(day):
@@ -100,7 +100,7 @@ def test_new_title_without_prices_receives_full_depth_and_title_already_complete
     client = DeepClient({'NEW.DE': {d: (50.0, 10) for d in DAYS}})
     stats = history_depth.run(conn, client, [new, full], NOW)
     assert [c[0] for c in client.calls] == ['NEW.DE']  # le titre déjà complet n'a coûté aucun appel
-    assert stats['complete'] == 2 and len(prices(conn, 1)) == 1260
+    assert stats['complete'] == 2 and len(prices(conn, 1)) == history_depth.HISTORY_CLOSES == 1261
     assert status(conn, 2)['detail'] == 'déjà complet'
     cov = history_depth.coverage(conn)
     assert cov['complete'] == 2 and cov['pending'] == 0 and cov['target'] == 1260
@@ -154,3 +154,26 @@ def test_daily_plan_never_asks_five_years_and_catchup_stays_short(conn):
     row = add_title(conn, 1, 'SHORT.DE', DAYS[-100:-5])
     plan, _fresh = collect.daily_plan(conn, [row], NOW)
     assert set(plan) <= {'5d', '1mo', '3mo', '6mo', '1y', '2y'}
+
+
+def test_changing_the_reference_depth_costs_one_narrow_call_only_for_the_missing_base_close(conn):
+    """1 260 séances exigent 1 261 clôtures : un registre « complet » à l'ancienne profondeur est réexaminé. Un titre déjà à 1 261 clôtures ne coûte aucun appel Yahoo ;
+    un titre à 1 260 clôtures en coûte un seul, limité à la clôture de base manquante. Aucun cours existant n'est modifié."""
+    from engine.shared import settings
+
+    old = add_title(conn, 1, 'OLD.DE', DAYS[1:])  # 1 260 clôtures : complet à l'ancienne définition
+    full = add_title(conn, 2, 'FULL.DE', DAYS)  # 1 261 clôtures
+    with conn.cursor() as cur:
+        cur.execute("INSERT INTO history_state(listing_id,status,checked_at) VALUES (1,'complete',NOW()),(2,'complete',NOW())")
+    conn.commit()
+    settings.put(conn, history_depth.CLOSES_SETTING, 1260)
+    client = DeepClient({'OLD.DE': {d: (10.0, 5) for d in DAYS}, 'FULL.DE': {d: (10.0, 5) for d in DAYS}})
+    stats = history_depth.run(conn, client, [old, full], NOW)
+    assert [c[0] for c in client.calls] == ['OLD.DE']  # un seul appel, pour le titre auquel manque la clôture de base
+    _symbol, start, end = client.calls[0]
+    assert (DAYS[0] - start).days == history_depth.MARGIN_DAYS and (end - DAYS[-1]).days <= 2  # fenêtre étroite autour de la clôture de base
+    assert stats['complete'] == 2 and len(prices(conn, 1)) == len(prices(conn, 2)) == 1261
+    assert {float(r['close_px']) for r in prices(conn, 1)} == {10.0}
+    assert settings.get(conn, history_depth.CLOSES_SETTING, None) == history_depth.HISTORY_CLOSES
+    again = history_depth.run(conn, client, [old, full], NOW)  # idempotent : plus rien à redemander
+    assert again['candidates'] == 0 and len(client.calls) == 1

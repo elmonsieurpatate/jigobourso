@@ -53,10 +53,10 @@ def test_auto_weights_follow_kappa_and_active_set():
     assert scores_profiles.auto_weights(0.7, []) == {}
 
 
-def test_state_exposes_exactly_the_seven_v4_strategies_and_no_legacy_engine():
+def test_state_exposes_the_v4_strategies_and_no_legacy_engine():
     sts = A.state(None)['strategies']
     labels = {s['name']: s['label'] for s in sts}
-    assert list(labels) == ['growth_regular', 'growth_v4', 'rebound', 'calm_rise', 'momentum_6m', 'momentum_12m', 'momentum_risk']
+    assert list(labels) == ['growth_regular', 'growth_v4', 'rebound', 'calm_rise', 'momentum_6m', 'momentum_12m', 'momentum_risk', 'long_mrar', 'long_classic']
     assert all(s['engine'] == 'v4' for s in sts)
     assert len({v for v in labels.values()}) == len(labels)  # aucun libellé en double
     assert [v for v in labels.values() if v.startswith('Croissance rapide')] == ['Croissance rapide']  # une seule « Croissance rapide »
@@ -361,3 +361,16 @@ def test_rebound_keeps_the_half_year_loaded_as_context_so_the_rebound_note_works
 
     after_fall, continuous = recovery_input([100, 90, 80, 90, 100]), recovery_input([100, 105, 110, 115, 120])
     assert after_fall == 100 and continuous == 0
+
+
+def test_long_term_builtin_strategies_use_mrar_only_in_the_first_and_leave_the_others_unchanged():
+    mrar, classic = (scores_profiles.base_config(n) for n in ('long_mrar', 'long_classic'))
+    for cfg in (mrar, classic):
+        assert [p['id'] for p in cfg['periods'] if p['enabled']] == ['three_year', 'five_year']
+        assert cfg['scoring']['weights'] == {'three_year': 50.0, 'five_year': 50.0}
+        assert all(p[f] is None for p in cfg['periods'] for f in ('min_slope', 'min_r2'))  # aucun seuil
+    assert mrar['scoring']['complex_weights']['risk_adjusted'] == 30 and classic['scoring']['complex_weights']['risk_adjusted'] == 0
+    assert sum(mrar['scoring']['complex_weights'].values()) == pytest.approx(100) and sum(classic['scoring']['complex_weights'].values()) == pytest.approx(100)
+    assert classic['scoring']['complex_weights']['dynamics'] == 40  # pondérations habituelles du Score 2
+    assert scores_specs.CT_BUILTIN['ltmrar'] == 'long_mrar' and scores_specs.CT_BUILTIN['ltclassic'] == 'long_classic'
+    assert scores_profiles.base_config('growth_v4')['scoring']['complex_weights'] == {}  # les sept stratégies d'origine ne bougent pas

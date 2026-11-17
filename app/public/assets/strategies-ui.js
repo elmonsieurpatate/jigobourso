@@ -19,6 +19,8 @@
     mom6: "Classe selon la variation des six derniers mois, hors dernier mois.",
     mom12: "Classe selon la variation des douze derniers mois, hors dernier mois.",
     momrisk: "Combine le momentum 6 et 12 mois, corrigé de la volatilité et du repli.",
+    ltmrar: "Classe sur trois et cinq ans, avec 30 % de rendement ajusté du risque (MRAR).",
+    ltclassic: "Classe sur trois et cinq ans avec le Score 2 habituel, sans MRAR.",
     personal: "Stratégie personnelle : visible uniquement dans votre compte.",
   };
   let META = {}; // icône et explications choisies par l'utilisateur (défauts des stratégies d'origine inclus) : mêmes partout

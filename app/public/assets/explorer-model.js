@@ -30,6 +30,8 @@ window.ExplorerModel = (() => {
     mom6: "Momentum 6 mois (expérimental)",
     mom12: "Momentum 12 mois (expérimental)",
     momrisk: "Momentum ajusté du risque (expérimental)",
+    ltmrar: "Long terme – Score 2 avec MRAR",
+    ltclassic: "Long terme – Score 2 classique",
   };
   const FALLBACK = {
     fast: ["week", "month"],
@@ -39,6 +41,8 @@ window.ExplorerModel = (() => {
     mom6: ["quarter", "half"],
     mom12: ["half", "year"],
     momrisk: ["half", "year"],
+    ltmrar: ["three_year", "five_year"],
+    ltclassic: ["three_year", "five_year"],
   };
   const SESS = {
     week: "5",

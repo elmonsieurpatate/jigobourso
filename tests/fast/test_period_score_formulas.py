@@ -45,8 +45,11 @@ def test_acceleration_uses_internal_halves_and_missing_is_unknown():
     dates = [str(i) for i in range(13)]
     observed = dict(zip(dates, closes))
     del observed[dates[5]]
-    assert window_inputs(dates, [], observed)['accel'] is None
-    assert window_inputs(dates, [], observed)['momentum_perf'] is None
+    tolerated = window_inputs(dates, [], observed)  # une clôture isolée manquante : mesures calculées sur les clôtures observées, jamais comblées
+    assert tolerated['accel'] is not None and tolerated['momentum_perf'] is not None
+    for k in range(3, 11):
+        observed.pop(dates[k], None)  # longue interruption (> MAX_GAP ou couverture insuffisante) : indisponible
+    assert window_inputs(dates, [], observed)['accel'] is None and window_inputs(dates, [], observed)['momentum_perf'] is None
 
 
 @pytest.mark.parametrize('n', [6, 21, 63, 126, 756, 1260])
@@ -284,7 +287,11 @@ def test_mrar_is_absent_when_the_window_is_too_short_or_incomplete():
     assert mrar_input(d, _monthly_path(d, [0.01])) is not None  # un an : 10 rendements mensuels complets au moins
     obs = dict(zip(d, _monthly_path(d, [0.01])))
     assert window_mrar(d, obs) is not None
-    obs.pop(d[100])  # un trou dans la fenêtre : aucune mesure
+    full = window_mrar(d, obs)
+    obs.pop(d[100])  # un trou isolé : toléré, le MRAR est calculé sur les clôtures observées (mêmes valeurs ici : trajectoire mensuelle régulière)
+    assert window_mrar(d, obs) is not None and window_mrar(d, obs) == pytest.approx(full, rel=1e-3)
+    for k in range(101, 115):
+        obs.pop(d[k])  # 15 séances consécutives sans cotation : interruption, aucune mesure
     assert window_mrar(d, obs) is None and window_inputs(d, [], obs)['mrar'] is None
     assert mrar_input(d, [100.0] * 5) is None and mrar_input([], []) is None
 

@@ -110,6 +110,15 @@ def _momentum(name, horizon, periods, weights, cw):
     return _historic(name, {pid: {} for pid in periods}, weights, cw)
 
 
+LONG_TUNING = {'sat_a': 17.0, 'accel_ref': 0.4, 'vol_mode': 'relative', 'dd_ref_long': 60.0, 'mrar_lo': -30.0, 'mrar_hi': 20.0}  # réglages validés sur données réelles (3 et 5 ans)
+LONG_CLASSIC = {'dynamics': 40, 'r2': 15, 'up_days': 5, 'concentration': 7, 'volatility': 15, 'drawdown': 8, 'liquidity': 10, 'acceleration': 0, 'momentum': 0, 'recovery': 0, 'risk_adjusted': 0}
+LONG_MRAR = {k: (30 if k == 'risk_adjusted' else round(v * 0.7, 1)) for k, v in LONG_CLASSIC.items()}  # MRAR 30 %, les autres composantes réduites proportionnellement (total 100 %)
+
+
+def _long(name, complex_weights):
+    return _historic(name, {'three_year': {}, 'five_year': {}}, {'three_year': 50, 'five_year': 50}, complex_weights, dict(LONG_TUNING))
+
+
 V4_STRATEGIES = {
     'growth_regular': {
         'label': 'Croissance régulière',
@@ -163,6 +172,21 @@ V4_STRATEGIES = {
 }
 
 
+V4_STRATEGIES.update(
+    {
+        'long_mrar': {
+            'label': 'Long terme – Score 2 avec MRAR',
+            'build': lambda: _long('long_mrar', LONG_MRAR),
+            'note': 'Trois et cinq ans (50 / 50) ; le rendement ajusté du risque (MRAR, γ = 2) pèse 30 % du Score 2, les autres composantes sont réduites proportionnellement. Aucun seuil.',
+        },
+        'long_classic': {
+            'label': 'Long terme – Score 2 classique',
+            'build': lambda: _long('long_classic', LONG_CLASSIC),
+            'note': 'Trois et cinq ans (50 / 50), pondérations habituelles du Score 2, sans MRAR (0 %). Sert de comparaison à la stratégie avec MRAR. Aucun seuil.',
+        },
+    }
+)  # stratégies long terme (3 et 5 ans), ajoutées après les sept d'origine : ordre et contenu des anciennes inchangés
+
 # ───────────── stratégies du Classement (« Blou », Croissance régulière…) : chacune a son propre profil de scores ─────────────
 CT_BUILTIN = {
     'fast': 'growth_v4',
@@ -172,6 +196,8 @@ CT_BUILTIN = {
     'mom6': 'momentum_6m',
     'mom12': 'momentum_12m',
     'momrisk': 'momentum_risk',
+    'ltmrar': 'long_mrar',
+    'ltclassic': 'long_classic',
 }  # stratégies d'origine de la page Classement -> stratégie de scores V4
 
 

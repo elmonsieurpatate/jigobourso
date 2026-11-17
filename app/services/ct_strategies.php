@@ -11,7 +11,7 @@ require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/../lib/http.php';
 
 const CT_BUILTIN = ['fast' => 'Croissance rapide', 'regular' => 'Croissance régulière', 'calm' => 'Hausse calme', 'rebound' => 'Rebond', 'mom6' => 'Momentum 6 mois (expérimental)', 'mom12' => 'Momentum 12 mois (expérimental)',
-    'momrisk' => 'Momentum ajusté du risque (expérimental)'];
+    'momrisk' => 'Momentum ajusté du risque (expérimental)', 'ltmrar' => 'Long terme – Score 2 avec MRAR', 'ltclassic' => 'Long terme – Score 2 classique'];
 const CT_PERIODS = ['week', 'month', 'quarter', 'half', 'year', 'two_year', 'three_year', 'five_year'];
 const CT_DAY = 'day';                                                           // Jour (1 séance) : facultatif, seule la variation 1J sert de critère
 const CT_METRICS = ['slope', 'r2', 'volatility', 'drawdown', 'return', 'volume'];
@@ -25,6 +25,8 @@ const CT_DEFAULT_META = [
     'mom6' => ['icon' => 'hourglass', 'description' => 'Le momentum des 6 derniers mois, dernier mois exclu : on classe les titres qui ont le mieux monté sur le semestre.'],
     'mom12' => ['icon' => 'calendar-days', 'description' => 'Le momentum des 12 derniers mois, dernier mois exclu : on classe les titres qui ont le mieux monté sur l’année.'],
     'momrisk' => ['icon' => 'shield-check', 'description' => 'Le momentum 6 et 12 mois, corrigé du risque : la volatilité et la plus forte baisse pénalisent la note.'],
+    'ltmrar' => ['icon' => 'scale', 'description' => 'Trois et cinq ans (50 / 50) : le Score 2 avec 30 % de rendement ajusté du risque (MRAR), qui récompense la hausse régulière et pénalise les creux profonds.'],
+    'ltclassic' => ['icon' => 'gauge', 'description' => 'Trois et cinq ans (50 / 50) : le Score 2 avec ses pondérations habituelles, sans MRAR. Sert de comparaison à « Long terme – Score 2 avec MRAR ».'],
 ];
 const CT_ICONS = ['arrow-up', 'arrow-down', 'arrow-left', 'arrow-right', 'arrow-up-left', 'arrow-down-left', 'arrow-left-right', 'chevron-up', 'chevron-down', 'chevrons-up', 'chevrons-down', 'chevrons-up-down',
     'arrow-big-up', 'arrow-big-down', 'arrow-big-up-dash', 'move-up', 'move-down', 'move-up-right', 'move-down-right', 'circle-arrow-up', 'circle-arrow-down', 'circle-arrow-up-right', 'circle-arrow-down-right',

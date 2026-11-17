@@ -274,14 +274,18 @@ def test_window_inputs_follow_v1_definitions():
     assert SI.path_inputs([100, 99, 98, 97])['spike_share'] == 1.0  # fenêtre sans hausse nette : concentration maximale
 
 
-def test_window_inputs_need_complete_windows_and_compute_acceleration():
+def test_window_inputs_tolerate_isolated_holes_and_compute_acceleration():
     dates = [f'2026-01-{d:02d}' for d in range(1, 13)]
     obs = {d: 100 * 1.01**i for i, d in enumerate(dates)}
     out = SI.window_inputs(dates, [], obs)
     assert out['accel'] == pytest.approx(0, abs=1e-9) and out['r2_prev'] == pytest.approx(1.0)
     obs_hole = dict(obs)
     del obs_hole[dates[9]]
-    assert all(v is None for v in SI.window_inputs(dates, [], obs_hole).values())
+    holed = SI.window_inputs(dates, [], obs_hole)
+    assert holed['up_fraction'] == pytest.approx(1.0) and holed['accel'] is not None  # clôture manquante : mesures sur les clôtures observées
+    for k in range(3, 11):
+        obs_hole.pop(dates[k], None)
+    assert all(v is None for v in SI.window_inputs(dates, [], obs_hole).values())  # interruption : indisponible
     accelerating = {d: 100 * (1.01**i if i < 6 else 1.01**6 * 1.03 ** (i - 6)) for i, d in enumerate(dates)}
     assert SI.window_inputs(dates, [], accelerating)['accel'] > 1.5
 

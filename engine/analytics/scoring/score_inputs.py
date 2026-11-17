@@ -6,11 +6,12 @@
   r2_prev      minimum des R² des deux moitiés, pour la fiabilité de l'accélération
   mrar         rendement ajusté du risque (Morningstar, γ = 2) annualisé, en %, sur les rendements mensuels CALENDAIRES de la fenêtre (cours de prix : ni dividendes ni frais)
 
-Une clôture absente rend ces mesures indisponibles (None) : on ne comble jamais un trou.
+Une fenêtre lacunaire reste mesurable si elle respecte la règle de couverture commune (measures.window_diagnosis : MIN_COVERAGE, MAX_GAP) : les mesures portent alors sur les clôtures réellement observées et leur rang
+de séance réel, jamais sur un cours inventé. Au-delà (interruption, historique trop court) : None.
 """
 
 import math
-from ..series.measures import window_metrics
+from ..series.measures import dated_window_metrics, observed_points, window_diagnosis
 
 
 RISK_GAMMA = 2.0  # aversion au risque du MRAR : constante de conception (Morningstar), jamais un réglage
@@ -31,14 +32,18 @@ def monthly_returns(dates, closes):
         else:
             anchors.append((month, c))
     anchors = anchors[:-1]
+    for i in range(1, len(anchors)):
+        year, month = int(anchors[i - 1][0][:4]), int(anchors[i - 1][0][5:7])
+        if anchors[i][0] != f'{year + month // 12:04d}-{month % 12 + 1:02d}':
+            return []  # un mois entier sans aucune clôture : interruption, aucun rendement mensuel fiable
     return [anchors[i][1] / anchors[i - 1][1] - 1 for i in range(1, len(anchors))]
 
 
-def mrar_input(dates, closes):
+def mrar_input(dates, closes, sessions=None):
     """MRAR annualisé en % (γ = 2) : [ (1/T) · Σ (1 + r_k)^(−γ) ]^(−12/γ) − 1. None si la fenêtre est trop courte pour être significative.
     Aucun taux sans risque : pour un taux constant il transforme tous les titres de la même façon et ne change aucun classement.
     Rendement de PRIX : les dividendes ne sont pas dans les cours stockés."""
-    if not closes or len(closes) - 1 < MRAR_MIN_SESSIONS:
+    if not closes or (len(closes) - 1 if sessions is None else sessions) < MRAR_MIN_SESSIONS:
         return None
     returns = monthly_returns(dates, closes)
     if len(returns) < MRAR_MIN_MONTHS:
@@ -52,8 +57,11 @@ def mrar_input(dates, closes):
 
 
 def window_mrar(current_dates, observations):
-    """MRAR d'une fenêtre de séances à partir des clôtures observées (fiche titre) ; None si la fenêtre n'est pas complète."""
-    return mrar_input(current_dates, _values(current_dates, observations))
+    """MRAR d'une fenêtre de séances à partir des clôtures observées (fiche titre) ; None si la fenêtre ne respecte pas la règle de couverture."""
+    points = observed_points(current_dates, observations)
+    if window_diagnosis(len(current_dates), points)['status'] != 'ok':
+        return None
+    return mrar_input([current_dates[i] for i, _ in points], [v for _, v in points], len(current_dates) - 1)
 
 
 def recent_exclusion(sessions):
@@ -80,48 +88,63 @@ def recovery_input(closes):
     return 100 * recovered * min(1.0, best_depth / 0.10)
 
 
-def period_path_inputs(closes):
-    """Mesures de trajectoire internes à une période complète de n séances."""
+def _period_points(count, points):
+    """Mesures de trajectoire d'une période de count-1 séances à partir des clôtures observées [(rang, clôture)] (lacunes tolérées, jamais comblées)."""
     out = {'accel': None, 'r2_prev': None, 'momentum_perf': None, 'recovery': None}
-    if not closes or len(closes) < 4:
+    if len(points) < 4:
         return out
-    n = len(closes) - 1
+    n = count - 1
     cut = n // 2
     if cut >= 3 and n - cut >= 3:
-        first, second = window_metrics(closes[: cut + 1]), window_metrics(closes[cut:])
-        if first and second:
+        ranks, seen = list(range(count)), dict(points)
+        first, second = dated_window_metrics(ranks[: cut + 1], seen)[0], dated_window_metrics(ranks[cut:], seen)[0]
+        if first and second and first['slope'] is not None and second['slope'] is not None:
             out['accel'] = second['slope'] - first['slope']
             out['r2_prev'] = min(first['r2'], second['r2'])
     measured = n - recent_exclusion(n)
     if measured >= 1:
-        out['momentum_perf'] = 100 * (closes[measured] / closes[0] - 1)
-    out['recovery'] = recovery_input(closes)
+        end = [v for i, v in points if i <= measured][-1]  # dernière clôture observée à ou avant la séance J − e(n) : jamais un cours inventé
+        out['momentum_perf'] = 100 * (end / points[0][1] - 1)
+    out['recovery'] = recovery_input([v for _, v in points])
     return out
 
 
-def _values(dates, observations):
-    if not dates:
-        return None
-    vals = [observations.get(d) for d in dates]
-    return None if any(v is None or not v > 0 or not math.isfinite(v) for v in vals) else [float(v) for v in vals]
+def period_path_inputs(closes):
+    """Mesures de trajectoire internes à une période complète de n séances."""
+    if not closes or len(closes) < 4:
+        return {'accel': None, 'r2_prev': None, 'momentum_perf': None, 'recovery': None}
+    return _period_points(len(closes), list(enumerate(closes)))
+
+
+def _path_points(points):
+    """up_fraction et spike_share depuis les clôtures observées [(rang, clôture)] : chaque variation entre deux clôtures observées compte pour les séances qu'elle couvre
+    (part des séances en hausse pondérée par la durée) ; la plus forte hausse est celle observée entre deux clôtures consécutives."""
+    if len(points) < 3:
+        return {'up_fraction': None, 'spike_share': None}
+    spans = [b[0] - a[0] for a, b in zip(points, points[1:])]
+    steps = [b[1] / a[1] - 1 for a, b in zip(points, points[1:])]
+    total = math.log(points[-1][1] / points[0][1])
+    return {
+        'up_fraction': sum(k for k, s in zip(spans, steps) if s > 0) / sum(spans),
+        'spike_share': (math.log1p(max(steps)) / total) if total > 0 else 1.0,
+    }
 
 
 def path_inputs(closes):
     """up_fraction et spike_share d'une fenêtre complète de n+1 clôtures."""
-    if not closes or len(closes) < 3:
+    if not closes:
         return {'up_fraction': None, 'spike_share': None}
-    steps = [closes[i] / closes[i - 1] - 1 for i in range(1, len(closes))]
-    total = math.log(closes[-1] / closes[0])
-    return {'up_fraction': sum(1 for s in steps if s > 0) / len(steps), 'spike_share': (math.log1p(max(steps)) / total) if total > 0 else 1.0}
+    return _path_points(list(enumerate(closes)))
 
 
 def window_inputs(current_dates, previous_dates, observations):
-    """Mesures de score internes à la fenêtre courante ; previous_dates reste accepté par l'ancienne interface."""
-    cur = _values(current_dates, observations)
+    """Mesures de score internes à la fenêtre courante ; previous_dates reste accepté par l'ancienne interface.
+    Fenêtre complète ou lacunaire dans la tolérance commune : mesurée sur les clôtures observées. Sinon : tout à None."""
     out = {'up_fraction': None, 'spike_share': None, 'accel': None, 'r2_prev': None, 'momentum_perf': None, 'recovery': None, 'mrar': None}
-    if cur is None:
+    points = observed_points(current_dates, observations)
+    if window_diagnosis(len(current_dates), points)['status'] != 'ok':
         return out
-    out.update(path_inputs(cur))
-    out.update(period_path_inputs(cur))
-    out['mrar'] = mrar_input(current_dates, cur)
+    out.update(_path_points(points))
+    out.update(_period_points(len(current_dates), points))
+    out['mrar'] = mrar_input([current_dates[i] for i, _ in points], [v for _, v in points], len(current_dates) - 1)
     return out

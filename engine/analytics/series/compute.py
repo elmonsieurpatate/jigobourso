@@ -14,6 +14,14 @@ from ...market.hours import expected_last_close  # noqa: F401 (conservé pour co
 from ...shared.db import ensure
 
 BASE_WINDOWS = (1, 21, 252)
+SPIKE_SHARE_CAP = 9999.0  # colonne DECIMAL(10,6) : sur 3 à 5 ans un cours quasi inchangé donne un gain net minuscule et un rapport énorme ; toute valeur ≥ 1 sature déjà les notes et les filtres (≤ 1)
+
+
+def bounded_spike_share(value):
+    """spike_share à stocker : plafonné pour tenir dans DECIMAL(10,6) (inchangé en dessous du plafond)."""
+    return None if value is None else min(value, SPIKE_SHARE_CAP)
+
+
 LOAD_MIN_DAYS = 610  # lecture minimale des clôtures (≈ 420 séances) : l'historique conservé est plus profond, mais seules les séances utiles au calcul sont lues
 
 
@@ -177,7 +185,7 @@ def _compute_one(
                     lid,
                     n,
                     _dec(m['up_fraction'], 6),
-                    _dec(m['spike_share'], 6),
+                    _dec(bounded_spike_share(m['spike_share']), 6),
                     _dec(m['accel']),
                     _dec(m['r2_prev'], 6),
                     _dec(m['momentum_perf'], 4),

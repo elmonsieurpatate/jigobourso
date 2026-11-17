@@ -14,7 +14,8 @@ pytestmark = pytest.mark.integration
 if not os.environ.get('JIGO_TEST_DATABASE'):
     pytest.skip('base jetable non configurée', allow_module_level=True)
 
-SEVEN = ['growth_v4', 'growth_regular', 'calm_rise', 'rebound', 'momentum_6m', 'momentum_12m', 'momentum_risk']
+SEVEN = ['growth_v4', 'growth_regular', 'calm_rise', 'rebound', 'momentum_6m', 'momentum_12m', 'momentum_risk']  # les sept d'origine
+BUILTIN = SEVEN + ['long_mrar', 'long_classic']  # + les deux stratégies long terme (3 et 5 ans)
 
 
 def fresh():
@@ -42,9 +43,9 @@ def test_seven_official_strategies_one_entry_each_and_all_official():
     conn = fresh()
     scores_specs.set_user(1)
     st = A.strategies_status(conn, {'ct_items': []})['strategies']
-    assert [s['name'] for s in st] == SEVEN
+    assert [s['name'] for s in st] == BUILTIN
     assert {s['status'] for s in st} == {'official'}
-    assert len({s['id'] for s in st}) == 7
+    assert len({s['id'] for s in st}) == 9
 
 
 def test_adaptation_is_private_and_independent_between_users():
@@ -81,6 +82,6 @@ def test_criteria_and_scores_are_judged_separately():
 def test_facts_come_from_executed_code_for_all_seven():
     conn = fresh()
     f = strategy_docs.facts(conn)
-    assert [s['name'] for s in f['strategies']] == SEVEN
+    assert [s['name'] for s in f['strategies']] == BUILTIN
     assert f['common']['slope_levels']['very_strong'] == pytest.approx(0.27543703768897265)
     assert all(abs(sum(p['weight'] for p in s['periods']) - 100) < 1e-6 for s in f['strategies'])

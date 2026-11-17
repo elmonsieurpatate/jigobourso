@@ -150,6 +150,8 @@ LABELS = {
     'momentum_6m': 'Momentum 6 mois',
     'momentum_12m': 'Momentum 12 mois',
     'momentum_risk': 'Momentum ajusté au risque',
+    'long_mrar': 'Long terme – Score 2 avec MRAR',
+    'long_classic': 'Long terme – Score 2 classique',
 }
 
 

@@ -41,7 +41,7 @@ def test_manual_selection_then_maintenance_with_fake_yahoo():
         assert [r['status'] for r in cur.fetchall()] == ['selected', 'excluded']
         cur.execute('SELECT sessions, slope, r2 FROM strategy_metrics WHERE listing_id=1 ORDER BY sessions')
         metrics = {r['sessions']: r for r in cur.fetchall()}
-        assert set(metrics) == {1, 5, 21, 63, 126, 252}
+        assert set(metrics) == {1, 5, 21, 63, 126, 252, 756, 1260}  # 756 et 1 260 : périodes des deux stratégies long terme intégrées
         assert abs(float(metrics[21]['slope']) - 0.3) < 0.01 and float(metrics[21]['r2']) > 0.999
         cur.execute('SELECT quality, closes_count FROM series_state WHERE listing_id=1')
         assert cur.fetchone()['closes_count'] == 260
