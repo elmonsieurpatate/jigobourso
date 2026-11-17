@@ -1,2 +1,10 @@
 == Validation du déploiement : full
 == Contrôles du serveur (lecture seule)
+== Contrôle des classements (lecture seule)
+diagnostic Explorer regular: 116 retenus, 254 non évaluables sur 9609
+diagnostic Explorer momentum_risk: 2290 retenus, 2306 non évaluables sur 9609
+== Contrôle des fichiers SQL : ajouts seulement
+== Essai isolé Hostinger (copie + base sandbox)
+== Version des pages : ?v=202611171701
+== Transfert du code
+== Dépendances Python, migrations de schéma, contrôles
