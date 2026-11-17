@@ -93,6 +93,13 @@ jobs:
           export PLAYWRIGHT_MODULE="$RUNNER_TEMP/financial-browser/node_modules/playwright-core" JIGO_CHROMIUM="$(command -v google-chrome || command -v chromium)"
           export JIGO_TEST_MAIL_DIR="$RUNNER_TEMP/account-mail" JIGO_E2E_RESULTS="$PWD/audit-results"
           scripts/e2e_browser.sh
+      - name: Joindre le diagnostic catalogue ciblé
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always() && inputs.operation == 'diagnostic' && inputs.catalogue_query != ''
+        with:
+          name: catalogue-inspection
+          path: ${{ runner.temp }}/catalogue-inspection.json
+          retention-days: 1
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
@@ -170,7 +177,6 @@ jobs:
             ${{ runner.temp }}/etf-*.json
             ${{ runner.temp }}/financial-*.json
             ${{ runner.temp }}/account-*.json
-            ${{ runner.temp }}/catalogue-inspection.json
           retention-days: 1
       - name: Publier le résultat
         if: always()
