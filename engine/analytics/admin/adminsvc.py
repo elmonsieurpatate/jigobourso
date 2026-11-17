@@ -5,7 +5,7 @@ import datetime
 from ..shared.dates import iso
 from engine.catalogue import rules as cat_rules
 from engine.jobs import tasks
-from engine.market import collect, hours, prefilter
+from engine.market import history_depth, hours, prefilter
 from engine.shared import settings
 from ..explorer import funnel
 
@@ -174,7 +174,7 @@ def yahoo_state(conn):
         pending.append('Des informations Yahoo plus récentes n’ont pas encore été filtrées : cliquez sur « Filtrer ».')
     level = _level(conn, 'prefilter')
     final = kinds.get('equity', 0) + kinds.get('etf', 0)
-    coverage = tasks.history_coverage(conn) if final else {'absent': 0, 'partial': 0, 'complete': 0, 'last_day': None, 'gap_titles': 0, 'gap_days': 0, 'gap_small': 0}
+    coverage = tasks.history_coverage(conn) if final else {'depth': {}, 'last_day': None, 'gap_titles': 0, 'gap_days': 0, 'gap_small': 0}
     return {
         'info': {'last': info, 'stats': stats.get('yahoo_info'), 'quotes': q['n'], 'quote_at': iso(q['t']), 'asked_now': len(tasks.info_set(conn))},
         'filters': level,
@@ -191,7 +191,7 @@ def yahoo_state(conn):
             'stats': stats.get('history'),
             'cron_daily': stats.get('daily'),
             'cron_intraday': stats.get('intraday'),
-            'full': collect.FULL_SESSIONS,
+            'full': history_depth.HISTORY_SESSIONS,
         },
         'running': _running(conn),
     }
@@ -205,7 +205,8 @@ Y_EXPR = (
     "WHEN l.status='selected' THEN 'kept' ELSE 'pending' END"
 )
 FINAL_EXPR = "((r.removed_step IS NULL AND l.status='selected' AND l.is_primary=1) OR h.listing_id IS NOT NULL)"
-D_EXPR = f"CASE WHEN NOT {FINAL_EXPR} THEN 'na' WHEN s.closes_count IS NULL OR s.closes_count=0 THEN 'absent' WHEN s.closes_count>=%s THEN 'complete' ELSE 'partial' END"
+D_STATES = ('complete', 'recent', 'incomplete', 'unavailable', 'error', 'pending', 'absent')  # profondeur de cinq ans : mêmes états que le registre history_state (job `history_deep`)
+D_EXPR = f"CASE WHEN NOT {FINAL_EXPR} THEN 'na' WHEN hs.status IS NOT NULL THEN hs.status WHEN s.closes_count IS NULL OR s.closes_count=0 THEN 'absent' ELSE 'pending' END"
 
 
 def _intraday_statuses(conn, rows, now):
@@ -260,14 +261,14 @@ def titles(conn, req):
         args.append(req['yahoo'])
     if req.get('final') in ('1', '0', 1, 0):
         where.append(FINAL_EXPR if str(req['final']) == '1' else f'NOT {FINAL_EXPR}')
-    if req.get('daily') in ('complete', 'partial', 'absent'):
+    if req.get('daily') in D_STATES:
         where.append(f'{D_EXPR}=%s')
-        args += [collect.FULL_SESSIONS, req['daily']]
+        args.append(req['daily'])
     sql_where = ' WHERE ' + ' AND '.join(where) if where else ''
     order = SORTS.get(req.get('sort'), 'r.name') + (' DESC' if req.get('dir') == 'desc' else ' ASC')
     page = max(1, int(req.get('page') or 1))
     frm = """FROM catalogue_raw r LEFT JOIN listings l ON l.mic=r.mic AND l.symbol=LEFT(r.symbol,24) LEFT JOIN latest_prices p ON p.listing_id=l.id
-             LEFT JOIN series_state s ON s.listing_id=l.id LEFT JOIN (SELECT DISTINCT listing_id FROM portfolio_transactions WHERE listing_id IS NOT NULL) h ON h.listing_id=l.id"""
+             LEFT JOIN series_state s ON s.listing_id=l.id LEFT JOIN history_state hs ON hs.listing_id=l.id LEFT JOIN (SELECT DISTINCT listing_id FROM portfolio_transactions WHERE listing_id IS NOT NULL) h ON h.listing_id=l.id"""
     with conn.cursor() as cur:
         cur.execute('SELECT COUNT(*) n FROM catalogue_raw')
         raw_total = cur.fetchone()['n']
@@ -278,7 +279,7 @@ def titles(conn, req):
                                p.price, p.currency pcur, p.price_time, p.quote_at, p.avg_volume_3m, s.closes_count, s.last_close_date, {Y_EXPR} y_state, {FINAL_EXPR} in_final,
                                h.listing_id IS NOT NULL held, {D_EXPR} d_state
                         {frm}{sql_where} ORDER BY {order}, r.id LIMIT 50 OFFSET %s""",
-            [collect.FULL_SESSIONS] + args + [(page - 1) * 50],
+            args + [(page - 1) * 50],
         )
         rows = cur.fetchall()
         info_done = bool(settings.get(conn, 'last_stats', {}).get('yahoo_info'))
@@ -303,12 +304,20 @@ def titles(conn, req):
         if r['y_state'] == 'pending' and r['quote_at'] is None and info_done:
             r['issue'] = 'Yahoo n’a renvoyé aucune information lors du dernier import'
         elif r['in_final'] and r['d_state'] == 'absent':
-            r['issue'] = 'Aucun historique quotidien reçu : lancez « Importer / mettre à jour les historiques »'
+            r['issue'] = 'Aucun historique quotidien reçu : lancez « Importer / mettre à jour les historiques » puis « Historique de cinq ans »'
         for k in ('price_time', 'quote_at', 'last_close_date'):
             r[k] = iso(r[k])
         r['price'] = None if r['price'] is None else float(r['price'])
         r['in_fdb_universe'] = r['removed_step'] is None
-    return {'total': total, 'raw_total': raw_total, 'page': page, 'pages': max(1, -(-total // 50)), 'rows': rows, 'full': collect.FULL_SESSIONS, 'places': [r['mic'] for r in _distinct_mics(conn)]}
+    return {
+        'total': total,
+        'raw_total': raw_total,
+        'page': page,
+        'pages': max(1, -(-total // 50)),
+        'rows': rows,
+        'full': history_depth.HISTORY_SESSIONS,
+        'places': [r['mic'] for r in _distinct_mics(conn)],
+    }
 
 
 def _distinct_mics(conn):

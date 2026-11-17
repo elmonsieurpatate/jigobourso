@@ -18,7 +18,7 @@ TASKS = (
         'label': 'Historique quotidien',
         'prefix': 'daily:',
         'stats': 'daily',
-        'help': 'Après la clôture officielle de chaque place : récupère les séances manquantes (jamais ce qui est déjà en base, 400 séances conservées), complète les trous, puis recalcule les indicateurs.',
+        'help': 'Après la clôture officielle de chaque place : récupère les séances manquantes (jamais ce qui est déjà en base, 1 260 séances (cinq ans) conservées), complète les trous, puis recalcule les indicateurs.',
         'params': {},
     },
     {

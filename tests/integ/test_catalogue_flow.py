@@ -92,7 +92,7 @@ def test_full_parcours_then_cron_only_maintains(env):
     go(conn, client, 'fdb_import')
     with conn.cursor() as cur:
         cur.execute('SELECT COUNT(*) n FROM catalogue_raw')
-        assert cur.fetchone()['n'] == 5 and tasks.history_coverage(conn)['complete'] == 0
+        assert cur.fetchone()['n'] == 5 and tasks.history_coverage(conn)['depth']['complete'] == 0
     assert statuses(conn) == {}  # l'import ne filtre rien et ne crée aucune cotation
     go(conn, client, 'fdb_filter')
     st = statuses(conn)
@@ -108,7 +108,7 @@ def test_full_parcours_then_cron_only_maintains(env):
     go(conn, client, 'history')
     h = settings.get(conn, 'last_stats')['history']
     assert h['daily']['added'] > 0 and h['intraday']['added'] == 2 * 2 * hours.expected_slots('XETR')
-    assert h['coverage']['complete'] == 2 and h['coverage']['absent'] == 0
+    assert h['coverage']['depth']['absent'] == 0 and h['coverage']['depth']['pending'] == 2 and h['coverage']['depth']['target'] == 1260
     # deuxième passage : rien n'est retéléchargé, aucun doublon
     calls = len(client.calls)
     go(conn, client, 'history', NOW + datetime.timedelta(minutes=5))

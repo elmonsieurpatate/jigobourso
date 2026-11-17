@@ -75,7 +75,7 @@ def test_database_socket_replaces_host_for_isolated_tests(monkeypatch):
         db.connect()
 
 
-STEPS = ('backup', 'quotes', 'fx', 'fx_history', 'gaps', 'volumes', 'detect', 'verify', 'recheck', 'compute', 'warm', 'etf', 'snapshot', 'outcomes', 'prune', 'housekeeping')
+STEPS = ('backup', 'quotes', 'fx', 'fx_history', 'gaps', 'deep', 'closures', 'volumes', 'detect', 'verify', 'recheck', 'compute', 'warm', 'etf', 'snapshot', 'outcomes', 'prune', 'housekeeping')
 
 
 @pytest.fixture
@@ -102,6 +102,7 @@ def plan(monkeypatch):
     monkeypatch.setattr(tasks, '_volumes_job_running', lambda conn: False)
     monkeypatch.setattr(tasks, '_job_running', lambda conn, job_type: False)
     monkeypatch.setattr(tasks.history_depth, 'run', step('deep', {'examined': 3, 'added': 7, 'volumes': 9, 'errors': 0, 'remaining': 0, 'rate_limited': False}))
+    monkeypatch.setattr(tasks.history_depth, 'reclassify', step('closures', {'incomplete -> complete': 2}))
     monkeypatch.setattr(tasks.splits, 'detect', step('detect', 0))
     monkeypatch.setattr(tasks.splits, 'verify', step('verify', {'confirmed': 0, 'real_move': 0, 'unanswered': 0}))
     monkeypatch.setattr(tasks.splits, 'recheck', step('recheck', {'rechecked': 0, 'confirmed': 0, 'unanswered': 0, 'waiting': 0}))
@@ -128,6 +129,7 @@ def test_maintenance_runs_everything_and_the_backup_comes_first(plan):
         'fx_history',
         'gaps',
         'deep',
+        'closures',
         'volumes',
         'detect',
         'verify',

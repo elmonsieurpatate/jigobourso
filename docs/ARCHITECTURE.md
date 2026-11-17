@@ -16,7 +16,7 @@ Rien n'est déployé ni modifié en production sans accord explicite. Ni Git ni 
 | # | Décision | Valeur |
 |---|---|---|
 | D1 | Cotation principale (R1) | place d'origine, puis liquidité (prix × volume moyen 3 mois, en EUR), devise euro puis ordre alphabétique en départage |
-| D2 | Historique quotidien | **400 séances** glissantes |
+| D2 | Historique quotidien | **1 260 séances (cinq ans)** glissantes, pour tous les titres (rétention 2 000 jours) |
 | D3 | Intraday | **barres de 15 min conservées** ; historiques 5 min et 1 h **supprimés** (modification du dossier initial) |
 | D4 | Titres collectés | sélectionnés principaux **+ toutes les cotations détenues** |
 | D5 | Page Suivi | **faite** : instantanés quotidiens des classements (`ranking_snapshots`) + résultats à 1/3/5 séances (`ranking_outcomes`) comparés à l'univers (`universe_outcomes`) |
@@ -38,7 +38,7 @@ Hypothèse à confirmer (réglable dans `settings`, pas de décision bloquante) 
 ## 3. Modèle de données (`db/schema.sql`, 26 tables/vues)
 
 - **Catalogue** : `instruments`, `listings` (ids = anciens `listing_id`), `catalogue_loads`.
-- **Prix** : `daily_prices` (400 séances), `intraday_prices` (15 min), `latest_prices`, `fx_rates`, `corporate_events`, `price_gaps`.
+- **Prix** : `daily_prices` (1 260 séances), `history_state` (registre de profondeur), `intraday_prices` (15 min), `latest_prices`, `fx_rates`, `corporate_events`, `price_gaps`.
 - **Analyse** : `strategy_metrics` (par titre et par fenêtre), `series_state` (indicateurs techniques, ruptures, qualité).
 - **Exploitation** : `jobs`, `job_logs`, `settings`, `result_cache` (verdicts de l'Explorer par configuration ; invalidé quand `data_version` change : calcul nocturne, jeu recommandable, traitement terminé ; ≈ 0,25 s au lieu de ≈ 1,5 s).
 - **Suivi** : `ranking_snapshots`, `ranking_outcomes`, `universe_outcomes` (`engine/analytics/portfolio/tracking.py`, alimentées par `nightly`).
@@ -117,7 +117,7 @@ Parcours, dans l'ordre, tout est manuel dans l'administration :
 | Filtres FinanceDatabase | `fdb_filter` | applique les règles aux données brutes (sans télécharger), crée/met à jour les cotations |
 | Import informations Yahoo | `yahoo_info` | cours, devise, volume moyen des titres issus du filtrage (pas d'historique) |
 | Filtres Yahoo | `yahoo_filter` | prix, liquidité, volume sur les informations stockées : le résultat est le catalogue final |
-| Historiques | `history` | clôtures manquantes (400 séances) + barres 15 min des deux dernières séances + indicateurs |
+| Historiques | `history` | clôtures manquantes récentes + barres 15 min des deux dernières séances + indicateurs |
 
 - **Règles** : `engine/catalogue/rules.py` (FinanceDatabase) et `engine/market/prefilter.py` (Yahoo) ; valeurs par défaut conservées, tout est modifiable. Les **places de cotation sont libres** : toute place présente dans les données importées est proposable (aucune liste codée en dur ne limite le choix). Une place sans horaires connus (`hours.known`) n'a que les clôtures quotidiennes.
 - **Cron** (`tick`) : uniquement `daily:<place>`, `intraday:<place>` puis `maintenance` (cours, indicateurs, suivi, trous, rétention) sur le catalogue final + titres détenus. Il n'importe jamais FinanceDatabase, ne filtre jamais, ne modifie jamais le catalogue. Seul un passage déclenché par le cron compte comme « observé » (`schedule.beat`).

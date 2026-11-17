@@ -509,7 +509,6 @@ def prune_daily(conn, now):
     return n
 
 
-FULL_SESSIONS = 400
 RANGES = ((4, '5d'), (25, '1mo'), (80, '3mo'), (170, '6mo'), (350, '1y'))
 
 

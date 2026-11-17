@@ -30,6 +30,9 @@ MARGIN_DAYS = 7  # marge avant la première séance manquante (fériés, décala
 RECENT_TOLERANCE_DAYS = 5  # écart toléré entre le premier cours de Yahoo et les séances manquantes les plus anciennes
 CLOSED_SHARE = 0.05  # un jour où moins de 5 % des titres récupérés d'une place ont une barre est une fermeture de la place
 CLOSED_MIN_TITLES = 20  # il faut au moins 20 titres récupérés sur la place pour en juger
+CLOSED_MAX_PER_PLACE = 10  # au-delà, la liste d'une place est suspecte (panne de données, pas fermetures) : aucune fermeture n'est retenue pour elle
+CLOSED_OUTAGE_SHARE = 0.5  # un jour « fermé » pour plus de la moitié des places jugées est une panne générale de données, jamais une fermeture
+CLOSED_OUTAGE_MIN_PLACES = 3  # nombre minimal de places jugées pour appliquer ce contrôle croisé
 CLOSED_SETTING = 'market_closed_days'
 RETRY_DAYS = {'error': 0.25, 'unavailable': 7, 'incomplete': 30}  # délai avant de redemander un titre selon son état ; complete et recent ne sont plus redemandés
 DEEP_LIMIT = 100  # titres traités au plus par passage de maintenance
@@ -101,7 +104,16 @@ def _compute_closed(conn, now):
             )
             count = {r['price_date']: r['c'] for r in cur.fetchall()}
             out[mic] = sorted(d for d in cal['dates'] if count.get(d, 0) < CLOSED_SHARE * n)
-    return out
+    return _reject_outages(out)
+
+
+def _reject_outages(flagged):
+    """Écarte ce qui ressemble à une panne de données plutôt qu'à une fermeture : un jour signalé sur la majorité des places jugées, ou une place qui en cumule trop."""
+    if len(flagged) >= CLOSED_OUTAGE_MIN_PLACES:
+        votes = Counter(d for ds in flagged.values() for d in ds)
+        general = {d for d, v in votes.items() if v > CLOSED_OUTAGE_SHARE * len(flagged)}
+        flagged = {mic: [d for d in ds if d not in general] for mic, ds in flagged.items()}
+    return {mic: ds for mic, ds in flagged.items() if len(ds) <= CLOSED_MAX_PER_PLACE}
 
 
 def closed_days(conn, now, refresh=False):
@@ -321,11 +333,17 @@ def reclassify(conn, now):
 
 
 def coverage(conn):
-    """Registre de profondeur pour l'administration : nombre de titres du jeu de collecte par état, titres sans ligne (à traiter) et jours omis par Yahoo."""
+    """Profondeur de l'historique du jeu de collecte, pour l'administration : UNE définition, celle du registre `history_state` (la même que le job `history_deep`).
+    complete : 1 260 séances présentes ; recent : titre plus jeune que la profondeur (rien de plus ancien chez Yahoo) ; incomplete : séances omises par Yahoo ;
+    unavailable / error : à reprendre ; pending : jamais vérifié (le titre a des cours, la profondeur n'a pas encore été contrôlée) ; absent : aucun cours du tout."""
     with conn.cursor() as cur:
-        cur.execute("SELECT COALESCE(h.status,'pending') s, COUNT(*) n, COALESCE(SUM(h.holes),0) holes FROM v_collect_set c LEFT JOIN history_state h ON h.listing_id=c.listing_id GROUP BY s")
+        cur.execute(
+            """SELECT CASE WHEN h.status IS NOT NULL THEN h.status WHEN EXISTS (SELECT 1 FROM daily_prices d WHERE d.listing_id=c.listing_id) THEN 'pending' ELSE 'absent' END s,
+                      COUNT(*) n, COALESCE(SUM(h.holes),0) holes
+               FROM v_collect_set c LEFT JOIN history_state h ON h.listing_id=c.listing_id GROUP BY s"""
+        )
         rows = cur.fetchall()
-    out = {s: 0 for s in ('complete', 'recent', 'incomplete', 'unavailable', 'error', 'pending')}
+    out = {s: 0 for s in ('complete', 'recent', 'incomplete', 'unavailable', 'error', 'pending', 'absent')}
     holes = 0
     for r in rows:
         out[r['s']] = int(r['n'])

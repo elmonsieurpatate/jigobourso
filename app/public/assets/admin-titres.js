@@ -24,9 +24,13 @@
       pending: ["warn", "En attente"],
       secondary: ["", "Secondaire"],
       na: ["", "–"],
-      complete: ["ok", "Complet"],
-      partial: ["warn", "Incomplet"],
-      absent: ["danger", "Absent"],
+      complete: ["ok", "5 ans complets"],
+      recent: ["info", "Récent"],
+      incomplete: ["warn", "Séances manquantes"],
+      unavailable: ["warn", "Indisponible"],
+      error: ["danger", "En erreur"],
+      pending: ["", "À vérifier"],
+      absent: ["danger", "Aucun cours"],
     };
     const badge = (k) => J.badge(B[k][1], B[k][0]);
     const cols = [
@@ -37,7 +41,7 @@
       "Mon catalogue",
       "Motif",
       { label: "Dernier cours", sort: "price_time" },
-      { label: "Quotidien", sort: "closes" },
+      { label: "Historique (5 ans)", sort: "closes" },
       "15 min",
       "Mise à jour / problème",
     ];
@@ -67,9 +71,13 @@
         ])}</select>
         <select id="td">${opt(tf.daily, [
           ["", "Historique quotidien : tous"],
-          ["complete", "Complet"],
-          ["partial", "Incomplet"],
-          ["absent", "Absent"],
+          ["complete", "5 ans complets"],
+          ["recent", "Récent (plus jeune que 5 ans)"],
+          ["incomplete", "Séances manquantes"],
+          ["pending", "À vérifier"],
+          ["unavailable", "Indisponible chez Yahoo"],
+          ["error", "En erreur"],
+          ["absent", "Aucun cours"],
         ])}</select></div>
       ${r.raw_total ? "" : '<div class="notice u-margin-0-18px-12px">Aucun titre connu : importez et filtrez FinanceDatabase (page FinanceDatabase).</div>'}
       <div class="table-wrap"><table>${J.table.head(cols, { key: tf.sort, dir: tf.dir })}<tbody>

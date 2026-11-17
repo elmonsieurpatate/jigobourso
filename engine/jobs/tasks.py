@@ -240,13 +240,10 @@ def fetch_intraday(conn, client, rows, now, cb=None, previous=True, failed=None)
 
 
 def history_coverage(conn):
-    """Historique quotidien du catalogue final : complet (≥ 400 séances), incomplet, absent ; date de dernière donnée."""
+    """Historique quotidien du catalogue final : profondeur de cinq ans selon le registre `history_state` (`depth`, même définition que le job `history_deep`),
+    date de dernière donnée, clôtures manquantes de la dernière année et volumes."""
     with conn.cursor() as cur:
-        cur.execute(
-            """SELECT COALESCE(SUM(n=0),0) absent, COALESCE(SUM(n BETWEEN 1 AND %s),0) partial, COALESCE(SUM(n>=%s),0) complete, MAX(last_day) last_day FROM
-                       (SELECT c.listing_id, COUNT(d.price_date) n, MAX(d.price_date) last_day FROM v_collect_set c LEFT JOIN daily_prices d ON d.listing_id=c.listing_id GROUP BY c.listing_id) t""",
-            (collect.FULL_SESSIONS - 1, collect.FULL_SESSIONS),
-        )
+        cur.execute("SELECT MAX(s.last_close_date) last_day FROM series_state s JOIN v_collect_set c ON c.listing_id=s.listing_id")
         r = cur.fetchone()
         cur.execute("""SELECT COUNT(*) titles, COALESCE(SUM(s.expected_252-s.observed_252),0) days, COALESCE(SUM(s.expected_252-s.observed_252<=2),0) small
                        FROM series_state s JOIN v_collect_set c ON c.listing_id=s.listing_id WHERE s.coverage_252<1 AND s.expected_252 IS NOT NULL""")
@@ -257,9 +254,6 @@ def history_coverage(conn):
     failing = len(collect.setting(conn, collect.VOLUME_ERRORS, {}))
     return {
         'depth': history_depth.coverage(conn),
-        'absent': int(r['absent']),
-        'partial': int(r['partial']),
-        'complete': int(r['complete']),
         'last_day': r['last_day'].isoformat() if r['last_day'] else None,
         'gap_titles': int(g['titles']),
         'gap_days': int(g['days']),
@@ -423,6 +417,14 @@ def maintenance(conn, client, now, log):
                 f'{r.get("examined", 0)} titres traités ({r.get("added", 0)} clôtures, {r.get("volumes", 0)} volumes ajoutés, {r.get("errors", 0)} en échec), {r["remaining"]} restent à traiter'
                 + (' (limitation Yahoo : reprise au prochain passage)' if r['rate_limited'] else '')
             ),
+        )
+    if _job_running(conn, 'history_deep'):
+        log('info', 'Fermetures exceptionnelles : le rattrapage manuel est en cours, reclassement reporté')
+    else:
+        attempt(
+            'Fermetures exceptionnelles',
+            lambda: history_depth.reclassify(conn, now),  # aucun appel Yahoo, ni cours ni volumes modifiés : seuls les statuts du registre changent
+            lambda c: f'{sum(c.values())} titres reclassés' if c else 'aucun titre reclassé',
         )
     if _volumes_job_running(conn):
         log('info', 'Volumes quotidiens : le rattrapage manuel est en cours, étape ignorée pour ne pas doubler les appels Yahoo')

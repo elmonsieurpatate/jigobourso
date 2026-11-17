@@ -206,3 +206,17 @@ def test_history_depth_classification_and_bounded_loading():
     # la lecture du calcul couvre toujours la fenêtre la plus longue demandée, mais pas davantage que nécessaire
     assert history_since([1, 21, 252], now) == now.date() - datetime.timedelta(days=610)
     assert history_since([1, 21, 1260], now) <= cal['start']
+
+
+def test_general_data_outage_is_never_taken_for_a_market_closure():
+    import datetime
+
+    from engine.market import history_depth as hd
+
+    d = lambda n: datetime.date(2025, 1, n)
+    # un jour signalé par 3 places sur 4 : panne générale ; un jour propre à une seule place : vraie fermeture
+    out = hd._reject_outages({'XNYS': [d(9), d(20)], 'XETR': [d(20)], 'XPAR': [d(20)], 'XLON': []})
+    assert out == {'XNYS': [d(9)], 'XETR': [], 'XPAR': [], 'XLON': []}
+    # une place qui cumule trop de jours est suspecte : rien n'est retenu pour elle
+    many = [datetime.date(2025, 1, 1) + datetime.timedelta(days=i) for i in range(hd.CLOSED_MAX_PER_PLACE + 1)]
+    assert hd._reject_outages({'XNYS': many}) == {}

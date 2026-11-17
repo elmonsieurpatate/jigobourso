@@ -84,6 +84,8 @@ def test_backfill_keeps_existing_closes_fills_volumes_and_classifies_recent_titl
     assert {float(r['close_px']) for r in rows if r['price_date'] in set(have)} == {10.0}  # jamais écrasées
     assert all(r['volume'] is not None for r in rows)  # volumes vides complétés
     assert status(conn, 1)['status'] == 'recent'
+    cov = history_depth.coverage(conn)  # titre jeune : « récent », jamais compté parmi les séances manquantes
+    assert cov['recent'] == 1 and cov['incomplete'] == 0 and cov['complete'] == 0 and cov['holes'] == 0
     # la demande par dates part de la première séance manquante moins une marge, et couvre la fin de la fenêtre
     symbol, start, end = client.calls[0]
     assert start == DAYS[0] - datetime.timedelta(days=history_depth.MARGIN_DAYS) and end >= DAYS[-1]  # première séance manquante de la fenêtre, moins la marge
@@ -112,11 +114,15 @@ def test_exceptional_closure_is_not_a_hole_but_a_real_hole_stays_incomplete(conn
     client = DeepClient(series)
     history_depth.run(conn, client, rows, NOW, limit=None)
     assert {status(conn, i)['status'] for i in range(1, 22)} == {'incomplete'}  # fermeture encore inconnue : tout paraît incomplet
+    calls, before = len(client.calls), [prices(conn, i) for i in (1, 22)]
     changes = history_depth.reclassify(conn, NOW)
+    assert len(client.calls) == calls and [prices(conn, i) for i in (1, 22)] == before  # aucun appel Yahoo, cours et volumes intacts
     assert changes == {'incomplete -> complete': 21}
     assert status(conn, 1)['status'] == 'complete' and status(conn, 1)['closed_days'] == 1
     assert status(conn, 22)['status'] == 'incomplete' and status(conn, 22)['holes'] == 2
     assert closure in history_depth.closed_days(conn, NOW)['XETR']
+    cov = history_depth.coverage(conn)  # une seule définition : celle du registre, avec le nombre de jours omis
+    assert cov['complete'] == 21 and cov['incomplete'] == 1 and cov['holes'] == 2
 
 
 def test_errors_are_retried_and_rate_limit_leaves_the_title_unmarked(conn):
