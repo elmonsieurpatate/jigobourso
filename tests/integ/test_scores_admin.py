@@ -129,14 +129,14 @@ def test_per_strategy_normalisations_persist_change_only_their_strategy_and_the_
     p['tuning'] = dict(p['tuning'], sat_a=40.0, accel_ref=1.5, vol_mode='relative')
     A.save(conn, {'profile': dict(p, name='rebound')})
     st = {s['name']: s for s in A.state(conn)['strategies']}
-    assert st['rebound']['current']['tuning'] == {'sat_a': 40.0, 'accel_ref': 1.5, 'vol_mode': 'relative'}  # persisté et relu
+    assert st['rebound']['current']['tuning'] == {'sat_a': 40.0, 'accel_ref': 1.5, 'vol_mode': 'relative', 'dd_ref_long': 60.0, 'mrar_lo': -30.0, 'mrar_hi': 20.0}  # persisté et relu
     assert st['growth_v4']['current']['tuning']['sat_a'] == 17.0  # autre stratégie : inchangée
     assert S._key(scores_profiles.build_config(conn, 'rebound'), ver) != key_before  # les nouveaux paramètres font partie de la clé de cache
     assert S._key(scores_profiles.build_config(conn, 'growth_v4'), ver) == S._key(scores_profiles.base_config('growth_v4'), ver)
     after = {n: {e['id']: (e['simple'], e['complex']) for e in S.score_book(conn, scores_profiles.build_config(conn, n), ver).values()} for n in ('growth_v4', 'rebound')}
     assert after['growth_v4'] == before['growth_v4'] and after['rebound'] != before['rebound']
     sim = scores_ranking.simulate(conn, {'strategy': 'rebound', 'q': 'UP.DE'})
-    assert sim['tuning'] == {'sat_a': 40.0, 'accel_ref': 1.5, 'vol_mode': 'relative'}  # la simulation affiche ce que le calcul utilise
+    assert sim['tuning'] == {'sat_a': 40.0, 'accel_ref': 1.5, 'vol_mode': 'relative', 'dd_ref_long': 60.0, 'mrar_lo': -30.0, 'mrar_hi': 20.0}  # la simulation affiche ce que le calcul utilise
     A.save(conn, {'reset': 'profile', 'name': 'rebound'})
     assert (
         scores_profiles.build_config(conn, 'rebound')['scoring']['sat_a'] == 17.0 and scores_profiles.build_config(conn, 'rebound')['scoring']['accel_ref'] == 0.25

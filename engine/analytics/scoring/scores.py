@@ -16,9 +16,10 @@ Le module ne connaît ni la base ni le réseau.
 
 import math
 
-VERSION = 6  # mesures de toutes les composantes confinées à chaque période active
+VERSION = 7  # composante « rendement ajusté du risque » (poids 0 par défaut : notes inchangées) ; mesures de toutes les composantes confinées à chaque période active
 KAPPA = 0.7  # poids automatiques : ω_p ∝ n_p^(1−κ) − n_{p−1}^(1−κ) ; κ = 0,7 redonne les 41,6 % / 58,4 % semaine / mois de V1
 COVERAGE_THRESHOLD = 0.75  # seuil de FIABILITÉ (information) : ne supprime plus aucune note
+MRAR_MIN_SESSIONS = 252  # durée minimale d'une période pour le rendement ajusté du risque (même valeur que score_inputs)
 MIN_SESSIONS = 3  # R² et volatilité n'existent pas sous 3 séances
 DAY_SESSIONS = 1  # granularité « Jour » (facultative, poids 0 par défaut) : seule la variation d'une séance existe, ni R², ni volatilité, ni repli, ni accélération
 SAT_A, SAT_B = (
@@ -31,12 +32,20 @@ ACCEL_R2 = 0.6  # fiabilité de l'accélération : facteur clamp(min(R² des deu
 VOL_MODES = ('absolute', 'relative')  # volatilité : seuils absolus (1 % → 5 %/séance) ou rapportée à la pente (rapport volatilité/pente, plancher de pente VOL_SLOPE_FLOOR)
 VOL_SLOPE_FLOOR = 0.3  # %/séance : pente minimale retenue au dénominateur du mode « relative » (évite les divisions instables)
 VOL_RATIO_BEST, VOL_RATIO_WORST = 1.0, 4.0  # mode « relative » : rapport volatilité/pente ≤ 1 → 100, ≥ 4 → 0
+DD_REF = 15.0  # % : repli pour lequel la note de drawdown tombe à 0, jusqu'à LONG_FROM séances
+DD_REF_LONG, DD_REF_LONG_RANGE = 60.0, (20.0, 100.0)  # % : repli de référence à 756 séances, réglable ; au-delà de LONG_FROM la référence croît comme (n/756)^LONG_EXPONENT
+LONG_EXPONENT = 0.25  # exposant d'horizon des échelles de risque, ajusté sur le 90e centile des replis (252 → 1 260 séances)
+LONG_FROM, LONG_FULL = 252, 504  # jusqu'à 252 séances : échelles historiques inchangées ; de 252 à 504 : transition géométrique lissée ; à partir de 504 : échelles longues
+VOL_RATIO_LONG = (10.0, 150.0)  # mode « relative », échelle longue : rapport volatilité/pente ≤ 10 → 100, ≥ 150 → 0
+VOL_SLOPE_FLOOR_LONG = 0.001  # %/séance : plancher de pente de l'échelle longue (une pente nulle ou négative donne 0)
+MRAR_LO, MRAR_LO_RANGE = -30.0, (-100.0, -1.0)  # %/an : MRAR pour lequel la note du rendement ajusté du risque vaut 0 (réglable)
+MRAR_HI, MRAR_HI_RANGE = 20.0, (1.0, 100.0)  # %/an : MRAR pour lequel elle vaut 100 (réglable)
 GATE_FLOOR = 32.0  # note de dynamique (0-100) en dessous de laquelle régularité et risque d'une période sont amortis
 RELIABILITY_SESSIONS = 21  # le R² d'une fenêtre plus courte est bruité : poids min(1, n/21) dans la moyenne des R²
 ANCHOR_LAMBDA = 0.5  # ancrage récent du score complexe : × (1 − λ(1 − g_court)) ; λ réglable dans l'administration (0 = neutralisé, 1 = maximal)
 LIQUIDITY_FLOOR_EUR, LIQUIDITY_CEIL_EUR = 2e6, 50e6  # échelle logarithmique 0 → 100 de la liquidité (valeur échangée par jour, en euros)
 
-COMPLEX_WEIGHTS = {'dynamics': 40, 'r2': 15, 'up_days': 5, 'concentration': 7, 'volatility': 15, 'drawdown': 8, 'liquidity': 10, 'acceleration': 0, 'momentum': 0, 'recovery': 0}
+COMPLEX_WEIGHTS = {'dynamics': 40, 'r2': 15, 'up_days': 5, 'concentration': 7, 'volatility': 15, 'drawdown': 8, 'liquidity': 10, 'acceleration': 0, 'momentum': 0, 'recovery': 0, 'risk_adjusted': 0}
 COMPLEX_LABELS = {
     'dynamics': 'Dynamique',
     'r2': 'Régularité (R²)',
@@ -48,6 +57,7 @@ COMPLEX_LABELS = {
     'acceleration': 'Accélération',
     'momentum': 'Momentum par période',
     'recovery': 'Récupération après baisse',
+    'risk_adjusted': 'Rendement ajusté du risque',
 }
 PER_PERIOD = ('dynamics', 'r2', 'up_days', 'concentration', 'volatility', 'drawdown', 'acceleration')
 GATED = ('r2', 'up_days', 'concentration', 'volatility', 'drawdown')
@@ -74,15 +84,50 @@ def period_momentum_note(perf, measured_sessions, sat_a=SAT_A):
     return 100 * clamp(perf / saturation(measured_sessions, sat_a))
 
 
-def vol_note(vol, slope, mode='absolute'):
-    """Note 0-100 de volatilité. absolute : (5 − vol)/4 ; relative : rapport vol/max(pente, plancher), 1 → 100 et 4 → 0 (une forte hausse à forte volatilité n'est plus écrasée, une pente nulle ou négative l'est)."""
+def long_weight(n):
+    """Poids de l'échelle « longue » d'une période de n séances : 0 jusqu'à LONG_FROM (échelles historiques exactes), 1 à partir de LONG_FULL, lissé entre les deux
+    (log₂ de l'horizon, puis lissage cubique : dérivée nulle aux deux extrémités, donc aucune cassure à 252 ni à 504)."""
+    if n <= LONG_FROM:
+        return 0.0
+    s = clamp(math.log2(n / LONG_FROM) / math.log2(LONG_FULL / LONG_FROM))
+    return s * s * (3 - 2 * s)
+
+
+def _geo(short, long, w):
+    """Interpolation géométrique entre l'échelle courte et l'échelle longue (les échelles sont multiplicatives)."""
+    return short if w <= 0 else short ** (1 - w) * long**w
+
+
+def drawdown_reference(n, dd_ref_long=DD_REF_LONG):
+    """Repli (%) pour lequel la note de drawdown d'une période de n séances tombe à 0 : 15 jusqu'à 252 séances, puis transition vers dd_ref_long·(n/756)^0,25."""
+    return _geo(DD_REF, dd_ref_long * (n / 756.0) ** LONG_EXPONENT, long_weight(n))
+
+
+def vol_ratio_scale(n):
+    """(meilleur rapport, pire rapport, plancher de pente) du mode « relative » pour une période de n séances ; (1, 4, 0,3) jusqu'à 252 séances."""
+    w = long_weight(n)
+    return _geo(VOL_RATIO_BEST, VOL_RATIO_LONG[0], w), _geo(VOL_RATIO_WORST, VOL_RATIO_LONG[1], w), _geo(VOL_SLOPE_FLOOR, VOL_SLOPE_FLOOR_LONG, w)
+
+
+def period_risk_adjusted_note(mrar, n, lo=MRAR_LO, hi=MRAR_HI):
+    """Rendement ajusté du risque d'une période : échelle affine du MRAR annualisé (en %/an) entre `lo` (0) et `hi` (100), la même pour toutes les périodes.
+    None sous un an (douze rendements mensuels n'existent pas) ou sans mesure : jamais une valeur artificielle."""
+    if mrar is None or n < MRAR_MIN_SESSIONS:
+        return None
+    return 100 * clamp((mrar - lo) / (hi - lo))
+
+
+def vol_note(vol, slope, mode='absolute', n=None):
+    """Note 0-100 de volatilité. absolute : (5 − vol)/4 ; relative : rapport vol/max(pente, plancher), 1 → 100 et 4 → 0 jusqu'à 252 séances (une forte hausse à forte volatilité n'est plus écrasée, une pente nulle ou négative l'est).
+    Au-delà de 252 séances le mode relatif change d'échelle sans cassure (vol_ratio_scale) : 10 → 100 et 150 → 0 à partir de 504 séances."""
     if vol is None:
         return None
     if mode == 'relative':
         if slope is None:
             return None
-        ratio = vol / max(slope, VOL_SLOPE_FLOOR)
-        return 100 * clamp((VOL_RATIO_WORST - ratio) / (VOL_RATIO_WORST - VOL_RATIO_BEST))
+        best, worst, floor = (VOL_RATIO_BEST, VOL_RATIO_WORST, VOL_SLOPE_FLOOR) if n is None else vol_ratio_scale(n)
+        ratio = vol / max(slope, floor)
+        return 100 * clamp((worst - ratio) / (worst - best))
     return 100 * clamp((5 - vol) / 4)
 
 
@@ -133,7 +178,7 @@ def liquidity_note(turnover_eur):
     return 100 * clamp(math.log10(max(turnover_eur, 1) / LIQUIDITY_FLOOR_EUR) / math.log10(LIQUIDITY_CEIL_EUR / LIQUIDITY_FLOOR_EUR))
 
 
-def period_components(m, n, sat_a=SAT_A, accel_ref=ACCEL_REF, vol_mode='absolute'):
+def period_components(m, n, sat_a=SAT_A, accel_ref=ACCEL_REF, vol_mode='absolute', dd_ref_long=DD_REF_LONG, mrar_lo=MRAR_LO, mrar_hi=MRAR_HI):
     """Notes 0-100 d'une période depuis ses mesures brutes. m : {slope, r2, volatility, drawdown, up_fraction, spike_share, accel, r2_prev}.
     Chaque note absente reste None (jamais 0). Renvoie None si la pente n'est pas mesurable."""
     if not m or m.get('slope') is None or not scorable(n):
@@ -147,17 +192,31 @@ def period_components(m, n, sat_a=SAT_A, accel_ref=ACCEL_REF, vol_mode='absolute
             'gate': clamp(dyn / GATE_FLOOR),
             'raw': {k: (m.get(k) if k == 'slope' else None) for k in ('slope', 'r2', 'volatility', 'drawdown', 'up_fraction', 'spike_share', 'accel')},
         }
-        c.update(r2=None, up_days=None, concentration=None, volatility=None, drawdown=None, acceleration=None, momentum=None, recovery=None, liquidity=None, spike_factor=None, up_factor=None)
+        c.update(
+            r2=None,
+            up_days=None,
+            concentration=None,
+            volatility=None,
+            drawdown=None,
+            acceleration=None,
+            momentum=None,
+            recovery=None,
+            risk_adjusted=None,
+            liquidity=None,
+            spike_factor=None,
+            up_factor=None,
+        )
         return c
     growth = period_growth(m['slope'], n)
     dyn = 100 * clamp(growth / saturation(n, sat_a))
-    c = {'growth': growth, 'dynamics': dyn, 'gate': clamp(dyn / GATE_FLOOR), 'raw': {k: m.get(k) for k in ('slope', 'r2', 'volatility', 'drawdown', 'up_fraction', 'spike_share', 'accel')}}
+    c = {'growth': growth, 'dynamics': dyn, 'gate': clamp(dyn / GATE_FLOOR), 'raw': {k: m.get(k) for k in ('slope', 'r2', 'volatility', 'drawdown', 'up_fraction', 'spike_share', 'accel', 'mrar')}}
     r2, up, spike, vol, dd = m.get('r2'), m.get('up_fraction'), m.get('spike_share'), m.get('volatility'), m.get('drawdown')
     c['r2'] = None if r2 is None else 100 * clamp((r2 - 0.5) / 0.45)
     c['up_days'] = None if up is None else 100 * clamp((up - 0.4) / 0.4)
     c['concentration'] = None if spike is None else 100 * clamp((0.60 - spike) / 0.50)
-    c['volatility'] = vol_note(vol, m.get('slope'), vol_mode)
-    c['drawdown'] = None if dd is None else 100 * clamp((15 - dd) / 15)
+    c['volatility'] = vol_note(vol, m.get('slope'), vol_mode, n)
+    dd_ref = drawdown_reference(n, dd_ref_long)
+    c['drawdown'] = None if dd is None else 100 * clamp((dd_ref - dd) / dd_ref)
     accel, r2p = m.get('accel'), m.get('r2_prev')
     if accel is None or r2p is None:
         c['acceleration'] = None
@@ -171,6 +230,7 @@ def period_components(m, n, sat_a=SAT_A, accel_ref=ACCEL_REF, vol_mode='absolute
 
     c['momentum'] = period_momentum_note(m.get('momentum_perf'), n - recent_exclusion(n), sat_a)
     c['recovery'] = m.get('recovery')
+    c['risk_adjusted'] = period_risk_adjusted_note(m.get('mrar'), n, mrar_lo, mrar_hi)
     c['liquidity'] = liquidity_note(m.get('turnover_eur'))
     # Qualité de trajectoire de la période (forme V1) : R² × (1 − ½ pic) × (½ + ½ séances positives)
     c['spike_factor'] = None if spike is None else 1 - 0.5 * clamp(spike)
@@ -205,6 +265,9 @@ def score_title(
     sat_a=SAT_A,
     accel_ref=ACCEL_REF,
     vol_mode='absolute',
+    dd_ref_long=DD_REF_LONG,
+    mrar_lo=MRAR_LO,
+    mrar_hi=MRAR_HI,
 ):
     """Calcule les deux scores d'un titre.
 
@@ -222,7 +285,7 @@ def score_title(
     periods = sorted([dict(p) for p in periods if scorable(p['sessions'])], key=lambda p: p['sessions'])
     if weights is None:
         weights = resolve_weights(periods, kappa)
-    comps = {p['id']: period_components(inputs.get(p['sessions']), p['sessions'], sat_a, accel_ref, vol_mode) for p in periods}
+    comps = {p['id']: period_components(inputs.get(p['sessions']), p['sessions'], sat_a, accel_ref, vol_mode, dd_ref_long, mrar_lo, mrar_hi) for p in periods}
     miss = _missing_taxonomy(periods, comps, set(required))
     avail = [p for p in periods if comps[p['id']] is not None and weights.get(p['id'], 0.0) > 0]
     wtot = sum(weights[p['id']] for p in avail)
@@ -261,7 +324,7 @@ def score_title(
         anchor,
         {},
     )
-    res['tuning'] = {'sat_a': sat_a, 'accel_ref': accel_ref, 'vol_mode': vol_mode}
+    res['tuning'] = {'sat_a': sat_a, 'accel_ref': accel_ref, 'vol_mode': vol_mode, 'dd_ref_long': dd_ref_long, 'mrar_lo': mrar_lo, 'mrar_hi': mrar_hi}
     return res
 
 
@@ -318,7 +381,7 @@ def _complex(avail, comps, weights, eff, period_cover, liquidity_score, threshol
             c, pw = comps[p['id']], eff.get(p['id'], 0.0)
             if c.get(key) is None or pw <= 0:
                 continue
-            gate = 1.0 if key in ('dynamics', 'acceleration', 'momentum', 'recovery', 'liquidity') else c['gate']
+            gate = 1.0 if key in ('dynamics', 'acceleration', 'momentum', 'recovery', 'risk_adjusted', 'liquidity') else c['gate']
             s += pw * gate * c[key]
             cv += pw
         if cv <= 0:

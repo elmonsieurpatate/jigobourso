@@ -287,6 +287,12 @@ def validate_scoring(raw, periods):
     sat_a = SC.SAT_A if sat_a is None else sat_a
     accel_ref = number(raw.get('accel_ref', SC.ACCEL_REF), SC.ACCEL_REF_RANGE[0], SC.ACCEL_REF_RANGE[1], 'Référence d’accélération')
     accel_ref = SC.ACCEL_REF if accel_ref is None else accel_ref
+    dd_ref_long = number(raw.get('dd_ref_long', SC.DD_REF_LONG), SC.DD_REF_LONG_RANGE[0], SC.DD_REF_LONG_RANGE[1], 'Repli de référence des périodes longues')
+    dd_ref_long = SC.DD_REF_LONG if dd_ref_long is None else dd_ref_long
+    mrar_lo = number(raw.get('mrar_lo', SC.MRAR_LO), SC.MRAR_LO_RANGE[0], SC.MRAR_LO_RANGE[1], 'MRAR de note 0')
+    mrar_lo = SC.MRAR_LO if mrar_lo is None else mrar_lo
+    mrar_hi = number(raw.get('mrar_hi', SC.MRAR_HI), SC.MRAR_HI_RANGE[0], SC.MRAR_HI_RANGE[1], 'MRAR de note 100')
+    mrar_hi = SC.MRAR_HI if mrar_hi is None else mrar_hi
     vol_mode = raw.get('vol_mode', 'absolute') or 'absolute'
     if vol_mode not in SC.VOL_MODES:
         raise ValueError('Méthode de volatilité inconnue')
@@ -299,6 +305,9 @@ def validate_scoring(raw, periods):
         'sat_a': sat_a,
         'accel_ref': accel_ref,
         'vol_mode': vol_mode,
+        'dd_ref_long': dd_ref_long,
+        'mrar_lo': mrar_lo,
+        'mrar_hi': mrar_hi,
     }
 
 

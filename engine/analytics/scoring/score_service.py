@@ -51,6 +51,9 @@ def params_for(config, kind):
         'sat_a': float(sc.get('sat_a', SC.SAT_A)),
         'accel_ref': float(sc.get('accel_ref', SC.ACCEL_REF)),
         'vol_mode': sc.get('vol_mode', 'absolute'),
+        'dd_ref_long': float(sc.get('dd_ref_long', SC.DD_REF_LONG)),
+        'mrar_lo': float(sc.get('mrar_lo', SC.MRAR_LO)),
+        'mrar_hi': float(sc.get('mrar_hi', SC.MRAR_HI)),
     }
 
 
@@ -82,7 +85,7 @@ def load_inputs(conn, sessions, ids=None):
         if sessions:
             marks = ','.join(['%s'] * len(sessions))
             cur.execute(
-                f"""SELECT m.listing_id, m.sessions, m.slope, m.r2, m.perf, m.volatility, m.drawdown, m.coverage, x.up_fraction, x.spike_share, x.accel, x.r2_prev, x.momentum_perf, x.recovery, x.turnover_eur, x.volume_days
+                f"""SELECT m.listing_id, m.sessions, m.slope, m.r2, m.perf, m.volatility, m.drawdown, m.coverage, x.up_fraction, x.spike_share, x.accel, x.r2_prev, x.momentum_perf, x.recovery, x.mrar, x.turnover_eur, x.volume_days
                             FROM strategy_metrics m JOIN v_recommendable r ON r.listing_id=m.listing_id LEFT JOIN score_inputs x ON x.listing_id=m.listing_id AND x.sessions=m.sessions
                             WHERE m.sessions IN ({marks}){scope}""",
                 list(sessions) + args,
@@ -104,6 +107,7 @@ def load_inputs(conn, sessions, ids=None):
                             'r2_prev',
                             'momentum_perf',
                             'recovery',
+                            'mrar',
                             'turnover_eur',
                             'volume_days',
                         )
@@ -128,6 +132,9 @@ def _score_all(data, config):
             sat_a=p['sat_a'],
             accel_ref=p['accel_ref'],
             vol_mode=p['vol_mode'],
+            dd_ref_long=p['dd_ref_long'],
+            mrar_lo=p['mrar_lo'],
+            mrar_hi=p['mrar_hi'],
         )
     return result
 

@@ -34,6 +34,7 @@
     "acceleration",
     "momentum",
     "recovery",
+    "risk_adjusted",
   ];
 
   const DEF = {
@@ -495,6 +496,7 @@
         "acceleration",
         "momentum",
         "recovery",
+        "risk_adjusted",
       ];
       return `<h2>Poids du score complexe, par stratégie</h2>${H.table(
         ["Stratégie"].concat(k.map((x) => c.complex_labels[x] || x)),

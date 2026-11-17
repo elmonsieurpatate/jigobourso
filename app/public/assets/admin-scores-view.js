@@ -75,6 +75,11 @@ window.AdminScoresView = (ctx) => {
       "Rebond par période",
       "Fraction récupérée du plus grand recul interne à chaque période, modulée par sa profondeur (saturation à 10 %). Une hausse continue vaut 0.",
     ],
+    [
+      "risk_adjusted",
+      "Rendement ajusté du risque",
+      "MRAR (Morningstar, aversion γ = 2) de chaque période, sur ses rendements mensuels calendaires : rendement de prix pénalisé par la variabilité. Disponible à partir de 252 séances et d’au moins 10 mois complets ; note affine du MRAR annualisé entre « note 0 » et « note 100 » (réglages avancés de la stratégie). Dividendes non inclus (0 dans le profil de référence).",
+    ],
   ];
   const TUNING = [
     [
@@ -93,10 +98,31 @@ window.AdminScoresView = (ctx) => {
       "vol_mode",
       "Notation de la volatilité",
       "méthode",
-      "Absolue : 100 à 1 %/séance, 0 à 5 %/séance. Relative à la pente : rapport volatilité ÷ pente (plancher de pente 0,3 %), 100 à 1 et 0 à 4 : une forte hausse peu heurtée n’est plus écrasée, une pente nulle ou négative reste à 0. Le drawdown et la liquidité restent notés à part.",
+      "Absolue : 100 à 1 %/séance, 0 à 5 %/séance. Relative à la pente : rapport volatilité ÷ pente (plancher de pente 0,3 %), 100 à 1 et 0 à 4 jusqu’à 252 séances ; de 252 à 504 séances l’échelle passe continûment à 100 pour 10 et 0 pour 150 (pente nulle ou négative : 0) : une forte hausse peu heurtée n’est plus écrasée, une pente nulle ou négative reste à 0. Le drawdown et la liquidité restent notés à part.",
+    ],
+  ];
+  const LONGTUNING = [
+    [
+      "dd_ref_long",
+      "Repli de référence des périodes longues",
+      "% à 756 séances",
+      "Repli maximal pour lequel la note de drawdown tombe à 0 à 756 séances (3 ans) ; il croît comme (séances/756)^0,25 (≈ 54 % à 504, ≈ 68 % à 1 260). Jusqu’à 252 séances l’échelle historique de 15 % est inchangée ; de 252 à 504 séances l’échelle passe de 15 % à sa valeur longue par une transition continue.",
+    ],
+    [
+      "mrar_lo",
+      "Rendement ajusté du risque : note 0",
+      "%/an",
+      "MRAR annualisé pour lequel la note du rendement ajusté du risque vaut 0 (échelle affine, la même pour toutes les périodes de 252 séances et plus). Valeur négative : les titres en perte ne sont plus tous à 0.",
+    ],
+    [
+      "mrar_hi",
+      "Rendement ajusté du risque : note 100",
+      "%/an",
+      "MRAR annualisé pour lequel la note du rendement ajusté du risque vaut 100. Rendement de prix : les dividendes ne sont pas inclus.",
     ],
   ];
   const VOLMODES = { absolute: "Absolue (1 % → 5 %/séance)", relative: "Relative à la pente" };
+  TUNING.push(...LONGTUNING);
   const CLABEL = Object.fromEntries(COMPLEX.map((c) => [c[0], c[1]]));
   const SIMPLE = [
     [
@@ -186,6 +212,7 @@ window.AdminScoresView = (ctx) => {
       <div class="as-formula">Note finale = somme pondérée × <b>(1 − λ × (1 − g))</b>, où g = min(1, dynamique de la période la plus courte ÷ 32), entre 0 et 1.</div>
       <p class="as-hint">Si la période courte (la semaine) garde une dynamique d’au moins 32 sur 100, g = 1 et rien n’est retiré. Plus elle faiblit, plus la note baisse, jusqu’à −λ (−50 % à λ = 0,5) pour une semaine plate ou négative. <b>λ = 0 neutralise l’ancrage.</b> Réglage commun à toutes les stratégies (onglet « Configuration du moteur »). Il ne concerne pas le score simple.</p>
       <p class="as-hint">Sur la base actuelle, la semaine faible pèse déjà dans la dynamique et dans les composantes amorties par g : l’ancrage s’y ajoute. Pour un titre à semaine plate, les deux premiers canaux retirent environ 35 % de la note et l’ancrage 0,5 porte la perte totale à environ 68 %. Le classement reste stable (corrélation de rang 0,996 entre λ = 0 et λ = 0,5, 93 titres communs sur le top 100) : l’ancrage sert surtout à départager les titres encore actifs de ceux qui ont calé.</p>
+      <p class="as-hint"><b>Rendement ajusté du risque</b> : MRAR = [ moyenne des (1 + r)<sup>−2</sup> ]<sup>−6</sup> − 1 sur les rendements mensuels r (mois calendaires complets, ancrés sur la dernière séance de chaque mois). Il porte sur le cours de prix : les dividendes ne sont pas inclus, un titre distribuant est donc sous-évalué face à un ETF capitalisant. Aucune valeur sous 252 séances ou avec moins de 10 mois complets ; la composante sort alors du calcul et son poids est renormalisé.</p>
       <p class="as-hint">La liquidité est mesurée dans chaque période active avec les seuls volumes réels disponibles, puis combinée selon les poids de la stratégie. Le profil de référence (Dynamique 40, R² 15, séances positives 5, concentration 7, volatilité 15, drawdown 8, liquidité 10) est celui de Croissance rapide.</p>`;
   }
 
@@ -200,7 +227,7 @@ window.AdminScoresView = (ctx) => {
       const input =
         k === "vol_mode"
           ? `<select class="as-select as-tsel" data-a="tune" data-k="${k}">${ctx.S.design.vol_modes.map((v) => `<option value="${v}" ${v === cur ? "selected" : ""}>${E(VOLMODES[v])}</option>`).join("")}</select>`
-          : `<input type="number" class="as-num" data-a="tune" data-k="${k}" min="${R[k][0]}" max="${R[k][1]}" step="${k === "sat_a" ? 1 : 0.05}" value="${cur}"> <span class="muted as-unit">${unit}</span>`;
+          : `<input type="number" class="as-num" data-a="tune" data-k="${k}" min="${R[k][0]}" max="${R[k][1]}" step="${["sat_a", "dd_ref_long", "mrar_lo", "mrar_hi"].includes(k) ? 1 : 0.05}" value="${cur}"> <span class="muted as-unit">${unit}</span>`;
       const shown = k === "vol_mode" ? VOLMODES[dflt] : dflt;
       return `<div class="as-tune"><div class="as-tune-head"><b>${n}</b> <span class="as-i" title="${E(help)}">ⓘ</span></div><div class="as-tune-ctl">${input}</div>
         <p class="as-hint">${E(help)}</p><p class="as-hint as-tune-def">Valeur par défaut : <b>${E(shown)}</b>${k in R ? ` · bornes ${R[k][0]} à ${R[k][1]}` : ""} ${same ? "" : `<button class="btn sm" data-a="tune-reset" data-k="${k}">Valeur par défaut</button>`}</p></div>`;
@@ -510,7 +537,7 @@ window.AdminScoresView = (ctx) => {
       c = r.complex,
       liq = r.liquidity || {};
     return `<div class="card"><div class="row between u-flex-wrap-wrap u-gap-12px"><div><h3 class="as-h m-0">${E(sim.title.name)}</h3><span class="muted">${E(sim.title.symbol)} · ${E(sim.title.mic)} · ${sim.title.kind === "etf" ? "ETF" : "Action"}</span></div><div class="as-scores">${sc(s, "s")}${sc(c, "c")}</div></div>
-      ${sim.tuning ? `<p class="as-hint">Normalisations utilisées par le calcul : saturation de dynamique <b>${fmt(sim.tuning.sat_a, 1)}</b> · référence d’accélération <b>${fmt(sim.tuning.accel_ref, 2)}</b> · volatilité <b>${E(VOLMODES[sim.tuning.vol_mode] || sim.tuning.vol_mode)}</b>.</p>` : ""}
+      ${sim.tuning ? `<p class="as-hint">Normalisations utilisées par le calcul : saturation de dynamique <b>${fmt(sim.tuning.sat_a, 1)}</b> · référence d’accélération <b>${fmt(sim.tuning.accel_ref, 2)}</b> · volatilité <b>${E(VOLMODES[sim.tuning.vol_mode] || sim.tuning.vol_mode)}</b>${sim.tuning.dd_ref_long != null ? ` · repli long <b>${fmt(sim.tuning.dd_ref_long, 0)} %</b> · MRAR <b>${fmt(sim.tuning.mrar_lo, 0)} → ${fmt(sim.tuning.mrar_hi, 0)} %/an</b>` : ""}.</p>` : ""}
       ${chartCard()}
       <div class="table-wrap"><table class="as-dec">${J.table.head(["Mesure", ...ids.map((i) => ({ label: `${E(L[i])}<br><small class="muted">poids réel ${fmt(100 * ((r.weights_effective || {})[i] || 0), 1)} %${r.periods[i] ? "" : " (période sans données)"}</small>`, num: true }))])}<tbody>
         ${rows.map(([n, k, u, d]) => `<tr><td>${n}</td>${ids.map((i) => cell(r.periods[i], k, u, d, i)).join("")}</tr>`).join("")}</tbody></table></div>

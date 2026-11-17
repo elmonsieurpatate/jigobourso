@@ -10,6 +10,7 @@ from engine.market import hours
 from engine.market.collect import latest_rates
 from engine.shared.units import to_eur_factor
 from engine.market.calendar import window_calendars, session_dates
+from ..scoring.score_inputs import window_mrar
 from ..series import signals
 from ..explorer import strategy
 from ..explorer import explorer_config
@@ -92,6 +93,11 @@ def instrument_sheet(conn, request):
         extras = extended_metrics(conn, [u], all_windows).get(lid, {})
         full = {n: dict(m, **extras.get(n, {})) if m else None for n, m in full.items()}
     sheet['measures'] = {str(n): dict(m, slope_period=explorer_config.period_slope(m.get('slope'), n)) if m else None for n, m in full.items()}
+    observed = dict(zip(dates, closes))
+    for n, ds in calendars.items():  # MRAR : même calcul que le moteur (fenêtre complète, aucune rupture de cours dedans)
+        row = sheet['measures'].get(str(n))
+        if row is not None and ds and not any(ds[0] < dates[i] <= ds[-1] for i in breaks):
+            row['mrar'] = window_mrar(ds, observed)
     sheet['analysis_windows'] = {str(n): ds for n, ds in calendars.items()}
     sheet['window_coverage'] = {str(n): {k: m.get(k) for k in ('observations', 'expected_closes', 'missing_sessions', 'coverage')} for n, m in full.items() if m and m.get('coverage') is not None}
     sheet['analysis_basis'] = basis

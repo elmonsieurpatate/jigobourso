@@ -371,6 +371,9 @@ def test_scoring_block_validation():
         'sat_a': 17.0,
         'accel_ref': 0.4,
         'vol_mode': 'absolute',
+        'dd_ref_long': 60.0,
+        'mrar_lo': -30.0,
+        'mrar_hi': 20.0,
     }
     for bad in ({'kappa': 1.0}, {'weights': {'nope': 1}}, {'complex_weights': {'nope': 1}}, {'weights': {'week': -1}}, {'threshold': 2}):
         c['scoring'] = bad
@@ -381,7 +384,19 @@ def test_scoring_block_validation():
 def test_every_existing_configuration_gets_default_scoring_without_changing_its_filters():
     old = S.preset('fast')
     up = LU.upgrade(old)
-    assert up['scoring'] == {'kappa': 0.7, 'weights': {}, 'complex_weights': {}, 'threshold': 0.75, 'anchor': 0.5, 'sat_a': 17.0, 'accel_ref': 0.4, 'vol_mode': 'absolute'}
+    assert up['scoring'] == {
+        'kappa': 0.7,
+        'weights': {},
+        'complex_weights': {},
+        'threshold': 0.75,
+        'anchor': 0.5,
+        'sat_a': 17.0,
+        'accel_ref': 0.4,
+        'vol_mode': 'absolute',
+        'dd_ref_long': 60.0,
+        'mrar_lo': -30.0,
+        'mrar_hi': 20.0,
+    }
     assert up['ranking']['mode'] == 'performance'  # le classement historique est conservé tel quel
 
 

@@ -217,8 +217,11 @@ Fenêtre trouée (`dated_window_metrics`) : acceptée si elle compte au moins `m
 | séances positives | part des variations > 0 de la fenêtre | `scoring/score_inputs.py:path_inputs` |
 | concentration (`spike_share`) | `ln(1 + plus forte hausse d'une séance) / ln(cours final / cours initial)` ; 1 si la fenêtre ne monte pas | `path_inputs` |
 | accélération V4 | pente par séance de la seconde moitié moins celle de la première moitié de la même période ; fiabilité fondée sur leurs R² | `score_inputs.py:window_inputs` |
+| rendement ajusté du risque (MRAR) | `[ (1/T)·Σ(1+r_k)^(−γ) ]^(−12/γ) − 1`, γ = 2 fixe (Morningstar), annualisé en %, sur les rendements mensuels r_k des **mois calendaires complets** de la fenêtre (ancre = clôture de la dernière séance du mois ; le mois en cours et le mois commencé avant la fenêtre ne donnent aucun rendement). Aucun taux sans risque : constant, il ne change aucun classement. Aucune valeur sous 252 séances, ni avec moins de 10 rendements mensuels, ni si la fenêtre a un trou ou une rupture de cours. Stocké dans `score_inputs.mrar` (plafonné à 10⁶ %) | `score_inputs.py:mrar_input`, `monthly_returns` |
 
 Pour le Score 2 V4, `score_inputs` utilise désormais deux moitiés successives **internes** à chaque période. L'ancien momentum 6-1/12-1 reste dans `series_state` pour les lecteurs historiques, mais ne contribue plus aux Scores V4.
+
+**Le MRAR est un rendement de PRIX.** Les cours stockés sont des clôtures brutes (`adj_close_px` n'est pas renseignée) corrigées des seuls splits confirmés : les dividendes n'y figurent pas, le détachement d'un dividende compte comme une perte, et un titre distribuant est sous-évalué face à un ETF capitalisant. Les frais sont déjà dans le cours d'un ETF. Les rendements sont dans la devise de cotation (aucune conversion). Ce n'est jamais un rendement total.
 
 Une clôture absente rend ces mesures indisponibles : on ne comble jamais un trou.
 
@@ -257,7 +260,14 @@ Deux notes sur 100 par stratégie : le score simple et le score complexe. Chaque
 | `SAT_B` | 0,52 | exposant de la saturation |
 | `ACCEL_REF` | 0,4 (plage 0,05 à 5) | accélération de référence |
 | `ACCEL_R2` | 0,6 | R² de pleine confiance de l'accélération |
-| `VOL_SLOPE_FLOOR` | 0,3 | plancher de pente pour la volatilité relative |
+| `VOL_SLOPE_FLOOR` | 0,3 | plancher de pente pour la volatilité relative, jusqu'à 252 séances (échelle longue : 0,001) |
+| `LONG_FROM`, `LONG_FULL` | 252, 504 | jusqu'à 252 séances les échelles de risque historiques s'appliquent **sans aucune modification** ; de 252 à 504 séances elles passent aux échelles longues par une transition continue ; au-delà de 504 séances ce sont les échelles longues |
+| `DD_REF`, `DD_REF_LONG` | 15 %, 60 % | repli pour lequel la note de drawdown tombe à 0 : 15 % jusqu'à 252 séances ; `dd_ref_long` à 756 séances (réglable, 20 à 100) et `dd_ref_long·(n/756)^0,25` au-delà |
+| `LONG_EXPONENT` | 0,25 | exposant d'horizon des échelles de risque (ajusté sur le 90e centile des replis de 252 à 1 260 séances) |
+| `VOL_RATIO_LONG` | 10 ; 150 | volatilité relative, échelle longue : rapport volatilité/pente ≤ 10 → 100, ≥ 150 → 0 (pente nulle ou négative : 0) |
+| `MRAR_LO`, `MRAR_HI` | −30 ; +20 %/an | MRAR annualisé pour lequel la note du rendement ajusté du risque vaut 0 et 100 (réglables, −100 à −1 et 1 à 100) |
+
+**Transition entre échelles courte et longue.** Poids `w(n)` : 0 jusqu'à 252 séances, 1 à partir de 504, entre les deux `s = log₂(n/252)` puis `w = s²(3 − 2s)` (dérivée nulle aux deux bornes : aucune marche). Chaque échelle est interpolée géométriquement : `échelle(n) = courte^(1−w) · longue^w`. Drawdown : courte = 15, longue = `dd_ref_long·(n/756)^0,25`. Volatilité relative : meilleur rapport 1 → 10, pire rapport 4 → 150, plancher de pente 0,3 → 0,001. À `w = 0` les résultats sont ceux de l'ancien code (égalité exacte vérifiée sur 20 000 titres simulés).
 | saturation du momentum | `SAT_A·((n−e(n))/5)^SAT_B` | même famille que la dynamique, sur la durée réellement mesurée |
 | `GATE_FLOOR` | 32 | plancher de la porte de fiabilité |
 | `RELIABILITY_SESSIONS` | 21 | séances d'une période pleinement fiable |
@@ -280,7 +290,7 @@ Poids automatiques : `ω ∝ n^(1−κ) − n_prev^(1−κ)` pour une période d
 
 Moyenne pondérée de notes de composantes, divisée par la somme des poids des composantes disponibles (une composante indisponible ne compte pas comme zéro, son poids sort du dénominateur), puis multipliée par `1 − λ·(1 − porte)` où la porte est celle de la période active la plus courte hors Jour. Avant l'agrégation, la porte de chaque période (dynamique / 32, plafonnée à 1) amortit aussi R², séances positives, concentration, volatilité et drawdown ; dynamique, accélération, momentum, récupération et liquidité n'en ont pas.
 
-Dix composantes (`scores.py:COMPLEX_WEIGHTS`, poids par défaut) :
+Onze composantes (`scores.py:COMPLEX_WEIGHTS`, poids par défaut) :
 
 | Composante | Poids | Note de 0 à 1 |
 |---|---|---|
@@ -288,12 +298,13 @@ Dix composantes (`scores.py:COMPLEX_WEIGHTS`, poids par défaut) :
 | `r2` | 15 | `(R² − 0,5) / 0,45` |
 | `up_days` | 5 | `(part de séances positives − 0,4) / 0,4` |
 | `concentration` | 7 | `(0,60 − spike_share) / 0,5` |
-| `volatility` | 15 | mode absolu : `(5 − vol) / 4` ; mode relatif : rapport volatilité / pente, 1 donne 100 et 4 donne 0, avec plancher de pente `VOL_SLOPE_FLOOR` |
-| `drawdown` | 8 | `(15 − drawdown) / 15` |
+| `volatility` | 15 | mode absolu : `(5 − vol) / 4` ; mode relatif : rapport volatilité / pente, 1 donne 100 et 4 donne 0, avec plancher de pente `VOL_SLOPE_FLOOR` | Au-delà de 252 séances le mode relatif change d'échelle sans cassure (voir *Transition* ci-dessus).
+| `drawdown` | 8 | `(R − drawdown) / R`, `R` = 15 % jusqu'à 252 séances, puis `R(n)` de la transition (60 % à 756 séances par défaut, `(n/756)^0,25` au-delà) |
 | `liquidity` | 10 | par période : valeur échangée moyenne réelle, échelle logarithmique 2 M€ à 50 M€ par jour |
 | `acceleration` | 0 | écart des pentes des deux moitiés internes ; référence `saturation(floor(n/2))/floor(n/2) × accel_ref`, fiabilité par les R² |
 | `momentum` | 0 | par période : rendement du début à `n−e(n)` séances, `e(n)=max(1,min(21,arrondi(n/12)))`, saturé comme la dynamique sur `n−e(n)` |
 | `recovery` | 0 | par période : `100 × fraction du plus grand recul récupérée à la clôture × min(1, profondeur/10 %)`, premier sommet-creux en cas d'égalité ; hausse continue = 0 |
+| `risk_adjusted` | 0 | par période d'au moins 252 séances : `100 × clamp((MRAR − mrar_lo) / (mrar_hi − mrar_lo))`, MRAR annualisé en %/an (§3.3), même échelle pour toutes les périodes (−30 → 0, +20 → 100 par défaut) ; non amortie par la porte de fiabilité ; absente (poids renormalisé) sans mesure. À poids 0 par défaut, aucune note n'est modifiée ; le Score 1 n'utilise jamais cette mesure |
 
 Les bornes de chaque note sont écrêtées entre 0 et 100. Les stratégies donnent des poids différents (§5.2).
 
@@ -303,7 +314,7 @@ Statut d'une note : `ok` (toutes les périodes), `partiel` (couverture ou séanc
 
 ### 4.7 Profils et réglages (`scores_profiles.py`)
 
-- `TUNING_DEFAULTS` : `sat_a`, `accel_ref`, `vol_mode` (`absolute` ou `relative`). Le momentum ne possède plus d'horizon fixe indépendant de la stratégie.
+- `TUNING_DEFAULTS` : `sat_a`, `accel_ref`, `vol_mode` (`absolute` ou `relative`), `dd_ref_long`, `mrar_lo`, `mrar_hi` (les trois derniers ne touchent que les périodes de plus de 252 séances). Le momentum ne possède plus d'horizon fixe indépendant de la stratégie.
 - Les poids des composantes d'un profil totalisent 100 (tolérance 0,05).
 - Profils enregistrés dans `settings.scores_profiles` (officiel) et `scores_profiles_u<uid>` (personnel). Aucun repli global des poids : un profil incomplet est refusé, sauf `momentum` et `recovery` qui valent 0 par défaut.
 - Paramètres globaux κ, seuil de couverture, ancrage : `settings.scores_v4` (validation `explorer/explorer_config.py:validate_scoring` : κ de 0 à 0,95, seuil de 0,1 à 1, ancrage de 0 à 1).

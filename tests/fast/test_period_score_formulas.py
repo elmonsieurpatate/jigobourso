@@ -145,7 +145,7 @@ def test_strategy_21_plus_126_reads_nothing_beyond_126_sessions():
     exact, with_older = _score_rows_21_126(0), _score_rows_21_126(300)
     assert sorted(r[1] for r in exact) == [21, 126]
     by = {r[1]: r for r in exact}
-    assert by[21][9] == 21 and by[126][9] == 126  # séances de volume : celles de la période seulement
+    assert by[21][10] == 21 and by[126][10] == 126  # séances de volume : celles de la période seulement
     assert exact == with_older  # 300 séances plus anciennes ne changent aucune entrée de score
 
 
@@ -163,7 +163,7 @@ def test_strategy_21_plus_126_scores_use_only_those_two_periods():
     obs = {d: c for d, c, _ in bars}
     cal = window_calendars('XETR', days[-1], windows)
     inputs = {}
-    for lid, n, up, spike, accel, r2p, mom, rec, turn, vd in score_rows:
+    for lid, n, up, spike, accel, r2p, mom, rec, mrar, turn, vd in score_rows:
         m = dated_window_metrics(cal[n], obs)[0]
         inputs[n] = dict(
             m, up_fraction=float(up), spike_share=float(spike), accel=float(accel), r2_prev=float(r2p), momentum_perf=float(mom), recovery=float(rec), turnover_eur=float(turn), volume_days=vd
@@ -220,3 +220,231 @@ def test_general_data_outage_is_never_taken_for_a_market_closure():
     # une place qui cumule trop de jours est suspecte : rien n'est retenu pour elle
     many = [datetime.date(2025, 1, 1) + datetime.timedelta(days=i) for i in range(hd.CLOSED_MAX_PER_PLACE + 1)]
     assert hd._reject_outages({'XNYS': many}) == {}
+
+
+# ───────── rendement ajusté du risque (MRAR) ─────────
+def _sessions(n, start='2022-01-03'):
+    import datetime
+
+    out, d = [], datetime.date.fromisoformat(start)
+    while len(out) < n + 1:
+        if d.weekday() < 5:
+            out.append(d.isoformat())
+        d += datetime.timedelta(days=1)
+    return out
+
+
+def _monthly_path(dates, monthly):
+    """Clôtures dont le rendement de chaque mois calendaire est `monthly[i % len]` (réparti à parts égales sur ses séances)."""
+    closes, price, last, k = [], 100.0, None, -1
+    for i, d in enumerate(dates):
+        month = d[:7]
+        if month != last:
+            k += 1
+            last = month
+            size = sum(1 for x in dates if x[:7] == month)
+        price *= (1 + monthly[k % len(monthly)]) ** (1 / size)
+        closes.append(price)
+    return closes
+
+
+def test_monthly_returns_use_complete_calendar_months_only():
+    from engine.analytics.scoring.score_inputs import monthly_returns
+
+    dates = _sessions(756)
+    returns = monthly_returns(dates, [100.0] * len(dates))
+    assert 33 <= len(returns) <= 36 and all(r == 0 for r in returns)
+    # le dernier mois (non terminé) et le premier (commencé avant la fenêtre) ne donnent aucun rendement
+    first_month, last_month = dates[0][:7], dates[-1][:7]
+    closes = [100.0 if d[:7] == first_month else 200.0 for d in dates]
+    assert max(monthly_returns(dates, closes)) == pytest.approx(1.0)  # un seul saut, à la fin du premier mois
+    closes = [100.0 if d[:7] != last_month else 5000.0 for d in dates]
+    assert monthly_returns(dates, closes) == [0.0] * len(monthly_returns(dates, closes))
+
+
+def test_mrar_of_a_constant_monthly_return_is_its_annualised_value_and_variability_is_penalised():
+    from engine.analytics.scoring.score_inputs import mrar_input
+
+    dates = _sessions(756)
+    steady = mrar_input(dates, _monthly_path(dates, [0.01]))
+    assert steady == pytest.approx(100 * (1.01**12 - 1), rel=2e-3)
+    wild = mrar_input(dates, _monthly_path(dates, [0.11, -0.09]))  # même rendement moyen, beaucoup plus de variabilité
+    assert wild is not None and wild < steady
+    lossy = mrar_input(dates, _monthly_path(dates, [-0.01]))
+    assert lossy < 0 and lossy > -100
+
+
+def test_mrar_is_absent_when_the_window_is_too_short_or_incomplete():
+    from engine.analytics.scoring.score_inputs import mrar_input, window_inputs, window_mrar
+
+    for n in (21, 63, 126, 251):
+        d = _sessions(n)
+        assert mrar_input(d, _monthly_path(d, [0.01])) is None  # moins d'un an : jamais de valeur artificielle
+    d = _sessions(252)
+    assert mrar_input(d, _monthly_path(d, [0.01])) is not None  # un an : 10 rendements mensuels complets au moins
+    obs = dict(zip(d, _monthly_path(d, [0.01])))
+    assert window_mrar(d, obs) is not None
+    obs.pop(d[100])  # un trou dans la fenêtre : aucune mesure
+    assert window_mrar(d, obs) is None and window_inputs(d, [], obs)['mrar'] is None
+    assert mrar_input(d, [100.0] * 5) is None and mrar_input([], []) is None
+
+
+def test_extreme_returns_stay_finite_and_inside_the_storage_bound():
+    from engine.analytics.scoring.score_inputs import MRAR_CAP, mrar_input
+
+    d = _sessions(756)
+    value = mrar_input(d, _monthly_path(d, [30.0, 40.0]))
+    assert value is not None and value <= MRAR_CAP
+    assert mrar_input(d, _monthly_path(d, [-0.9, -0.95])) > -100
+
+
+def test_risk_adjusted_note_is_an_affine_scale_of_the_annualised_mrar_and_absent_under_a_year():
+    from engine.analytics.scoring.scores import period_risk_adjusted_note
+
+    assert period_risk_adjusted_note(None, 756) is None and period_risk_adjusted_note(50.0, 126) is None
+    assert period_risk_adjusted_note(-30.0, 756) == 0 and period_risk_adjusted_note(20.0, 756) == 100  # bornes par défaut −30 / +20
+    assert period_risk_adjusted_note(-5.0, 756) == pytest.approx(50.0) and period_risk_adjusted_note(-60.0, 1260) == 0 and period_risk_adjusted_note(1e6, 1260) == 100
+    assert period_risk_adjusted_note(-5.0, 252) == period_risk_adjusted_note(-5.0, 1260)  # même échelle pour toutes les périodes mesurables
+    assert period_risk_adjusted_note(-10.0, 756, -20.0, 10.0) == pytest.approx(100 / 3)  # bornes réglables
+    # les valeurs négatives ne sont plus toutes à 0 : le classement parmi les titres en perte est conservé
+    assert period_risk_adjusted_note(-25.0, 756) < period_risk_adjusted_note(-5.0, 756)
+    # sat_a n'intervient plus : la note ne dépend que de l'échelle affine
+    assert SC.period_components({**_flat_metrics(), 'mrar': -5.0}, 756, sat_a=5.0)['risk_adjusted'] == SC.period_components({**_flat_metrics(), 'mrar': -5.0}, 756, sat_a=100.0)['risk_adjusted']
+
+
+def _flat_metrics():
+    return dict(
+        slope=0.05,
+        r2=0.8,
+        volatility=1.5,
+        drawdown=12.0,
+        up_fraction=0.55,
+        spike_share=0.2,
+        accel=0.001,
+        r2_prev=0.7,
+        momentum_perf=20.0,
+        recovery=30.0,
+        coverage=1.0,
+        turnover_eur=5e6,
+        volume_days=756,
+    )
+
+
+def test_risk_adjusted_weight_zero_leaves_both_scores_unchanged_and_weight_positive_uses_it():
+    def M(n):
+        return dict(
+            slope=0.05,
+            r2=0.8,
+            volatility=1.5,
+            drawdown=12.0,
+            up_fraction=0.55,
+            spike_share=0.2,
+            accel=0.001,
+            r2_prev=0.7,
+            momentum_perf=20.0,
+            recovery=30.0,
+            coverage=1.0,
+            turnover_eur=5e6,
+            volume_days=n,
+        )
+
+    periods = [{'id': 'three_year', 'sessions': 756}, {'id': 'five_year', 'sessions': 1260}]
+    base = {n: M(n) for n in (756, 1260)}
+    with_mrar = {n: dict(M(n), mrar=12.0) for n in (756, 1260)}
+    ref = SC.score_title(base, {}, periods)
+    same = SC.score_title(with_mrar, {}, periods)  # poids par défaut : 0
+    assert same['simple']['score'] == ref['simple']['score'] and same['complex']['score'] == ref['complex']['score']
+    assert same['complex']['contributions'].keys() == ref['complex']['contributions'].keys()
+    weighted = SC.score_title(with_mrar, {}, periods, complex_weights={'dynamics': 20, 'risk_adjusted': 20})
+    assert 'risk_adjusted' in weighted['complex']['contributions'] and weighted['complex']['contributions']['risk_adjusted']['value'] is not None
+    assert weighted['simple']['score'] == ref['simple']['score']  # le Score 1 ne change jamais
+    # sans mesure (titre trop récent) : la composante sort du calcul, son poids est renormalisé (jamais 0 ni bonus)
+    missing = SC.score_title(base, {}, periods, complex_weights={'dynamics': 20, 'risk_adjusted': 20})['complex']
+    assert missing['contributions']['risk_adjusted']['unavailable'] and 0 <= missing['score'] <= 100
+
+
+def test_profiles_saved_before_the_component_stay_valid_with_weight_zero():
+    config = C.validate(__import__('engine.analytics.scoring.scores_specs', fromlist=['x']).V4_STRATEGIES['growth_regular']['build']())
+    profile = scores_profiles.profile_of(config)
+    assert profile['complex_weights']['risk_adjusted'] == 0 and 'risk_adjusted' in SC.COMPLEX_LABELS
+    old = dict(profile, complex_weights={k: v for k, v in profile['complex_weights'].items() if k != 'risk_adjusted'})
+    assert scores_profiles.clean_profile(old)['complex_weights']['risk_adjusted'] == 0
+
+
+# ───────── échelles des périodes longues : aucune modification jusqu'à 252 séances, transition continue ensuite ─────────
+def _old_drawdown_note(dd):
+    return 100 * SC.clamp((15 - dd) / 15)
+
+
+def _old_relative_vol_note(vol, slope):
+    return 100 * SC.clamp((4.0 - vol / max(slope, 0.3)) / (4.0 - 1.0))
+
+
+@pytest.mark.parametrize('n', [3, 5, 21, 63, 126, 189, 252])
+def test_notes_up_to_252_sessions_are_exactly_the_historical_ones(n):
+    import random
+
+    rng = random.Random(n)
+    for _ in range(300):
+        m = dict(_flat_metrics(), drawdown=rng.uniform(0, 80), volatility=rng.uniform(0.1, 8), slope=rng.uniform(-1, 8))
+        for mode in ('absolute', 'relative'):
+            c = SC.period_components(m, n, vol_mode=mode)
+            assert c['drawdown'] == _old_drawdown_note(m['drawdown'])  # égalité exacte, pas approchée
+            assert c['volatility'] == (_old_relative_vol_note(m['volatility'], m['slope']) if mode == 'relative' else 100 * SC.clamp((5 - m['volatility']) / 4))
+        # le réglage des périodes longues n'a aucun effet sur elles
+        assert SC.period_components(m, n, vol_mode='relative', dd_ref_long=25.0)['drawdown'] == SC.period_components(m, n, vol_mode='relative')['drawdown']
+    assert SC.drawdown_reference(n) == 15.0 and SC.vol_ratio_scale(n) == (1.0, 4.0, 0.3)
+
+
+def test_transition_between_252_and_504_sessions_is_continuous_monotone_and_exact_at_both_ends():
+    assert SC.long_weight(252) == 0 and SC.long_weight(504) == 1 and SC.long_weight(1260) == 1
+    assert SC.drawdown_reference(504) == pytest.approx(60 * (504 / 756) ** 0.25) and SC.vol_ratio_scale(504) == (10.0, 150.0, 0.001)
+    prev = SC.drawdown_reference(252)
+    for n in range(253, 2001):
+        ref = SC.drawdown_reference(n)
+        assert ref >= prev - 1e-12  # monotone : un horizon plus long n'exige jamais un repli plus petit
+        assert ref / prev - 1 < 0.012  # aucune marche : au plus 1,2 % de variation de la référence d'une séance à la suivante
+        prev = ref
+    assert SC.drawdown_reference(253) - 15 < 0.01  # dérivée nulle en 252 : 253 séances restent presque à 15 %
+    scales = [SC.vol_ratio_scale(n) for n in range(252, 506)]
+    assert all(b >= a - 1e-12 and w >= v - 1e-12 and f <= g + 1e-12 for (a, v, g), (b, w, f) in zip(scales, scales[1:]))
+    # la note d'un même titre varie peu d'une séance à l'autre sur toute la transition (aucune marche à 252 ni à 504)
+    m = dict(_flat_metrics(), drawdown=20.0, volatility=1.5, slope=0.4)
+    for field, step in (('drawdown', 0.8), ('volatility', 1.5)):  # la note passe de 8 à 100 sur 250 séances : au plus 1,4 point par séance
+        notes = [SC.period_components(m, n, vol_mode='relative')[field] for n in range(252, 520)]
+        assert all(abs(b - a) < step for a, b in zip(notes, notes[1:])), field
+    assert abs(SC.period_components(m, 253, vol_mode='relative')['volatility'] - SC.period_components(m, 252, vol_mode='relative')['volatility']) < 0.05
+
+
+def test_long_period_scales_spread_notes_that_the_historical_scale_flattened_and_dd_ref_long_is_configurable():
+    deep = dict(_flat_metrics(), drawdown=35.0)
+    mild = dict(_flat_metrics(), drawdown=20.0)
+    assert SC.period_components(deep, 252)['drawdown'] == 0 == SC.period_components(mild, 252)['drawdown']  # échelle historique : indiscernables
+    a, b = SC.period_components(deep, 756)['drawdown'], SC.period_components(mild, 756)['drawdown']
+    assert 0 < a < b < 100  # échelle longue : ordonnés
+    assert SC.period_components(deep, 756, dd_ref_long=30.0)['drawdown'] == 0 < SC.period_components(deep, 756, dd_ref_long=90.0)['drawdown']
+    # volatilité relative longue : pente ≤ 0 → 0 ; hausse régulière → bonne note ; plus de plancher de 0,3 qui écrase tout
+    flat_down = SC.period_components(dict(_flat_metrics(), slope=-0.01), 756, vol_mode='relative')['volatility']
+    steady = SC.period_components(dict(_flat_metrics(), slope=0.12, volatility=1.2), 756, vol_mode='relative')['volatility']
+    weak = SC.period_components(dict(_flat_metrics(), slope=0.02, volatility=1.5), 756, vol_mode='relative')['volatility']
+    assert flat_down == 0 and steady > weak > 0
+    assert SC.period_components(dict(_flat_metrics(), slope=0.12, volatility=1.2), 756, vol_mode='absolute')['volatility'] == 100 * SC.clamp((5 - 1.2) / 4)  # mode absolu inchangé
+
+
+def test_new_tunings_are_validated_with_their_ranges_and_default_to_the_proposed_values():
+    ok = C.validate_scoring(None, [])
+    assert (ok['dd_ref_long'], ok['mrar_lo'], ok['mrar_hi']) == (60.0, -30.0, 20.0)
+    ok = C.validate_scoring({'dd_ref_long': 50, 'mrar_lo': -20, 'mrar_hi': 10}, [])
+    assert (ok['dd_ref_long'], ok['mrar_lo'], ok['mrar_hi']) == (50.0, -20.0, 10.0)
+    for bad in ({'dd_ref_long': 5}, {'dd_ref_long': 500}, {'mrar_lo': 0}, {'mrar_lo': -500}, {'mrar_hi': 0}, {'mrar_hi': 500}, {'mrar_lo': 'x'}):
+        with pytest.raises(ValueError):
+            C.validate_scoring(bad, [])
+    design = scores_profiles.design()
+    assert design['tuning']['dd_ref_long'] == 60.0 and design['tuning_ranges']['mrar_lo'] == [-100.0, -1.0] and 'long' in scores_profiles.formula()
+
+
+def test_profiles_saved_before_the_new_tunings_keep_their_scores():
+    config = C.validate(__import__('engine.analytics.scoring.scores_specs', fromlist=['x']).V4_STRATEGIES['growth_regular']['build']())
+    profile = scores_profiles.clean_profile(scores_profiles.profile_of(config))
+    old = dict(profile, tuning={k: v for k, v in profile['tuning'].items() if k in ('sat_a', 'accel_ref', 'vol_mode')})
+    assert scores_profiles.clean_profile(old)['tuning'] == profile['tuning']  # valeurs par défaut complétées, aucun changement de note

@@ -122,7 +122,7 @@ def compute_all(conn, now, batch=400):
             )
         for i in range(0, len(score_rows), 5000):
             cur.executemany(
-                '''INSERT INTO score_inputs(listing_id,sessions,up_fraction,spike_share,accel,r2_prev,momentum_perf,recovery,turnover_eur,volume_days) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)''',
+                '''INSERT INTO score_inputs(listing_id,sessions,up_fraction,spike_share,accel,r2_prev,momentum_perf,recovery,mrar,turnover_eur,volume_days) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)''',
                 score_rows[i : i + 5000],
             )
         # volume_checked_at (passage du collecteur de volumes) est conservé : mise à jour des seuls champs calculés.
@@ -173,7 +173,19 @@ def _compute_one(
             period_bars = [volumes_by_date.get(d, (None, None)) for d in cur_dates[1:]]
             turnover, days = liq.period_turnover(period_bars, eur_factor)
             score_rows.append(
-                (lid, n, _dec(m['up_fraction'], 6), _dec(m['spike_share'], 6), _dec(m['accel']), _dec(m['r2_prev'], 6), _dec(m['momentum_perf'], 4), _dec(m['recovery'], 4), _dec(turnover, 4), days)
+                (
+                    lid,
+                    n,
+                    _dec(m['up_fraction'], 6),
+                    _dec(m['spike_share'], 6),
+                    _dec(m['accel']),
+                    _dec(m['r2_prev'], 6),
+                    _dec(m['momentum_perf'], 4),
+                    _dec(m['recovery'], 4),
+                    _dec(m['mrar'], 4),
+                    _dec(turnover, 4),
+                    days,
+                )
             )
     for n, m in measures.items():
         metric_rows.append(

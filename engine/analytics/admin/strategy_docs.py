@@ -52,6 +52,8 @@ def facts(conn, request=None):
             'min_sessions': SC.MIN_SESSIONS,
             'accel': {'ref': SC.ACCEL_REF, 'r2': SC.ACCEL_R2},
             'recovery': {'depth_saturation_pct': 10},
+            'risk_adjusted': {'gamma': 2, 'min_sessions': 252, 'min_months': 10, 'price_return': True, 'lo': SC.MRAR_LO, 'hi': SC.MRAR_HI},
+            'long': {'from': SC.LONG_FROM, 'full': SC.LONG_FULL, 'exponent': SC.LONG_EXPONENT, 'dd_ref_long': SC.DD_REF_LONG, 'vol_ratio_long': list(SC.VOL_RATIO_LONG)},
             'momentum': {'exclusion_cap': 21, 'exclusion_divisor': 12, 'saturation': {'a': SC.SAT_A, 'b': SC.SAT_B}},
             'liquidity': {'floor_eur': SC.LIQUIDITY_FLOOR_EUR, 'ceil_eur': SC.LIQUIDITY_CEIL_EUR},
             'vol': {'ratio_best': SC.VOL_RATIO_BEST, 'ratio_worst': SC.VOL_RATIO_WORST, 'slope_floor': SC.VOL_SLOPE_FLOOR},

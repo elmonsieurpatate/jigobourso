@@ -18,7 +18,13 @@ def design():
         'anchor': SC.ANCHOR_LAMBDA,
         'complex_weights': dict(SC.COMPLEX_WEIGHTS),
         'tuning': dict(TUNING_DEFAULTS),
-        'tuning_ranges': {'sat_a': list(SC.SAT_A_RANGE), 'accel_ref': list(SC.ACCEL_REF_RANGE)},
+        'tuning_ranges': {
+            'sat_a': list(SC.SAT_A_RANGE),
+            'accel_ref': list(SC.ACCEL_REF_RANGE),
+            'dd_ref_long': list(SC.DD_REF_LONG_RANGE),
+            'mrar_lo': list(SC.MRAR_LO_RANGE),
+            'mrar_hi': list(SC.MRAR_HI_RANGE),
+        },
         'vol_modes': list(SC.VOL_MODES),
     }
 
@@ -33,6 +39,14 @@ def formula():
         'min_sessions': SC.MIN_SESSIONS,
         'liquidity_floor_eur': SC.LIQUIDITY_FLOOR_EUR,
         'liquidity_ceil_eur': SC.LIQUIDITY_CEIL_EUR,
+        'long': {
+            'from': SC.LONG_FROM,
+            'full': SC.LONG_FULL,
+            'exponent': SC.LONG_EXPONENT,
+            'dd_ref': SC.DD_REF,
+            'vol_ratio_long': list(SC.VOL_RATIO_LONG),
+            'vol_slope_floor_long': SC.VOL_SLOPE_FLOOR_LONG,
+        },
     }
 
 
@@ -56,7 +70,7 @@ def profile_of(config):
     }
 
 
-TUNING_DEFAULTS = {'sat_a': SC.SAT_A, 'accel_ref': SC.ACCEL_REF, 'vol_mode': 'absolute'}
+TUNING_DEFAULTS = {'sat_a': SC.SAT_A, 'accel_ref': SC.ACCEL_REF, 'vol_mode': 'absolute', 'dd_ref_long': SC.DD_REF_LONG, 'mrar_lo': SC.MRAR_LO, 'mrar_hi': SC.MRAR_HI}
 
 
 def tuning_of(sc):
@@ -165,7 +179,7 @@ def clean_profile(raw):
     if not [pid for pid in active if pid != 'day'] and not (mode == 'custom' and day_on and out['weights'].get('day', 0) > 0):
         raise ValueError('Jour seul n’a aucun poids automatique : activez une autre granularité ou donnez-lui un poids personnalisé')
     cw = dict(raw.get('complex_weights') or {})
-    for new in ('momentum', 'recovery'):
+    for new in ('momentum', 'recovery', 'risk_adjusted'):
         cw.setdefault(new, 0)  # composantes ajoutées après coup : un profil enregistré sans elles les garde à 0
     if set(cw) != set(SC.COMPLEX_WEIGHTS):
         raise ValueError('Poids du score complexe incomplets')

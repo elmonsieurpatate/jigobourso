@@ -166,6 +166,7 @@ CREATE TABLE IF NOT EXISTS score_inputs (
   r2_prev      DECIMAL(8,6) NULL,
   momentum_perf DECIMAL(12,4) NULL,
   recovery     DECIMAL(8,4) NULL,
+  mrar         DECIMAL(12,4) NULL,                              -- rendement ajusté du risque annualisé (%, γ = 2), mois calendaires, cours de prix ; NULL sous 252 séances
   turnover_eur DECIMAL(20,4) NULL,
   volume_days  SMALLINT UNSIGNED NULL,
   PRIMARY KEY (listing_id, sessions),
