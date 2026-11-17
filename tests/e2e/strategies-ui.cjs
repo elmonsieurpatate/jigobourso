@@ -26,10 +26,10 @@ const api=(pg,route,body)=>pg.evaluate(async([r,b])=>{try{const j=b?await J.post
   // 2. permissions serveur
   for(const r of ['admin/scores','admin/table-layouts','admin/users']){const x=await api(U.pg,r);must(x.json===null,'Route admin ouverte à un compte ordinaire : '+r);}
   must((await api(A.pg,'admin/scores')).json!==null,'Admin refusé');
-  // 3. sélecteur groupé : 7 intégrées Officielles, une entrée chacune
+  // 3. sélecteur groupé : 9 intégrées Officielles (7 historiques + 2 long terme), une entrée chacune
   const opts=async pg=>{await pg.click('.sui-pick-btn');const o=await pg.$$eval('.sui-opt',x=>x.map(e=>({id:e.dataset.id,label:e.querySelector('.grow').textContent.trim(),badge:e.querySelector('.badge').textContent.trim()})));const g=await pg.$$eval('.sui-grp',x=>x.map(e=>e.textContent.trim()));await pg.keyboard.press('Escape');return {o,g};};
   const u=await opts(U.pg);
-  must(/^Stratégies intégrées \(7\)$/i.test(u.g[0]),'Groupe : '+u.g);must(u.o.filter(x=>x.badge.toLowerCase()==='officielle').length===7,'7 Officielles attendues : '+JSON.stringify(u.o));
+  must(/^Stratégies intégrées \(9\)$/i.test(u.g[0]),'Groupe : '+u.g);must(u.o.filter(x=>x.badge.toLowerCase()==='officielle').length===9,'9 Officielles attendues : '+JSON.stringify(u.o));must(['Long terme – Score 2 avec MRAR','Long terme – Score 2 classique'].every(l=>u.o.some(x=>x.label===l)),'Stratégies long terme absentes du sélecteur : '+JSON.stringify(u.o));
   must(new Set(u.o.map(x=>x.label)).size===u.o.length,'Doublon de stratégie');
   must(await U.pg.$('.sui-banner'),'Bandeau absent');
   // 4. texte de la stratégie affiché une seule fois (sous le sélecteur), avec lien vers la fiche
@@ -42,7 +42,7 @@ const api=(pg,route,body)=>pg.evaluate(async([r,b])=>{try{const j=b?await J.post
   let su=await st(U.pg);const sa=await st(A.pg);
   must(su.calm_rise.status==='adapted'&&su.calm_rise.scores.modified>=1&&su.calm_rise.criteria.state==='official','Statut utilisateur : '+JSON.stringify(su.calm_rise));
   must(sa.calm_rise.status==='official','L’adaptation fuit vers un autre compte');
-  must(['growth_v4','growth_regular','calm_rise','rebound','momentum_6m','momentum_12m','momentum_risk'].every(k=>su[k]),'7 stratégies attendues');
+  must(['growth_v4','growth_regular','calm_rise','rebound','momentum_6m','momentum_12m','momentum_risk'].every(k=>su[k]),'7 stratégies historiques attendues');must(['long_mrar','long_classic'].every(k=>su[k]&&su[k].status==='official'),'2 stratégies long terme officielles attendues : '+JSON.stringify(['long_mrar','long_classic'].map(k=>su[k])));
   await U.pg.goto(BASE+'mes-strategies.html');await U.pg.waitForSelector('[data-act="restore-scores"]');
   must((await U.pg.$$('[data-act="compare"]')).length===1,'Comparaison attendue pour une seule stratégie');
   await U.pg.click('[data-act="compare"]');must(await U.pg.$('.sui-cmp .mod'),'Tableau de comparaison absent');
