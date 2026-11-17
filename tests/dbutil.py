@@ -34,6 +34,7 @@ TABLES = (
     'corporate_events',
     'etf_profiles',
     'intraday_prices',
+    'history_state',
     'daily_prices',
     'latest_prices',
     'fx_rates',

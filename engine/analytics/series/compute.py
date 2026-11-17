@@ -14,6 +14,7 @@ from ...market.hours import expected_last_close  # noqa: F401 (conservé pour co
 from ...shared.db import ensure
 
 BASE_WINDOWS = (1, 21, 252)
+LOAD_MIN_DAYS = 610  # lecture minimale des clôtures (≈ 420 séances) : l'historique conservé est plus profond, mais seules les séances utiles au calcul sont lues
 
 
 def wanted_windows(conn):
@@ -29,6 +30,13 @@ def wanted_windows(conn):
     return sorted(w for w in windows if type(w) is int and 1 <= w <= 1260)
 
 
+def history_since(windows, now):
+    """Première date de clôture lue pour le calcul : la plus longue fenêtre demandée (1,6 jour calendaire par séance, plus une marge), au moins LOAD_MIN_DAYS.
+    L'historique de 1 260 séances conservé en base ne coûte donc ni mémoire ni temps tant qu'aucune stratégie ne demande une période longue."""
+    days = max(LOAD_MIN_DAYS, int(max(windows) * 1.6) + 40)
+    return now.date() - datetime.timedelta(days=days)
+
+
 def _dec(v, places=6):
     return None if v is None else round(v, places)
 
@@ -38,6 +46,7 @@ def compute_all(conn, now, batch=400):
 
     Les clôtures sont lues par lots de `batch` cotations : la mémoire reste de l'ordre de la centaine de Mo (hébergement mutualisé)."""
     windows = wanted_windows(conn)
+    since = history_since(windows, now)
     splits = load_splits(conn)
     with conn.cursor() as cur:
         cur.execute('SELECT listing_id, mic FROM v_collect_set')
@@ -69,8 +78,8 @@ def compute_all(conn, now, batch=400):
         with conn.cursor() as cur:
             cur.execute(
                 f"""SELECT listing_id, price_date, close_px, adj_close_px, volume FROM daily_prices
-                            WHERE listing_id IN ({','.join(['%s'] * len(part))}) ORDER BY listing_id, price_date""",
-                part,
+                            WHERE listing_id IN ({','.join(['%s'] * len(part))}) AND price_date >= %s ORDER BY listing_id, price_date""",
+                part + [since],
             )
             volumes = {}
             for r in cur.fetchall():

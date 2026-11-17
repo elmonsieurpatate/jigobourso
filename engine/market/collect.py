@@ -6,17 +6,16 @@ Le jeu de collecte vient de v_collect_set : sélectionnées principales + cotati
 
 import datetime
 import json
-import math
 import statistics
 import threading
 import time
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 
-from . import hours, prefilter
+from . import history_depth, hours, prefilter
 from .yahoo import RateLimited, local_date
 
-DAILY_KEEP_DAYS = 610  # ≈ 420 séances US (580 jours n'en gardaient que 380-399 : jamais « complet » à 400)
+DAILY_KEEP_DAYS = history_depth.KEEP_DAYS  # rétention des clôtures : 1 260 séances (cinq ans de bourse) plus une marge, pour tous les titres, indépendamment des stratégies
 SPARK_BATCH = 20
 QUOTE_BATCH = 50
 CHUNK = 2000
@@ -349,18 +348,12 @@ def volume_candidates(conn, rows, now, since=None):
     by_id = {r['listing_id']: r for r in rows}
     if since is not None and since.tzinfo is not None:
         since = naive_utc(since)
-    target = required_daily_sessions(conn)
-    full_range = '1y' if target <= FULL_SESSIONS else backfill_range(target)
-    depth_tried = setting(conn, 'volume_deep_backfill_tried', {}) if target > FULL_SESSIONS else {}
-    checked, lastnull, volume_counts = {}, set(), {}
+    checked, lastnull = {}, set()
     with conn.cursor() as cur:
         for part in _batches(list(by_id), CHUNK):
             marks = ','.join(['%s'] * len(part))
             cur.execute(f'SELECT listing_id, volume_checked_at FROM liquidity_state WHERE listing_id IN ({marks})', part)
             checked.update({x['listing_id']: x['volume_checked_at'] for x in cur.fetchall()})
-            if target > FULL_SESSIONS:
-                cur.execute(f'SELECT listing_id, COUNT(*) AS n, COUNT(volume) AS valid FROM daily_prices WHERE listing_id IN ({marks}) GROUP BY listing_id', part)
-                volume_counts.update({x['listing_id']: (x['n'], x['valid']) for x in cur.fetchall()})
             if since is None:
                 cur.execute(
                     f"""SELECT d.listing_id FROM daily_prices d JOIN (SELECT listing_id, MAX(price_date) m FROM daily_prices WHERE listing_id IN ({marks}) GROUP BY listing_id) x
@@ -376,15 +369,10 @@ def volume_candidates(conn, rows, now, since=None):
         at = checked.get(lid)
         if since is not None:
             if at is None or at < since:
-                todo.append((at is not None, at or datetime.datetime.min, lid, full_range))
+                todo.append((at is not None, at or datetime.datetime.min, lid, VOLUME_BACKFILL_RANGE))
             continue
         if at is None:
-            todo.append((False, datetime.datetime.min, lid, full_range))
-            continue
-        count, valid = volume_counts.get(lid, (0, 0))
-        prior = depth_tried.get(str(lid))
-        if target > FULL_SESSIONS and count and valid < max(3, math.ceil(0.75 * min(count, target))) and (not prior or (naive_utc(now).date() - datetime.date.fromisoformat(prior)).days > 30):
-            todo.append((False, at, lid, full_range))
+            todo.append((False, datetime.datetime.min, lid, VOLUME_BACKFILL_RANGE))
             continue
         if r['mic'] not in thresholds:
             try:
@@ -406,10 +394,6 @@ def fill_volumes_batch(conn, client, rows, now, limit=100000, budget_s=VOLUME_BU
 
     by_id = {r['listing_id']: r for r in rows}
     plan = volume_candidates(conn, rows, now, since)
-    deep_target = required_daily_sessions(conn)
-    deep_range = backfill_range(deep_target)
-    deep_tried = setting(conn, 'volume_deep_backfill_tried', {}) if deep_target > FULL_SESSIONS else {}
-    requested_ranges = dict(plan)
     errors_seen = setting(conn, VOLUME_ERRORS, {})
     stamp_s = naive_utc(now).strftime('%Y-%m-%dT%H')
     cutoff = naive_utc(now) - datetime.timedelta(hours=VOLUME_RETRY_HOURS)
@@ -444,8 +428,6 @@ def fill_volumes_batch(conn, client, rows, now, limit=100000, budget_s=VOLUME_BU
                     continue
             ensure(conn)  # la connexion a pu être fermée pendant l'attente de Yahoo (20 s d'inactivité)
             n = store_volumes(conn, by_id[lid], data, now)
-            if deep_target > FULL_SESSIONS and requested_ranges.get(lid) == deep_range:
-                deep_tried[str(lid)] = naive_utc(now).date().isoformat()
             stats['examined'] += 1
             stats['written'] += n
             if not n and not any(b[5] is not None for b in (data or {}).get('bars') or []):
@@ -474,13 +456,6 @@ def fill_volumes_batch(conn, client, rows, now, limit=100000, budget_s=VOLUME_BU
         run_pass(again)
     for lid in failed:
         errors_seen[str(lid)] = stamp_s
-    if deep_target > FULL_SESSIONS:
-        with conn.cursor() as cur:
-            cur.execute(
-                'INSERT INTO settings(name,value_json,updated_at) VALUES (%s,%s,%s) ON DUPLICATE KEY UPDATE value_json=VALUES(value_json),updated_at=VALUES(updated_at)',
-                ('volume_deep_backfill_tried', json.dumps(deep_tried), naive_utc(now)),
-            )
-        conn.commit()
     stats['errors'] = len(failed)
     keep = {k: v for k, v in errors_seen.items() if datetime.datetime.strptime(v, '%Y-%m-%dT%H') > cutoff - datetime.timedelta(days=1)}
     with conn.cursor() as cur:
@@ -526,9 +501,9 @@ def collect_daily(conn, client, rows, now, range_='2y', progress=None):
 
 
 def prune_daily(conn, now):
-    keep_days = max(DAILY_KEEP_DAYS, int(required_daily_sessions(conn) * 1.52) + 35)
+    """Supprime les clôtures plus anciennes que la rétention (≈ 5,5 ans). Aucune stratégie, active ou non, ne la réduit : l'historique de 1 260 séances est conservé pour tous les titres."""
     with conn.cursor() as cur:
-        cur.execute('DELETE FROM daily_prices WHERE price_date < %s', (naive_utc(now).date() - datetime.timedelta(days=keep_days),))
+        cur.execute('DELETE FROM daily_prices WHERE price_date < %s', (naive_utc(now).date() - datetime.timedelta(days=DAILY_KEEP_DAYS),))
         n = cur.rowcount
     conn.commit()
     return n
@@ -538,25 +513,7 @@ FULL_SESSIONS = 400
 RANGES = ((4, '5d'), (25, '1mo'), (80, '3mo'), (170, '6mo'), (350, '1y'))
 
 
-def required_daily_sessions(conn):
-    """Plus longue fenêtre réellement demandée, sans dédoubler pour l'accélération."""
-    from engine.shared.period_requests import requested_sessions
-
-    return max({FULL_SESSIONS, *requested_sessions(conn)})
-
-
-def backfill_range(sessions):
-    return '5y' if sessions > 504 else '2y'
-
-
-def latest_settled(mic, now):
-    """Date de la dernière séance dont la clôture officielle est publiée."""
-    day = hours.session_date(mic, now)
-    if not hours.is_settled(mic, day, now):
-        day -= datetime.timedelta(days=1)
-        while day.weekday() >= 5:
-            day -= datetime.timedelta(days=1)
-    return day
+latest_settled = hours.latest_settled  # conservé ici : la plupart des appelants le lisent depuis `collect`
 
 
 def daily_plan(conn, rows, now):
@@ -568,46 +525,20 @@ def daily_plan(conn, rows, now):
         for part in _batches(ids, CHUNK):
             cur.execute(f"SELECT listing_id, COUNT(*) n, MIN(price_date) a, MAX(price_date) b FROM daily_prices WHERE listing_id IN ({','.join(['%s'] * len(part))}) GROUP BY listing_id", part)
             stats.update({r['listing_id']: (r['n'], r['a'], r['b']) for r in cur.fetchall()})
-    tried = setting(conn, 'daily_backfill_tried', {})
-    target = required_daily_sessions(conn)
-    full_range = backfill_range(target)
-    keep_days = max(DAILY_KEEP_DAYS, int(target * 1.52) + 35)
     today = naive_utc(now).date()
     plan, fresh = defaultdict(list), 0
     for r in rows:
         st = stats.get(r['listing_id'])
         if not st:
-            plan[full_range].append(r)
+            plan['2y'].append(r)
             continue
-        n, first, last = st
-        if n < target and first > today - datetime.timedelta(days=keep_days - 20):
-            t = tried.get(str(r['listing_id']))
-            if not t or (today - datetime.date.fromisoformat(t)).days > 30:
-                plan[full_range].append(r)
-                continue
+        last = st[2]
         if last >= latest_settled(r['mic'], now):
             fresh += 1
             continue
         days = (today - last).days
-        plan[next((rg for lim, rg in RANGES if days <= lim), full_range)].append(r)
+        plan[next((rg for lim, rg in RANGES if days <= lim), '2y')].append(r)
     return dict(plan), fresh
-
-
-def mark_backfill_tried(conn, rows, now):
-    """Mémorise les cotations dont la fenêtre complète vient d'être demandée et qui restent sous 400 séances (titres récents) : on ne les redemande pas chaque jour."""
-    ids = [r['listing_id'] for r in rows]
-    target = required_daily_sessions(conn)
-    tried = setting(conn, 'daily_backfill_tried', {})
-    keep = {k: v for k, v in tried.items() if (naive_utc(now).date() - datetime.date.fromisoformat(v)).days <= 30}
-    with conn.cursor() as cur:
-        for part in _batches(ids, CHUNK):
-            cur.execute(f"SELECT listing_id FROM daily_prices WHERE listing_id IN ({','.join(['%s'] * len(part))}) GROUP BY listing_id HAVING COUNT(*) < %s", part + [target])
-            keep.update({str(r['listing_id']): naive_utc(now).date().isoformat() for r in cur.fetchall()})
-        cur.execute(
-            'INSERT INTO settings(name, value_json, updated_at) VALUES (%s,%s,%s) ON DUPLICATE KEY UPDATE value_json=VALUES(value_json), updated_at=VALUES(updated_at)',
-            ('daily_backfill_tried', json.dumps(keep), naive_utc(now)),
-        )
-    conn.commit()
 
 
 def observed_holiday(conn, mic, day):

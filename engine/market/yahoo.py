@@ -88,6 +88,19 @@ class YahooClient:
         text = self.transport.get('/v8/finance/chart/' + urllib.parse.quote(symbol, safe=''), {'range': range_, 'interval': '1d', 'events': 'split', 'includePrePost': 'false'})
         return parse_splits(json.loads(text))
 
+    def chart_dates(self, symbol, start, end):
+        """Clôtures et volumes quotidiens entre deux dates (period1/period2) : la profondeur se déduit des séances voulues, jamais d'un nombre d'années.
+        Ajoute `first_trade` (date de première cotation déclarée par Yahoo, ou None) au résultat de parse_chart ; None si la réponse est inexploitable."""
+        epoch = lambda d: int(datetime(d.year, d.month, d.day, tzinfo=timezone.utc).timestamp())  # noqa: E731
+        text = self.transport.get('/v8/finance/chart/' + urllib.parse.quote(symbol, safe=''), {'period1': epoch(start), 'period2': epoch(end), 'interval': '1d', 'includePrePost': 'false'})
+        payload = json.loads(text)
+        data = parse_chart(payload)
+        if data is not None:
+            meta = ((((payload or {}).get('chart') or {}).get('result') or [{}])[0] or {}).get('meta') or {}
+            ftd = meta.get('firstTradeDate')
+            data['first_trade'] = datetime.fromtimestamp(ftd, timezone.utc).date() if isinstance(ftd, int) and not isinstance(ftd, bool) else None
+        return data
+
     def chart(self, symbol, range_='5d', interval='15m'):
         """Bougies OHLCV d'un seul symbole (utilisé à la consultation d'une fiche) : voir parse_chart."""
         text = self.transport.get('/v8/finance/chart/' + urllib.parse.quote(symbol, safe=''), {'range': range_, 'interval': interval, 'includePrePost': 'false'})

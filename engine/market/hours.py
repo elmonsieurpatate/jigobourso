@@ -98,6 +98,16 @@ def is_settled(mic, day, now):
     return now >= end
 
 
+def latest_settled(mic, now):
+    """Date de la dernière séance dont la clôture officielle est publiée."""
+    day = session_date(mic, now)
+    if not is_settled(mic, day, now):
+        day -= timedelta(days=1)
+        while day.weekday() >= 5:
+            day -= timedelta(days=1)
+    return day
+
+
 def settle_utc(mic, day):
     """Instant (UTC naïf, comme la base) à partir duquel la clôture officielle de la séance `day` est publiée."""
     tz, _, closes = spec(mic)

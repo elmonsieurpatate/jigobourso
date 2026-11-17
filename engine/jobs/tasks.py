@@ -21,7 +21,7 @@ from engine.analytics.market_views import etf
 from engine.analytics.explorer import funnel
 from engine.analytics.portfolio import tracking
 from engine.catalogue import loader
-from engine.market import catchup, collect, hours, splits
+from engine.market import catchup, collect, history_depth, hours, splits
 from engine.market.yahoo import RateLimited
 from engine.shared import settings
 from engine.shared.db import ensure
@@ -208,8 +208,6 @@ def fetch_daily(conn, client, rows, now, cb=None, allowed=None):
     for rng, group in plan.items():
         ok, ln, er = collect.collect_daily(conn, client, group, now, range_=rng, progress=cb)
         answered, lines, err = answered + ok, lines + ln, err + er
-        if rng == '2y':
-            collect.mark_backfill_tried(conn, group, now)
     if cb and fresh:
         cb(fresh)
     added = max(0, _count(conn, 'daily_prices', ids) - before)
@@ -258,6 +256,7 @@ def history_coverage(conn):
         v = cur.fetchone()
     failing = len(collect.setting(conn, collect.VOLUME_ERRORS, {}))
     return {
+        'depth': history_depth.coverage(conn),
         'absent': int(r['absent']),
         'partial': int(r['partial']),
         'complete': int(r['complete']),
@@ -414,6 +413,17 @@ def maintenance(conn, client, now, log):
             + (' (limitation Yahoo : reprise au prochain passage)' if r['rate_limited'] else '')
         ),
     )
+    if _job_running(conn, 'history_deep'):
+        log('info', 'Historique de cinq ans : le rattrapage manuel est en cours, étape ignorée pour ne pas doubler les appels Yahoo')
+    else:
+        attempt(
+            'Historique de cinq ans',
+            lambda: history_depth.run(conn, client, rows, now, limit=history_depth.DEEP_LIMIT, budget_s=history_depth.DEEP_BUDGET_S, workers=GAP_WORKERS, client_factory=type(client)),
+            lambda r: (
+                f'{r.get("examined", 0)} titres traités ({r.get("added", 0)} clôtures, {r.get("volumes", 0)} volumes ajoutés, {r.get("errors", 0)} en échec), {r["remaining"]} restent à traiter'
+                + (' (limitation Yahoo : reprise au prochain passage)' if r['rate_limited'] else '')
+            ),
+        )
     if _volumes_job_running(conn):
         log('info', 'Volumes quotidiens : le rattrapage manuel est en cours, étape ignorée pour ne pas doubler les appels Yahoo')
     else:
@@ -569,7 +579,7 @@ def tick(conn, client, now=None, trigger='cron'):
     return done
 
 
-JOBS = ('fdb_import', 'fdb_filter', 'yahoo_info', 'yahoo_filter', 'history', 'gaps', 'volumes')
+JOBS = ('fdb_import', 'fdb_filter', 'yahoo_info', 'yahoo_filter', 'history', 'gaps', 'volumes', 'history_deep')
 MANUAL_LABELS = {
     'maintenance': 'Entretien après collecte',
     'metrics': 'Indicateurs et classements',
@@ -581,6 +591,7 @@ MANUAL_LABELS = {
     'history': 'Import / mise à jour des historiques',
     'gaps': 'Clôtures manquantes (tout le catalogue)',
     'volumes': 'Volumes quotidiens (tout le catalogue)',
+    'history_deep': 'Historique de cinq ans (tout le catalogue)',
 }
 
 
@@ -603,7 +614,7 @@ def precheck(conn, name):
         raise ValueError('Aucun titre à interroger : filtrez d’abord FinanceDatabase (étape 2).')
     if name == 'history' and not collect.collection_set(conn):
         raise ValueError('Le catalogue final est vide : filtrez d’abord Yahoo Finance (étape 4).')
-    if name in ('gaps', 'volumes') and not collect.collection_set(conn):
+    if name in ('gaps', 'volumes', 'history_deep') and not collect.collection_set(conn):
         raise ValueError('Le catalogue final est vide : filtrez d’abord Yahoo Finance (étape 4).')
     if busy:
         raise ValueError(f'« {MANUAL_LABELS[busy["job_type"]]} » est déjà en cours : attendez sa fin.')
@@ -654,6 +665,69 @@ def gaps_all(conn, client, now, log):
         r['examined'],
         int(r['rate_limited']),
         f'{r["added"]} clôtures ajoutées sur {r["examined"]} titres examinés sur {r["candidates"]} incomplets' + (' · limitation Yahoo, à relancer' if r['rate_limited'] else ''),
+    )
+
+
+def _job_running(conn, job_type):
+    with conn.cursor() as cur:
+        cur.execute("SELECT 1 FROM jobs WHERE job_type=%s AND status IN ('queued','running') LIMIT 1", (job_type,))
+        return cur.fetchone() is not None
+
+
+DEEP_BACKOFF_S = (60, 120, 240)  # pauses successives quand Yahoo limite les appels (429), avant d'arrêter proprement : relancer reprend où le traitement s'est arrêté
+
+
+def history_deep(conn, client, now, log):
+    """« Historique de cinq ans » : complète jusqu'à 1 260 séances de clôtures et de volumes pour TOUS les titres du jeu de collecte, sans plafond de temps ni de quantité,
+    quatre fils Yahoo. Relançable : seuls les titres sans état, en erreur ou à réessayer sont repris ; les clôtures existantes ne sont jamais modifiées.
+    Ensuite : reclassement des fermetures exceptionnelles (ex. 9 janvier 2025 à Wall Street), puis recalcul des indicateurs si des données ont été ajoutées."""
+    rows = collect.collection_set(conn)
+    if not rows:
+        raise RuntimeError('Le catalogue final est vide : filtrez d’abord Yahoo Finance')
+    total = {'examined': 0, 'added': 0, 'volumes': 0, 'complete': 0, 'recent': 0, 'incomplete': 0, 'unavailable': 0, 'error': 0}
+    limited = 0
+    r = {}
+    while True:
+        r = _step(
+            log,
+            'Historique de cinq ans',
+            lambda: history_depth.run(
+                conn,
+                client,
+                rows,
+                now,
+                limit=None,
+                budget_s=6 * 3600,
+                workers=GAP_WORKERS,
+                client_factory=type(client),
+                progress=lambda d, t: log.progress(f'Historique de cinq ans : {d} / {t} titres') if hasattr(log, 'progress') else None,
+            ),
+            lambda r: (
+                f'{r.get("examined", 0)} titres traités sur {r["candidates"]}, {r.get("added", 0)} clôtures et {r.get("volumes", 0)} volumes ajoutés, {r.get("errors", 0)} en échec'
+                + (' (limitation Yahoo)' if r['rate_limited'] else '')
+            ),
+        )
+        for k in total:
+            total[k] += r.get(k, 0)
+        if not r['rate_limited'] or limited >= len(DEEP_BACKOFF_S):
+            break
+        wait = DEEP_BACKOFF_S[limited]
+        limited += 1
+        log('warning', f'Limitation Yahoo (429) : pause de {wait} s puis reprise ({limited}/{len(DEEP_BACKOFF_S)})')
+        time.sleep(wait)
+    _step(log, 'Fermetures exceptionnelles', lambda: history_depth.reclassify(conn, now), lambda c: f'{sum(c.values())} titres reclassés' if c else 'aucun titre reclassé')
+    if total['added'] or total['volumes']:
+        _step(log, 'Détection des sauts de cours', lambda: splits.detect(conn, now), lambda n: f'{n} nouveaux sauts ressemblant à un split')
+        _step(log, 'Indicateurs et classements', lambda: compute.compute_all(conn, now), lambda c: f'{c[0]} séries, {c[1]} lignes de mesures')
+    cov = history_depth.coverage(conn)
+    if not r['candidates'] and not total['examined']:
+        return 0, 0, 'rien à faire : tous les titres ont déjà leur historique de cinq ans'
+    return (
+        total['examined'],
+        total['error'] + int(r['rate_limited']),
+        f'{total["examined"]} titres traités ({cov["complete"]} complets, {cov["recent"]} récents, {cov["incomplete"]} incomplets, {cov["unavailable"]} indisponibles, {cov["error"]} en erreur, {cov["pending"]} à traiter)'
+        + f' · +{total["added"]} clôtures, +{total["volumes"]} volumes'
+        + (' · limitation Yahoo, à relancer' if r['rate_limited'] else ''),
     )
 
 
@@ -712,6 +786,7 @@ def run_manual(conn, client, name, now=None, trigger='admin'):
         'history': lambda log: history(conn, client, now, log),
         'gaps': lambda log: gaps_all(conn, client, now, log),
         'volumes': lambda log: volumes_all(conn, client, now, log),
+        'history_deep': lambda log: history_deep(conn, client, now, log),
         'maintenance': lambda log: maintenance(conn, client, now, log),
         'metrics': lambda log: _recompute(conn, now, log, 'metrics'),
         'etf': lambda log: _recompute(conn, now, log, 'etf'),

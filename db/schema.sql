@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS catalogue_loads (
 ) ENGINE=InnoDB;
 
 -- ───────────── PRIX ─────────────
-CREATE TABLE IF NOT EXISTS daily_prices (                                     -- clôtures DÉFINITIVES, 400 séances glissantes
+CREATE TABLE IF NOT EXISTS daily_prices (                                     -- clôtures DÉFINITIVES, 1 260 séances (cinq ans) conservées pour tous les titres
   listing_id   INT UNSIGNED NOT NULL,
   price_date   DATE NOT NULL,
   close_px     DECIMAL(16,6) NOT NULL,
@@ -62,6 +62,22 @@ CREATE TABLE IF NOT EXISTS daily_prices (                                     --
   PRIMARY KEY (listing_id, price_date),
   CONSTRAINT fk_daily_listing FOREIGN KEY (listing_id) REFERENCES listings(id)
 ) ENGINE=InnoDB ROW_FORMAT=COMPRESSED KEY_BLOCK_SIZE=8;
+
+-- Profondeur de l'historique quotidien (1 260 séances par titre) : trop récent, incomplet ou en erreur ? Alimentée par engine/market/history_depth.py.
+CREATE TABLE IF NOT EXISTS history_state (
+  listing_id  INT UNSIGNED NOT NULL,
+  status      VARCHAR(12) CHARACTER SET ascii NOT NULL,
+  checked_at  DATETIME NOT NULL,
+  first_bar   DATE NULL,
+  holes       SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+  missing     SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+  closed_days SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+  added       INT UNSIGNED NOT NULL DEFAULT 0,
+  detail      VARCHAR(120) NULL,
+  PRIMARY KEY (listing_id),
+  KEY ix_history_state_status (status, checked_at),
+  CONSTRAINT fk_history_state_listing FOREIGN KEY (listing_id) REFERENCES listings(id)
+) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS intraday_prices (                                  -- barres de 15 min normalisées sur leur créneau
   listing_id  INT UNSIGNED NOT NULL,

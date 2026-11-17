@@ -187,3 +187,22 @@ def test_title_sheet_labels_every_period_including_custom_ones():
     assert _period_label({'id': 'half', 'sessions': 126}) == 'Six mois'
     assert _period_label({'id': 'two_year', 'sessions': 504}) == '2 ans'
     assert _period_label({'id': 'custom_x', 'sessions': 400}) == '400 séances'
+
+
+def test_history_depth_classification_and_bounded_loading():
+    import datetime
+
+    from engine.analytics.series.compute import history_since
+    from engine.market import history_depth as H
+
+    now = datetime.datetime(2026, 11, 17, 12, tzinfo=datetime.timezone.utc)
+    cal = H.Calendars(now).get('XNYS')
+    gap = cal['dates'][-500]
+    have = set(cal['dates']) - {gap}
+    assert H.classify(cal, have, set(), cal['dates'][0], None) == ('incomplete', 1, 1)
+    assert H.classify(cal, have, {gap}, cal['dates'][0], None) == ('complete', 0, 0)  # fermeture exceptionnelle : pas un trou
+    young = set(cal['dates'][-300:])
+    assert H.classify(cal, young, set(), cal['dates'][-300], cal['dates'][-300])[0] == 'recent'
+    # la lecture du calcul couvre toujours la fenêtre la plus longue demandée, mais pas davantage que nécessaire
+    assert history_since([1, 21, 252], now) == now.date() - datetime.timedelta(days=610)
+    assert history_since([1, 21, 1260], now) <= cal['start']

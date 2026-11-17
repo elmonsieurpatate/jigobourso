@@ -100,6 +100,8 @@ def plan(monkeypatch):
     monkeypatch.setattr(tasks.collect, 'fill_gaps_batch', step('gaps', {'added': 2, 'examined': 1, 'remaining': 0, 'rate_limited': False}))
     monkeypatch.setattr(tasks.collect, 'fill_volumes_batch', step('volumes', {'examined': 5, 'written': 40, 'without_volume': 1, 'errors': 0, 'remaining': 0, 'rate_limited': False}))
     monkeypatch.setattr(tasks, '_volumes_job_running', lambda conn: False)
+    monkeypatch.setattr(tasks, '_job_running', lambda conn, job_type: False)
+    monkeypatch.setattr(tasks.history_depth, 'run', step('deep', {'examined': 3, 'added': 7, 'volumes': 9, 'errors': 0, 'remaining': 0, 'rate_limited': False}))
     monkeypatch.setattr(tasks.splits, 'detect', step('detect', 0))
     monkeypatch.setattr(tasks.splits, 'verify', step('verify', {'confirmed': 0, 'real_move': 0, 'unanswered': 0}))
     monkeypatch.setattr(tasks.splits, 'recheck', step('recheck', {'rechecked': 0, 'confirmed': 0, 'unanswered': 0, 'waiting': 0}))
@@ -125,6 +127,7 @@ def test_maintenance_runs_everything_and_the_backup_comes_first(plan):
         'fx',
         'fx_history',
         'gaps',
+        'deep',
         'volumes',
         'detect',
         'verify',

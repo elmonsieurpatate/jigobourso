@@ -111,11 +111,20 @@ Jour férié observé (`collect.py:observed_holiday`) : une place est jugée fé
 
 | Constante | Valeur | Rôle (`engine/market/collect.py`) |
 |---|---|---|
-| `DAILY_KEEP_DAYS` | 610 minimum | rétention étendue selon la plus longue fenêtre réellement demandée |
-| `FULL_SESSIONS` | 400 minimum | cible de rattrapage étendue selon les périodes actives, sans doublement pour l'accélération |
+| `DAILY_KEEP_DAYS` | 2 000 jours (`history_depth.KEEP_DAYS`) | rétention fixe des clôtures : 1 260 séances plus une marge, pour tous les titres, **quelles que soient les périodes actives** |
+| `FULL_SESSIONS` | 400 | seuil « historique complet » des listes de l'administration (minimum utile au calcul) ; la profondeur de référence est `history_depth.HISTORY_SESSIONS` = 1 260 |
 | `SPARK_BATCH` | 20 | symboles par appel d'historique |
 | `QUOTE_BATCH` | 50 | symboles par appel de cotation |
 | `FX_HISTORY_DAYS` | 300 | profondeur visée de l'historique de change |
+
+**Profondeur permanente de cinq ans** (`engine/market/history_depth.py`, registre `history_state`). Chaque titre de l'univers conserve jusqu'à 1 260 séances de clôtures et de volumes, indépendamment des stratégies : conserver les cours et calculer les scores sont deux besoins distincts, et les Scores 1 et 2 ne lisent que les séances de leurs périodes actives (le calcul nocturne ne lit que `max(610 jours, 1,6 × plus longue fenêtre demandée + 40 jours)`, `compute.history_since`).
+
+- **Demande à Yahoo** : point d'accès `chart`, un appel par titre, par dates (`YahooClient.chart_dates`, `period1`/`period2`) depuis la première séance manquante de la fenêtre moins 7 jours. La fenêtre vient du calendrier de la place (`Calendars` : les 1 260 dernières séances jusqu'à la dernière clôture publiée) : cinq années civiles ne couvrent pas toujours 1 260 séances (1 797 à 1 832 jours selon les places).
+- **Écriture** : `INSERT IGNORE` des seuls jours absents (une clôture existante n'est jamais modifiée) et `UPDATE ... WHERE volume IS NULL` pour les volumes vides.
+- **États du registre** : `complete` (1 260 séances présentes, ou déjà complet sans appel), `recent` (titre plus jeune que la profondeur : Yahoo n'a rien de plus ancien, jamais redemandé), `incomplete` (Yahoo omet des jours après sa première barre ; nouvelle tentative après 30 jours), `unavailable` (aucune barre ou HTTP 404 ; 7 jours), `error` (échec réseau ; 6 heures). Un titre sans ligne est à traiter : un nouveau titre reçoit son historique complet à la maintenance suivante.
+- **Fermetures exceptionnelles** : une séance du calendrier où moins de 5 % des titres récupérés d'une place (au moins 20) ont une barre n'est pas un trou (ex. 9 janvier 2025 à Wall Street, inconnu de certaines versions d'`exchange_calendars`). Recalculées au plus une fois par jour (`settings.market_closed_days`) et à la fin du rattrapage, qui reclasse les « incomplets » (`history_depth.reclassify`).
+- **Rattrapage ONE SHOT** : tâche `history_deep` (administration, « Historique de cinq ans » ; ou `python -m engine.cli job --name history_deep`), tout le catalogue, quatre fils, sans plafond de temps, reprenable (les titres déjà traités sont sautés), pauses de 60/120/240 s sur limitation Yahoo (429) puis arrêt propre.
+- **Collectes habituelles** : l'étape « Historique de cinq ans » de la maintenance traite au plus `DEEP_LIMIT` = 100 titres et `DEEP_BUDGET_S` = 90 s par passage (nouveaux titres d'abord, puis erreurs et incomplets dont le délai est écoulé) et s'efface pendant le rattrapage manuel. Les clôtures du jour restent gérées par `daily_plan` (petites fenêtres).
 
 - Clôtures quotidiennes dans `daily_prices` (clôtures définitives, `close_px`, `volume`). La colonne `adj_close_px` est réservée et jamais renseignée ; un cours ajusté n'est jamais mélangé à `close_px`.
 - Intraday : barres de 15 minutes dans `intraday_prices`, conservées `retention_sessions` séances (20 par défaut, 5 à 60, plafond `YAHOO_DEPTH_SESSIONS`) ; `prune_intraday` purge le reste. Les trous de collecte sont consignés dans `price_gaps` ; un créneau est jugé troué selon les seuils de `collect.py` (0,4 / 2 créneaux / 0,05 / 0,85).

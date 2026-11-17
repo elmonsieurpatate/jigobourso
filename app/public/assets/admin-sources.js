@@ -83,7 +83,8 @@
       fin = s.final,
       st = info.stats,
       cov = fin.coverage,
-      h = fin.stats;
+      h = fin.stats,
+      dp = cov.depth || {};
     const hist = fin.last_history,
       many = (x) => (x == null ? "–" : nf(x));
     AC.page.innerHTML = `${runBar()}${s.pending.map((p) => `<div class="notice mb-3">${J.esc(p)}</div>`).join("")}
@@ -105,6 +106,8 @@
         <button class="btn primary lg" id="go-history" ${fin.total ? "" : 'disabled title="Le catalogue final est vide : filtrez d’abord Yahoo"'}>Importer / mettre à jour les historiques</button>
         <button class="btn ml-2" id="go-gaps" ${fin.total ? "" : "disabled"} title="Un appel Yahoo par titre dont l’année est incomplète">Combler les clôtures manquantes</button>
         <button class="btn ml-2" id="go-volumes" ${fin.total ? "" : "disabled"} title="Un appel Yahoo par titre : un an de volumes quotidiens">Collecter les volumes quotidiens</button>
+        <button class="btn ml-2" id="go-deep" ${fin.total ? "" : "disabled"} title="Un appel Yahoo par titre : jusqu’à ${dp.target || 1260} séances de clôtures et de volumes">Historique de cinq ans</button>
+        <p class="small mt-2">Historique de cinq ans (${nf(dp.target || 1260)} séances) : <b>${nf(dp.complete)}</b> complets · <b>${nf(dp.recent)}</b> titres plus jeunes que cinq ans · <span class="${dp.incomplete ? "warn" : ""}">${nf(dp.incomplete)} incomplets (${nf(dp.holes)} jours omis par Yahoo)</span> · ${nf(dp.unavailable)} indisponibles · <span class="${dp.error ? "warn" : ""}">${nf(dp.error)} en erreur</span> · <b>${nf(dp.pending)}</b> à traiter. Le cron complète automatiquement les nouveaux titres et les erreurs ; le rattrapage ci-dessus traite tout le catalogue en une fois et reprend où il s’est arrêté. Les séances de fermeture exceptionnelle d’une place ne sont pas comptées comme des trous.</p>
         <p class="small mt-2">Volumes quotidiens : <b>${nf(cov.volume_checked)}</b> titres traités sur <b>${nf(cov.volume_titles)}</b> · liquidité réelle pour <b>${nf(cov.volume_real_liquidity)}</b> titres · <span class="${cov.volume_errors ? "warn" : ""}">${nf(cov.volume_errors)} en échec (repris automatiquement)</span> · dernière collecte : <b>${cov.volume_last ? J.dateTime(cov.volume_last) : "jamais"}</b>. L’entretien automatique renouvelle les volumes à chaque nouvelle séance.</p>
         <p class="small mt-2">Clôtures manquantes sur la dernière année : <b>${nf(cov.gap_days)}</b> séances sur <b>${nf(cov.gap_titles)}</b> titres${cov.gap_titles ? ` (dont ${nf(cov.gap_small)} titres à 1 ou 2 séances seulement)` : ""}. Un titre déjà essayé aujourd’hui n’est pas redemandé : s’il reste incomplet, c’est que Yahoo n’a pas ces jours.</p>
         <p class="small muted mt-2">Récupère les clôtures quotidiennes manquantes (jusqu’à ${fin.full} séances, sans retélécharger l’existant), complète les barres de 15 minutes des deux dernières séances, puis recalcule les indicateurs. Le cron entretient ensuite ces historiques automatiquement.</p>
@@ -153,6 +156,12 @@
         "gaps",
         "Combler les clôtures manquantes",
         "Interroge Yahoo (un appel par titre) pour chaque titre dont la dernière année a des séances manquantes, ajoute uniquement les jours absents, puis recalcule les indicateurs. Plusieurs minutes ; reprenable si Yahoo limite les appels.",
+      );
+    J.$("#go-deep").onclick = () =>
+      run(
+        "history_deep",
+        "Historique de cinq ans",
+        "Interroge Yahoo (un appel par titre, 4 en parallèle) pour compléter jusqu’à 1 260 séances de clôtures et de volumes pour tout le catalogue, sans jamais modifier une clôture existante, puis recalcule les indicateurs. Plusieurs dizaines de minutes ; reprenable : les titres déjà traités sont sautés. Aucune stratégie n’est modifiée : les scores n’utilisent que leurs périodes actives.",
       );
     J.$("#go-volumes").onclick = () =>
       run(
