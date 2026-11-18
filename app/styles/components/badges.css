@@ -1,4 +1,4 @@
-/* Badges : .badge (+ .ok .warn .danger .info .accent .outline .sm) et états métier équivalents. */
+/* Badges : .badge (+ .ok .warn .caution .danger .info .accent .outline .sm) et états métier équivalents. */
 :is(.badge, .as-pill, .ct-tag, .ps-tag) {
   display: inline-flex;
   align-items: center;
@@ -31,6 +31,11 @@
   border-color: transparent;
   color: var(--warn-ink);
 }
+.badge.caution {
+  background: var(--caution-soft);
+  border-color: transparent;
+  color: var(--caution-ink);
+}
 .badge.danger {
   background: var(--danger-soft);
   border-color: transparent;
@@ -41,6 +46,13 @@
 }
 .badge.sm {
   padding: var(--sp-2) var(--sp-8);
+}
+button.badge {
+  cursor: pointer;
+}
+.badge svg {
+  width: 13px;
+  height: 13px;
 }
 button.badge:hover {
   border-color: var(--accent);

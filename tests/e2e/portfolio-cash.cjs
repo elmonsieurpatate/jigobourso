@@ -25,11 +25,12 @@ const USER = 'cash_user', PASS = 'cash-local-password-2026';
     const dialog = page.locator('dialog[open]');
     const click = async (name) => dialog.getByRole('button', { name, exact: true }).click();
     const closed = () => page.locator('dialog[open]').waitFor({ state: 'detached' });
-    const row = (name) => page.locator('tr', { hasText: name });
+    const row = (name) => page.locator('.card', { hasText: name }).filter({ has: page.locator('[data-a="edit"], [data-a="unarchive"]') }).last();
     const act = (name, a) => row(name).locator(`[data-a="${a}"]`).click();
 
     // ── création par l'interface ──
     await page.goto(BASE + '/mes-portefeuilles.html');
+    await page.locator('#side').waitFor();   // le menu latéral est monté (J.init)
     await page.locator('#pfm-new').click();
     await page.locator('#pf-name').fill('ETF Long Terme');
     await page.locator('#pf-kind').selectOption('virtual');
@@ -50,7 +51,7 @@ const USER = 'cash_user', PASS = 'cash-local-password-2026';
     const cashText = await page.locator('#cash-host').innerText();
     assert.match(cashText.replace(/[\s  ]/g, ''), /1000,00€deliquidités/, 'solde affiché : ' + cashText.slice(0, 80));
     assert.match(cashText, /Capital initial/);
-    assert.ok(await page.locator('.notice', { hasText: 'Liquidités' }).count(), 'bandeau de liquidités');
+    assert.equal(await page.locator('.notice.info', { hasText: 'Liquidités' }).count(), 0, 'plus de bandeau d’information : le bilan unique le remplace');
 
     // ── achat 200 € puis vente 250 € par l'interface ──
     const trade = async (side, price) => {
@@ -71,6 +72,49 @@ const USER = 'cash_user', PASS = 'cash-local-password-2026';
     assert.equal(Math.round(detail.totals.realized * 100) / 100, 50, 'gain réalisé conservé');
     assert.equal(detail.positions.length, 0, 'plus de position ouverte'); assert.equal(detail.closed.length, 1, 'position clôturée conservée');
     assert.equal(detail.totals.total_gain, 50);
+
+    await page.goto(BASE + '/mes-portefeuilles.html');
+    await page.locator('[data-sub="portefeuilles"] a.sv', { hasText: '🚀' }).waitFor();   // icône du portefeuille dans le menu (chargé après la page)
+
+    // ── bilan avec liquidités (moteur v2) : valeur totale, gains, performance exacte, contribution du titre vendu ──
+    await page.goto(BASE + '/portefeuilles.html?id=' + created.id);
+    await page.locator('.pf-kpis').waitFor();
+    await page.locator('#pfc-plot .fc-plot').waitFor();
+    const kpis = (await page.locator('#px-page').innerText()).replace(/[\s  ]/g, '');
+    assert.match(kpis, /Valeurtotale1050,00€/i, 'valeur totale liquidités comprises : ' + kpis.slice(0, 200));
+    assert.match(kpis, /Argentdisponible1050,00€/i); assert.match(kpis, /Résultatglobal\+50,00€/i); assert.match(kpis, /Gainsréalisés\+50,00€/i); assert.match(kpis, /Gainslatents/i);
+    assert.match(kpis, /\+5,00%/); assert.match(kpis, /exact/i);
+    assert.equal(await page.locator('#pf-perf2').count(), 0, 'plus de second bilan');
+    assert.equal(await page.locator('.px-syn').count(), 0, 'plus d’ancien bilan sur un portefeuille à liquidités');
+    // réglages remis à zéro au chargement : onglet Valeur, tous les titres cochés, période « Depuis le début »
+    assert.equal(await page.locator('.px-top [data-k="mode"] .on').innerText(), 'Valeur');
+    assert.equal(await page.locator('.px-ph + .px-per .on, #px-page .px-per [data-aper].on').first().innerText(), 'Depuis le début');
+    // graphique unique : vue complète = titre vendu présent ; positions actuelles = absent
+    assert.match(await page.locator('#pfc-leg').innerText(), /ALPHA/, 'titre vendu présent dans le portefeuille complet');
+    await page.locator('.px-ph [data-k="view"] [data-v="open"]').click();
+    await page.locator('#pfc-def').waitFor();
+    assert.doesNotMatch(await page.locator('#pfc-leg').innerText(), /ALPHA/, 'titre vendu absent des positions actuelles');
+    await page.locator('.px-ph [data-k="view"] [data-v="full"]').click();
+    for (const m of ['value', 'gain', 'perf', 'market']) { await page.locator(`.px-top [data-k="mode"] [data-v="${m}"]`).click(); await page.locator('#pfc-plot .fc-plot, #pfc-plot .px-empty').first().waitFor(); }
+    await page.locator('.px-top [data-k="mode"] [data-v="value"]').click();
+    // un titre décoché l'est dans tous les onglets
+    const chip = page.locator('#pfc-leg [data-sid]', { hasText: 'ALPHA' }); await chip.click();
+    for (const m of ['gain', 'perf']) { await page.locator(`.px-top [data-k="mode"] [data-v="${m}"]`).click(); assert.equal(await page.locator('#pfc-leg [data-sid]', { hasText: 'ALPHA' }).getAttribute('aria-pressed'), 'false', 'titre décoché partout : ' + m); }
+    await page.locator('.px-top [data-k="mode"] [data-v="value"]').click();
+    // « Mes actions » : la position clôturée est dans le filtre « Vendues » avec son gain réalisé ; « Contribution au résultat » suit le même filtre
+    await page.locator('[data-afilter="sold"]').first().click();
+    const sold = (await page.locator('.px-t').innerText()).replace(/[\s  ]/g, '');
+    assert.match(sold, /ALPHA/); assert.match(sold, /\+50,00€/, 'gain réalisé de la position clôturée');
+    assert.match((await page.locator('.bars').innerText()).replace(/[\s  ]/g, ''), /ALPHA\(vendu\)\+50,00€/, 'contribution du titre vendu');
+    await page.locator('[data-aper="1m"]').first().click(); await page.locator('.px-t').waitFor();
+    await page.locator('[data-gosuivi]').click();
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true, 'débordement horizontal du bilan');
+    if (process.env.SHOTS) await page.locator('#px-page').screenshot({ path: process.env.SHOTS + '/bilan-liquidites.png' });
+    const legacyPf = (await api('portfolio/create', { name: 'Témoin ancien modèle' })).data.id;
+    await page.goto(BASE + '/portefeuilles.html?id=' + legacyPf);
+    await page.locator('.px-zones').waitFor();
+    assert.equal(await page.locator('.pf-kpis, #pfc-card').count(), 0, 'aucun bilan à liquidités sur un portefeuille ancien modèle');
+    await api('portfolio/delete', { id: legacyPf });
 
     // ── renommage, icône, description ──
     await page.goto(BASE + '/mes-portefeuilles.html');
@@ -161,7 +205,8 @@ const USER = 'cash_user', PASS = 'cash-local-password-2026';
     // ── mobile : pas de débordement horizontal ──
     await page.setViewportSize({ width: 390, height: 900 });
     await page.goto(BASE + '/mes-portefeuilles.html');
-    await page.locator('#page .card, #page .empty').first().waitFor();
+    await page.locator('#page h2').first().waitFor();
+    await page.locator('#side').waitFor({ state: 'attached' });
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true, 'débordement horizontal à 390 px');
 
     assert.deepEqual(errors, [], 'erreurs JavaScript : ' + errors.join(' | '));

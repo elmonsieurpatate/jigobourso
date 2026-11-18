@@ -436,3 +436,89 @@ def test_legacy_portfolio_is_strictly_unchanged_by_the_new_model(alice):
     assert alice.call('portfolio/history', params=f'&id={pf}')[0] == 200  # l'historique et la performance existants fonctionnent
     listed = {p['id']: p for p in alice.call('portfolios')[1]['portfolios']}[pf]
     assert listed['cash'] is None and listed['cash_model'] == 'legacy' and round(listed['totals']['total_gain'], 2) == 250.0
+
+
+# ───────── performance avec liquidités (moteur v2, lecture seule) ─────────
+def seed_prices():
+    """Cours d'ALPHA sur la période des opérations (le monde de test n'en a pas en mai) : la valorisation quotidienne en a besoin."""
+    conn = connect()
+    with conn.cursor() as cur:
+        cur.executemany(
+            'INSERT INTO daily_prices(listing_id,price_date,close_px) VALUES (1,%s,%s) ON DUPLICATE KEY UPDATE close_px=VALUES(close_px)',
+            [('2026-05-04', 205), ('2026-05-05', 220), ('2026-05-06', 255), ('2026-05-07', 255), ('2026-05-08', 255)],
+        )
+    conn.commit()
+    conn.close()
+
+
+def perf(c, pf):
+    status, data = c.call('portfolio/performance', params=f'&id={pf}')
+    assert status == 200, data
+    return data
+
+
+def test_performance_route_is_empty_for_a_legacy_portfolio(alice):
+    pid = alice.call('portfolio/create', {'name': 'Ancien'})[1]['id']
+    assert buy(alice, pid, 1, 100)[0] == 200
+    assert perf(alice, pid) == {'model': 'legacy'}  # aucun calcul v2 : l'ancien affichage reste seul
+
+
+def test_performance_route_reference_scenario_matches_ledger_and_cash(alice):
+    seed_prices()
+    pf = create(alice, capital=1000)
+    assert buy(alice, pf, 1, 200)[0] == 200 and buy(alice, pf, 1, 250, date='2026-05-06', side='sell')[0] == 200
+    p = perf(alice, pf)
+    ledger = alice.call('portfolio', params=f'&id={pf}')[1]
+    assert p['model'] == 'cash' and p['summary']['initial_capital'] == 1000
+    assert p['value'][-1] == pytest.approx(1050) and p['cash'][-1] == pytest.approx(1050) and p['securities'][-1] == pytest.approx(0)
+    assert p['gain'][-1] == pytest.approx(50) and p['realized'][-1] == pytest.approx(50) and p['latent'][-1] == pytest.approx(0)
+    assert p['gain'][-1] == pytest.approx(ledger['totals']['total_gain'])  # même gain que le registre
+    assert p['cash'][-1] == pytest.approx(ledger['cash']['balance'])  # mêmes liquidités que le modèle de phase 1
+    assert p['twr']['central'][-1] == pytest.approx(0.05) and not any(p['estimated'])
+    assert p['checks']['identity_max_abs_error'] < 1e-9 and p['checks']['contribution_sum_max_abs_error'] < 1e-9
+    ((key, pos),) = p['positions'].items()
+    assert pos['status'] == 'closed' and pos['realized'] == pytest.approx(50)  # position vendue conservée dans les contributions
+    assert pos['contribution'] == pytest.approx(0.05)
+    # séries du graphique unique : vue complète (titre vendu conservé, contribution = TWR) ; vue « positions actuelles » vide, aucun titre vendu
+    ch = p['chart']
+    assert len(ch['days']) == len(p['value']) and ch['open'] is None
+    assert ch['full']['holdings'][key]['contribution'][-1] == pytest.approx(0.05) and ch['full']['twr']['central'][-1] == pytest.approx(0.05)
+    (sale,) = [t for t in p['trades'] if t['kind'] == 'sell']
+    assert sale['realized'] == pytest.approx(50) and sale['key'] == key and sale['symbol']  # gain réalisé de la vente, donné par le moteur
+
+
+def test_performance_route_deposit_and_withdrawal_do_not_change_gain_or_return(alice):
+    seed_prices()
+    pf = create(alice, capital=1000)
+    buy(alice, pf, 1, 200)
+    buy(alice, pf, 1, 250, date='2026-05-06', side='sell')
+    one = perf(alice, pf)
+    assert alice.call('cash/add', dict(portfolio_id=pf, kind='deposit', amount=500, occurred_at='2026-05-07'))[0] == 200
+    assert alice.call('cash/add', dict(portfolio_id=pf, kind='withdrawal', amount=100, occurred_at='2026-05-08'))[0] == 200
+    two = perf(alice, pf)
+    assert two['value'][-1] == pytest.approx(1450) and two['net_contributions'][-1] == pytest.approx(1400)
+    assert two['gain'][-1] == pytest.approx(one['gain'][-1]) and two['twr']['central'][-1] == pytest.approx(one['twr']['central'][-1])
+
+
+def test_performance_route_same_day_buy_and_sell_keep_ledger_order(alice):
+    """Achat et vente le même jour (même heure par défaut) : la position est soldée, jamais une vente de titres non détenus."""
+    seed_prices()
+    pf = create(alice, capital=1000)
+    assert buy(alice, pf, 1, 200)[0] == 200 and buy(alice, pf, 1, 250, side='sell')[0] == 200
+    p = perf(alice, pf)
+    assert p['securities'][-1] == pytest.approx(0) and p['realized'][-1] == pytest.approx(50) and p['value'][-1] == pytest.approx(1050)
+    assert p['twr']['central'][-1] == pytest.approx(0.05)
+
+
+def test_performance_route_open_view_excludes_sold_titles_and_reconciles(alice):
+    seed_prices()
+    pf = create(alice, capital=1000)
+    assert buy(alice, pf, 1, 200, date='2026-05-04')[0] == 200  # 200 € d'ALPHA, conservés : le titre reste détenu
+    p = perf(alice, pf)
+    ch = p['chart']
+    assert ch['open'] and ch['open']['keys'] == list(p['positions'])
+    # sous-portefeuille : valeur = titres seuls, gain = réalisé (ventes partielles) + latent, performance = celle du titre (un seul titre, achat unique)
+    o = ch['open']
+    assert o['value'][-1] == pytest.approx(p['securities'][-1])
+    assert o['realized'][-1] + o['latent'][-1] == pytest.approx(o['gain'][-1])
+    assert o['twr']['central'][-1] == pytest.approx(p['positions'][o['keys'][0]]['twr'])

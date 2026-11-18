@@ -24,6 +24,10 @@
     sort: store("sort") || "value",
     dir: store("dir") || -1,
     closed: false,
+    afilter: "all",
+    aper: "all",
+    perf: null,
+    perfErr: null,
     sel: null,
     tr: null,
     trErr: null,
@@ -44,6 +48,7 @@
   const cssv = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim() || "#2563eb";
   const pal = () => Array.from({ length: 12 }, (_, i) => `var(--series-${i + 1})`);
   const pkey = (p) => (p.listing_id ? String(p.listing_id) : "S" + String(p.symbol).toUpperCase());
+  const cashModel = () => !!(C.D.cash && C.D.cash.model === "cash");
   const all = () => [...C.D.positions, ...C.D.closed];
   const open = () => C.D.positions.filter((p) => p.qty > 0);
   const lineOf = (p) => C.H.lines.find((l) => l.key === pkey(p));
@@ -90,7 +95,14 @@
     if (!pl) return Object.assign(base, { k: "na", t: "Indisponible" });
     const c = root.PlanSuivi.chip(pl),
       o = (pl.origins || []).find((x) => x.label);
-    return { k: c.k, t: c.t, rank: c.rank, strat: pl.watch ? pl.watch.label : null, origin: o ? o.label : null };
+    return {
+      k: c.k,
+      t: c.t,
+      b: c.badge || "",
+      rank: c.rank,
+      strat: pl.watch ? pl.watch.label : null,
+      origin: o ? o.label : null,
+    };
   }
   function planSummary() {
     if (!S.tr)
@@ -128,6 +140,25 @@
     const b = vals.find(isNum);
     return vals.map((v) => (isNum(v) && b ? 100 * (v / b - 1) : null));
   };
+  /** Créneau manquant au milieu d'une séance (collecte ratée) : report du dernier cours, sans jamais franchir une clôture. */
+  function fillSessionHoles(times, raw) {
+    const v = raw.slice(),
+      day = (t) => String(t).slice(0, 10);
+    let n = 0;
+    for (let i = 1; i < v.length - 1; i++) {
+      if (isNum(v[i]) || !isNum(v[i - 1]) || day(times[i - 1]) !== day(times[i])) continue;
+      let j = i + 1;
+      while (j < v.length && !isNum(v[j]) && day(times[j]) === day(times[i])) j++;
+      if (j < v.length && isNum(v[j]) && day(times[j]) === day(times[i])) {
+        for (let k = i; k < j; k++) {
+          v[k] = v[i - 1];
+          n++;
+        }
+        i = j;
+      }
+    }
+    return { v, n };
+  }
   async function build(st, o) {
     const perso = st.mode === "perso",
       per = st.per,
@@ -246,22 +277,30 @@
             out.meta.notes.push(nameOf(l.key) + " : aucune barre de 15 minutes sur cette période.");
             return;
           }
-          let v = raw;
-          if (pct) v = rebase(raw);
+          const hole = fillSessionHoles(times, raw);
+          if (hole.n)
+            out.meta.notes.push(
+              nameOf(l.key) +
+                " : " +
+                hole.n +
+                " créneau(x) de 15 minutes non collecté(s), dernier cours connu reporté.",
+            );
+          let v = hole.v;
+          if (pct) v = rebase(v);
           else {
             const r = l.currency === "EUR" ? 1 : rateOf(l);
             if (r === null) {
               out.meta.notes.push(nameOf(l.key) + " : change indisponible, valeur en euros impossible.");
               return;
             }
-            v = raw.map((x) => (isNum(x) ? x * r : null));
+            v = hole.v.map((x) => (isNum(x) ? x * r : null));
             if (l.currency !== "EUR")
               out.meta.notes.push(nameOf(l.key) + " : converti au dernier change connu (" + (l.currency || "") + ").");
           }
           add(l.key, nameOf(l.key), v);
         });
         out.ref = pct
-          ? "0 % = premier cours de chaque titre dans la fenêtre. Aucun point intermédiaire n’est inventé : un trou reste un trou."
+          ? "0 % = premier cours de chaque titre dans la fenêtre. Un créneau non collecté en pleine séance reprend le dernier cours connu (signalé en note)."
           : "Cours convertis en euros.";
         out.markersFrom = true;
         return out;
@@ -483,6 +522,8 @@
     const H = C.H,
       wAll = PFM.resolveWindow(H, "all"),
       pf = PFM.portfolio(H, wAll);
+    const P = cashModel() && root.PFPerf2 && root.PFPerf2.usable(S.perf) ? S.perf : null;
+    const PS = P ? root.PFPerf2.periodStats(P, S.aper) : null;
     const rows = all().map((p) => {
       const l = lineOf(p),
         r = l ? PFM.position(H, l, wAll) : { result: null, sinceBuy: null, sinceBuyPct: null };
@@ -491,9 +532,18 @@
         l,
         r,
         key: pkey(p),
-        contrib: PFM.contribution(r, pf),
-        gain: r.sinceBuy,
-        pctv: r.sinceBuyPct,
+        // portefeuille à liquidités : rendement, gain et contribution du moteur v2 (leur somme = TWR) ; sinon ancien calcul
+        // période choisie (« Depuis le début » par défaut) : gain en euros, rendement du titre et part du gain total
+        contrib:
+          PS && PS.rows[pkey(p)]
+            ? PS.rows[pkey(p)].contribution === null
+              ? null
+              : 100 * PS.rows[pkey(p)].contribution
+            : PFM.contribution(r, pf),
+        gain: PS && PS.rows[pkey(p)] ? PS.rows[pkey(p)].gain : r.sinceBuy,
+        pctv:
+          PS && PS.rows[pkey(p)] ? (PS.rows[pkey(p)].twr === null ? null : 100 * PS.rows[pkey(p)].twr) : r.sinceBuyPct,
+        share: PS && PS.rows[pkey(p)] ? PS.rows[pkey(p)].share : null,
         w: C.D.totals.value > 0 && p.qty > 0 ? (100 * p.value) / C.D.totals.value : null,
         watch: watchOf(p),
       };
@@ -516,7 +566,7 @@
       base = t.invested_total || 0,
       tg = t.total_gain,
       tx = taxOf(Object.values(C.D.realized_by_year || {}), t.unrealized, tg, base);
-    return `<section class="px-card px-syn"><div class="px-val"><span class="px-l">Valeur du portefeuille</span><strong>${eur(t.value)}</strong><span class="px-pill ${cl(tg)}">${sg(tg)}${base > 0 && isNum(tg) ? ` <small>(${pc((100 * tg) / base)})</small>` : ""}</span></div>
+    return `<section class="px-card px-syn"><div class="px-val"><span class="px-l">${cashModel() ? "Valeur des titres (ancien calcul)" : "Valeur du portefeuille"}</span><strong>${eur(t.value)}</strong><span class="px-pill ${cl(tg)}">${sg(tg)}${base > 0 && isNum(tg) ? ` <small>(${pc((100 * tg) / base)})</small>` : ""}</span></div>
       <dl class="px-kv"><div><dt>Capital investi</dt><dd>${eur(t.cost)}</dd></div><div><dt>Gains latents</dt><dd class="${cl(t.unrealized)}">${sg(t.unrealized)}</dd></div><div><dt>Gains réalisés</dt><dd class="${cl(t.realized)}">${sg(t.realized)}</dd></div><div><dt>Résultat total</dt><dd class="${cl(tg)}">${sg(tg)}</dd></div></dl>
       <div class="px-evo" aria-label="Évolution">${st.evo.map(({ l, q }) => `<div><span>${l}</span><b class="${cl(q.pct)}">${pc(q.pct)}</b><small class="${cl(q.result)}">${sg(q.result)}</small></div>`).join("")}</div>
       <div class="px-tax"><span>Après impôts (estimation)</span><b class="${cl(tx.net)}">${sg(tx.net)} <small>(${pc(tx.pct)})</small></b><small>Brut ${sg(tg)} · impôt ${eur(tx.inc, 0)} · prélèvements sociaux ${eur(tx.soc, 0)}. PFU 30 % supposé (compte-titres), comme si les titres ouverts étaient vendus aujourd’hui ; hors PEA, reports de pertes, dividendes et situation personnelle.</small></div><div class="px-hh"><div><span>Contribue le plus</span><b class="${cl(st.best && st.best.contrib)}">${st.best ? esc(st.best.p.symbol) + " " + pt(st.best.contrib) : "–"}</b></div><div><span>Pèse le plus</span><b class="${cl(st.worst && st.worst.contrib)}">${st.worst && st.worst.contrib < 0 ? esc(st.worst.p.symbol) + " " + pt(st.worst.contrib) : "–"}</b></div></div></section>`;
@@ -549,7 +599,7 @@
         const { p } = r,
           closed = !(p.qty > 0),
           w = r.watch;
-        return `<tr class="${closed ? "closed" : ""}" data-open="${esc(r.key)}" tabindex="0"><td class="c-title" data-l="Titre"><b>${esc(p.symbol)}</b><span class="ell">${esc(p.name_catalogue || p.name || "")}${closed ? " · soldé" : ""}</span>${closed ? "" : J.riskBar(J.riskWorst((C.D.lots || []).filter((lo) => (p.listing_id ? lo.listing_id === p.listing_id : lo.symbol === p.symbol)).map((lo) => lo.alert && lo.alert.risk)), { compact: true })}</td><td class="num c-value" data-l="Valeur">${closed ? "–" : eur(p.value)}</td><td class="num c-gain ${cl(r.gain)}" data-l="Gain/perte">${sg(r.gain)}</td><td class="num c-pct ${cl(r.pctv)}" data-l="Rendement">${pc(r.pctv)}</td><td class="num c-contrib ${cl(r.contrib)}" data-l="Contribution">${pt(r.contrib)}</td><td class="num c-w" data-l="Poids">${isNum(r.w) ? J.num(r.w, 1) + " %" : "–"}</td><td class="c-strat" data-l="Stratégie"><span class="ell">${esc(w.strat || w.origin || "Non renseignée")}</span></td><td class="c-watch" data-l="Suivi"><button type="button" class="px-w ${w.k}" data-conf="${esc(r.key)}">${I.bell}${esc(w.t)}</button></td>
+        return `<tr class="${closed ? "closed" : ""}" data-open="${esc(r.key)}" tabindex="0"><td class="c-title" data-l="Titre"><span class="ident"><b>${esc(p.symbol)}</b><small>${esc(p.name_catalogue || p.name || "")}${closed ? " · soldé" : ""}</small></span>${closed ? "" : J.riskBar(J.riskWorst((C.D.lots || []).filter((lo) => (p.listing_id ? lo.listing_id === p.listing_id : lo.symbol === p.symbol)).map((lo) => lo.alert && lo.alert.risk)), { compact: true })}</td><td class="num c-value" data-l="Valeur">${closed ? "–" : eur(p.value)}</td><td class="num c-gain ${cl(r.gain)}" data-l="Gain/perte">${sg(r.gain)}</td><td class="num c-pct ${cl(r.pctv)}" data-l="Rendement">${pc(r.pctv)}</td><td class="num c-contrib ${cl(r.contrib)}" data-l="Contribution">${pt(r.contrib)}</td><td class="num c-w" data-l="Poids">${isNum(r.w) ? J.num(r.w, 1) + " %" : "–"}</td><td class="c-strat" data-l="Stratégie"><span class="ell">${esc(w.strat || w.origin || "Non renseignée")}</span></td><td class="c-watch" data-l="Suivi"><button type="button" class="badge ${w.b || ""} px-w" data-conf="${esc(r.key)}">${I.bell}${esc(w.t)}</button></td>
         <td class="c-act"><button type="button" class="btn sm" data-buy="${esc(r.key)}">Acheter</button><button type="button" class="btn sm" data-sell="${esc(r.key)}" ${closed ? "disabled" : ""}>Vendre</button>${p.listing_id ? `<a class="btn sm" href="titre.html?id=${p.listing_id}&from=portefeuille" target="_blank" rel="noopener" aria-label="Analyse du titre ${esc(p.symbol)} (nouvel onglet)">Analyse ${I.ext}</a>` : ""}</td></tr>`;
       })
       .join("");
@@ -568,17 +618,36 @@
       )
       .join("")}</nav>`;
   }
+  function cashSub() {
+    const n = all().length,
+      o = open().length,
+      s = S.perf && S.perf.summary,
+      d = S.perf && S.perf.days && S.perf.days[0];
+    return `${n} titre${n > 1 ? "s" : ""} (${o} détenu${o > 1 ? "s" : ""}, ${n - o} vendu${n - o > 1 ? "s" : ""})${s && isNum(s.initial_capital) ? " · Capital initial : " + eur(s.initial_capital) : ""}${d ? " · Depuis le " + J.date(d) : ""}`;
+  }
+  /** Titre et sous-titre dans l'en-tête de page (un seul titre pour toute la page). */
+  function setTitle() {
+    const h = J.$("#pf-h1"),
+      sub = J.$("#pf-sub");
+    if (!h || !sub) return;
+    h.innerHTML = `${esc(C.name || "Portefeuille")}${cashModel() ? " " + J.badge("Modèle : avec liquidités", "ok") : ""}`;
+    sub.textContent = cashModel()
+      ? cashSub()
+      : `${open().length} position${open().length > 1 ? "s" : ""} · valeur et résultat en euros`;
+  }
   function head() {
-    return `<header class="px-head"><div><h1>${esc(C.name || "Portefeuille")}</h1><p class="muted">${open().length} position${open().length > 1 ? "s" : ""} · valeur et résultat en euros</p></div><div class="px-ha"><button type="button" class="btn primary" data-add>Ajouter une opération</button></div></header>${zoneTabs()}`;
+    return zoneTabs();
   }
   /* ───────── sections repliables (seul l'affichage est replié : le suivi continue d'être calculé) ───────── */
+  /** État replié d'une section ; « Suivi des positions » est replié par défaut sur un portefeuille à liquidités (lien « Voir le suivi »). */
+  const foldedOf = (key) => (key === "suivi" && cashModel() ? store("fold_suivi") !== false : !!store("fold_" + key));
   function foldHead(key, title, count) {
-    const folded = !!store("fold_" + key);
+    const folded = foldedOf(key);
     return `<button type="button" class="px-fold" data-fold="${key}" aria-expanded="${!folded}" aria-controls="px-fb-${key}"><span class="chv">${I.chev}</span><h2>${title}${count ? ` <span>(${count})</span>` : ""}</h2><span class="hint">${folded ? "Masqué · afficher" : "Masquer"}</span></button>`;
   }
   /** Suivi des positions : une ligne par position ouverte (même jauge, mêmes conseils que le détail), classées par urgence de décision. */
   function suiviSection() {
-    const fs = !!store("fold_suivi"),
+    const fs = foldedOf("suivi"),
       ps = open().filter((p) => p.listing_id),
       noq = open().length - ps.length;
     let sum = "",
@@ -600,7 +669,7 @@
         .map(([k, l]) => `<span><i class="${k}">${cnt(k)}</i>${l}</span>`)
         .join("");
       body = `<p class="psr-note">Un repère de surveillance, jamais un ordre de vente : rien n’est vendu automatiquement. Les couleurs de la jauge sont des zones de prix et de protection, pas une garantie de faible risque. Clique le nom d’un titre pour son détail, « Configurer » pour ses règles.</p>
-        <div class="psr-list"><div class="psr-cols" aria-hidden="true"><span>Titre</span><span>Perf.</span><span>Suivi et protections</span><span>Conseil</span><span></span></div>${items.length ? items.map((x) => root.PlanSuivi.row(x.pl, { key: pkey(x.p) })).join("") : '<p class="px-note">Aucune position suivie.</p>'}</div>${noq ? `<p class="px-note">${noq} position${noq > 1 ? "s" : ""} sans cotation suivie : pas de suivi possible.</p>` : ""}`;
+        ${items.length ? `<div class="table-wrap"><table class="psr-t">${J.table.head(["Titre", ["Perf.", "num"], "Suivi et protections", "Conseil", ""])}${items.map((x) => root.PlanSuivi.row(x.pl, { key: pkey(x.p) })).join("")}</table></div>` : '<p class="px-note">Aucune position suivie.</p>'}${noq ? `<p class="px-note">${noq} position${noq > 1 ? "s" : ""} sans cotation suivie : pas de suivi possible.</p>` : ""}`;
     }
     return `<section class="px-card${fs ? " folded" : ""}" id="px-sec-suivi"><div class="px-ph">${foldHead("suivi", "Suivi des positions", ps.length || "")}<div class="psr-sum" aria-label="Synthèse du suivi">${sum}</div></div><div class="px-fold-body" id="px-fb-suivi" ${fs ? "hidden" : ""}>${body}</div></section>`;
   }
@@ -625,7 +694,99 @@
     });
   }
 
+  /** Portefeuille à liquidités : « Mon argent », un graphique (deux vues, trois modes), « Mes actions ». Aucun style ici : composants et classes du site. */
+  const actCell = (r) => {
+    const p = r.p,
+      closed = !(p.qty > 0);
+    return `<td class="c-act"><button type="button" class="btn sm" data-buy="${esc(r.key)}">Acheter</button><button type="button" class="btn sm" data-sell="${esc(r.key)}" ${closed ? "disabled" : ""}>Vendre</button>${p.listing_id ? `<a class="btn sm" href="titre.html?id=${p.listing_id}&from=portefeuille" target="_blank" rel="noopener" aria-label="Analyse du titre ${esc(p.symbol)} (nouvel onglet)">Analyse ${I.ext}</a>` : ""}</td>`;
+  };
+  function actionsTable(st) {
+    const held = (r) => r.p.qty > 0;
+    const rows = st.rows
+      .filter((r) => S.afilter === "all" || (S.afilter === "held") === held(r))
+      .sort((a, b) => held(b) - held(a) || (b.p.value || 0) - (a.p.value || 0));
+    const cols = [
+      { label: "Titre", cls: "c-title" },
+      { label: "Quantité", num: true, cls: "c-qty" },
+      { label: "PRU", num: true, cls: "c-pru" },
+      { label: "Cours actuel", num: true, cls: "c-price" },
+      { label: "Valeur", num: true, cls: "c-value" },
+      { label: "Gain / perte", num: true, cls: "c-gain" },
+      { label: "Rendement", num: true, cls: "c-pct" },
+      { label: "Poids", num: true, cls: "c-wt" },
+      { label: "Actions", cls: "c-act" },
+    ];
+    const body = rows
+      .map((r) => {
+        const p = r.p,
+          on = held(r);
+        return `<tr class="${on ? "" : "closed"}" data-open="${esc(r.key)}" tabindex="0"><td class="c-title" data-l="Titre"><span class="ident"><b>${esc(p.symbol)}${on ? "" : " " + J.badge("Vendu", "", { sm: true })}</b><small>${esc(p.name_catalogue || p.name || "")}</small></span></td><td class="num c-qty" data-l="Quantité">${on ? J.num(p.qty, 4) : "–"}</td><td class="num c-pru" data-l="PRU">${on ? eur(p.cost / p.qty) : "–"}</td><td class="num c-price" data-l="Cours actuel">${on && isNum(p.price_eur) ? eur(p.price_eur) : "–"}</td><td class="num c-value" data-l="Valeur">${on ? eur(p.value) : "–"}</td><td class="num c-gain ${cl(r.gain)}" data-l="Gain / perte">${sg(r.gain)}</td><td class="num c-pct ${cl(r.pctv)}" data-l="Rendement">${pc(r.pctv)}</td><td class="num c-wt" data-l="Poids">${isNum(r.w) ? J.num(r.w, 1) + " %" : "–"}</td>${actCell(r)}</tr>`;
+      })
+      .join("");
+    return `<div class="px-tw"><table class="px-t pf-acts">${J.table.head(cols)}<tbody>${body || '<tr><td colspan="9" class="px-note">Aucune position.</td></tr>'}</tbody></table></div>`;
+  }
+  function viewCash(st) {
+    if (!S.perf)
+      return `<section class="px-card">${S.perfErr ? `<p class="notice err">Bilan avec liquidités indisponible : ${esc(S.perfErr)}</p>` : '<div class="empty"><span class="spinner"></span></div>'}</section>`;
+    const P = S.perf;
+    if (!root.PFPerf2.usable(P))
+      return `<section class="px-card"><p class="px-note">Aucune donnée de performance pour ce portefeuille.</p></section>`;
+    const t = C.D.totals,
+      F = P.chart.full,
+      gross = F.gain[F.gain.length - 1],
+      tax = taxOf(
+        Object.values(C.D.realized_by_year || {}),
+        t.unrealized,
+        gross,
+        P.net_contributions[P.net_contributions.length - 1],
+      );
+    const n = st.rows.length,
+      nHeld = st.rows.filter((r) => r.p.qty > 0).length;
+    const filter = J.seg(
+      [
+        ["all", `Toutes (${n})`],
+        ["held", `Détenues (${nHeld})`],
+        ["sold", `Vendues (${n - nHeld})`],
+      ],
+      S.afilter,
+      "data-afilter",
+      { label: "Filtrer les titres" },
+    );
+    // mêmes périodes et même composant que le graphique (.px-per) ; « Depuis le début » par défaut
+    const aper = `<div class="px-per" role="group" aria-label="Période des gains et rendements">${PFM.PERIODS.map(([k, l]) => `<button type="button" data-aper="${k}" class="${S.aper === k ? "on" : ""}" aria-pressed="${S.aper === k}">${l}</button>`).join("")}</div>`;
+    const WORD = {
+      all: "depuis le début",
+      max: "sur tout l’historique",
+      "1d": "sur la dernière séance",
+      "2d": "sur 2 séances",
+      "5d": "sur 5 séances",
+      "1w": "sur 1 semaine",
+      "2w": "sur 2 semaines",
+      "1m": "sur 1 mois",
+      "3m": "sur 3 mois",
+      "6m": "sur 6 mois",
+      "1y": "sur 1 an",
+      "2y": "sur 2 ans",
+      "3y": "sur 3 ans",
+      "5y": "sur 5 ans",
+      "10y": "sur 10 ans",
+    };
+    const label = WORD[S.aper];
+    const contrib = st.rows
+      .filter((r) => S.afilter === "all" || (S.afilter === "held") === r.p.qty > 0)
+      .filter((r) => isNum(r.gain) && Math.abs(r.gain) > 1e-9)
+      .sort((a, b) => b.gain - a.gain)
+      .map((r) => ({
+        label: r.p.symbol,
+        tag: r.p.qty > 0 ? "" : "vendu",
+        value: r.gain,
+        text: sg(r.gain),
+        share: r.share,
+      }));
+    return `${root.PFPerf2.money(P, tax)}${root.PFPerf2.boxHtml(P)}<section class="px-card"><div class="px-ph"><h2>Contribution au résultat</h2>${filter}${aper}</div><p class="small muted">Impact de chaque titre sur le gain total, ${label}. Les titres vendus gardent leur gain réalisé.</p>${contrib.length ? J.bars(contrib, "Contribution de chaque titre au résultat") : '<p class="px-note">Aucun gain ou perte sur cette période.</p>'}</section><section class="px-card"><div class="px-ph"><h2>Mes actions</h2>${filter}${aper}</div><p class="small muted">Gain et rendement ${label}. Quantité, PRU, cours et valeur sont ceux d’aujourd’hui. <button type="button" class="px-link" data-gosuivi>Voir le suivi des positions</button></p>${actionsTable(st)}<p class="px-note">Rendement : celui du titre sur la période (TWR), à ne pas additionner. Un titre vendu garde son gain réalisé.</p></section>${suiviSection()}`;
+  }
   function viewOverview(st) {
+    if (cashModel()) return viewCash(st);
     const nc = st.rows.filter((r) => !(r.p.qty > 0)).length;
     const fp = !!store("fold_positions");
     return `${synth(st)}${planSummary()}<section class="px-card"><h2>Évolution</h2>${boxHtml(S.main, PfDetail.MAIN)}</section><section class="px-card${fp ? " folded" : ""}" id="px-sec-positions"><div class="px-ph">${foldHead("positions", "Positions", "")}${nc ? `<label class="px-chk" id="px-closed-wrap" ${fp ? "hidden" : ""}><input type="checkbox" id="px-closed" ${S.closed ? "checked" : ""}> Afficher les positions soldées (${nc})</label>` : ""}</div><div class="px-fold-body" id="px-fb-positions" ${fp ? "hidden" : ""}>${table(st, 0)}</div></section>${suiviSection()}`;
@@ -650,7 +811,10 @@
       body = S.zone === "transactions" ? viewTx() : viewOverview(st);
     if (!J.$("#px-drawer-root")) C.host.innerHTML = '<div id="px-page"></div><div id="px-drawer-root" hidden></div>';
     J.$("#px-page").innerHTML = head() + body;
-    if (S.zone === "overview") bindBox(S.main, PfDetail.MAIN);
+    setTitle();
+    if (S.zone === "overview" && cashModel()) {
+      if (S.perf && root.PFPerf2.usable(S.perf)) root.PFPerf2.mountChart(J.$("#pfc-card"), S.perf, C.helpers);
+    } else if (S.zone === "overview") bindBox(S.main, PfDetail.MAIN);
   }
   function onClick(e) {
     const t = e.target,
@@ -661,6 +825,29 @@
       render();
       const h = J.$(".px-zones");
       h && h.scrollIntoView({ block: "start" });
+      return;
+    }
+    const ap = t.closest("[data-aper]");
+    if (ap) {
+      S.aper = ap.dataset.aper;
+      const y = scrollY;
+      render();
+      scrollTo(0, y);
+      return;
+    }
+    const af = t.closest("[data-afilter]");
+    if (af) {
+      S.afilter = af.dataset.afilter;
+      const y = scrollY;
+      render();
+      scrollTo(0, y);
+      return;
+    }
+    if (t.closest("[data-gosuivi]")) {
+      const fold = J.$('[data-fold="suivi"]');
+      if (fold && fold.getAttribute("aria-expanded") === "false") fold.click();
+      const sec = J.$("#px-sec-suivi");
+      sec && sec.scrollIntoView({ block: "start" });
       return;
     }
     const s = t.closest("[data-sort]");
@@ -745,8 +932,23 @@
       S.main.hidden.clear();
       S.zone = "overview";
     }
+    S.perf = null;
+    S.perfErr = null;
+    const perfP =
+      cashModel() && root.PFPerf2
+        ? root.PFPerf2.load(
+            C.current,
+            `${C.D.cash.movements}|${C.D.cash.balance}|${(C.D.transactions_list || []).length}`,
+          )
+            .then((P) => {
+              if (C.host === host) S.perf = P;
+            })
+            .catch((e) => {
+              S.perfErr = e.message;
+            })
+        : null;
     render();
-    await loadTracking();
+    await Promise.all([loadTracking(), perfP]);
     if (C.host === host) {
       const y = scrollY;
       render();

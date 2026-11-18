@@ -309,8 +309,9 @@
       ? '<div class="notice warn">Portefeuille archivé : consultation seule. Désarchivez-le depuis « Gérer » pour le modifier.</div>'
       : "";
     if (!d.cash) return arch;
-    const withCash = d.totals.value == null ? null : d.totals.value + d.cash.balance;
-    return `${arch}<div class="notice ${d.cash.negative ? "warn" : "info"}"><b>Liquidités : ${J.eur(d.cash.balance)}</b>${withCash == null ? "" : ` · valeur avec liquidités : <b>${J.eur(withCash)}</b>`} · ${PFAdmin.KIND_LABEL[d.cash.kind]}. <button type="button" class="btn sm" id="goto-cash">Argent et mouvements</button> <span class="small">Les pourcentages de performance affichés restent pour l’instant calculés selon l’ancien modèle (estimation) ; le nouveau calcul est préparé en parallèle.</span></div>`;
+    return d.cash.negative
+      ? `${arch}<div class="notice warn"><b>Liquidités négatives : ${J.eur(d.cash.balance)}.</b> Ajoutez de l’argent ou corrigez une opération depuis « Argent ».</div>`
+      : arch;
   }
   async function render() {
     const lr = await J.api("portfolios");
@@ -339,7 +340,7 @@
         )
         .join(
           "",
-        )}</select><button class="btn sm" id="new-pf" aria-label="Créer un portefeuille">＋</button><a class="btn sm" href="mes-portefeuilles.html">Gérer</a><button class="btn primary" id="add-tx">＋ Transaction</button>`;
+        )}</select><button class="btn sm" id="new-pf" aria-label="Créer un portefeuille">＋</button><button class="btn primary" id="add-tx">＋ Transaction</button>${d.cash ? '<button class="btn" id="goto-cash" type="button">Argent</button>' : ""}<a class="btn" href="mes-portefeuilles.html">Gérer</a>`;
     page.innerHTML = `${cashBanner(d)}${d.integrity && !d.integrity.ok ? `<div class="notice err">${d.integrity.issues.map((i) => J.esc(i.message)).join("<br>")}</div>` : ""}${d.totals.unpriced ? '<div class="notice warn">Valorisation et gain total indisponibles : cours ou change manquant. Aucun prix d’achat n’est utilisé comme cours actuel.</div>' : ""}
       <nav class="pf-nav" id="pf-nav" role="tablist" aria-label="Espaces du portefeuille">${[
         ["home", "Mon portefeuille"],

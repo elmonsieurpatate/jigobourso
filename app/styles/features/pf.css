@@ -125,9 +125,6 @@ a.px-sum:hover {
   font-size: var(--fs-11);
   color: var(--muted);
 } /* tableaux compacts */
-.px-t {
-  font-size: var(--fs-12);
-}
 .px-t tbody tr:hover {
   background: var(--surface-2, var(--bg));
 }
@@ -137,31 +134,6 @@ a.px-sum:hover {
 }
 .px-t .c-strat .ell {
   color: var(--text);
-}
-.px-t .c-act .px-w {
-  border-radius: var(--radius-pill);
-  font: 600 0.72rem system-ui;
-  font-variant-numeric: tabular-nums;
-  border: 1px solid var(--line);
-  background: var(--surface-2, var(--bg));
-  color: var(--text);
-}
-.px-w.ko {
-  background: var(--down);
-  border-color: var(--down);
-  color: var(--on-solid);
-}
-.px-w.ok {
-  color: var(--up);
-  border-color: var(--up);
-}
-.px-w.na {
-  color: var(--warn);
-  border-color: var(--warn);
-}
-.px-w.none,
-.px-w.off {
-  color: var(--muted);
 }
 .px-chk {
   font-size: var(--fs-11);
@@ -324,4 +296,44 @@ a.px-sum:hover {
 }
 .fc-svg {
   font-size: var(--fs-10);
+}
+/* pastilles de légende du graphique des portefeuilles à liquidités : couleurs des séries */
+.px-chip i.c0 {
+  background: var(--text);
+}
+.px-chip i.c1 {
+  background: var(--series-1);
+}
+.px-chip i.c2 {
+  background: var(--series-2);
+}
+.px-chip i.c3 {
+  background: var(--series-3);
+}
+.px-chip i.c4 {
+  background: var(--series-4);
+}
+.px-chip i.c5 {
+  background: var(--series-5);
+}
+.px-chip i.c6 {
+  background: var(--series-6);
+}
+.px-chip i.c7 {
+  background: var(--series-7);
+}
+.px-chip i.c8 {
+  background: var(--series-8);
+}
+.px-chip i.c9 {
+  background: var(--series-9);
+}
+.px-chip i.c10 {
+  background: var(--series-10);
+}
+.px-chip i.c11 {
+  background: var(--series-11);
+}
+.px-chip i.c12 {
+  background: var(--series-12);
 }

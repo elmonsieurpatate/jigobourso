@@ -42,10 +42,10 @@ const text = s => s.replace(/\s+/g, ' ').trim();
       assert.equal(await sec.locator('.psr').count(), 25, 'une ligne par position ouverte');
       assert.equal(await page.evaluate(() => { const p = document.querySelector('#px-sec-positions'), s = document.querySelector('#px-sec-suivi'); return !!(p.compareDocumentPosition(s) & Node.DOCUMENT_POSITION_FOLLOWING); }), true, 'Suivi des positions sous le tableau Positions');
       { const tops = await sec.locator('.psr').evaluateAll(els => els.map(e => Math.round(e.getBoundingClientRect().top))); assert.equal(new Set(tops).size, tops.length, 'jamais deux positions sur la même ligne'); }
-      const row = sym => sec.locator(`.psr:has(.psr-name strong:text-is("${sym}"))`);
+      const row = sym => sec.locator(`.psr:has(.psr-name b:text-is("${sym}"))`);
       const adv = async sym => text(await row(sym).evaluate(e => (e.querySelector('.psr-adv').textContent + ' ' + e.querySelector('.psr-more').textContent)));
       const states = ['SUIVI PARTIEL', 'CONSERVER', 'SURVEILLER', 'RÉÉVALUER', 'SORTIE À ENVISAGER'];
-      for (const t of await sec.locator('.psr .psr-adv').allInnerTexts()) assert.ok(states.some(x => t.includes(x)), 'chaque ligne porte un état : ' + text(t).slice(0, 60));
+      for (const t of await sec.locator('.psr .psr-adv').allInnerTexts()) assert.ok(states.some(x => t.toUpperCase().includes(x)), 'chaque ligne porte un état : ' + text(t).slice(0, 60));
       await noOverflow('suivi'); await shot('suivi');
       // 4. cas chiffrés : chaque conseil nomme la règle déclenchée
       assert.match(await adv('GIBO'), /SURVEILLER[\s\S]*La hausse se poursuit, mais le risque de repli est très élevé/i); assert.match(await adv('GIBO'), /Protection automatique : [\d\s.,  ]+ €\. Tu peux la modifier/i); assert.doesNotMatch(await adv('GIBO'), /SORTIE|RÉÉVALUER/i, 'forte volatilité seule : jamais un ordre de sortie');
@@ -70,7 +70,7 @@ const text = s => s.replace(/\s+/g, ' ').trim();
       // 5. sept stratégies : chaque ligne affiche sa stratégie de surveillance
       for (const [sym, chip] of Object.entries({ FAST: /Croissance rapide/, REGULAR: /Croissance régulière/, CALM: /Hausse calme/, REBOUND: /Rebond/, MOM6: /Momentum 6 mois/, MOM12: /Momentum 12 mois/, MOMRISK: /ajusté au risque/, NOSTRAT: /non définie/ })) assert.match(await row(sym).getByTitle('Stratégie de surveillance de la position', { exact: true }).innerText(), chip, sym);
       // 6. cohérence ligne / détail : même état, même message, même protection
-      const detail = async sym => { await page.locator(`#px-sec-suivi .psr:has(.psr-name strong:text-is("${sym}")) .psr-name`).click(); await page.locator('.px-drawer').waitFor(); await page.locator('.px-tabs2 [data-tab="suivi"]').click(); await page.locator('.ps-card').waitFor(); };
+      const detail = async sym => { await page.locator(`#px-sec-suivi .psr:has(.psr-name b:text-is("${sym}")) .psr-name`).click(); await page.locator('.px-drawer').waitFor(); await page.locator('.px-tabs2 [data-tab="suivi"]').click(); await page.locator('.ps-card').waitFor(); };
       const close = async () => { await page.locator('.px-dact [data-close]').click(); await page.locator('.px-drawer').waitFor({ state: 'detached' }); };
       for (const sym of ['GIBO', 'LOSSPERS', 'MULTIRULE', 'RISEUP', 'SHORT']) { const a = (await adv(sym)).replace(/Explication et détails[\s\S]*/, '').replace(/Configurer/, '').trim(); await detail(sym); const d = text(await page.locator('.ps-card .ps-advice, .ps-card .psr-adv, .ps-card [class*=adv]').first().innerText());
         const head = a.split(/\s{1}/).slice(0, 8).join(' '); assert.ok(d.toLowerCase().includes(head.slice(0, 40).toLowerCase()), `ligne et détail alignés ${sym} : « ${head} » / « ${d.slice(0, 100)} »`); await noOverflow('détail ' + sym); await close(); }
@@ -120,7 +120,7 @@ const text = s => s.replace(/\s+/g, ' ').trim();
       for (const theme of ['dark', 'light']) { await page.evaluate(t => { document.documentElement.dataset.theme = t; }, theme);
         const bad = await sec.evaluate(c => { const lum = rgb => { const v = rgb.match(/[\d.]+/g).slice(0, 3).map(Number).map(x => { x /= 255; return x <= .03928 ? x / 12.92 : ((x + .055) / 1.055) ** 2.4; }); return .2126 * v[0] + .7152 * v[1] + .0722 * v[2]; };
           const bgOf = el => { for (let e = el; e; e = e.parentElement) { const b = getComputedStyle(e).backgroundColor; const a = b.match(/[\d.]+/g); if (a && (a.length < 4 || +a[3] > .5)) return b; } return 'rgb(255,255,255)'; };
-          return [...c.querySelectorAll('.psr-msg, .psr-more p, .ps-state, .psr-gain strong, .ps-lb b, .ps-lb strong, .psr-hl, .psr-id .badge')].filter(e => e.offsetParent && e.textContent.trim()).map(e => { const f = lum(getComputedStyle(e).color), g = lum(bgOf(e)), [hi, lo] = f > g ? [f, g] : [g, f]; return { t: e.textContent.trim().slice(0, 30), r: (hi + .05) / (lo + .05) }; }).filter(x => x.r < 4.5); });
+          return [...c.querySelectorAll('.psr-msg, .psr-more p, .psr-adv .badge, .psr-gain strong, .ps-lb b, .ps-lb strong, .psr-hl, .psr-id .badge')].filter(e => e.offsetParent && e.textContent.trim()).map(e => { const f = lum(getComputedStyle(e).color), g = lum(bgOf(e)), [hi, lo] = f > g ? [f, g] : [g, f]; return { t: e.textContent.trim().slice(0, 30), r: (hi + .05) / (lo + .05) }; }).filter(x => x.r < 4.5); });
         assert.deepEqual(bad, [], 'contraste insuffisant (' + theme + ')'); await shot('suivi-' + theme); }
       // 12. zone Transactions inchangée
       await page.locator('.px-zones [data-zone="transactions"]').click(); assert.ok(await page.locator('.px-tx').count()); await page.locator('[data-hist]').first().click(); await page.waitForSelector('#back-home'); assert.match(await page.locator('#panel-manage').innerText(), /Lots et réglages/); assert.doesNotMatch(await page.locator('#panel-manage').innerText(), /Lots et réglages des alertes/); await page.locator('#back-home').click(); await page.locator('.px-zones').waitFor(); await page.locator('.px-zones [data-zone="transactions"]').click(); await page.locator('.px-zones [data-zone="overview"]').click();

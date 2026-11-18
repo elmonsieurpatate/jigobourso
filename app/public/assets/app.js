@@ -381,10 +381,7 @@ J.NAV = (admin) => [
     icon: "wallet",
     file: ["portefeuilles.html", "mes-portefeuilles.html"],
     dynamic: "portfolios",
-    children: [
-      { label: "Vue d’ensemble", href: "portefeuilles.html", on: (q) => !q.has("id") },
-      { label: "Gérer mes portefeuilles", href: "mes-portefeuilles.html", on: () => true },
-    ],
+    children: [{ label: "Gérer mes portefeuilles", href: "mes-portefeuilles.html", on: () => true }],
   },
   {
     id: "bilan",
@@ -563,7 +560,7 @@ J.buildShell = function (page, user) {
           .forEach((p) =>
             sub.insertAdjacentHTML(
               "beforeend",
-              `<a class="sv ${file === "portefeuilles.html" && (cur == p.id || (!cur && false)) ? "on" : ""}" href="portefeuilles.html?id=${p.id}">${J.esc(p.name)}${p.is_default ? " ★" : ""}</a>`,
+              `<a class="sv ${file === "portefeuilles.html" && (cur == p.id || (!cur && false)) ? "on" : ""}" href="portefeuilles.html?id=${p.id}">${p.icon ? `<span aria-hidden="true">${J.esc(p.icon)}</span> ` : ""}${J.esc(p.name)}${p.is_default ? " ★" : ""}</a>`,
             ),
           );
       })

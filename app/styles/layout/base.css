@@ -1560,3 +1560,65 @@ dialog .ps-rule-top {
 .u-width-64px {
   width: 64px !important;
 }
+
+/* Cellule identité d'un tableau (symbole + nom) : composant commun, voir components/tables.css */
+.ident {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+}
+.ident > b,
+.ident > small {
+  display: block;
+}
+.ident > small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 18rem;
+}
+
+/* Barres de contribution : J.bars (nom, barre, valeur, part) */
+.bars {
+  display: grid;
+  gap: var(--sp-8);
+}
+.bar-row {
+  display: grid;
+  grid-template-columns: minmax(5rem, 9rem) minmax(0, 1fr) minmax(4.5rem, auto) 3.5rem;
+  align-items: center;
+  gap: var(--sp-12);
+}
+.bar-t {
+  display: block;
+  height: 10px;
+  overflow: hidden;
+}
+.bar-f {
+  display: block;
+  height: 100%;
+}
+.bar-v,
+.bar-s {
+  text-align: right;
+  white-space: nowrap;
+}
+@media (max-width: 600px) {
+  .bar-row {
+    grid-template-columns: minmax(0, 1fr) auto 3.2rem;
+    grid-template-areas: "l v s" "t t t";
+    gap: var(--sp-4) var(--sp-8);
+  }
+  .bar-l {
+    grid-area: l;
+  }
+  .bar-t {
+    grid-area: t;
+  }
+  .bar-v {
+    grid-area: v;
+  }
+  .bar-s {
+    grid-area: s;
+  }
+}

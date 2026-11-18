@@ -2,6 +2,14 @@
 .portfolio-page .page-head {
   align-items: end;
 }
+.portfolio-page .page-head h1 {
+  font-size: var(--fs-28);
+}
+@media (max-width: 600px) {
+  .portfolio-page .page-head h1 {
+    font-size: var(--fs-20);
+  }
+}
 .portfolio-actions {
   display: flex;
   align-items: center;

@@ -5,6 +5,8 @@ const BASE = process.env.BASE || 'http://127.0.0.1:18095', SHOTS = process.env.S
 const PERIODS = ['1d', '2d', '5d', '1w', '2w', '1m', '3m', '6m', '1y', '2y', '3y', '5y', '10y', 'max', 'all'];
 (async () => {
   const b = await chromium.launch({ executablePath: process.env.JIGO_CHROMIUM, args: ['--no-sandbox'] }); const report = [];
+  // Premier chargement : démarrage à froid du moteur et des caches, lent quand la machine est chargée (diagnostic : docs/PERFORMANCE_V2_COMPARATIF.md §7). Seul ce chargement a 60 s ; les erreurs JavaScript et HTTP restent contrôlées partout.
+  let warm = false;
   try {
     for (const width of [320, 375, 390, 430, 768, 1024, 1440]) {
       const ctx = await b.newContext({extraHTTPHeaders:{Origin:BASE}, viewport: { width, height: width > 700 ? 1000 : 900 }, isMobile: width < 600, hasTouch: width < 600 });
@@ -12,15 +14,15 @@ const PERIODS = ['1d', '2d', '5d', '1w', '2w', '1m', '3m', '6m', '1y', '2y', '3y
       assert.equal((await ctx.request.post(BASE + '/api.php?r=auth/login', { data: { username: 'audit_portfolio', password: 'audit-local-validation-2026' } })).ok(), true);
       const list = (await (await ctx.request.get(BASE + '/api.php?r=portfolios')).json()).portfolios;
       let id = null, rows = 0;
-      for (const p of list) { await page.goto(BASE + '/portefeuilles.html?id=' + p.id); await page.locator('.px-zones').waitFor(); const n = await page.locator('.px-t tbody tr').count(); if (n > rows) { rows = n; id = p.id; } }
+      for (const p of list) { await page.goto(BASE + '/portefeuilles.html?id=' + p.id); await page.locator('.px-zones').waitFor(warm ? {} : { timeout: 60000 }); warm = true; const n = await page.locator('.px-t tbody tr').count(); if (n > rows) { rows = n; id = p.id; } }
       assert.ok(id, 'portefeuille avec positions'); await page.goto(BASE + '/portefeuilles.html?id=' + id); await page.locator('.px-zones').waitFor();
       const shot = async n => { if (SHOTS && [390, 1440].includes(width)) await page.screenshot({ path: `${SHOTS}/pf5-${n}-${width}.png`, fullPage: n !== 'drawer' && n !== 'surv-detail' && n !== 'alert-edit' }); };
       const noOverflow = async tag => assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true, `débordement horizontal ${tag} ${width}`);
       const settle = async () => { await page.waitForFunction(() => !document.querySelector('#px-main-plot.loading') && document.querySelector('#px-main-plot svg,#px-main-plot .px-empty')); };
       // deux zones, ordre de la vue d'ensemble
       assert.deepEqual(await page.locator('.px-zones button').allInnerTexts(), ['Vue d’ensemble', 'Transactions']);
-      const order = await page.evaluate(() => ['.px-head', '.px-syn', '.px-sum', '#px-main-box', '.px-t'].map(s => document.querySelector(s).getBoundingClientRect().top));
-      assert.deepEqual(order, [...order].sort((x, y) => x - y), 'ordre : en-tête, synthèse, alertes, graphique, positions');
+      const order = await page.evaluate(() => ['.px-zones', '.px-syn', '.px-sum', '#px-main-box', '.px-t'].map(s => document.querySelector(s).getBoundingClientRect().top));
+      assert.deepEqual(order, [...order].sort((x, y) => x - y), 'ordre : zones, synthèse, alertes, graphique, positions');
       await settle(); await noOverflow('overview'); await shot('overview');
       // thème : les cartes suivent les variables du thème (pas de fond forcé)
       const bg = () => page.evaluate(() => getComputedStyle(document.querySelector('.px-card')).backgroundColor);

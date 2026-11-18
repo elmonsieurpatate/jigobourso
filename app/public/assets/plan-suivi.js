@@ -30,11 +30,11 @@
   };
   /** Quatre états de décision (jamais un ordre) + suivi partiel. tone = classe visuelle, k = classe du pastille du tableau (colonne « Suivi »). */
   const STATE = {
-    exit: { label: "Sortie à envisager", tone: "exit", icon: "exit", k: "ko", rank: 0 },
-    reevaluate: { label: "Réévaluer", tone: "reeval", icon: "warn", k: "rv", rank: 1 },
-    watch: { label: "Surveiller", tone: "watch", icon: "info", k: "na", rank: 2 },
-    keep: { label: "Conserver", tone: "ok", icon: "ok", k: "ok", rank: 3 },
-    na: { label: "Suivi partiel", tone: "na", icon: "info", k: "none", rank: 4 },
+    exit: { label: "Sortie à envisager", tone: "exit", badge: "danger", icon: "exit", k: "ko", rank: 0 },
+    reevaluate: { label: "Réévaluer", tone: "reeval", badge: "caution", icon: "warn", k: "rv", rank: 1 },
+    watch: { label: "Surveiller", tone: "watch", badge: "warn", icon: "info", k: "na", rank: 2 },
+    keep: { label: "Conserver", tone: "ok", badge: "ok", icon: "ok", k: "ok", rank: 3 },
+    na: { label: "Suivi partiel", tone: "na", badge: "", icon: "info", k: "none", rank: 4 },
   };
   const RISK_CLASS = { low: "r-low", moderate: "r-mod", high: "r-high", very_high: "r-vhigh" };
   const stateOf = (pl) => (pl && pl.advice && STATE[pl.advice.state] ? pl.advice.state : "na");
@@ -45,7 +45,7 @@
     if (!pl) return { k: "na", t: "Chargement…", rank: 5 };
     if (pl.status === "unavailable") return { k: "none", t: "Indisponible", rank: 4 };
     const s = STATE[stateOf(pl)];
-    return { k: s.k, t: s.label, rank: s.rank, state: stateOf(pl) };
+    return { k: s.k, t: s.label, rank: s.rank, state: stateOf(pl), badge: s.badge };
   }
 
   /** Échelle de la jauge : linéaire, ou logarithmique quand l'écart entre le plus bas et le plus haut dépasse ×3 (fortes progressions). */
@@ -133,12 +133,12 @@
         target: "Objectif perso",
       },
       name = (x) => (compact ? SHORT[x.id] || x.label : x.label);
-    // dégradé ancré sur les niveaux : rouge sous la plus basse protection, jaune au PRU, vert au-dessus. Ce sont des zones de prix et de protection, pas une garantie de faible risque.
     const prot = m.filter((x) => x.id === "personal" || x.id === "suggested").map((x) => sc.at(x.value)),
       xp = isNum(P.pru) ? sc.at(P.pru) : 50;
-    const lowest = prot.length ? Math.min(...prot) : Math.max(0, xp - 25),
-      mid = (lowest + xp) / 2;
-    const grad = `linear-gradient(90deg,var(--gauge-exit) 0%,var(--gauge-exit) ${Math.max(lowest - 4, 0).toFixed(1)}%,var(--gauge-danger) ${lowest.toFixed(1)}%,var(--gauge-watch) ${mid.toFixed(1)}%,var(--gauge-neutral) ${xp.toFixed(1)}%,var(--gauge-hold) ${Math.min(xp + (100 - xp) * 0.35, 100).toFixed(1)}%,var(--gauge-good) ${Math.min(xp + (100 - xp) * 0.75, 100).toFixed(1)}%,var(--gauge-strong) 100%)`;
+    const lowest = prot.length ? Math.min(...prot) : Math.max(0, xp - 25);
+    // zones douces : sous la protection, entre protection et PRU, au-dessus du PRU (zones de prix, pas une garantie de faible risque)
+    const soft = (v) => `color-mix(in srgb, var(${v}) 55%, var(--surface))`,
+      grad = `linear-gradient(90deg,${soft("--gauge-danger")} 0 ${lowest.toFixed(1)}%,${soft("--gauge-watch")} ${lowest.toFixed(1)}% ${Math.max(xp, lowest).toFixed(1)}%,${soft("--gauge-good")} ${Math.max(xp, lowest).toFixed(1)}% 100%)`;
     const sorted = m.toSorted((a, b) => sc.at(a.value) - sc.at(b.value)),
       labelled = sorted;
     // alternance de niveaux d'étiquettes pour éviter les chevauchements (repères très proches ou superposés)
@@ -205,7 +205,7 @@
     const msg = a.message || a.headline || "",
       others = a.others || [];
     const more = `${compact ? `<p class="ps-full">${esc(a.detail)}</p>` : ""}${others.length ? `<div class="ps-others"><b>${others.length} autre${others.length > 1 ? "s règles déclenchées" : " règle déclenchée"}</b><ul>${others.map((o) => `<li><span class="ps-os ${STATE[o.state] ? STATE[o.state].tone : ""}">${esc(o.label)}</span> ${esc(o.text)}<small>${esc(o.detail || "")}</small></li>`).join("")}</ul></div>` : ""}${a.why && a.why.length ? `<div class="ps-why"><b>Pourquoi ce message ?</b><ul>${a.why.map((w) => `<li>${esc(w)}</li>`).join("")}</ul></div>` : ""}`;
-    return `<div class="ps-advice ${S.tone} st-${sk}" role="status"><span class="ps-ai">${ICON[S.icon]}</span><div class="ps-ab"><div class="ps-line"><span class="ps-state">${esc(S.label)}</span><b>${esc(msg)}</b></div>
+    return `<div class="ps-advice ${S.tone} st-${sk}" role="status"><span class="ps-ai">${ICON[S.icon]}</span><div class="ps-ab"><div class="ps-line"><span class="badge ${S.badge}">${esc(S.label)}</span><b>${esc(msg)}</b></div>
       <p class="ps-detail">${esc(compact ? firstSentence(a.detail) : a.detail)}</p>${a.protection ? `<p class="ps-prot">${esc(a.protection)}</p>` : ""}
       ${more ? `<details class="ps-more"><summary>${compact ? "Explication et détails" : others.length ? "Autres règles et explication" : "Pourquoi ce message ?"}</summary>${more}</details>` : ""}</div></div>`;
   }
@@ -244,14 +244,14 @@
     const hl = ok
       ? `<p class="psr-hl">Plus-haut depuis l’entrée : <b>${eur(pl.prices.high)}</b> · recul <b class="${pl.recul_pct > 0.004 ? "down" : ""}">${pc(-pl.recul_pct)}</b></p>`
       : "";
-    return `<article class="psr st-${sk}" data-ps-row="${id}" aria-label="Suivi ${esc(pl.symbol)}">
-      <div class="psr-id"><button type="button" class="psr-name"${key} title="Ouvrir le détail de la position"><strong>${esc(pl.symbol)}</strong><small>${esc(pl.name || "")}</small></button>
-        <span class="badge ${st.support === "undefined" ? "" : "info"}" title="Stratégie de surveillance de la position">${st.label ? esc(st.label) : "Stratégie non définie"}</span></div>
-      <div class="psr-gain ${cl(g.pct)}"><strong>${pc(g.pct)}</strong><span>${sgn(g.eur)}</span></div>
-      <div class="psr-gauge">${ok ? gauge(pl, { compact: true }) : '<span class="ps-na">jauge indisponible</span>'}</div>
-      <div class="psr-adv ps-advice ${S.tone} st-${sk}" role="status"><span class="ps-state">${esc(S.label)}</span> <span class="psr-msg">${esc(a.message || a.headline || "Suivi indisponible.")}</span></div>
-      <div class="psr-act"><button type="button" class="btn sm psr-cfg" data-ps-cfg="${id}">Configurer</button><button type="button" class="btn sm psr-exp" data-ps-exp="${id}" aria-expanded="false" aria-controls="psr-more-${id}" aria-label="Afficher l’explication et les détails" title="Explication et détails"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
-      <div class="psr-more" id="psr-more-${id}" hidden>${adviceBox(pl)}${hl}</div></article>`;
+    return `<tbody class="psr st-${sk}" data-ps-row="${id}" aria-label="Suivi ${esc(pl.symbol)}"><tr>
+      <td class="psr-id"><button type="button" class="ident psr-name"${key} title="Ouvrir le détail de la position"><b>${esc(pl.symbol)}</b><small>${esc(pl.name || "")}</small></button>
+        <span class="badge ${st.support === "undefined" ? "" : "info"}" title="Stratégie de surveillance de la position">${st.label ? esc(st.label) : "Stratégie non définie"}</span></td>
+      <td class="num psr-gain ${cl(g.pct)}"><strong>${pc(g.pct)}</strong><span>${sgn(g.eur)}</span></td>
+      <td><div class="psr-gauge">${ok ? gauge(pl, { compact: true }) : '<span class="ps-na">jauge indisponible</span>'}</div></td>
+      <td class="psr-adv st-${sk}" role="status"><span class="badge ${S.badge}">${esc(S.label)}</span> <span class="psr-msg">${esc(a.message || a.headline || "Suivi indisponible.")}</span></td>
+      <td class="psr-act"><div class="psr-btns"><button type="button" class="btn sm psr-cfg" data-ps-cfg="${id}">Configurer</button><button type="button" class="btn sm psr-exp" data-ps-exp="${id}" aria-expanded="false" aria-controls="psr-more-${id}" aria-label="Afficher l’explication et les détails" title="Explication et détails"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div></td></tr>
+      <tr class="psr-more" id="psr-more-${id}" hidden><td colspan="5">${adviceBox(pl)}${hl}</td></tr></tbody>`;
   }
 
   /** Rend la carte complète (détail d'une position) dans `host`. ctx : { plan, strategies, portfolio, listing, reload() }. */

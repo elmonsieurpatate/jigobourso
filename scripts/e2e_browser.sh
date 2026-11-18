@@ -58,7 +58,7 @@ run split-reviews timeout 120s node tests/e2e/split-reviews.cjs
 fi
 if want portfolio; then
 run portfolio-seed python tests/seeds/portfolio_audit_seed.py
-run portfolio-v5 timeout 240s node tests/e2e/portfolio-v5.cjs
+run portfolio-v5 timeout 420s node tests/e2e/portfolio-v5.cjs
 php scripts/create_user.php cash_user cash-local-password-2026 > /dev/null   # mêmes titres et cours que portfolio-v5 (ALPHA en euros)
 run portfolio-cash timeout 240s node tests/e2e/portfolio-cash.cjs
 fi

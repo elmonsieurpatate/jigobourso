@@ -171,3 +171,50 @@ body .ct .ct-group-operator select {
     padding: var(--sp-2) 0;
   }
 }
+
+/* Cellule identité : symbole en gras, nom en dessous (tableaux Mes actions, Suivi des positions, transactions) */
+.ident > b {
+  color: var(--text);
+  font-weight: 700;
+}
+.ident > small {
+  color: var(--muted);
+  font-size: var(--fs-11);
+  font-weight: 400;
+}
+
+/* Barres de contribution (J.bars) */
+.bar-l {
+  color: var(--text);
+  font-size: var(--td-size);
+  font-weight: 600;
+}
+.bar-l small,
+.bar-s {
+  color: var(--muted);
+  font-size: var(--fs-11);
+  font-weight: 400;
+}
+.bar-t {
+  background: var(--surface-2);
+  border-radius: var(--radius-16);
+}
+.bar-f {
+  border-radius: var(--radius-16);
+}
+.bar-f.pos {
+  background: var(--ok);
+}
+.bar-f.neg {
+  background: var(--danger);
+}
+.bar-v {
+  font-size: var(--td-size);
+  font-variant-numeric: tabular-nums;
+}
+.bar-v.pos {
+  color: var(--ok);
+}
+.bar-v.neg {
+  color: var(--danger);
+}

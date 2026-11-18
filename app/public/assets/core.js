@@ -469,21 +469,59 @@ J.table = (() => {
   return T;
 })();
 
+/* Barres horizontales de contribution : items { label, tag?, value (signé), text, share? } ; la plus longue barre = 100 %. */
+J.bars = (items, label = "Contribution") => {
+  const max = Math.max(...items.map((i) => Math.abs(i.value)), 1e-9);
+  return `<div class="bars" role="list" aria-label="${J.esc(label)}">${items
+    .map(
+      (i) =>
+        `<div class="bar-row" role="listitem"><span class="bar-l">${J.esc(i.label)}${i.tag ? ` <small>(${J.esc(i.tag)})</small>` : ""}</span><span class="bar-t"><i class="bar-f ${i.value < 0 ? "neg" : "pos"}" data-style="width:${Math.max(1, (100 * Math.abs(i.value)) / max).toFixed(1)}%"></i></span><b class="bar-v ${i.value < 0 ? "neg" : "pos"}">${i.text}</b><span class="bar-s">${i.share === null || i.share === undefined ? "–" : J.numS(100 * i.share, 1) + " %"}</span></div>`,
+    )
+    .join("")}</div>`;
+};
+
 // Styles de données (couleurs, largeurs, positions calculées) : les gabarits écrivent data-style="…", appliqué ici par l'API CSSOM
 // (autorisée par la CSP, contrairement à l'attribut style). Le MutationObserver s'exécute avant le prochain rendu.
 (() => {
   "use strict";
-  const probe = document.createElement ? document.createElement("span") : null;
-  // fusion sans écraser : une valeur déjà posée par le code (el.style.x = …, exécuté juste après un innerHTML) l'emporte sur le gabarit
+  // Découpe « a:b;c:d » aux points-virgules de premier niveau (ni dans une parenthèse, ni dans une chaîne).
+  const declarations = (text) => {
+    const out = [];
+    let cur = "",
+      depth = 0,
+      quote = "";
+    for (const ch of text) {
+      if (quote) quote = ch === quote ? "" : quote;
+      else if (ch === '"' || ch === "'") quote = ch;
+      else if (ch === "(") depth++;
+      else if (ch === ")") depth = Math.max(0, depth - 1);
+      if (ch === ";" && !depth && !quote) {
+        out.push(cur);
+        cur = "";
+      } else cur += ch;
+    }
+    out.push(cur);
+    return out
+      .map((d) => {
+        const k = d.indexOf(":");
+        if (k < 1) return null;
+        const value = d.slice(k + 1).trim(),
+          important = /\s*!important$/i.test(value);
+        return {
+          name: d.slice(0, k).trim(),
+          value: value.replace(/\s*!important$/i, ""),
+          priority: important ? "important" : "",
+        };
+      })
+      .filter(Boolean);
+  };
+  // fusion sans écraser : une valeur déjà posée par le code (el.style.x = …, exécuté juste après un innerHTML) l'emporte sur le gabarit.
+  // Les déclarations sont posées telles quelles : un raccourci contenant var(--…) (ex. background: linear-gradient(… var(--x) …)) ne se décompose pas en propriétés détaillées.
   const apply = (el, force) => {
     const v = el.getAttribute("data-style");
-    if (v === null || !el.style || !probe) return;
-    probe.style.cssText = v;
-    for (let k = 0; k < probe.style.length; k++) {
-      const prop = probe.style[k];
-      if (force || !el.style.getPropertyValue(prop))
-        el.style.setProperty(prop, probe.style.getPropertyValue(prop), probe.style.getPropertyPriority(prop));
-    }
+    if (v === null || !el.style) return;
+    for (const d of declarations(v))
+      if (force || !el.style.getPropertyValue(d.name)) el.style.setProperty(d.name, d.value, d.priority);
   };
   const scan = (root) => {
     if (root.nodeType !== 1) return;

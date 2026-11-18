@@ -170,32 +170,6 @@
 .ps-line b {
   font-size: var(--fs-15);
 }
-.ps-state {
-  border-radius: var(--radius-8);
-  font: 800 0.72rem system-ui;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  background: var(--muted);
-  color: var(--on-solid);
-}
-.ps-advice.ok .ps-state {
-  background: var(--ok);
-}
-.ps-advice.watch .ps-state {
-  background: var(--warn);
-}
-.ps-advice.reeval .ps-state {
-  background: var(--caution);
-}
-.ps-advice.exit .ps-state {
-  background: var(--danger);
-}
-.ps-advice.na .ps-state {
-  background: var(--surface);
-  color: var(--muted);
-  border: 1px solid var(--line);
-}
 .ps-prot {
   font-size: var(--fs-12);
   font-weight: 600;
@@ -241,11 +215,6 @@
 .ps-method {
   font-size: var(--fs-11);
   color: var(--muted);
-}
-.px-w.rv {
-  background: var(--caution);
-  border-color: var(--caution);
-  color: var(--on-solid);
 }
 .px-sum .n.rv {
   background: var(--caution);
@@ -317,39 +286,6 @@ dialog .ps-rule legend {
   background: var(--info-soft);
   color: var(--info);
 } /* Suivi des positions : grille type tableau, une ligne compacte par position */
-.psr-list {
-  border-top: 1px solid var(--line);
-}
-.psr-cols {
-  font-size: var(--fs-10);
-  font-weight: 700;
-  color: var(--muted);
-  background: var(--surface-2, transparent);
-  border-radius: var(--radius-8);
-}
-.psr {
-  border-bottom: 1px solid var(--line);
-  background: transparent;
-}
-.psr::before {
-  border-radius: var(--radius-4);
-  background: var(--muted);
-}
-.psr.st-ok::before {
-  background: var(--ok);
-}
-.psr.st-watch::before {
-  background: var(--gold);
-}
-.psr.st-reevaluate::before {
-  background: var(--caution);
-}
-.psr.st-exit::before {
-  background: var(--danger);
-}
-.psr.st-na::before {
-  background: var(--muted);
-}
 .psr-name {
   background: none;
   border: 0;
@@ -361,14 +297,6 @@ dialog .ps-rule legend {
   outline-offset: 2px;
   border-radius: var(--radius-8);
 }
-.psr-name strong {
-  font-size: var(--fs-14);
-  line-height: var(--lh-tight);
-}
-.psr-name small {
-  color: var(--muted);
-  font-size: var(--fs-10);
-}
 .psr-gain strong {
   font-size: var(--fs-13);
   line-height: var(--lh-tight);
@@ -378,7 +306,20 @@ dialog .ps-rule legend {
   font-size: var(--fs-10);
 }
 .psr-gauge .ps-track {
-  border-radius: var(--radius-4);
+  border-radius: var(--radius-16);
+}
+.psr-gauge .ps-legend b {
+  color: var(--muted);
+  font-size: var(--fs-10);
+  font-weight: 500;
+}
+.psr-gauge .ps-legend strong {
+  font-size: var(--fs-12);
+}
+.psr-gauge .ps-legend em {
+  font-size: var(--fs-10);
+  font-style: normal;
+  color: var(--muted);
 }
 .psr-gauge .ps-lb {
   font-size: var(--fs-10);
@@ -389,14 +330,6 @@ dialog .ps-rule legend {
 }
 .psr-gauge .ps-dot {
   border-width: 2px;
-}
-.psr-adv.ps-advice {
-  background: none;
-  border-radius: 0;
-}
-.psr-adv .ps-state {
-  font-size: var(--fs-11);
-  border-radius: var(--radius-8);
 }
 .psr-msg {
   font-size: var(--fs-12);
@@ -413,12 +346,11 @@ dialog .ps-rule legend {
   font-size: var(--fs-11);
   color: var(--muted);
 }
-:root[data-theme="dark"] .psr-adv.ps-advice {
-  background: none;
-} /* Suivi des positions : repères en traits verticaux fins (aucune icône) */
+/* Suivi des positions : repères en traits verticaux fins (aucune icône) */
 .ps-tk {
-  border-radius: var(--radius-4);
+  border-radius: 50%;
   background: var(--text);
+  border: 2px solid var(--surface);
 }
 .ps-mk.ps-m-suggested .ps-tk {
   background: var(--info);
@@ -440,9 +372,15 @@ dialog .ps-rule legend {
   background: transparent;
   box-shadow: none;
 }
-.psr-gauge .ps-tk {
-  box-shadow: 0 0 0 1px var(--marker-light-shadow);
+
+@media (max-width: 900px) {
+  .psr-t td {
+    border: 0;
+  }
+  .psr-t tbody.psr {
+    border-bottom: 1px solid var(--line);
+  }
 }
-:root[data-theme="dark"] .psr-gauge .ps-tk {
-  box-shadow: 0 0 0 1px var(--marker-dark-shadow);
+.psr-gauge .ps-legend li {
+  border-bottom: 0;
 }

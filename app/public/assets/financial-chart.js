@@ -38,8 +38,8 @@
       }
       const w = host.clientWidth,
         h = config.height || 300,
-        left = w < 500 ? 56 : 70,
-        right = 18,
+        left = 8,
+        right = w < 500 ? 56 : 68,
         top = 35,
         bottom = 32;
       const full = { from: input.times[0], to: input.times.at(-1) },
@@ -95,8 +95,10 @@
       for (let k = 0; k < 5; k++) {
         const v = lo + ((hi - lo) * k) / 4,
           Y = y(v);
-        html += `<line x1="${left}" x2="${w - right}" y1="${Y}" y2="${Y}" stroke="var(--line)"/><text x="${left - 7}" y="${Y + 4}" text-anchor="end">${esc(config.format(v))}</text>`;
+        html += `<line x1="${left}" x2="${w - right}" y1="${Y}" y2="${Y}" stroke="var(--line)"/><text x="${w - right + 7}" y="${Y + 4}" text-anchor="start">${esc(config.format(v))}</text>`;
       }
+      if (config.zeroLine && lo < 0 && hi > 0)
+        html += `<line class="fc-zero" x1="${left}" x2="${w - right}" y1="${y(0)}" y2="${y(0)}" stroke="var(--muted)" stroke-dasharray="5 4"/><text class="fc-zero-label" x="${left + 4}" y="${y(0) - 4}">${esc(config.format(0))}</text>`;
       for (let k = 0; k < 3; k++) {
         const t = r.from + (n * k) / 2;
         html += `<text x="${x(t)}" y="${h - 9}" text-anchor="${k === 0 ? "start" : k === 2 ? "end" : "middle"}">${esc(fmtTime(t))}</text>`;
@@ -116,6 +118,30 @@
           }
           d += (pen ? "L" : "M") + x(t).toFixed(2) + " " + y(v).toFixed(2);
           pen = true;
+        }
+        if (s.width >= 2.5) {
+          // aire discrète sous la courbe principale, comme sur la fiche d'un titre
+          let a = "",
+            first = null,
+            prev = null;
+          const base = y(Math.max(lo, Math.min(0, hi)));
+          for (let i = 0; i <= input.times.length; i++) {
+            const t = input.times[i],
+              v = s.values[i];
+            if (i < input.times.length && Number.isFinite(v)) {
+              if (first === null) {
+                first = x(t);
+                a += "M" + first.toFixed(2) + " " + base.toFixed(2) + "L";
+              } else a += "L";
+              a += x(t).toFixed(2) + " " + y(v).toFixed(2);
+              prev = x(t);
+            } else if (first !== null) {
+              a += "L" + prev.toFixed(2) + " " + base.toFixed(2) + "Z";
+              first = null;
+            }
+          }
+          if (a)
+            html += `<path class="fc-area" d="${a}" clip-path="url(#pf-clip)" fill="${s.color}" fill-opacity="0.08" stroke="none"/>`;
         }
         html += `<path data-curve="${esc(s.id)}" d="${d}" clip-path="url(#pf-clip)" fill="none" stroke="${s.color}" stroke-width="${s.width || 2}" vector-effect="non-scaling-stroke"/>`;
         const last = input.times.findLastIndex((t, i) => t >= r.from && t <= r.to && Number.isFinite(s.values[i]));
