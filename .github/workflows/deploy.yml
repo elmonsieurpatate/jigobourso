@@ -24,91 +24,42 @@ concurrency:
   group: hostinger-jigobourso-production
   cancel-in-progress: false
 jobs:
+  # Contrôles courts et tests complets démarrent ensemble (aucune dépendance entre eux) ; le déploiement attend les deux.
   syntax:
     name: Contrôles courts
-    runs-on: ubuntu-22.04
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Dépendances des contrôles
-        run: |
-          python3 -m pip install --quiet -r requirements-dev.txt
-          npm ci --ignore-scripts --no-audit --no-fund
-      - name: Contrôles communs aux PR et à main
-        run: scripts/validate_quality.sh
+    uses: ./.github/workflows/quality.yml
 
   tests:
     name: Tests complets
-    needs: syntax
     if: >-
       (github.event_name == 'push' && !contains(github.event.head_commit.message, '[deploy quick]')) ||
       (github.event_name == 'workflow_dispatch' && inputs.operation == 'deploy' && inputs.validation != 'quick')
-    permissions: {contents: write}
+    uses: ./.github/workflows/tests.yml
+
+  # Verdict public des tests publié AVANT le déploiement (même branche deployment-status que le job hostinger : l'ordre évite deux écritures simultanées).
+  tests_status:
+    name: Verdict des tests
+    needs: tests
+    if: always() && needs.tests.result != 'skipped'
     runs-on: ubuntu-22.04
-    timeout-minutes: 20
-    services:
-      mariadb:
-        image: mariadb:10.11
-        env:
-          MARIADB_ROOT_PASSWORD: local-test-only
-          MARIADB_DATABASE: jigobourso_it
-        ports: ["3306:3306"]
-        options: >-
-          --health-cmd="healthcheck.sh --connect --innodb_initialized"
-          --health-interval=5s --health-timeout=5s --health-retries=20
+    timeout-minutes: 5
+    permissions:
+      contents: write # branche deployment-status : compte rendu public sans secret
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
-        with:
-          python-version: "3.9"
-      - name: Dépendances
-        run: |
-          python -m pip install -r requirements.txt -r requirements-dev.txt
-          python scripts/check_env.py
-      - name: Tests rapides
-        run: |
-          set -euo pipefail
-          scripts/test_suite.sh fast | tee "$RUNNER_TEMP/jigobourso-deploy.log"
-      - name: Tests d'intégration (base jetable du runner)
+      - name: Publier le verdict
         env:
-          JIGO_TEST_DATABASE: "1"
-          JIGO_DB_HOST: 127.0.0.1
-          JIGO_DB_PORT: "3306"
-          JIGO_DB_NAME: jigobourso_it
-          JIGO_DB_USER: root
-          JIGO_DB_PASSWORD: local-test-only
-        run: |
-          set -euo pipefail
-          MYSQL_PWD=local-test-only mysql -h127.0.0.1 -uroot jigobourso_it < db/schema.sql
-          scripts/test_suite.sh integ | tee -a "$RUNNER_TEMP/jigobourso-deploy.log"
-      - name: Browser financial smoke (isolated synthetic database)
-        env: {JIGO_TEST_DATABASE: '1', JIGO_DB_HOST: 127.0.0.1, JIGO_DB_PORT: '3306', JIGO_DB_NAME: jigobourso_it, JIGO_DB_USER: root, JIGO_DB_PASSWORD: local-test-only}
-        run: |
-          set -euo pipefail
-          npm install --prefix "$RUNNER_TEMP/financial-browser" --no-save playwright-core@1.56.1 > /dev/null
-          export PLAYWRIGHT_MODULE="$RUNNER_TEMP/financial-browser/node_modules/playwright-core" JIGO_CHROMIUM="$(command -v google-chrome || command -v chromium)"
-          export JIGO_TEST_MAIL_DIR="$RUNNER_TEMP/account-mail" JIGO_E2E_RESULTS="$PWD/audit-results"
-          scripts/e2e_browser.sh
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: always()
-        with:
-          name: financial-browser
-          path: audit-results/
-          retention-days: 1
-      - name: Publish verification result before deployment
-        if: always()
-        env:
-          STATUS: tests_${{ job.status }}
           GH_TOKEN: ${{ github.token }}
+          RESULT: ${{ needs.tests.result }}
         run: |
-          if [ -f audit-results/account-browser.json ]; then cat audit-results/account-browser.json >> "$RUNNER_TEMP/jigobourso-deploy.log"; fi
+          set -euo pipefail
+          case "$RESULT" in success) STATUS=tests_success ;; cancelled) STATUS=tests_cancelled ;; *) STATUS=tests_failure ;; esac
+          export STATUS
           bash ops/report-status.sh
   hostinger:
-    needs: [syntax, tests]
+    needs: [syntax, tests, tests_status]
     if: >-
       always() && !cancelled() && github.ref == 'refs/heads/main' &&
       needs.syntax.result == 'success' &&
@@ -121,6 +72,7 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: write # met à jour la branche deployment-status (compte rendu sans secret)
+      actions: read # lire les autres exécutions du workflow (garde contre un déploiement obsolète)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -132,7 +84,27 @@ jobs:
           TEST_RESULT: ${{ needs.tests.result }}
         run: |
           printf '### Opération : %s\n\nValidation : `%s` · Tests complets : `%s`\n' "$OPERATION" "$VALIDATION" "$TEST_RESULT" >> "$GITHUB_STEP_SUMMARY"
+      - name: Ne pas déployer une version plus ancienne qu'une exécution plus récente
+        id: fresh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OPERATION: ${{ inputs.operation || 'deploy' }}
+        run: |
+          set -euo pipefail
+          # Une exécution de push plus récente, en attente, en cours ou déjà réussie, déploie (ou a déjà déployé) un code plus récent : celui-ci ne doit pas l'écraser.
+          # Une exécution plus récente en échec ou annulée ne déploie rien : cette version, déjà validée, reste déployable. Les commits [skip ci] ne créent aucune exécution et ne bloquent donc rien.
+          if [ "$OPERATION" = deploy ]; then
+            created=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" --jq .created_at)
+            newer=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/deploy.yml/runs?branch=main&event=push&per_page=50" \
+              --jq "[.workflow_runs[] | select(.created_at > \"$created\" and .id != $GITHUB_RUN_ID and (.status != \"completed\" or .conclusion == \"success\"))] | length")
+            if [ "$newer" -gt 0 ]; then
+              echo "stale=true" >> "$GITHUB_OUTPUT"
+              printf '### Déploiement ignoré\n\nUne exécution plus récente de main déploie (ou a déjà déployé) un code plus récent : cette version ne l’écrase pas.\n' >> "$GITHUB_STEP_SUMMARY"
+              echo "Déploiement ignoré : exécution plus récente de main détectée"
+            fi
+          fi
       - name: Configurer SSH
+        if: steps.fresh.outputs.stale != 'true'
         env:
           DEPLOY_KEY: ${{ secrets.HOSTINGER_SSH_PRIVATE_KEY }}
         run: |
@@ -144,6 +116,7 @@ jobs:
           printf '%s\n' '[147.79.103.168]:65002 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAr7QtJ399JQsqSyH2cDwi5RUdPt5VVTateWLrGAKuVE' > "$RUNNER_TEMP/jigobourso-ssh/known_hosts"
           ssh-keygen -lf "$RUNNER_TEMP/jigobourso-ssh/known_hosts" | grep -F 'SHA256:fh14KGbEYreksPS6ughPoyn+M4caidDfVZrVAHG1OzM'
       - name: Diagnostic ou déploiement
+        if: steps.fresh.outputs.stale != 'true'
         env:
           JIGO_CATALOGUE_QUERY: ${{ inputs.catalogue_query || '' }}
           OPERATION: ${{ inputs.operation || 'deploy' }}
@@ -181,7 +154,7 @@ jobs:
       - name: Publier le résultat
         if: always()
         env:
-          STATUS: ${{ job.status }}
+          STATUS: ${{ steps.fresh.outputs.stale == 'true' && 'skipped_newer_version' || job.status }}
           GH_TOKEN: ${{ github.token }}
         run: bash ops/report-status.sh
       - name: Retirer la clé du runner

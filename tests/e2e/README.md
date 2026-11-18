@@ -7,8 +7,10 @@ sont soit des parcours Chromium, soit des modèles exécutables sous Node.
 ## Recette active commune aux PR et à main
 
 Point d’entrée : `scripts/e2e_browser.sh` (`make e2e` initialise d’abord la base
-jetable). Aucun de ces scénarios ne doit viser la production. Ils tournent en série,
-car les seeds réinitialisent `jigobourso_it`. Le runner conserve un journal par étape.
+jetable). Aucun de ces scénarios ne doit viser la production. Ils tournent en série
+dans un même groupe, car les seeds réinitialisent `jigobourso_it` ; les trois groupes
+(`core`, `plan`, `portfolio`, argument de `scripts/e2e_browser.sh`) sont indépendants et la CI les
+lance en parallèle, chacun sur sa propre base. Le runner conserve un journal par étape.
 
 | Seed / préparation | Parcours | Ce qu’il vérifie |
 |---|---|---|

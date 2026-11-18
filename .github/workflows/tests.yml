@@ -1,0 +1,135 @@
+name: Tests complets (réutilisable)
+# Les quatre blocs de la recette tournent en parallèle, chacun sur son propre runner et sa propre base jetable (aucune donnée partagée, aucune dépendance d'ordre) :
+#   fast   tests rapides, sans base ni réseau
+#   integ  tests d'intégration sur MariaDB, répartis en N blocs de fichiers (scripts/test_suite.sh integ i/N)
+#   e2e    parcours navigateur, un groupe indépendant par job (scripts/e2e_browser.sh core|plan|portfolio)
+# Le verdict publié sur la branche deployment-status l'est par deploy.yml (job tests_status) : un workflow appelé ne peut pas obtenir plus de droits que son appelant, et la PR n'a que contents:read.
+# Aucun test n'est supprimé, ignoré ni relancé automatiquement : un échec reste un échec (fail-fast désactivé pour les voir tous en une seule exécution).
+on:
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  fast:
+    name: Tests rapides
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.9"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+      - name: Dépendances
+        run: |
+          python -m pip install -r requirements.txt -r requirements-dev.txt
+          python scripts/check_env.py
+      - name: Tests rapides
+        run: scripts/test_suite.sh fast
+
+  integ:
+    name: Intégration ${{ matrix.shard }}/2
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    env:
+      JIGO_TEST_DATABASE: "1"
+      JIGO_DB_HOST: 127.0.0.1
+      JIGO_DB_PORT: "3306"
+      JIGO_DB_NAME: jigobourso_it
+      JIGO_DB_USER: root
+      JIGO_DB_PASSWORD: local-test-only
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: local-test-only
+          MARIADB_DATABASE: jigobourso_it
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.9"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+      - name: Dépendances
+        run: |
+          python -m pip install -r requirements.txt -r requirements-dev.txt
+          python scripts/check_env.py
+      - name: Tests d'intégration (base jetable du runner)
+        run: |
+          set -euo pipefail
+          MYSQL_PWD=local-test-only mysql -h127.0.0.1 -uroot jigobourso_it < db/schema.sql
+          scripts/test_suite.sh integ ${{ matrix.shard }}/2
+
+  e2e:
+    name: Navigateur ${{ matrix.group }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    env:
+      JIGO_TEST_DATABASE: "1"
+      JIGO_DB_HOST: 127.0.0.1
+      JIGO_DB_PORT: "3306"
+      JIGO_DB_NAME: jigobourso_it
+      JIGO_DB_USER: root
+      JIGO_DB_PASSWORD: local-test-only
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [core, plan, portfolio]
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: local-test-only
+          MARIADB_DATABASE: jigobourso_it
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.9"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+      - name: Dépendances
+        run: |
+          python -m pip install -r requirements.txt -r requirements-dev.txt
+          python scripts/check_env.py
+      - name: Recette navigateur (${{ matrix.group }}, base jetable du runner)
+        run: |
+          set -euo pipefail
+          MYSQL_PWD=local-test-only mysql -h127.0.0.1 -uroot jigobourso_it < db/schema.sql
+          npm install --prefix "$RUNNER_TEMP/financial-browser" --no-save playwright-core@1.56.1 > /dev/null
+          export PLAYWRIGHT_MODULE="$RUNNER_TEMP/financial-browser/node_modules/playwright-core" JIGO_CHROMIUM="$(command -v google-chrome || command -v chromium)"
+          export JIGO_TEST_MAIL_DIR="$RUNNER_TEMP/account-mail" JIGO_E2E_RESULTS="$PWD/audit-results"
+          scripts/e2e_browser.sh ${{ matrix.group }}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: browser-${{ matrix.group }}
+          path: audit-results/
+          retention-days: 1
+          if-no-files-found: ignore

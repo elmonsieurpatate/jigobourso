@@ -1,0 +1,27 @@
+name: Contrôles courts (réutilisable)
+# Barrière de qualité commune à la PR et à main : aucun secret, aucune base, quelques secondes.
+on:
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  quality:
+    name: Contrôles courts
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Python 3.9 comme la production et les tests : compileall et migrate --check détectent une syntaxe ou un module absent de 3.9 (le Python par défaut du runner est 3.10).
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.9"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+      - name: Dépendances des contrôles
+        run: |
+          python -m pip install --quiet -r requirements-dev.txt
+          npm ci --ignore-scripts --no-audit --no-fund
+      - name: Contrôles communs aux PR et à main
+        run: scripts/validate_quality.sh

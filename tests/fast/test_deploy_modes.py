@@ -106,7 +106,7 @@ def isolated_deployment(tmp_path, mode, fail_public=False):
     binaries = tmp_path / 'bin'
     binaries.mkdir()
     transport = '''#!/usr/bin/env python3
-import datetime,json,os,pathlib,sys
+import datetime,json,os,pathlib,re,sys
 tool=pathlib.Path(sys.argv[0]).name
 args=sys.argv[1:];command=' '.join(args)
 body=sys.stdin.read() if tool=='ssh' and ('bash -s' in command or command.endswith('php')) else ''
@@ -121,7 +121,7 @@ if tool=='ssh':
 elif tool=='curl':
  if '-o' in args and args[args.index('-o')+1]!='/dev/null':
   target=pathlib.Path(args[args.index('-o')+1]);target.parent.mkdir(parents=True,exist_ok=True)
-  target.write_text('?v='+datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%d%H%M'))
+  target.write_text(re.search(r'\?v=\d+', pathlib.Path(os.environ['MOCK_PROJECT'], 'app/public/index.html').read_text()).group(0))  # la page servie porte la version que le script vient d'écrire : aucune horloge, donc pas d'échec au changement de minute
  if '-w' in args: print('500' if os.environ.get('MOCK_FAIL_PUBLIC') else ('401' if 'secondary-filters' in command else '200'),end='')
 '''
     for tool in ('ssh', 'scp', 'rsync', 'curl'):
@@ -139,6 +139,7 @@ elif tool=='curl':
         JIGO_DEPLOY_BASE='http://unreachable.invalid',
         MOCK_COMMANDS=str(commands),
         GITHUB_SHA='a' * 40,
+        MOCK_PROJECT=str(project),
     )
     env.pop('JIGO_DEPLOY_SANDBOX', None)
     if fail_public:
