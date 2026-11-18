@@ -308,7 +308,7 @@
             .map(
               (
                 x,
-              ) => `<tr ${x.id ? `data-id="${x.id}"` : ""} class="pointer"><td><b>${J.esc(x.name)}</b>${x.held ? ' <span class="badge accent">détenu</span>' : ""}<div class="small muted">${J.esc(x.symbol)} · ${J.esc(x.isin || "")} · ${J.esc(x.country || "")}</div></td><td>${J.esc(x.mic)}</td><td>${x.kind === "etf" ? "ETF" : "Action"}</td>
+              ) => `<tr ${x.sheet_id || x.id ? `data-id="${x.sheet_id || x.id}"` : ""} class="pointer"><td>${x.sheet_id || x.id ? `<a href="titre.html?id=${x.sheet_id || x.id}"><b>${J.esc(x.name)}</b></a>${x.sheet_redirected ? `<div class="small muted">Fiche du produit sur ${J.esc(x.sheet_symbol)}</div>` : ""}` : `<b>${J.esc(x.name)}</b><div class="small muted">Pas de fiche interne · <a href="https://finance.yahoo.com/quote/${encodeURIComponent(x.symbol)}" target="_blank" rel="noopener">Yahoo Finance ↗</a></div>`}${x.held ? ' <span class="badge accent">détenu</span>' : ""}<div class="small muted">${J.esc(x.symbol)} · ${J.esc(x.isin || "")} · ${J.esc(x.country || "")}</div></td><td>${J.esc(x.mic)}</td><td>${x.kind === "etf" ? "ETF" : "Action"}</td>
           <td class="small">${J.esc(cat ? x.removed_reason || "conservée" : x.excluded_reason || x.status + (x.is_primary ? " · principale" : ""))}</td>${cat ? "" : `<td class="num">${x.price_eur != null ? J.num(x.price_eur, 2) : "–"}</td><td class="num">${x.liquidity_eur != null ? J.num(x.liquidity_eur, 0) : "–"}</td>`}</tr>`,
             )
             .join("") || `<tr><td colspan="6" class="empty">Aucun titre.</td></tr>`
@@ -345,7 +345,10 @@
         host.innerHTML = "";
       };
       J.$$("tr[data-id]", host).forEach(
-        (tr) => (tr.onclick = () => (location.href = "titre.html?id=" + tr.dataset.id)),
+        (tr) =>
+          (tr.onclick = (e) => {
+            if (!e.target.closest("a,button,input,select")) location.href = "titre.html?id=" + tr.dataset.id;
+          }),
       );
       host.scrollIntoView({ block: "nearest" });
     }

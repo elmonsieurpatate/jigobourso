@@ -154,7 +154,9 @@
   const periodRows = Object.entries(s.measures)
     .filter(([, m]) => m)
     .map(([n, m]) => ({ n: +n, m }));
-  const labelFor = (n) => (s.config_periods.find((p) => p.sessions === n) || { label: n + " séances" }).label;
+  const labelFor = (n) =>
+    (s.config_periods.find((p) => p.sessions === n) || { label: { 756: "3 ans", 1260: "5 ans" }[n] || n + " séances" })
+      .label;
   const grouped = {};
   (v.reasons || []).forEach((r) => {
     (grouped[r.period || "data"] = grouped[r.period || "data"] || []).push(r);
@@ -246,6 +248,8 @@
         ["3 M", 63],
         ["6 M", 126],
         ["1 A", 252],
+        ["3 ans", 756],
+        ["5 ans", 1260],
         ["Max", 0],
       ];
       let sessions = 252,
@@ -256,9 +260,9 @@
         JEtf.assessment(s.assessment) +
         JEtf.reading(s.signals) +
         tradability(s.tradability) +
-        `<div class="card"><div class="row between wrap-s"><h2 class="m-0">Évolution du cours</h2><div class="row gap-s"><span class="seg" id="range">${R.map(([l, n]) => `<button data-n="${n}" class="${n === sessions ? "on" : ""}">${l}</button>`).join("")}</span>
+        `<div class="card"><div class="row between wrap-s"><h2 class="m-0">Évolution du cours</h2><div class="row gap-s wrap-s"><span class="seg wrap-s" id="range" role="group" aria-label="Période du graphique">${R.map(([l, n]) => `<button data-n="${n}" class="${n === sessions ? "on" : ""}">${l}</button>`).join("")}</span>
         <button class="badge accent" data-o="ma20">Moy. 20 j</button><button class="badge outline" data-o="ma50">Moy. 50 j</button><button class="badge accent" data-o="vol">Volumes</button></div></div>
-        <div id="chart" class="mt-2"></div><div class="row between small muted mt-2" id="chart-sum"></div></div>
+        <p id="chart-history-notice" class="notice small" role="status" hidden></p><div id="chart" class="mt-2"></div><div class="row between small muted mt-2" id="chart-sum"></div></div>
         <div class="card"><h2>Performances</h2><div class="metric-grid">${[
           ["Var. 1J", perf(1), "Variation du cours entre les deux dernières séances clôturées."],
           ["1 semaine", perf(5)],
@@ -266,6 +270,8 @@
           ["3 mois", perf(63)],
           ["6 mois", perf(126)],
           ["1 an", perf(252)],
+          ["3 ans", perf(756)],
+          ["5 ans", perf(1260)],
         ]
           .map(
             ([l, p, tip]) =>
@@ -274,13 +280,20 @@
           .join("")}</div>
         <p class="small muted mt-3">Performances calculées sur la même série que la stratégie (${J.esc(s.analysis_basis === "adjusted" ? "clôtures ajustées du fournisseur" : "clôtures brutes, splits connus corrigés si leur ratio est disponible")}), dans sa devise (${J.esc(s.currency || "")}). Elles décrivent le passé et ne garantissent rien pour la suite.</p></div>`;
       const draw = () => {
+        const coverage = s.window_coverage?.[String(sessions)];
+        const incomplete = sessions > 0 && (s.daily.length < sessions + 1 || (coverage && coverage.coverage < 1));
+        const notice = J.$("#chart-history-notice");
+        notice.hidden = !incomplete;
+        notice.textContent = incomplete
+          ? `Historique incomplet pour ${sessions} séances : ${coverage?.observations ?? s.daily.length} clôtures disponibles sur ${sessions + 1} attendues. La courbe montre uniquement les données disponibles ; la performance complète reste indisponible.`
+          : "";
         const r = J.priceChart(
           J.$("#chart"),
           s.daily.map((d, i) => [d[0], d[1], s.daily_volume[i]]),
-          { sessions, ma20, ma50, volume: vol, unit: s.currency },
+          { sessions: sessions ? sessions + 1 : 0, ma20, ma50, volume: vol, unit: s.currency },
         );
         J.$("#chart-sum").innerHTML = r
-          ? `<span>${J.date(r.from)} → ${J.date(r.to)} · ${r.sessions} séances</span><span class="${J.cls(r.perf)}"><b>${J.pct(r.perf, 1)}</b> sur la période · plus haut ${J.num(r.high, 2)} · plus bas ${J.num(r.low, 2)}</span>`
+          ? `<span>${J.date(r.from)} → ${J.date(r.to)} · ${Math.max(0, r.sessions - 1)} variations de séance</span><span class="${J.cls(r.perf)}"><b>${J.pct(r.perf, 1)}</b> ${incomplete ? "sur les données disponibles" : "sur la période"} · plus haut ${J.num(r.high, 2)} · plus bas ${J.num(r.low, 2)}</span>`
           : "";
       };
       J.$$("#range button").forEach(

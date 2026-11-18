@@ -29,6 +29,7 @@ run catalogue-search node tests/e2e/catalogue-search.cjs
 run explorer-hidden-search node tests/e2e/explorer-hidden-search.cjs
 run keyboard node tests/e2e/keyboard.cjs
 run title-layout node tests/e2e/title-layout.cjs
+run admin-title-history node tests/e2e/admin-title-history.cjs
 run strategies-ui timeout 240s node tests/e2e/strategies-ui.cjs      # avant account-navigation : celui-ci provoque des échecs de connexion volontaires
 run account-navigation timeout 180s node tests/e2e/account-navigation.cjs
 # Chaque groupe métier réinitialise explicitement la même base jetable, en série.

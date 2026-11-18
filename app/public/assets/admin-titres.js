@@ -58,6 +58,7 @@
       }[k] || ["Statut indisponible", "warn"];
       return J.badge(state[0], state[1]);
     };
+    const sheetId = (x) => (x.primary?.in_catalogue ? x.primary.id : x.lid || x.primary?.id);
     const query = tf.q.trim().toUpperCase();
     const product = /^[A-Z]{2}[A-Z0-9]{10}$/.test(query)
       ? r.rows.find((x) => x.isin?.toUpperCase() === query && x.primary?.in_catalogue)
@@ -123,7 +124,7 @@
           .map(
             (
               x,
-            ) => `<tr ${x.in_final && x.lid ? `data-id="${x.lid}"` : ""} class="pointer"><td><b>${J.esc(x.name)}</b>${x.in_final ? " " + J.badge("Principale retenue", "ok") : x.primary?.in_catalogue ? " " + J.badge("Autre cotation", "") : ""}<div class="small muted">${J.esc(x.symbol)} · ${J.esc(x.mic)} · ${J.esc(x.isin || "")} · ${J.esc(x.country || "")}${x.category ? " · " + J.esc(x.category) : ""}</div></td>
+            ) => `<tr ${sheetId(x) ? `data-id="${sheetId(x)}"` : ""} class="pointer"><td>${sheetId(x) ? `<a href="titre.html?id=${sheetId(x)}"><b>${J.esc(x.name)}</b></a>` : `<b>${J.esc(x.name)}</b><div class="small muted">Pas de fiche interne · <a href="https://finance.yahoo.com/quote/${encodeURIComponent(x.symbol)}" target="_blank" rel="noopener">Yahoo Finance ↗</a></div>`}${x.in_final ? " " + J.badge("Principale retenue", "ok") : x.primary?.in_catalogue ? " " + J.badge("Autre cotation", "") : ""}<div class="small muted">${J.esc(x.symbol)} · ${J.esc(x.mic)} · ${J.esc(x.isin || "")} · ${J.esc(x.country || "")}${x.category ? " · " + J.esc(x.category) : ""}</div></td>
         <td>${J.esc(x.mic)}<div class="small muted">${x.kind === "etf" ? "ETF" : "Action"}</div></td><td>${badge(x.fdb_state, x.fdb_state === "kept" ? "Admis FDB" : "")}</td><td>${badge(x.y_state, x.y_state === "kept" ? "Retenu Yahoo" : "")}</td>
         <td>${x.in_final ? '<span class="badge ok">Oui</span>' : '<span class="badge danger">Non</span>'}${x.held ? ' <span class="badge accent">lié à un portefeuille · suivi séparément</span>' : ""}${x.primary?.in_catalogue && x.primary.id !== x.lid ? `<div class="small">Produit conservé : <a href="titre.html?id=${x.primary.id}">${J.esc(x.primary.symbol)} · ${J.esc(x.primary.mic)}</a><div class="muted">Cette cotation n’est pas la principale retenue.</div></div>` : ""}</td>
         <td class="small">${x.reason ? `<b>${J.esc(x.reason.stage)}</b>${x.reason.rule ? " · " + J.esc(x.reason.rule) : ""}<div class="muted">${J.esc(x.reason.detail || "")}</div>` : "–"}</td>
@@ -176,7 +177,12 @@
       tf.dir = n.dir;
       titres();
     });
-    J.$$("tr[data-id]").forEach((tr) => (tr.onclick = () => (location.href = "titre.html?id=" + tr.dataset.id)));
+    J.$$("tr[data-id]", AC.page).forEach(
+      (tr) =>
+        (tr.onclick = (e) => {
+          if (!e.target.closest("a,button,input,select")) location.href = "titre.html?id=" + tr.dataset.id;
+        }),
+    );
   }
 
   Object.assign(AC.tabs, { titres });

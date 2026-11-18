@@ -227,6 +227,24 @@ def _filters(stage, q, kind, mic):
     return ' AND '.join(where), args
 
 
+def _sheet_links(cur, rows):
+    """Une fiche par produit quand sa principale est retenue ; identité de cotation préservée."""
+    keys = sorted({r['group_key'] for r in rows})
+    if not keys:
+        return
+    cur.execute(f"SELECT i.group_key,l.id,l.symbol,l.mic,l.is_primary,l.status FROM instruments i JOIN listings l ON l.instrument_id=i.id WHERE i.group_key IN ({','.join(['%s'] * len(keys))})", keys)
+    listings = cur.fetchall()
+    exact = {(x['group_key'], x['mic'], x['symbol']): x for x in listings}
+    primary = {x['group_key']: x for x in listings if x['is_primary'] and x['status'] == 'selected'}
+    for row in rows:
+        own = exact.get((row['group_key'], row['mic'], row['symbol'][:24]))
+        target = primary.get(row['group_key']) or own
+        row.setdefault('id', own['id'] if own else None)
+        row['sheet_id'] = target['id'] if target else None
+        row['sheet_symbol'] = target['symbol'] if target else None
+        row['sheet_redirected'] = target is not None and (own is None or own['id'] != target['id'])
+
+
 def items(conn, stage, step, q='', kind='', mic='', page=1, quality=''):
     page = max(1, int(page))
     if stage not in FILTER_COLUMNS:
@@ -253,7 +271,7 @@ def items(conn, stage, step, q='', kind='', mic='', page=1, quality=''):
             cur.execute(f'SELECT COUNT(*) n FROM catalogue_raw r WHERE {cond_all}', args)
             total = cur.fetchone()['n']
             cur.execute(
-                f'SELECT r.kind, r.mic, r.symbol, r.isin, r.name, r.country, r.category, r.currency, r.removed_step, r.removed_reason FROM catalogue_raw r WHERE {cond_all} ORDER BY r.name, r.mic LIMIT %s OFFSET %s',
+                f'SELECT r.kind, r.mic, r.symbol, r.isin, r.name, r.country, r.category, r.currency, r.group_key, r.removed_step, r.removed_reason FROM catalogue_raw r WHERE {cond_all} ORDER BY r.name, r.mic LIMIT %s OFFSET %s',
                 args + limit_args,
             )
             rows = cur.fetchall()
@@ -269,7 +287,7 @@ def items(conn, stage, step, q='', kind='', mic='', page=1, quality=''):
             cur.execute(f'SELECT COUNT(*) n FROM listings l JOIN instruments i ON i.id=l.instrument_id {join} WHERE {cond_all}', args)
             total = cur.fetchone()['n']
             cur.execute(
-                f"""SELECT l.id, l.symbol, l.mic, l.currency, l.status, l.excluded_reason, l.is_primary, i.name, i.isin, i.kind, i.country, p.price, p.currency price_currency, p.avg_volume_3m, p.quote_at, p.price_time,
+                f"""SELECT l.id, l.symbol, l.mic, l.currency, l.status, l.excluded_reason, l.is_primary, i.name, i.isin, i.kind, i.country, i.group_key, p.price, p.currency price_currency, p.avg_volume_3m, p.quote_at, p.price_time,
                                    {'s.quality,' if step == 'history' else ''} (SELECT COUNT(*) FROM portfolio_transactions t WHERE t.listing_id=l.id) held
                             FROM listings l JOIN instruments i ON i.id=l.instrument_id LEFT JOIN latest_prices p ON p.listing_id=l.id {join}
                             WHERE {cond_all} ORDER BY i.name, l.mic LIMIT %s OFFSET %s""",
@@ -284,6 +302,7 @@ def items(conn, stage, step, q='', kind='', mic='', page=1, quality=''):
                 r['liquidity_eur'] = price * r['avg_volume_3m'] * f if price is not None and r['avg_volume_3m'] is not None and f else None
                 r['held'] = bool(r['held'])
                 r['is_primary'] = bool(r['is_primary'])
+        _sheet_links(cur, rows)
     return {'total': total, 'page': page, 'pages': max(1, -(-total // PAGE)), 'rows': rows}
 
 

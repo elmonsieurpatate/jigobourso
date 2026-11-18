@@ -171,3 +171,42 @@ def test_actions_etf_can_return_partial_intraday_without_hiding_the_title(catalo
     assert status == 200, data
     primary = next(r for r in data['rows'] if r['lid'] == 3)
     assert primary['in_final'] is True and primary['intraday_state'] == 'partial'
+
+
+def test_financedatabase_and_yahoo_rows_link_to_the_retained_product(catalogue):
+    conn, _ = catalogue
+    rows = {r['symbol']: r for r in funnel.items(conn, 'catalogue', 'raw', q='LU1812092168')['rows']}
+    assert rows['TEST.PA']['id'] == 3 and rows['TEST.PA']['sheet_id'] == 3
+    assert rows['TEST.DE']['id'] == 4 and rows['TEST.DE']['sheet_id'] == 3
+    assert rows['TEST.L']['id'] is None and rows['TEST.L']['sheet_id'] == 3
+    assert rows['TEST.L']['sheet_redirected'] and rows['TEST.DE']['sheet_redirected']
+    assert all(r['sheet_symbol'] == 'TEST.PA' for r in rows.values())
+    with conn.cursor() as cur:
+        cur.execute("UPDATE listings SET status='candidate',excluded_reason=NULL WHERE id=4")
+    conn.commit()
+    secondary = funnel.items(conn, 'yahoo', 'secondary', q='TEST.DE')['rows']
+    assert secondary[0]['id'] == 4 and secondary[0]['sheet_id'] == 3
+
+
+def test_sheet_exposes_five_years_and_keeps_volumes_aligned(catalogue, monkeypatch):
+    from engine.analytics.admin import title_sheet
+    from engine.market.calendar import session_dates
+
+    conn, _ = catalogue
+    days = session_dates('XPAR', '2026-11-17', 1261)
+    with conn.cursor() as cur:
+        cur.executemany('INSERT INTO daily_prices(listing_id,price_date,close_px,volume) VALUES (3,%s,%s,%s)', [(d, 100 + i / 100, 1000 + i) for i, d in enumerate(days)])
+    conn.commit()
+    monkeypatch.setattr(title_sheet, 'expected_close', lambda *_: '2026-11-17')
+    sheet = title_sheet.instrument_sheet(conn, {'listing_id': 3, 'config': 'regular'})
+    assert len(sheet['daily']) == len(sheet['daily_raw']) == len(sheet['daily_volume']) == 1261
+    assert sheet['daily'][0][0] == days[0] and sheet['daily_volume'][0] == 1000
+    assert sheet['daily_volume'][-1] == 2260
+    assert sheet['measures']['756']['perf'] is not None and sheet['measures']['1260']['perf'] is not None
+    with conn.cursor() as cur:
+        cur.execute('DELETE FROM daily_prices WHERE listing_id=3 AND price_date<%s', (days[-696],))
+    conn.commit()
+    short = title_sheet.instrument_sheet(conn, {'listing_id': 3, 'config': 'regular'})
+    assert len(short['daily']) == 696  # aucune nouvelle troncature à 400
+    assert short['measures']['756'] is None or short['measures']['756'].get('perf') is None
+    assert short['window_coverage']['756']['observations'] == 696

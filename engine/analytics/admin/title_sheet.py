@@ -73,14 +73,14 @@ def instrument_sheet(conn, request):
         'excluded_reason': u['excluded_reason'],
         'is_primary': bool(u['is_primary']),
         'other_listings': [{'id': s['id'], 'mic': s['mic'], 'symbol': s['symbol'], 'currency': s['currency'], 'status': s['status'], 'is_primary': bool(s['is_primary'])} for s in siblings],
-        'daily': daily[-400:],
-        'daily_volume': daily_volume[-400:],
+        'daily': daily,
+        'daily_volume': daily_volume,
         'state': {k: (float(v) if hasattr(v, 'as_integer_ratio') and not isinstance(v, int) else v) for k, v in state.items() if k != 'break_dates'},
         'break_dates': state.get('break_dates'),
     }
     sheet.update(_sheet_context(conn, u, state, daily))
     # Verdict : uniquement pour une cotation recommandable ; sinon la fiche explique pourquoi elle ne l'est pas.
-    all_windows = sorted({1, 5, 21, 63, 126, 252} | {p['sessions'] for p in config['periods']})
+    all_windows = sorted({1, 5, 21, 63, 126, 252, 756, 1260} | {p['sessions'] for p in config['periods']})
     bars = [(r['price_date'].isoformat(), float(r['close_px']), None if r['adj_close_px'] is None else float(r['adj_close_px'])) for r in rows]
     with conn.cursor() as cur:
         cur.execute("SELECT event_date, ratio FROM corporate_events WHERE listing_id=%s AND kind IN ('split','reverse_split')", (lid,))
@@ -104,7 +104,7 @@ def instrument_sheet(conn, request):
     chart_dates, chart_closes, _, chart_breaks = prepare_series(bars, splits)
     volumes = dict(zip((d for d, _ in daily), daily_volume))
     sheet['daily_raw'] = sheet['daily']
-    sheet['daily'] = [[d, c] for d, c in zip(chart_dates, chart_closes)][-400:]
+    sheet['daily'] = [[d, c] for d, c in zip(chart_dates, chart_closes)]
     sheet['daily_volume'] = [volumes.get(d) for d, _ in sheet['daily']]
     sheet['chart_break_dates'] = [chart_dates[i] for i in chart_breaks]
     sheet['data_corrections'] = data_corrections(bars, splits)
