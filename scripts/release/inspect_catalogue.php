@@ -38,6 +38,7 @@ $started = microtime(true);
 try {
     $titles = engine_call('titles', ['q' => $term]);
     $titlesProbe = ['total' => $titles['total'], 'returned' => count($titles['rows']),
+        'states' => array_values(array_map(fn($r) => ['symbol' => $r['symbol'], 'daily' => $r['d_state'], 'intraday' => $r['intraday_state']], array_filter($titles['rows'], fn($r) => ($r['isin'] ?? '') === $term))),
         'matching_isin' => count(array_filter($titles['rows'], fn($r) => ($r['isin'] ?? '') === $term))];
 } catch (Throwable $e) {
     $titlesProbe = ['error' => $e->getMessage()];
