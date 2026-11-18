@@ -125,6 +125,13 @@
       onDone: render,
     });
   }
+  function openCash() {
+    switchView("manage");
+    const fold = J.$('[data-fold="cash"]');
+    fold.classList.remove("folded");
+    fold.querySelector(".fold-h")?.setAttribute("aria-expanded", "true");
+    fold.scrollIntoView({ block: "start" });
+  }
   function openHistory(id = null, key = null) {
     const tx0 = D.transactions_list.find((t) => t.id === id);
     TX_FILTER.key = key || (tx0 ? positionKey(tx0) : "");
@@ -296,8 +303,19 @@
     );
   }
 
+  let ICONS = [];
+  function cashBanner(d) {
+    const arch = d.portfolio.archived
+      ? '<div class="notice warn">Portefeuille archivé : consultation seule. Désarchivez-le depuis « Gérer » pour le modifier.</div>'
+      : "";
+    if (!d.cash) return arch;
+    const withCash = d.totals.value == null ? null : d.totals.value + d.cash.balance;
+    return `${arch}<div class="notice ${d.cash.negative ? "warn" : "info"}"><b>Liquidités : ${J.eur(d.cash.balance)}</b>${withCash == null ? "" : ` · valeur avec liquidités : <b>${J.eur(withCash)}</b>`} · ${PFAdmin.KIND_LABEL[d.cash.kind]}. <button type="button" class="btn sm" id="goto-cash">Argent et mouvements</button> <span class="small">Les pourcentages de performance affichés restent pour l’instant calculés selon l’ancien modèle (estimation) ; le nouveau calcul est préparé en parallèle.</span></div>`;
+  }
   async function render() {
-    list = (await J.api("portfolios")).portfolios;
+    const lr = await J.api("portfolios");
+    list = lr.portfolios;
+    ICONS = lr.icons;
     if (!list.length) {
       J.$("#pf-toolbar").innerHTML = "";
       page.innerHTML =
@@ -313,8 +331,16 @@
     history.replaceState(null, "", "?id=" + current);
     const etfHtml = JEtf.portfolio(d.etf_analysis);
     J.$("#pf-toolbar").innerHTML =
-      `<label class="sr-only" for="pf-select">Portefeuille affiché</label><select id="pf-select">${list.map((p) => `<option value="${p.id}" ${p.id === current ? "selected" : ""}>${J.esc(p.name)}${p.is_default ? " ★" : ""}</option>`).join("")}</select><button class="btn sm" id="new-pf" aria-label="Créer un portefeuille">＋</button><button class="btn primary" id="add-tx">＋ Transaction</button>`;
-    page.innerHTML = `${d.integrity && !d.integrity.ok ? `<div class="notice err">${d.integrity.issues.map((i) => J.esc(i.message)).join("<br>")}</div>` : ""}${d.totals.unpriced ? '<div class="notice warn">Valorisation et gain total indisponibles : cours ou change manquant. Aucun prix d’achat n’est utilisé comme cours actuel.</div>' : ""}
+      `<label class="sr-only" for="pf-select">Portefeuille affiché</label><select id="pf-select">${list
+        .filter((p) => !p.archived || p.id === current)
+        .map(
+          (p) =>
+            `<option value="${p.id}" ${p.id === current ? "selected" : ""}>${J.esc(p.icon || "")} ${J.esc(p.name)}${p.is_default ? " ★" : ""}${p.archived ? " (archivé)" : ""}</option>`,
+        )
+        .join(
+          "",
+        )}</select><button class="btn sm" id="new-pf" aria-label="Créer un portefeuille">＋</button><a class="btn sm" href="mes-portefeuilles.html">Gérer</a><button class="btn primary" id="add-tx">＋ Transaction</button>`;
+    page.innerHTML = `${cashBanner(d)}${d.integrity && !d.integrity.ok ? `<div class="notice err">${d.integrity.issues.map((i) => J.esc(i.message)).join("<br>")}</div>` : ""}${d.totals.unpriced ? '<div class="notice warn">Valorisation et gain total indisponibles : cours ou change manquant. Aucun prix d’achat n’est utilisé comme cours actuel.</div>' : ""}
       <nav class="pf-nav" id="pf-nav" role="tablist" aria-label="Espaces du portefeuille">${[
         ["home", "Mon portefeuille"],
         ["manage", "Historique et gestion"],
@@ -325,7 +351,7 @@
         )
         .join("")}</nav>
       <section class="pf-panel" id="panel-home" data-panel="home" role="tabpanel" aria-labelledby="tab-home"><div id="pf-home" class="pf-home"><span class="spinner"></span></div></section>
-      <section class="pf-panel" id="panel-manage" data-panel="manage" role="tabpanel" aria-labelledby="tab-manage"><button type="button" class="btn sm" id="back-home">← Retour au portefeuille</button>${section("tx", "Transactions", "", txBody(d))}${d.sales.length ? section("sales", "Ventes réalisées", "", salesBody(d)) : ""}${d.lots.length ? section("lots", "Lots et réglages", "", lotsBody(d)) : ""}${section("valuation", "Valeur et mouvements d’argent", "", `<p class="small muted">La valeur varie aussi avec les achats et ventes. Ces montants ne sont pas un rendement. Période commune sélectionnée en haut.</p><div id="value-history"></div>`)}${d.allocation?.rows ? section("alloc", "Répartition par zone", "", allocBody(d.allocation)) : ""}${d.positions.some((p) => p.kind === "etf") && etfHtml ? section("etf", "Secteurs de vos ETF", "", etfHtml.replace(/^<div class="card">\s*<h2>[^<]*<\/h2>/, "<div>")) : ""}${splitNotice(d.positions)}${section("settings", "Réglages du portefeuille", "", `<div class="row"><button class="btn sm" id="rename">Renommer</button>${d.portfolio.is_default ? "" : '<button class="btn sm" id="mk-default">Définir par défaut</button>'}<button class="btn sm danger" id="del-pf">Supprimer</button></div><p class="small muted">Stratégie : ${J.esc(d.portfolio.strategy ? NAMES[d.portfolio.strategy.name] || "Personnalisée" : "Croissance régulière par défaut")}. Réglage depuis l’Explorer.</p>`)}</section>`;
+      <section class="pf-panel" id="panel-manage" data-panel="manage" role="tabpanel" aria-labelledby="tab-manage"><button type="button" class="btn sm" id="back-home">← Retour au portefeuille</button>${section("cash", "Argent", "", '<div id="cash-host"><span class="spinner"></span></div>')}${section("tx", "Transactions", "", txBody(d))}${d.sales.length ? section("sales", "Ventes réalisées", "", salesBody(d)) : ""}${d.lots.length ? section("lots", "Lots et réglages", "", lotsBody(d)) : ""}${section("valuation", "Valeur et mouvements d’argent", "", `<p class="small muted">La valeur varie aussi avec les achats et ventes. Ces montants ne sont pas un rendement. Période commune sélectionnée en haut.</p><div id="value-history"></div>`)}${d.allocation?.rows ? section("alloc", "Répartition par zone", "", allocBody(d.allocation)) : ""}${d.positions.some((p) => p.kind === "etf") && etfHtml ? section("etf", "Secteurs de vos ETF", "", etfHtml.replace(/^<div class="card">\s*<h2>[^<]*<\/h2>/, "<div>")) : ""}${splitNotice(d.positions)}${section("settings", "Réglages du portefeuille", "", `<div class="row"><button class="btn sm" id="rename">Renommer</button>${d.portfolio.is_default ? "" : '<button class="btn sm" id="mk-default">Définir par défaut</button>'}<button class="btn sm danger" id="del-pf">Supprimer</button></div><p class="small muted">Stratégie : ${J.esc(d.portfolio.strategy ? NAMES[d.portfolio.strategy.name] || "Personnalisée" : "Croissance régulière par défaut")}. Réglage depuis l’Explorer.</p>`)}</section>`;
     folds();
     J.$("#pf-select").onchange = (e) => {
       current = +e.target.value;
@@ -361,6 +387,10 @@
           hm.innerHTML = `<p class="notice err">Historique indisponible : ${J.esc(e.message)}. Rechargez la page.</p>`;
       });
     J.$("#new-pf").onclick = createPf;
+    J.$("#goto-cash")?.addEventListener("click", openCash);
+    PFAdmin.cashPanel(J.$("#cash-host"), { id: current, archived: d.portfolio.archived }, render).catch(
+      (e) => (J.$("#cash-host").innerHTML = `<p class="notice err">${J.esc(e.message)}</p>`),
+    );
     J.$("#add-tx").onclick = () => J.txDialog({ portfolios: list, portfolioId: current, onDone: render });
     J.$$("[data-lot]").forEach(
       (b) =>
@@ -627,21 +657,12 @@
     });
   }
   function createPf() {
-    J.dialog({
-      title: "Nouveau portefeuille",
-      body: J.field("Nom", '<input id="nm" maxlength="100" autofocus>'),
-      actions: [
-        { label: "Annuler", run: () => {} },
-        {
-          label: "Créer",
-          cls: "primary",
-          run: async (d) => {
-            const r = await J.post("portfolio/create", { name: J.$("#nm", d).value });
-            current = r.id;
-            render();
-          },
-        },
-      ],
+    PFAdmin.create({
+      icons: ICONS,
+      onDone: (id) => {
+        current = id;
+        render();
+      },
     });
   }
   let rs;

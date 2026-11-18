@@ -254,7 +254,11 @@ export MYSQL_PWD="$JIGO_DB_PASSWORD"
 dbconn=(-u"$JIGO_DB_USER"); if [ -n "${JIGO_DB_SOCKET:-}" ]; then dbconn+=(--protocol=socket --socket="$JIGO_DB_SOCKET"); else dbconn+=(-h"$JIGO_DB_HOST" -P"${JIGO_DB_PORT:-3306}"); fi   # JIGO_DB_SOCKET : essais isolés uniquement
 install -d -m 700 "$BACKUPS"
 file="$BACKUPS/financial-$(date -u +%Y%m%d%H%M%S).sql.gz"
-mariadb-dump "${dbconn[@]}" --single-transaction --quick "$JIGO_DB_NAME" portfolios portfolio_transactions position_levels | gzip > "$file"
+tables=(portfolios portfolio_transactions position_levels)
+for t in portfolio_cash_movements portfolio_cash_audit; do   # tables ajoutées par migration : absentes avant le premier déploiement qui les apporte
+  if [ -n "$(mariadb "${dbconn[@]}" -N -e "SHOW TABLES LIKE '$t'" "$JIGO_DB_NAME")" ]; then tables+=("$t"); fi
+done
+mariadb-dump "${dbconn[@]}" --single-transaction --quick "$JIGO_DB_NAME" "${tables[@]}" | gzip > "$file"
 chmod 600 "$file"
 gzip -t "$file"
 echo "Sauvegarde financière vérifiée : $(basename "$file")"

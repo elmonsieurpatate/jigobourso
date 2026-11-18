@@ -379,9 +379,12 @@ J.NAV = (admin) => [
     id: "portefeuilles",
     label: "Portefeuilles",
     icon: "wallet",
-    file: ["portefeuilles.html"],
+    file: ["portefeuilles.html", "mes-portefeuilles.html"],
     dynamic: "portfolios",
-    children: [{ label: "Vue d’ensemble", href: "portefeuilles.html", on: (q) => !q.has("id") }],
+    children: [
+      { label: "Vue d’ensemble", href: "portefeuilles.html", on: (q) => !q.has("id") },
+      { label: "Gérer mes portefeuilles", href: "mes-portefeuilles.html", on: () => true },
+    ],
   },
   {
     id: "bilan",
@@ -555,12 +558,14 @@ J.buildShell = function (page, user) {
       .then((r) => {
         const sub = J.$('[data-sub="portefeuilles"]'),
           cur = new URLSearchParams(location.search).get("id");
-        r.portfolios.forEach((p) =>
-          sub.insertAdjacentHTML(
-            "beforeend",
-            `<a class="sv ${file === "portefeuilles.html" && (cur == p.id || (!cur && false)) ? "on" : ""}" href="portefeuilles.html?id=${p.id}">${J.esc(p.name)}${p.is_default ? " ★" : ""}</a>`,
-          ),
-        );
+        r.portfolios
+          .filter((p) => !p.archived)
+          .forEach((p) =>
+            sub.insertAdjacentHTML(
+              "beforeend",
+              `<a class="sv ${file === "portefeuilles.html" && (cur == p.id || (!cur && false)) ? "on" : ""}" href="portefeuilles.html?id=${p.id}">${J.esc(p.name)}${p.is_default ? " ★" : ""}</a>`,
+            ),
+          );
       })
       .catch(() => {});
   /* en-tête : fil d'Ariane, recherche, thème */

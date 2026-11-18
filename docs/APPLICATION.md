@@ -590,6 +590,27 @@ Similarité entre ETF (`build`, `correlate`) :
 - concentration (`concentration`) : alerte quand au moins 3 ETF d'une même famille figurent parmi les dix premiers ; `RANKED_DEPTH` = 300 ;
 - exposition (`exposure`) : une catégorie du catalogue est une indication qualitative, jamais une pondération.
 
+### 8.11 Liquidités et administration des portefeuilles (`services/cash.php`, `services/portfolio_admin.php`)
+
+Deux modèles coexistent, par portefeuille (`portfolios.cash_model`) :
+
+- **`legacy`** (tous les portefeuilles d'avant la migration `20261122`) : aucune liquidité, résultats calculés exactement comme décrit en 8.1–8.5. Il le reste jusqu'à une conversion volontaire.
+- **`cash`** : le solde se déduit toujours des mouvements d'argent (`portfolio_cash_movements` : `initial_capital`, `deposit`, `withdrawal`, `dividend`, `fee`) et des transactions (achat = débit, frais compris ; vente = crédit net de frais). Jamais stocké.
+
+Règles (une seule implémentation, `cash_validate`, appliquée par `write_transaction` à chaque écriture, avec revalidation de TOUT l'historique) :
+
+- dépôts, retraits et capital initial sont des apports externes (ni gain ni perte) ; dividende = gain ; frais de compte = perte ;
+- `virtual` : le solde ne descend jamais sous zéro, pas de marge ; `real` : solde négatif toléré et signalé, mais un retrait ne peut jamais le creuser ;
+- ordre à horodatage égal : capital et dépôts, ventes, achats, frais, retraits (déterministe). Date sans heure : un dépôt vaut début de journée, un retrait fin de journée, le reste midi ;
+- une correction (modifier ou supprimer un mouvement ou une transaction) est refusée si elle rend le solde invalide à n'importe quelle date ; chaque correction de mouvement est journalisée (`portfolio_cash_audit`) ;
+- dividendes : structure complète (net crédité, brut, retenue, devise, taux) ; l'interface saisit le montant réellement crédité avec sa devise.
+
+**Conversion legacy → cash** (explicite, aperçu en lecture seule avant validation, `plan_hash` pour garantir que ce qui est validé est ce qui a été prévisualisé) : soit à partir d'une date avec un solde d'ouverture déclaré (les opérations antérieures gardent l'ancien calcul, jamais mélangées silencieusement), soit reconstitution complète avec les dépôts passés déclarés par l'utilisateur. Aucun dépôt n'est jamais inventé ; les transactions ne sont jamais modifiées. Annulation possible uniquement si aucune opération ni mouvement manuel n'a été saisi depuis (sinon 409 avec la liste des dépendances).
+
+**Administration** : création (nom, icône d'une liste fermée, description, type, capital), modification, défaut, archivage (lecture seule, exclu du bilan par défaut, défaut réaffecté à un portefeuille actif sinon action explicite), réinitialisation (garde identité, type, stratégie, défaut ; supprime toutes les opérations et données de suivi), suppression (une transaction, cascade des clés étrangères, garde qui vérifie qu'aucune table portant `portfolio_id` ne conserve de ligne ; données partagées et stratégies sauvegardées jamais touchées). Réinitialisation et suppression exigent le nom du portefeuille quand il contient des données, et proposent l'export CSV.
+
+La performance affichée n'est PAS modifiée par ces changements (8.5 reste la référence) ; le nouveau moteur est préparé en parallèle pour comparaison.
+
 ## 9. Intégrité financière et comportements jamais dégradés en silence
 
 | Cas | Comportement | Code |

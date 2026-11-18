@@ -59,5 +59,7 @@ fi
 if want portfolio; then
 run portfolio-seed python tests/seeds/portfolio_audit_seed.py
 run portfolio-v5 timeout 240s node tests/e2e/portfolio-v5.cjs
+php scripts/create_user.php cash_user cash-local-password-2026 > /dev/null   # mêmes titres et cours que portfolio-v5 (ALPHA en euros)
+run portfolio-cash timeout 240s node tests/e2e/portfolio-cash.cjs
 fi
 echo "e2e navigateur ($group) : OK"

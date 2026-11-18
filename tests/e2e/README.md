@@ -22,6 +22,7 @@ lance en parallèle, chacun sur sa propre base. Le runner conserve un journal pa
 | plan_suivi_seed | plan-suivi | conseils et protections chiffrés, règles personnelles, indépendance des positions, thèmes, 320–1440 px |
 | split_review_seed | split-reviews | décision, ratio erroné, refus/réexamen, audit, idempotence, droits, mobile |
 | portfolio_audit_seed | portfolio-v5 | zones, périodes, graphiques, détail, surveillance, 320–1440 px |
+| mêmes données | portfolio-cash | liquidités : création, achat/vente (1 000 → 800 → 1 050 €, gain réalisé 50 €), renommage, icône, description, dépôt/retrait, archivage, conversion avec aperçu, réinitialisation, suppression |
 
 Avant ces parcours : galerie de référence dans quatre contextes, contrastes et
 contrats de toutes les classes utilitaires. Ces contrôles ne remplacent pas Safari

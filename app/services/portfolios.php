@@ -8,13 +8,19 @@ require_once __DIR__ . '/ledger.php';
 require_once __DIR__ . '/transactions.php';
 require_once __DIR__ . '/alerts.php';
 require_once __DIR__ . '/portfolio_access.php';
+require_once __DIR__ . '/cash.php';
+require_once __DIR__ . '/portfolio_admin.php';
 
 const LOT_STRATEGIES = ['regular', 'fast', 'recovery', 'low_volatility', 'momentum', 'momentum12', 'momentum_risk', 'prudent'];   // engine/analytics/portfolio/alerts.py STRATEGIES (parité testée : tests/fast/test_alerts.py)
 
 function pf_list(array $u, array $b = []) {
-    $rows = q('SELECT id, name, is_default, strategy_config IS NOT NULL AS has_strategy, created_at FROM portfolios WHERE user_id = ? ORDER BY is_default DESC, name', [$u['id']])->fetchAll();
-    foreach ($rows as &$r) { $r['is_default'] = (bool)$r['is_default']; $r['totals'] = portfolio_valuation((int)$r['id'])['totals']; }
-    return ['portfolios' => $rows];
+    $rows = q('SELECT id, name, is_default, strategy_config IS NOT NULL AS has_strategy, created_at, icon, description, cash_model, kind, archived_at, cash_from, cash_converted_at FROM portfolios WHERE user_id = ? ORDER BY is_default DESC, name', [$u['id']])->fetchAll();
+    foreach ($rows as &$r) {
+        $r['is_default'] = (bool)$r['is_default']; $r['archived'] = $r['archived_at'] !== null;
+        $r['totals'] = portfolio_valuation((int)$r['id'])['totals'];
+        $r['cash'] = cash_summary($r);   // null (aucune requête) pour un portefeuille sans liquidités
+    }
+    return ['portfolios' => $rows, 'icons' => PF_ICONS];
 }
 
 function pf_detail(array $u, array $b = []) {
@@ -54,7 +60,7 @@ function pf_detail(array $u, array $b = []) {
     $v['lot_strategies'] = $alerts['strategies'] ?? null;
     $v['curves'] = $alerts['curves'] ?? (object)[];
     $v['allocation'] = engine_call('allocation', ['target' => $target, 'positions' => array_map(function ($x) { return array_intersect_key($x, array_flip(['listing_id', 'kind', 'value'])); }, $v['positions'])]);
-    return $v + ['portfolio' => ['id' => (int)$p['id'], 'name' => $p['name'], 'is_default' => (bool)$p['is_default'], 'strategy' => $p['strategy_config'] ? json_decode($p['strategy_config'], true) : null], 'transactions_list' => $tx];
+    return $v + ['cash' => cash_summary($p), 'portfolio' => ['id' => (int)$p['id'], 'name' => $p['name'], 'is_default' => (bool)$p['is_default'], 'icon' => $p['icon'], 'description' => $p['description'], 'kind' => $p['kind'], 'cash_model' => $p['cash_model'], 'archived' => $p['archived_at'] !== null, 'strategy' => $p['strategy_config'] ? json_decode($p['strategy_config'], true) : null], 'transactions_list' => $tx];
 }
 
 function pf_history_refresh(array $u, array $b = []) {
@@ -127,14 +133,6 @@ function pf_lot_settings(array $u, array $b = []) {
     return ['ok' => true];
 }
 
-function pf_create(array $u, array $b = []) {
-    $name = str_in($b, 'name', 100);
-    if (q('SELECT 1 FROM portfolios WHERE user_id = ? AND name = ?', [$u['id'], $name])->fetch()) throw new ApiError('Ce nom existe déjà', 409);
-    $first = !q('SELECT 1 FROM portfolios WHERE user_id = ?', [$u['id']])->fetch();
-    q('INSERT INTO portfolios(user_id, name, is_default, created_at, updated_at) VALUES (?,?,?,?,?)', [$u['id'], $name, $first ? 1 : 0, now_utc(), now_utc()]);
-    return ['id' => (int)db()->lastInsertId()];
-}
-
 function pf_rename(array $u, array $b = []) {
     $p = own_portfolio((int)($b['id'] ?? 0), $u);
     $name = str_in($b, 'name', 100);
@@ -145,19 +143,11 @@ function pf_rename(array $u, array $b = []) {
 
 function pf_make_default(array $u, array $b = []) {
     $p = own_portfolio((int)($b['id'] ?? 0), $u);
+    if ($p['archived_at'] !== null) throw new ApiError('Un portefeuille archivé ne peut pas être le portefeuille par défaut', 409);
     tx(function () use ($u, $p) {
         q('UPDATE portfolios SET is_default = 0 WHERE user_id = ?', [$u['id']]);
         q('UPDATE portfolios SET is_default = 1 WHERE id = ?', [$p['id']]);
     });
-    return ['ok' => true];
-}
-
-function pf_delete(array $u, array $b = []) {
-    $p = own_portfolio((int)($b['id'] ?? 0), $u);
-    $n = (int)q('SELECT COUNT(*) FROM portfolio_transactions WHERE portfolio_id = ?', [$p['id']])->fetchColumn();
-    if ($n > 0 && ($b['confirm'] ?? '') !== $p['name']) throw new ApiError("Ce portefeuille contient $n transactions : tapez son nom pour confirmer la suppression", 422);
-    q('DELETE FROM portfolios WHERE id = ?', [$p['id']]);
-    if ($p['is_default']) q('UPDATE portfolios SET is_default = 1 WHERE user_id = ? ORDER BY id LIMIT 1', [$u['id']]);
     return ['ok' => true];
 }
 
@@ -265,7 +255,8 @@ function tx_update(array $u, array $b = []) {
 }
 
 function pf_bilan(array $u, array $b = []) {
-    $list = q('SELECT id, name, is_default FROM portfolios WHERE user_id = ? ORDER BY is_default DESC, name', [$u['id']])->fetchAll();
+    $archived = !empty($b['include_archived']);   // les archivés sont exclus du bilan courant, consultables à la demande
+    $list = q('SELECT id, name, is_default FROM portfolios WHERE user_id = ?' . ($archived ? '' : ' AND archived_at IS NULL') . ' ORDER BY is_default DESC, name', [$u['id']])->fetchAll();
     $all = ['value' => 0.0, 'cost' => 0.0, 'unrealized' => 0.0, 'realized' => 0.0, 'fees' => 0.0, 'invested_total' => 0.0, 'unpriced' => 0];
     $years = []; $rows = []; $issues = []; $excluded = [];
     foreach ($list as $p) {

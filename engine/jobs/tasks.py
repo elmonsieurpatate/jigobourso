@@ -309,7 +309,21 @@ def history(conn, client, now, log):
 
 # ───────── entretien : purges et sauvegarde ─────────
 BACKUP_TABLES = ('users', 'portfolios', 'portfolio_transactions', 'position_levels', 'explorer_saved', 'settings')  # ce qui n'est pas reconstructible depuis Yahoo
+BACKUP_OPTIONAL_TABLES = (
+    'portfolio_cash_movements',
+    'portfolio_cash_audit',
+)  # ajoutées par migration : sauvegardées dès qu'elles existent (une base pas encore migrée ne fait pas échouer la sauvegarde)
 BACKUP_KEEP = 14
+
+
+def existing_tables(conn, names):
+    """Parmi `names`, les tables présentes dans la base courante (aucune si la question échoue : la sauvegarde de base ne dépend jamais d'elle)."""
+    try:
+        with conn.cursor() as cur:
+            cur.execute('SELECT table_name t FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name IN (%s)' % ','.join(['%s'] * len(names)), tuple(names))
+            return tuple(r['t'] for r in cur.fetchall())
+    except Exception:  # noqa: BLE001
+        return ()
 
 
 def housekeeping(conn, now):
@@ -338,7 +352,7 @@ def housekeeping(conn, now):
     return out
 
 
-def backup_user_data(now, directory=None):
+def backup_user_data(now, directory=None, optional=()):
     """Une sauvegarde par jour (UTC) des tables irremplaçables (comptes, portefeuilles, transactions, réglages), hors racine web, droits 600,
     14 exemplaires conservés. Renvoie le chemin créé, ou None si celle du jour existe déjà. Lève RuntimeError si l'outil ou le dump échoue."""
     directory = directory or os.environ.get('JIGO_BACKUP_DIR') or os.path.join(os.environ.get('JIGO_DATA_DIR', 'data'), 'backups')
@@ -352,7 +366,7 @@ def backup_user_data(now, directory=None):
     env = dict(os.environ, MYSQL_PWD=os.environ.get('JIGO_DB_PASSWORD', ''))
     socket = os.environ.get('JIGO_DB_SOCKET')  # base de test locale uniquement
     where = ['--protocol=socket', f'--socket={socket}'] if socket else [f'-h{os.environ["JIGO_DB_HOST"]}', f'-P{os.environ.get("JIGO_DB_PORT", "3306")}']
-    cmd = [dump, *where, f'-u{os.environ["JIGO_DB_USER"]}', '--single-transaction', '--quick', os.environ['JIGO_DB_NAME'], *BACKUP_TABLES]
+    cmd = [dump, *where, f'-u{os.environ["JIGO_DB_USER"]}', '--single-transaction', '--quick', os.environ['JIGO_DB_NAME'], *BACKUP_TABLES, *(t for t in optional if t in BACKUP_OPTIONAL_TABLES)]
     part = target + '.part'
     try:
         with open(part, 'wb') as out, tempfile.TemporaryFile() as err:
@@ -393,7 +407,11 @@ def maintenance(conn, client, now, log):
             return default
 
     # 1. L'irremplaçable d'abord : comptes, portefeuilles, transactions.
-    attempt('Sauvegarde des données utilisateur', lambda: backup_user_data(now), lambda r: 'déjà faite aujourd’hui' if r is None else os.path.basename(r))
+    attempt(
+        'Sauvegarde des données utilisateur',
+        lambda: backup_user_data(now, optional=existing_tables(conn, BACKUP_OPTIONAL_TABLES)),
+        lambda r: 'déjà faite aujourd’hui' if r is None else os.path.basename(r),
+    )
     # 2. Données de marché (réseau).
     rows = collect.collection_set(conn)
     ok, err = attempt('Cours de référence (Quote)', lambda: collect.refresh_quotes(conn, client, rows, now), lambda r: f'{r[0]} reçus sur {len(rows)}', (0, 0))

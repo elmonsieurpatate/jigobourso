@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../lib/db.php';
 require_once __DIR__ . '/ledger.php';
+require_once __DIR__ . '/cash.php';
 require_once __DIR__ . '/../lib/http.php';
 require_once __DIR__ . '/../lib/units.php';
 
@@ -65,14 +66,19 @@ function validate_transaction_history(array $rows): void {
     if ($bad) throw new ApiError('Vente supérieure à la quantité détenue à la date du ' . $bad[0]['trade_at'] . ' (' . $bad[0]['symbol'] . ')', 422);
 }
 // All writers take the same portfolio row lock before reading the ledger: concurrent writes serialize.
+// Le callback reçoit (lignes de transactions, ligne du portefeuille). Après le changement, tout l'historique est revalidé : quantités détenues (toujours) et liquidités (modèle cash) ;
+// un portefeuille archivé est en lecture seule.
 function write_transaction(int $userId, int $portfolioId, callable $change): array {
     return tx(function () use ($userId, $portfolioId, $change) {
-        $p = q('SELECT id FROM portfolios WHERE id = ? AND user_id = ? FOR UPDATE', [$portfolioId, $userId])->fetch();
+        $p = q('SELECT * FROM portfolios WHERE id = ? AND user_id = ? FOR UPDATE', [$portfolioId, $userId])->fetch();
         if (!$p) throw new ApiError('Portefeuille introuvable', 404);
+        if ($p['archived_at'] !== null) throw new ApiError('Portefeuille archivé : désarchivez-le pour le modifier', 409);
         $rows = q('SELECT * FROM portfolio_transactions WHERE portfolio_id = ? ORDER BY trade_at, id FOR UPDATE', [$portfolioId])->fetchAll();
-        $result = $change($rows);
+        $result = $change($rows, $p);
         $after = q('SELECT * FROM portfolio_transactions WHERE portfolio_id = ? ORDER BY trade_at, id', [$portfolioId])->fetchAll();
         validate_transaction_history($after);
+        $now = q('SELECT * FROM portfolios WHERE id = ?', [$portfolioId])->fetch();   // le callback a pu changer le modèle (conversion, annulation)
+        if ($now['cash_model'] === 'cash') cash_validate($now, $after, cash_load_movements($portfolioId));
         return $result;
     });
 }

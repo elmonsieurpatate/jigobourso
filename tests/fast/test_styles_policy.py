@@ -40,7 +40,7 @@ def test_layout_and_explicit_utilities_remain_allowed():
 
 def test_all_current_sources_follow_the_ownership_policy():
     errors, pages = check()
-    assert pages == 19 and not errors, errors
+    assert pages == 20 and not errors, errors
 
 
 def test_features_are_scoped_without_adding_specificity():

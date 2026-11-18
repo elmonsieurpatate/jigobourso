@@ -310,6 +310,13 @@ CREATE TABLE IF NOT EXISTS portfolios (
   strategy_config  JSON NULL,                                   -- configuration de stratégie complète (version 2+)
   created_at       DATETIME NOT NULL,
   updated_at       DATETIME NOT NULL,
+  cash_model       ENUM('legacy','cash') NOT NULL DEFAULT 'legacy', -- legacy : sans liquidités (portefeuilles d'avant), cash : achats/ventes/dépôts/retraits suivis
+  kind             ENUM('virtual','real') NULL,                 -- NULL tant que le portefeuille est legacy
+  icon             VARCHAR(16) NULL,
+  description      VARCHAR(280) NULL,
+  archived_at      DATETIME NULL,
+  cash_from        DATETIME NULL,                               -- les transactions à partir de cette date agissent sur les liquidités
+  cash_converted_at DATETIME NULL,                              -- renseigné seulement pour un portefeuille converti depuis legacy
   PRIMARY KEY (id),
   UNIQUE KEY uq_portfolio_name (user_id, name),
   UNIQUE KEY uq_portfolio_default (default_user_id),
@@ -337,6 +344,40 @@ CREATE TABLE IF NOT EXISTS portfolio_transactions (
   KEY ix_tx_listing (listing_id),                               -- jeu de collecte : cotations détenues
   CONSTRAINT fk_tx_portfolio FOREIGN KEY (portfolio_id) REFERENCES portfolios(id) ON DELETE CASCADE,
   CONSTRAINT fk_tx_listing FOREIGN KEY (listing_id) REFERENCES listings(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS portfolio_cash_movements (
+  id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  portfolio_id    BIGINT UNSIGNED NOT NULL,
+  kind            ENUM('initial_capital','deposit','withdrawal','dividend','fee') NOT NULL,
+  amount_net      DECIMAL(24,8) NOT NULL,
+  currency        CHAR(3) CHARACTER SET ascii NOT NULL DEFAULT 'EUR',
+  fx_to_eur       DECIMAL(20,10) NOT NULL DEFAULT 1,
+  gross_amount    DECIMAL(24,8) NULL,
+  withholding_tax DECIMAL(24,8) NULL,
+  listing_id      INT UNSIGNED NULL,
+  occurred_at     DATETIME NOT NULL,
+  note            VARCHAR(500) NULL,
+  source          ENUM('manual','conversion') NOT NULL DEFAULT 'manual',
+  created_at      DATETIME NOT NULL,
+  updated_at      DATETIME NOT NULL,
+  PRIMARY KEY (id),
+  KEY ix_cash_portfolio_date (portfolio_id, occurred_at, id),
+  CONSTRAINT fk_cash_portfolio FOREIGN KEY (portfolio_id) REFERENCES portfolios(id) ON DELETE CASCADE,
+  CONSTRAINT fk_cash_listing FOREIGN KEY (listing_id) REFERENCES listings(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS portfolio_cash_audit (
+  id           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  portfolio_id BIGINT UNSIGNED NOT NULL,
+  movement_id  BIGINT UNSIGNED NULL,
+  action       ENUM('edit','remove','convert','undo_convert','reset') NOT NULL,
+  before_json  JSON NULL,
+  after_json   JSON NULL,
+  at           DATETIME NOT NULL,
+  PRIMARY KEY (id),
+  KEY ix_cash_audit_portfolio (portfolio_id, at),
+  CONSTRAINT fk_cash_audit_portfolio FOREIGN KEY (portfolio_id) REFERENCES portfolios(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS etf_profiles (                                     -- fiche pédagogique ETF, mise en cache

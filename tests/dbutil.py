@@ -22,6 +22,8 @@ TABLES = (
     'job_logs',
     'jobs',
     'price_gaps',
+    'portfolio_cash_audit',
+    'portfolio_cash_movements',
     'portfolio_transactions',
     'portfolios',
     'sessions',
