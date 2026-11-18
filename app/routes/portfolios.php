@@ -9,6 +9,7 @@ return [
     'portfolio' => function () { return pf_detail(require_user(), $_GET); },
     'portfolio/history-refresh' => function () { need_post(); return pf_history_refresh(require_user(), body()); },
     'portfolio/history' => function () { return pf_history(require_user(), $_GET); },
+    'portfolio/dynamics' => function () { return pf_dynamics(require_user(), $_GET); },
     'portfolio/performance' => function () { return pf_performance(require_user(), $_GET); },
     'position/levels' => function () { need_post(); return pf_set_levels(require_user(), body()); },
     'portfolio/target' => function () { need_post(); return pf_set_target(require_user(), body()); },

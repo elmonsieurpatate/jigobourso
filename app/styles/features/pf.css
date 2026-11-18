@@ -337,3 +337,29 @@ a.px-sum:hover {
 .px-chip i.c12 {
   background: var(--series-12);
 }
+
+/* La couleur décrit exclusivement le rendement, jamais la dynamique. */
+.pfd-cell,
+.pfd-legend span {
+  border-radius: var(--radius-4);
+  color: var(--text);
+}
+.pfd-gain-strong {
+  background: color-mix(in srgb, var(--ok) 32%, var(--surface));
+}
+.pfd-gain {
+  background: color-mix(in srgb, var(--ok) 18%, var(--surface));
+}
+.pfd-gain-soft {
+  background: color-mix(in srgb, var(--ok) 8%, var(--surface));
+}
+.pfd-neutral,
+.pfd-personal {
+  background: var(--surface-2);
+}
+.pfd-loss-soft {
+  background: color-mix(in srgb, var(--danger) 12%, var(--surface));
+}
+.pfd-loss-strong {
+  background: color-mix(in srgb, var(--danger) 32%, var(--surface));
+}

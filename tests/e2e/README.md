@@ -28,6 +28,8 @@ Avant ces parcours : galerie de référence dans quatre contextes, contrastes et
 contrats de toutes les classes utilitaires. Ces contrôles ne remplacent pas Safari
 ni un appareil physique. Les scénarios simulent le navigateur sur données de test.
 
+La recette portfolio inclut également `portfolio_dynamics_seed.py` puis `portfolio-dynamics.cjs` : matrice de onze horizons sur portefeuilles cash et legacy, positions vendues, latent restant, devise de cotation, données insuffisantes, tri, contrastes et défilement mobile. Les données sur huit ans sont exclusivement synthétiques dans la base jetable.
+
 ## Classement des autres fichiers
 
 - Modèles sans navigateur : `core`, `explorer-model` (inclut restauration/migrations),

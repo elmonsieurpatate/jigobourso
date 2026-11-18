@@ -161,6 +161,10 @@ def serve(cmd):
             from .analytics.series import history
 
             result = history.portfolio_history(connect(), request)
+        elif cmd == 'portfolio-dynamics':
+            from .analytics.portfolio import dynamics
+
+            result = dynamics.run(connect(), request)
         elif cmd == 'portfolio-cash-performance':
             from .analytics.series import cash_history
 
@@ -258,6 +262,7 @@ def _main(argv=None):
         ('etf-portfolio', 'Expositions connues et similarité du portefeuille'),
         ('portfolio-refresh', 'collecte ciblée et limitée d’un titre détenu'),
         ('portfolio-history', 'évolution du portefeuille jour par jour (JSON sur stdin)'),
+        ('portfolio-dynamics', 'performances et dynamique des cours détenus (JSON sur stdin)'),
         ('portfolio-cash-performance', 'performance avec liquidités (moteur v2, comparaison, JSON sur stdin)'),
         ('watch-template', 'modèle de règles de surveillance d’une stratégie (JSON sur stdin)'),
         ('watch-eval', 'évaluation de règles d’alerte (JSON sur stdin)'),
@@ -316,6 +321,7 @@ def _main(argv=None):
         'lot-alerts',
         'position-plan',
         'portfolio-history',
+        'portfolio-dynamics',
         'portfolio-cash-performance',
         'portfolio-refresh',
         'watch-template',

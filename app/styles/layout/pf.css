@@ -145,6 +145,10 @@ a.px-sum {
   flex-wrap: wrap;
   margin-bottom: var(--sp-8);
 }
+.px-top .seg {
+  max-width: 100%;
+  flex-wrap: wrap;
+}
 .px-tabs,
 .px-seg {
   display: flex;
@@ -704,7 +708,7 @@ body.px-lock {
 /* portefeuille à liquidités : « Mon argent », graphique et panneau latéral */
 .pf-kpis {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--sp-8);
   margin-bottom: var(--sp-10);
 }
@@ -720,7 +724,7 @@ body.px-lock {
 }
 @media (max-width: 1100px) {
   .pf-kpis {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .pf-evo {
     grid-template-columns: minmax(0, 1fr);
@@ -753,4 +757,23 @@ body.px-lock {
   .fc-tip {
     max-height: 110px;
   }
+}
+
+/* Matrice de consultation : le défilement reste dans le tableau sur mobile. */
+.pf-dynamics {
+  min-width: 0;
+}
+.pfd-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  isolation: isolate;
+}
+.pfd-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-6);
+  margin-top: var(--sp-12);
+}
+.pfd-legend span {
+  padding: var(--sp-4) var(--sp-8);
 }

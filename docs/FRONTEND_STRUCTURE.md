@@ -112,3 +112,10 @@ signaux, indicateurs, réglages de stratégie, filtres, états, risque et access
 ont chacun leur source dans components. Leur ordre explicite dans le manifeste
 conserve la cascade ; ce découpage supplémentaire ne change aucun octet des
 11 sorties compilées, vérifié par build_styles --check.
+
+La matrice des portefeuilles utilise `pf-dynamics.js` pour son rendu pur et
+`pf-home.js` pour le chargement, le tri et les interactions. Le calcul des deux
+fenêtres et des intensités appartient à `engine/analytics/portfolio/dynamics.py`.
+Les gains personnels restent ceux du registre PHP. Les styles de grille restent
+dans `layout/pf.css`, la géométrie du tableau dans `components/tables.css` et les
+nuances métier dans `features/pf.css` ; aucune feuille publique n'est éditée à la main.

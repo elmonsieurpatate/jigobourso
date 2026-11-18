@@ -218,3 +218,53 @@ body .ct .ct-group-operator select {
 .bar-v.neg {
   color: var(--danger);
 }
+
+/* Matrice multi-périodes : grille dense, identité figée, valeurs tabulaires. */
+.pfd-table {
+  width: 100%;
+  min-width: 1080px;
+  border-collapse: separate;
+  border-spacing: var(--sp-2);
+  table-layout: fixed;
+  font-variant-numeric: tabular-nums;
+}
+.pfd-table th,
+.pfd-table td {
+  padding: var(--sp-8) var(--sp-4);
+  text-align: center;
+  vertical-align: middle;
+}
+.pfd-table .pfd-title {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  width: 142px;
+  max-width: 142px;
+  text-align: left;
+  background: var(--surface);
+}
+.pfd-title small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-11);
+  color: var(--muted);
+}
+.pfd-cell strong,
+.pfd-cell small {
+  display: block;
+  white-space: nowrap;
+}
+.pfd-cell strong {
+  font-size: var(--fs-13);
+}
+.pfd-cell small {
+  font-size: var(--fs-11);
+}
+.pfd-table .pfd-group {
+  border-left: 2px solid var(--line);
+}
+.pfd-table .pfd-personal {
+  border-right: 2px solid var(--line);
+}

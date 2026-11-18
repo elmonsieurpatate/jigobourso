@@ -294,3 +294,13 @@ function pf_export_data(array $u, int $id): array {
     $rows = q('SELECT * FROM portfolio_transactions WHERE portfolio_id = ? ORDER BY trade_at, id', [$p['id']])->fetchAll();
     return ['portfolio' => $p, 'transactions' => $rows];
 }
+
+// La liste est issue du registre authentifié, jamais d'identifiants fournis librement.
+function pf_dynamics(array $u, array $b = []) {
+    $p = own_portfolio((int)($b['id'] ?? 0), $u);
+    $v = portfolio_valuation((int)$p['id']);
+    $ids = array_values(array_unique(array_map(fn($r) => (int)$r['listing_id'], array_filter($v['positions'], fn($r) => $r['qty'] > 0 && $r['listing_id']))));
+    $r = engine_call('portfolio-dynamics', ['listing_ids' => $ids]);
+    $r['listings'] = (object)$r['listings'];
+    return $r;
+}

@@ -28,6 +28,9 @@
     aper: "all",
     perf: null,
     perfErr: null,
+    market: null,
+    marketErr: null,
+    marketSort: { key: "title", dir: "asc" },
     sel: null,
     tr: null,
     trErr: null,
@@ -39,6 +42,7 @@
   };
   let C = null;
   const BARS = {};
+  const marketLoads = new WeakMap();
   const esc = J.esc;
   const eur = J.eur;
   const sg = (v) => J.eurS(v);
@@ -725,6 +729,24 @@
       .join("");
     return `<div class="px-tw"><table class="px-t pf-acts">${J.table.head(cols)}<tbody>${body || '<tr><td colspan="9" class="px-note">Aucune position.</td></tr>'}</tbody></table></div>`;
   }
+  const marketTable = () => root.PFDynamics.html(S.market, C.D.positions, S.marketErr, S.marketSort);
+  async function loadMarket() {
+    const context = C;
+    S.market = null;
+    S.marketErr = null;
+    try {
+      let entry = marketLoads.get(context.D);
+      if (!entry || Date.now() - entry.at > 60000) {
+        entry = { at: Date.now(), promise: J.api("portfolio/dynamics", { params: { id: context.current } }) };
+        marketLoads.set(context.D, entry);
+      }
+      const data = await entry.promise;
+      if (C.D === context.D && C.current === context.current) S.market = data;
+    } catch (e) {
+      marketLoads.delete(context.D);
+      if (C.D === context.D && C.current === context.current) S.marketErr = e.message;
+    }
+  }
   function viewCash(st) {
     if (!S.perf)
       return `<section class="px-card">${S.perfErr ? `<p class="notice err">Bilan avec liquidités indisponible : ${esc(S.perfErr)}</p>` : '<div class="empty"><span class="spinner"></span></div>'}</section>`;
@@ -783,13 +805,13 @@
         text: sg(r.gain),
         share: r.share,
       }));
-    return `${root.PFPerf2.money(P, tax)}${root.PFPerf2.boxHtml(P)}<section class="px-card"><div class="px-ph"><h2>Contribution au résultat</h2>${filter}${aper}</div><p class="small muted">Impact de chaque titre sur le gain total, ${label}. Les titres vendus gardent leur gain réalisé.</p>${contrib.length ? J.bars(contrib, "Contribution de chaque titre au résultat") : '<p class="px-note">Aucun gain ou perte sur cette période.</p>'}</section><section class="px-card"><div class="px-ph"><h2>Mes actions</h2>${filter}${aper}</div><p class="small muted">Gain et rendement ${label}. Quantité, PRU, cours et valeur sont ceux d’aujourd’hui. <button type="button" class="px-link" data-gosuivi>Voir le suivi des positions</button></p>${actionsTable(st)}<p class="px-note">Rendement : celui du titre sur la période (TWR), à ne pas additionner. Un titre vendu garde son gain réalisé.</p></section>${suiviSection()}`;
+    return `${root.PFPerf2.money(P, tax)}${marketTable()}${root.PFPerf2.boxHtml(P)}<section class="px-card"><div class="px-ph"><h2>Contribution au résultat</h2>${filter}${aper}</div><p class="small muted">Impact de chaque titre sur le gain total, ${label}. Les titres vendus gardent leur gain réalisé.</p>${contrib.length ? J.bars(contrib, "Contribution de chaque titre au résultat") : '<p class="px-note">Aucun gain ou perte sur cette période.</p>'}</section><section class="px-card"><div class="px-ph"><h2>Mes actions</h2>${filter}${aper}</div><p class="small muted">Gain et rendement ${label}. Quantité, PRU, cours et valeur sont ceux d’aujourd’hui. <button type="button" class="px-link" data-gosuivi>Voir le suivi des positions</button></p>${actionsTable(st)}<p class="px-note">Rendement : celui du titre sur la période (TWR), à ne pas additionner. Un titre vendu garde son gain réalisé.</p></section>${suiviSection()}`;
   }
   function viewOverview(st) {
     if (cashModel()) return viewCash(st);
     const nc = st.rows.filter((r) => !(r.p.qty > 0)).length;
     const fp = !!store("fold_positions");
-    return `${synth(st)}${planSummary()}<section class="px-card"><h2>Évolution</h2>${boxHtml(S.main, PfDetail.MAIN)}</section><section class="px-card${fp ? " folded" : ""}" id="px-sec-positions"><div class="px-ph">${foldHead("positions", "Positions", "")}${nc ? `<label class="px-chk" id="px-closed-wrap" ${fp ? "hidden" : ""}><input type="checkbox" id="px-closed" ${S.closed ? "checked" : ""}> Afficher les positions soldées (${nc})</label>` : ""}</div><div class="px-fold-body" id="px-fb-positions" ${fp ? "hidden" : ""}>${table(st, 0)}</div></section>${suiviSection()}`;
+    return `${synth(st)}${marketTable()}${planSummary()}<section class="px-card"><h2>Évolution</h2>${boxHtml(S.main, PfDetail.MAIN)}</section><section class="px-card${fp ? " folded" : ""}" id="px-sec-positions"><div class="px-ph">${foldHead("positions", "Positions", "")}${nc ? `<label class="px-chk" id="px-closed-wrap" ${fp ? "hidden" : ""}><input type="checkbox" id="px-closed" ${S.closed ? "checked" : ""}> Afficher les positions soldées (${nc})</label>` : ""}</div><div class="px-fold-body" id="px-fb-positions" ${fp ? "hidden" : ""}>${table(st, 0)}</div></section>${suiviSection()}`;
   }
   function viewTx() {
     const tr = (C.H.trades || [])
@@ -817,6 +839,24 @@
     } else if (S.zone === "overview") bindBox(S.main, PfDetail.MAIN);
   }
   function onClick(e) {
+    const marketInfo = e.target.closest('.pfd-cell[title][role="button"]');
+    if (marketInfo) {
+      J.dialog({ title: "Performance et dynamique de la période", body: `<p>${esc(marketInfo.title)}</p>` });
+      return;
+    }
+    if (e.target.closest("[data-market-retry]")) {
+      const pending = loadMarket();
+      render();
+      pending.then(refreshPage);
+      return;
+    }
+    const marketSort = e.target.closest('[data-sort^="market:"]');
+    if (marketSort) {
+      const key = marketSort.dataset.sort.slice(7);
+      S.marketSort = J.table.nextSort(S.marketSort, key, key === "title" ? "asc" : "desc");
+      refreshPage();
+      return;
+    }
     const t = e.target,
       z = t.closest("[data-zone]");
     if (z) {
@@ -914,7 +954,7 @@
     }
   }
   function onKey(e) {
-    if (["Enter", " "].includes(e.key) && e.target.matches("tr[data-open],tr[data-tx]")) {
+    if (["Enter", " "].includes(e.key) && e.target.matches('tr[data-open],tr[data-tx],.pfd-cell[role="button"]')) {
       e.preventDefault();
       e.target.click();
     }
@@ -934,6 +974,8 @@
     }
     S.perf = null;
     S.perfErr = null;
+    S.market = null;
+    S.marketErr = null;
     const perfP =
       cashModel() && root.PFPerf2
         ? root.PFPerf2.load(
@@ -948,7 +990,7 @@
             })
         : null;
     render();
-    await Promise.all([loadTracking(), perfP]);
+    await Promise.all([loadTracking(), perfP, loadMarket()]);
     if (C.host === host) {
       const y = scrollY;
       render();

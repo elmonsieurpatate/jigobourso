@@ -666,8 +666,11 @@
       },
     });
   }
-  let rs;
+  let rs,
+    lastWidth = innerWidth;
   addEventListener("resize", () => {
+    if (innerWidth === lastWidth) return;
+    lastWidth = innerWidth;
     clearTimeout(rs);
     rs = setTimeout(drawEvo, 150);
   });
