@@ -39,7 +39,7 @@ return [
     'admin/yahoo' => function () { require_admin(); return engine_call('yahoo-state', []); },
     'admin/titles' => function () {
         require_admin();
-        $keys = ['q', 'kind', 'mic', 'fdb', 'yahoo', 'final', 'daily', 'sort', 'dir'];
+        $keys = ['q', 'kind', 'mic', 'fdb', 'yahoo', 'final', 'daily', 'world', 'sort', 'dir'];
         $req = ['page' => (int)($_GET['page'] ?? 1)];
         foreach ($keys as $k) $req[$k] = (string)($_GET[$k] ?? '');
         return engine_call('titles', $req);

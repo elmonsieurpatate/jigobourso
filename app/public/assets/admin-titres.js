@@ -4,9 +4,25 @@
   const AC = window.AdminCore;
   const { nf, runBar } = AC;
   // ───────── Actions / ETF ─────────
-  const tf = { q: "", kind: "", mic: "", fdb: "", yahoo: "", final: "", daily: "", sort: "name", dir: "asc", page: 1 };
+  const tf = {
+    q: "",
+    kind: "",
+    mic: "",
+    fdb: "",
+    yahoo: "",
+    final: "",
+    daily: "",
+    world: "",
+    sort: "name",
+    dir: "asc",
+    page: 1,
+  };
   AC.titresFilter = (patch) =>
-    Object.assign(tf, { q: "", kind: "", mic: "", fdb: "", yahoo: "", final: "", daily: "", page: 1 }, patch); // utilisée par les tuiles de l'onglet Yahoo
+    Object.assign(
+      tf,
+      { q: "", kind: "", mic: "", fdb: "", yahoo: "", final: "", daily: "", world: "", page: 1 },
+      patch,
+    ); // utilisée par les tuiles de l'onglet Yahoo
   const titresLatest = J.latest();
   let searchTimer;
   async function titres() {
@@ -58,6 +74,15 @@
       }[k] || ["Statut indisponible", "warn"];
       return J.badge(state[0], state[1]);
     };
+    // Actifs sous gestion en euros (cotation Yahoo) : « 12,3 Md€ », « 850 M€ » ; « – » quand Yahoo n'en donne pas.
+    const aumText = (v) =>
+      v == null
+        ? "–"
+        : v >= 1e9
+          ? `${J.num(v / 1e9, 1)} Md€`
+          : v >= 1e6
+            ? `${J.num(v / 1e6, 0)} M€`
+            : `${J.num(v / 1e3, 0)} k€`;
     const sheetId = (x) => (x.primary?.in_catalogue ? x.primary.id : x.lid || x.primary?.id);
     const query = tf.q.trim().toUpperCase();
     const product = /^[A-Z]{2}[A-Z0-9]{10}$/.test(query)
@@ -73,6 +98,7 @@
       "Yahoo",
       "Catalogue final",
       "Motif",
+      { label: "Actifs (ETF)", sort: "aum" },
       { label: "Dernier cours", sort: "price_time" },
       { label: "Historique (5 ans)", sort: "closes" },
       "15 min",
@@ -83,6 +109,10 @@
           ["", "Actions et ETF"],
           ["equity", "Actions"],
           ["etf", "ETF"],
+        ])}</select>
+        <select id="tw">${opt(tf.world, [
+          ["", "ETF : tous"],
+          ["1", "ETF Monde (d'après le nom)"],
         ])}</select>
         <select id="tm"><option value="">Toutes les places</option>${r.places.map((m) => `<option ${tf.mic === m ? "selected" : ""}>${J.esc(m)}</option>`).join("")}</select>
         <select id="tfdb">${opt(tf.fdb, [
@@ -125,14 +155,15 @@
             (
               x,
             ) => `<tr ${sheetId(x) ? `data-id="${sheetId(x)}"` : ""} class="pointer"><td>${sheetId(x) ? `<a href="titre.html?id=${sheetId(x)}"><b>${J.esc(x.name)}</b></a>` : `<b>${J.esc(x.name)}</b><div class="small muted">Pas de fiche interne · <a href="https://finance.yahoo.com/quote/${encodeURIComponent(x.symbol)}" target="_blank" rel="noopener">Yahoo Finance ↗</a></div>`}${x.in_final ? " " + J.badge("Principale retenue", "ok") : x.primary?.in_catalogue ? " " + J.badge("Autre cotation", "") : ""}<div class="small muted">${J.esc(x.symbol)} · ${J.esc(x.mic)} · ${J.esc(x.isin || "")} · ${J.esc(x.country || "")}${x.category ? " · " + J.esc(x.category) : ""}</div></td>
-        <td>${J.esc(x.mic)}<div class="small muted">${x.kind === "etf" ? "ETF" : "Action"}</div></td><td>${badge(x.fdb_state, x.fdb_state === "kept" ? "Admis FDB" : "")}</td><td>${badge(x.y_state, x.y_state === "kept" ? "Retenu Yahoo" : "")}</td>
+        <td>${J.esc(x.mic)}<div class="small muted">${x.kind === "etf" ? "ETF" : "Action"}${x.is_world ? ` ${J.badge("Monde", "info")}` : ""}${x.is_top ? ` ${J.badge("Top " + r.top_etf, "accent")}` : ""}</div></td><td>${badge(x.fdb_state, x.fdb_state === "kept" ? "Admis FDB" : "")}</td><td>${badge(x.y_state, x.y_state === "kept" ? "Retenu Yahoo" : "")}</td>
         <td>${x.in_final ? '<span class="badge ok">Oui</span>' : '<span class="badge danger">Non</span>'}${x.held ? ' <span class="badge accent">lié à un portefeuille · suivi séparément</span>' : ""}${x.primary?.in_catalogue && x.primary.id !== x.lid ? `<div class="small">Produit conservé : <a href="titre.html?id=${x.primary.id}">${J.esc(x.primary.symbol)} · ${J.esc(x.primary.mic)}</a><div class="muted">Cette cotation n’est pas la principale retenue.</div></div>` : ""}</td>
         <td class="small">${x.reason ? `<b>${J.esc(x.reason.stage)}</b>${x.reason.rule ? " · " + J.esc(x.reason.rule) : ""}<div class="muted">${J.esc(x.reason.detail || "")}</div>` : "–"}</td>
+        <td class="num small">${x.kind === "etf" ? `${aumText(x.aum_eur)}${x.aum_eur == null && x.net_assets != null ? '<div class="muted">taux inconnu</div>' : ""}` : "–"}</td>
         <td class="num small">${x.price != null ? J.num(x.price, 2) + " " + J.esc(x.pcur || "") + `<div class="muted">${x.price_time ? J.dateTime(x.price_time) : ""}</div>` : "–"}</td>
         <td>${x.in_final || x.held ? badge(x.d_state) + `<div class="small muted">${x.closes_count != null ? x.closes_count + " séances" : ""}${x.last_close_date ? " · dernière " + J.date(x.last_close_date) : ""}</div>` : "–"}</td><td>${x.in_final || x.held ? intradayBadge(x.intraday_state) : "–"}</td>
         <td class="small">${x.issue ? `<span class="warn">${J.esc(x.issue)}</span>` : x.quote_at ? "Infos Yahoo " + J.ago(x.quote_at) : "–"}</td></tr>`,
           )
-          .join("") || '<tr><td colspan="10" class="empty">Aucun titre.</td></tr>'
+          .join("") || '<tr><td colspan="11" class="empty">Aucun titre.</td></tr>'
       }</tbody></table></div>${product ? "</details>" : ""}
       <div class="row between card-bar card-bar-sm"><span class="muted small">${nf(r.total)} cotations sur ${nf(r.raw_total)} connues</span><span class="row gap-s"><button class="btn sm" id="tp" ${r.page <= 1 ? "disabled" : ""}>←</button><span class="small">Page ${r.page} / ${r.pages}</span><button class="btn sm" id="tn" ${r.page >= r.pages ? "disabled" : ""}>→</button></span></div>`;
     const go = () => {
@@ -144,6 +175,7 @@
       tf.yahoo = J.$("#ty").value;
       tf.final = J.$("#tfin").value;
       tf.daily = J.$("#td").value;
+      tf.world = J.$("#tw").value;
       tf.page = 1;
       titres();
     };
@@ -162,7 +194,7 @@
         go();
       }
     };
-    ["tk", "tm", "tfdb", "ty", "tfin", "td"].forEach((i) => (J.$("#" + i).onchange = go));
+    ["tk", "tw", "tm", "tfdb", "ty", "tfin", "td"].forEach((i) => (J.$("#" + i).onchange = go));
     J.$("#tp").onclick = () => {
       tf.page--;
       titres();

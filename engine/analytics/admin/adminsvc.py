@@ -5,7 +5,8 @@ import datetime
 from ..shared.dates import iso
 from engine.catalogue import rules as cat_rules
 from engine.jobs import tasks
-from engine.market import history_depth, hours, prefilter
+from engine.market import collect, history_depth, hours, prefilter
+from engine.shared.units import to_eur_factor
 from engine.shared import settings
 from ..explorer import funnel
 
@@ -199,6 +200,21 @@ def yahoo_state(conn):
 
 # ───────── page Actions / ETF ─────────
 SORTS = {'name': 'r.name', 'mic': 'r.mic', 'symbol': 'r.symbol', 'country': 'r.country', 'price_time': 'p.price_time', 'closes': 's.closes_count'}
+# ETF « Monde » : repère par le NOM du produit (aucune donnée de zone n'est stockée) ; affiché comme tel, jamais comme une certitude sur la composition.
+WORLD_TERMS = ('world', 'monde', 'acwi', 'all-country', 'all country')
+TOP_ETF = 100  # repère « parmi les plus gros » : rang par actifs sous gestion (en euros) parmi les ETF du catalogue final
+
+
+def _aum_expr(conn):
+    """Actifs sous gestion en euros, en SQL : taux du jour de chaque unité de cotation (GBp inclus, mêmes règles que `to_eur_factor`). NULL si le taux est inconnu."""
+    rates = collect.latest_rates(conn)
+    with conn.cursor() as cur:
+        cur.execute('SELECT DISTINCT currency FROM latest_prices WHERE currency IS NOT NULL AND net_assets IS NOT NULL')
+        units = [r['currency'] for r in cur.fetchall()]
+    cases = ' '.join(f"WHEN '{u}' THEN {f!r}" for u in units if u.isalnum() and (f := to_eur_factor(u, rates)) is not None)
+    return f'(p.net_assets * CASE BINARY p.currency {cases} END)' if cases else 'NULL'  # BINARY : « GBp » et « GBP » sont deux unités
+
+
 FDB_STEP = {r['id']: r['label'] for r in cat_rules.RULES}
 Y_EXPR = (
     "CASE WHEN r.removed_step IS NOT NULL OR l.id IS NULL THEN 'na' WHEN l.status='excluded' THEN 'removed' WHEN l.is_primary=0 THEN 'secondary' "
@@ -266,8 +282,16 @@ def titles(conn, req):
     if req.get('daily') in D_STATES:
         where.append(f'{D_EXPR}=%s')
         args.append(req['daily'])
+    aum = _aum_expr(conn)
+    if str(req.get('world')) == '1':
+        where.append("r.kind='etf' AND (" + ' OR '.join(['LOWER(r.name) LIKE %s'] * len(WORLD_TERMS)) + ')')
+        args += [f'%{t}%' for t in WORLD_TERMS]
     sql_where = ' WHERE ' + ' AND '.join(where) if where else ''
-    order = SORTS.get(req.get('sort'), 'r.name') + (' DESC' if req.get('dir') == 'desc' else ' ASC')
+    desc = req.get('dir') == 'desc'
+    if req.get('sort') == 'aum':
+        order = f'({aum} IS NULL), {aum}' + (' DESC' if desc else ' ASC')  # actifs inconnus en fin de liste, dans les deux sens
+    else:
+        order = SORTS.get(req.get('sort'), 'r.name') + (' DESC' if desc else ' ASC')
     page = max(1, int(req.get('page') or 1))
     frm = """FROM catalogue_raw r LEFT JOIN instruments i ON i.group_key=r.group_key
              LEFT JOIN listings l ON l.instrument_id=i.id AND l.mic=r.mic AND l.symbol=LEFT(r.symbol,24)
@@ -280,13 +304,19 @@ def titles(conn, req):
         total = cur.fetchone()['n']
         cur.execute(
             f"""SELECT r.kind, r.mic, r.symbol, r.isin, r.name, r.country, r.category, r.removed_step, r.removed_reason, l.id lid, l.status, l.excluded_reason, l.is_primary, main.id primary_id, main.symbol primary_symbol, main.mic primary_mic, main.status primary_status,
-                               p.price, p.currency pcur, p.price_time, p.quote_at, p.avg_volume_3m, s.closes_count, s.last_close_date, {Y_EXPR} y_state, {FINAL_EXPR} in_final,
+                               p.price, p.currency pcur, p.price_time, p.quote_at, p.avg_volume_3m, p.net_assets, {aum} aum_eur, s.closes_count, s.last_close_date, {Y_EXPR} y_state, {FINAL_EXPR} in_final,
                                h.listing_id IS NOT NULL held, {D_EXPR} d_state
                         {frm}{sql_where} ORDER BY {order}, r.id LIMIT 50 OFFSET %s""",
             args + [(page - 1) * 50],
         )
         rows = cur.fetchall()
         info_done = bool(settings.get(conn, 'last_stats', {}).get('yahoo_info'))
+        cur.execute(
+            f"""SELECT {aum} v FROM listings l JOIN instruments i ON i.id=l.instrument_id JOIN latest_prices p ON p.listing_id=l.id
+                WHERE i.kind='etf' AND l.status='selected' AND l.is_primary=1 AND p.net_assets IS NOT NULL AND {aum} IS NOT NULL ORDER BY v DESC LIMIT 1 OFFSET {TOP_ETF - 1}"""
+        )
+        top = cur.fetchone()
+        top_threshold = float(top['v']) if top and top['v'] is not None else None
     for r in rows:
         r['in_final'] = bool(r['in_final'])
         r['primary'] = None if r['primary_id'] is None else {'id': r['primary_id'], 'symbol': r['primary_symbol'], 'mic': r['primary_mic'], 'in_catalogue': r['primary_status'] == 'selected'}
@@ -313,6 +343,10 @@ def titles(conn, req):
         for k in ('price_time', 'quote_at', 'last_close_date'):
             r[k] = iso(r[k])
         r['price'] = None if r['price'] is None else float(r['price'])
+        r['aum_eur'] = None if r['aum_eur'] is None or r['kind'] != 'etf' else float(r['aum_eur'])
+        r['net_assets'] = None if r['net_assets'] is None else int(r['net_assets'])
+        r['is_world'] = r['kind'] == 'etf' and any(t in (r['name'] or '').lower() for t in WORLD_TERMS)
+        r['is_top'] = bool(r['in_final'] and r['aum_eur'] is not None and top_threshold is not None and r['aum_eur'] >= top_threshold)
         r['in_fdb_universe'] = r['removed_step'] is None
     return {
         'total': total,
@@ -321,6 +355,7 @@ def titles(conn, req):
         'pages': max(1, -(-total // 50)),
         'rows': rows,
         'full': history_depth.HISTORY_SESSIONS,
+        'top_etf': TOP_ETF,
         'places': [r['mic'] for r in _distinct_mics(conn)],
     }
 

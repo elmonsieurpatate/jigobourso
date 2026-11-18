@@ -210,3 +210,31 @@ def test_sheet_exposes_five_years_and_keeps_volumes_aligned(catalogue, monkeypat
     assert len(short['daily']) == 696  # aucune nouvelle troncature à 400
     assert short['measures']['756'] is None or short['measures']['756'].get('perf') is None
     assert short['window_coverage']['756']['observations'] == 696
+
+
+def test_etf_assets_in_euros_world_filter_and_sort(catalogue):
+    conn, _ = catalogue
+    with conn.cursor() as cur:
+        cur.execute(
+            "INSERT INTO instruments(id,group_key,isin,kind,name) VALUES (7,'isin:IE00B4L5Y983','IE00B4L5Y983','etf','Fonds MSCI World UCITS'),(8,'isin:IE0000000002','IE0000000002','etf','Fonds Emergents UCITS')"
+        )
+        cur.execute("INSERT INTO listings(id,instrument_id,mic,symbol,status,is_primary) VALUES (7,7,'XPAR','WRLD.PA','selected',1),(8,8,'XPAR','EMRG.PA','selected',1)")
+        for lid, symbol, name, isin in [(7, 'WRLD.PA', 'Fonds MSCI World UCITS', 'IE00B4L5Y983'), (8, 'EMRG.PA', 'Fonds Emergents UCITS', 'IE0000000002')]:
+            cur.execute('INSERT INTO catalogue_raw(kind,mic,symbol,isin,name,group_key) VALUES (%s,%s,%s,%s,%s,%s)', ('etf', 'XPAR', symbol, isin, name, f'isin:{isin}'))
+        cur.execute("INSERT INTO fx_rates(currency,rate_date,to_eur) VALUES ('USD',CURDATE(),0.9)")
+        cur.execute("INSERT INTO latest_prices(listing_id,price,price_time,source,currency,net_assets) VALUES (7,100,NOW(),'quote','USD',10000000000),(8,50,NOW(),'quote','EUR',2000000000)")
+    conn.commit()
+    result = adminsvc.titles(conn, {'kind': 'etf', 'sort': 'aum', 'dir': 'desc'})
+    by_symbol = {r['symbol']: r for r in result['rows']}
+    assert by_symbol['WRLD.PA']['aum_eur'] == pytest.approx(9e9)  # 10 Md USD au taux du jour
+    assert by_symbol['EMRG.PA']['aum_eur'] == pytest.approx(2e9)
+    ranked = [r['symbol'] for r in result['rows'] if r['aum_eur'] is not None]
+    assert ranked == ['WRLD.PA', 'EMRG.PA']  # plus gros d'abord
+    assert result['rows'][-1]['aum_eur'] is None  # actifs inconnus en fin de liste
+    assert by_symbol['WRLD.PA']['is_world'] is True and by_symbol['EMRG.PA']['is_world'] is False
+    assert by_symbol['WRLD.PA']['is_top'] is False  # moins de 100 ETF avec actifs connus : pas de seuil, donc pas de repère
+    only_world = adminsvc.titles(conn, {'world': '1'})
+    assert {r['symbol'] for r in only_world['rows']} == {'WRLD.PA'}
+    ascending = adminsvc.titles(conn, {'kind': 'etf', 'sort': 'aum', 'dir': 'asc'})['rows']
+    assert [r['symbol'] for r in ascending if r['aum_eur'] is not None] == ['EMRG.PA', 'WRLD.PA']
+    assert ascending[-1]['aum_eur'] is None
