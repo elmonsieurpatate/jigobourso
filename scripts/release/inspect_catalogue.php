@@ -28,6 +28,9 @@ $stored = [];
 foreach ($primaryIds as $id) {
     $stored[$id] = [
         'series' => q('SELECT closes_count,last_close_date,quality FROM series_state WHERE listing_id=?', [$id])->fetch(),
+        'history' => q('SELECT status,checked_at,first_bar,holes,missing,closed_days,added,detail FROM history_state WHERE listing_id=?', [$id])->fetch(),
+        'daily_bounds' => q('SELECT COUNT(*) AS count,MIN(price_date) AS first_date,MAX(price_date) AS last_date FROM daily_prices WHERE listing_id=?', [$id])->fetch(),
+        'daily_dates' => q('SELECT price_date FROM daily_prices WHERE listing_id=? ORDER BY price_date', [$id])->fetchAll(PDO::FETCH_COLUMN),
         'metrics' => q('SELECT sessions,slope,r2,coverage,observations,expected_closes FROM strategy_metrics WHERE listing_id=? ORDER BY sessions', [$id])->fetchAll(),
         'inputs' => q('SELECT sessions FROM score_inputs WHERE listing_id=? ORDER BY sessions', [$id])->fetchAll(),
     ];
