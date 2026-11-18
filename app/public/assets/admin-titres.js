@@ -35,7 +35,6 @@
     const B = {
       kept: ["ok", "Conservé"],
       removed: ["danger", "Écarté"],
-      pending: ["warn", "En attente"],
       secondary: ["", "Secondaire"],
       na: ["", "–"],
       complete: ["ok", "5 ans complets"],
@@ -46,7 +45,19 @@
       pending: ["", "À vérifier"],
       absent: ["danger", "Aucun cours"],
     };
-    const badge = (k, label) => J.badge(label || B[k][1], B[k][0]);
+    const badge = (k, label) => {
+      const state = B[k] || ["warn", "Statut indisponible"];
+      return J.badge(label || state[1], state[0]);
+    };
+    const intradayBadge = (k) => {
+      const state = {
+        complete: ["Complet", "ok"],
+        partial: ["Partiel", "warn"],
+        absent: ["Aucun cours", "danger"],
+        na: ["Non géré", ""],
+      }[k] || ["Statut indisponible", "warn"];
+      return J.badge(state[0], state[1]);
+    };
     const query = tf.q.trim().toUpperCase();
     const product = /^[A-Z]{2}[A-Z0-9]{10}$/.test(query)
       ? r.rows.find((x) => x.isin?.toUpperCase() === query && x.primary?.in_catalogue)
@@ -117,7 +128,7 @@
         <td>${x.in_final ? '<span class="badge ok">Oui</span>' : '<span class="badge danger">Non</span>'}${x.held ? ' <span class="badge accent">lié à un portefeuille · suivi séparément</span>' : ""}${x.primary?.in_catalogue && x.primary.id !== x.lid ? `<div class="small">Produit conservé : <a href="titre.html?id=${x.primary.id}">${J.esc(x.primary.symbol)} · ${J.esc(x.primary.mic)}</a><div class="muted">Cette cotation n’est pas la principale retenue.</div></div>` : ""}</td>
         <td class="small">${x.reason ? `<b>${J.esc(x.reason.stage)}</b>${x.reason.rule ? " · " + J.esc(x.reason.rule) : ""}<div class="muted">${J.esc(x.reason.detail || "")}</div>` : "–"}</td>
         <td class="num small">${x.price != null ? J.num(x.price, 2) + " " + J.esc(x.pcur || "") + `<div class="muted">${x.price_time ? J.dateTime(x.price_time) : ""}</div>` : "–"}</td>
-        <td>${x.in_final || x.held ? badge(x.d_state) + `<div class="small muted">${x.closes_count != null ? x.closes_count + " séances" : ""}${x.last_close_date ? " · dernière " + J.date(x.last_close_date) : ""}</div>` : "–"}</td><td>${x.in_final || x.held ? (x.intraday_state === "na" ? '<span class="small muted">non géré</span>' : badge(x.intraday_state)) : "–"}</td>
+        <td>${x.in_final || x.held ? badge(x.d_state) + `<div class="small muted">${x.closes_count != null ? x.closes_count + " séances" : ""}${x.last_close_date ? " · dernière " + J.date(x.last_close_date) : ""}</div>` : "–"}</td><td>${x.in_final || x.held ? intradayBadge(x.intraday_state) : "–"}</td>
         <td class="small">${x.issue ? `<span class="warn">${J.esc(x.issue)}</span>` : x.quote_at ? "Infos Yahoo " + J.ago(x.quote_at) : "–"}</td></tr>`,
           )
           .join("") || '<tr><td colspan="10" class="empty">Aucun titre.</td></tr>'

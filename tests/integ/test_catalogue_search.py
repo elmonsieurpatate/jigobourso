@@ -156,3 +156,18 @@ def test_actions_etf_http_search_does_not_keep_unrelated_rows(catalogue):
     status, data = client.call('admin/titles', params='&q=LU9999999999')
     assert status == 200, data
     assert data['total'] == 0 and data['rows'] == []
+
+
+def test_actions_etf_can_return_partial_intraday_without_hiding_the_title(catalogue):
+    from engine.market import hours, intraday
+
+    conn, client = catalogue
+    day = hours.session_date('XPAR', hours.utcnow())
+    start, _ = intraday.session_window('XPAR', day)
+    with conn.cursor() as cur:
+        cur.execute('INSERT INTO intraday_prices(listing_id,slot_start,close_px) VALUES (3,%s,100)', (start,))
+    conn.commit()
+    status, data = client.call('admin/titles', params='&q=LU1812092168')
+    assert status == 200, data
+    primary = next(r for r in data['rows'] if r['lid'] == 3)
+    assert primary['in_final'] is True and primary['intraday_state'] == 'partial'

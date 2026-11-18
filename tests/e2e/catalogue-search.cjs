@@ -20,7 +20,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright-core')
           const rows = params.q === 'LU1812092168' ? symbols.map((symbol, i) => ({
             symbol, mic: i === 0 ? 'XETR' : 'XPAR', isin: 'LU1812092168', name: 'Produit de test', kind: 'etf',
             lid: i + 1, in_final: i === 0, fdb_state: 'kept', y_state: i === 0 ? 'kept' : 'secondary',
-            d_state: 'absent', intraday_state: 'na', primary: { id: 1, symbol: 'SELD.DE', mic: 'XETR', in_catalogue: true },
+            d_state: 'incomplete', intraday_state: i === 0 ? (window.intradayState || 'partial') : 'na', primary: { id: 1, symbol: 'SELD.DE', mic: 'XETR', in_catalogue: true },
           })) : [];
           return { places: ['XPAR'], raw_total: 8, rows, total: rows.length, page: 1, pages: 1 };
         };
@@ -38,6 +38,14 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright-core')
       assert.equal(await page.locator('#titles-results tbody tr').count(), 8);
       await page.locator('#titles-results summary').click();
       assert(await page.locator('#titles-results table').isVisible());
+      assert.match(await page.locator('#titles-results tbody tr').first().locator('td').nth(8).innerText(), /Partiel/);
+      assert.match(await page.locator('#titles-results tbody tr').first().locator('td').nth(7).innerText(), /Séances manquantes/);
+      await page.evaluate(() => window.intradayState = 'complete');
+      await page.locator('#tq').press('Enter');
+      await page.waitForTimeout(220);
+      await page.locator('#titles-results summary').click();
+      assert.equal(await page.locator('#titles-results tbody tr').first().locator('td').nth(8).innerText(), 'Complet', 'les barres intrajournalières ne doivent pas être étiquetées 5 ans complets');
+
       await page.locator('#tq').fill('ERROR');
       assert.equal(await page.locator('#titles-results table').count(), 0, 'les anciens résultats ne doivent pas rester pendant la nouvelle recherche');
       await page.waitForTimeout(650);

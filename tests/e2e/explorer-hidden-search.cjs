@@ -7,10 +7,10 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright-core')
     for (const width of [390, 1280]) {
       const page = await browser.newPage({ viewport: { width, height: 900 } });
       const errors = []; page.on('pageerror', e => errors.push(e.message));
-      let requests = 0;
+      let requests = 0, withoutScores = false;
       await page.route('**/api.php?r=ranking%2Ftable', route => {
         requests++;
-        return route.fulfill({ json: { universe: 1, rows: [{ id: 999, symbol: 'DEMO.PA', name: 'Titre recherché', isin: 'LU1812092168', mic: 'XPAR', kind: 'etf', currency: 'EUR', status: 'excluded', simple: 80, complex: 90, rank_simple: 42, rank_complex: 42, pos_simple: 1, pos_complex: 1, group: {}, price: null, price_eur: null, change: null, slope: null, r2: null, volatility: null, drawdown: null, turnover_eur: null, avg_volume: null }] } });
+        return route.fulfill({ json: { universe: 1, rows: withoutScores ? [] : [{ id: 999, symbol: 'DEMO.PA', name: 'Titre recherché', isin: 'LU1812092168', mic: 'XPAR', kind: 'etf', currency: 'EUR', status: 'excluded', simple: 80, complex: 90, rank_simple: 42, rank_complex: 42, pos_simple: 1, pos_complex: 1, group: {}, price: null, price_eur: null, change: null, slope: null, r2: null, volatility: null, drawdown: null, turnover_eur: null, avg_volume: null }] } });
       });
       await page.route('**/api.php?r=listings%2Fsearch*', route => route.fulfill({ json: { results: new URL(route.request().url()).searchParams.get('q') === 'introuvable' ? [] : [{ id: 999, symbol: 'DEMO.PA', name: 'Titre recherché', in_catalogue: true, primary: { id: 999, symbol: 'DEMO.PA', mic: 'XPAR', in_catalogue: true } }] } }));
       await page.goto((process.env.BASE || 'http://127.0.0.1:18089') + '/login.html');
@@ -43,6 +43,14 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright-core')
         assert.equal(await page.locator('#ct-search').inputValue(), 'LU1812092168');
         assert.equal(requests, n, 'le bouton du tableau vide ne relance pas les scores');
       }
+      withoutScores = true;
+      await page.locator('#ct-apply').click();
+      await page.waitForFunction(() => document.querySelector('.ct-ranking').getAttribute('aria-busy') !== 'true');
+      await page.locator('#ct-table-body tr[data-row="999"]').waitFor();
+      assert.match(await page.locator('#ct-table-body').innerText(), /sans note dans le classement chargé/);
+      assert.match(await page.locator('#ct-result-count').innerText(), /1 sans note/);
+      assert.equal(await page.locator('#ct-table-body .ct-rank-cell').innerText(), '—');
+      assert(!await page.locator('#ct-table-body').innerText().then(s => s.includes('NaN')));
       await page.locator('#ct-search').fill('introuvable');
       await page.waitForTimeout(500);
       assert.equal(await page.locator('#ct-table-body tr[data-row]').count(), 0, 'afficher les masqués ne doit pas ignorer la recherche');

@@ -611,11 +611,63 @@
       }
     }, 350);
   }
+  function catalogueOnlyRows() {
+    const present = new Set(intrinsicRows.map((r) => Number(r.id)));
+    const found = new Map();
+    for (const r of catalogueResults) {
+      const primary = r.primary?.in_catalogue ? r.primary : r.in_catalogue ? r : null;
+      if (!primary || present.has(Number(primary.id)) || found.has(Number(primary.id))) continue;
+      const source = catalogueResults.find((x) => Number(x.id) === Number(primary.id)) || {};
+      const missing = Object.fromEntries(
+        [
+          "price",
+          "price_eur",
+          "change",
+          "slope",
+          "r2",
+          "volatility",
+          "drawdown",
+          "turnover_eur",
+          "avg_volume",
+          "simple",
+          "complex",
+          "rank_simple",
+          "rank_complex",
+          "pos_simple",
+          "pos_complex",
+          "quality",
+        ].map((k) => [k, null]),
+      );
+      found.set(Number(primary.id), {
+        ...toRow({
+          ...missing,
+          id: Number(primary.id),
+          symbol: primary.symbol,
+          mic: primary.mic,
+          name: r.name,
+          isin: r.isin,
+          kind: r.kind,
+          currency: source.currency || null,
+          country: source.country || null,
+          category: source.category || null,
+          group: {},
+          simple_status: "inconnu",
+          complex_status: "inconnu",
+          status: "undetermined",
+        }),
+        catalogueOnly: true,
+      });
+    }
+    return [...found.values()];
+  }
   function visibleRows() {
     const ids = catalogueIds();
+    // Un produit retrouvé ne disparaît pas parce qu'il n'a aucune note : affichage
+    // explicite, sans score ni rang inventé, uniquement avec « Afficher les masqués ».
+    const sourceRows = showHidden && applied && !loadError ? [...intrinsicRows, ...catalogueOnlyRows()] : intrinsicRows;
     const needle = J.fold(tableState.query.trim());
     const base = needle
-      ? intrinsicRows.filter(
+      ? sourceRows.filter(
           (r) => ids.has(r.id) || J.fold(r.symbol + " " + r.name + " " + (r.isin || "")).includes(needle),
         )
       : intrinsicRows;
@@ -663,7 +715,7 @@
       }
     }
     if (key === "name")
-      return `<a class="ct-company" href="${esc(sheetHref(row.id))}" target="_blank" rel="noopener" aria-label="Ouvrir la fiche de ${esc(row.symbol)} dans un nouvel onglet"><span class="ct-company-mark" data-style="--mark:${row.color}" aria-hidden="true">${esc(row.symbol.slice(0, 2))}</span><span class="ct-company-text"><b>${esc(row.symbol)}${row.kind === "etf" ? ' <i class="ct-kind">ETF</i>' : ""}${row.held ? ' <i class="ct-kind held">détenu</i>' : ""}</b><span>${esc(row.name)}</span>${row.category ? `<span class="ct-sub ct-sector">${esc(row.category)}</span>` : ""}</span></a>`;
+      return `<a class="ct-company" href="${esc(sheetHref(row.id))}" target="_blank" rel="noopener" aria-label="Ouvrir la fiche de ${esc(row.symbol)} dans un nouvel onglet"><span class="ct-company-mark" data-style="--mark:${row.color}" aria-hidden="true">${esc(row.symbol.slice(0, 2))}</span><span class="ct-company-text"><b>${esc(row.symbol)}${row.kind === "etf" ? ' <i class="ct-kind">ETF</i>' : ""}${row.held ? ' <i class="ct-kind held">détenu</i>' : ""}</b><span>${esc(row.name)}</span>${row.category ? `<span class="ct-sub ct-sector">${esc(row.category)}</span>` : ""}${row.catalogueOnly ? '<span class="ct-sub">Dans le catalogue · sans note dans le classement chargé</span>' : ""}</span></a>`;
     if (key === "market")
       return `<b>${esc(row.mic)}</b><span class="ct-sub">${esc(row.country || "Pays inconnu")} · ${esc(row.currency || "—")}</span>`;
     if (key === "sector") {
@@ -756,7 +808,11 @@
     $("#ct-result-count").textContent = loadError
       ? ""
       : `${num0(rows.length)} titre${rows.length > 1 ? "s" : ""}` +
-        (rows.length !== intrinsicRows.length ? ` sur ${num0(intrinsicRows.length)} évalués` : "");
+        (rows.some((r) => r.catalogueOnly)
+          ? ` · ${num0(rows.filter((r) => r.catalogueOnly).length)} sans note`
+          : rows.length !== intrinsicRows.length
+            ? ` sur ${num0(intrinsicRows.length)} évalués`
+            : "");
     const wstyle = (w) => (w ? ` data-style="width:${w}px;min-width:${w}px;max-width:none"` : "");
     const cls = (key) => (key === "rank" ? "ct-rank-cell" : key === "name" ? "ct-name-heading" : "");
     $("#ct-table-head").innerHTML = J.table.headRow(
