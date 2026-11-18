@@ -38,13 +38,13 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright-core')
       assert.equal(await page.locator('#titles-results tbody tr').count(), 8);
       await page.locator('#titles-results summary').click();
       assert(await page.locator('#titles-results table').isVisible());
-      assert.match(await page.locator('#titles-results tbody tr').first().locator('td').nth(8).innerText(), /Partiel/);
-      assert.match(await page.locator('#titles-results tbody tr').first().locator('td').nth(7).innerText(), /Séances manquantes/);
+      assert.match(await page.locator('#titles-results tbody tr').first().locator('td').nth(9).innerText(), /Partiel/);
+      assert.match(await page.locator('#titles-results tbody tr').first().locator('td').nth(8).innerText(), /Séances manquantes/);
       await page.evaluate(() => window.intradayState = 'complete');
       await page.locator('#tq').press('Enter');
       await page.waitForTimeout(220);
       await page.locator('#titles-results summary').click();
-      assert.equal(await page.locator('#titles-results tbody tr').first().locator('td').nth(8).innerText(), 'Complet', 'les barres intrajournalières ne doivent pas être étiquetées 5 ans complets');
+      assert.equal(await page.locator('#titles-results tbody tr').first().locator('td').nth(9).innerText(), 'Complet', 'les barres intrajournalières ne doivent pas être étiquetées 5 ans complets');
 
       await page.locator('#tq').fill('ERROR');
       assert.equal(await page.locator('#titles-results table').count(), 0, 'les anciens résultats ne doivent pas rester pendant la nouvelle recherche');
