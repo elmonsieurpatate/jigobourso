@@ -1,5 +1,5 @@
 /* Portefeuille avec liquidités : cartes de bilan, graphique unique (deux vues, trois modes) et tableau des positions clôturées.
-   Uniquement pour les portefeuilles à liquidités ; les portefeuilles « ancien modèle » gardent leur affichage (pf-home.js).
+   Vue commune ; les anciens portefeuilles utilisent une reconstruction explicitement distincte des liquidités réelles.
    Aucun calcul financier ici : tout vient de portfolio/performance (engine/analytics/portfolio/cash_performance.py, adaptateur series/cash_history.py).
    Le graphique réutilise J.financialChart, les classes px-* et le tableau J.table de l'ensemble du site. */
 (function (root) {
@@ -29,7 +29,14 @@
       );
     return cache.get(key);
   }
-  const usable = (P) => !!(P && P.model === "cash" && P.days && P.days.length && P.chart);
+  const usable = (P) =>
+    !!(
+      P &&
+      (P.model === "cash" || (P.model === "legacy" && P.mode === "legacy_equivalent")) &&
+      P.days &&
+      P.days.length &&
+      P.chart
+    );
 
   /* ───────── « Mon argent » : chiffres du bilan (composant .metric du site) ───────── */
   const metric = (label, value, sub, tone = "") =>
@@ -170,12 +177,16 @@
       def = "",
       zero = false;
     if (st.view === "full" && st.mode === "value") {
-      add("value", "Valeur totale", pick(V.value, win), { width: 2.6 });
-      add("sec", "Titres", pick(V.securities, win), { color: "var(--series-2)" });
-      add("cash", "Liquidités", pick(V.cash, win), { color: "var(--series-5)" });
+      add("value", P.model === "cash" ? "Valeur totale" : "Valeur des titres", pick(V.value, win), { width: 2.6 });
+      if (P.model === "cash") {
+        add("sec", "Titres", pick(V.securities, win), { color: "var(--series-2)" });
+        add("cash", "Liquidités", pick(V.cash, win), { color: "var(--series-5)" });
+      }
       keys.forEach((k) => add("k" + k, names(k), held(V.holdings[k].value, win), { color: color(P, k) }));
       def =
-        "Valeur du portefeuille en euros : titres et liquidités. Les courbes de chaque titre sont masquées : cliquez une pastille pour les afficher.";
+        P.model === "cash"
+          ? "Valeur du portefeuille en euros : titres et liquidités. Les courbes de chaque titre sont masquées : cliquez une pastille pour les afficher."
+          : "Valeur des titres en euros, sans solde de liquidités connu. Les ventes restent dans l’historique. Cliquez une pastille pour afficher un titre.";
     } else if (st.view === "full" && st.mode === "perf") {
       zero = true;
       fmt = (v) => J.numS(v, 2) + " pt";
@@ -202,6 +213,9 @@
         );
       def =
         "Performance (en points de %) : la courbe épaisse est la performance globale (TWR, liquidités comprises) ; chaque autre courbe est la contribution du titre, en points de cette performance. Les contributions se somment ; les rendements des titres ne se somment pas.";
+      if (P.model === "legacy")
+        def =
+          "Performance reconstituée des titres : achats et ventes neutralisés par des flux techniques de comparaison. Ce ne sont pas vos dépôts ou retraits réels. Les contributions sont exprimées en points.";
       if (win.ref !== null)
         notes.push(
           "Sur une sous-période, une contribution est l’écart de contribution cumulée : leur somme approche le rendement de la période sans l’égaler exactement.",
@@ -353,6 +367,7 @@
     if (!plot) return;
     const st = ST,
       token = ++st.token;
+    plot.classList.add("loading");
     let out;
     try {
       out = st.mode === "market" ? await marketOut(P, st) : build(P, st);
@@ -360,6 +375,7 @@
       if (token !== st.token) return;
       plot._financial && plot._financial.destroy();
       plot.innerHTML = `<div class="notice err">Impossible de charger les données : ${esc(e.message)}</div>`;
+      plot.classList.remove("loading");
       return;
     }
     if (token !== st.token) return;
@@ -421,6 +437,7 @@
           draw(host, P, hooks);
         }),
     );
+    plot.classList.remove("loading");
   }
 
   /** Chiffres par titre sur une période : gain en euros, rendement (TWR du titre rebasé), contribution en points de la performance globale. */
@@ -463,7 +480,12 @@
             if (g.classList.contains("px-per")) x.setAttribute("aria-pressed", String(on));
           });
           host.querySelector("#pfc-unit").hidden = ST.mode !== "market";
-          draw(host, P, hooks);
+          const y = scrollY;
+          const pending = draw(host, P, hooks);
+          const token = ST.token;
+          pending.then(() => {
+            if (host.isConnected && token === ST.token) scrollTo(0, y);
+          });
         }),
     );
     host.querySelector("#pfc-marks").onchange = (e) => {

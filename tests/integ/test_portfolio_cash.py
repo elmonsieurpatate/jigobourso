@@ -457,10 +457,14 @@ def perf(c, pf):
     return data
 
 
-def test_performance_route_is_empty_for_a_legacy_portfolio(alice):
+def test_performance_route_modernises_legacy_without_converting_or_inventing_cash(alice):
     pid = alice.call('portfolio/create', {'name': 'Ancien'})[1]['id']
     assert buy(alice, pid, 1, 100)[0] == 200
-    assert perf(alice, pid) == {'model': 'legacy'}  # aucun calcul v2 : l'ancien affichage reste seul
+    r = perf(alice, pid)
+    assert r['model'] == 'legacy' and r['mode'] == 'legacy_equivalent'
+    assert r['cash_balance_known'] is False
+    assert rows('SELECT cash_model FROM portfolios WHERE id=%s', (pid,))[0]['cash_model'] == 'legacy'
+    assert not rows('SELECT id FROM portfolio_cash_movements WHERE portfolio_id=%s', (pid,))
 
 
 def test_performance_route_reference_scenario_matches_ledger_and_cash(alice):
@@ -522,3 +526,10 @@ def test_performance_route_open_view_excludes_sold_titles_and_reconciles(alice):
     assert o['value'][-1] == pytest.approx(p['securities'][-1])
     assert o['realized'][-1] + o['latent'][-1] == pytest.approx(o['gain'][-1])
     assert o['twr']['central'][-1] == pytest.approx(p['positions'][o['keys'][0]]['twr'])
+
+
+def test_empty_legacy_performance_remains_valid_without_computing_cash(alice):
+    pid = alice.call('portfolio/create', {'name': 'Ancien vide'})[1]['id']
+    r = perf(alice, pid)
+    assert r['model'] == 'legacy' and r['cash_balance_known'] is False and r['days'] == []
+    assert not rows('SELECT id FROM portfolio_cash_movements WHERE portfolio_id=%s', (pid,))

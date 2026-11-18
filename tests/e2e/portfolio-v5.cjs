@@ -6,7 +6,6 @@ const PERIODS = ['1d', '2d', '5d', '1w', '2w', '1m', '3m', '6m', '1y', '2y', '3y
 (async () => {
   const b = await chromium.launch({ executablePath: process.env.JIGO_CHROMIUM, args: ['--no-sandbox'] }); const report = [];
   // Premier chargement : démarrage à froid du moteur et des caches, lent quand la machine est chargée (diagnostic : docs/PERFORMANCE_V2_COMPARATIF.md §7). Seul ce chargement a 60 s ; les erreurs JavaScript et HTTP restent contrôlées partout.
-  let warm = false;
   try {
     for (const width of [320, 375, 390, 430, 768, 1024, 1440]) {
       const ctx = await b.newContext({extraHTTPHeaders:{Origin:BASE}, viewport: { width, height: width > 700 ? 1000 : 900 }, isMobile: width < 600, hasTouch: width < 600 });
@@ -14,14 +13,14 @@ const PERIODS = ['1d', '2d', '5d', '1w', '2w', '1m', '3m', '6m', '1y', '2y', '3y
       assert.equal((await ctx.request.post(BASE + '/api.php?r=auth/login', { data: { username: 'audit_portfolio', password: 'audit-local-validation-2026' } })).ok(), true);
       const list = (await (await ctx.request.get(BASE + '/api.php?r=portfolios')).json()).portfolios;
       let id = null, rows = 0;
-      for (const p of list) { await page.goto(BASE + '/portefeuilles.html?id=' + p.id); await page.locator('.px-zones').waitFor(warm ? {} : { timeout: 60000 }); warm = true; const n = await page.locator('.px-t tbody tr').count(); if (n > rows) { rows = n; id = p.id; } }
-      assert.ok(id, 'portefeuille avec positions'); await page.goto(BASE + '/portefeuilles.html?id=' + id); await page.locator('.px-zones').waitFor();
+      for (const p of list) { const d=await (await ctx.request.get(BASE+'/api.php?r=portfolio&id='+p.id)).json(); const n=d.positions.filter(x=>x.qty>0).length; if(n>rows){rows=n;id=p.id;} }
+      assert.ok(id, 'portefeuille avec positions'); await page.goto(BASE + '/portefeuilles.html?id=' + id); await page.locator('.px-zones').waitFor();await page.locator('#pfc-plot svg,#pfc-plot .px-empty').waitFor({timeout:60000});
       const shot = async n => { if (SHOTS && [390, 1440].includes(width)) await page.screenshot({ path: `${SHOTS}/pf5-${n}-${width}.png`, fullPage: n !== 'drawer' && n !== 'surv-detail' && n !== 'alert-edit' }); };
       const noOverflow = async tag => assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true, `débordement horizontal ${tag} ${width}`);
-      const settle = async () => { await page.waitForFunction(() => !document.querySelector('#px-main-plot.loading') && document.querySelector('#px-main-plot svg,#px-main-plot .px-empty')); };
+      const settle = async () => { await page.waitForFunction(() => !document.querySelector('#pfc-plot.loading') && document.querySelector('#pfc-plot svg,#pfc-plot .px-empty')); };
       // deux zones, ordre de la vue d'ensemble
       assert.deepEqual(await page.locator('.px-zones button').allInnerTexts(), ['Vue d’ensemble', 'Transactions']);
-      const order = await page.evaluate(() => ['.px-zones', '.px-syn', '.px-sum', '#px-main-box', '.px-t'].map(s => document.querySelector(s).getBoundingClientRect().top));
+      const order = await page.evaluate(() => ['.px-zones', '.px-syn', '.pf-dynamics', '#pfc-card', '.px-t'].map(s => document.querySelector(s).getBoundingClientRect().top));
       assert.deepEqual(order, [...order].sort((x, y) => x - y), 'ordre : zones, synthèse, alertes, graphique, positions');
       await settle(); await noOverflow('overview'); await shot('overview');
       // thème : les cartes suivent les variables du thème (pas de fond forcé)
@@ -29,12 +28,12 @@ const PERIODS = ['1d', '2d', '5d', '1w', '2w', '1m', '3m', '6m', '1y', '2y', '3y
       const light = await bg(); await page.evaluate(() => { document.documentElement.dataset.theme = 'dark'; }); const dark = await bg(); await page.evaluate(() => { document.documentElement.dataset.theme = 'light'; });
       assert.notEqual(light, dark, 'le thème change les couleurs'); assert.notEqual(light, 'rgb(15, 33, 66)');
       // périodes × modes (rapport de couverture)
-      for (const mode of ['perso', 'market']) {
-        await page.locator(`#px-main-box [data-k="mode"] [data-v="${mode}"]`).click();
+      for (const mode of ['perf', 'market']) {
+        await page.locator(`#pfc-card [data-k="mode"] [data-v="${mode}"]`).click();
         for (const per of PERIODS) {
-          await page.locator(`#px-main-box [data-k="per"] [data-v="${per}"]`).click(); await settle();
-          const cur = await page.locator('#px-main-cur').innerText(), sum = await page.locator('#px-main-sum').innerText(), hasSvg = await page.locator('#px-main-plot svg.fc-svg').count();
-          assert.match(sum, /^Données :/); assert.ok(hasSvg || await page.locator('#px-main-plot .px-empty').count(), `${mode} ${per} : graphique ou message`);
+          await page.locator(`#pfc-card [data-k="per"] [data-v="${per}"]`).click(); await settle();
+          const cur = await page.locator('#pfc-cur').innerText(), sum = await page.locator('#pfc-notes').innerText(), hasSvg = await page.locator('#pfc-plot svg.fc-svg').count();
+          assert.ok(hasSvg || await page.locator('#pfc-plot .px-empty').count(), `${mode} ${per} : graphique ou message`);
           if (width === 1440) report.push({ mode, per, cur: cur.replace(/\s+/g, ' '), data: sum });
         }
       }
@@ -43,22 +42,23 @@ const PERIODS = ['1d', '2d', '5d', '1w', '2w', '1m', '3m', '6m', '1y', '2y', '3y
       const early = await page.evaluate(async () => { const C = PFHome.ctx(), st = { mode: 'market', per: 'max', unit: 'pct' }, keys = C.D.positions.filter(p => p.qty > 0).map(p => p.listing_id ? String(p.listing_id) : 'S' + p.symbol.toUpperCase()); const o = await PFHome.build(st, { keys, pf: false }); return { first: o.times[0], op: C.H.dates[0], n: o.series.length }; });
       assert.ok(early.n >= 1 && String(early.first).slice(0, 10) <= early.op, `max market commence avant ou à la première opération ${JSON.stringify(early)}`);
       // lignes et marqueurs, bascule € / %
-      await page.locator('#px-main-box [data-k="mode"] [data-v="perso"]').click(); await page.locator('#px-main-box [data-k="per"] [data-v="all"]').click(); await settle();
-      await page.locator('#px-main-box [data-k="unit"] [data-v="eur"]').click(); await settle(); await page.locator('#px-main-box [data-k="unit"] [data-v="pct"]').click(); await settle();
+      await page.locator('#pfc-card [data-k="mode"] [data-v="market"]').click(); await page.locator('#pfc-card [data-k="per"] [data-v="all"]').click(); await settle();
+      await page.locator('#pfc-card [data-k="unit"] [data-v="eur"]').click(); await settle(); await page.locator('#pfc-card [data-k="unit"] [data-v="pct"]').click(); await settle();
+      await page.locator('#pfc-card [data-k="mode"] [data-v="perf"]').click(); await settle();
       // pastille : masquer une courbe garde les autres
-      const chips = page.locator('#px-main-leg .px-chip'); const nChips = await chips.count(); assert.ok(nChips >= 2); const before = await page.locator('#px-main-plot path[data-curve]').count();
-      await chips.nth(1).click(); await settle(); assert.equal(await page.locator('#px-main-plot path[data-curve]').count(), before - 1); await page.locator('#px-main-leg .px-chip').nth(1).click(); await settle();
+      const chips = page.locator('#pfc-leg .px-chip:not(.off)'); const nChips = await chips.count(); assert.ok(nChips >= 2); const before = await page.locator('#pfc-plot path[data-curve]').count();
+      const sid=await chips.nth(1).getAttribute('data-sid');await page.locator(`[data-sid="${sid}"]`).click(); await settle(); assert.equal(await page.locator('#pfc-plot path[data-curve]').count(), before - 1); await page.locator(`[data-sid="${sid}"]`).click(); await settle();
       // pas de saut de défilement au changement de période
-      const y0 = await page.evaluate(() => scrollY); await page.locator('#px-main-box [data-k="per"] [data-v="3m"]').click(); await settle(); assert.equal(await page.evaluate(() => scrollY), y0, 'défilement stable');
+      await page.locator('#pfc-card [data-k="per"] [data-v="3m"]').scrollIntoViewIfNeeded(); const y0 = await page.evaluate(() => scrollY); await page.locator('#pfc-card [data-k="per"] [data-v="3m"]').evaluate(b => b.click()); await settle(); assert.equal(await page.evaluate(() => scrollY), y0, 'défilement stable');
       if (width > 700) { // zoom par glissement : ni sélection de texte ni défilement
-        const box = await page.locator('#px-main-plot .fc-plot').boundingBox(); const sy = await page.evaluate(() => scrollY);
+        const box = await page.locator('#pfc-plot .fc-plot').boundingBox(); const sy = await page.evaluate(() => scrollY);
         await page.mouse.move(box.x + box.width * 0.4, box.y + box.height / 2); await page.mouse.down(); await page.mouse.move(box.x + box.width * 0.7, box.y + box.height / 2, { steps: 6 }); await page.mouse.up();
         assert.equal(await page.evaluate(() => getSelection().toString()), '', 'aucune sélection de texte'); assert.equal(await page.evaluate(() => scrollY), sy);
-        await page.locator('#px-main-plot .fc-plot').dblclick({ position: { x: box.width / 2, y: box.height / 2 } });
-        await page.mouse.move(box.x + box.width * 0.5, box.y + box.height / 2); await page.waitForTimeout(100); assert.ok(await page.locator('#px-main-plot .fc-tip').isVisible(), 'infobulle');
+        await page.locator('#pfc-plot .fc-plot').dblclick({ position: { x: box.width / 2, y: box.height / 2 } });
+        await page.mouse.move(box.x + box.width * 0.5, box.y + box.height / 2); await page.waitForTimeout(100); assert.ok(await page.locator('#pfc-plot .fc-tip').isVisible(), 'infobulle');
       }
       // tableau compact : en-têtes, tri stable, ligne cliquable
-      if (width >= 1024) { for (const h of ['Titre', 'Valeur', 'Gain/perte', 'Rendement', 'Suivi', 'Actions']) assert.ok((await page.locator('.px-t thead').first().innerText()).toLowerCase().includes(h.toLowerCase()), h); }
+      if (width >= 1024) { for (const h of ['Titre', 'Valeur', 'Gain / perte', 'Rendement', 'Actions']) assert.ok((await page.locator('.px-t thead').first().innerText()).toLowerCase().includes(h.toLowerCase()), h); }
       await noOverflow('tableau'); await page.locator('.px-t [data-sort="value"]').first().evaluate(e => e.click());
       // les deux accès redondants ont disparu du Portefeuille
       const pageTxt = await page.locator('#px-page').innerText(); assert.ok(!/Transactions et lots/.test(pageTxt) && !/Centre d’alertes/.test(pageTxt), 'accès redondants supprimés');

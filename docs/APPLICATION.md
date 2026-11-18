@@ -549,6 +549,11 @@ Les ventes consomment les achats les plus anciens. Les lots ouverts alimentent l
 - Pour les portefeuilles à liquidités : les quatre cartes montrent capital net apporté, liquidités, valeur des actions et gain total = liquidités + titres − capital net apporté. Rendement simple = gain / capital net apporté si celui-ci est strictement positif, distinct du TWR. Valeur totale, impôts indicatifs, gain net, réalisé, latent, TWR et encadrement restent accessibles. Les cartes lisent la dernière valeur du bilan, jamais une ancienne valeur non nulle lorsque la dernière est indisponible. Les portefeuilles legacy conservent leur bilan d'origine : pas de liquidités ni d'apports externes inventés.
 
 
+### Vue temporaire modernisée des anciens portefeuilles
+
+Les portefeuilles `legacy` utilisent également la vue graphique commune et ses quinze périodes, via `portfolio/performance` en mode `legacy_equivalent` déjà existant. Le registre, le modèle et les mouvements stockés ne sont pas modifiés. Le bilan historique reste affiché ; liquidités et apports externes sont explicitement non renseignés. La série de liquidités synthétiques n’est jamais affichée comme un solde réel. Les flux techniques de comparaison neutralisent achats/ventes uniquement en mémoire et ne constituent pas des dépôts/retraits réels. La conversion persistante reste une opération distincte nécessitant les véritables soldes ou apports.
+
+
 ### 8.6 Plan de suivi d'une position (`engine/analytics/portfolio/position_plan.py`, `MODEL_VERSION` = 1)
 
 Modèle courant de décision par position.

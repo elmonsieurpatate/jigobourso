@@ -526,7 +526,7 @@
     const H = C.H,
       wAll = PFM.resolveWindow(H, "all"),
       pf = PFM.portfolio(H, wAll);
-    const P = cashModel() && root.PFPerf2 && root.PFPerf2.usable(S.perf) ? S.perf : null;
+    const P = root.PFPerf2 && root.PFPerf2.usable(S.perf) ? S.perf : null;
     const PS = P ? root.PFPerf2.periodStats(P, S.aper) : null;
     const rows = all().map((p) => {
       const l = lineOf(p),
@@ -698,7 +698,7 @@
     });
   }
 
-  /** Portefeuille à liquidités : « Mon argent », un graphique (deux vues, trois modes), « Mes actions ». Aucun style ici : composants et classes du site. */
+  /** Vue commune : bilan réel ou historique, graphique et positions. Aucun style ici : composants et classes du site. */
   const actCell = (r) => {
     const p = r.p,
       closed = !(p.qty > 0);
@@ -706,18 +706,16 @@
   };
   function actionsTable(st) {
     const held = (r) => r.p.qty > 0;
-    const rows = st.rows
-      .filter((r) => S.afilter === "all" || (S.afilter === "held") === held(r))
-      .sort((a, b) => held(b) - held(a) || (b.p.value || 0) - (a.p.value || 0));
+    const rows = sortRows(st.rows.filter((r) => S.afilter === "all" || (S.afilter === "held") === held(r)));
     const cols = [
-      { label: "Titre", cls: "c-title" },
+      { label: "Titre", sort: "title", cls: "c-title" },
       { label: "Quantité", num: true, cls: "c-qty" },
       { label: "PRU", num: true, cls: "c-pru" },
       { label: "Cours actuel", num: true, cls: "c-price" },
-      { label: "Valeur", num: true, cls: "c-value" },
-      { label: "Gain / perte", num: true, cls: "c-gain" },
-      { label: "Rendement", num: true, cls: "c-pct" },
-      { label: "Poids", num: true, cls: "c-wt" },
+      { label: "Valeur", sort: "value", num: true, cls: "c-value" },
+      { label: "Gain / perte", sort: "gain", num: true, cls: "c-gain" },
+      { label: "Rendement", sort: "pct", num: true, cls: "c-pct" },
+      { label: "Poids", sort: "w", num: true, cls: "c-wt" },
       { label: "Actions", cls: "c-act" },
     ];
     const body = rows
@@ -727,7 +725,7 @@
         return `<tr class="${on ? "" : "closed"}" data-open="${esc(r.key)}" tabindex="0"><td class="c-title" data-l="Titre"><span class="ident"><b>${esc(p.symbol)}${on ? "" : " " + J.badge("Vendu", "", { sm: true })}</b><small>${esc(p.name_catalogue || p.name || "")}</small></span></td><td class="num c-qty" data-l="Quantité">${on ? J.num(p.qty, 4) : "–"}</td><td class="num c-pru" data-l="PRU">${on ? eur(p.cost / p.qty) : "–"}</td><td class="num c-price" data-l="Cours actuel">${on && isNum(p.price_eur) ? eur(p.price_eur) : "–"}</td><td class="num c-value" data-l="Valeur">${on ? eur(p.value) : "–"}</td><td class="num c-gain ${cl(r.gain)}" data-l="Gain / perte">${sg(r.gain)}</td><td class="num c-pct ${cl(r.pctv)}" data-l="Rendement">${pc(r.pctv)}</td><td class="num c-wt" data-l="Poids">${isNum(r.w) ? J.num(r.w, 1) + " %" : "–"}</td>${actCell(r)}</tr>`;
       })
       .join("");
-    return `<div class="px-tw"><table class="px-t pf-acts">${J.table.head(cols)}<tbody>${body || '<tr><td colspan="9" class="px-note">Aucune position.</td></tr>'}</tbody></table></div>`;
+    return `<div class="px-tw"><table class="px-t pf-acts">${J.table.head(cols, sortState())}<tbody>${body || '<tr><td colspan="9" class="px-note">Aucune position.</td></tr>'}</tbody></table></div>`;
   }
   const marketTable = () => root.PFDynamics.html(S.market, C.D.positions, S.marketErr, S.marketSort);
   async function loadMarket() {
@@ -805,10 +803,10 @@
         text: sg(r.gain),
         share: r.share,
       }));
-    return `${root.PFPerf2.money(P, tax)}${marketTable()}${root.PFPerf2.boxHtml(P)}<section class="px-card"><div class="px-ph"><h2>Contribution au résultat</h2>${filter}${aper}</div><p class="small muted">Impact de chaque titre sur le gain total, ${label}. Les titres vendus gardent leur gain réalisé.</p>${contrib.length ? J.bars(contrib, "Contribution de chaque titre au résultat") : '<p class="px-note">Aucun gain ou perte sur cette période.</p>'}</section><section class="px-card"><div class="px-ph"><h2>Mes actions</h2>${filter}${aper}</div><p class="small muted">Gain et rendement ${label}. Quantité, PRU, cours et valeur sont ceux d’aujourd’hui. <button type="button" class="px-link" data-gosuivi>Voir le suivi des positions</button></p>${actionsTable(st)}<p class="px-note">Rendement : celui du titre sur la période (TWR), à ne pas additionner. Un titre vendu garde son gain réalisé.</p></section>${suiviSection()}`;
+    return `${cashModel() ? root.PFPerf2.money(P, tax) : `${synth(st)}<p class="notice info">Vue temporaire modernisée : toutes les périodes sont disponibles. Vos transactions et résultats d’origine sont conservés. Les liquidités et les apports/retraits externes restent non renseignés ; la courbe reconstitue la performance des titres, sans inventer de solde.</p>`}${marketTable()}${root.PFPerf2.boxHtml(P)}<section class="px-card"><div class="px-ph"><h2>Contribution au résultat</h2>${filter}${aper}</div><p class="small muted">Impact de chaque titre sur le gain total, ${label}. Les titres vendus gardent leur gain réalisé.</p>${contrib.length ? J.bars(contrib, "Contribution de chaque titre au résultat") : '<p class="px-note">Aucun gain ou perte sur cette période.</p>'}</section><section class="px-card"><div class="px-ph"><h2>Mes actions</h2>${filter}${aper}</div><p class="small muted">Gain et rendement ${label}. Quantité, PRU, cours et valeur sont ceux d’aujourd’hui. <button type="button" class="px-link" data-gosuivi>Voir le suivi des positions</button></p>${actionsTable(st)}<p class="px-note">Rendement : celui du titre sur la période (TWR), à ne pas additionner. Un titre vendu garde son gain réalisé.</p></section>${suiviSection()}`;
   }
   function viewOverview(st) {
-    if (cashModel()) return viewCash(st);
+    if (root.PFPerf2) return viewCash(st);
     const nc = st.rows.filter((r) => !(r.p.qty > 0)).length;
     const fp = !!store("fold_positions");
     return `${synth(st)}${marketTable()}${planSummary()}<section class="px-card"><h2>Évolution</h2>${boxHtml(S.main, PfDetail.MAIN)}</section><section class="px-card${fp ? " folded" : ""}" id="px-sec-positions"><div class="px-ph">${foldHead("positions", "Positions", "")}${nc ? `<label class="px-chk" id="px-closed-wrap" ${fp ? "hidden" : ""}><input type="checkbox" id="px-closed" ${S.closed ? "checked" : ""}> Afficher les positions soldées (${nc})</label>` : ""}</div><div class="px-fold-body" id="px-fb-positions" ${fp ? "hidden" : ""}>${table(st, 0)}</div></section>${suiviSection()}`;
@@ -834,7 +832,7 @@
     if (!J.$("#px-drawer-root")) C.host.innerHTML = '<div id="px-page"></div><div id="px-drawer-root" hidden></div>';
     J.$("#px-page").innerHTML = head() + body;
     setTitle();
-    if (S.zone === "overview" && cashModel()) {
+    if (S.zone === "overview" && root.PFPerf2) {
       if (S.perf && root.PFPerf2.usable(S.perf)) root.PFPerf2.mountChart(J.$("#pfc-card"), S.perf, C.helpers);
     } else if (S.zone === "overview") bindBox(S.main, PfDetail.MAIN);
   }
@@ -962,6 +960,7 @@
   async function mount(host, ctx) {
     const first = !C || C.host !== host;
     C = Object.assign({ host }, ctx);
+    const context = C;
     if (first) {
       host.addEventListener("click", onClick);
       host.addEventListener("change", onChange);
@@ -976,22 +975,21 @@
     S.perfErr = null;
     S.market = null;
     S.marketErr = null;
-    const perfP =
-      cashModel() && root.PFPerf2
-        ? root.PFPerf2.load(
-            C.current,
-            `${C.D.cash.movements}|${C.D.cash.balance}|${(C.D.transactions_list || []).length}`,
-          )
-            .then((P) => {
-              if (C.host === host) S.perf = P;
-            })
-            .catch((e) => {
-              S.perfErr = e.message;
-            })
-        : null;
+    const perfP = root.PFPerf2
+      ? root.PFPerf2.load(
+          C.current,
+          JSON.stringify([C.D.cash, C.D.transactions_list, C.D.positions.map((p) => [p.listing_id, p.qty, p.value])]),
+        )
+          .then((P) => {
+            if (C === context) S.perf = P;
+          })
+          .catch((e) => {
+            if (C === context) S.perfErr = e.message;
+          })
+      : null;
     render();
     await Promise.all([loadTracking(), perfP, loadMarket()]);
-    if (C.host === host) {
+    if (C === context) {
       const y = scrollY;
       render();
       scrollTo(0, y);

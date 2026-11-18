@@ -16,6 +16,7 @@ for(const legacy of [false,true]){
  assert.deepEqual(await page.locator('.pfd-table thead th').allTextContents().then(a=>a.slice(2).map(x=>x.trim())),['1J','2J','3J','1S','2S','1M','3M','6M','1A','2A','4A']);
  assert.equal(await page.locator('.pfd-table tbody tr').count(),5);
  const text=await page.locator('.pfd-table').innerText(); assert(!text.includes('GIBO')&&!text.includes('DXC'));
+ if(legacy){await page.locator('#pfc-plot .fc-plot').waitFor();assert.match(await page.locator('#px-page').innerText(),/Vue temporaire modernisée/);assert.equal(await page.locator('.px-top [data-k="per"] button').count(),15);assert.equal(await page.locator('.pf-kpis').count(),0);}
  const raw=await (await ctx.request.get(BASE+'/api.php?r=portfolio&id='+pf.id)).json();
  const vfc=raw.positions.find(p=>p.symbol==='VFC');
  const row=page.locator('.pfd-table tbody tr').filter({hasText:'VFC'});

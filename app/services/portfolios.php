@@ -76,14 +76,15 @@ function pf_history(array $u, array $b = []) {
     return engine_call('portfolio-history', ['transactions' => $tx]);
 }
 
-// Performance avec liquidités (moteur v2, lecture seule). Portefeuille « ancien modèle » : aucun calcul, l'affichage historique reste seul.
+// Performance en lecture seule : liquidités réelles ou reconstruction legacy, sans conversion persistante.
 function pf_performance(array $u, array $b = []) {
     $p = own_portfolio((int)($b['id'] ?? 0), $u);
-    if (($p['cash_model'] ?? 'legacy') !== 'cash') return ['model' => 'legacy'];
+    $legacy = ($p['cash_model'] ?? 'legacy') !== 'cash';
     $tx = q('SELECT id, listing_id, symbol, name, side, quantity, unit_price, currency, fx_to_eur, fees, trade_at FROM portfolio_transactions WHERE portfolio_id = ? ORDER BY trade_at, id', [$p['id']])->fetchAll();
+    if ($legacy && !$tx) return ['model' => 'legacy', 'mode' => 'legacy_equivalent', 'cash_balance_known' => false, 'days' => [], 'chart' => null];
     $mv = array_map(fn($m) => array_intersect_key($m, array_flip(['id', 'kind', 'amount_net', 'currency', 'fx_to_eur', 'listing_id', 'occurred_at'])), cash_load_movements((int)$p['id']));
-    $r = engine_call('portfolio-cash-performance', ['transactions' => $tx, 'movements' => $mv, 'mode' => 'cash', 'cash_from' => $p['cash_from'], 'compact' => true]);
-    return ['model' => 'cash'] + $r;
+    $r = engine_call('portfolio-cash-performance', ['transactions' => $tx, 'movements' => $mv, 'mode' => $legacy ? 'legacy_equivalent' : 'cash', 'cash_from' => $p['cash_from'], 'compact' => true]);
+    return ['model' => $legacy ? 'legacy' : 'cash', 'cash_balance_known' => !$legacy] + $r;
 }
 
 function pf_set_levels(array $u, array $b = []) {
