@@ -1,162 +1,28 @@
-name: Jigobourso — déploiement Hostinger
+name: Diagnostic privé des anciens portefeuilles
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
-    inputs:
-      operation:
-        description: diagnostic (lecture seule), deploy, ou rollback (restaure la dernière sauvegarde du code)
-        type: choice
-        options: [diagnostic, deploy, rollback]
-        default: diagnostic
-      validation:
-        description: full = tests complets ; quick = déploiement rapide avec contrôles essentiels
-        type: choice
-        options: [full, quick]
-        default: full
-      catalogue_query:
-        description: 'Diagnostic seulement : ISIN ou symbole à examiner (lecture seule)'
-        type: string
-        default: ''
 permissions:
   contents: read
-concurrency:
-  group: hostinger-jigobourso-production
-  cancel-in-progress: false
 jobs:
-  # Contrôles courts et tests complets démarrent ensemble (aucune dépendance entre eux) ; le déploiement attend les deux.
-  syntax:
-    name: Contrôles courts
-    uses: ./.github/workflows/quality.yml
-
-  tests:
-    name: Tests complets
-    if: >-
-      (github.event_name == 'push' && !contains(github.event.head_commit.message, '[deploy quick]')) ||
-      (github.event_name == 'workflow_dispatch' && inputs.operation == 'deploy' && inputs.validation != 'quick')
-    uses: ./.github/workflows/tests.yml
-
-  # Verdict public des tests publié AVANT le déploiement (même branche deployment-status que le job hostinger : l'ordre évite deux écritures simultanées).
-  tests_status:
-    name: Verdict des tests
-    needs: tests
-    if: always() && needs.tests.result != 'skipped'
+  inspect:
     runs-on: ubuntu-22.04
     timeout-minutes: 5
-    permissions:
-      contents: write # branche deployment-status : compte rendu public sans secret
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Publier le verdict
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RESULT: ${{ needs.tests.result }}
-        run: |
-          set -euo pipefail
-          case "$RESULT" in success) STATUS=tests_success ;; cancelled) STATUS=tests_cancelled ;; *) STATUS=tests_failure ;; esac
-          export STATUS
-          bash ops/report-status.sh
-  hostinger:
-    needs: [syntax, tests, tests_status]
-    if: >-
-      always() && !cancelled() && github.ref == 'refs/heads/main' &&
-      needs.syntax.result == 'success' &&
-      (needs.tests.result == 'success' ||
-       (needs.tests.result == 'skipped' &&
-        ((github.event_name == 'workflow_dispatch' && (inputs.operation != 'deploy' || inputs.validation == 'quick')) ||
-         (github.event_name == 'push' && contains(github.event.head_commit.message, '[deploy quick]')))))
-    runs-on: ubuntu-latest
-    environment: production
-    timeout-minutes: 30
-    permissions:
-      contents: write # met à jour la branche deployment-status (compte rendu sans secret)
-      actions: read # lire les autres exécutions du workflow (garde contre un déploiement obsolète)
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Indiquer le mode demandé
-        env:
-          OPERATION: ${{ inputs.operation || 'deploy' }}
-          VALIDATION: ${{ (github.event_name == 'push' && contains(github.event.head_commit.message, '[deploy quick]')) && 'quick' || inputs.validation || 'full' }}
-          TEST_RESULT: ${{ needs.tests.result }}
-        run: |
-          printf '### Opération : %s\n\nValidation : `%s` · Tests complets : `%s`\n' "$OPERATION" "$VALIDATION" "$TEST_RESULT" >> "$GITHUB_STEP_SUMMARY"
-      - name: Ne pas déployer une version plus ancienne qu'une exécution plus récente
-        id: fresh
-        env:
-          GH_TOKEN: ${{ github.token }}
-          OPERATION: ${{ inputs.operation || 'deploy' }}
-        run: |
-          set -euo pipefail
-          # Une exécution de push plus récente, en attente, en cours ou déjà réussie, déploie (ou a déjà déployé) un code plus récent : celui-ci ne doit pas l'écraser.
-          # Une exécution plus récente en échec ou annulée ne déploie rien : cette version, déjà validée, reste déployable. Les commits [skip ci] ne créent aucune exécution et ne bloquent donc rien.
-          if [ "$OPERATION" = deploy ]; then
-            created=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" --jq .created_at)
-            newer=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/deploy.yml/runs?branch=main&event=push&per_page=50" \
-              --jq "[.workflow_runs[] | select(.created_at > \"$created\" and .id != $GITHUB_RUN_ID and (.status != \"completed\" or .conclusion == \"success\"))] | length")
-            if [ "$newer" -gt 0 ]; then
-              echo "stale=true" >> "$GITHUB_OUTPUT"
-              printf '### Déploiement ignoré\n\nUne exécution plus récente de main déploie (ou a déjà déployé) un code plus récent : cette version ne l’écrase pas.\n' >> "$GITHUB_STEP_SUMMARY"
-              echo "Déploiement ignoré : exécution plus récente de main détectée"
-            fi
-          fi
-      - name: Configurer SSH
-        if: steps.fresh.outputs.stale != 'true'
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Lecture seule et chiffrement du diagnostic
         env:
           DEPLOY_KEY: ${{ secrets.HOSTINGER_SSH_PRIVATE_KEY }}
         run: |
           set -euo pipefail
-          test -n "$DEPLOY_KEY"
-          install -d -m 700 "$RUNNER_TEMP/jigobourso-ssh"
-          printf '%s\n' "$DEPLOY_KEY" > "$RUNNER_TEMP/jigobourso-ssh/key"
-          chmod 600 "$RUNNER_TEMP/jigobourso-ssh/key"
-          printf '%s\n' '[147.79.103.168]:65002 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAr7QtJ399JQsqSyH2cDwi5RUdPt5VVTateWLrGAKuVE' > "$RUNNER_TEMP/jigobourso-ssh/known_hosts"
-          ssh-keygen -lf "$RUNNER_TEMP/jigobourso-ssh/known_hosts" | grep -F 'SHA256:fh14KGbEYreksPS6ughPoyn+M4caidDfVZrVAHG1OzM'
-      - name: Diagnostic ou déploiement
-        if: steps.fresh.outputs.stale != 'true'
-        env:
-          JIGO_CATALOGUE_QUERY: ${{ inputs.catalogue_query || '' }}
-          OPERATION: ${{ inputs.operation || 'deploy' }}
-          JIGO_DEPLOY_VALIDATION: ${{ (github.event_name == 'push' && contains(github.event.head_commit.message, '[deploy quick]')) && 'quick' || inputs.validation || 'full' }}
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          bash ops/deploy.sh "$OPERATION" > "$RUNNER_TEMP/jigobourso-deploy.log" 2>&1 &
-          pid=$!
-          while kill -0 "$pid" 2>/dev/null; do
-            STATUS=in_progress bash ops/report-status.sh || true
-            sleep 30
-          done
-          result=0
-          wait "$pid" || result=$?
-          # Le journal d'Actions est public avec le dépôt : seules les lignes d'étapes et de verdict sont affichées (ops/public-log.sh).
-          bash ops/public-log.sh < "$RUNNER_TEMP/jigobourso-deploy.log"
-          exit "$result"
-      - name: Joindre le diagnostic catalogue ciblé
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: always() && inputs.operation == 'diagnostic' && inputs.catalogue_query != ''
+          umask 077
+          trap 'rm -f "$RUNNER_TEMP/inspection-key" "$RUNNER_TEMP/inspection.json" "$RUNNER_TEMP/inspection-error.log"' EXIT
+          printf '%s\n' "$DEPLOY_KEY" > "$RUNNER_TEMP/inspection-key"
+          printf '%s\n' '[147.79.103.168]:65002 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAr7QtJ399JQsqSyH2cDwi5RUdPt5VVTateWLrGAKuVE' > "$RUNNER_TEMP/inspection-hosts"
+          ssh -F /dev/null -p 65002 -i "$RUNNER_TEMP/inspection-key" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$RUNNER_TEMP/inspection-hosts" -o ConnectTimeout=20 u381524662@147.79.103.168 'cd /home/u381524662/domains/jigobourso.turnjoy.dev/jigobourso-v2 && php' < scripts/release/inspect_legacy_portfolios.php > "$RUNNER_TEMP/inspection.json" 2> "$RUNNER_TEMP/inspection-error.log" || { echo 'Diagnostic interrompu ; aucune donnée financière publiée dans les logs.'; exit 1; }
+          openssl cms -encrypt -binary -aes-256-cbc -in "$RUNNER_TEMP/inspection.json" -outform DER -out "$RUNNER_TEMP/legacy-portfolios.p7m" scripts/release/legacy-inspection-certificate.pem
+          echo 'Diagnostic en lecture seule terminé et chiffré.'
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
-          name: catalogue-inspection
-          path: ${{ runner.temp }}/catalogue-inspection.json
+          name: encrypted-legacy-portfolios
+          path: ${{ runner.temp }}/legacy-portfolios.p7m
           retention-days: 1
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: always()
-        with:
-          name: financial-preservation
-          path: |
-            ${{ runner.temp }}/etf-*.json
-            ${{ runner.temp }}/financial-*.json
-            ${{ runner.temp }}/account-*.json
-          retention-days: 1
-      - name: Publier le résultat
-        if: always()
-        env:
-          STATUS: ${{ steps.fresh.outputs.stale == 'true' && 'skipped_newer_version' || job.status }}
-          GH_TOKEN: ${{ github.token }}
-        run: bash ops/report-status.sh
-      - name: Retirer la clé du runner
-        if: always()
-        run: rm -f "$RUNNER_TEMP/jigobourso-ssh/key"
