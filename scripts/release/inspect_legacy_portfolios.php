@@ -44,6 +44,11 @@ try {
                 $flags['purchase_cost_matches_record']=abs($expected-$pos['cost'])<1e-6;
                 $f=eur_factor($pos['price_currency'],fx_rates());
                 $flags['FX_has_changed_since_purchase']=$f!==null&&abs($f-(float)$first['fx_to_eur'])>1e-6;
+                $flags['FX_increases_EUR_return']=$f!==null&&$f>(float)$first['fx_to_eur'];
+                $last=q('SELECT close_px FROM daily_prices WHERE listing_id=? AND price_date=?',[(int)$pos['listing_id'],$month['end']])->fetch();
+                $flags['valuation_quote_matches_market_end_close']=$last&&abs((float)$pos['price']-(float)$last['close_px'])<1e-5;
+                $usd=100*((float)$pos['price']/(float)$first['unit_price']-1);
+                $flags['USD_purchase_return_is_lower_than_personal_EUR_return']=$usd<$pos['unrealized_pct'];
                 $b=q('SELECT close_px FROM daily_prices WHERE listing_id=? AND price_date=?',[(int)$pos['listing_id'],$month['start']])->fetch();
                 $flags['purchase_price_lower_than_month_start']=$b&&(float)$first['unit_price']<(float)$b['close_px'];
             }
