@@ -36,4 +36,4 @@ def test_no_page_loads_the_same_asset_twice():
 def test_page_weight_ceiling():
     """Poids cumulé des scripts et feuilles de style par page : plafond de non-régression (octets non compressés), pas un objectif d'optimisation."""
     heaviest = max(sum(os.path.getsize(os.path.join(PUB, 'assets', a)) for a in files if a in ASSETS) for files in page_assets().values())
-    assert heaviest <= 490_000, heaviest  # 480 000 → 490 000 : matrice groupée pf-dynamics.js et styles du tableau ; aucune dépendance ajoutée.
+    assert heaviest <= 492_000, heaviest  # 490 000 → 492 000 : explications gain personnel / part du gain et détail du prix de revient ; aucune dépendance ajoutée.

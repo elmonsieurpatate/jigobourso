@@ -70,9 +70,10 @@ for(const legacy of [false,true]){
  }
  await page.setViewportSize({width:1440,height:1100});
  await page.waitForTimeout(350);await page.locator('.pfd-table').waitFor({timeout:60000});
- await page.locator('.pfd-cell[role="button"]').first().click();
+ await page.locator('.pfd-cell[role="button"]:not(.pfd-personal)').first().click();
  await page.getByRole('dialog').waitFor();assert.match(await page.getByRole('dialog').innerText(),/Fenêtre précédente/);
  await page.getByRole('button',{name:'Fermer',exact:true}).click();
+ await page.locator('.pfd-personal[role="button"]').first().click();await page.getByRole('dialog').waitFor();assert.match(await page.getByRole('dialog').innerText(),/coût restant/);await page.getByRole('button',{name:'Fermer',exact:true}).click();
 }
 assert.deepEqual(errors,[]);await ctx.close();console.log('Matrice : cash et legacy, onze horizons, tri, quantités restantes, titres vendus, devises, contrastes, 320/390/1440 clair et sombre : OK');
 }finally{await browser.close();}})().catch(e=>{console.error(e);process.exit(1)});
