@@ -2,7 +2,7 @@ name: Tests complets (réutilisable)
 # Les quatre blocs de la recette tournent en parallèle, chacun sur son propre runner et sa propre base jetable (aucune donnée partagée, aucune dépendance d'ordre) :
 #   fast   tests rapides, sans base ni réseau
 #   integ  tests d'intégration sur MariaDB, répartis en N blocs de fichiers (scripts/test_suite.sh integ i/N)
-#   e2e    parcours navigateur, un groupe indépendant par job (scripts/e2e_browser.sh core|plan|portfolio)
+#   e2e    parcours navigateur, un groupe indépendant par job (scripts/e2e_browser.sh core|pages|plan|portfolio)
 # Le verdict publié sur la branche deployment-status l'est par deploy.yml (job tests_status) : un workflow appelé ne peut pas obtenir plus de droits que son appelant, et la PR n'a que contents:read.
 # Aucun test n'est supprimé, ignoré ni relancé automatiquement : un échec reste un échec (fail-fast désactivé pour les voir tous en une seule exécution).
 on:
@@ -92,7 +92,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        group: [core, plan, portfolio]
+        group: [core, pages, plan, portfolio]
     services:
       mariadb:
         image: mariadb:10.11

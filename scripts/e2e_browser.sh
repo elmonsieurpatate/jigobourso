@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
 # Point d'entrée unique des parcours navigateur actifs de la CI sur la base jetable jigobourso_it.
 # Prérequis : `make db-reset`, playwright-core (PLAYWRIGHT_MODULE) et un Chromium (JIGO_CHROMIUM). Même enchaînement que .github/workflows/ci.yml.
-# Usage : scripts/e2e_browser.sh [core|plan|portfolio|all]  (défaut : all, en série comme avant).
-# Les trois groupes sont indépendants : plan et portfolio repartent d'une base remise à zéro par leur propre graine (tests/dbutil.reset_data) et créent leurs utilisateurs ;
+# Usage : scripts/e2e_browser.sh [core|pages|plan|portfolio|all]  (défaut : all, en série comme avant).
+# Les quatre groupes sont indépendants (core et pages partagent les mêmes graines, créées par chacun sur sa base ; aucun ne dépend de l'état laissé par l'autre) : plan et portfolio repartent d'une base remise à zéro par leur propre graine (tests/dbutil.reset_data) et créent leurs utilisateurs ;
 # la CI les lance donc en parallèle, chacun sur sa propre base jetable. `all` reste l'enchaînement historique.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 group=${1:-all}
-case "$group" in core|plan|portfolio|all) ;; *) echo 'Usage: scripts/e2e_browser.sh [core|plan|portfolio|all]' >&2; exit 2 ;; esac
+case "$group" in core|pages|plan|portfolio|all) ;; *) echo 'Usage: scripts/e2e_browser.sh [core|pages|plan|portfolio|all]' >&2; exit 2 ;; esac
 want() { [ "$group" = all ] || [ "$group" = "$1" ]; }
 export PATH="$PWD/.venv/bin:$PATH" JIGO_TEST_DATABASE=1 JIGO_DB_HOST=127.0.0.1 JIGO_DB_PORT="${JIGO_DB_PORT:-33307}" JIGO_DB_NAME=jigobourso_it JIGO_DB_USER=root JIGO_DB_PASSWORD=local-test-only
 export JIGO_PYTHON="$(command -v python)" JIGO_ENGINE_ROOT="$PWD" PYTHONPATH="$PWD"
 : "${PLAYWRIGHT_MODULE:?chemin de playwright-core}" "${JIGO_CHROMIUM:?chemin de Chromium}"
 export JIGO_TEST_MAIL_DIR="${JIGO_TEST_MAIL_DIR:-$(mktemp -d)}"; install -d -m 700 "$JIGO_TEST_MAIL_DIR"
-if want core; then
+if want core || want pages; then
   python tests/seeds/account_seed.py > /dev/null
   php scripts/create_user.php review_user review-local-password --admin --email=review@example.test > /dev/null
   php scripts/create_user.php plain_user plain-local-password --email=plain@example.test > /dev/null
@@ -34,6 +34,9 @@ export BASE=http://127.0.0.1:18089
 run personal-filters timeout 120s node tests/e2e/personal-filters.cjs
 run scores-preview timeout 120s node tests/e2e/scores-preview.cjs
 run financial timeout 180s node tests/e2e/financial.cjs
+fi
+if want pages; then
+export BASE=http://127.0.0.1:18089
 run catalogue-search node tests/e2e/catalogue-search.cjs
 run explorer-hidden-search node tests/e2e/explorer-hidden-search.cjs
 run keyboard node tests/e2e/keyboard.cjs

@@ -9,9 +9,9 @@ Deux workflows réutilisables, appelés à l'identique par `deploy.yml` (main) e
 | Workflow | Contenu | Durée mesurée |
 |---|---|---|
 | `quality.yml` (job `syntax`) | ruff, formatage, PHP, JS, CSS, migrations — Python 3.9 comme la production | 15–25 s |
-| `tests.yml` (job `tests`) | `fast`, `integ` en 2 blocs, `e2e` en 3 groupes (`core`, `plan`, `portfolio`) : **tous en parallèle**, chacun sur son runner et sa base jetable ; puis `verdict` (main seulement) | durée du plus long bloc au lieu de la somme |
+| `tests.yml` (job `tests`) | `fast`, `integ` en 2 blocs, `e2e` en 4 groupes (`core`, `pages`, `plan`, `portfolio`) : **tous en parallèle**, chacun sur son runner et sa base jetable ; puis `verdict` (main seulement) | durée du plus long bloc au lieu de la somme |
 
-`syntax` et `tests` démarrent ensemble ; `hostinger` attend les deux (portes testées dans `tests/fast/test_deploy_modes.py`). Aucun test n'est relancé automatiquement et fail-fast est désactivé : un échec réel reste visible, et tous les échecs apparaissent en une exécution. Le découpage de l'intégration (`scripts/integ_shards.py`) est vérifié par `tests/fast/test_integ_shards.py` : aucun fichier perdu ni dupliqué. Les groupes navigateur sont indépendants (`scripts/e2e_browser.sh core|plan|portfolio|all`, `all` = enchaînement historique en série pour le poste local).
+`syntax` et `tests` démarrent ensemble ; `hostinger` attend les deux (portes testées dans `tests/fast/test_deploy_modes.py`). Aucun test n'est relancé automatiquement et fail-fast est désactivé : un échec réel reste visible, et tous les échecs apparaissent en une exécution. Le découpage de l'intégration (`scripts/integ_shards.py`) est vérifié par `tests/fast/test_integ_shards.py` : aucun fichier perdu ni dupliqué. Les groupes navigateur sont indépendants (`scripts/e2e_browser.sh core|pages|plan|portfolio|all`, `all` = enchaînement historique en série pour le poste local).
 
 **Garde contre un déploiement obsolète** : avant de déployer, le job `hostinger` vérifie qu'aucune exécution `push` plus récente de `main` n'est en attente, en cours ou réussie ; sinon il ne déploie pas (statut `skipped_newer_version`). Une exécution plus récente en échec ne bloque pas : cette version, déjà validée, reste déployable. La concurrence du workflow (`hostinger-jigobourso-production`) garantit en outre un seul déploiement à la fois.
 

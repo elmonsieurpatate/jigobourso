@@ -92,7 +92,7 @@ bruts, chemins privés ou versions des paquets.
 
 ## Barrières PR/main après audit
 
-`validate_quality.sh`, `test_suite.sh` (blocs `integ i/n`) et `e2e_browser.sh` (groupes `core|plan|portfolio`) sont les points d’entrée
+`validate_quality.sh`, `test_suite.sh` (blocs `integ i/n`) et `e2e_browser.sh` (groupes `core|pages|plan|portfolio`) sont les points d’entrée
 communs aux deux workflows. Ruff, formatage, construction CSS synchronisée,
 frontières Halo, tests non sautés et parcours actifs sont ainsi exécutés avant
 fusion. Le workflow PR conserve contents:read et ne reçoit aucun secret de production.
