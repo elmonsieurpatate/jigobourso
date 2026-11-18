@@ -14,10 +14,33 @@ $rows = q("SELECT r.symbol, r.mic, r.isin, r.name, r.group_key, r.removed_step, 
            ORDER BY r.group_key, r.mic, r.symbol LIMIT 100", [$term, $term])->fetchAll();
 require_once getcwd() . '/app/services/explore_actions.php';
 $lookups = [];
+$timings = [];
 foreach (array_slice(array_unique(array_merge([$term], array_column($rows, 'symbol'))), 0, 12) as $symbol) {
+    $started = microtime(true);
     $lookups[$symbol] = array_map(function ($r) {
         return ['id' => $r['id'], 'symbol' => $r['symbol'], 'status' => $r['status'],
                 'in_catalogue' => $r['in_catalogue'] ?? null, 'primary' => $r['primary'] ?? null];
     }, listings_search(['q' => $symbol])['results']);
+    $timings[$symbol] = round(microtime(true) - $started, 4);
 }
-echo json_encode(['catalogue_query' => $term, 'rows' => $rows, 'lookups' => $lookups], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT) . "\n";
+$primaryIds = array_unique(array_filter(array_column($rows, 'primary_id')));
+$stored = [];
+foreach ($primaryIds as $id) {
+    $stored[$id] = [
+        'series' => q('SELECT closes_count,last_close_date,quality FROM series_state WHERE listing_id=?', [$id])->fetch(),
+        'metrics' => q('SELECT sessions,slope,r2,coverage,observations,expected_closes FROM strategy_metrics WHERE listing_id=? ORDER BY sessions', [$id])->fetchAll(),
+        'inputs' => q('SELECT sessions FROM score_inputs WHERE listing_id=? ORDER BY sessions', [$id])->fetchAll(),
+    ];
+}
+// Appel réellement utilisé par Actions/ETF, borné pour ne pas immobiliser le diagnostic.
+putenv('JIGO_ENGINE_TIMEOUT=20');
+$started = microtime(true);
+try {
+    $titles = engine_call('titles', ['q' => $term]);
+    $titlesProbe = ['total' => $titles['total'], 'returned' => count($titles['rows']),
+        'matching_isin' => count(array_filter($titles['rows'], fn($r) => ($r['isin'] ?? '') === $term))];
+} catch (Throwable $e) {
+    $titlesProbe = ['error' => $e->getMessage()];
+}
+$titlesProbe['seconds'] = round(microtime(true) - $started, 4);
+echo json_encode(['catalogue_query' => $term, 'rows' => $rows, 'lookups' => $lookups, 'lookup_seconds' => $timings, 'stored' => $stored, 'titles_probe' => $titlesProbe], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT) . "\n";
