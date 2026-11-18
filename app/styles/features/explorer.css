@@ -427,9 +427,6 @@
   .ct-strategy .ct-provisional {
     font-size: var(--fs-11);
   }
-  .ct-period label {
-    font-size: 0;
-  }
 } /* Mobile : réglages encore plus denses (valeur sur la ligne du titre, aide discrète). */
 @media (max-width: 760px) {
   .ct-strategy label {

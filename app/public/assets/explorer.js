@@ -405,6 +405,14 @@
     chart();
     preview();
   }
+  function showAddedPeriod(id) {
+    const label = periods.find(([key]) => key === id)[1];
+    $("#ct-period-feedback").textContent =
+      `${label} : période ajoutée et activée. Ses réglages sont affichés ci-dessous. Pensez à enregistrer la stratégie.`;
+    const button = $("#ct-periods").querySelector(`[data-period="${id}"]`);
+    button.focus({ preventScroll: true });
+    button.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "instant" });
+  }
   function renderExpert() {
     $("#ct-rules").innerHTML = V.rulesHtml(tree());
     preview();
@@ -962,6 +970,7 @@
         state.selected = id;
         renderSimple();
         renderExpert();
+        showAddedPeriod(id);
       }
     } else if (b.dataset.addCustom) {
       const n = Number($("#ct-custom-sessions").value);
@@ -977,6 +986,7 @@
         state.selected = id;
         renderSimple();
         renderExpert();
+        showAddedPeriod(id);
       }
     } else if (b.dataset.removeCustom) {
       const id = b.dataset.removeCustom;

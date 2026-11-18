@@ -31,12 +31,12 @@ window.ExplorerView = (() => {
           `<div class="ct-period ${c.periods[k].enabled ? "active" : ""} ${selected === k ? "selected" : ""}"><button type="button" data-period="${k}" aria-pressed="${selected === k}">${esc(label)}<small>≈ ${n} séance${n > 1 ? "s" : ""}</small></button><label><input type="checkbox" data-enabled="${k}" ${c.periods[k].enabled ? "checked" : ""}>Activée</label>${k.startsWith("custom_") ? `<button type="button" data-remove-custom="${k}" aria-label="Supprimer cette période">×</button>` : ""}</div>`,
       )
       .join("") +
-    `<div class="ct-period"><select id="ct-add-period" aria-label="Ajouter une période prédéfinie">${periods
+    `<div class="ct-period-add"><div class="ct-period-add-row"><label for="ct-add-period">Période prédéfinie</label><select id="ct-add-period" aria-label="Ajouter une période prédéfinie">${periods
       .filter(([k]) => !c.periods[k]?.enabled && k !== selected && !k.startsWith("custom_"))
       .map(([k, label, n]) => `<option value="${k}">${esc(label)} (${n} séances)</option>`)
       .join(
         "",
-      )}</select><button type="button" data-add-period="1">Ajouter</button><input id="ct-custom-sessions" type="number" min="3" max="1260" step="1" placeholder="Séances" aria-label="Durée personnalisée en séances"><button type="button" data-add-custom="1">Créer</button></div>`;
+      )}</select><button type="button" class="btn" data-add-period="1" ${periods.some(([k]) => !c.periods[k]?.enabled && k !== selected && !k.startsWith("custom_")) ? "" : "disabled"}>Ajouter</button></div><div class="ct-period-add-row"><label for="ct-custom-sessions">Période personnalisée (séances)</label><input id="ct-custom-sessions" type="number" min="3" max="1260" step="1" placeholder="Séances" aria-label="Durée personnalisée en séances"><button type="button" class="btn" data-add-custom="1">Créer</button></div><p id="ct-period-feedback" class="ct-note" role="status" aria-live="polite"></p></div>`;
   const SLIDERS_DAY = [
     [
       "return",

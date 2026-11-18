@@ -50,6 +50,34 @@
 }
 .ct-period {
   position: relative;
+  min-width: 0;
+}
+.ct-period-add {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-12);
+  min-width: 0;
+}
+.ct-period-add-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--sp-8);
+  align-items: end;
+}
+.ct-period-add-row label {
+  grid-column: 1 / -1;
+}
+.ct-period-add-row select,
+.ct-period-add-row input {
+  width: 100%;
+}
+.ct-period-add > p {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+.ct-period-add > p:empty {
+  display: none;
 }
 .ct-period button {
   display: block;
@@ -1298,23 +1326,20 @@
     padding: 0 var(--sp-12) var(--sp-10);
     gap: var(--sp-6);
   }
+  .ct-period-add {
+    grid-template-columns: minmax(0, 1fr);
+  }
   .ct-period {
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 var(--sp-6) 0 0;
+    flex-direction: column;
+    align-items: stretch;
   }
   .ct-period button {
-    text-align: left;
-    width: auto;
-    flex: 1;
-  }
-  .ct-period button small {
-    display: none;
+    width: 100%;
+    min-width: 0;
   }
   .ct-period label {
-    padding: 0;
-    gap: 0;
+    padding: 0 var(--sp-6) var(--sp-8);
+    gap: var(--sp-6);
   }
   .ct-period label input {
     margin: 0;
@@ -1384,14 +1409,14 @@
   .ct-control > label {
     grid-column: 1/-1;
     grid-row: 1;
-    padding-right: 90px;
+    min-width: 0;
   }
   .ct-control .ct-slider-row {
     display: contents;
   }
   .ct-control .ct-number {
     grid-column: 1/-1;
-    grid-row: 1;
+    grid-row: 2;
     justify-self: end;
     display: flex;
     align-items: center;
