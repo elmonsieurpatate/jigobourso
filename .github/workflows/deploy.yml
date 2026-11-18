@@ -9,7 +9,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - name: Lecture seule et chiffrement du diagnostic
+      - name: Diagnostic limité en lecture seule
         env:
           DEPLOY_KEY: ${{ secrets.HOSTINGER_SSH_PRIVATE_KEY }}
         run: |
@@ -19,10 +19,5 @@ jobs:
           printf '%s\n' "$DEPLOY_KEY" > "$RUNNER_TEMP/inspection-key"
           printf '%s\n' '[147.79.103.168]:65002 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAr7QtJ399JQsqSyH2cDwi5RUdPt5VVTateWLrGAKuVE' > "$RUNNER_TEMP/inspection-hosts"
           ssh -F /dev/null -p 65002 -i "$RUNNER_TEMP/inspection-key" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$RUNNER_TEMP/inspection-hosts" -o ConnectTimeout=20 u381524662@147.79.103.168 'cd /home/u381524662/domains/jigobourso.turnjoy.dev/jigobourso-v2 && php' < scripts/release/inspect_legacy_portfolios.php > "$RUNNER_TEMP/inspection.json" 2> "$RUNNER_TEMP/inspection-error.log" || { echo 'Diagnostic interrompu ; aucune donnée financière publiée dans les logs.'; exit 1; }
-          openssl cms -encrypt -binary -aes-256-cbc -in "$RUNNER_TEMP/inspection.json" -outform DER -out "$RUNNER_TEMP/legacy-portfolios.p7m" scripts/release/legacy-inspection-certificate.pem
-          echo 'Diagnostic en lecture seule terminé et chiffré.'
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
-        with:
-          name: encrypted-legacy-portfolios
-          path: ${{ runner.temp }}/legacy-portfolios.p7m
-          retention-days: 1
+          cat "$RUNNER_TEMP/inspection.json"
+          echo 'Diagnostic terminé : uniquement des booléens, aucun montant ni transaction exporté.'
