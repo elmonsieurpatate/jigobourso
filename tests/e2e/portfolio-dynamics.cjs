@@ -26,6 +26,16 @@ for(const legacy of [false,true]){
  assert.equal(api.listings['1003'].currency,'USD');
  await page.locator('[data-sort="market:1d"]').click();assert.equal(await page.locator('.pfd-table th[aria-sort="descending"]').count(),1);
  assert.equal(await page.locator('.pfd-table thead th').count(),13);
+ if(!legacy){
+  const missing=await page.evaluate(async id=>{
+    const P=await J.api('portfolio/performance',{params:{id}});
+    for(const key of ['value','securities','gain','latent'])P.chart.full[key][P.chart.full[key].length-1]=null;
+    const html=PFPerf2.money(P,{inc:0,soc:0});
+    const doc=new DOMParser().parseFromString(html,'text/html');
+    return [...doc.querySelectorAll('.pf-kpis .v')].map(e=>e.textContent.trim());
+  },pf.id);
+  assert.equal(missing[2],'–');assert.equal(missing[3],'–');
+ }
  if(!legacy){assert.equal(await page.locator('.pf-kpis .metric').count(),4);const labels=await page.locator('.pf-kpis .l').allTextContents();assert.deepEqual(labels,['Capital net apporté','Liquidités','Valeur des actions','Gain total']);}
  for(const theme of ['light','dark'])for(const width of [320,390,1440]){
   await page.setViewportSize({width,height:1100});await page.waitForTimeout(350);await page.locator(".pfd-table").waitFor({timeout:60000});await page.evaluate(t=>{document.documentElement.dataset.theme=t;J.store.set('jigo_theme',t);},theme);

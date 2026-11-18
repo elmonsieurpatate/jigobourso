@@ -35,20 +35,21 @@
   const metric = (label, value, sub, tone = "") =>
     `<div class="metric"><span class="l">${label}</span><div class="v ${tone}">${value}</div><span class="s">${sub}</span></div>`;
   function money(P, tax) {
+    const current = (a) => a?.[a.length - 1] ?? null;
     const F = P.chart.full,
       s = P.summary || {},
-      value = last(F.value),
-      cash = last(F.cash),
-      sec = last(F.securities),
-      gain = last(F.gain),
-      real = last(F.realized),
-      lat = last(F.latent),
-      c = last(F.twr.central),
-      lo = last(F.twr.low),
-      hi = last(F.twr.high),
+      value = current(F.value),
+      cash = current(F.cash),
+      sec = current(F.securities),
+      gain = current(F.gain),
+      real = current(F.realized),
+      lat = current(F.latent),
+      c = current(F.twr.central),
+      lo = current(F.twr.low),
+      hi = current(F.twr.high),
       est = F.estimated.filter(Boolean).length,
       mwr = P.mwr && isNum(P.mwr.period) ? P.mwr.period : null,
-      cap = last(P.net_contributions),
+      cap = current(P.net_contributions),
       net = isNum(gain) ? gain - tax.inc - tax.soc : null,
       taxTotal = tax.inc + tax.soc;
     const share =
