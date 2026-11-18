@@ -20,8 +20,8 @@ const PERIODS = ['1d', '2d', '5d', '1w', '2w', '1m', '3m', '6m', '1y', '2y', '3y
       const settle = async () => { await page.waitForFunction(() => !document.querySelector('#pfc-plot.loading') && document.querySelector('#pfc-plot svg,#pfc-plot .px-empty')); };
       // deux zones, ordre de la vue d'ensemble
       assert.deepEqual(await page.locator('.px-zones button').allInnerTexts(), ['Vue d’ensemble', 'Transactions']);
-      const order = await page.evaluate(() => ['.px-zones', '.px-syn', '.pf-dynamics', '#pfc-card', '.px-t'].map(s => document.querySelector(s).getBoundingClientRect().top));
-      assert.deepEqual(order, [...order].sort((x, y) => x - y), 'ordre : zones, synthèse, alertes, graphique, positions');
+      const order = await page.evaluate(() => ['.px-zones', '.px-syn', '#pfc-card', '.pf-dynamics', '.px-t'].map(s => document.querySelector(s).getBoundingClientRect().top));
+      assert.deepEqual(order, [...order].sort((x, y) => x - y), 'ordre : zones, bilan, graphique, performances, positions');
       await settle(); await noOverflow('overview'); await shot('overview');
       // thème : les cartes suivent les variables du thème (pas de fond forcé)
       const bg = () => page.evaluate(() => getComputedStyle(document.querySelector('.px-card')).backgroundColor);

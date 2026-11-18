@@ -268,3 +268,8 @@ body .ct .ct-group-operator select {
 .pfd-table .pfd-personal {
   border-right: 2px solid var(--line);
 }
+
+.pfd-cell .pfd-dynamic {
+  margin-top: var(--sp-4);
+  padding: var(--sp-2) var(--sp-4);
+}

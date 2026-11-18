@@ -15,6 +15,8 @@ for(const legacy of [false,true]){
  assert.equal(await page.locator('.pfd-table thead th').count(),13);
  assert.deepEqual(await page.locator('.pfd-table thead th').allTextContents().then(a=>a.slice(2).map(x=>x.trim())),['1J','2J','3J','1S','2S','1M','3M','6M','1A','2A','4A']);
  assert.equal(await page.locator('.pfd-table tbody tr').count(),5);
+ const contribution=page.locator('.px-card').filter({has:page.getByRole('heading',{name:'Contribution au résultat',exact:true})});
+ assert((await contribution.boundingBox()).y<(await page.locator('.pf-dynamics').boundingBox()).y,'Performances après la contribution');
  const text=await page.locator('.pfd-table').innerText(); assert(!text.includes('GIBO')&&!text.includes('DXC'));
  if(legacy){await page.locator('#pfc-plot .fc-plot').waitFor();assert.match(await page.locator('#px-page').innerText(),/Vue temporaire modernisée/);assert.equal(await page.locator('.px-top [data-k="per"] button').count(),15);assert.equal(await page.locator('.pf-kpis').count(),0);}
  const raw=await (await ctx.request.get(BASE+'/api.php?r=portfolio&id='+pf.id)).json();
@@ -48,12 +50,22 @@ for(const legacy of [false,true]){
   await page.locator('.pfd-scroll').evaluate(el=>el.scrollLeft=350);
   const fixed=await row.locator('.pfd-title').boundingBox();const spacing=await page.locator('.pfd-table').evaluate(e=>parseFloat(getComputedStyle(e).borderSpacing));assert(Math.abs(first.x-fixed.x)<=spacing+1,'Nom non figé');
   await page.locator('.pfd-scroll').evaluate(el=>el.scrollLeft=0);
+  // Deux signaux opposés dans une même cellule : fond de performance et pastille de dynamique.
+  await page.evaluate(()=>{
+   const heats=['gain-strong','gain','gain-soft','neutral','loss-soft','loss-strong'],returns=[4,2,.5,0,-1,-4];
+   const cells=Object.fromEntries(heats.map((h,i)=>['c'+i,{return:returns[i],previous:0,delta:i===0?-2:1,heat:h,arrow:i===0?'down':'up',neutral_points:.1,start:'2026-11-16',end:'2026-11-17',previous_start:'2026-11-13'}]));
+   const data={horizons:heats.map((_,i)=>({key:'c'+i,label:'Test '+i,group:'short'})),listings:{1:{cells,currency:'EUR',basis:'adjusted'}}};
+   const fixture=document.createElement('div');fixture.id='pfd-colour-fixture';fixture.innerHTML=PFDynamics.html(data,[{listing_id:1,symbol:'Styles de démonstration',qty:1,unrealized:0,unrealized_pct:0}],null,{key:'title',dir:'asc'});document.body.append(fixture);
+  });
+  const signals=await page.locator('#pfd-colour-fixture .pfd-cell:not(.pfd-personal)').evaluateAll(els=>els.map(e=>({heat:getComputedStyle(e).backgroundColor,ink:getComputedStyle(e).color,dynamic:getComputedStyle(e.querySelector('.pfd-dynamic')).color})));
+  assert.notEqual(signals[0].dynamic,signals[4].dynamic,'Dynamique négative et positive : couleurs distinctes');
+  assert.notEqual(signals[0].ink,signals[0].dynamic,'Gain et dynamique inverse indépendants');
   // Vérification du contraste calculé des six nuances avec le texte du thème.
-  const contrast=await page.locator('.pfd-legend span').evaluateAll(els=>{
+  const contrast=await page.locator('.pfd-legend span,#pfd-colour-fixture .pfd-cell:not(.pfd-personal),#pfd-colour-fixture .pfd-dynamic').evaluateAll(els=>{
    const rgb=s=>{const canvas=document.createElement('canvas');canvas.width=canvas.height=1;const c=canvas.getContext('2d');c.fillStyle=s;c.fillRect(0,0,1,1);return [...c.getImageData(0,0,1,1).data].slice(0,3).map(x=>x/255);};
    const lum=s=>rgb(s).map(x=>x<=.04045?x/12.92:((x+.055)/1.055)**2.4).reduce((n,x,i)=>n+x*[.2126,.7152,.0722][i],0);
    return els.map(el=>{const s=getComputedStyle(el),a=lum(s.color),b=lum(s.backgroundColor);return(Math.max(a,b)+.05)/(Math.min(a,b)+.05)});
-  });assert(contrast.every(x=>x>=4.5),'Contrastes '+contrast);
+  });assert(contrast.every(x=>x>=4.5),'Contrastes '+contrast);await page.locator('#pfd-colour-fixture').evaluate(e=>e.remove());
   if(OUT){fs.mkdirSync(OUT,{recursive:true});await page.screenshot({path:`${OUT}/matrix-${legacy?'legacy':'cash'}-${width}-${theme}.png`,fullPage:true});await page.locator('.pf-dynamics').screenshot({path:`${OUT}/table-${legacy?'legacy':'cash'}-${width}-${theme}.png`});}
  }
  await page.setViewportSize({width:1440,height:1100});
