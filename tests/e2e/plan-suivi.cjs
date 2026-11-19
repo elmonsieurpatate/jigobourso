@@ -24,23 +24,23 @@ const text = s => s.replace(/\s+/g, ' ').trim();
         assert.ok(Math.abs(st.positions[String(ml.listing_id)].prices.pru - 120) < 1e-9, 'jauge MULTILOT : 120 €'); }
       // 1. navigation : deux zones, plus d'onglet Positions ni Surveillance, plus d'entrée « Alertes »
       assert.deepEqual(await page.locator('.px-zones button').allInnerTexts(), ['Vue d’ensemble', 'Transactions']);
-      await page.waitForFunction(() => !/Chargement/.test(document.querySelector('.px-sum').innerText)); await noOverflow('overview');
+      await page.waitForFunction(() => document.querySelector('#px-sec-suivi .psr-sum') && !/Chargement/.test(document.querySelector('#px-sec-suivi').innerText)); await noOverflow('overview');
       assert.equal(await page.locator('a[href="alertes.html"]').count(), 0, 'plus de lien vers le Centre d’alertes');
-      assert.match(await page.locator('.px-sum').innerText(), /Synthèse du suivi/); assert.match(await page.locator('#px-sec-suivi h2').innerText(), /Suivi des positions/); assert.doesNotMatch(await page.locator('body').innerText(), /Surveillance/);
+      assert.match(await page.locator('#px-sec-suivi .psr-sum').innerText(), /(à surveiller|à conserver|à réévaluer|sortie à envisager)/); assert.match(await page.locator('#px-sec-suivi h2').innerText(), /Suivi des positions/); assert.doesNotMatch(await page.locator('body').innerText(), /Surveillance/);
       // 2. la liste des positions : toutes les positions ouvertes (plus de limite à 8), colonnes inchangées sauf « Suivi »
       const heads = (await page.locator('.px-t thead th').allInnerTexts()).map(t => t.replace(/[▲▼]/g, '').trim().toLowerCase());
-      assert.deepEqual(heads, ['titre', 'valeur', 'gain/perte', 'rendement', 'contribution', 'poids', 'stratégie', 'suivi', 'actions']);
-      assert.equal(await page.locator('.px-t tbody tr').count(), 25, '25 positions ouvertes');
+      assert.deepEqual(heads, ['titre', 'quantité', 'pru', 'cours actuel', 'valeur', 'gain / perte', 'rendement', 'poids', 'actions']);
+      assert.equal(await page.locator('.px-t tbody tr').count(), 26, '25 positions ouvertes et 1 soldée (filtre « Toutes »)');
+      await page.locator('[data-afilter="held"]').first().click(); assert.equal(await page.locator('.px-t tbody tr').count(), 25, '25 positions ouvertes (filtre « Détenues »)');
       assert.equal(await page.locator('.px-more').count(), 0);
-      const closedBox = page.locator('#px-closed'); assert.equal(await closedBox.count(), 1, 'positions soldées : case dans la Vue d’ensemble');
-      await closedBox.check(); assert.equal(await page.locator('.px-t tbody tr').count(), 26); await page.locator('#px-closed').uncheck();
-      assert.ok(await page.locator('#px-main-box').count(), 'graphique conservé');
+      await page.locator('[data-afilter="sold"]').first().click(); assert.equal(await page.locator('.px-t tbody tr').count(), 1, 'positions soldées : filtre « Vendues » dans la Vue d’ensemble'); await page.locator('[data-afilter="all"]').first().click();
+      assert.ok(await page.locator('#pfc-box').count(), 'graphique conservé');
       await shot('overview');
 
       // 3. « Suivi des positions » : sous le tableau, une ligne par position ouverte, toutes visibles sans ouvrir de détail
       const sec = page.locator('#px-sec-suivi'); await sec.locator('.psr').first().waitFor();
       assert.equal(await sec.locator('.psr').count(), 25, 'une ligne par position ouverte');
-      assert.equal(await page.evaluate(() => { const p = document.querySelector('#px-sec-positions'), s = document.querySelector('#px-sec-suivi'); return !!(p.compareDocumentPosition(s) & Node.DOCUMENT_POSITION_FOLLOWING); }), true, 'Suivi des positions sous le tableau Positions');
+      assert.equal(await page.evaluate(() => { const p = document.querySelector('.px-t'), s = document.querySelector('#px-sec-suivi'); return !!(p.compareDocumentPosition(s) & Node.DOCUMENT_POSITION_FOLLOWING); }), true, 'Suivi des positions sous le tableau « Mes actions »');
       { const tops = await sec.locator('.psr').evaluateAll(els => els.map(e => Math.round(e.getBoundingClientRect().top))); assert.equal(new Set(tops).size, tops.length, 'jamais deux positions sur la même ligne'); }
       const row = sym => sec.locator(`.psr:has(.psr-name b:text-is("${sym}"))`);
       const adv = async sym => text(await row(sym).evaluate(e => (e.querySelector('.psr-adv').textContent + ' ' + e.querySelector('.psr-more').textContent)));
@@ -74,15 +74,14 @@ const text = s => s.replace(/\s+/g, ' ').trim();
       const close = async () => { await page.locator('.px-dact [data-close]').click(); await page.locator('.px-drawer').waitFor({ state: 'detached' }); };
       for (const sym of ['GIBO', 'LOSSPERS', 'MULTIRULE', 'RISEUP', 'SHORT']) { const a = (await adv(sym)).replace(/Explication et détails[\s\S]*/, '').replace(/Configurer/, '').trim(); await detail(sym); const d = text(await page.locator('.ps-card .ps-advice, .ps-card .psr-adv, .ps-card [class*=adv]').first().innerText());
         const head = a.split(/\s{1}/).slice(0, 8).join(' '); assert.ok(d.toLowerCase().includes(head.slice(0, 40).toLowerCase()), `ligne et détail alignés ${sym} : « ${head} » / « ${d.slice(0, 100)} »`); await noOverflow('détail ' + sym); await close(); }
-      // 7. repli indépendant des deux sections : le repli masque seulement l'affichage, le contenu reste intact
+      // 7. repli de « Suivi des positions » : le repli masque seulement l'affichage, le contenu reste intact (le tableau « Mes actions » n'est plus repliable)
       const foldBtn = n => page.locator(`[data-fold="${n}"]`);
-      assert.equal(await foldBtn('suivi').getAttribute('aria-expanded'), 'true'); assert.equal(await foldBtn('positions').getAttribute('aria-expanded'), 'true');
-      await foldBtn('suivi').click(); assert.equal(await foldBtn('suivi').getAttribute('aria-expanded'), 'false'); assert.equal(await page.locator('#px-fb-suivi').isVisible(), false); assert.equal(await page.locator('#px-fb-positions').isVisible(), true, 'Positions indépendante');
-      await foldBtn('positions').click(); assert.equal(await page.locator('#px-fb-positions').isVisible(), false); assert.equal(await foldBtn('suivi').getAttribute('aria-expanded'), 'false');
-      assert.ok(await page.locator('#px-main-box').count(), 'graphique intact après repli'); await page.reload(); await page.locator('.px-zones').waitFor();
-      assert.equal(await foldBtn('positions').getAttribute('aria-expanded'), 'false', 'état mémorisé (Positions)'); assert.equal(await foldBtn('suivi').getAttribute('aria-expanded'), 'false', 'état mémorisé (Suivi)');
-      await foldBtn('positions').click(); await foldBtn('suivi').click(); await page.locator('#px-sec-suivi .psr').first().waitFor();
-      assert.equal(await page.locator('.px-t tbody tr').count(), 25, 'tableau Positions inchangé après repli/dépli'); assert.equal(await sec.locator('.psr').count(), 25);
+      assert.equal(await foldBtn('suivi').getAttribute('aria-expanded'), 'true'); assert.equal(await foldBtn('positions').count(), 0, 'plus de section « Positions » repliable');
+      await foldBtn('suivi').click(); assert.equal(await foldBtn('suivi').getAttribute('aria-expanded'), 'false'); assert.equal(await page.locator('#px-fb-suivi').isVisible(), false); assert.equal(await page.locator('.px-t').isVisible(), true, 'Mes actions reste affiché');
+      assert.ok(await page.locator('#pfc-box').count(), 'graphique intact après repli'); await page.reload(); await page.locator('.px-zones').waitFor();
+      assert.equal(await foldBtn('suivi').getAttribute('aria-expanded'), 'false', 'état mémorisé (Suivi)');
+      await foldBtn('suivi').click(); await page.locator('#px-sec-suivi .psr').first().waitFor();
+      assert.equal(await page.locator('.px-t tbody tr').count(), 26, 'tableau Mes actions inchangé après repli/dépli'); assert.equal(await sec.locator('.psr').count(), 25);
       // 8. dialogue Configurer : valeurs automatiques à côté des personnalisées, règle par règle
       const cfg = async sym => { await row(sym).locator('[data-ps-cfg]').click(); await page.locator('dialog [data-rule="stop"]').waitFor(); };
       const save = async () => { await page.locator('dialog .btn.primary').click(); await page.waitForFunction(() => !document.querySelector('dialog[open]')); await page.waitForTimeout(400); await sec.locator('.psr').first().waitFor(); };
@@ -115,7 +114,7 @@ const text = s => s.replace(/\s+/g, ' ').trim();
       await page.locator('.px-tabs2 [data-tab="chiffres"]').click(); await page.locator('.px-tech summary').click(); assert.equal(await page.locator('.px-tech [data-lot]').count(), 3, 'trois lots restants');
       await page.locator('.px-tech [data-lot]').first().click(); await page.locator('dialog #lt-st').waitFor(); assert.doesNotMatch(await page.locator('dialog').innerText(), /Désactiver les alertes/); for (const id of ['#lt-days', '#lt-drop']) assert.equal(await page.locator('dialog ' + id).count(), 1);
       await page.locator('dialog button:has-text("Annuler")').click(); await page.waitForFunction(() => !document.querySelector('dialog[open]')); await close();
-      await page.locator('.px-t tbody tr:has(.c-title b:text-is("DEEP140")) .px-w').click(); await page.locator('.ps-card').waitFor(); await close();
+      await page.locator('.px-t tbody tr:has(.c-title b:text-is("DEEP140")) .c-title').click(); await page.locator('.px-drawer').waitFor(); await page.locator('.px-tabs2 [data-tab="suivi"]').click(); await page.locator('.ps-card').waitFor(); await close();
       // 11. thème sombre / clair : contraste des textes du suivi
       for (const theme of ['dark', 'light']) { await page.evaluate(t => { document.documentElement.dataset.theme = t; }, theme);
         const bad = await sec.evaluate(c => { const lum = rgb => { const v = rgb.match(/[\d.]+/g).slice(0, 3).map(Number).map(x => { x /= 255; return x <= .03928 ? x / 12.92 : ((x + .055) / 1.055) ** 2.4; }); return .2126 * v[0] + .7152 * v[1] + .0722 * v[2]; };
