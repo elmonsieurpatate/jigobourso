@@ -554,7 +554,7 @@ body.side-collapsed .side {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.side .nv .chev {
+.side .nv .nv-chev {
   flex: none;
   width: 15px;
   height: 15px;
@@ -563,7 +563,7 @@ body.side-collapsed .side {
   transition: transform 0.2s;
   opacity: 0.7;
 }
-.side .grp.open > .nv .chev {
+.side .grp.open > .nv .nv-chev {
   transform: rotate(90deg);
 }
 .side .nv.on::before,
@@ -577,8 +577,7 @@ body.side-collapsed .side {
 }
 .side .sub {
   display: none;
-  margin: 0 0 var(--sp-6) var(--sp-20);
-  padding-left: var(--sp-12);
+  margin: 0 0 var(--sp-6);
 }
 .side .grp.open > .sub {
   display: block;
@@ -592,22 +591,12 @@ body.side-collapsed .side {
   position: relative;
   display: flex;
   align-items: center;
-  gap: var(--sp-8);
-  padding: var(--sp-8) var(--sp-10);
+  gap: var(--sp-12);
+  padding: var(--sp-6) var(--sp-12);
   margin: var(--sp-2) 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-.side .sv::before {
-  content: "";
-  flex: none;
-  width: 5px;
-  height: 5px;
-  opacity: 0.5;
-}
-.side .sv.on::before {
-  opacity: 1;
 }
 .side .sv .cnt {
   margin-left: auto;
@@ -638,7 +627,7 @@ body.side-collapsed .side {
   display: block;
 }
 body.side-collapsed .side .lbl,
-body.side-collapsed .side .chev,
+body.side-collapsed .side .nv-chev,
 body.side-collapsed .side .sec,
 body.side-collapsed .side .sub,
 body.side-collapsed .side .brand span,
@@ -735,7 +724,7 @@ body.side-collapsed .side-foot .who {
     z-index: var(--z-backdrop);
   }
   body.side-collapsed .side .lbl,
-  body.side-collapsed .side .chev,
+  body.side-collapsed .side .nv-chev,
   body.side-collapsed .side .brand span,
   body.side-collapsed .side .who span,
   body.side-collapsed .side .who b {

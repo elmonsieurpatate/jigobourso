@@ -50,7 +50,7 @@
   fill: none;
   stroke: currentColor;
 }
-.side .nv .chev {
+.side .nv .nv-chev {
   fill: none;
   stroke: currentColor;
 }
@@ -68,9 +68,6 @@
 .side .grp.cur > .nv svg.ic {
   color: var(--side-active-ink);
 }
-.side .sub {
-  border-left: 1px solid var(--side-line);
-}
 .side .sh {
   font-size: var(--fs-10);
   font-weight: 800;
@@ -85,10 +82,6 @@
   font-weight: 500;
   text-decoration: none;
 }
-.side .sv::before {
-  border-radius: 50%;
-  background: currentColor;
-}
 .side .sv:hover {
   background: var(--side-sub-overlay);
   color: var(--on-dark);
@@ -98,9 +91,6 @@
   color: var(--on-dark);
   background: var(--side-sub-hover-overlay);
   font-weight: 700;
-}
-.side .sv.on::before {
-  background: var(--side-active);
 }
 .side .sv .cnt {
   font-size: var(--fs-10);

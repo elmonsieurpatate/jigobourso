@@ -24,9 +24,6 @@
   padding: var(--sp-8) var(--sp-12);
   margin: var(--sp-2) 0;
 }
-.side .sv {
-  padding: var(--sp-6) var(--sp-10);
-}
 .side .nv:hover,
 .side .sv:hover,
 .side-foot .who:hover {
@@ -41,12 +38,6 @@
 }
 .side .nv.on svg.ic,
 .side .grp.cur > .nv svg.ic {
-  color: var(--accent);
-}
-.side .sub {
-  border-left-color: var(--line);
-}
-.side .sv::before {
   color: var(--accent);
 }
 .side .who {
@@ -221,17 +212,9 @@
 .side .sv {
   min-height: 30px;
 }
-.side .sub {
-  margin-left: var(--sp-32);
-  padding-left: 0;
-  border-left: 0;
-}
-.side .sv::before {
-  display: none;
-}
 .side .sv .ico {
   flex: none;
-  width: var(--sp-16);
+  width: var(--sp-20);
   text-align: center;
 }
 .side .sv .ico.dot::before {

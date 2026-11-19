@@ -429,7 +429,7 @@ J.buildShell = function (page, user) {
       if (!n.children)
         return `<a class="nv ${here ? "on" : ""}" href="${n.href}" title="${J.esc(n.label)}">${J.icon(n.icon)}<span class="lbl">${J.esc(n.label)}</span></a>`;
       const open = here;
-      return `<div class="grp ${open ? "open" : ""} ${here ? "cur" : ""}" data-id="${n.id}"><button class="nv" type="button" aria-expanded="${!!open}" title="${J.esc(n.label)}">${J.icon(n.icon)}<span class="lbl">${J.esc(n.label)}</span>${J.icon("chev", "chev")}</button>
+      return `<div class="grp ${open ? "open" : ""} ${here ? "cur" : ""}" data-id="${n.id}"><button class="nv" type="button" aria-expanded="${!!open}" title="${J.esc(n.label)}">${J.icon(n.icon)}<span class="lbl">${J.esc(n.label)}</span>${J.icon("chev", "nv-chev")}</button>
       <div class="sub" data-sub="${n.id}">${n.children.map((c) => (c.head ? `<div class="sh">${J.esc(c.head)}</div>` : `<a class="sv ${here && isOn(c) ? "on" : ""}" href="${c.href}" title="${J.esc(c.label)}"><span class="ico dot" aria-hidden="true"></span><span class="lbl">${J.esc(c.label)}</span></a>`)).join("")}</div></div>`;
     })
     .join("");
