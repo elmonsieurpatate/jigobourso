@@ -70,8 +70,7 @@ h4 {
   color: var(--muted);
   font-size: var(--text-sm);
 }
-.page-kicker,
-.eyebrow {
+.page-kicker {
   display: block;
   margin-bottom: var(--sp-6);
   color: var(--accent);

@@ -28,7 +28,7 @@ Tailles partagées (jetons de `theme/tokens.css`, relevés à 40 px / 32 px sur 
 | Onglets | `.tabs` (+ `.pf-nav` `.px-zones` `.sr-tabs`) | actif : `.on`, `.selected`, `aria-selected` | 35 px |
 | Champ | `input` `select` `textarea` ; déclencheur `.ct-multi-trigger` | — | 35 px |
 | Badge | `.badge` | `.ok .warn .caution .danger .info .accent`, `.outline`, `.sm` ; états métier `.as-pill`, `.ps-tag`, `.ac-badge`, `.ct-demo-badge` partagent la même base | 25 px (`.sm` 21 px) |
-| Carte | `.card` | `.flush` `.tight` `.flat` `.inset` | — |
+| Carte | `.card` | `.flush` (0), `.tight` (16 px), `.flat` (sans ombre), `.inset` ; remplissage standard 20 px, jamais redéfini par une page | — |
 | Tableau | `table` | voir ci-dessous | — |
 | Notification | `.toast` (`J.toast`) | `role="status"` | — |
 

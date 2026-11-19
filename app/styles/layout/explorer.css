@@ -32,10 +32,6 @@
 .ct-strategy select {
   width: 310px;
 }
-.ct-provisional,
-.ct-strategy .ct-provisional {
-  margin-left: auto;
-}
 .ct-period-heading {
   display: flex;
   align-items: center;
@@ -272,9 +268,6 @@
     flex-direction: column;
     align-items: flex-end;
   }
-  .ct-provisional {
-    display: none;
-  }
 }
 @media (max-width: 760px) {
   .ct-heading {
@@ -293,10 +286,6 @@
   .ct-strategy select {
     flex: 1;
     width: auto;
-  }
-  .ct-provisional {
-    width: 100%;
-    margin: 0;
   }
   .ct-period-heading {
     display: block;
@@ -1145,9 +1134,6 @@
     width: 100%;
     min-width: 0;
   }
-  .ct-strategy .ct-provisional {
-    grid-column: 1/-1;
-  }
   .ct-periods {
     gap: var(--sp-8);
   }
@@ -1312,9 +1298,6 @@
   .ct-strategy {
     padding: var(--sp-10) var(--sp-12);
   }
-  .ct-strategy .ct-provisional {
-    margin-left: 0;
-  }
   .ct-period-heading {
     padding: var(--sp-12) var(--sp-12) var(--sp-6);
   }
@@ -1382,9 +1365,6 @@
   }
   .ct-strategy label {
     display: block;
-  }
-  .ct-strategy .ct-provisional {
-    display: none;
   }
   .ct-period-heading span {
     display: none;
@@ -1466,7 +1446,6 @@
   margin-left: auto;
   white-space: nowrap;
 }
-.ct-provisional + .ct-fold,
 .ct-strategy-tools + .ct-fold {
   margin-left: var(--sp-12);
 }

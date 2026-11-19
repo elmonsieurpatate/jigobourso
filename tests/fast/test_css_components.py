@@ -42,6 +42,30 @@ def test_important_budget_does_not_grow():
     assert total <= 69, f'{total} `!important` : réduire plutôt qu\'ajouter'
 
 
-def test_removed_legacy_summary_does_not_return():
+REMOVED = (
+    'px-sum',
+    'px-head',
+    'px-table-wrap',
+    'ac-indicators',
+    'ac-layout',
+    'ac-search',
+    'ac-sidebar',
+    'ac-status',
+    'ct-provisional',
+    'eyebrow',
+    'hb-example',
+    'hb-jigo',
+    'hb-tip',
+    'hb-warn',
+    'strat-cards',
+    'strat-extra',
+    'strat-grid',
+)
+
+
+def test_removed_classes_do_not_return():
+    """Classes sans aucun usage dans le HTML, le JS ou le PHP : retirées du CSS ; leur retour sans balisage est une règle morte."""
     for f in STYLES.rglob('*.css'):
-        assert '.px-sum' not in f.read_text(encoding='utf-8'), f.name
+        source = f.read_text(encoding='utf-8')
+        for name in REMOVED:
+            assert not re.search(rf'\.{name}(?![\w-])', source), f'{f.name} : .{name}'

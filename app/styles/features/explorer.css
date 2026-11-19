@@ -14,11 +14,6 @@
 .ct-strategy label {
   font-weight: 650;
 }
-.ct-provisional,
-.ct-strategy .ct-provisional {
-  font-size: var(--fs-11);
-  color: var(--muted);
-}
 .ct-period-heading span {
   font-size: var(--fs-12);
   color: var(--muted);
@@ -112,9 +107,6 @@
   color: var(--muted);
 }
 @media (max-width: 760px) {
-  .ct-provisional {
-    font-size: var(--fs-11);
-  }
   .ct-period-heading span {
     font-size: var(--fs-11);
   }
@@ -414,11 +406,6 @@
 }
 .ct-config-footer {
   font-size: var(--fs-11);
-}
-@media (max-width: 760px) {
-  .ct-strategy .ct-provisional {
-    font-size: var(--fs-11);
-  }
 } /* Mobile : réglages encore plus denses (valeur sur la ligne du titre, aide discrète). */
 @media (max-width: 760px) {
   .ct-strategy label {

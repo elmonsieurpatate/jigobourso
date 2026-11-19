@@ -37,8 +37,7 @@ td {
 th.num,
 th.n {
   text-align: right;
-}
-/* Variante dense : lignes plus serrées, mêmes règles par ailleurs */
+} /* Variante dense : lignes plus serrées, mêmes règles par ailleurs */
 table.dense :is(th, td) {
   padding: var(--cell-pad-dense);
 }
@@ -64,7 +63,7 @@ tr:last-child td {
 .px-t .num {
   font-variant-numeric: tabular-nums;
 }
-:is(.table-wrap.boxed, .ct-table-wrap, .px-table-wrap) {
+:is(.table-wrap.boxed, .ct-table-wrap) {
   border: 1px solid var(--line);
   border-radius: var(--control-radius);
   overflow: auto;
@@ -88,28 +87,23 @@ tr[data-child-of] td {
   background: none;
   border: 0;
   color: var(--text);
-  padding: var(--sp-14) var(--sp-6) var(--sp-6);
+  padding: var(--sp-10) var(--sp-6) var(--sp-2);
+  font-size: var(--fs-13);
   font-weight: 650;
 }
 .ct-number input {
   font-weight: 650;
 }
-.ct .ct-group-operator select {
+body .ct .ct-group-operator select {
   height: 28px;
   padding: var(--sp-2) var(--sp-4);
-  background: var(--accent);
-  color: white;
+  background-color: var(--accent);
+  background-image: none;
+  color: var(--accent-ink);
   font-size: var(--fs-11);
   font-weight: 750;
   border: 0;
   border-radius: var(--radius-8);
-  background-image: none;
-}
-body .ct .ct-group-operator select {
-  background-image: none;
-  background-color: var(--accent);
-  color: var(--accent-ink);
-  padding: var(--sp-2) var(--sp-4);
 }
 .ct .ct-category-search input {
   height: 32px;
@@ -118,17 +112,6 @@ body .ct .ct-group-operator select {
   font-size: var(--fs-11);
   padding: var(--sp-4) 0;
   border-radius: 0;
-}
-.ct-period button {
-  padding: var(--sp-10) var(--sp-6) var(--sp-2);
-  font-size: var(--fs-13);
-}
-.ac .ac-search input {
-  height: 34px;
-  border: 0;
-  background: transparent;
-  font-size: var(--fs-11);
-  padding: 0;
 }
 .ac-editor > header > button {
   border: 0;
@@ -166,9 +149,7 @@ body .ct .ct-group-operator select {
   .px-t td {
     padding: var(--sp-2) 0;
   }
-}
-
-/* Cellule identité : symbole en gras, nom en dessous (tableaux Mes actions, Suivi des positions, transactions) */
+} /* Cellule identité : symbole en gras, nom en dessous (tableaux Mes actions, Suivi des positions, transactions) */
 .ident > b {
   color: var(--text);
   font-weight: 700;
@@ -177,9 +158,7 @@ body .ct .ct-group-operator select {
   color: var(--muted);
   font-size: var(--fs-11);
   font-weight: 400;
-}
-
-/* Barres de contribution (J.bars) */
+} /* Barres de contribution (J.bars) */
 .bar-l {
   color: var(--text);
   font-size: var(--td-size);
@@ -213,9 +192,7 @@ body .ct .ct-group-operator select {
 }
 .bar-v.neg {
   color: var(--danger);
-}
-
-/* Matrice multi-périodes : grille dense, identité figée, valeurs tabulaires. */
+} /* Matrice multi-périodes : grille dense, identité figée, valeurs tabulaires. */
 .pfd-table {
   width: 100%;
   min-width: 1080px;
@@ -267,7 +244,6 @@ body .ct .ct-group-operator select {
 .pfd-table .pfd-personal {
   border-right: 2px solid var(--line);
 }
-
 .pfd-cell .pfd-dynamic {
   margin-top: var(--sp-2);
 }

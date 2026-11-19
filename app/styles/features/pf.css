@@ -11,9 +11,6 @@
 .pf-home .down {
   color: var(--down);
 }
-.px-head p {
-  font-size: var(--fs-11);
-}
 .px-zones {
   border-bottom: 1px solid var(--line);
 }
@@ -60,9 +57,7 @@
 .px-hh div {
   background: var(--surface-2, var(--bg));
   border-radius: var(--radius-8);
-} /* résumé de surveillance */
-
-/* graphique */
+} /* résumé de surveillance */ /* graphique */
 .px-tabs,
 .px-seg {
   background: var(--surface-2, var(--bg));
@@ -193,8 +188,7 @@
   color: var(--muted);
   font-size: var(--fs-10);
   line-height: var(--lh-snug);
-}
-/* ---- styles propres à la page Portefeuilles, sortis de base.css ---- */
+} /* ---- styles propres à la page Portefeuilles, sortis de base.css ---- */
 .fold-x {
   font-weight: 600;
 }
@@ -274,8 +268,7 @@
 }
 .fc-svg {
   font-size: var(--fs-10);
-}
-/* pastilles de légende du graphique des portefeuilles à liquidités : couleurs des séries */
+} /* pastilles de légende du graphique des portefeuilles à liquidités : couleurs des séries */
 .px-chip i.c0 {
   background: var(--text);
 }
@@ -314,9 +307,7 @@
 }
 .px-chip i.c12 {
   background: var(--series-12);
-}
-
-/* Matrice : point coloré = performance du cours (échelle de température) ; flèche colorée = dynamique. */
+} /* Matrice : point coloré = performance du cours (échelle de température) ; flèche colorée = dynamique. */
 .pfd-cell {
   border-radius: var(--radius-8);
   background: var(--surface-2);

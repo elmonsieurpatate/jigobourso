@@ -21,7 +21,7 @@
   margin-block: 0;
 }
 .card.tight {
-  padding: var(--sp-12) var(--sp-14);
+  padding: var(--sp-16);
 }
 .card.flush {
   padding: 0;
@@ -47,8 +47,7 @@
 .px-card {
   padding: var(--sp-14);
 }
-.ac-editability.editable,
-.hb-jigo .hb-t {
+.ac-editability.editable {
   background: var(--ok-soft);
   color: var(--ok-ink);
 }
@@ -66,7 +65,6 @@
 }
 .as-total.ok,
 .ct-score.high,
-.ac-status.active,
 .ac-validation.success,
 .ps-ic.t-up,
 .ps-ic.ic-bars,

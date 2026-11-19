@@ -14,15 +14,6 @@
   font-weight: 500;
   color: var(--muted);
 }
-.ac-search {
-  border: 1px solid var(--line);
-  border-radius: var(--radius-8);
-  color: var(--muted);
-}
-.ac-status.inactive {
-  background: var(--surface-2);
-  color: var(--muted);
-}
 .ac-indicator-icon {
   font-size: var(--fs-28);
   line-height: var(--lh-none);

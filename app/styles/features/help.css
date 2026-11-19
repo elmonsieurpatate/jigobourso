@@ -90,14 +90,6 @@
 .hb-c {
   background: var(--surface);
 }
-.hb-example .hb-t {
-  background: var(--warn-soft);
-  color: var(--warn-ink);
-}
-.hb-warn .hb-t {
-  background: var(--danger-soft);
-  color: var(--danger-ink);
-}
 .hf figcaption {
   font-size: var(--fs-12);
   color: var(--muted);

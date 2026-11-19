@@ -17,7 +17,6 @@
   color: var(--danger-ink);
 }
 .toast,
-.ct-provisional,
 .ac-validation,
 .sr-preview {
   border-radius: var(--control-radius);
@@ -81,8 +80,7 @@ dialog::backdrop {
 }
 dialog:modal {
   overscroll-behavior: contain;
-}
-/* Infobulle native (popover) ancrée à l'élément ; texte seul, jamais interactive. */
+} /* Infobulle native (popover) ancrée à l'élément ; texte seul, jamais interactive. */
 .jtip {
   margin: 0;
   inset: auto;
@@ -133,7 +131,6 @@ summary {
   border-radius: var(--control-radius);
   background: var(--halo-control);
 }
-
 @keyframes pend {
   50% {
     box-shadow: 0 0 0 7px color-mix(in srgb, var(--accent) 12%, transparent);

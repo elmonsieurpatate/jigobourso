@@ -32,9 +32,6 @@
 .pf-home h3 {
   margin: var(--sp-16) 0 var(--sp-8);
 }
-.px-head p {
-  margin: var(--sp-2) 0 0;
-}
 .px-ha {
   display: flex;
   gap: var(--sp-8);
@@ -680,8 +677,7 @@ body.px-lock {
 }
 .fc-buy-label.dim {
   opacity: 0.5;
-}
-/* portefeuille à liquidités : « Mon argent », graphique et panneau latéral */
+} /* portefeuille à liquidités : « Mon argent », graphique et panneau latéral */
 .pf-kpis {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -714,25 +710,19 @@ body.px-lock {
   .pf-side {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-}
-
-/* « Mes actions » sur mobile : la carte garde valeur, gain, rendement et poids ; le détail s'ouvre au toucher de la ligne */
+} /* « Mes actions » sur mobile : la carte garde valeur, gain, rendement et poids ; le détail s'ouvre au toucher de la ligne */
 @media (max-width: 600px) {
   .px-t.pf-acts .c-qty,
   .px-t.pf-acts .c-pru,
   .px-t.pf-acts .c-price {
     display: none;
   }
-}
-
-/* Repères d'achat et de vente sur mobile : étiquettes courtes, infobulle limitée pour ne pas couvrir la courbe */
+} /* Repères d'achat et de vente sur mobile : étiquettes courtes, infobulle limitée pour ne pas couvrir la courbe */
 @media (max-width: 600px) {
   .fc-tip {
     max-height: 110px;
   }
-}
-
-/* Matrice de consultation : le défilement reste dans le tableau sur mobile. */
+} /* Matrice de consultation : le défilement reste dans le tableau sur mobile. */
 .pf-dynamics {
   min-width: 0;
 }

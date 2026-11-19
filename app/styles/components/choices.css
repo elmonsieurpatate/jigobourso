@@ -14,7 +14,6 @@ input[type="radio"] {
 input[type="range"] {
   accent-color: var(--accent);
 } /* Champ de recherche dans un conteneur déjà encadré, interrupteur, opérateur ET/OU : variantes explicites. */
-.ac .ac-search input,
 .ct .ct-category-search input {
   border: 0;
   background: transparent;

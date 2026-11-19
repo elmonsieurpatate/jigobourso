@@ -66,8 +66,7 @@
 .q:hover,
 .q[aria-expanded="true"],
 .ct-strategy-icon,
-.ct-valid,
-.hb-tip .hb-t {
+.ct-valid {
   background: var(--accent-soft);
   color: var(--accent);
 }
@@ -102,9 +101,6 @@
   }
 }
 @media (max-width: 600px) {
-  .strat-grid > .strat .tx b {
-    font-size: var(--fs-12);
-  }
   .sl {
     border-left: 0;
     border-top: 1px solid var(--line);

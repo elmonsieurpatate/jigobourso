@@ -97,25 +97,6 @@ label.field {
     transform: rotate(360deg);
   }
 } /* spécifiques */
-.strat-cards {
-  display: block;
-}
-.strat-grid {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: var(--sp-12);
-}
-.strat-extra {
-  display: flex;
-  gap: var(--sp-12);
-  flex-wrap: wrap;
-  margin-top: var(--sp-12);
-}
-@media (max-width: 1400px) {
-  .strat-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
 .strat {
   position: relative;
   display: flex;
@@ -188,41 +169,6 @@ label.field {
   }
 }
 @media (max-width: 600px) {
-  .strat-grid {
-    display: flex;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    gap: var(--sp-8);
-    padding: var(--sp-2) var(--sp-2) var(--sp-8);
-    scrollbar-width: thin;
-  }
-  .strat-grid > .strat {
-    flex: 0 0 164px;
-    width: 164px;
-    min-height: 58px;
-    padding: var(--sp-8) var(--sp-10);
-    gap: var(--sp-8);
-  }
-  .strat-grid > .strat .ico {
-    width: 26px;
-  }
-  .strat-grid > .strat .ico svg {
-    width: 26px;
-  }
-  .strat-grid > .strat .tx b {
-    overflow-wrap: anywhere;
-  }
-  .strat-grid > .strat .tx span,
-  .strat-grid > .strat .q {
-    display: none;
-  }
-  .strat-extra {
-    margin-top: var(--sp-4);
-  }
-  .strat-extra > .strat {
-    min-height: 48px;
-    padding: var(--sp-6) var(--sp-10);
-  }
   .page-head {
     gap: var(--sp-8);
     margin-bottom: var(--sp-8);
@@ -934,13 +880,6 @@ table.cmp {
   .menu {
     margin-top: var(--sp-8);
   }
-  .strat-extra {
-    margin-top: var(--sp-2);
-  }
-  .strat-extra > .strat {
-    min-height: 42px;
-    padding: var(--sp-6) var(--sp-10);
-  }
 } /* Repères des courbes du portefeuille : dates d'achat et niveaux d'alerte */
 .price-svg .markline {
   stroke-width: 1.5;
@@ -1348,7 +1287,6 @@ button.badge {
   gap: var(--sp-10);
   flex-wrap: wrap;
 }
-.px-head,
 dialog .ps-rule-top {
   display: flex;
   justify-content: space-between;
@@ -1558,9 +1496,7 @@ dialog .ps-rule-top {
 }
 .u-width-64px {
   width: 64px !important;
-}
-
-/* Cellule identité d'un tableau (symbole + nom) : composant commun, voir components/tables.css */
+} /* Cellule identité d'un tableau (symbole + nom) : composant commun, voir components/tables.css */
 .ident {
   display: block;
   min-width: 0;
@@ -1575,9 +1511,7 @@ dialog .ps-rule-top {
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 18rem;
-}
-
-/* Barres de contribution : J.bars (nom, barre, valeur, part) */
+} /* Barres de contribution : J.bars (nom, barre, valeur, part) */
 .bars {
   display: grid;
   gap: var(--sp-8);

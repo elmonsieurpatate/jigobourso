@@ -87,9 +87,6 @@
   background: var(--accent-soft);
   font-size: var(--fs-11);
 }
-.strategies-page #page > .card {
-  padding: var(--sp-16);
-}
 .settings-page #page > .as,
 .settings-page #page > .card {
   min-width: 0;
