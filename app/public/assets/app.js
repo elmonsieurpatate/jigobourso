@@ -374,7 +374,6 @@ J.NAV = (admin) => [
       { label: "Mes filtres et catégories", href: "mes-filtres.html", icon: "funnel", on: () => true },
     ],
   },
-  { id: "suivi", label: "Suivi des classements", icon: "pulse", file: ["suivi.html"], href: "suivi.html" },
   { sec: "Mon patrimoine" },
   {
     id: "portefeuilles",
@@ -431,7 +430,7 @@ J.buildShell = function (page, user) {
         return `<a class="nv ${here ? "on" : ""}" href="${n.href}" title="${J.esc(n.label)}">${J.icon(n.icon)}<span class="lbl">${J.esc(n.label)}</span></a>`;
       const open = here;
       return `<div class="grp ${open ? "open" : ""} ${here ? "cur" : ""}" data-id="${n.id}"><button class="nv" type="button" aria-expanded="${!!open}" title="${J.esc(n.label)}">${J.icon(n.icon)}<span class="lbl">${J.esc(n.label)}</span>${J.icon("chev", "chev")}</button>
-      <div class="sub" data-sub="${n.id}">${n.children.map((c) => (c.head ? `<div class="sh">${J.esc(c.head)}</div>` : `<a class="sv ${here && isOn(c) ? "on" : ""}" href="${c.href}" title="${J.esc(c.label)}"><span class="lbl">${J.esc(c.label)}</span></a>`)).join("")}</div></div>`;
+      <div class="sub" data-sub="${n.id}">${n.children.map((c) => (c.head ? `<div class="sh">${J.esc(c.head)}</div>` : `<a class="sv ${here && isOn(c) ? "on" : ""}" href="${c.href}" title="${J.esc(c.label)}"><span class="ico dot" aria-hidden="true"></span><span class="lbl">${J.esc(c.label)}</span></a>`)).join("")}</div></div>`;
     })
     .join("");
   const initial = (user.username || "?").slice(0, 1);
@@ -556,7 +555,7 @@ J.buildShell = function (page, user) {
           .forEach((p) =>
             sub.insertAdjacentHTML(
               "beforeend",
-              `<a class="sv ${p.icon ? "has-ic" : ""} ${file === "portefeuilles.html" && cur == p.id ? "on" : ""}" href="portefeuilles.html?id=${p.id}" title="${J.esc(p.name)}">${p.icon ? `<span class="ico" aria-hidden="true">${J.esc(p.icon)}</span>` : ""}<span class="lbl">${J.esc(p.name)}${p.is_default ? " ★" : ""}</span></a>`,
+              `<a class="sv ${file === "portefeuilles.html" && cur == p.id ? "on" : ""}" href="portefeuilles.html?id=${p.id}" title="${J.esc(p.name)}"><span class="ico${p.icon ? "" : " dot"}" aria-hidden="true">${J.esc(p.icon || "")}</span><span class="lbl">${J.esc(p.name)}${p.is_default ? " ★" : ""}</span></a>`,
             ),
           );
       })

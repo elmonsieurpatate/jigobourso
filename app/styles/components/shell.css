@@ -234,6 +234,20 @@
   width: var(--sp-16);
   text-align: center;
 }
+.side .sv .ico.dot::before {
+  content: "";
+  display: inline-block;
+  width: var(--sp-4);
+  height: var(--sp-4);
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.5;
+  vertical-align: middle;
+}
+.side .sv.on .ico.dot::before {
+  background: var(--accent);
+  opacity: 1;
+}
 .side .sec {
   padding-top: var(--sp-14);
 }
