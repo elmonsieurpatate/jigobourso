@@ -108,22 +108,6 @@
       origin: o ? o.label : null,
     };
   }
-  function planSummary() {
-    if (!S.tr)
-      return `<div class="px-sum"><span class="px-ab">${I.bell}<b>Synthèse du suivi</b></span><span class="muted">${S.trErr ? "Indisponible : " + esc(S.trErr) : "Chargement…"}</span></div>`;
-    const ws = open()
-        .filter((p) => p.listing_id)
-        .map(watchOf),
-      n = (k) => ws.filter((w) => w.k === k).length;
-    const parts = [
-      [n("ko"), "sortie à envisager", "ko"],
-      [n("rv"), "à réévaluer", "rv"],
-      [n("na"), "à surveiller", "na"],
-      [n("ok"), "à conserver", "ok"],
-    ].filter((x) => x[0]);
-    return `<div class="px-sum"><span class="px-ab">${I.bell}<b>Synthèse du suivi</b></span>${parts.length ? parts.map(([c, l, k]) => `<span><i class="n ${k}">${c}</i>${l}</span>`).join("") : '<span class="muted">Aucune position suivie</span>'}<span class="muted">Un repère, jamais un ordre : rien n’est vendu automatiquement.</span></div>`;
-  }
-
   /* ───────── données du graphique : une seule fonction, deux modes, toutes les périodes ───────── */
   async function ensureBars(ids) {
     for (const id of ids)
@@ -806,10 +790,7 @@
     return `${cashModel() ? root.PFPerf2.money(P, tax) : `${synth(st)}<p class="notice info">Vue temporaire modernisée : toutes les périodes sont disponibles. Vos transactions et résultats d’origine sont conservés. Les liquidités et les apports/retraits externes restent non renseignés ; la courbe reconstitue la performance des titres, sans inventer de solde.</p>`}${root.PFPerf2.boxHtml(P)}<section class="px-card"><div class="px-ph"><h2>Contribution au résultat</h2>${filter}${aper}</div><p class="small muted">Gain de chaque titre en euros, ${label}. <b>Le % à droite est sa part du gain global, pas le rendement du titre.</b> Les titres vendus gardent leur gain réalisé.</p>${contrib.length ? J.bars(contrib, "Contribution de chaque titre au résultat") : '<p class="px-note">Aucun gain ou perte sur cette période.</p>'}</section>${marketTable()}<section class="px-card"><div class="px-ph"><h2>Mes actions</h2>${filter}${aper}</div><p class="small muted">Gain et rendement ${label}. Quantité, PRU, cours et valeur sont ceux d’aujourd’hui. <button type="button" class="px-link" data-gosuivi>Voir le suivi des positions</button></p>${actionsTable(st)}<p class="px-note">Rendement : celui du titre sur la période (TWR), à ne pas additionner. Un titre vendu garde son gain réalisé.</p></section>${suiviSection()}`;
   }
   function viewOverview(st) {
-    if (root.PFPerf2) return viewCash(st);
-    const nc = st.rows.filter((r) => !(r.p.qty > 0)).length;
-    const fp = !!store("fold_positions");
-    return `${synth(st)}${marketTable()}${planSummary()}<section class="px-card"><h2>Évolution</h2>${boxHtml(S.main, PfDetail.MAIN)}</section><section class="px-card${fp ? " folded" : ""}" id="px-sec-positions"><div class="px-ph">${foldHead("positions", "Positions", "")}${nc ? `<label class="px-chk" id="px-closed-wrap" ${fp ? "hidden" : ""}><input type="checkbox" id="px-closed" ${S.closed ? "checked" : ""}> Afficher les positions soldées (${nc})</label>` : ""}</div><div class="px-fold-body" id="px-fb-positions" ${fp ? "hidden" : ""}>${table(st, 0)}</div></section>${suiviSection()}`;
+    return viewCash(st);
   }
   function viewTx() {
     const tr = (C.H.trades || [])

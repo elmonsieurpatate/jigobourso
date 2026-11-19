@@ -38,6 +38,10 @@ th.num,
 th.n {
   text-align: right;
 }
+/* Variante dense : lignes plus serrées, mêmes règles par ailleurs */
+table.dense :is(th, td) {
+  padding: var(--cell-pad-dense);
+}
 td.small,
 th.small {
   font-size: var(--td-size);
@@ -114,14 +118,6 @@ body .ct .ct-group-operator select {
   font-size: var(--fs-11);
   padding: var(--sp-4) 0;
   border-radius: 0;
-}
-.ct-ranking th button {
-  border: 0;
-  background: none;
-  color: inherit;
-  padding: 0;
-  font-weight: 650;
-  font-size: inherit;
 }
 .ct-period button {
   padding: var(--sp-10) var(--sp-6) var(--sp-2);

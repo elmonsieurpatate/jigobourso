@@ -216,9 +216,7 @@
   font-size: var(--fs-11);
   color: var(--muted);
 }
-.px-sum .n.rv {
-  background: var(--caution);
-}
+
 @container pscard (max-width: 640px) {
   .ps-t strong,
   .ps-gain strong {
@@ -280,10 +278,8 @@ dialog .ps-rule legend {
   font-weight: 700;
 }
 .ps-tag {
-  border-radius: var(--radius-pill);
-  font: 700 0.72rem system-ui;
-  font-variant-numeric: tabular-nums;
   background: var(--info-soft);
+  border-color: transparent;
   color: var(--info);
 } /* Suivi des positions : grille type tableau, une ligne compacte par position */
 .psr-name {

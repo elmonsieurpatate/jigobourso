@@ -1357,7 +1357,6 @@ dialog .ps-rule-top {
   flex-wrap: wrap;
 }
 .px-ab,
-.px-sum span,
 .psr-sum span {
   display: inline-flex;
   align-items: center;

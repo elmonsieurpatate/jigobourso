@@ -145,7 +145,6 @@
   gap: var(--sp-12);
 }
 .px-card,
-.px-sum,
 .ps-card {
   border-color: var(--line);
   border-radius: var(--radius);

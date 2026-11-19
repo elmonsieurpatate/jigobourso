@@ -23,8 +23,7 @@
 .portfolio-page .pf-nav {
   margin: 0 0 var(--sp-10);
 }
-.portfolio-page .px-card,
-.portfolio-page .px-sum {
+.portfolio-page .px-card {
   background: var(--surface);
   box-shadow: var(--shadow);
 }

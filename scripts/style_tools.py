@@ -45,7 +45,7 @@ APPEARANCE = {
     'outline-offset',
 }
 CONTROL_GEOMETRY = {'padding', 'padding-top', 'padding-right', 'padding-bottom', 'padding-left', 'height', 'min-height'}
-COMMON_CLASSES = {'btn', 'badge', 'card', 'tab', 'seg', 'chip', 'switch', 'q', 'notice', 'empty', 'spinner', 'metric', 'kpi'}
+COMMON_CLASSES = {'btn', 'badge', 'ac-badge', 'ct-demo-badge', 'as-pill', 'ct-tag', 'ps-tag', 'card', 'tab', 'seg', 'chip', 'switch', 'q', 'notice', 'empty', 'spinner', 'metric', 'kpi'}
 COMMON_TAGS = {'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'button', 'input', 'select', 'textarea', 'th', 'td'}
 GROUPS = {'media', 'supports', 'container', 'layer', 'scope'}
 

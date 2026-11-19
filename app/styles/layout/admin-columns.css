@@ -116,9 +116,6 @@
   white-space: nowrap;
   text-align: left;
 }
-.ac-badge {
-  padding: var(--sp-2) var(--sp-6);
-}
 @media (max-width: 900px) {
   .ac-grid {
     grid-template-columns: minmax(0, 1fr);

@@ -1,5 +1,5 @@
 /* Cartes et panneaux. */
-:is(.card, .ct-panel, .ac-panel, .ps-card, .as-tile, .h-side, .sr-card, .px-card, .px-sum, .hcard) {
+:is(.card, .ct-panel, .ac-panel, .ps-card, .as-tile, .h-side, .sr-card, .px-card, .hcard) {
   background: var(--panel-bg);
   color: var(--text);
   border: 1px solid var(--line);

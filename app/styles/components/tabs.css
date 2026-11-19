@@ -7,6 +7,7 @@
   overflow-x: auto;
 }
 :is(.tabs button, .pf-nav button, .px-zones button, .px-tabs2 button, .sr-tabs button) {
+  min-height: var(--control-h);
   padding: var(--tab-pad);
   border: 0;
   border-bottom: 2px solid transparent;

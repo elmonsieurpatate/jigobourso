@@ -45,10 +45,3 @@
 .ac-table {
   font-size: var(--fs-11);
 }
-.ac-badge {
-  font-style: normal;
-  font-size: var(--fs-10);
-  font-weight: 700;
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--line);
-}

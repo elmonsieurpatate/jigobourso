@@ -12,8 +12,15 @@
     .ct-columns summary,
     .ct-fold
   ) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-8);
+  box-sizing: border-box;
   min-height: var(--control-h);
   padding: var(--btn-pad);
+  white-space: nowrap;
+  cursor: pointer;
   border: 1px solid var(--line);
   border-radius: var(--control-radius);
   background: var(--surface);
@@ -68,7 +75,7 @@
   color: var(--accent-ink);
   filter: brightness(1.06);
 }
-.btn.sm {
+:is(.btn.sm, .px-per button, .as-win button, .ct-group-actions button, .ct-multi-popup footer button) {
   min-height: var(--control-h-sm);
   padding: var(--btn-pad-sm);
   font-size: var(--btn-size-sm);
@@ -99,20 +106,6 @@
   background: var(--danger-soft);
   border-color: var(--danger);
   color: var(--danger);
-}
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--sp-8);
-  white-space: nowrap;
-  cursor: pointer;
-  text-decoration: none;
-  transition:
-    background 0.15s,
-    border-color 0.15s,
-    color 0.15s,
-    box-shadow 0.15s;
 }
 .btn.icon svg {
   width: 18px;

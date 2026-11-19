@@ -18,12 +18,31 @@ Trois fichiers communs, chargés dans cet ordre sur toutes les pages, puis le CS
 
 ## Composants
 
-- **Bouton** `.btn` : `.primary`, `.danger`, `.ghost`, taille `.sm`, carré `.icon` (+ `.sm`).
-- **Carte** `.card` : `.flush` (sans padding), `.tight`, `.flat` (sans ombre), `.inset` (panneau interne grisé).
-- **Tableau** `table` + `.dense` ; conteneur `.table-wrap` avec `.tall` (hauteur max, en-tête collant) et `.boxed` (cadre).
-- **Badge** `.badge` : `.ok .warn .danger .info .accent`, `.outline`, `.sm` (remplace tag, chip, pill).
-- **Onglets** `.tabs` (soulignés) et **segments** `.seg` (choix exclusif). Actif : `.on`, `.selected` ou `aria-selected` / `aria-pressed`.
-- **Notification** `.toast` (`J.toast`, `#ct-feedback`, `#ac-feedback`), `role="status"`.
+Tailles partagées (jetons de `theme/tokens.css`, relevés à 40 px / 32 px sur mobile) : **contrôle standard 35 px** (`--control-h`), **contrôle compact 29 px** (`--control-h-sm`). Boutons, champs, sélecteurs multiples et onglets utilisent la première ; la variante compacte est toujours explicite (`.sm`). Aucune page ne définit la hauteur ou le remplissage d'un bouton, d'un champ ou d'un badge : `make css-check` échoue sinon.
+
+| Composant | Classe | Variantes | Hauteur |
+|---|---|---|---|
+| Bouton | `.btn` | `.primary` `.danger` `.ghost` ; `.sm` compact ; `.icon` carré (+ `.sm`) | 35 / 29 px |
+| Sélecteur de période | `.px-per button`, `.as-win button` | compact par construction (même géométrie que `.btn.sm`) | 29 px |
+| Choix exclusif | `.seg` (+ `.as-seg` `.ct-seg` `.px-seg`) | actif : `.on` ou `aria-pressed` | 29 px |
+| Onglets | `.tabs` (+ `.pf-nav` `.px-zones` `.sr-tabs`) | actif : `.on`, `.selected`, `aria-selected` | 35 px |
+| Champ | `input` `select` `textarea` ; déclencheur `.ct-multi-trigger` | — | 35 px |
+| Badge | `.badge` | `.ok .warn .caution .danger .info .accent`, `.outline`, `.sm` ; états métier `.as-pill`, `.ps-tag`, `.ac-badge`, `.ct-demo-badge` partagent la même base | 25 px (`.sm` 21 px) |
+| Carte | `.card` | `.flush` `.tight` `.flat` `.inset` | — |
+| Tableau | `table` | voir ci-dessous | — |
+| Notification | `.toast` (`J.toast`) | `role="status"` | — |
+
+**Tableaux.** Un seul socle (`components/tables.css`) : en-tête 10 px / graisse 800 / majuscules, cellules 11 px, séparateurs 1 px `--line`, survol `--halo-hover`, valeurs numériques tabulaires alignées à droite (`.num`), tri sur `th.sortable` / `aria-sort`, états vides `.empty`. Variantes explicites : **standard** (`table`), **dense** (`table.dense`, remplissage `--cell-pad-dense`), **financière** (`.px-t` : lignes cliquables, cellule identité `.ident`, gains `.pos` / `.neg`), **administration** (`table` standard dans `.table-wrap.tall` ou `.boxed`). Tableaux spécialisés conservés : matrice de performance et dynamique (`.pfd-table`, point thermique `--temp-1…7`, flèche de dynamique) et suivi des positions (`.psr-t`, jauge, carte sous 900 px) ; ils réutilisent les mêmes en-têtes et séparateurs.
+
+**Couleurs sémantiques.** Hausse et gain `--ok`, baisse et perte `--danger`, avertissement `--warn`, réévaluation `--caution`, information `--info`. Échelle de température `--temp-1` (forte baisse) à `--temp-7` (forte hausse) pour la performance du cours et la jauge de suivi. Les palettes de séries de graphiques (`--series-*`, `--chart-*`) sont volontairement distinctes.
+
+## Créer une nouvelle page sans réintroduire de styles
+
+1. Balisage : `.card` / `.px-card` pour les blocs, `.btn` (+ variante) pour les actions, `table` pour les listes, `.badge` pour les statuts, `.seg` ou `.tabs` pour les choix. Ne pas inventer `.ma-page-bouton`.
+2. CSS de page : uniquement la disposition (grille, flex, espacement, largeurs) dans `app/styles/layout/<page>.css`. Pas de couleur, de bordure, de hauteur ni de remplissage de composant.
+3. Apparence propre au métier (visualisation, couleur d'état) : `app/styles/features/<page>.css`, avec des jetons.
+4. Valeurs : uniquement l'échelle de `css_scale.py` (espacements, tailles, rayons, interlignes, points de rupture). Pas de `!important` hors des utilitaires déjà présents.
+5. `make css-format css-build css-check`, puis `.venv/bin/python -m pytest tests/fast/test_css_scale.py tests/fast/test_css_components.py`, puis un contrôle visuel en clair et en sombre à 1440 et 390 px.
 
 ## Reste à faire
 

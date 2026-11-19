@@ -73,7 +73,7 @@ input.switch:checked:after {
   border-radius: var(--control-radius);
   background: var(--halo-control);
   color: var(--text);
-  padding: var(--sp-8) var(--sp-10);
+  padding: 0 var(--sp-10);
   min-height: var(--control-h);
   font-size: var(--control-size);
 }

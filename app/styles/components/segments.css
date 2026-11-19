@@ -8,6 +8,7 @@
   background: var(--thead);
 }
 :is(.seg button, .ct-seg button, .as-seg button, .px-seg button, .px-tabs button) {
+  min-height: var(--control-h-sm);
   padding: var(--seg-pad);
   border: 0;
   border-radius: var(--control-radius);

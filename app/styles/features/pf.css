@@ -61,40 +61,8 @@
   background: var(--surface-2, var(--bg));
   border-radius: var(--radius-8);
 } /* résumé de surveillance */
-.px-sum {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-12);
-  color: var(--text);
-  text-decoration: none;
-  font-size: var(--fs-12);
-}
-a.px-sum:hover {
-  border-color: var(--accent);
-}
-.px-sum .n {
-  font-style: normal;
-  font-weight: 700;
-  border-radius: var(--radius-12);
-  font-size: var(--fs-11);
-  color: var(--on-solid);
-  background: var(--muted);
-}
-.px-sum .n.ko {
-  background: var(--down);
-}
-.px-sum .n.na {
-  background: var(--warn);
-}
-.px-sum .n.ok {
-  background: var(--up);
-}
-.px-sum .n.none {
-  background: var(--muted);
-}
-.px-card .px-sum {
-  border: 0;
-} /* graphique */
+
+/* graphique */
 .px-tabs,
 .px-seg {
   background: var(--surface-2, var(--bg));
@@ -226,10 +194,7 @@ a.px-sum:hover {
   font-size: var(--fs-10);
   line-height: var(--lh-snug);
 }
-.px-sum .n.info {
-  background: var(--info);
-  color: var(--on-solid);
-} /* ---- styles propres à la page Portefeuilles, sortis de base.css ---- */
+/* ---- styles propres à la page Portefeuilles, sortis de base.css ---- */
 .fold-x {
   font-weight: 600;
 }

@@ -372,10 +372,6 @@ dialog .ps-rule .small {
 dialog [data-reset][hidden] {
   display: none;
 }
-.ps-tag {
-  display: inline-block;
-  padding: var(--sp-2) var(--sp-10);
-}
 .px-chk[hidden] {
   display: none;
 } /* Suivi des positions : tableau commun (th/td de components/tables.css), une position par <tbody> */

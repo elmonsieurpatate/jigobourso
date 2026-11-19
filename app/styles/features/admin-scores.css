@@ -14,10 +14,8 @@
 }
 .as-pill {
   background: var(--accent-soft);
+  border-color: var(--accent-border);
   color: var(--accent);
-  border-radius: var(--radius-pill);
-  font-weight: 700;
-  font-size: var(--fs-12);
 }
 .as-total {
   border-radius: var(--radius-12);

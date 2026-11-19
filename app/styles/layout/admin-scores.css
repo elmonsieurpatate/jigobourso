@@ -74,10 +74,6 @@
   min-width: 74px;
   text-align: right;
 }
-.as-pill {
-  padding: var(--sp-2) var(--sp-10);
-  display: inline-block;
-}
 .as-num {
   width: 84px;
   padding: var(--sp-6) var(--sp-8);
