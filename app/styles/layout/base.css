@@ -554,17 +554,11 @@ body.side-collapsed .side {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.side .nv .nv-chev {
-  flex: none;
-  width: 15px;
-  height: 15px;
-  stroke-width: 2;
-  stroke-linecap: round;
-  transition: transform 0.2s;
-  opacity: 0.7;
+.side .nv .chev {
+  margin: 0 var(--sp-4) 0 0;
 }
-.side .grp.open > .nv .nv-chev {
-  transform: rotate(90deg);
+.side .grp:not(.open) > .nv .chev {
+  transform: rotate(-45deg);
 }
 .side .nv.on::before,
 .side .grp.cur > .nv::before {
@@ -627,7 +621,7 @@ body.side-collapsed .side {
   display: block;
 }
 body.side-collapsed .side .lbl,
-body.side-collapsed .side .nv-chev,
+body.side-collapsed .side .chev,
 body.side-collapsed .side .sec,
 body.side-collapsed .side .sub,
 body.side-collapsed .side .brand span,
@@ -724,7 +718,7 @@ body.side-collapsed .side-foot .who {
     z-index: var(--z-backdrop);
   }
   body.side-collapsed .side .lbl,
-  body.side-collapsed .side .nv-chev,
+  body.side-collapsed .side .chev,
   body.side-collapsed .side .brand span,
   body.side-collapsed .side .who span,
   body.side-collapsed .side .who b {

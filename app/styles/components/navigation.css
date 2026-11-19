@@ -50,10 +50,6 @@
   fill: none;
   stroke: currentColor;
 }
-.side .nv .nv-chev {
-  fill: none;
-  stroke: currentColor;
-}
 .side .nv.on,
 .side .grp.cur > .nv {
   color: var(--on-dark);
