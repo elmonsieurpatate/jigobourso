@@ -374,6 +374,7 @@ J.NAV = (admin) => [
       { label: "Mes filtres et catégories", href: "mes-filtres.html", icon: "funnel", on: () => true },
     ],
   },
+  { id: "suivi", label: "Suivi des classements", icon: "pulse", file: ["suivi.html"], href: "suivi.html" },
   { sec: "Mon patrimoine" },
   {
     id: "portefeuilles",
@@ -390,8 +391,6 @@ J.NAV = (admin) => [
     file: ["bilan.html"],
     children: [{ label: "Bilan global", href: "bilan.html", on: () => true }],
   },
-  { sec: "Méthode" },
-  { id: "suivi", label: "Suivi des classements", icon: "pulse", file: ["suivi.html"], href: "suivi.html" },
   ...(admin
     ? [
         { sec: "Administration technique" },
@@ -424,21 +423,15 @@ J.buildShell = function (page, user) {
     const href = c.href.split("#")[0].split("?")[0];
     return href === file && c.on(new URLSearchParams(location.search), location.hash);
   };
-  let opened;
-  try {
-    opened = JSON.parse(store.get("jigo_nav_open") || "{}");
-  } catch (e) {
-    opened = {};
-  }
   const html = nav
     .map((n) => {
       if (n.sec) return `<div class="sec">${J.esc(n.sec)}</div>`;
       const here = n.file.includes(file);
       if (!n.children)
         return `<a class="nv ${here ? "on" : ""}" href="${n.href}" title="${J.esc(n.label)}">${J.icon(n.icon)}<span class="lbl">${J.esc(n.label)}</span></a>`;
-      const open = here || opened[n.id];
+      const open = here;
       return `<div class="grp ${open ? "open" : ""} ${here ? "cur" : ""}" data-id="${n.id}"><button class="nv" type="button" aria-expanded="${!!open}" title="${J.esc(n.label)}">${J.icon(n.icon)}<span class="lbl">${J.esc(n.label)}</span>${J.icon("chev", "chev")}</button>
-      <div class="sub" data-sub="${n.id}">${n.children.map((c) => (c.head ? `<div class="sh">${J.esc(c.head)}</div>` : `<a class="sv ${here && isOn(c) ? "on" : ""}" href="${c.href}">${J.esc(c.label)}</a>`)).join("")}</div></div>`;
+      <div class="sub" data-sub="${n.id}">${n.children.map((c) => (c.head ? `<div class="sh">${J.esc(c.head)}</div>` : `<a class="sv ${here && isOn(c) ? "on" : ""}" href="${c.href}" title="${J.esc(c.label)}"><span class="lbl">${J.esc(c.label)}</span></a>`)).join("")}</div></div>`;
     })
     .join("");
   const initial = (user.username || "?").slice(0, 1);
@@ -502,10 +495,13 @@ J.buildShell = function (page, user) {
           location.href = nav.find((n) => n.id === g.dataset.id).children.find((c) => c.href).href;
           return;
         }
-        g.classList.toggle("open");
-        b.setAttribute("aria-expanded", g.classList.contains("open"));
-        opened[g.dataset.id] = g.classList.contains("open");
-        store.set("jigo_nav_open", JSON.stringify(opened));
+        const willOpen = !g.classList.contains("open");
+        J.$$(".grp.open", side).forEach((o) => {
+          o.classList.remove("open");
+          o.firstElementChild.setAttribute("aria-expanded", "false");
+        });
+        g.classList.toggle("open", willOpen);
+        b.setAttribute("aria-expanded", willOpen);
       }),
   );
   J.$$("#nav a", side).forEach((a) =>
@@ -560,7 +556,7 @@ J.buildShell = function (page, user) {
           .forEach((p) =>
             sub.insertAdjacentHTML(
               "beforeend",
-              `<a class="sv ${file === "portefeuilles.html" && (cur == p.id || (!cur && false)) ? "on" : ""}" href="portefeuilles.html?id=${p.id}">${p.icon ? `<span aria-hidden="true">${J.esc(p.icon)}</span> ` : ""}${J.esc(p.name)}${p.is_default ? " ★" : ""}</a>`,
+              `<a class="sv ${p.icon ? "has-ic" : ""} ${file === "portefeuilles.html" && cur == p.id ? "on" : ""}" href="portefeuilles.html?id=${p.id}" title="${J.esc(p.name)}">${p.icon ? `<span class="ico" aria-hidden="true">${J.esc(p.icon)}</span>` : ""}<span class="lbl">${J.esc(p.name)}${p.is_default ? " ★" : ""}</span></a>`,
             ),
           );
       })

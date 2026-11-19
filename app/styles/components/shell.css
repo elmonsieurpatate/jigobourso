@@ -211,21 +211,28 @@
   }
 }
 .side .nv .lbl,
-.side .sv {
-  white-space: normal;
-  overflow: visible;
-  text-overflow: clip;
-  line-height: var(--lh-tight);
-}
-.side .nv .lbl {
+.side .sv .lbl {
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: var(--lh-tight);
 }
 .side .sv {
   min-height: 30px;
 }
 .side .sub {
-  margin-left: var(--sp-12);
-  padding-left: var(--sp-10);
+  margin-left: var(--sp-32);
+  padding-left: 0;
+  border-left: 0;
+}
+.side .sv::before {
+  display: none;
+}
+.side .sv .ico {
+  flex: none;
+  width: var(--sp-16);
+  text-align: center;
 }
 .side .sec {
   padding-top: var(--sp-14);
