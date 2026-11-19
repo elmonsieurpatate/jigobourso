@@ -19,3 +19,4 @@ site OK : accueil 200, version 202611191224 servie, API répond (200)
 == Vérification des métadonnées du classement test (lecture seule)
 site OK : catalogue : 31870 instruments, 40813 cotations ; affectations exhaustives
 site OK : correspondances de repli : pays 2, secteurs/ETF 9281, MIC 0
+Déploiement terminé : ace45d3f56f21a8363aeb9ee0a5c0430509c6fb5
