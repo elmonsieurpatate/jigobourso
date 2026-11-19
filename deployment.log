@@ -1,2 +1,22 @@
 == Validation du déploiement : full
 == Contrôles du serveur (lecture seule)
+== Contrôle des classements (lecture seule)
+diagnostic Explorer regular: 263 retenus, 102 non évaluables sur 9609
+diagnostic Explorer momentum_risk: 2767 retenus, 1316 non évaluables sur 9609
+== Contrôle des fichiers SQL : ajouts seulement
+== Essai isolé Hostinger (copie + base sandbox)
+== Version des pages : ?v=202611191513
+== Transfert du code
+== Dépendances Python, migrations de schéma, contrôles
+moteur importable
+== Contrôle d'intégrité financière
+PHP valide
+== Vérification des calculs financiers avec les calendriers de séance
+== Vérification ETF
+== Vérification publique
+site OK : menus de test 200, versions vérifiées, API filtres protégées (401)
+site OK : accueil 200, version 202611191513 servie, API répond (200)
+== Vérification des métadonnées du classement test (lecture seule)
+site OK : catalogue : 31870 instruments, 40813 cotations ; affectations exhaustives
+site OK : correspondances de repli : pays 2, secteurs/ETF 9281, MIC 0
+Déploiement terminé : 756c2dd5c4c3fe1cdff0a410dee8516d3f2aedb6
