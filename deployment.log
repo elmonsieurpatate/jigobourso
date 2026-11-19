@@ -17,3 +17,6 @@ PHP valide
 site OK : menus de test 200, versions vérifiées, API filtres protégées (401)
 site OK : accueil 200, version 202611191242 servie, API répond (200)
 == Vérification des métadonnées du classement test (lecture seule)
+site OK : catalogue : 31870 instruments, 40813 cotations ; affectations exhaustives
+site OK : correspondances de repli : pays 2, secteurs/ETF 9281, MIC 0
+Déploiement terminé : c90087c25545b79bacfa8e8e7268c96fe00fc275
