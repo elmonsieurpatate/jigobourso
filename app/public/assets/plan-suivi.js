@@ -136,9 +136,9 @@
     const prot = m.filter((x) => x.id === "personal" || x.id === "suggested").map((x) => sc.at(x.value)),
       xp = isNum(P.pru) ? sc.at(P.pru) : 50;
     const lowest = prot.length ? Math.min(...prot) : Math.max(0, xp - 25);
-    // zones douces : sous la protection, entre protection et PRU, au-dessus du PRU (zones de prix, pas une garantie de faible risque)
-    const soft = (v) => `color-mix(in srgb, var(${v}) 55%, var(--surface))`,
-      grad = `linear-gradient(90deg,${soft("--gauge-danger")} 0 ${lowest.toFixed(1)}%,${soft("--gauge-watch")} ${lowest.toFixed(1)}% ${Math.max(xp, lowest).toFixed(1)}%,${soft("--gauge-good")} ${Math.max(xp, lowest).toFixed(1)}% 100%)`;
+    // zones sur l'échelle de température : sous la protection, entre protection et PRU, au-dessus du PRU (zones de prix, pas une garantie de faible risque)
+    const zone = (v) => `var(${v})`,
+      grad = `linear-gradient(90deg,${zone("--temp-2")} 0 ${lowest.toFixed(1)}%,${zone("--temp-4")} ${lowest.toFixed(1)}% ${Math.max(xp, lowest).toFixed(1)}%,${zone("--temp-6")} ${Math.max(xp, lowest).toFixed(1)}% 100%)`;
     const sorted = m.toSorted((a, b) => sc.at(a.value) - sc.at(b.value)),
       labelled = sorted;
     // alternance de niveaux d'étiquettes pour éviter les chevauchements (repères très proches ou superposés)

@@ -54,8 +54,14 @@ def test_missing_inside_window_does_not_shift_the_window():
     assert c['end'] == DAYS[-1] and c['start'] == DAYS[-6]
 
 
-def test_missing_latest_is_not_silently_replaced_by_older_close():
-    assert calc(series()[:-1])['cells']['1d']['reason'] == 'missing'
+def test_short_collection_lag_ends_windows_at_last_known_close():
+    c = calc(series()[:-2])['cells']['1d']
+    assert c['reason'] is None and c['end'] == DAYS[-3]
+
+
+def test_long_collection_lag_is_not_silently_replaced_by_older_close():
+    c = calc(series()[: -(D.MAX_LAG + 1)])['cells']['1d']
+    assert c['reason'] == 'missing' and c['return'] is None
 
 
 def test_month_boundaries_are_calendar_months_and_clamped_independently():
@@ -103,7 +109,7 @@ def test_current_session_excluded_and_prices_scale_independent():
 def test_heat_thresholds_scale_by_horizon_and_arrow_neutral_keeps_numbers():
     assert D.heat(2, 1) == 'gain'
     assert D.heat(2, 252) == 'gain-soft'
-    assert {D.heat(v, 1) for v in [4, 2, 0.5, 0, -1, -4]} == {'gain-strong', 'gain', 'gain-soft', 'neutral', 'loss-soft', 'loss-strong'}
+    assert {D.heat(v, 1) for v in [4, 2, 0.5, 0, -0.5, -2, -4]} == {'gain-strong', 'gain', 'gain-soft', 'neutral', 'loss-soft', 'loss', 'loss-strong'}
     c = calc([(d, p, None) for d, p in zip(DAYS[-3:], [100, 100.01, 100.03])])['cells']['1d']
     assert c['arrow'] == 'flat' and c['delta'] != 0
 

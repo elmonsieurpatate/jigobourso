@@ -16,7 +16,7 @@ from engine.market.calendar import session_dates
 from engine.analytics.series.loader import load_bars_and_splits
 from engine.analytics.series.series import prepare_series
 
-VERSION = 1
+VERSION = 3
 # key, label, sessions (courts), mois calendaires (longs), famille
 HORIZONS = (
     ('1d', '1J', 1, None, 'short'),
@@ -39,15 +39,29 @@ def shift_months(day, months):
     return datetime.date(year, month + 1, min(day.day, calendar.monthrange(year, month + 1)[1]))
 
 
+MAX_LAG = 5  # séances de retard tolérées sur la dernière clôture attendue
+
+
 def heat(value, sessions):
-    """Six intensités : bruit de 0,05 %, hausse modérée à 1 %, forte à 3 %,
-    multipliés par sqrt(nombre de séances). Calibration descriptive, pas un score.
+    """Sept intensités (échelle de température) : bruit de 0,05 %, variation modérée à 1 %,
+    forte à 3 %, multipliés par sqrt(nombre de séances). Calibration descriptive, pas un score.
     """
     if value is None:
         return 'missing'
-    scale = math.sqrt(max(1, sessions))
-    x = value / scale
-    return 'gain-strong' if x >= 3 else 'gain' if x >= 1 else 'gain-soft' if x >= 0.05 else 'neutral' if x > -0.05 else 'loss-soft' if x > -3 else 'loss-strong'
+    x = value / math.sqrt(max(1, sessions))
+    if x >= 3:
+        return 'gain-strong'
+    if x >= 1:
+        return 'gain'
+    if x >= 0.05:
+        return 'gain-soft'
+    if x > -0.05:
+        return 'neutral'
+    if x > -1:
+        return 'loss-soft'
+    if x > -3:
+        return 'loss'
+    return 'loss-strong'
 
 
 def measure(bars, splits, mic, now, expected=None):
@@ -59,6 +73,13 @@ def measure(bars, splits, mic, now, expected=None):
     dates, closes, basis, breaks = prepare_series([b for b in bars if b[0] <= settled.isoformat()], splits)
     obs = dict(zip(dates, closes))
     break_days = [dates[i] for i in breaks]
+    # Collecte en retard de quelques séances : les fenêtres se terminent à la dernière clôture connue
+    # (la date de fin reste affichée dans chaque cellule). Au-delà de MAX_LAG séances, rien n'est affiché.
+    if dates and days:
+        known = [d for d in days if d <= dates[-1]]
+        lag = len(days) - len(known)
+        if 0 < lag <= MAX_LAG:
+            days = known
     result = {'basis': basis, 'currency_basis': 'listing', 'as_of': days[-1] if days else None, 'last_available': dates[-1] if dates else None, 'cells': {}}
     if not days:
         for key, *_ in HORIZONS:

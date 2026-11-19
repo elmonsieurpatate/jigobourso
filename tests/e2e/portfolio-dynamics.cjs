@@ -52,7 +52,7 @@ for(const legacy of [false,true]){
   await page.locator('.pfd-scroll').evaluate(el=>el.scrollLeft=0);
   // Deux signaux opposés dans une même cellule : fond de performance et pastille de dynamique.
   await page.evaluate(()=>{
-   const heats=['gain-strong','gain','gain-soft','neutral','loss-soft','loss-strong'],returns=[4,2,.5,0,-1,-4];
+   const heats=['gain-strong','gain','gain-soft','neutral','loss-soft','loss','loss-strong'],returns=[4,2,.5,0,-.5,-2,-4];
    const cells=Object.fromEntries(heats.map((h,i)=>['c'+i,{return:returns[i],previous:0,delta:i===0?-2:1,heat:h,arrow:i===0?'down':'up',neutral_points:.1,start:'2026-11-16',end:'2026-11-17',previous_start:'2026-11-13'}]));
    const data={horizons:heats.map((_,i)=>({key:'c'+i,label:'Test '+i,group:'short'})),listings:{1:{cells,currency:'EUR',basis:'adjusted'}}};
    const fixture=document.createElement('div');fixture.id='pfd-colour-fixture';fixture.innerHTML=PFDynamics.html(data,[{listing_id:1,symbol:'Styles de démonstration',qty:1,unrealized:0,unrealized_pct:0}],null,{key:'title',dir:'asc'});document.body.append(fixture);
@@ -64,7 +64,8 @@ for(const legacy of [false,true]){
   const contrast=await page.locator('.pfd-legend span,#pfd-colour-fixture .pfd-cell:not(.pfd-personal),#pfd-colour-fixture .pfd-dynamic').evaluateAll(els=>{
    const rgb=s=>{const canvas=document.createElement('canvas');canvas.width=canvas.height=1;const c=canvas.getContext('2d');c.fillStyle=s;c.fillRect(0,0,1,1);return [...c.getImageData(0,0,1,1).data].slice(0,3).map(x=>x/255);};
    const lum=s=>rgb(s).map(x=>x<=.04045?x/12.92:((x+.055)/1.055)**2.4).reduce((n,x,i)=>n+x*[.2126,.7152,.0722][i],0);
-   return els.map(el=>{const s=getComputedStyle(el),a=lum(s.color),b=lum(s.backgroundColor);return(Math.max(a,b)+.05)/(Math.min(a,b)+.05)});
+   const bgOf=el=>{for(let e=el;e;e=e.parentElement){const c=getComputedStyle(e).backgroundColor;if(c&&!/rgba\(.*, 0\)|transparent/.test(c))return c}return 'rgb(255,255,255)'};
+   return els.map(el=>{const s=getComputedStyle(el),a=lum(s.color),b=lum(bgOf(el));return(Math.max(a,b)+.05)/(Math.min(a,b)+.05)});
   });assert(contrast.every(x=>x>=4.5),'Contrastes '+contrast);await page.locator('#pfd-colour-fixture').evaluate(e=>e.remove());
   if(OUT){fs.mkdirSync(OUT,{recursive:true});await page.screenshot({path:`${OUT}/matrix-${legacy?'legacy':'cash'}-${width}-${theme}.png`,fullPage:true});await page.locator('.pf-dynamics').screenshot({path:`${OUT}/table-${legacy?'legacy':'cash'}-${width}-${theme}.png`});}
  }

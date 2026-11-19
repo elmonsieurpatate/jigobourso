@@ -254,10 +254,23 @@ a.px-sum:hover {
   outline-offset: -2px;
 }
 .fc-buy-label {
-  font: 600 var(--fs-10) system-ui;
+  font: 700 var(--fs-10) system-ui;
   font-variant-numeric: tabular-nums;
-  border: 1px solid;
-  border-radius: var(--radius-4);
+  border: 2px solid var(--surface);
+  border-radius: var(--radius-pill);
+  color: var(--temp-ink);
+  line-height: 18px;
+  text-align: center;
+  box-shadow: 0 1px 3px var(--shadow-marker-color);
+}
+.fc-buy-label.buy {
+  background: var(--ok);
+}
+.fc-buy-label.sell {
+  background: var(--danger);
+}
+.fc-buy-label.mixed {
+  background: var(--temp-3);
 }
 .fc-tip {
   background: var(--surface);
@@ -281,11 +294,11 @@ a.px-sum:hover {
 .fc-trade-line {
   border-left: 1px dashed var(--ok);
 }
-.fc-trade-line.mixed {
-  border-image: linear-gradient(var(--ok), var(--danger)) 1;
+.fc-trade-line.sell {
+  border-left-color: var(--danger);
 }
-.fc-buy-label {
-  background: var(--surface);
+.fc-trade-line.mixed {
+  border-left-color: var(--temp-3);
 }
 .tx-filters label {
   font-size: var(--fs-11);
@@ -338,37 +351,53 @@ a.px-sum:hover {
   background: var(--series-12);
 }
 
-/* Fond : rendement ; pastille indépendante : dynamique, y compris de sens opposé. */
-.pfd-cell,
-.pfd-legend span {
-  border-radius: var(--radius-4);
-  color: var(--pfd-foreground, var(--text));
-}
-.pfd-gain-strong {
-  --pfd-foreground: var(--surface);
-  background: var(--ok);
-}
-.pfd-gain {
-  background: color-mix(in srgb, var(--ok) 35%, var(--surface));
-}
-.pfd-gain-soft {
-  background: var(--ok-soft);
-}
-.pfd-neutral,
-.pfd-personal {
+/* Matrice : point coloré = performance du cours (échelle de température) ; flèche colorée = dynamique. */
+.pfd-cell {
+  border-radius: var(--radius-8);
   background: var(--surface-2);
+  color: var(--text);
 }
-.pfd-loss-soft {
-  background: var(--danger-soft);
+.pfd-cell strong::before,
+.pfd-legend span::before {
+  content: "";
+  display: inline-block;
+  width: 0.8em;
+  height: 0.8em;
+  margin-right: 0.45em;
+  border-radius: 50%;
+  vertical-align: -0.05em;
+  background: var(--pfd-dot, var(--muted));
+}
+.pfd-legend > b {
+  font-weight: 500;
+}
+.pfd-missing strong::before,
+.pfd-personal strong::before {
+  display: none;
 }
 .pfd-loss-strong {
-  --pfd-foreground: var(--surface);
-  background: var(--danger);
+  --pfd-dot: var(--temp-1);
+}
+.pfd-loss {
+  --pfd-dot: var(--temp-2);
+}
+.pfd-loss-soft {
+  --pfd-dot: var(--temp-3);
+}
+.pfd-neutral {
+  --pfd-dot: var(--temp-4);
+}
+.pfd-gain-soft {
+  --pfd-dot: var(--temp-5);
+}
+.pfd-gain {
+  --pfd-dot: var(--temp-6);
+}
+.pfd-gain-strong {
+  --pfd-dot: var(--temp-7);
 }
 .pfd-dynamic {
-  background: var(--surface);
   color: var(--muted);
-  border-radius: var(--radius-4);
   font-weight: 700;
 }
 .pfd-dynamic-up {

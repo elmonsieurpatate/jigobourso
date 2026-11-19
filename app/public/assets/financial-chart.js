@@ -162,31 +162,27 @@
         if (!groups.has(t)) groups.set(t, []);
         groups.get(t).push(m);
       }
-      let lane = 0;
       for (const [t, items] of groups) {
         const sell = items.some((m) => m.kind === "sell"),
           buy = items.some((m) => m.kind === "buy"),
+          kind = buy && sell ? "mixed" : sell ? "sell" : "buy",
           active = !config.selected?.size || items.some((m) => config.selected.has(m.key));
         const line = document.createElement("div");
-        line.className = "fc-trade-line" + (active ? "" : " dim");
+        line.className = `fc-trade-line ${kind}` + (active ? "" : " dim");
         line.style.left = x(t) + "px";
-        line.style.borderColor = sell ? "#dc2626" : "#15803d";
-        if (sell && buy) line.classList.add("mixed");
         const b = document.createElement("button");
         b.type = "button";
-        b.className = "fc-buy-label" + (active ? "" : " dim");
+        b.className = `fc-buy-label ${kind}` + (active ? "" : " dim");
         b.dataset.time = t;
-        b.style.left = Math.max(left, Math.min(w - 94, x(t) - 18)) + "px";
-        b.style.top = (lane++ % 2 ? 18 : 0) + "px";
-        b.textContent =
+        b.style.left = Math.max(left, Math.min(w - 24, x(t) - 10)) + "px";
+        const name =
           (buy ? "Achat" : "") +
           (buy && sell ? " / " : "") +
           (sell ? "Vente" : "") +
           " " +
           [...new Set(items.map((m) => m.symbol))].join(", ");
-        b.style.color = sell ? "#b91c1c" : "#15803d";
-        b.style.borderColor = b.style.color;
-        b.setAttribute("aria-label", fmtTime(t) + " · " + b.textContent);
+        b.textContent = { buy: "▲", sell: "▼", mixed: "◆" }[kind] + (items.length > 1 ? items.length : "");
+        b.setAttribute("aria-label", fmtTime(t) + " · " + name);
         const show = () => {
           pinned = true;
           tip.innerHTML =

@@ -243,6 +243,9 @@ body .ct .ct-group-operator select {
   text-align: left;
   background: var(--surface);
 }
+.pfd-table .pfd-title b {
+  font-size: var(--fs-14);
+}
 .pfd-title small {
   display: block;
   overflow: hidden;
@@ -270,6 +273,5 @@ body .ct .ct-group-operator select {
 }
 
 .pfd-cell .pfd-dynamic {
-  margin-top: var(--sp-4);
-  padding: var(--sp-2) var(--sp-4);
+  margin-top: var(--sp-2);
 }
